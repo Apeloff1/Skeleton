@@ -1,0 +1,29 @@
+# Unified original-game physics and genre achievements: a persistent living NPC campaign
+**Authored:** 2026-10-12, Europe/Oslo. Stacked on source-custodied cross-genre achievements #3696, typed NPC conditional rules #3693 and replay-verified physical campaign saves #3691.
+
+## What the engine now actually does
+An independently reconstructed original physical campaign containing platformer/racing/sandbox collision incidents, credible NPC witnesses, persistent rumors, damaged places and original investigations can now receive genuine source-backed achievements from **other original engines** while retaining that exact shared world state.
+
+The program first independently reconstructs and verifies the existing entire original physical episode campaign. It copies only that authenticated resulting NPC world as its deterministic continuation baseline. Creators then supply up to four distinct independently reviewed farming, sailing or flight sessions, with a maximum of eight specifically mapped original action events across them. Every distinct genre session is independently replayed from its original scene and typed settings, and every event binding is separately verified by the previously validated cross-genre bridge.
+
+Only then are the proven source events admitted into the **same persistent original 49-cell world**. Its full NPC positions, eyewitness memory, rumors, site inventory and integrity, clock, quests and player resources continue from the earlier physical experiences. Legitimate original farm harvest and aircraft landing events can generate local firsthand discovery stories; successfully docked/delivered original maritime cargo can transfer at most one real finite site-stock unit per genuine event. External genre achievements are attributed as `external:genre`, not a player action, so they cannot mint reputation, free gold or fictitious player testimony/material progress.
+
+## Chronology and guarantees
+Genre sessions enter the world in the explicitly authored sequence; within each genre session, events are sorted by real original source action index. Reusing any genre session receipt is forbidden, and impossible/duplicate event bindings are denied. The original physics base is checked again, plus each cross-genre event source, before any persistent event is admitted. An SHA-256 chain records every source editor, session digest, independently replayed genre proof, source action/frame identity, original witnessed NPC event, quest origins, finite world-stock deltas and before/after event ordering. Entire combined state is independently reconstructed and compared on verification.
+
+Optional subsequent original NPC-world actions execute through the actual quest director, consuming real finite resources and respecting obstacles/quest rules. At most 24 commands may follow the source genre events. A terminal world rejects further events/actions. Resource stock, NPC memory and eyewitness integrity remain bounded by the existing advanced quest-world settings.
+
+## Game creator Studio
+Original users can build and replay a physical episode campaign as before, then open a signed farming/sailing/flight game source, inspect an actually earned event/action index, choose a destination in the original NPC world and click **Add reviewed original genre achievement to campaign**. A queue shows the actual originating editor, independent source digest, action indices and mapped sites. The **Replay unified original physical and genre NPC world** command performs all independent server proofs and renders the current NPC world map, source chronology, actual site inventory, separate firsthand memories and rumors, and continuing quest status. There is also a **Clear unpublished genre achievements** action. This remains operator-controlled local gameplay, never autonomous remote publication.
+
+## Adversarial validation
+Eight full-engine tests target persistent real physics→farm NPC chronology, source-backed finite maritime stock in a previously existing world, sequential authentic three-genre achievements, duplicate source denial, bounded world followups, forged NPC testimony/site inventory/event hashes, swapped original scenes and false source state, and malformed or over-budget additions. Three Studio tests cover actual queue/run/clear controls, exact session/scene custody and server-side independent replay. These join the full Windows and Ubuntu original game reference suite.
+
+## Limits and future milestone
+The supported sequence is a signed physical campaign **followed by** genre acquisitions, not arbitrary interleaving of all original game events across a true shared frame clock. This milestone does not rewrite the existing portable physical-only save schema; a future unified save format must capture complete mixed-source inputs and prevent partial prefix substitution. Native Godot independently validates selected individual original game engines but does not yet execute the entire composite multi-genre NPC campaign. No external project files, commercial game release or AI permanent weights are altered.
+
+### 2026-10-12 dated improvements
+- Real original physics impacts (improved: witnessed damage is source attributable).
+- Persistent NPC episodic world and saved replay (improved: memory and quests continue safely over authored game sessions).
+- Verified farming, maritime and flight event bridge (improved: non-physics original achievements produce authentic NPC-world consequences).
+- **Unified persistent genre campaign** (improved: these events enter the same NPC memory, quest and resource economy, not an isolated temporary preview).
