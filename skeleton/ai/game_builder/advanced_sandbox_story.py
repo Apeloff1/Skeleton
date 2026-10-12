@@ -55,11 +55,13 @@ def _record(state,config,cause,site,witnesses,events,source):
     evidence={
         "schema":"skeleton.game_builder.original_witness.v1",
         "sequence":state["witness_sequence"],"turn":state["turn"],
+        "previous_witness_digest":state["witness_head"],
         "day":state["day"],"region":state["region"],
         "site":site,"cause":cause,
         "witnesses":witnesses,"source":source,
     }
     evidence["digest"]=_digest(evidence)
+    state["witness_head"]=evidence["digest"]
     state["witness_sequence"]+=1
     state["observations"].append(evidence)
     limit=config["observation_limit"]
