@@ -496,6 +496,16 @@ def test_orchestration_rejects_unscheduled_or_duplicate_reviewed_sources(setup):
         run_shadow_automation(
             automation, library, plan, (item,), **{**options, "now": T2},
         )
+    swapped = replace(
+        plan, assignments=(
+            replace(plan.assignments[0],
+                    url="https://beta.example.org/research"),
+        ),
+    )
+    with pytest.raises(PermissionError, match="canonical reviewed source"):
+        run_shadow_automation(
+            automation, library, swapped, (item,), **options,
+        )
     assert automation.active_weights(OWNER, authorized=True) == ()
 
 
