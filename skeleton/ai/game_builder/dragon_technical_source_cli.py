@@ -9,6 +9,7 @@ from .dragon_almanacs import DragonAlmanacs
 from .dragon_technical_source_atlas import CATALOG, CATALOG_DIGEST, DragonTechnicalSources
 from .dragon_technical_source_captures import DragonSourceCaptures
 from .dragon_technical_source_analysis import DragonTechnicalGlean
+from .dragon_technical_source_operations import DragonSourceOperations
 from .reviewed_knowledge import ReviewedKnowledgeStore
 
 
@@ -16,7 +17,8 @@ def main():
     parser=argparse.ArgumentParser(description="Policy-stage technical source metadata")
     parser.add_argument("command",choices=("census","import","plan","history",
                                                   "capture-history","capture-review",
-                                                  "capture-census","glean-preview","glean-handoff"))
+                                                  "capture-census","glean-preview","glean-handoff",
+                                                  "operations-inspect","operations-review"))
     parser.add_argument("--database",required=True)
     parser.add_argument("--owner",required=True)
     parser.add_argument("--trusted-local-operator",action="store_true")
@@ -55,7 +57,16 @@ def main():
             report=atlas.history(args.owner,args.source_id,authorized=True)
         else:
             captures=DragonSourceCaptures(atlas.a)
-            if args.command in ("glean-preview","glean-handoff"):
+            if args.command in ("operations-inspect","operations-review"):
+                operations=DragonSourceOperations(captures)
+                if args.command=="operations-inspect":
+                    if not args.source_id:
+                        parser.error("--source-id required for operations inspection")
+                    report=operations.inspect(args.owner,args.source_id,authorized=True)
+                else:
+                    report=operations.review_queue(args.owner,authorized=True,
+                                                   limit=args.limit)
+            elif args.command in ("glean-preview","glean-handoff"):
                 if not args.source_id:
                     parser.error("--source-id required for glean inspection")
                 glean=DragonTechnicalGlean(captures)

@@ -20,6 +20,7 @@ from skeleton.ai.webcrawler.dragon_nest_worker_admission import (
     DragonNestWorkerAdmission, HatchlingWorkerTicket,
 )
 from .dragon_technical_source_captures import DragonSourceCaptures
+from .dragon_technical_source_operations import DragonSourceOperations
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +46,7 @@ class _AdmittedHTTP:
 
     def __init__(self, fetcher: SafeHttpFetcher, admission: DragonNestWorkerAdmission,
                  ticket: HatchlingWorkerTicket, *, sample_provider, consent_provider,
-                 idle_since_provider, at_provider, clock):
+                 idle_since_provider, at_provider, clock, operations=None):
         self.fetcher=fetcher
         self.admission=admission
         self.ticket=ticket
@@ -54,6 +55,7 @@ class _AdmittedHTTP:
         self.idle_since_provider=idle_since_provider
         self.at_provider=at_provider
         self.clock=clock
+        self.operations=operations
         self.requests=0
         self.page_bytes=None
 
@@ -65,8 +67,10 @@ class _AdmittedHTTP:
             "consented","article_consent","video_consent","updates_consent"
         }:
             raise PermissionError("live typed specialist consent required")
-        if not self.admission.authorize_chunk(
-            self.ticket, sample=self.sample_provider(),
+        gate=self.operations if self.operations is not None else self.admission
+        if not gate.authorize_chunk(
+            self.ticket, **({"admission":self.admission} if self.operations is not None else {}),
+            sample=self.sample_provider(),
             at=self.at_provider(), idle_since=self.idle_since_provider(),
             now_seconds=self.clock(), authorized=True,trusted_worker=True,
             **flags
@@ -96,6 +100,7 @@ def acquire_canonical_technical_article(
     authorized: bool,
     trusted_worker: bool,
     reference_storage_permitted: bool,
+    operations: DragonSourceOperations | None = None,
 ) -> SourceAcquisitionResult:
     """Fetch and stage ONE editorial article, then acknowledge the worker stop.
 
@@ -111,6 +116,10 @@ def acquire_canonical_technical_article(
         raise TypeError("bounded specialist worker ticket required")
     if authorized is not True or trusted_worker is not True:
         raise PermissionError("trusted authenticated capture worker required")
+    if operations is not None and (not isinstance(operations,DragonSourceOperations)
+                                  or operations.captures is not captures):
+        raise PermissionError("same canonical durable capture authority required")
+    recorded_capture=None
     try:
         if reference_storage_permitted is not True:
             raise PermissionError("explicit reference text retention permission required")
@@ -131,7 +140,8 @@ def acquire_canonical_technical_article(
                              sample_provider=sample_provider,
                              consent_provider=consent_provider,
                              idle_since_provider=idle_since_provider,
-                             at_provider=at_provider,clock=clock)
+                             at_provider=at_provider,clock=clock,
+                             operations=operations)
         requests=0
         now=_epoch(at_provider())
         # A URL in the catalog is not permission. Require a canonical policy
@@ -178,8 +188,10 @@ def acquire_canonical_technical_article(
         flags=consent_provider()
         if not isinstance(flags,dict) or flags.get("consented") is not True:
             raise PermissionError("consent lost before reference capture")
-        if not admission.authorize_chunk(
-            ticket,sample=sample_provider(),at=at_provider(),
+        final_gate=operations if operations is not None else admission
+        if not final_gate.authorize_chunk(
+            ticket,**({"admission":admission} if operations is not None else {}),
+            sample=sample_provider(),at=at_provider(),
             idle_since=idle_since_provider(),now_seconds=clock(),
             authorized=True,trusted_worker=True,**flags
         ):
@@ -190,6 +202,7 @@ def acquire_canonical_technical_article(
             reference_storage_permitted=True,
             response_body_bytes=guarded.page_bytes
         )
+        recorded_capture=entry["capture_digest"]
         return SourceAcquisitionResult(ticket.owner,ticket.source_id,True,
                                        "captured_pending_independent_review",
                                        entry,guarded.requests)
@@ -198,3 +211,8 @@ def acquire_canonical_technical_article(
         # A preempt request alone never frees physical resources.
         admission.stopped(ticket,authorized=True,trusted_worker=True,
                           worker_stopped=True)
+        if operations is not None:
+            operations.release(
+                ticket,admission,now=_epoch(at_provider()),
+                capture_digest=recorded_capture,
+                authorized=True,trusted_worker=True)
