@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from fractions import Fraction
+from .advanced_physics_dynamics import (
+    resolve_moving_pairs, advance_rotation, apply_torque,
+    solve_radial_rope, transfer_collision_spin,
+)
 
 from .system_editors import SystemEditorError
 
@@ -30,7 +34,7 @@ ACTIONS = (
     "select:3", "select:4", "select:5", "select:6", "select:7",
     "attach:0", "attach:1", "detach",
     "magnet:on", "magnet:off", "fan:on", "fan:off",
-    "step", "step:4", "brake", "inspect",
+    "step", "step:4", "brake", "torque:cw", "torque:ccw", "inspect",
 )
 MATERIALS = ("wood", "metal", "rubber", "glass")
 MATERIAL_RESTITUTION = {"wood": 35, "metal": 20, "rubber": 80, "glass": 15}
@@ -203,6 +207,8 @@ def start(config, seed):
         "battery": config["initial_battery"], "impulses_left": config["impulse_budget"],
         "motors_used": 0, "contacts": 0, "fractures": 0, "water_contacts": 0,
         "rope_breaks": 0, "max_velocity_seen": 0, "goal_frames": 0,
+        "continuous_pair_contacts": 0, "max_angular_speed_seen": 0,
+        "peak_cable_extension": 0,
         "milestones": [], "events": [], "finished": False, "failed": False,
     }
     apply_scene(state, config, default_layout(config, seed))
@@ -214,7 +220,8 @@ def apply_scene(state, config, layout):
     for key in LAYOUT_KEYS:
         state[key] = deepcopy(scene[key])
     state["bodies"] = [{
-        **original, "sleep": 0, "broken": False
+        **original, "sleep": 0, "broken": False,
+        "orientation": 0, "angular_velocity": 0
     } for original in scene["bodies"]]
 
 
@@ -276,7 +283,7 @@ def _world(body, state, config, events, previous=None):
                     if entry > leave:
                         possible = False
                         break
-                if possible and hit_axis is not None and 0 <= entry <= leave <= 1:
+                if possible and hit_axis is not None and 0 <= entry <= 1 and leave >= entry:
                     for axis in axes:
                         pos[axis] = previous[axis] + int(
                             Fraction(pos[axis]-previous[axis])*entry)
@@ -334,6 +341,8 @@ def _pair_contacts(state, config, events):
                 delta_b = impulse - delta_a
                 first["velocity"][axis] -= direction * delta_a
                 second["velocity"][axis] += direction * delta_b
+                transfer_collision_spin(
+                    first, second, axis, -direction, impulse, axes, config)
                 if impulse >= first["break_threshold"]:
                     first["broken"] = True
                     state["fractures"] += 1
@@ -347,6 +356,8 @@ def _pair_contacts(state, config, events):
 def _advance(state, config, events):
     for _ in range(config["substeps"]):
         state["frame"] += 1
+        old_positions = {body["id"]: body["position"][:]
+                         for body in state["bodies"]}
         for body in state["bodies"]:
             if body["broken"]:
                 continue
@@ -383,6 +394,8 @@ def _advance(state, config, events):
                     vel[2] = vel[2] * (100-config["floor_friction"])//100
             state["max_velocity_seen"] = max(state["max_velocity_seen"], max(abs(v) for v in vel))
             _world(body, state, config, events, previous)
+        if config["continuous_pair_collision"]:
+            resolve_moving_pairs(state, config, old_positions, events)
         for _solver in range(config["solver_iterations"]):
             before = state["contacts"]
             _pair_contacts(state, config, events)
@@ -391,27 +404,8 @@ def _advance(state, config, events):
                     _world(body, state, config, events)
             if state["contacts"] == before:
                 break
-        if state["rope"] is not None:
-            rope = state["rope"]
-            body = next((b for b in state["bodies"] if b["id"] == rope["body"] and not b["broken"]), None)
-            if body is None:
-                state["rope"] = None
-            else:
-                anchor = state["anchors"][rope["anchor"]]
-                for axis in (range(3) if state["depth"] > 1 else range(2)):
-                    difference = body["position"][axis] - anchor[axis]
-                    if abs(difference) > config["rope_length"]:
-                        tension = abs(difference) - config["rope_length"]
-                        if tension > config["rope_strength"]:
-                            state["rope_breaks"] += 1
-                            state["rope"] = None
-                            events.append("physical_cable_snapped")
-                            break
-                        body["position"][axis] = anchor[axis] + _sign(difference)*config["rope_length"]
-                        body["velocity"][axis] = 0
-                        events.append("cable_tension_constrained")
-                if state["rope"] is not None:
-                    _world(body, state, config, events)
+        solve_radial_rope(state, config, events, _world)
+        advance_rotation(state, config)
         if (state["magnet"] or state["fan"]) and state["battery"] > 0:
             state["battery"] -= 1
             state["motors_used"] += 1
@@ -485,7 +479,15 @@ def step(state, config, action):
     elif action == "brake":
         for axis in range(3):
             body["velocity"][axis] = body["velocity"][axis] * (100-config["brake_strength"])//100
+        body["angular_velocity"] = body["angular_velocity"] * (
+            100-config["brake_strength"])//100
         events.append("real_velocity_braked")
+    elif action in ("torque:cw", "torque:ccw"):
+        if body["broken"] or not state["impulses_left"]:
+            raise PhysicsActionError("no valid finite torque impulse available")
+        state["impulses_left"] -= 1
+        apply_torque(body, config, clockwise=action=="torque:cw")
+        events.append("finite_angular_impulse_applied")
     else:
         events.append("physics_step_observed")
     state["tick"] += 1
