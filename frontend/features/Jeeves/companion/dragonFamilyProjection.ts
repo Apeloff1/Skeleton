@@ -19,11 +19,11 @@ export interface DragonIdleFamilyProjection {
  host_state:'not_connected'|'not_observed';
  max_tasks_per_tick:number;
  history:readonly {sequence:number;at:string;dragon:DragonFamilyRole;
-   source_id:string;outcome:'changed'|'unchanged'|'failed'|'paused'|'recovered';
+   source_id:string;outcome:'changed'|'unchanged'|'failed'|'paused'|'recovered'|'policy_blocked'|'rate_limited'|'review_cleared';
    change:string;digest:string}[];
  workers:Partial<Record<DragonFamilyRole,{
    known_sources:number;failed:number;incomplete_leases:number;
-   last_changes:number;unchanged:number;earliest_due_at:string|null;
+   last_changes:number;unchanged:number;policy_blocked:number;rate_limited:number;earliest_due_at:string|null;
  }>>;
 }
 export interface DragonGleanProjection {
@@ -144,7 +144,7 @@ export function validateDragonFamily(input:unknown):DragonFamilyProjection|null 
       !w.history.every((e,i)=>e&&count(e.sequence)&&e.sequence>0&&utc(e.at)&&
         ['article','video','monitor'].includes(e.dragon)&&
         typeof e.source_id==='string'&&e.source_id.length<=128&&
-        ['changed','unchanged','failed','paused','recovered'].includes(e.outcome)&&
+        ['changed','unchanged','failed','paused','recovered','policy_blocked','rate_limited','review_cleared'].includes(e.outcome)&&
         typeof e.change==='string'&&e.change.length<=200&&
         HEX.test(e.digest)&&(i===0||e.sequence<w.history[i-1].sequence))||
       !w.workers||typeof w.workers!=='object'||Array.isArray(w.workers)||
@@ -154,6 +154,7 @@ export function validateDragonFamily(input:unknown):DragonFamilyProjection|null 
       if(item!==undefined&&(!item||!count(item.known_sources)||
          !count(item.failed)||!count(item.incomplete_leases)||
          !count(item.last_changes)||!count(item.unchanged)||
+         !count(item.policy_blocked)||!count(item.rate_limited)||
          !(item.earliest_due_at===null||utc(item.earliest_due_at))))return null;
     }
   }
