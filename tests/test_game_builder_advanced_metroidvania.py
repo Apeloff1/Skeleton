@@ -22,11 +22,11 @@ from skeleton.ai.game_builder.advanced_gameplay_save import (
 
 
 class OriginalConnectedWorldTests(unittest.TestCase):
-    def test_thirty_nine_meaningful_editor_controls_and_24_room_world(self):
+    def test_forty_meaningful_editor_controls_and_24_room_world(self):
         self.assertIn("metroidvania", ENGINES)
         self.assertEqual(set(ACTIONS),set(ACTION_HELP["metroidvania"]))
         spec=next(x for x in catalog() if x["id"]=="metroidvania")
-        self.assertEqual(len(spec["fields"]),39)
+        self.assertEqual(len(spec["fields"]),40)
         self.assertEqual(spec["runtime_maturity"],"advanced_reference_runtime")
         config=make_editor_document("metroidvania")["settings"]
         world=default_layout(config,0)
