@@ -131,6 +131,7 @@ class DragonResearchWorkboard:
             "owner":owner,"missions":tasks,
             "lane_counts":counts,
             "sources_on_page":listing["page_size"],
+            "scanned_registered_source_rows":listing["scanned_source_count"],
             "mission_count":len(tasks),
             "has_more":listing["has_more"],
             "next_after_source":listing["next_after_source"],

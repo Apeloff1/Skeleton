@@ -18,6 +18,7 @@ from .dragon_article_hatchling import DragonArticleHatchling
 from .dragon_source_delta_ledger import DragonSourceDeltaLedger
 from .dragon_research_source_picker import DragonResearchSourcePicker
 from .dragon_research_workboard import DragonResearchWorkboard
+from .dragon_task_research_planner import DragonTaskResearchPlanner
 from .dragon_family_research_history import DragonFamilyResearchHistory
 from .dragon_video_transcript_ledger import DragonVideoTranscriptLedger
 from .reviewed_knowledge import _integer
@@ -72,6 +73,16 @@ class DragonThreeHatchlingCoordinator:
             self.article,self.video,self.updates
         ).page(owner,authorized=authorized,limit=limit,
                after_source=after_source)
+
+    def task_research_plan(self, owner: str, *, authorized: bool,
+                           task_terms: tuple[str,...],
+                           max_sources: int = 300,
+                           limit: int = 12) -> dict:
+        """Balance three real hatchling lanes against current game-studio needs."""
+        board = DragonResearchWorkboard(self.article, self.video, self.updates)
+        return DragonTaskResearchPlanner(board).plan(
+            owner, authorized=authorized, task_terms=task_terms,
+            max_sources=max_sources, limit=limit)
 
     def family_history(self, owner: str, *, article_source_id: str,
                        video_source_id: str, update_source_id: str,
