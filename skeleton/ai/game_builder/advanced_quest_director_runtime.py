@@ -153,7 +153,8 @@ def apply_scene(state,config,layout):
         {**npc,"memories":[],"heard":[],"suspicion":config["starting_suspicion"],
          "witnessed":0,"rumors_spread":0,"cargo":0,
          "personal_supplies":config["npc_supplies"],
-         "energy":config["npc_energy"]}
+         "energy":config["npc_energy"],"home":npc["cell"],
+         "investigations":[],"walks":0}
         for npc in source["npcs"]
     ]
     return state
@@ -169,6 +170,7 @@ def start(config,seed):
         "events_log":[],"quests":[],"quest_archive":[],
         "next_event":0,"next_quest":0,
         "npc_events_generated":0,"next_npc_actor":0,
+        "npc_walks":0,"forensic_edges":[],
         "quests_completed":0,"quests_exploited":0,
         "rumor_edges":[],"milestones":[],
         "finished":False,"failed":False,"victory":False,"reason":"",
@@ -235,7 +237,7 @@ def _emit(state,config,kind,site,events,*,actor="player"):
         "id":state["next_event"],"tick":state["tick"],"kind":kind,
         "site_id":site["id"],"cell":site["cell"],
         "actor":actor,"direct_witnesses":witnesses,
-        "rumored_to":[],"original_source":"physical_player_world_action",
+        "rumored_to":[],"original_source":"physical_player_world_action" if actor=="player" else "physical_npc_world_action",
     }
     state["events_log"].append(entry);state["next_event"]+=1
     for n in state["npcs"]:
@@ -376,6 +378,91 @@ def _autonomous_npc_action(state,config,events):
     events.append("NPC_authored_role_drove_finite_physical_world_event")
 
 
+
+
+def _npc_route(start,goals,blocked):
+    """Shortest original grid route to a legal inspection/patrol tile."""
+    pending=deque([start]);prior={start:None}
+    goals=set(goals)
+    while pending:
+        cell=pending.popleft()
+        if cell in goals:
+            path=[]
+            while cell!=start:
+                path.append(cell)
+                cell=prior[cell]
+            path.reverse()
+            return path
+        for candidate in _neighbors(cell):
+            if candidate not in blocked and candidate not in prior:
+                prior[candidate]=cell
+                pending.append(candidate)
+    return None
+
+
+def _npc_mobility_tick(state,config,events):
+    """Actually walk a finite-energy NPC; forensic leads never become witnesses."""
+    if not config["npc_mobility"] or not state["npcs"] or (
+         state["npc_walks"]>=config["npc_walk_budget"]):
+        return
+    npc=state["npcs"][(state["tick"]//config["npc_patrol_interval"]-1)%
+                       len(state["npcs"])]
+    if npc["energy"]<config["npc_move_energy_cost"]:
+        events.append("original_roaming_npc_exhausted_personal_energy")
+        return
+    lead=None
+    if config["npc_pursues_evidence"]:
+        for original in reversed(state["events_log"]):
+            if original["id"] in npc["investigations"]:
+                continue
+            if (original["id"] not in
+                [m["event_id"] for m in npc["memories"]] and
+                _distance(npc["cell"],original["cell"])<=config["npc_lead_radius"]):
+                lead=original
+                break
+    if lead is not None:
+        target=lead["cell"]
+    else:
+        # Patrol alternating source districts, each with a physically
+        # different original site, rather than teleporting to a target.
+        district=(npc["id"]+state["day"]+1)%len(state["sites"])
+        target=state["sites"][district]["cell"]
+    if _distance(npc["cell"],target)<=1:
+        if lead is not None:
+            npc["investigations"].append(lead["id"])
+            while len(npc["investigations"])>config["npc_investigation_memory"]:
+                npc["investigations"].pop(0)
+            entry={
+                "tick":state["tick"],"npc_id":npc["id"],
+                "event_id":lead["id"],"source_cell":target,
+                "npc_cell":npc["cell"],
+                "authority":"forensic_after_event_not_eyewitness",
+            }
+            state["forensic_edges"].append(entry)
+            _remember(npc,lead,config,direct=False)
+            events.append("original_npc_forensic_inspection_not_direct_witness")
+        else:
+            events.append("original_npc_reached_actual_patrol_district")
+        return
+    blocked=set(state["world"]["obstacles"])
+    blocked.update(site["cell"] for site in state["sites"])
+    blocked.update(other["cell"] for other in state["npcs"] if other is not npc)
+    if config["npc_avoids_player"]:
+        blocked.add(state["player"])
+    goals=[cell for cell in _neighbors(target) if cell not in blocked]
+    path=_npc_route(npc["cell"],goals,blocked)
+    if not path:
+        events.append("original_npc_route_physically_blocked")
+        return
+    destination=path[0]
+    if _distance(npc["cell"],destination)!=1:
+        raise QuestDirectorError("original NPC movement must follow adjacent real tiles")
+    npc["cell"]=destination
+    npc["energy"]-=config["npc_move_energy_cost"]
+    npc["walks"]+=1
+    state["npc_walks"]+=1
+    events.append("original_npc_walked_real_adjacent_world_tile")
+
 def _tick(state,config,events,steps=1):
     for _ in range(steps):
         state["tick"]+=1
@@ -387,6 +474,8 @@ def _tick(state,config,events,steps=1):
         _rumors(state,config,events)
         if state["tick"]%config["npc_act_interval"]==0:
             _autonomous_npc_action(state,config,events)
+        if state["tick"]%config["npc_patrol_interval"]==0:
+            _npc_mobility_tick(state,config,events)
         if config["memory_decay_ticks"]>0:
             for npc in state["npcs"]:
                 if state["tick"]%config["memory_decay_ticks"]==0:
