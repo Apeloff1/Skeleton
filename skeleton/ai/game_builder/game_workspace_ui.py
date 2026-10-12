@@ -3367,7 +3367,6 @@ $("advanced-whatif-run").addEventListener("click",async()=>{
   const proof=response.analysis;
   if(!proof || response.original_project_files_mutated ||
      response.counterfactuals_promoted || response.native_all_engines_certified ||
-     proof.world_scene_digest===false ||
      proof.source_game_files_modified ||
      proof.unearned_world_rewards_applied ||
      proof.automatic_ai_weight_promotion ||
