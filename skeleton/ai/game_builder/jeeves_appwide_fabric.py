@@ -337,6 +337,17 @@ OPERATIONS = {
     "crawler.plan":("compute", "bounded evidence-acquisition planner",False),
     "companion.visual":("compute", "dragon event visual reducer",False),
     "learning.improvement_proposal":("proposal", "model improvement review",True),
+    "forge.kinds":("read", "installed Universal Forge component kinds",False),
+    "forge.graph":("compute", "typed original asset forge graph with port and cycle validation",False),
+    "game.compile.original":("compute", "bounded replay-verified browser game compiler",True),
+    "game.compile.native":("compute", "bounded original game plus native source compiler",True),
+    "game.mirror.review":("compute", "adversarial original game replay and source mirror",True),
+    "companion.simulate":("compute", "consent-bound Dragon state machine rehearsal",False),
+    "crawler.catalog":("read", "existing source workers and acquisition state",False),
+    "tool.fabric":("read", "native canonical tool contract and executor status",False),
+    "tool.plan":("proposal", "finite typed operator-supervised tool plan",True),
+    "model.improvement":("proposal", "shadow-model and code change review plan",False),
+
 }
 
 
@@ -445,6 +456,28 @@ class JeevesAppwideRuntime:
                                  session=params.get("session"),
                                  cast=params.get("cast"),region=params.get("region"),
                                  act=params.get("act"),scene=params.get("scene"))
+        elif action in (
+            "forge.kinds","forge.graph","game.compile.original",
+            "game.compile.native","game.mirror.review","companion.simulate",
+            "crawler.catalog","tool.fabric","tool.plan","model.improvement"):
+            if ws is None or project != ws.active():
+                raise JeevesAppwideError("active project needed for production adapters")
+            from .jeeves_app_runtime import dispatch_app_action
+            from .jeeves_app_runtime import ACTIONS as canonical_actions
+            require_canonical = canonical_actions[action][3]
+            if require_canonical and not authorized:
+                raise PermissionError("reviewed production operation requires approval")
+            # The existing typed dispatcher remains the single actual
+            # compiler/forge/companion executor; no substitute stack.
+            underlying=dispatch_app_action(
+                ws,project,action,params,authorized=authorized)
+            result={
+                "canonical_adapter":action,
+                "canonical_receipt_digest":underlying["digest"],
+                "result":underlying["result"],
+                "weights_changed":underlying["model_weights_changed"],
+                "source_committed":underlying["source_files_committed"],
+            }
         elif action=="crawler.plan":
             # No network access or automatic knowledge promotion.
             from ..webcrawler.active_research import plan_acquisition
