@@ -308,3 +308,32 @@ def test_provenance_browser_fails_closed_for_corrupted_receipts(tmp_path, baseli
         store.db.commit()
         with pytest.raises(ValueError, match="corrupt"):
             ingress.provenance_page("owner", source, authorized=True)
+
+
+def test_latest_raw_discovery_batch_extends_historical_chain_without_authority(baseline, chain):
+    new_path = ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json"
+    latest = _supplement(new_path)
+    checked = validate_discovery_chain(baseline, [*chain, latest])
+    previous = validate_discovery_chain(baseline, chain)
+    assert latest[1]["status"] == "raw_discovery_only_not_ingested_into_canonical_queue"
+    assert checked["raw_new"] == 1033
+    assert checked["raw_total_discovered"] == 5438
+    assert checked["new"] >= previous["new"]
+    assert checked["total_discovered"] >= previous["total_discovered"]
+    assert checked["total_discovered"] <= checked["raw_total_discovered"]
+    assert all(row["training_authorized"] is False and
+               row["rights"] == "not_assessed"
+               for row in checked["sources"].values())
+
+
+def test_latest_batch_cannot_claim_approval_or_fork_history(baseline, chain):
+    latest = _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")
+    bad = deepcopy(latest)
+    bad[1]["candidates"][0]["training_authorized"] = True
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*chain, bad])
+    bad = deepcopy(latest)
+    bad[1]["counts"]["raw_provisional_urls"] += 1
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*chain, bad])
