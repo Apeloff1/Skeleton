@@ -24,14 +24,16 @@ PHASES = ("bounded_player_action", "direct_source_witness",
           "active_lod_schedule", "complete_source_receipt")
 OPTIONS = {
     "chunks_per_side": (3, 5),
-    "citizens": tuple(range(8, 33)),
-    "active_limit": tuple(range(4, 17)),
+    "citizens": tuple(range(8, 129)),
+    "active_limit": tuple(range(4, 33)),
     "chunk_radius": (0, 1),
     "max_turns": tuple(range(1, 129)),
+    "lod_policy": ("nearest", "fair"),
 }
 DEFAULTS = {
     "chunks_per_side": 3, "citizens": 16, "active_limit": 12,
     "chunk_radius": 1, "max_turns": 96,
+    "lod_policy": "nearest",
 }
 
 
@@ -46,7 +48,11 @@ def _options(options):
         raise ChunkWorldError("only registered bounded chunk-world controls are supported")
     result = {**DEFAULTS, **options}
     for key, choices in OPTIONS.items():
-        if type(result[key]) is not int or result[key] not in choices:
+        if (key == "lod_policy" and
+            (type(result[key]) is not str or result[key] not in choices)) or (
+            key != "lod_policy" and
+            (type(result[key]) is not int or result[key] not in choices)
+        ):
             raise ChunkWorldError("invalid original streaming setting: " + key)
     if result["active_limit"] > result["citizens"]:
         raise ChunkWorldError("active detailed budget cannot exceed actual citizen count")
@@ -170,7 +176,8 @@ def _init_world(rules, sources, options, seed):
             "position": origin_cell, "home": origin_cell,
             "work": translate(source["sites"][idx]["cell"], middle, middle),
             "phase": "home", "walked": 0, "deferred_ticks": 0,
-            "detailed_ticks": 0,
+            "detailed_ticks": 0, "deferred_streak": 0,
+            "longest_deferral": 0, "eligible_deferred_ticks": 0,
             "trust": rules["dialogue"]["starting_trust"],
             "patience": (alias["initial_patience"] if alias else
                          rules["dialogue"]["speaker_patience"]),
@@ -201,7 +208,8 @@ def _init_world(rules, sources, options, seed):
             "name": "Original Traveller %03d" % idx,
             "position": pos, "home": pos, "work": work,
             "phase": "home", "walked": 0, "deferred_ticks": 0,
-            "detailed_ticks": 0,
+            "detailed_ticks": 0, "deferred_streak": 0,
+            "longest_deferral": 0, "eligible_deferred_ticks": 0,
             "trust": rules["dialogue"]["starting_trust"],
             "patience": rules["dialogue"]["speaker_patience"],
             "heard": [], "memories": [], "bond": 0, "supported": 0,
@@ -223,6 +231,8 @@ def _init_world(rules, sources, options, seed):
         "scheduler": {
             "detailed_updates": 0, "deferred_actor_turns": 0,
             "physical_moves": 0, "forged_offscreen_events": 0,
+            "eligible_deferred_actor_turns": 0,
+            "max_deferral_streak": 0,
         },
         "last_events": [], "provenance": "original_chunked_derived_scene",
     }
@@ -236,8 +246,17 @@ def _visible(state, opts):
         if max(abs(a-b) for a,b in zip(
             _chunk(actor["position"], state["side"]),camera)) <= radius
     ]
-    nearby.sort(key=lambda a: (_dist(a["position"],state["player"],state["side"]),
-                               a["index"]))
+    if opts["lod_policy"] == "fair":
+        # Deferral debt wins gradually; inactive citizens remain at exact
+        # last physical position and never mint unseen witness statements.
+        nearby.sort(key=lambda a: (
+            _dist(a["position"], state["player"], state["side"]) -
+            4 * a["deferred_streak"], a["index"],
+        ))
+    else:
+        nearby.sort(key=lambda a: (
+            _dist(a["position"], state["player"], state["side"]), a["index"],
+        ))
     detailed = nearby[:opts["active_limit"]]
     chunks = [
         [x,y] for y in range(opts["chunks_per_side"])
@@ -426,7 +445,21 @@ def _schedule(state,rules,opts):
     for actor in state["actors"]:
         if actor["index"] not in ids:
             actor["deferred_ticks"] += 1
+            actor["deferred_streak"] += 1
+            actor["longest_deferral"] = max(
+                actor["longest_deferral"], actor["deferred_streak"])
+            if max(abs(a-b) for a,b in zip(
+                _chunk(actor["position"], state["side"]),
+                _chunk(state["player"], state["side"]),
+            )) <= opts["chunk_radius"]:
+                actor["eligible_deferred_ticks"] += 1
+                state["scheduler"]["eligible_deferred_actor_turns"] += 1
+            state["scheduler"]["max_deferral_streak"] = max(
+                state["scheduler"]["max_deferral_streak"],
+                actor["deferred_streak"],
+            )
         else:
+            actor["deferred_streak"] = 0
             current = actor["position"]
             occupied.remove(current)
             goal = actor["work"] if working else actor["home"]
