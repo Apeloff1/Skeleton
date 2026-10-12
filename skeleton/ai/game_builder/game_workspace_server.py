@@ -73,10 +73,26 @@ class _LocalStudioServer(ThreadingHTTPServer):
     daemon_threads=True
     allow_reuse_address=False
 
-    def __init__(self,address,workspace,secret):
+    def __init__(self,address,workspace,secret,repo_root):
         super().__init__(address,_StudioHandler)
         self.workspace=workspace
         self.secret=secret
+        self.appwide_repo_root=repo_root
+        self.appwide_runtime=None
+        import threading
+        self.appwide_scan_lock=threading.RLock()
+
+    def jeeves_appwide(self):
+        """Lazy full checkout scan: ordinary Game Studio pages remain fast."""
+        with self.appwide_scan_lock:
+            if self.appwide_runtime is None:
+                from .jeeves_appwide_fabric import (
+                    AppwideInventory,JeevesAppwideRuntime)
+                inventory=AppwideInventory(self.appwide_repo_root)
+                inventory.scan()
+                self.appwide_runtime=JeevesAppwideRuntime(
+                    inventory,workspace=self.workspace)
+            return self.appwide_runtime
 
 
 class _StudioHandler(BaseHTTPRequestHandler):
@@ -201,6 +217,10 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 family=family,offset=int(params.get("offset",0)),
                 limit=int(params.get("limit",80)),
                 query=params.get("query") or None))
+        if path=="/api/jeeves-appwide-status":
+            return self._json(200,self.server.jeeves_appwide().inventory.report())
+        if path=="/api/jeeves-appwide-catalog":
+            return self._json(200,self.server.jeeves_appwide().catalog())
         if path=="/api/story-memory-page":
             from .story_memory import character_memory_page
             return self._json(200,character_memory_page(
@@ -242,6 +262,14 @@ class _StudioHandler(BaseHTTPRequestHandler):
             return self._json(200,dispatch_app_action(
                 studio,values["project"],values["action"],
                 values["args"],authorized=True))
+        if path=="/api/jeeves-appwide-invoke":
+            action=values.get("action")
+            params=values.get("params",{})
+            operator_approved=values.get("operator_authorized") is True
+            # A local session token is not the same as approval to modify code.
+            receipt=self.server.jeeves_appwide().invoke(
+                action,params,authorized=operator_approved)
+            return self._json(200,receipt)
         if path=="/api/jeeves-chapter-chat":
             from .jeeves_chapter_chat import chat_turn
             result=chat_turn(studio,values["project"],values["prompt"],
@@ -692,7 +720,7 @@ class _StudioHandler(BaseHTTPRequestHandler):
 
 
 def create_workspace_server(workspace: GameWorkspace, *, host: str="127.0.0.1",
-                            port: int=0):
+                            port: int=0, repo_root=None):
     """Bind loopback, no public listener, no cross-origin API and no CORS."""
     if host!="127.0.0.1":
         raise StudioServerError("AI game studio never listens on a public address")
@@ -700,8 +728,10 @@ def create_workspace_server(workspace: GameWorkspace, *, host: str="127.0.0.1",
         raise StudioServerError("pre-initialized controlled local game workspace required")
     if type(port) is not int or not 0<=port<=65535:
         raise StudioServerError("invalid bounded local HTTP port")
+    if repo_root is None:
+        repo_root=Path(__file__).resolve().parents[3]
     secret=secrets.token_urlsafe(32)
-    server=_LocalStudioServer((host,port),workspace,secret)
+    server=_LocalStudioServer((host,port),workspace,secret,repo_root)
     return server
 
 
