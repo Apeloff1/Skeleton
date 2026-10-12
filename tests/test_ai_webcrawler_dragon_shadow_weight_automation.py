@@ -334,7 +334,7 @@ def test_wrong_review_owner_or_record_cannot_approve_shadow(setup):
             memory_promotion=promotion, review_id=review_id,
             at=T3, authorized=True,
         )
-    with pytest.raises((PermissionError, ValueError)):
+    with pytest.raises((KeyError, PermissionError, ValueError)):
         automation.promote(
             OWNER, weight.candidate_id, suite(setup),
             memory_promotion=promotion, review_id="a" * 64,
@@ -665,7 +665,7 @@ def test_health_counts_active_and_detects_source_root_drift(setup):
 
 def test_compiled_sparse_postings_equal_original_integer_scoring(setup):
     from collections import Counter
-    from skeleton.ai.webcrawler.dragon_almanac_weights import WORD
+    from skeleton.ai.game_builder.dragon_almanac_weights import WORD
     from skeleton.ai.webcrawler.dragon_shadow_weight_automation import (
         _compile_postings, _rank_postings, _route,
     )

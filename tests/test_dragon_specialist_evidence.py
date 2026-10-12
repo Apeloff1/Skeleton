@@ -748,8 +748,20 @@ def test_workboard_duplicate_reobservation_does_not_claim_change(context):
         DragonArticleHatchling(captures),videos,
         DragonSourceDeltaLedger(captures))
     add_capture(captures,sid,url,new,epoch(T0)+4,"same-source-recheck")
-    missions=board.page(OWNER,authorized=True)["missions"]
-    changes=[m for m in missions if m["lane"]=="updates"]
+    # The catalog has 248 entries, while a workboard response is capped
+    # to 60 source IDs. Page through canonical cursors before asserting a
+    # particular source's state.
+    changes=[]
+    cursor=None
+    for _ in range(10):
+        page=board.page(OWNER,authorized=True,limit=60,after_source=cursor)
+        changes.extend(
+            m for m in page["missions"]
+            if m["lane"]=="updates" and m["source_id"]==sid)
+        if not page["has_more"]:
+            break
+        cursor=page["next_after_source"]
+        assert cursor
     assert len(changes)==1
     assert changes[0]["action"]=="update_unchanged"
     assert changes[0]["requires_idle"] is False
