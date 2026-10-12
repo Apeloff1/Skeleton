@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
-from .dragon_discovery_mission import MissionSourceScout, SourceMission
+from .dragon_discovery_mission import MissionSourceScout, SourceMission, _tokens
 from .dragon_almanacs import DragonAlmanacs, _auth
 from .reviewed_knowledge import _integer
 
@@ -79,7 +79,13 @@ class MissionPortfolio:
         axes = {}
         scan_totals = {}
         indexed_complete = True
+        generic = _tokens(request.mission.goal)
+        stopwords = frozenset({"and", "the", "with", "for", "from",
+                               "some", "into", "about", "that", "this"})
         for axis in request.axes:
+            distinct_axis_terms = _tokens(axis.question) - generic - stopwords
+            if not distinct_axis_terms:
+                raise ValueError("portfolio axis has no distinctive research terms")
             goal = axis.question + " " + request.mission.goal
             # SourceMission already rejects nonfinite/scalar and unbounded
             # inputs; do not bypass its admission path for portfolio missions.
@@ -106,6 +112,12 @@ class MissionPortfolio:
                     not result["index_health"]["coverage_complete"]):
                 indexed_complete = False
             for hit in result["selection"]:
+                # Shared generic project terms cannot masquerade as subsystem
+                # coverage. Only a source with at least one distinct axis term
+                # contributes an actual discovery candidate for that axis.
+                if not (distinct_axis_terms &
+                        set(hit.get("matched_goal_terms", []))):
+                    continue
                 sid = hit["source_id"]
                 if sid in observations:
                     prior = observations[sid]
