@@ -329,9 +329,11 @@ class ShadowWeightAutomation:
         return False
 
     def _active(self, owner: str) -> tuple[ShadowWeight, ...]:
+        # Verify every owner row before filtering by stage. A forged stage
+        # must not make a corrupted active weight silently disappear from audit.
         rows = self.db.execute(
             "SELECT candidate_id FROM dragon_shadow_weights "
-            "WHERE owner=? AND stage='active' ORDER BY candidate_id", (owner,)
+            "WHERE owner=? ORDER BY candidate_id", (owner,)
         )
         active = []
         for (cid,) in rows.fetchall():
