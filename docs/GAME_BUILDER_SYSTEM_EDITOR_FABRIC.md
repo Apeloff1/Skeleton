@@ -1854,3 +1854,47 @@ and platform performance certification remain
 separate future product milestones. No commercial
 multiplayer release claim follows from deterministic
 two-peer replay alone.
+
+
+### Advanced fighting combat fidelity and prediction reversal
+
+The same original Fighting family now exposes **55 independent
+typed control axes**. Added combat rules are observable in both
+one-player and authentic dual-peer reference gameplay:
+combos expire after an authored number of *real elapsed fighting
+simulation frames*, dashes move at most two physical unblocked
+tiles while spending explicit additional finite stamina, and
+feints disrupt a real opponent guard only inside configured
+physical interaction range. Distant feints still cost stamina,
+but no longer act as a magical map-wide posture edit.
+Original arena knockback is now also resolved one tile at a
+time, stopping on real authored cover rather than tunneling
+through intermediate stage geometry. A disabled original
+cover/hazard budget generates zero stage objects rather
+than fabricating an object contrary to the editor settings.
+Starting meter may not exceed its typed capacity.
+
+The independent rollback runner applies the same dash and
+feint physics to the two real participant streams, retains
+actual clock-frame changes for explicitly elapsed 60/240
+frame inputs and records them in signed turn evidence.
+The rollback correction engine now handles a particularly
+important **premature predicted knockout**: when a speculative
+opponent action ended the guessed game but a later physical
+authoritative parry prevents the knockout, the predicted
+record is truncated at its authentic provisional endpoint
+and the complete actual game replays and continues. The
+receipt explicitly labels provisional-frame truncation
+rather than representing a guess as genuine success.
+
+Regression cases cover physically blocked knockback,
+genuine zero-object editor budgets, meter overcapacity,
+dash stamina conservation, legal close feints, long-frame
+combo expiration, two-player frame-clock parity, bounded
+prediction correction and the reversal of an incorrect
+provisional knockout through a legally timed parry.
+
+As elsewhere, this new gameplay remains a **reference
+implementation** pending exact-head Windows/Linux CI,
+hardware/controller testing and independent native build
+certification.
