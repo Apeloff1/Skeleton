@@ -146,3 +146,26 @@ python -m skeleton.ai.game_builder.dragon_almanac_cli mission-audit \
 ```
 
 An audit provides `current`, `stale` and a resumable `next_source`, while rejecting unexpected posting contents. Auditing never certifies factual truth, legal rights, source independence or model performance. Repeat audit pages until the cursor is absent; the audit's scope is the materialized postings, not unindexed content.
+
+## Cross-engine research portfolios
+
+A single-source mission is insufficient for an actual game project. `mission-portfolio` composes **up to 24 separately defined research axes** (for example: events and quest triggers, platform-specific physics, input latency, renderer architecture, original audio, accessibility, copyright/asset licensing and native homebrew packaging). A typed plan sets an individual minimum of unreviewed discovery leads and importance weight, plus a project-wide selection budget and per-host diversity cap.
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli mission-portfolio \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --query "original Game Boy homebrew platform game" \
+  --platform "Game Boy" --genre platformer --era 1990s \
+  --axis "physics:collision dynamics and movement:3:10" \
+  --axis "quests:observed NPC event driven quest triggers:3:9" \
+  --axis "rendering:tile map and scrolling renderer:2:8" \
+  --axis "rights:original music and asset licenses:3:10" \
+  --indexed --scan-budget 3000 --per-axis-candidates 30 \
+  --portfolio-limit 40 --max-per-host 3
+```
+
+The planner performs **one policy-free metadata search per axis**, with axis-specific matching required beyond the generic project goal. It then selects a deduplicated source portfolio by deterministic marginal gain across unmet axes. One source may contribute to multiple knowledge goals; repeating the same URL does not create artificial independent-source credit. The planner reports unfilled axes, per-axis input budgets and truncations, index freshness, and all rights-review flags.
+
+This mechanism produces better acquisition *orders for human/operator consideration*, not a final curriculum, legal clearance or verified game knowledge. The canonical policy/fetch/extract/analyze/review stages still own all execution authority. The planner neither changes durable job priorities nor executes new crawling, demo builds, human studies, model fine-tuning or memory promotion. A completed **candidate** quota must not be confused with a completed **evidence** quota.
+
+Use `mission-health` to inspect policy-stage index coverage; use `mission-audit` to assess stale postings before project-critical indexed planning. Output from these tools should be included as a provenance-bound planning receipt only after the appropriate higher-level governance workflow accepts it.
