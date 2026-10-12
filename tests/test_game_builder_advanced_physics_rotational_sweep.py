@@ -136,6 +136,7 @@ class OriginalRotatingSweepTests(unittest.TestCase):
         state=start(cfg,0)
         body=state["bodies"][0]
         body["position"]=[300,600,0]
+        body["shape_half"]=[40,10]  # Genuine thin rectangle: starts clear, rotates into contact.
         body["orientation"]=90000
         body["angular_velocity"]=12000
         state["fixtures"]=[
