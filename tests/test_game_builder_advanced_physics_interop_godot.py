@@ -62,6 +62,11 @@ class SourceBoundNativeEncounterTests(unittest.TestCase):
                                  physics["physics_scene"]["layout"]["fixtures"])
                 self.assertIn(SOURCE_CHECK.strip(),
                               package.files["godot/scripts/main.gd"].decode("utf-8"))
+                script=package.files["godot/scripts/main.gd"].decode("utf-8")
+                self.assertIn('for fixture in chart["fixtures"]:',script)
+                self.assertIn('REVIEWED PHYSICS ENCOUNTER - CONTACTS',script)
+                self.assertIn('draw_string(get_theme_default_font()',script)
+                self.assertIn('physical_color=Color(0.31,0.64,0.71,0.55)',script)
                 self.assertTrue(package.files["godot/proof.json"])
                 self.assertIn(b"verify-physics",package.files["README.md"])
                 self.assertEqual(package.files,
