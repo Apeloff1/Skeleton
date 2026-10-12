@@ -37,9 +37,9 @@ from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 
 
 class GenreMaturityTests(unittest.TestCase):
-    def test_eight_genuine_advanced_replay_engines(self):
+    def test_nine_genuine_advanced_replay_engines(self):
         self.assertEqual(set(ENGINES),set(ADVANCED_ENGINE_IDS))
-        self.assertEqual(len(ENGINES),8)
+        self.assertEqual(len(ENGINES),9)
         for genre in ("shooter","deck_battler","puzzle"):
             self.assertIn(genre,ACTION_HELP)
             self.assertGreaterEqual(len(ACTION_HELP[genre]),7)
@@ -48,7 +48,7 @@ class GenreMaturityTests(unittest.TestCase):
         self.assertTrue(all(spec["progression_floor"]=="advanced" for spec in specs.values()))
         for genre in ENGINES:
             self.assertEqual(specs[genre]["runtime_maturity"],"advanced_reference_runtime")
-        self.assertEqual(sum(1 for s in specs.values() if s["runtime_maturity"]=="authoring_only"),35)
+        self.assertEqual(sum(1 for s in specs.values() if s["runtime_maturity"]=="authoring_only"),34)
 
     def test_distinct_reference_states_and_chain_identity(self):
         for genre,commands in (
