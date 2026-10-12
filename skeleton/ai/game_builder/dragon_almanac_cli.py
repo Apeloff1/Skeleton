@@ -15,13 +15,20 @@ from .reviewed_knowledge import ReviewedKnowledgeStore
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
     parser.add_argument("--registry", default=str(Path(__file__).parent / "catalogs/dragon_sources_20261010"))
     parser.add_argument("--output")
     parser.add_argument("--now", type=int)
+    parser.add_argument("--platform", default="", help="Target console, computer or mobile platform")
+    parser.add_argument("--genre", default="", help="Target game style or editor family")
+    parser.add_argument("--era", default="", help="Historical era or generation")
+    parser.add_argument("--prefer-video", action="store_true")
+    parser.add_argument("--topic", help="Optional owner-scoped almanac topic ID")
+    parser.add_argument("--limit", type=int, default=25)
+    parser.add_argument("--scan-budget", type=int, default=2000)
     parser.add_argument("--query", help="Reviewed mechanic or design research question")
     parser.add_argument("--design", type=Path, help="Strict native game design JSON")
     args = parser.parse_args()
@@ -30,7 +37,17 @@ def main():
     with ReviewedKnowledgeStore(args.database) as library:
         almanacs = DragonAlmanacs(library)
         worker = SequentialAlmanacWorker(almanacs)
-        if args.command.startswith("delivery-"):
+        if args.command == "mission-scout":
+            from .dragon_discovery_mission import MissionSourceScout, SourceMission
+            if not args.query:
+                parser.error("mission-scout requires --query")
+            result = MissionSourceScout(almanacs).propose(
+                args.owner,
+                SourceMission(args.query, platform=args.platform, genre=args.genre,
+                              era=args.era, prefer_video=args.prefer_video,
+                              limit=args.limit, scan_budget=args.scan_budget),
+                authorized=True, topic=args.topic)
+        elif args.command.startswith("delivery-"):
             from .dragon_delivery import DragonDelivery
             from ..webcrawler.dragon_game_design import load_design
             if args.now is None:
