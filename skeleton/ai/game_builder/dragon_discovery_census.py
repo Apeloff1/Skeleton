@@ -10,7 +10,7 @@ import re
 from urllib.parse import urlsplit
 
 from .dragon_discovery_admission import validate_discovery_chain
-from .dragon_discovery_reconciled import _chain, SOURCE_BATCHES
+from .dragon_discovery_reconciled import _chain, SOURCE_BATCHES, EXPECTED_RAW_TOTAL
 from .dragon_source_catalog import canonical_source_url
 
 
@@ -55,7 +55,7 @@ def discovery_census(registry: dict, *, top_hosts: int = 25) -> dict:
         raise ValueError("invalid top host count")
     chain = _chain()
     checked = validate_discovery_chain(registry, chain)
-    if checked["raw_total_discovered"] != 19_228 or len(chain) != len(SOURCE_BATCHES):
+    if checked["raw_total_discovered"] != EXPECTED_RAW_TOTAL or len(chain) != len(SOURCE_BATCHES):
         raise ValueError("census evidence must match full frozen sequence")
 
     raw_by_host = Counter()
