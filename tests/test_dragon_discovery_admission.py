@@ -268,3 +268,43 @@ def test_topic_and_source_pagination_reject_type_confusion(tmp_path):
                 ingress.topic_page("owner", authorized=True, limit=value)
             with pytest.raises(ValueError):
                 ingress.source_page("owner", "topic-missing", authorized=True, limit=value)
+
+
+
+def test_provenance_browser_preserves_distinct_raw_urls_for_one_acquisition(tmp_path, baseline, chain):
+    with ReviewedKnowledgeStore(tmp_path / "origins.sqlite") as store:
+        ingress = DragonDiscoveryAdmission(DragonAlmanacs(store))
+        ingress.import_chain("owner", baseline, chain, authorized=True)
+        duplicate_source = store.db.execute(
+            """SELECT normalized_source FROM dragon_almanac_supplement_receipts_v2
+               WHERE owner='owner' GROUP BY normalized_source HAVING COUNT(*)>1
+               ORDER BY normalized_source LIMIT 1""").fetchone()[0]
+        first = ingress.provenance_page("owner", duplicate_source,
+                                        authorized=True, limit=1)
+        second = ingress.provenance_page("owner", duplicate_source, authorized=True,
+                                         limit=1, offset=first["next_offset"])
+        assert first["next_offset"] == 1
+        assert first["provenance"][0]["raw_source_id"] != second["provenance"][0]["raw_source_id"]
+        assert first["provenance"][0]["approved"] is False
+        assert second["provenance"][0]["training_authorized"] is False
+        assert len(first["provenance"][0]["receipt_digest"]) == 64
+        assert store.db.execute(
+            "SELECT COUNT(*) FROM dragon_almanac_jobs WHERE owner='owner' AND source=?",
+            (duplicate_source,)).fetchone()[0] == 1
+        with pytest.raises(ValueError, match="unknown owner source"):
+            ingress.provenance_page("other", duplicate_source, authorized=True)
+
+
+def test_provenance_browser_fails_closed_for_corrupted_receipts(tmp_path, baseline, chain):
+    with ReviewedKnowledgeStore(tmp_path / "provenance-corrupt.sqlite") as store:
+        ingress = DragonDiscoveryAdmission(DragonAlmanacs(store))
+        ingress.import_chain("owner", baseline, chain, authorized=True)
+        source = store.db.execute(
+            "SELECT normalized_source FROM dragon_almanac_supplement_receipts_v2 ORDER BY normalized_source LIMIT 1"
+        ).fetchone()[0]
+        store.db.execute(
+            """UPDATE dragon_almanac_supplement_receipts_v2 SET body='{}'
+               WHERE owner='owner' AND normalized_source=?""", (source,))
+        store.db.commit()
+        with pytest.raises(ValueError, match="corrupt"):
+            ingress.provenance_page("owner", source, authorized=True)
