@@ -951,6 +951,45 @@ function drawAdvancedGame(session){
   c.fillStyle="#a9dccc";
   c.fillText("Original sprites are drawn primitives; collision and judging are backend-owned.",12,258);
  }
+ if(editor==="quest_director"){
+  const ox=14,oy=47,cell=25;
+  c.fillStyle="#dbece5";
+  c.fillText("Original witnessed causal world · day "+state.day+
+       " · tick "+state.tick,12,35);
+  for(let i=0;i<49;i++){
+   const x=ox+(i%7)*cell,y=oy+Math.floor(i/7)*27;
+   c.fillStyle=state.world.obstacles.includes(i)?"#67767c":
+      selectedQuestCell===i?"#4e7770":"#315a59";
+   c.fillRect(x,y,23,25);
+   let token="";
+   const site=state.sites.find(s=>s.cell===i);
+   const npc=state.npcs.find(n=>n.cell===i);
+   if(site)token=site.kind==="settlement"?"S":site.kind==="bridge"?"B":
+             site.kind==="grove"?"G":"A";
+   if(npc)token=npc.memories.length?"!":npc.heard.length?"?":"N";
+   if(state.player===i)token="P";
+   if(token){
+    c.fillStyle=token==="P"?"#ffde98":token==="!"?"#a0f5c1":"#e2dfe2";
+    c.fillText(token,x+6,y+18);
+   }
+  }
+  c.fillStyle="#e4ede6";
+  const tx=215;
+  c.fillText("Reputation "+state.reputation+" · gold "+state.gold,tx,58);
+  c.fillText("Supplies "+state.supplies+" · stamina "+state.stamina,tx,82);
+  c.fillText("Direct events "+state.events_log.length,tx,106);
+  c.fillText("Corroborated quests "+state.quests.length,tx,130);
+  c.fillText("Resolved "+state.quests_completed+
+     " · exploited "+state.quests_exploited,tx,154);
+  c.fillText("Rumor edges "+state.rumor_edges.length,tx,178);
+  c.fillText("Player location "+state.player,tx,202);
+  const active=state.quests.find(q=>q.status==="active");
+  if(active)c.fillText("Quest #"+active.id+" · "+
+    (active.choice||"uncommitted")+
+    " · evidence "+active.testimonies.length,tx,225);
+  c.fillStyle="#a7dcc6";
+  c.fillText("Witness (!) is distinct from hearsay (?) · player P · authored sites S/B/G/A",12,256);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
@@ -998,12 +1037,63 @@ document.addEventListener("keydown",event=>{
 });
 let originalRhythmLongrunRecord=null;
 let originalRoguelikeLongrunRecord=null;
+let selectedQuestSite=0;
+let selectedQuestNPC=0;
+let selectedQuestCell=8;
 let selectedRhythmNote=0;
 let selectedRTSCell=27;
 let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="quest_director"){
+  const state=advancedSession.state;
+  const picker=document.createElement("label");picker.textContent="Original player action";
+  const action=document.createElement("select");
+  action.id="quest-director-command";
+  for(const registered of actions){
+   const option=document.createElement("option");option.value=registered;
+   option.textContent=registered.replaceAll("_"," ");
+   action.append(option);
+  }
+  picker.append(action);target.append(picker);
+  const submit=document.createElement("button");submit.type="button";
+  submit.textContent="Execute physical witnessed-world action";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.addEventListener("click",()=>advanceAdvanced(action.value));
+  target.append(submit);
+  const context=document.createElement("small");
+  context.id="quest-director-context";
+  const cell=selectedQuestCell;
+  const site=state.sites.find(s=>s.cell===cell);
+  const npc=state.npcs.find(n=>n.cell===cell);
+  context.textContent="Selected world cell "+cell+
+   (site?" · site #"+site.id+" "+site.kind+" HP "+site.integrity:"")+
+   (npc?" · NPC #"+npc.id+" "+npc.role+
+     " direct:"+npc.memories.length+" rumor:"+npc.heard.length:"");
+  target.append(context);
+  const nearby=document.createElement("label");
+  nearby.textContent="NPC witness origin and current quest status";
+  const report=document.createElement("pre");
+  report.id="quest-director-evidence";
+  report.textContent=JSON.stringify({
+    player:state.player,
+    latest_event:state.events_log.at(-1)||null,
+    active_quests:state.quests.filter(q=>q.status==="active").map(q=>({
+      id:q.id,event_id:q.origin_event,source:q.site_id,
+      witnessed:q.witnesses,testimonies:q.testimonies,
+      hearsay:q.heard_from,choice:q.choice,
+      physical_followups:q.material_actions
+    })),
+    milestones:state.milestones.slice(-4),
+    completed:state.quests_completed,
+    nonterminal_world:!advancedSession.terminal,
+    native_hardware_verified:advancedSession.native_hardware_verified
+  },null,2);
+  nearby.append(report);target.append(nearby);
+  return;
+ }
+
  if(advancedSession?.editor==="fighting"){
   const label=document.createElement("label");
   label.textContent="Original arena strike / defense / movement";
@@ -1496,6 +1586,19 @@ function renderAdvancedActions(actions){
 }
 
 $("advanced-canvas").addEventListener("click",event=>{
+ if(advancedSession?.editor==="quest_director"){
+  const board=$("advanced-canvas"),rect=board.getBoundingClientRect();
+  const px=(event.clientX-rect.left)*board.width/rect.width;
+  const py=(event.clientY-rect.top)*board.height/rect.height;
+  const x=Math.floor((px-14)/25),y=Math.floor((py-47)/27);
+  if(x<0||x>=7||y<0||y>=7||
+      px>14+x*25+23||py>47+y*27+25)return;
+  selectedQuestCell=y*7+x;
+  renderAdvancedActions(ACTION_HELP[advancedSession.editor]||[]);
+  drawAdvancedGame(advancedSession);
+  return;
+ }
+
  if(advancedSession&&advancedSession.editor==="rts"){
   const board=$("advanced-canvas"),rect=board.getBoundingClientRect();
   const px=(event.clientX-rect.left)*board.width/rect.width;
@@ -1587,6 +1690,11 @@ async function advanceAdvanced(action){
 // Visual paint works only on the local draft JSON. It cannot bypass the
 // server's canonical validation, exact-file review, or human commit.
 const PAINT_TOOLS={
+ quest_director:["obstacle_toggle","site_move","npc_move","player_spawn",
+      "site_integrity_up","site_stock_up","npc_trust_up",
+      "npc_perception_up","site_kind_next","npc_role_next",
+      "climate_next","day_phase_next"],
+
  fighting:["hazard_toggle","hazard_damage_up","cover_toggle",
            "cover_hp_up","player_spawn","enemy_spawn",
            "theme_next","weather_next"],
@@ -1681,6 +1789,34 @@ function renderSceneAuthoring(){
   shape=sceneGridShape(source);
  }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
 
+ if(source.editor==="quest_director"){
+  const m=source.layout,ox=13,oy=39,size=29;
+  ctx.fillText("Signed 7×7 witnessed quest site and NPC source painter",12,23);
+  for(let i=0;i<49;i++){
+   const x=ox+(i%7)*size,y=oy+Math.floor(i/7)*28;
+   ctx.fillStyle=m.obstacles.includes(i)?"#68777b":"#355e56";
+   ctx.fillRect(x,y,27,26);
+   const site=m.sites.find(s=>s.cell===i);
+   const npc=m.npcs.find(n=>n.cell===i);
+   let token="";
+   if(site)token="S"+site.id;
+   if(npc)token="N"+npc.id;
+   if(i===m.player_spawn)token="P";
+   if(token){
+    ctx.fillStyle="#e8e9c6";
+    ctx.fillText(token,x+6,y+18);
+   }
+  }
+  ctx.fillStyle="#d6e7dc";const tx=230;
+  ctx.fillText("Climate "+m.climate,tx,54);
+  ctx.fillText("Day phase "+m.day_phase,tx,79);
+  ctx.fillText("NPC witnesses "+m.npcs.length,tx,104);
+  ctx.fillText("Quest origin sites "+m.sites.length,tx,129);
+  ctx.fillText("Physical obstacles "+m.obstacles.length,tx,154);
+  ctx.fillText("Selected authored cell "+selectedQuestCell,tx,179);
+  ctx.fillText("Review identity, visibility, budgets, path reachability",12,254);
+  return;
+ }
  if(source.editor==="fighting"){
   const arena=source.layout,ox=12,oy=41,sx=23,sy=52;
   ctx.fillText("Original 3-lane arena · source-bound units and stage objects",12,23);
@@ -1958,6 +2094,56 @@ function renderSceneAuthoring(){
  }
 }
 
+function paintQuestDirectorCell(cell){
+ const doc=JSON.parse($("advanced-scene-json").value);
+ if(doc.editor!=="quest_director"||systemEditor().id!=="quest_director")
+  throw Error("Original NPC quest scene must match current editor");
+ if(!Number.isInteger(cell)||cell<0||cell>=49)
+  throw Error("Original world paint coordinate must be inside 7×7");
+ selectedQuestCell=cell;
+ const m=doc.layout,tool=$("advanced-paint-tool").value,cfg=systemSettings();
+ const site=m.sites.find(s=>s.cell===selectedQuestSite);
+ const npc=m.npcs.find(n=>n.cell===selectedQuestNPC);
+ if(tool==="obstacle_toggle"){
+  m.obstacles=m.obstacles.includes(cell)?
+     m.obstacles.filter(p=>p!==cell):[...m.obstacles,cell].sort((a,b)=>a-b);
+ }else if(tool==="site_move"){
+  if(!site)throw Error("Select a source site first");
+  site.cell=cell;
+ }else if(tool==="npc_move"){
+  if(!npc)throw Error("Select a source NPC first");
+  npc.cell=cell;
+ }else if(tool==="player_spawn")m.player_spawn=cell;
+ else if(tool==="site_integrity_up"){
+  if(!site)throw Error("Select authored original site");
+  site.integrity=Math.min(cfg.site_integrity,site.integrity+1);
+ }else if(tool==="site_stock_up"){
+  if(!site)throw Error("Select authored original finite site");
+  site.stock=Math.min(cfg.site_stock,site.stock+1);
+ }else if(tool==="npc_trust_up"){
+  if(!npc)throw Error("Select authored original eyewitness");
+  npc.trust=Math.min(cfg.starting_trust,npc.trust+1);
+ }else if(tool==="npc_perception_up"){
+  if(!npc)throw Error("Select authored original NPC");
+  npc.perception=Math.min(cfg.npc_perception,npc.perception+1);
+ }else if(tool==="site_kind_next"){
+  if(!site)throw Error("Select original site");
+  const kinds=["settlement","bridge","grove","archive"];
+  site.kind=kinds[(kinds.indexOf(site.kind)+1)%kinds.length];
+ }else if(tool==="npc_role_next"){
+  if(!npc)throw Error("Select original resident");
+  const kinds=["caretaker","scout","merchant","scribe"];
+  npc.role=kinds[(kinds.indexOf(npc.role)+1)%kinds.length];
+ }else if(tool==="climate_next"){
+  const kinds=["temperate","rainforest","highland","steppe"];
+  m.climate=kinds[(kinds.indexOf(m.climate)+1)%kinds.length];
+ }else if(tool==="day_phase_next"){
+  m.day_phase=(m.day_phase+1)%cfg.day_ticks;
+ }else throw Error("Unregistered original world source change");
+ $("advanced-scene-json").value=JSON.stringify(doc,null,2);
+ renderSceneAuthoring();
+ status("Original witnessed world changed. Validate all NPC identities, LOS, budgets, reachability and new source digest before play.");
+}
 function paintFightingCell(column,lane){
  const doc=JSON.parse($("advanced-scene-json").value);
  if(doc.editor!=="fighting"||systemEditor().id!=="fighting")
@@ -2375,6 +2561,14 @@ $("advanced-scene-grid").addEventListener("click",event=>{
   if(!text)throw Error("Generate a scene document first");
   const doc=JSON.parse(text),shape=sceneGridShape(doc);
   const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  if(doc.editor==="quest_director"){
+   const px=(event.clientX-rect.left)*canvas.width/rect.width;
+   const py=(event.clientY-rect.top)*canvas.height/rect.height;
+   const x=Math.floor((px-13)/29),y=Math.floor((py-39)/28);
+   if(x<0||x>=7||y<0||y>=7||
+      px>13+x*29+27||py>39+y*28+26)return;
+   paintQuestDirectorCell(y*7+x);return;
+  }
   if(doc.editor==="fighting"){
    const px=(event.clientX-rect.left)*canvas.width/rect.width;
    const py=(event.clientY-rect.top)*canvas.height/rect.height;
