@@ -76,6 +76,14 @@ function MessageCard({ message, controller, busy }: { message: Message; controll
         <Button icon="copy-outline" label="Copy" onPress={() => {
           void Clipboard.setStringAsync(message.text).then(() => controller.notify('Message copied.')).catch(() => controller.notify('Clipboard is unavailable. Select the message text to copy it.'));
         }} />
+        {failed && <Button icon="cloud-download-outline" label="Check server" disabled={busy} onPress={() => {
+          void controller.refreshCanonical().then(() => {
+            const current = controller.active.messages.find(item => item.id === message.id);
+            controller.notify(current?.status === 'complete'
+              ? 'The completed reply was recovered from canonical history.'
+              : 'No confirmed reply yet. Retry will reuse the original message ID.');
+          });
+        }} />}
         {failed && <Button icon="refresh-outline" label="Retry" disabled={busy} onPress={() => { void controller.retry(message.id); }} />}
         {message.status === 'complete' && !!message.text.trim() && <Button icon="book-outline" label="Save note" onPress={() => setCapture(captureInput(controller.active, message, ''))} />}
       </View>
