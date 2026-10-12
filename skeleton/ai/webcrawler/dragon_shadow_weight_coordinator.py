@@ -94,8 +94,20 @@ def run_shadow_automation(
     # Assignment IDs originate from the idle fairness planner, while receipts
     # must originate from the independent canonical reviewed knowledge store.
     admitted_sources = {x.source_id for x in plan.assignments}
-    if len(admitted_sources) != len(plan.assignments):
-        raise ValueError("one source must not consume multiple specialist slots")
+    if (len(admitted_sources) != len(plan.assignments)
+            or any(x.execution_authorized or x.memory_promotion_authorized
+                   or not x.evidence_only for x in plan.assignments)):
+        raise ValueError("one source and non-executing specialist intent required")
+    # A discovery hint is not a source permit: the worker must bind every
+    # scheduled URL back to the canonical owner's reviewed source catalog.
+    canonical_sources = {
+        source["source_id"]: source["source_url"]
+        for source in library._rows(plan.owner)
+        if source["status"] == "active"
+        and "design_reference" in source["allowed_scopes"]
+    }
+    if any(canonical_sources.get(x.source_id) != x.url for x in plan.assignments):
+        raise PermissionError("planner URL is not the canonical reviewed source")
     if len({(x.source_id, x.note_id) for x in reviewed}) != len(reviewed):
         raise ValueError("duplicate reviewed acquisitions cannot multiply work")
     if any(x.source_id not in admitted_sources for x in reviewed):
