@@ -130,11 +130,31 @@ def next_story_scene_template(workspace, project, act, scene):
     bible, history, index = load_story_workspace(workspace, project)
     if bible is None or bible["phase"] != "design":
         raise StoryCanonError("approve story, cast and design before scene creation")
+    contract = load_continuity_contract(workspace, project)
+    if contract is not None:
+        from .story_continuity_assurance import SCENE_TARGET
+        if len(history) >= SCENE_TARGET:
+            raise StoryCanonError("all 9999 staged scenes are already completed")
+        if type(act) is not int or type(scene) is not int or not 1 <= scene <= 9999:
+            raise StoryCanonError("strict scene numbering requires 1..9999")
+        if not history:
+            if (act,scene) != (1,1):
+                raise StoryCanonError("Jeeves must begin at act one, scene one")
+        else:
+            prior = history[-1]
+            if not ((act == prior["act"] and scene == prior["scene"]+1) or
+                    (act == prior["act"]+1 and scene == 1)):
+                raise StoryCanonError(
+                    "only the exact next scene in the current or next act is allowed")
     source = story_scene_template(bible, sequence=len(history)+1,
                                   act=act, scene=scene)
     source["prior_digest"] = index["head_digest"]
     return {"path": scene_path(source), "document": source,
             "previous_history_digest": index["digest"],
+            "continuity_contract_required_before_human_commit":
+                contract is not None,
+            "next_global_sequence": len(history)+1,
+            "required_scene_target": 9999,
             "requires_external_Jeeves_content_generation": True,
             "write_authorized": False}
 
