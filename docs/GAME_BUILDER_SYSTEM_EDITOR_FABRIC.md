@@ -1674,3 +1674,125 @@ stock-source conservation. A full-scale
 native thousands-of-units game, network
 model and hardware performance validation
 remain separate deliverables.
+
+
+## Nineteenth original advanced family — Arena Fighting (12 October 2026)
+
+The Action-family Fighting Game editor now includes a genuinely executable
+offline original multi-round arena game, raising the distinct reference
+family count from eighteen to **19/43 = 44.2%** and leaving **24/43
+authoring-only families**. This is advanced deterministic Python reference
+gameplay and local authoring, *not* a native or device-certified fighting
+game build.
+
+### Original three-lane combat and authentic physical objectives
+
+The arena is a typed three-lane horizontal original stage with an 8–16 cell
+width, distinct authored player and opponent spawn coordinates, environmental
+hazards, bounded breakable line-of-sight cover and exact world weather/theme.
+The authored scene is validated as one content-addressed source, with
+bounds, unique IDs and occupied-cell checks. Neither fighter can be
+placed outside the stage or in another fighter, hazard or surviving
+cover object through the authorized map source. Signed source cannot
+mint an extra opponent, imported game character, copyrighted asset,
+impossible arena timer or arbitrary serialized win condition.
+
+Both combatants have actual position, horizontal facing, three-lane
+movement, health, stamina, meter, finite guard pool, stun, attack recovery,
+airborne interval, grounded/crouch mode, actual parry, hits, whiffs,
+combo, damage ledger and ringout counts. Movement increments only through
+real unoccupied intermediate cells and pays its own physical stamina.
+Eight differentiated original attacks are registered: jab, cross,
+kick, sweep, uppercut, grapple, projectile and special. Their range,
+damage, stamina cost, guard zone and original special-meter expense differ.
+Unreachable attacks physically whiff rather than awarding score, damage
+or a combo. Original ranged strikes are stopped by real authored cover
+and visually reduced by real fog; airborne attacks avoid true ground
+sweeps, while crouching avoids high non-special strikes.
+
+High and low guards block different physical zones. Properly timed
+parries consume stamina, neutralize genuine incoming strikes, and
+stun the opponent, but **expire after their current frame interval**;
+one permanently activated defensive shield is not allowed. Guard
+pressure drains guard durability, guard break creates recovery/stun,
+grapples bypass static guard at close range, and hitstun and recovery
+constrain subsequent attacks. Enemy behavior depends on real distance,
+stance, player action history, available stamina, active stun and
+defensive versus aggressive versus adaptive authored AI policy.
+Hit-confirmed combos and earned special meter provide real strategic
+progression, with bounded combo limit and damage scaling.
+
+A round ends only because a combatant actually loses health or the
+authenticated round timer is reached. Knockback changes live spatial
+position, and an authorized ringout can end a round only after genuine
+combat pushes a fighter beyond a real edge. Multi-round victories require
+the configured number of **actual round wins**, with resetting
+positions, health and stamina between rounds and a persistent record
+of both sides' historical results. A lost fight cannot be resurrected
+by posting a fake action, edited win flag or refunded damage receipt.
+
+### Fifty typed controls and functional Studio
+
+The editor has been extended from five to **50 typed
+gameplay-affecting design axes**. They govern grid width, best-of
+rounds, per-fighter health and stamina, attack cost, fatigue/recovery,
+hitstun/parry timing, airborne movement, finite guard durability,
+combo limits/damage, damage and pushback, ringout policy, real stage
+hazards and cover, AI style/adaptation, special/projectile meter costs,
+round clocks, optional original accessibility auto-guard and replay
+determinism policy. Existing timing, rollback-compatibility and
+input-buffer knobs remain explicit, distinct authored values.
+
+The Studio renders a physically separate original three-lane
+match arena, player and opponent colored geometric sprites,
+environmental hazards, intact cover, airborne and parry states,
+real combat HP/stamina/meter/guard/stun/combo, round tallies,
+ringout counts and frame time. All game-playable commands are
+drawn from the original strict action registry, with a keyboard
+mapping for approach/retreat, three-lane sidesteps, jab, kick,
+jump and parry. A separate eight-tool original scene painter
+can move fighter spawns, adjust permitted real hazards/cover,
+change original weather and scene theme, then requires new
+exact-source validation. Painting never mutates the operating
+game through a hidden permission path.
+
+The independent Windows/Linux regression lane tests genuine
+spatial whiffs, two actual KOs for match victory, opponent combat
+wins, distinct high/low blocking, parry stamina and recovery,
+stamina-conserving combos, original paid projectile/special,
+fog/cover interactions, ringouts, forged source/spawn rejection,
+portable original save replay, Studio controls, hybrid assembly
+and the offline no-native-certification CLI. Those checks need
+their own exact-head passing result before a CI pass is claimed.
+
+**Honest scope:** The original reference is a bounded turn-frame
+game, not a high-frame-rate 3D/2D fighting engine with animation
+cancel data, independent controller latency certification, verified
+online rollback netcode, network matchmaking, a large roster,
+motion-captured character animations or licensed commercial
+publication. Its user-facing edits and replay contracts are
+original and modular; native and device assurance remain separate
+tasks.
+
+## RTS fidelity supplement — seventy-seven real controls
+
+The original RTS editor further advances from 72 to **77 typed
+gameplay-control axes**. Actual ranged fire now checks intervening
+physical wall, building and friendly-body cover using an original
+grid line-of-sight test. Target designation can issue a legal
+move-then-fire order, but the attack does not shoot through
+opaque world geometry. Rain physically reduces safe ranged
+attack reach, and desert campaigns consume additional real
+logistics energy. Enemy forces are now able to attack and destroy
+the actual friendly command base from authentic nearby positions,
+producing a distinct real battle-loss cause. Authorized player
+victory halts the opposing simulation before a contradictory
+post-victory defeat can be invented. This deliberately goes
+beyond labels for weather, stance or enemy behavior.
+
+Dedicated adversarial regression cases cover obstructed
+projectiles, body-blocked ranged attacks, actual rain reach,
+desert resupply accounting, surviving base HP loss and an
+opposing side's legitimate command-destruction victory.
+The 77-control matrix is an authored tactical reference, not
+a claim of verified multi-thousand-unit native RTS performance.
