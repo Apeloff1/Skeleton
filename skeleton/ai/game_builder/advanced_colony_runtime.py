@@ -78,8 +78,10 @@ def start(config, seed):
     return apply_scene({
         "seed": seed, "tick": 0, "day": 1, "population": population,
         "healthy": population, "morale": 65, "health": 100,
-        "food": max(20, population * 2), "water": max(20, population * 2),
-        "wood": 14, "stone": 9, "medicine": 4, "credits": 20,
+        "food": max(config["initial_stores"], population * 2),
+        "water": max(config["initial_stores"], population * 2),
+        "wood": 14, "stone": 9, "medicine": 4,
+        "credits": config["starting_credits"],
         "district": 0, "districts": [], "threat_level": 0,
         "caravan_stock": 0, "buildings": {name: 0 for name in BUILDINGS},
         "workers": {name: 0 for name in ROLES},
@@ -121,21 +123,30 @@ def _advance(state, config):
     jobs = state["workers"]
     structures = state["buildings"]
     district = state["districts"][state["district"]]
-    farm = min(district["food"], jobs["farmers"] * (1 + structures["farm"]))
+    farm = min(district["food"], jobs["farmers"] *
+               (1 + structures["farm"]) * config["worker_productivity"])
     district["food"] -= farm
     state["food"] += farm
-    gathered = min(district["wood"], jobs["gatherers"] * 2)
+    gathered = min(district["wood"], jobs["gatherers"] * 2 * config["worker_productivity"])
     district["wood"] -= gathered
     state["wood"] += gathered
-    mined = min(district["stone"], jobs["miners"])
+    mined = min(district["stone"], jobs["miners"] * config["worker_productivity"])
     district["stone"] -= mined
     state["stone"] += mined
-    drawn = min(district["water"], max(0, structures["well"] * 3))
+    drawn = min(district["water"], structures["well"] * config["water_yield"])
     district["water"] -= drawn
     state["water"] += drawn
     if farm or gathered or mined or drawn:
         events.append("assigned_labor_produced_finite_goods")
     appetite = max(1, (people + 3) // 4) + config["need_decay"] // 4
+    if config["food_policy"] == "frugal":
+        appetite = max(1, appetite - 1)
+        state["morale"] = max(0, state["morale"] - 1)
+        events.append("frugal_consumption_policy")
+    elif config["food_policy"] == "abundant":
+        appetite += 1
+        state["morale"] = min(100, state["morale"] + 2)
+        events.append("abundant_consumption_policy")
     if state["ration_days"]:
         appetite = max(1, appetite - 1)
         state["ration_days"] -= 1
@@ -148,7 +159,7 @@ def _advance(state, config):
         events.append("basic_needs_unmet")
     else:
         state["starvation_days"] = 0
-        state["morale"] = min(100, state["morale"] + 1)
+        state["morale"] = min(100, state["morale"] + (2 if config["relationships"] else 1))
     if state["injured"]:
         care = min(state["injured"],
                    jobs["medics"] * (1 + structures["clinic"]), state["medicine"])
@@ -156,7 +167,19 @@ def _advance(state, config):
         state["medicine"] -= care
         if care:
             events.append("injured_settlers_healed")
-    if config["threats"] != "off" and state["day"] % 5 == 0:
+    if config["disasters"] != "off" and state["day"] % (
+            7 if config["disasters"] == "rare" else 4) == 0:
+        loss = min(state["food"], 2 + state["threat_level"])
+        state["food"] -= loss
+        state["health"] = max(0, state["health"] - (1 if structures["clinic"] else 3))
+        events.append("severe_weather_damaged_colony_supplies")
+    if config["disease_pressure"] and state["day"] % 7 == 0:
+        sick = min(max(0, people - state["injured"]),
+                   max(0, config["disease_pressure"] - structures["clinic"]))
+        state["injured"] += sick
+        if sick:
+            events.append("preventable_colony_disease_outbreak")
+    if config["threats"] != "off" and state["day"] % config["raid_interval"] == 0:
         strength = state["threat_level"] + 2 + (state["day"] // 10
                    if config["threats"] == "adaptive" else 0)
         defense = jobs["guards"] * 2 + structures["watch"] * 3 + state["fortification"]
@@ -192,6 +215,10 @@ def _advance(state, config):
             state["milestones"].append("thriving_outpost")
             events.append("thriving_outpost_milestone")
     state["healthy"] = max(0, state["population"] - state["injured"])
+    if config["ending_policy"] == "thriving_victory" and \
+            "thriving_outpost" in state["milestones"]:
+        state["finished"] = True
+        events.append("authored_campaign_victory")
     if state["population"] == 0:
         state["failed"] = True
         events.append("colony_abandoned")
@@ -255,6 +282,8 @@ def step(state, config, action):
         state["water"] += 1
         events.append("finite_caravan_trade")
     elif action == "recruit":
+        if not config["allow_migration"]:
+            raise ColonyActionError("authored migration policy forbids recruitment")
         if state["population"] >= config["settlers"] + state["buildings"]["house"] * 6:
             raise ColonyActionError("housing capacity prevents expansion")
         _take(state, "credits", 8)
