@@ -363,6 +363,19 @@ class DragonGleanMatrix:
         return sorted(briefs,key=lambda b:(
             b["priority"],-b["source_count"],b["lens"],b["proposition_digest"]))[:limit]
 
+    def _wiki_source_stage(self,owner: str,sid: str,digest: str) -> str | None:
+        # Almanakk may not have been installed for this tenant/device yet.
+        # Missing tables are a hard 'not independently reviewed', never an
+        # SQLite exception that could be mistaken for accepted evidence.
+        has_table=self.db.execute("""SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='dragon_almanakk_reviews'""").fetchone()
+        if not has_table:
+            return None
+        row=self.db.execute("""SELECT stage FROM dragon_almanakk_reviews
+            WHERE owner=? AND source_id=? AND content_digest=?
+            ORDER BY updated_at DESC LIMIT 1""",(owner,sid,digest)).fetchone()
+        return row[0] if row else None
+
     def queue_shadow_candidate(self,owner: str,lens:str,proposition_digest:str,*,
                                authorized:bool,at:float,
                                wiki_claim_verify:Callable[[str,str,str,tuple[str,...]],bool]) -> str:
@@ -390,10 +403,8 @@ class DragonGleanMatrix:
             if not sources:
                 raise PermissionError("no corroborated sources")
             for sid,digest in sources:
-                current=self.db.execute("""SELECT stage FROM dragon_almanakk_reviews
-                    WHERE owner=? AND source_id=? AND content_digest=?
-                    ORDER BY updated_at DESC LIMIT 1""",(owner,sid,digest)).fetchone()
-                if not current or current[0] not in (
+                stage=self._wiki_source_stage(owner,sid,digest)
+                if stage not in (
                         "wiki_verified","shadow_validated","weight_handoff"):
                     raise PermissionError("all corroborating sources require independent Wiki review")
             evidence=tuple(cells[0]["evidence_fingerprint"] for _ in range(1))
@@ -437,10 +448,8 @@ class DragonGleanMatrix:
                        latest_pairs=={tuple(v) for v in revisions})
             if fresh:
                 for sid,digest in latest_pairs:
-                    row=self.db.execute("""SELECT stage FROM dragon_almanakk_reviews
-                        WHERE owner=? AND source_id=? AND content_digest=?
-                        ORDER BY updated_at DESC LIMIT 1""",(owner,sid,digest)).fetchone()
-                    if not row or row[0] not in ("wiki_verified","shadow_validated","weight_handoff"):
+                    if self._wiki_source_stage(owner,sid,digest) not in (
+                            "wiki_verified","shadow_validated","weight_handoff"):
                         fresh=False
                         break
             result.append(dict(lens=lens,proposition_digest=prop,
