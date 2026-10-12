@@ -371,3 +371,87 @@ detection.
 **Release remains gated** on actual installed host adapters, real device
 state signals, independent Wiki/holdout evaluators, tenant-isolated storage,
 deployment-specific resource budgets and passing exact-head gates.
+
+
+## Host-consented idle research (2026-10-12 UTC)
+
+The next milestone adds a **durable opt-in control** in
+`skeleton/ai/webcrawler/dragon_family_idle_host.py`, built on the existing
+`DragonConsentLedger` and canonical `DragonFamilyCustodyBridge`. It does
+not make the remote web backend an authoritative observer of a user's device.
+
+1. The host authenticates the user's tenant and issues the existing Dragon
+   consent receipt for BOTH capture and analysis, with `scope_digest` from
+   `idle_consent_scope(owner,task_topics,adjacent_topics)` and a finite
+   expiry no longer than 30 days. Only the existing ConsentLedger can mint
+   that receipt; this module cannot invent user approval.
+2. The host creates `DragonIdleHostControl(bridge)`, then calls
+   `activate(consent_id=...,task_topics=...,adjacent_topics=...,at=...,authorized=True)`.
+   Consent, source scope and session generation are persisted in the canonical
+   SQLite database. Opt-in is denied if the receipt is absent, expired,
+   revoked or for a different task scope.
+3. From its **existing OS/native app idle event loop**, the host invokes
+   `tick(authorized=True,host_idle_state=...,article_capture=...,
+   video_capture=...,monitor_capture=...)`. The idle callback must report
+   accurate wall time, last local interaction, foreground work, app jobs,
+   consent, and resource availability. An HTTP client is **not** a trusted
+   local idle detector, and the backend does not silently schedule ticks.
+4. The source/role budget is reserved atomically **within the same SQLite
+   transaction as the worker lease**, not on optimistic dispatch count.
+   Defaults: no more than 48 attempts/day and 20 per role/day. The host may
+   configure stricter limits. Separate cooldowns and failed-attempt backoff
+   apply in the specialist coordinator.
+5. On every host observation, session generation, consent scope, revocation
+   and expiry are revalidated. A mid-capture opt-out or consent revocation
+   discards the result; no game growth or Almanakk promotion is allowed.
+   `stop(at=...,authorized=True)` fences the active session generation
+   without revoking consent used by unrelated application workflows.
+6. `read_idle_host_projection` is a **read-only** authenticated status
+   projection with no schema creation, no worker start and no client-mintable
+   consent. The companion displays opt-in, daily attempts and next eligible
+   tick, but its `host_idle_now` is deliberately `null`. A server status
+   screen cannot know whether a local computer is currently idle.
+
+A minimal host-facing example after a separately consented, policy-approved
+source catalog and reviewer have already been configured:
+
+```python
+from skeleton.ai.webcrawler.dragon_family_idle_host import (
+    DragonIdleHostControl, idle_consent_scope,
+)
+# Only run inside the authenticated native/desktop host boundary:
+scope = idle_consent_scope(owner, ("game_engine",), ("physics",))
+# The existing DragonConsentLedger issues an explicit, revocable capture+
+# analysis receipt with scope and deadline after user authorization.
+host = DragonIdleHostControl(owner_locked_custody_bridge)
+host.activate(
+    consent_id=existing_consent_receipt.consent_id,
+    task_topics=("game_engine",), adjacent_topics=("physics",),
+    at=host_utc_now, authorized=True,
+)
+# Each callback must provide truly reviewed source evidence, or None.
+summary = host.tick(
+    authorized=True,
+    host_idle_state=read_trusted_os_activity,
+    article_capture=capture_consented_reviewed_article,
+    video_capture=capture_licensed_timecoded_video,
+    monitor_capture=check_and_review_changed_source,
+)
+# Foreground resumption, sign-out or consent withdrawal:
+host.stop(at=host_utc_now, authorized=True)
+```
+
+Test coverage in `tests/test_ai_webcrawler_dragon_family_idle_host.py`
+includes scoped opt-in, deny-before-activation, consent expiry/revocation,
+mid-capture opt-out, foreground interruption, one-time growth, atomic daily
+role quotas, rate throttling, read-only status and SQLite restart recovery.
+
+### Production release boundary
+
+This milestone completes the host **control interface**, not OS detection or
+an installed scheduler. Deployment must still connect independently trusted
+Windows/macOS/Linux local activity probes, cancellable source adapters with
+robots/SSRF/terms/rights checks, independent Wiki/holdout evaluators,
+operator stop controls, and a complete passing exact-head release suite.
+No code introduced here trains or mutates AI model weights; sandbox
+`shadow_validated` and signed `weight_handoff` remain distinct stages.
