@@ -1047,7 +1047,8 @@ function paintStealthCell([x,y]){
  const layout=doc.layout,tool=$("advanced-paint-tool").value,p=[x,y];
  const eq=q=>Array.isArray(q)&&q[0]===x&&q[1]===y;
  const arrays=["walls","shadows","vents","doors","cameras","keycards","intel"];
- for(const key of arrays)layout[key]=layout[key].filter(q=>!eq(q));
+ if(arrays.includes(tool)||tool==="erase"||tool==="patrol_route")
+  for(const key of arrays)layout[key]=layout[key].filter(q=>!eq(q));
  if(tool==="erase"){
   layout.guard_routes=layout.guard_routes.filter(r=>!r.some(eq));
  }else if(arrays.includes(tool)){
