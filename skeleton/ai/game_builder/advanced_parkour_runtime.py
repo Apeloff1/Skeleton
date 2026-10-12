@@ -101,8 +101,8 @@ def normalize_layout(config,layout):
             raise ParkourActionError("medal must have exact physical location")
         x=_int(medal["x"],1,exit_x-1,"medal x")
         lane=_int(medal["lane"],0,2,"medal lane")
-        if (x,lane) in seen:
-            raise ParkourActionError("duplicated earned medal location")
+        if (x,lane) in seen or any(m["x"]==x for m in medals_out):
+            raise ParkourActionError("earned medal positions must have unique course columns")
         seen.add((x,lane));medals_out.append({"x":x,"lane":lane})
     hazards=layout["obstacles"]
     if type(hazards) is not list or not 2<=len(hazards)<=24:
@@ -256,10 +256,9 @@ def step(state,config,action):
              if old_x<part["x"]<=state["x"] and part["lane"]==state["lane"]]
     for part in crossed:
         kind=part["kind"]
-        enough=(action in COMPATIBLE[kind] and (
-            kind!="wall" or action in ("wall_run","grapple") or
-            part["height"]<=config["vault_clearance"] if action=="vault"
-            else True))
+        enough=action in COMPATIBLE[kind]
+        if kind=="wall" and action=="vault":
+            enough=enough and part["height"]<=config["vault_clearance"]
         if action in ("jump","double_jump") and kind in ("gap","rail","hazard"):
             enough=enough and state["height"]>=part["height"]
         if action=="grapple" and part["height"]>config["grapple_reach"]:
