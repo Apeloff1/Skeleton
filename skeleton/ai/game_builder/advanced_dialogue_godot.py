@@ -12,7 +12,7 @@ from .advanced_godot_export import (
     AdvancedGodotExportError, NativeAdvancedGamePackage, _json,
 )
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
-from .advanced_level_scenes import make_advanced_scene, validate_advanced_scene
+from .advanced_level_scenes import SceneError, make_advanced_scene, validate_advanced_scene
 from .dual_runtime_export import _PROJECT, _SCENE, _EXPORT_PRESETS
 from .system_editors import make_editor_document
 
@@ -425,7 +425,10 @@ def render_dialogue_godot_package(
     if type(session) is not dict or session.get("editor") != "dialogue":
         raise AdvancedGodotExportError("authored replay-verified Dialogue game required")
     cfg = make_editor_document("dialogue", settings)
-    verify_advanced_session(session, cfg["settings"])
+    try:
+        verify_advanced_session(session, cfg["settings"])
+    except SceneError as exc:
+        raise AdvancedGodotExportError("reviewed Dialogue source scene does not match session settings") from exc
     scene = (
         validate_advanced_scene(session["scene"], cfg["settings"])
         if session.get("scene") is not None
