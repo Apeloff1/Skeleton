@@ -114,20 +114,20 @@ class OriginalColonyRuntimeTests(unittest.TestCase):
                 verify_advanced_session(forged, cfg)
         save = export_advanced_savegame(session, cfg)
         result = import_advanced_savegame(save)
-        self.assertEqual(result["editor"], "colony")
+        self.assertEqual(result["session"]["editor"], "colony")
         next_save = continue_advanced_savegame(save, ["build:well", "tick"])
-        self.assertTrue(verify_advanced_session(next_save["session"], cfg))
+        self.assertTrue(verify_advanced_session(import_advanced_savegame(next_save)["session"], cfg))
 
     def test_original_population_and_water_depletion_are_real(self):
         cfg = {"settlers": 1, "jobs": 1, "threats": "off", "need_decay": 20}
         scene = make_advanced_scene("colony", cfg, seed=0)
-        result = run_advanced_session("colony", cfg, ["tick:4"] * 3,
+        result = run_advanced_session("colony", cfg, ["tick:4"] * 2,
                                       scene=scene)
         self.assertTrue(result["state"]["failed"])
         self.assertTrue(result["terminal"])
         self.assertEqual(result["state"]["population"], 0)
         with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("colony", cfg, ["tick:4"] * 3 + ["rest"], scene=scene)
+            run_advanced_session("colony", cfg, ["tick:4"] * 2 + ["rest"], scene=scene)
 
     def test_game_actions_not_arbitrary_code(self):
         for cmd in ("eval('1')", "teleport:all", "mine:50000", "trade:infinite"):
