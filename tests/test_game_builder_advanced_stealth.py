@@ -158,7 +158,7 @@ class OriginalStealthReferenceTests(unittest.TestCase):
         self.assertEqual(import_advanced_savegame(save)["session"],session)
         following=continue_advanced_savegame(save,["move_east"])
         self.assertTrue(import_advanced_savegame(following)["verified"])
-        for field,new in (("score",10000000),("archive",True),("alarm",0),
+        for field,new in (("score",10000000),("archive",True),("alarm",90),
                           ("finished",True),("keycards_owned",20)):
             altered=deepcopy(session)
             altered["state"][field]=new
