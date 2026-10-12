@@ -11,6 +11,7 @@ from copy import deepcopy
 from fractions import Fraction
 from .advanced_physics_oriented import (
     oriented_world, oriented_static, oriented_pairs,
+    sat_manifold, box_vertices,
 )
 from .advanced_physics_dynamics import (
     resolve_moving_pairs, advance_rotation, apply_torque,
@@ -154,9 +155,23 @@ def normalize_layout(config, layout):
            for axis in (range(3) if depth > 1 else range(2))):
         raise PhysicsActionError("goal cannot award victory on spawn without physical movement")
     for i, a in enumerate(bodies):
-        for b in bodies[i+1:]:
-            if all(abs(a["position"][axis] - b["position"][axis]) <
-                   a["radius"] + b["radius"] for axis in range(3 if depth > 1 else 2)):
+        for other in bodies[i+1:]:
+            if config["collision_geometry"]=="oriented_box":
+                shape_a={"position":a["position"],"half_size":a["shape_half"],
+                         "orientation":a["initial_orientation"]}
+                shape_b={"position":other["position"],
+                         "half_size":other["shape_half"],
+                         "orientation":other["initial_orientation"]}
+                if depth>1:
+                    shape_a["z_radius"]=a["radius"]
+                    shape_b["z_radius"]=other["radius"]
+                overlapping=sat_manifold(shape_a,shape_b) is not None
+            else:
+                overlapping=all(
+                    abs(a["position"][axis] - other["position"][axis]) <
+                    a["radius"] + other["radius"]
+                    for axis in range(3 if depth > 1 else 2))
+            if overlapping:
                 raise PhysicsActionError("dynamic rigid bodies cannot begin interpenetrating")
     fixtures = layout["fixtures"]
     if type(fixtures) is not list or len(fixtures) > 24:
@@ -182,12 +197,31 @@ def normalize_layout(config, layout):
             "layer": _number(original["layer"], 1, 3, "fixture layer"),
         })
     for body in bodies:
+        if config["collision_geometry"]=="oriented_box":
+            corners=box_vertices(body["position"],body["shape_half"],
+                                 body["initial_orientation"])
+            if any(not 0<=vertex[0]<=bound_x or
+                   not 0<=vertex[1]<=floor*SCALE for vertex in corners):
+                raise PhysicsActionError("rotated body corners exceed original playable map")
         for fixture in normalized_fixtures:
-            if body["mask"] & fixture["layer"] and all(
-                abs(body["position"][axis] - fixture["position"][axis])
-                < body["radius"] + fixture["half_size"][axis]
-                for axis in range(3 if depth > 1 else 2)
-            ):
+            if not (body["mask"] & fixture["layer"]):
+                continue
+            if config["collision_geometry"]=="oriented_box":
+                shape_a={"position":body["position"],"half_size":body["shape_half"],
+                         "orientation":body["initial_orientation"]}
+                shape_b={"position":fixture["position"],
+                         "half_size":fixture["half_size"],
+                         "orientation":fixture["orientation"]}
+                if depth>1:
+                    shape_a["z_radius"]=body["radius"]
+                    shape_b["z_radius"]=fixture["half_size"][2]
+                overlapping=sat_manifold(shape_a,shape_b) is not None
+            else:
+                overlapping=all(
+                    abs(body["position"][axis]-fixture["position"][axis]) <
+                    body["radius"]+fixture["half_size"][axis]
+                    for axis in range(3 if depth>1 else 2))
+            if overlapping:
                 raise PhysicsActionError("starting body overlaps a blocking solid")
     anchors = layout["anchors"]
     if type(anchors) is not list or len(anchors) != 2:
