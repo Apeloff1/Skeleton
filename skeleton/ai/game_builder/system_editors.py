@@ -5907,8 +5907,40 @@ for _entry in CATALOG:
             {"key": "flight_steps_limit", "kind": "int", "default": 128, "minimum": 32, "maximum": 128, "options": []},
             {"key": "autopilot", "kind": "bool", "default": False, "minimum": None, "maximum": None, "options": []},
         ])
+# Distinct genuine vessel mechanics for skiff, sloop and schooner.
+for _entry in CATALOG:
+    if _entry["id"] == "sailing":
+        _entry["fields"].extend([
+            {"key": "route_length", "kind": "int", "default": 48, "minimum": 40, "maximum": 120, "options": []},
+            {"key": "harbor_length", "kind": "int", "default": 12, "minimum": 6, "maximum": 20, "options": []},
+            {"key": "launch_speed", "kind": "int", "default": 3, "minimum": 0, "maximum": 15, "options": []},
+            {"key": "cargo_capacity", "kind": "int", "default": 100, "minimum": 10, "maximum": 500, "options": []},
+            {"key": "cargo_contract", "kind": "int", "default": 20, "minimum": 1, "maximum": 200, "options": []},
+            {"key": "sail_area", "kind": "int", "default": 60, "minimum": 20, "maximum": 120, "options": []},
+            {"key": "sail_trim", "kind": "int", "default": 80, "minimum": 0, "maximum": 100, "options": []},
+            {"key": "mast_integrity", "kind": "int", "default": 75, "minimum": 10, "maximum": 100, "options": []},
+            {"key": "engine_fuel", "kind": "int", "default": 60, "minimum": 0, "maximum": 300, "options": []},
+            {"key": "engine_power", "kind": "int", "default": 25, "minimum": 1, "maximum": 50, "options": []},
+            {"key": "tide_strength", "kind": "int", "default": 5, "minimum": 0, "maximum": 30, "options": []},
+            {"key": "current_period", "kind": "int", "default": 5, "minimum": 1, "maximum": 12, "options": []},
+            {"key": "max_speed", "kind": "int", "default": 12, "minimum": 3, "maximum": 25, "options": []},
+            {"key": "draft", "kind": "int", "default": 4, "minimum": 1, "maximum": 12, "options": []},
+            {"key": "shoal_damage", "kind": "int", "default": 14, "minimum": 1, "maximum": 60, "options": []},
+            {"key": "repair_supplies", "kind": "int", "default": 2, "minimum": 0, "maximum": 8, "options": []},
+            {"key": "provisions", "kind": "int", "default": 160, "minimum": 20, "maximum": 600, "options": []},
+            {"key": "safe_dock_speed", "kind": "int", "default": 5, "minimum": 0, "maximum": 20, "options": []},
+            {"key": "wind_variability", "kind": "int", "default": 6, "minimum": 0, "maximum": 20, "options": []},
+            {"key": "storm_resistance", "kind": "int", "default": 20, "minimum": 0, "maximum": 100, "options": []},
+            {"key": "crew_morale", "kind": "int", "default": 80, "minimum": 0, "maximum": 100, "options": []},
+            {"key": "buoy_lane_tolerance", "kind": "int", "default": 1, "minimum": 0, "maximum": 3, "options": []},
+            {"key": "fatigue_limit", "kind": "int", "default": 100, "minimum": 20, "maximum": 400, "options": []},
+            {"key": "anchor_brake", "kind": "int", "default": 8, "minimum": 1, "maximum": 20, "options": []},
+            {"key": "cargo_spill", "kind": "int", "default": 2, "minimum": 0, "maximum": 50, "options": []},
+            {"key": "voyage_turn_limit", "kind": "int", "default": 128, "minimum": 30, "maximum": 128, "options": []},
+            {"key": "vessel_class", "kind": "enum", "default": "sloop", "minimum": None, "maximum": None, "options": ["skiff", "sloop", "schooner"]},
+        ])
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6001,6 +6033,15 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
         normalized["board_width"], normalized["board_height"]
     ):
         raise SystemEditorError("tactics range exceeds available board dimensions")
+    if editor_id == "sailing":
+        if normalized["cargo_contract"] > normalized["cargo_capacity"]:
+            raise SystemEditorError("cargo delivery cannot exceed vessel hold capacity")
+        if normalized["harbor_length"] > normalized["route_length"] // 3:
+            raise SystemEditorError("harbor consumes essential navigation route")
+        if normalized["launch_speed"] > normalized["max_speed"]:
+            raise SystemEditorError("initial vessel velocity exceeds safe hull speed")
+        if normalized["safe_dock_speed"] > normalized["max_speed"]:
+            raise SystemEditorError("dock limit outside vessel velocity envelope")
     if editor_id == "flight":
         if normalized["stall_speed"] > normalized["engine_thrust"]:
             raise SystemEditorError("stall speed exceeds configured thrust envelope")
