@@ -1314,6 +1314,234 @@ CATALOG = json.loads(r'''[
         "minimum": null,
         "maximum": null,
         "options": []
+      },
+      {
+        "key": "health",
+        "kind": "int",
+        "default": 12,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "stamina",
+        "kind": "int",
+        "default": 8,
+        "minimum": 2,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "sprint_stamina",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "stamina_regen",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "stun_charges",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "smoke_charges",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "emp_charges",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "hacking_charges",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "medkits",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "medkit_heal",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "disguises",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "stun_duration",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "smoke_duration",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "crouch_visibility_reduction",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "shadow_bonus",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "hearing_range",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "crouch_noise_threshold",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "detection_gain",
+        "kind": "int",
+        "default": 14,
+        "minimum": 1,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "noise_gain",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "contact_damage",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "camera_range",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "alarm_gain",
+        "kind": "int",
+        "default": 15,
+        "minimum": 1,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "alarm_cooldown",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "alarm_damage",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "fail_on_alarm",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "emp_radius",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "mission",
+        "kind": "enum",
+        "default": "archive",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "archive",
+          "sabotage",
+          "intelligence"
+        ]
+      },
+      {
+        "key": "intel_target",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
       }
     ],
     "preview": null
@@ -2397,7 +2625,7 @@ CATALOG = json.loads(r'''[
   }
 ]''')
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
