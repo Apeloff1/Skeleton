@@ -58,8 +58,10 @@ def default_layout(config,seed):
         "start":[0,1],
         "exit_x":length-1,
         "obstacles":obstacles,
-        "medals":[{"x":length//3,"lane":1},
-                  {"x":2*length//3,"lane":1}],
+        "medals":[
+            {"x":(length*i)//(config["medals_required"]+1),"lane":1}
+            for i in range(1,config["medals_required"]+1)
+        ],
         "checkpoints":[length//4,length//2,3*length//4],
         "wind_direction":(-1,1)[seed%2],
     }
@@ -263,11 +265,16 @@ def step(state,config,action):
             enough=enough and state["height"]>=part["height"]
         if action=="grapple" and part["height"]>config["grapple_reach"]:
             enough=False
+        if action in ("climb","mantle") and (
+            part["height"]*12>state["grip"]+state["height"]*2
+        ):
+            enough=False
         if action=="wall_run" and part["height"]>config["wall_run_height"]:
             enough=False
         if not enough:
             damage=config["collision_damage"]+(
-                config["hardcore_damage"] if config["difficulty"]=="hardcore" else 0
+                config["hardcore_damage"] if config["difficulty"]=="hardcore" else
+                -config["collision_damage"]//2 if config["difficulty"]=="assisted" else 0
             )
             state["health"]=max(0,state["health"]-damage)
             state["falls"]+=1
@@ -302,7 +309,8 @@ def step(state,config,action):
         state["cooldown"]-=1
     if action not in ("rest","recover"):
         state["stamina"]=min(state["max_stamina"],
-                             state["stamina"]+config["stamina_regen_per_turn"])
+                             state["stamina"]+config["stamina_regen_per_turn"]+
+                             (1 if config["difficulty"]=="assisted" else 0))
     state["tick"]+=1
     if state["health"]<=0 or state["tick"]>=config["time_limit"]:
         state["failed"]=True
