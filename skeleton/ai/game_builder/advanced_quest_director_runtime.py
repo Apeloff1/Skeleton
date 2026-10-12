@@ -727,6 +727,12 @@ def apply_verified_external_gameplay_event(state,config,site_id,receipt,kind):
         any(c not in "0123456789abcdef" for c in
             receipt["source_session_digest"])):
         raise QuestDirectorError("exact original game event source custody required")
+    if (receipt["source_editor"],receipt["source_event"],kind) not in (
+        ("farming","mature_crop_harvested","discover"),
+        ("sailing","original_cargo_delivered","help"),
+        ("flight","runway_landing_confirmed","discover"),
+    ):
+        raise QuestDirectorError("genre event kind cannot impersonate a different original source")
     if len(state["events_log"])>=config["event_budget"]:
         raise QuestDirectorError("original NPC world event budget exceeded")
     site=_site(state,site_id)
