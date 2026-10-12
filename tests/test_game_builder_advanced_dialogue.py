@@ -164,8 +164,8 @@ class OriginalAdvancedDialogueTests(unittest.TestCase):
              make_editor_document("npc_society", {"population": 64})],
             authorized=True,
         )
-        self.assertTrue(result["advanced_evidence"])
-        played = {x["editor"] for x in result["advanced_evidence"]}
+        self.assertTrue(result["advanced_runtime_evidence"])
+        played = {x["editor"] for x in result["advanced_runtime_evidence"]}
         self.assertIn("dialogue", played)
         self.assertIn("npc_society", played)
 
