@@ -1,9 +1,10 @@
 """Fail-closed operator entry for the complete, reconciled source evidence lane.
 
 The previous independent batch 0024 and orphaned batch 0030 do not form a
-consecutive custody chain. Their *individual pinned references* were replayed
-into audited, strictly consecutive batches 0031..0037. This lane deliberately
-uses the four historical valid supplements then 0031..0037, not the orphans.
+consecutive custody chain. Their pinned catalog discoveries were reconciled
+into audited consecutive batches 0031..0037; further, twelve new source
+catalogs extend this custody lineage through 0038..0041. Excluded orphans
+never appear as asserted ancestors or training grants.
 """
 from __future__ import annotations
 
@@ -14,12 +15,12 @@ from .dragon_discovery_admission import (
     DragonDiscoveryAdmission, _supplement, validate_discovery_chain,
 )
 
-EXPECTED_RAW_TOTAL = 10_551
+EXPECTED_RAW_TOTAL = 12_777
 SOURCE_BATCHES = (
     "docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json",
     *(
         f"docs/ai/evidence/dragon-source-expansion-20261012-batch-{n:04d}.json"
-        for n in (21, 22, 23, 31, 32, 33, 34, 35, 36, 37)
+        for n in (21, 22, 23, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41)
     ),
 )
 EXCLUDED_ORPHANS = (
