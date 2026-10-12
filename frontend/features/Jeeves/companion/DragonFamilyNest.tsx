@@ -45,6 +45,26 @@ export default function DragonFamilyNest({family}:{family?:DragonFamilyProjectio
     'Detects verified changes in known sources'} · idle only</Text>
    <Text style={s.muted}>New information acquired: {child.discoveries} · Last growth: {safeDate(child.last_grew_at)}</Text>
    <Text style={s.privacy}>Only grows while the host confirms idle time, consent, and resource capacity. Updated or adjacent knowledge must be independently verified.</Text></View>
+  {f.idle_work&&<View style={s.details} accessibilityLabel="Idle-only specialist work status">
+   <Text style={s.title}>🌙 Dragon Nest · Idle Research</Text>
+   <Text style={s.muted}>{f.idle_work.configured?
+    'Host dispatch ledger connected. Current device activity has not been observed in this view.':
+    'Idle scheduler has no durable dispatch ledger yet.'}</Text>
+   <View style={s.brood}>{f.children.map(child=>{
+     const status=f.idle_work?.workers[child.id];
+     return <View key={child.id} style={s.creature}>
+      <Text style={s.name}>{child.name}</Text>
+      <Text style={s.role}>{status?
+       `Sources: ${status.known_sources} · New: ${status.last_changes}`:
+       'Waiting for idle research'}</Text>
+      <Text style={s.role}>{status?
+       `Unchanged: ${status.unchanged} · Errors: ${status.failed}`:
+       'No dispatch history'}</Text>
+      {status?.earliest_due_at&&<Text style={s.when}>Next eligible: {safeDate(status.earliest_due_at)}</Text>}
+     </View>;
+   })}</View>
+   <Text style={s.privacy}>Only the trusted host can attest idle time and authorize new research. Pending leases are not proof that anything is running now.</Text>
+  </View>}
   {f.almanakk&&<View style={s.details} accessibilityLabel="Almanakk verified research pipeline">
    <Text style={s.title}>📚 Almanakk · Wiki knowledge journey</Text>
    <Text style={s.muted}>Dragon → Almanakk → Wiki → HOAG/Jeeves → Game Builder</Text>
