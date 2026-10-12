@@ -18,6 +18,7 @@ import sqlite3
 from .core import CrawlDocument, CrawlPolicy, destination_allowed
 from .dragon_crawl_custody import CapturedSource, bind_crawl_evidence
 from .dragon_family import DragonFamily, SourceReceipt, SourceSeed, _digest, _epoch, _owner, _source_id, _tokens, _uri
+from .dragon_family_almanakk import DragonAlmanakkLane, WikiEvidence, SandboxEvidence
 from .dragon_knowledge_ledger import DragonKnowledgeLedger
 from .video_digest import VideoKnowledgeChunk
 
@@ -107,8 +108,20 @@ class DragonFamilyCustodyBridge:
         return False
 
     def family(self) -> DragonFamily:
-        """Same SQLite connection and authority as the canonical Dragon Lab."""
-        return DragonFamily(self.db, approval=self.verify)
+        """Owner-locked family on the canonical research SQLite connection."""
+        return DragonFamily(self.db, approval=self.verify, owner_scope=self.owner)
+
+    def almanakk(self, *, wiki_verify=None, sandbox_verify=None,
+                 handoff_verify=None) -> DragonAlmanakkLane:
+        """Owner-locked integration; independent evaluators are host supplied.
+
+        No reviewer callback, no Wiki/shadow/weight promotion.
+        """
+        return DragonAlmanakkLane(
+            self.db,source_approval=self.verify,owner_scope=self.owner,
+            wiki_verify=wiki_verify,sandbox_verify=sandbox_verify,
+            handoff_verify=handoff_verify,
+        )
 
     def article(self, snapshot: ApprovedSourceSnapshot,
                 document: CrawlDocument) -> tuple[SourceSeed, SourceReceipt]:
