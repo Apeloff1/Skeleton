@@ -79,6 +79,25 @@ class OriginalPeerRollbackTests(unittest.TestCase):
         self.assertNotEqual(proof["predicted_match_digest"],correct["digest"])
         self.assertEqual(correct["state"]["opponent"]["x"],4)
 
+
+    def test_authoritative_parry_revives_match_after_wrong_predicted_knockout(self):
+        cfg=self.rules(rounds_to_win=1,enemy_health=10,attack_bonus=10)
+        blue=["approach","approach","inspect","jab","inspect"]
+        predicted=["approach","approach","inspect","inspect","inspect"]
+        actual=["approach","approach","inspect","parry","inspect"]
+        correction=reconcile_peer_prediction(cfg,blue,predicted,actual)
+        self.assertEqual(correction["reconciled_indices"],[3])
+        self.assertTrue(correction["prediction_terminal_truncated"])
+        self.assertEqual(correction["predicted_frames_executed"],4)
+        self.assertEqual(correction["authoritative_match"]["frames"],5)
+        self.assertFalse(correction["authoritative_match"]["terminal"])
+        self.assertEqual(correction["authoritative_match"]["state"]["opponent"]["parried"],1)
+        self.assertTrue(verify_peer_reconciliation(correction,cfg))
+        altered=deepcopy(correction)
+        altered["prediction_terminal_truncated"]=False
+        with self.assertRaises(FightingRollbackError):
+            verify_peer_reconciliation(altered,cfg)
+
     def test_actual_parry_is_order_dependent_and_cannot_be_fabricated(self):
         cfg=self.rules(starting_stamina=100)
         blue=["approach","approach","inspect","jab"]
