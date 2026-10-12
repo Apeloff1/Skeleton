@@ -5874,8 +5874,41 @@ CATALOG = json.loads(r'''[
     "preview": null
   }
 ]''')
+# Advanced flight axes materially affect the executable flight model.
+for _entry in CATALOG:
+    if _entry["id"] == "flight":
+        _entry["fields"].extend([
+            {"key": "fuel_capacity", "kind": "int", "default": 160, "minimum": 20, "maximum": 500, "options": []},
+            {"key": "mass", "kind": "int", "default": 45, "minimum": 1, "maximum": 150, "options": []},
+            {"key": "drag", "kind": "int", "default": 20, "minimum": 1, "maximum": 80, "options": []},
+            {"key": "turbulence", "kind": "int", "default": 4, "minimum": 0, "maximum": 20, "options": []},
+            {"key": "engine_heat_limit", "kind": "int", "default": 90, "minimum": 20, "maximum": 200, "options": []},
+            {"key": "cooling_rate", "kind": "int", "default": 2, "minimum": 1, "maximum": 20, "options": []},
+            {"key": "runway_length", "kind": "int", "default": 12, "minimum": 6, "maximum": 20, "options": []},
+            {"key": "route_length", "kind": "int", "default": 50, "minimum": 40, "maximum": 120, "options": []},
+            {"key": "launch_altitude", "kind": "int", "default": 45, "minimum": 5, "maximum": 100, "options": []},
+            {"key": "max_altitude", "kind": "int", "default": 240, "minimum": 40, "maximum": 400, "options": []},
+            {"key": "landing_speed", "kind": "int", "default": 75, "minimum": 10, "maximum": 250, "options": []},
+            {"key": "landing_altitude", "kind": "int", "default": 14, "minimum": 2, "maximum": 50, "options": []},
+            {"key": "stall_sink", "kind": "int", "default": 9, "minimum": 1, "maximum": 20, "options": []},
+            {"key": "repair_kits", "kind": "int", "default": 2, "minimum": 0, "maximum": 4, "options": []},
+            {"key": "boost_charges", "kind": "int", "default": 3, "minimum": 0, "maximum": 8, "options": []},
+            {"key": "fuel_burn", "kind": "int", "default": 1, "minimum": 1, "maximum": 5, "options": []},
+            {"key": "terrain_height", "kind": "int", "default": 12, "minimum": 0, "maximum": 70, "options": []},
+            {"key": "waypoint_floor", "kind": "int", "default": 10, "minimum": 1, "maximum": 100, "options": []},
+            {"key": "waypoint_ceiling", "kind": "int", "default": 130, "minimum": 20, "maximum": 350, "options": []},
+            {"key": "headwind", "kind": "int", "default": 2, "minimum": 0, "maximum": 20, "options": []},
+            {"key": "wind_period", "kind": "int", "default": 6, "minimum": 1, "maximum": 12, "options": []},
+            {"key": "damage_tolerance", "kind": "int", "default": 60, "minimum": 20, "maximum": 200, "options": []},
+            {"key": "airspace_width", "kind": "int", "default": 4, "minimum": 1, "maximum": 8, "options": []},
+            {"key": "lift_response", "kind": "int", "default": 4, "minimum": 1, "maximum": 12, "options": []},
+            {"key": "control_response", "kind": "int", "default": 1, "minimum": 1, "maximum": 3, "options": []},
+            {"key": "landing_fuel_reserve", "kind": "int", "default": 0, "minimum": 0, "maximum": 80, "options": []},
+            {"key": "flight_steps_limit", "kind": "int", "default": 128, "minimum": 32, "maximum": 128, "options": []},
+            {"key": "autopilot", "kind": "bool", "default": False, "minimum": None, "maximum": None, "options": []},
+        ])
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -5968,8 +6001,22 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
         normalized["board_width"], normalized["board_height"]
     ):
         raise SystemEditorError("tactics range exceeds available board dimensions")
-    if editor_id == "flight" and normalized["stall_speed"] > normalized["engine_thrust"]:
-        raise SystemEditorError("stall speed exceeds configured thrust envelope")
+    if editor_id == "flight":
+        if normalized["stall_speed"] > normalized["engine_thrust"]:
+            raise SystemEditorError("stall speed exceeds configured thrust envelope")
+        if normalized["runway_length"] > normalized["route_length"] // 3:
+            raise SystemEditorError("runway exceeds bounded route navigation budget")
+        if not normalized["waypoint_floor"] < normalized["waypoint_ceiling"] <= normalized["max_altitude"]:
+            raise SystemEditorError("navigation window outside physical ceiling")
+        if normalized["launch_altitude"] >= normalized["max_altitude"]:
+            raise SystemEditorError("launch altitude exceeds ceiling")
+        if normalized["landing_speed"] < normalized["stall_speed"]:
+            raise SystemEditorError("landing speed below stall threshold")
+        if normalized["landing_altitude"] >= normalized["launch_altitude"]:
+            raise SystemEditorError("landing must occur below launch altitude")
+        if normalized["landing_fuel_reserve"] > normalized["fuel_capacity"]:
+            raise SystemEditorError("impossible landing fuel reserve")
+
     if editor_id == "platform_profile" and normalized["npc_active_budget"] * 1 > normalized["ram_budget_mb"] * 20:
         raise SystemEditorError("active NPCs exceed requested conservative memory envelope")
     if editor_id == "colony" and normalized["settlers"] > normalized["jobs"] * 30:
