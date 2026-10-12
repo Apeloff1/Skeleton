@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from hashlib import sha256
+from pathlib import Path
 import json
 import tempfile
 import unittest
@@ -21,7 +22,7 @@ class JeevesProductionContractTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.ws=GameWorkspace.create(self.temp.name,authorized=True)
+        self.ws=GameWorkspace.create(str(Path(self.temp.name)/"workbench"),authorized=True)
         self.ws.create_project("worldforge","rpg",authorized=True)
 
     def test_chat_turns_follow_unskippable_story_cast_design_sequence(self):

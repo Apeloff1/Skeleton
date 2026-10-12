@@ -50,7 +50,7 @@ class JeevesWorkspaceTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.studio=GameWorkspace.create(self.temp.name,authorized=True)
+        self.studio=GameWorkspace.create(str(Path(self.temp.name)/"workbench"),authorized=True)
         self.studio.create_project("worldforge","rpg",authorized=True)
 
     def commit_bible_phases(self):
