@@ -557,7 +557,7 @@ def _tool_contracts():
     plans=[]
     for phase in Phase:
         for spec in fabric.discover(actor=Actor.JEEVES,phase=phase):
-            if spec.tool_id not in {x["id"] for x in plans}:
+            if spec.tool_id not in {x["tool_id"] for x in plans}:
                 plans.append({**spec.to_payload(),
                               "local_executor_present":spec.tool_id in EXECUTABLE_TOOLS,
                               "model_may_execute_without_operator":False})
