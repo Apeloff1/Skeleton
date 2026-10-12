@@ -25,7 +25,7 @@ from skeleton.ai.webcrawler.dragon_resource_session import HardwareSample
 from skeleton.ai.webcrawler.dragon_shadow_weight_automation import ShadowWeightAutomation
 from skeleton.ai.webcrawler.dragon_shadow_weight_coordinator import ReviewedAcquisition
 
-from test_ai_webcrawler_dragon_mother_glean_matrix import (
+from tests.test_ai_webcrawler_dragon_mother_glean_matrix import (
     OWNER, T0, T1, T2, scenario,
 )
 
@@ -172,7 +172,7 @@ def test_unconfirmed_single_publisher_insight_never_enters_shadow(pipeline):
     plan, candidate, options = package(pipeline)
     for sid in ("beta", "gamma"):
         rev = library.history(OWNER, sid, authorized=True)[-1]
-        from test_ai_webcrawler_dragon_mother_glean_matrix import document
+        from tests.test_ai_webcrawler_dragon_mother_glean_matrix import document
         library.import_document(
             document(
                 sid, group="group-alpha", at="2026-10-12T12:15:00Z",
