@@ -492,6 +492,29 @@ def _schedule(state,rules,opts):
     return moves
 
 
+def _lod_receipt(world, previous):
+    """Per-turn, source-reconstructible proof of exactly which bodies ran."""
+    scheduler = world["scheduler"]
+    detailed = scheduler["detailed_updates"] - previous["detailed_updates"]
+    deferred = scheduler["deferred_actor_turns"] - previous["deferred_actor_turns"]
+    eligible_unserved = (scheduler["eligible_deferred_actor_turns"] -
+                         previous["eligible_deferred_actor_turns"])
+    ids = list(world["detailed_actor_ids"])
+    if (len(ids) != detailed or len(set(ids)) != detailed or
+        detailed + deferred != len(world["actors"]) or
+        not 0 <= eligible_unserved <= deferred):
+        raise ChunkWorldError("per-turn original NPC update ledger violates finite detail conservation")
+    return {
+        "selected_actor_ids": ids,
+        "actually_detailed": detailed,
+        "deferred": deferred,
+        "eligible_but_deferred": eligible_unserved,
+        "currently_loaded_chunks": [list(x) for x in world["loaded_chunks"]],
+        "longest_global_deferral": scheduler["max_deferral_streak"],
+        "phantom_updates": scheduler["forged_offscreen_events"],
+    }
+
+
 def run_chunked_npc_world(actions=(),settings=None,*,scenes=None,seed=0,options=None):
     if type(actions) not in (tuple,list) or len(actions)>MAX_STEPS:
         raise ChunkWorldError("maximum 128 exact bounded original action inputs")
@@ -507,6 +530,7 @@ def run_chunked_npc_world(actions=(),settings=None,*,scenes=None,seed=0,options=
         if i>=opts["max_turns"]:
             raise ChunkWorldError("authored original world turn budget exhausted")
         before = _hash(world)
+        previous_scheduler = dict(world["scheduler"])
         active,_ = _visible(world,opts)
         observed = _act(world,rules,opts,command,active)
         moves = _schedule(world,rules,opts)
@@ -516,6 +540,7 @@ def run_chunked_npc_world(actions=(),settings=None,*,scenes=None,seed=0,options=
             "step":i,"command":command,"tick":world["tick"],
             "previous":prev,"before":before,
             "causal_events":observed,"physical_moves":moves,
+            "lod_fidelity":_lod_receipt(world, previous_scheduler),
             "after":_hash(world),"ordered_phases":list(PHASES),
         }
         event["digest"] = _hash(event)
