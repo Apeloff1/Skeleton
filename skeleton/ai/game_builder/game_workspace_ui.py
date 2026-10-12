@@ -1064,6 +1064,49 @@ function drawAdvancedGame(session){
   c.fillStyle="#b6edcf";
   c.fillText("Skiff / sloop / schooner · physical port cargo delivery",12,265);
  }
+ if(editor==="parkour"){
+  const ox=16,oy=62,courseW=W-180,laneH=55,scale=courseW/Math.max(1,state.exit_x);
+  c.fillStyle="#cbece5";
+  c.fillText(state.title+" · "+state.style+" · "+state.weather,12,36);
+  for(let lane=0;lane<3;lane++){
+   c.fillStyle=lane%2?"#324e61":"#254454";
+   c.fillRect(ox,oy+lane*laneH,courseW,laneH-3);
+   c.strokeStyle="#507385";
+   c.beginPath();c.moveTo(ox,oy+(lane+1)*laneH-3);
+   c.lineTo(ox+courseW,oy+(lane+1)*laneH-3);c.stroke();
+  }
+  for(const cp of state.checkpoints){
+   c.fillStyle=state.checkpoint>=cp?"#8ceac3":"#809ca6";
+   c.fillRect(ox+cp*scale-1,oy-2,2,laneH*3+2);
+  }
+  for(const obstacle of state.obstacles){
+   const x=ox+obstacle.x*scale,y=oy+obstacle.lane*laneH;
+   const t=obstacle.kind;
+   c.fillStyle=t==="gap"?"#151b2a":t==="hazard"?"#df8075":
+      t==="wall"||t==="ledge"?"#b6a88b":"#9b9bd9";
+   c.fillRect(x-4,y+19,9,24);
+   c.fillStyle="#f0e9d8";c.fillText(t[0].toUpperCase(),x-3,y+16);
+  }
+  for(const mark of state.medals){
+   if(state.medals_collected.includes(mark.x))continue;
+   const x=ox+mark.x*scale,y=oy+mark.lane*laneH+14;
+   c.fillStyle="#f4d984";c.beginPath();c.arc(x,y,5,0,Math.PI*2);c.fill();
+  }
+  const px=ox+state.x*scale,py=oy+state.lane*laneH+26;
+  c.fillStyle="#9df5d2";c.fillRect(px-5,py-13,11,19);
+  c.fillStyle="#f6e1a5";c.beginPath();c.arc(px,py-17-Math.min(12,state.height),5,0,Math.PI*2);c.fill();
+  const tx=W-157;c.fillStyle="#e6f4ea";
+  c.fillText("Position "+state.x+"/"+state.exit_x,tx,61);
+  c.fillText("Stamina "+state.stamina,tx,86);
+  c.fillText("Health "+state.health,tx,111);
+  c.fillText("Momentum "+state.momentum,tx,136);
+  c.fillText("Height "+state.height,tx,161);
+  c.fillText("Flow "+state.flow_chain,tx,186);
+  c.fillText("Medals "+state.medals_collected.length+"/"+state.medals.length,tx,211);
+  c.fillText("Falls "+state.falls,tx,236);
+  c.fillStyle="#a4ebca";
+  c.fillText("Verified course mechanics: climb · parkour · swing · grapple",12,265);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
