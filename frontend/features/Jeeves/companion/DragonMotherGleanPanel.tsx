@@ -19,7 +19,7 @@ export interface MotherGleanSummary {
 }
 
 const bounded = (x: unknown, max: number): x is number =>
-  Number.isSafeInteger(x) && typeof x === 'number' && x >= 0 && x <= max;
+  typeof x === 'number' && Number.isSafeInteger(x) && x >= 0 && x <= max;
 
 export function normalizeMotherGleanSummary(raw: unknown): MotherGleanSummary | null {
   if (raw === null || typeof raw !== 'object') return null;
