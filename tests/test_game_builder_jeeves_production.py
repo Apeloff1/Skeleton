@@ -57,8 +57,12 @@ class JeevesProductionContractTests(unittest.TestCase):
                   cast=["alina","boren"],region="lantern_city")
         self.assertEqual(fourth["stage"],"scene")
         self.assertEqual(fourth["target_path"],
-                         "story/scenes/act_0001/scene_000001.json")
+                         "story/chapters/chapter_001/acts/act_0001/scene_000001.json")
         self.assertEqual(fourth["source_template"]["sequence"],1)
+        self.assertEqual(fourth["source_template"]["chapter"],1)
+        self.assertEqual(fourth["source_context"]["required_chapter"],1)
+        self.assertEqual(fourth["source_template"]["storytelling"]["form"],"prologue")
+        self.assertIn("active_chapter_context",fourth["source_context"]["full_canon_brief"])
         self.assertEqual(fourth["source_context"]["full_canon_brief"]["next_sequence"],1)
         self.assertIn("wiki_story_facts",fourth["independent_review_required"])
         self.assertFalse(fourth["human_authority_not_delegated"] is False)
