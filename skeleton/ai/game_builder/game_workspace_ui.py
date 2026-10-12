@@ -1107,6 +1107,92 @@ function drawAdvancedGame(session){
   c.fillStyle="#a4ebca";
   c.fillText("Verified course mechanics: climb · parkour · swing · grapple",12,265);
  }
+ if(editor==="rpg"){
+  const ox=15,oy=64,tile=19;
+  const w=advancedSettings.world_width,h=advancedSettings.world_height;
+  const at=(a,b)=>a[0]===b[0]&&a[1]===b[1];
+  c.fillStyle="#e0ece2";
+  c.fillText(state.title+" · "+state.climate+" · chapter "+state.chapters_completed,12,35);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+   const bx=ox+x*tile,by=oy+(h-y-1)*tile;
+   const cell=[x,y];
+   c.fillStyle=(x+y)%2?"#314e42":"#38594b";
+   c.fillRect(bx,by,tile-1,tile-1);
+   if(state.blocked.some(p=>at(p,cell))){
+    c.fillStyle="#7b858b";c.fillRect(bx+2,by+2,tile-5,tile-5);
+   }
+   let glyph="";
+   if(at(state.camp,cell))glyph="C";
+   if(at(state.relic,cell)&&!state.quest_relic)glyph="◆";
+   if(at(state.enemy,cell)&&state.enemy_hp>0)glyph="!";
+   if(at(state.exit,cell))glyph="E";
+   const npc=state.npcs.find(p=>at(p.at,cell));
+   if(npc)glyph=npc.role==="archivist"?"A":"M";
+   if(glyph){c.fillStyle="#f5d18e";c.fillText(glyph,bx+4,by+14);}
+   if(at(state.position,cell)){
+    c.fillStyle="#b1f6cd";c.beginPath();
+    c.arc(bx+9,by+9,7,0,Math.PI*2);c.fill();
+    c.fillStyle="#244031";c.fillText("@",bx+4,by+13);
+   }
+  }
+  const tx=W-171,hero=state.party[state.selected];
+  c.fillStyle="#edf4e9";
+  c.fillText("Role "+hero.class,tx,62);
+  c.fillText("Level "+hero.level+" · XP "+hero.xp,tx,84);
+  c.fillText("HP "+hero.hp+" · Mana "+hero.mana,tx,106);
+  c.fillText("Party "+state.party.length,tx,128);
+  c.fillText("Gold "+state.gold,tx,150);
+  c.fillText("Reputation "+state.factions.guild+"/"+state.factions.village,tx,172);
+  c.fillText("Quests "+Object.values(state.quests).filter(v=>v==="completed").length+"/3",tx,194);
+  c.fillText("Stories "+state.social_memories.length,tx,216);
+  c.fillStyle="#a8e3bc";
+  c.fillText(state.chapter_claimed?"Postgame explorable · retire is optional":
+    "Evidence, faction choices and party tactics determine progress",12,275);
+ }
+ if(editor==="procedural_world"){
+  const ox=15,oy=55,fw=W-187,fh=178,scale=20;
+  c.fillStyle="#e1edf3";
+  c.fillText(state.title+" · "+state.climate+" · "+advancedSettings.persistence,12,35);
+  c.fillStyle="#253c50";c.fillRect(ox,oy,fw,fh);
+  const xcenter=ox+fw/2,ycenter=oy+fh/2;
+  c.strokeStyle="#496176";
+  for(let ix=0;ix<Math.ceil(fw/scale);ix++){
+   const xx=ox+ix*scale;c.beginPath();c.moveTo(xx,oy);c.lineTo(xx,oy+fh);c.stroke();
+  }
+  for(let iy=0;iy<Math.ceil(fh/scale);iy++){
+   const yy=oy+iy*scale;c.beginPath();c.moveTo(ox,yy);c.lineTo(ox+fw,yy);c.stroke();
+  }
+  const place=(x,y,colour,glyph)=>{
+   const px=xcenter+(x-state.position[0])*scale;
+   const py=ycenter-(y-state.position[1])*scale;
+   if(px<ox||px>=ox+fw||py<oy||py>=oy+fh)return;
+   c.fillStyle=colour;c.beginPath();c.arc(px,py,7,0,Math.PI*2);c.fill();
+   c.fillStyle="#173044";c.fillText(glyph,px-4,py+4);
+  };
+  place(0,0,"#bfebb1","H");
+  for(const mark of state.landmarks)
+   place(mark.at[0],mark.at[1],state.surveyed.includes(mark.id)?"#82dcc4":"#f3d085",
+     mark.id===0?"R":"O");
+  for(const [key,change] of Object.entries({...state.persisted,...state.edits})){
+   const vals=key.split(":").map(Number);
+   if(change.structure==="shelter")place(vals[0],vals[1],"#d1eeb0","S");
+   else if(change.planted)place(vals[0],vals[1],"#a0e9ac","P");
+  }
+  place(state.position[0],state.position[1],"#f2f6e1","@");
+  const tx=W-171;
+  c.fillStyle="#eef6ed";
+  c.fillText("Chunk loads "+state.chunk_loads,tx,62);
+  c.fillText("Resident "+state.chunks.length,tx,85);
+  c.fillText("Evictions "+state.chunk_evictions,tx,108);
+  c.fillText("Health "+state.health,tx,131);
+  c.fillText("Energy "+state.energy,tx,154);
+  c.fillText("Food "+state.inventory.food,tx,177);
+  c.fillText("Water "+state.inventory.water,tx,200);
+  c.fillText("Survey "+state.surveyed.length+"/2",tx,223);
+  c.fillStyle="#b3e4cf";
+  c.fillText(state.expedition_complete?"Nonterminal expedition complete · return home to retire":
+    "H home · R ruins · O observatory · S shelter · source-owned chunk edits",12,272);
+ }
  if(editor==="maze"){
   const ox=14,oy=56,tile=19,radiusX=6,radiusY=5;
   const viewX=Math.max(1,state.position[0]-radiusX);
@@ -1275,6 +1361,54 @@ let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="rpg"){
+  const state=advancedSession.state;
+  const box=document.createElement("label");
+  box.textContent="Original party / witnessed-world gameplay";
+  const cmd=document.createElement("select");cmd.id="rpg-authoritative-command";
+  for(const action of actions){
+   const item=document.createElement("option");item.value=action;
+   item.textContent=action.replaceAll("_"," ");cmd.append(item);
+  }
+  box.append(cmd);target.append(box);
+  const submit=document.createElement("button");submit.type="button";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.textContent="Perform replay-verified RPG action";
+  submit.addEventListener("click",()=>advanceAdvanced(cmd.value));
+  target.append(submit);
+  const notes=document.createElement("small");
+  const hero=state.party[state.selected];
+  notes.textContent="Selected "+hero.class+" level "+hero.level+
+   " · NPC memories "+state.social_memories.length+
+   " · "+Object.entries(state.quests).map(([q,s])=>q+": "+s).join(" · ")+
+   (state.chapter_claimed?" · optional post-story play remains open":"");
+  target.append(notes);
+  return;
+ }
+ if(advancedSession?.editor==="procedural_world"){
+  const state=advancedSession.state;
+  const box=document.createElement("label");
+  box.textContent="Original frontier travel, ecology and persistent tile actions";
+  const cmd=document.createElement("select");cmd.id="frontier-source-command";
+  for(const action of actions){
+   const item=document.createElement("option");item.value=action;
+   item.textContent=action.replaceAll("_"," ");cmd.append(item);
+  }
+  box.append(cmd);target.append(box);
+  const submit=document.createElement("button");submit.type="button";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.textContent="Execute source-bound world action";
+  submit.addEventListener("click",()=>advanceAdvanced(cmd.value));
+  target.append(submit);
+  const status=document.createElement("small");
+  status.textContent="Position "+state.position.join(",")+
+    " · resident chunks "+state.chunks.length+"/"+advancedSettings.active_chunks+
+    " · saved tile deltas "+Object.keys(state.persisted).length+
+    " · active modifications "+Object.keys(state.edits).length+
+    " · landmark evidence "+state.surveyed.length+"/2";
+  target.append(status);
+  return;
+ }
  if(advancedSession?.editor==="maze"){
   const state=advancedSession.state;
   const allowed=new Set(["north","south","east","west","ascend","descend",
