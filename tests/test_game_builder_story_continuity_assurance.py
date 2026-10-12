@@ -200,6 +200,81 @@ class MeticulousProductionContinuityTests(unittest.TestCase):
                 write_reviewed(workspace,"game/continuity_contract.json",sign(
                     {**self.contract,"human_design_reviewed":False},CONTRACT))
 
+    def test_studio_api_requires_exact_source_review_before_receipt_approval(self):
+        import http.client
+        import threading
+        from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
+        from skeleton.ai.game_builder.story_workspace import next_story_scene_template
+        with tempfile.TemporaryDirectory() as folder:
+            ws=GameWorkspace.create(str(Path(folder)/"local_studio"),authorized=True)
+            ws.create_project("worldforge","rpg",authorized=True)
+            for phase in stages():
+                write_reviewed(ws,"game/story_bible.json",phase)
+            server=create_workspace_server(ws,port=0)
+            thread=threading.Thread(target=server.serve_forever,daemon=True)
+            thread.start()
+            try:
+                def request(route,payload, *,token=True):
+                    connection=http.client.HTTPConnection(
+                        "127.0.0.1",server.server_port,timeout=15)
+                    headers={"Host":"127.0.0.1:"+str(server.server_port),
+                             "Content-Type":"application/json"}
+                    if token:headers["X-Game-Studio-Token"]=server.secret
+                    connection.request("POST",route,body=json.dumps(payload),
+                                       headers=headers)
+                    response=connection.getresponse()
+                    status=response.status
+                    body=json.loads(response.read())
+                    connection.close()
+                    return status,body
+                request_source={"project":"worldforge"}
+                self.assertEqual(request("/api/story-continuity-template",
+                                         request_source,token=False)[0],403)
+                status,template=request("/api/story-continuity-template",
+                                        request_source)
+                self.assertEqual(status,200)
+                self.assertEqual(template["path"],"game/continuity_contract.json")
+                status,signed_contract=request("/api/story-sign",{
+                    "project":"worldforge","path":"game/continuity_contract.json",
+                    "document":self.contract})
+                self.assertEqual(status,200)
+                self.assertFalse(signed_contract["write_authorized"])
+                write_reviewed(ws,"game/continuity_contract.json",self.contract)
+                with self.assertRaises(StoryCanonError):
+                    next_story_scene_template(ws,"worldforge",2,1)
+                status,draft=request("/api/story-scene-template",{
+                    "project":"worldforge","act":1,"scene":1})
+                self.assertEqual(status,200)
+                self.assertEqual(draft["next_global_sequence"],1)
+                source=scene_source(self.bible)
+                seen=observations(self.contract,self.bible,source)
+                altered=deepcopy(seen)
+                altered["cast"][0]["voice_id"]="unapproved_voice"
+                self.assertEqual(request("/api/story-sign",{
+                    "project":"worldforge",
+                    "path":"story/scenes/act_0001/scene_000001.json",
+                    "document":source,"observations":altered})[0],400)
+                status,approved_scene=request("/api/story-sign",{
+                    "project":"worldforge",
+                    "path":"story/scenes/act_0001/scene_000001.json",
+                    "document":source,"observations":seen})
+                self.assertEqual(status,200)
+                self.assertEqual(approved_scene["document"]["assurance"]["sequence"],1)
+                write_reviewed(ws,approved_scene["path"],approved_scene["document"])
+                self.assertEqual(next_story_scene_template(
+                    ws,"worldforge",1,2)["next_global_sequence"],2)
+                self.assertEqual(request("/api/story-stage-confirmation",
+                                         request_source)[1]["accepted_scenes"],1)
+                status,detail=request("/api/story-detail-timeline",{
+                    "project":"worldforge","character":"alina"})
+                self.assertEqual(status,200)
+                self.assertEqual(detail["immutable_source_profile"]["voice_id"],
+                                 "voice_original_alina")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=3)
+
     def test_9999_linked_receipts_span_exactly_100_acts(self):
         # Stream-authored regression fixture: avoid quadratic per-commit replay
         # during construction, then independently verify *all* 9999 sources,
