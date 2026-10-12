@@ -341,7 +341,8 @@ class GameWorkspace:
                     raise WorkspaceError("editor source path does not match typed system ID")
             if relative.startswith("scenes/advanced_"):
                 self._validate_advanced_scene_source(project,relative,parsed)
-            if relative=="game/story_bible.json" or relative.startswith("story/scenes/"):
+            if (relative in ("game/story_bible.json","game/continuity_contract.json")
+                    or relative.startswith("story/scenes/")):
                 from .story_workspace import validate_story_workspace_source
                 validate_story_workspace_source(self,project,relative,parsed)
         proposal=dict(
@@ -388,7 +389,8 @@ class GameWorkspace:
                     raise WorkspaceError("editor document path mismatches its system identity")
             if proposal["path"].startswith("scenes/advanced_"):
                 self._validate_advanced_scene_source(project,proposal["path"],parsed)
-            if (proposal["path"]=="game/story_bible.json" or
+            if (proposal["path"] in ("game/story_bible.json",
+                                      "game/continuity_contract.json") or
                     proposal["path"].startswith("story/scenes/")):
                 from .story_workspace import validate_story_workspace_source
                 validate_story_workspace_source(self,project,proposal["path"],parsed)
