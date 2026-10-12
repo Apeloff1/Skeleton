@@ -318,7 +318,7 @@ class DiscoveryFacetIndex:
         )
         sql = (
             "WITH mission_terms(token,weight) AS (VALUES " + bound_terms + ") "
-            "SELECT s.source,s.body,s.digest,j.stage,j.state "
+            "SELECT s.source,s.body,s.digest,j.stage,j.state,j.input_digest "
             "FROM mission_terms q "
             "JOIN dragon_discovery_facet_terms t ON t.token=q.token "
             "JOIN dragon_discovery_facet_records i "
