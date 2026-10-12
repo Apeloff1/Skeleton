@@ -72,6 +72,8 @@ def render_interop_godot_package(proof, source_session, source_settings=None,
         "source_settings_digest":make_editor_document(
             source_session["editor"],source_settings)["digest"],
         "source_actions":list(source_session["actions"]),
+        "original_authored_scene":source_session["scene"],
+        "original_source_settings":settings,
         "interop_digest":proof["digest"],
         "physics_session_digest":physics["digest"],
         "physical_witnesses":proof["witnesses"],
