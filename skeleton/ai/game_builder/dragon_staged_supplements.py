@@ -42,6 +42,21 @@ _NOISY_HOSTS = frozenset({
 _MAX_OBSERVATIONS = 20_000
 
 
+def _git_readme_path(path: object) -> bool:
+    """Accept a bounded relative Git tree path, never traversal or URL syntax.
+
+    Paths are evidence *claims* only. They do not verify GitHub content,
+    commit ancestry, download permission, or crawl/weight authority.
+    """
+    if not isinstance(path, str) or not 1 <= len(path) <= 256:
+        return False
+    if path.startswith(("/", "\\")) or "\\" in path or ":" in path:
+        return False
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in path):
+        return False
+    return all(part not in ("", ".", "..") for part in path.split("/"))
+
+
 def read_staged_catalog_snapshot(path: str | Path) -> dict:
     """Load only a regular, bounded repository evidence file with strict JSON.
 
@@ -154,9 +169,7 @@ def build_catalog_supplements(
         if (not isinstance(repo, str) or not _REPO.fullmatch(repo)
                 or not isinstance(commit, str) or not _SHA.fullmatch(commit)
                 or not isinstance(blob, str) or not _SHA.fullmatch(blob)
-                or not isinstance(path, str) or not 1 <= len(path) <= 256
-                or path.startswith("/") or ".." in path.split("/")
-                or "\\" in path
+                or not _git_readme_path(path)
                 or not isinstance(observed, list)
                 or len(observed) > 3000):
             raise ValueError("invalid Git-pinned staged README catalog")
