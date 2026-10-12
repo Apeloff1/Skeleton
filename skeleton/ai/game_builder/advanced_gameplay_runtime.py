@@ -663,7 +663,11 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "stealth":stealth_start,
         **GENRE_STARTS,
     }
-    state=starts[editor](rules,seed)
+    try:
+        state=starts[editor](rules,seed)
+    except (GenreActionError,FarmingActionError,FactoryActionError,
+            ColonyActionError,CityActionError,StealthActionError) as exc:
+        raise AdvancedRuntimeError(str(exc)) from exc
     if scene is not None:
         from .advanced_level_scenes import validate_advanced_scene
         authored=validate_advanced_scene(scene,rules)
