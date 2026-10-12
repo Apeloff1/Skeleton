@@ -342,7 +342,7 @@ class GameWorkspace:
             if relative.startswith("scenes/advanced_"):
                 self._validate_advanced_scene_source(project,relative,parsed)
             if (relative in ("game/story_bible.json","game/continuity_contract.json")
-                    or relative.startswith("story/scenes/")):
+                    or relative.startswith(("story/scenes/","story/chapters/"))):
                 from .story_workspace import validate_story_workspace_source
                 validate_story_workspace_source(self,project,relative,parsed)
         proposal=dict(
@@ -391,7 +391,7 @@ class GameWorkspace:
                 self._validate_advanced_scene_source(project,proposal["path"],parsed)
             if (proposal["path"] in ("game/story_bible.json",
                                       "game/continuity_contract.json") or
-                    proposal["path"].startswith("story/scenes/")):
+                    proposal["path"].startswith(("story/scenes/","story/chapters/"))):
                 from .story_workspace import validate_story_workspace_source
                 validate_story_workspace_source(self,project,proposal["path"],parsed)
             if proposal["path"]=="game/director.json":
