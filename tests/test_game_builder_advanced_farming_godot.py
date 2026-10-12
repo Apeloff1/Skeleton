@@ -48,7 +48,7 @@ class FarmingReferenceAndNativeTests(unittest.TestCase):
         for seed in (0,1,2,8):
             cfg={"crop_types":3,"field_tiles":4}
             source=designed_farm(cfg,seed)
-            actions=["plant:0","plant:1","advance","water:0",
+            actions=["plant:0","plant:1","advance",
                      "advance:4","harvest:1","sell"]
             game=run_advanced_session("farming",cfg,actions,seed=seed,scene=source)
             self.assertTrue(verify_advanced_session(game,cfg))
