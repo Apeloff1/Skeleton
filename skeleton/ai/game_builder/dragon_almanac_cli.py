@@ -15,12 +15,13 @@ from .reviewed_knowledge import ReviewedKnowledgeStore
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "import-supplements", "delivery-status", "delivery-search", "delivery-brief"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
     parser.add_argument("--registry", default=str(Path(__file__).parent / "catalogs/dragon_sources_20261010"))
     parser.add_argument("--output")
+    parser.add_argument("--supplement", action="append", default=[], help="Evidence JSON; repeat in chronological chain order")
     parser.add_argument("--now", type=int)
     parser.add_argument("--query", help="Reviewed mechanic or design research question")
     parser.add_argument("--design", type=Path, help="Strict native game design JSON")
@@ -66,6 +67,13 @@ def main():
                       "catalog_digest": registry["catalog_digest"],
                       "almanacs": almanacs.report(args.owner, authorized=True, limit=1),
                       "worker": worker.status(args.owner, authorized=True)}
+        elif args.command == "import-supplements":
+            from .dragon_discovery_admission import import_supplement_files
+            if not args.supplement:
+                parser.error("import-supplements requires --supplement in chain order")
+            registry = read_source_registry(args.registry)
+            result = import_supplement_files(
+                almanacs, args.owner, registry, args.supplement, authorized=True)
         elif args.command == "experiment":
             if args.now is None or not args.output:
                 parser.error("experiment requires --now and --output for raw evidence")
