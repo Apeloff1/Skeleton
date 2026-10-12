@@ -12,6 +12,8 @@
     "app/jeeves-chat.tsx",
     "app/story-index.tsx",
     "app/chapter-studio.tsx",
+    "app/story-outcomes.tsx",
+    "features/Jeeves/outcomeStudio.ts",
     "features/Jeeves/chapterStudio.ts",
     "features/Jeeves/ChatChapterActions.tsx",
     "features/Jeeves/ChatStoryActions.tsx",
