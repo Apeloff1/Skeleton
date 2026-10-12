@@ -40,6 +40,8 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_genre_npc_event_bridge import (run_cross_genre_world,
+    verify_cross_genre_world)
 from .advanced_npc_conditional_world import (run_npc_conditional_rules,
     verify_npc_conditional_rules)
 from .advanced_physics_episodic_save import (export_episodic_savegame,
@@ -439,6 +441,21 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-cross-genre-npc-world":
+            report=run_cross_genre_world(
+                values["session"],values["world_scene"],values["bindings"],
+                values.get("source_settings"),values.get("world_settings"),
+                world_actions=values.get("world_actions",[]))
+            if not verify_cross_genre_world(
+                    report,values["session"],values["world_scene"],
+                    values.get("source_settings"),values.get("world_settings")):
+                raise ValueError("independent original genre NPC world replay rejected")
+            return self._json(200,{
+                "report":report,
+                "original_project_files_modified":False,
+                "native_hardware_certified":False,
+                "automatic_rewards_or_promotion":False,
             })
         if path=="/api/advanced-npc-conditional-world":
             mode=values.get("mode","preview")
