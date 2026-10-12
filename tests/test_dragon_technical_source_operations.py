@@ -454,3 +454,106 @@ def test_supervisor_does_not_dispatch_into_crashed_leases(lab):
                     authorized=True,trusted_worker=True)
     assert coordinator.ready(OWNER,now=NOW+64,authorized=True)["ready_sources"]==[]
     assert coordinator.ready(OWNER,now=NOW+65,authorized=True)["ready_sources"]==[lab[7]]
+
+
+
+def _robots_policy_worker(lab, *, crawl_delay):
+    """Run existing socket-bound crawler against a deterministic local fixture."""
+    schedule(lab)
+    controller=DragonResearchSupervisor(lab[6],lab[3])
+    reserved=controller.reserve_next(
+        OWNER,sample=hardware(),at=T2,idle_since=T0,now_seconds=1000,
+        authorized=True,trusted_worker=True,consented=True,article_consent=True)
+    assert reserved.ticket is not None and reserved.lease is not None
+    ticket=reserved.ticket
+    host=urlsplit(ticket.source_url).hostname
+    fetcher=SafeHttpFetcher(allowed_hosts=frozenset({host}),
+                            bind_dns_to_socket=True)
+    requested=[];slept=[]
+    def fixture(url, *, user_agent, max_bytes, extra_headers=None):
+        requested.append(url)
+        if not url.endswith("/robots.txt"):
+            raise AssertionError("long-delay policy unexpectedly fetched page")
+        body=("User-agent: *\nCrawl-delay: "+str(crawl_delay)+
+              "\nAllow: /\n").encode()
+        return FetchResponse(url,200,{"content-type":"text/plain"},
+                             body,float(NOW))
+    fetcher.fetch_once=fixture
+    result=acquire_canonical_technical_article(
+        lab[3],lab[5],ticket,fetcher=fetcher,
+        sample_provider=hardware,consent_provider=consent,
+        idle_since_provider=lambda:T0,at_provider=lambda:T2,
+        clock=lambda:1000.0,
+        sleep=lambda seconds:slept.append(seconds),
+        capture_id="robots-cooldown-policy-fixture",
+        authorized=True,trusted_worker=True,reference_storage_permitted=True,
+        operations=lab[6])
+    assert len(requested)==1 and requested[0].endswith("/robots.txt")
+    assert slept==[]
+    assert lab[4].active_grants()==()
+    assert not lab[3].active
+    return result,lab[6].inspect(OWNER,lab[7],authorized=True)
+
+
+def test_long_robots_delay_persists_ready_time_without_holding_worker(lab):
+    result,state=_robots_policy_worker(lab,crawl_delay=180)
+    assert result.captured is False
+    assert result.reason=="deferred_for_robots_crawl_delay"
+    assert result.retry_after_seconds==180
+    assert not result.source_policy_hold
+    assert state["state"]=="retry_wait"
+    assert state["next_ready_at"]==NOW+180
+    peer=DragonSourceOperations(lab[5])
+    assert peer.ready_candidates(OWNER,now=NOW+179,authorized=True)==()
+    assert peer.ready_candidates(OWNER,now=NOW+180,authorized=True)==(lab[7],)
+    cooldown=lab[0].db.execute(
+        "SELECT next_at FROM dragon_source_host_cooldown_v1 WHERE host=?",
+        (urlsplit(lab[8]).hostname,)).fetchone()
+    assert cooldown==(NOW+180,)
+    assert lab[5].history(OWNER,lab[7],authorized=True)==()
+
+
+def test_multiday_robots_delay_waits_without_synchronous_sleep(lab):
+    result,state=_robots_policy_worker(lab,crawl_delay=172800)
+    assert result.retry_after_seconds==172800
+    assert state["next_ready_at"]==NOW+172800
+    assert lab[6].ready_candidates(
+        OWNER,now=NOW+86400,authorized=True)==()
+    # The original policy expires before the next allowed attempt.
+    # A fresh policy receipt must be granted separately before resuming.
+
+
+def test_extreme_robots_delay_requires_manual_policy_hold(lab):
+    result,state=_robots_policy_worker(lab,crawl_delay=700000)
+    assert result.reason=="robots_delay_exceeds_week_manual_review"
+    assert result.source_policy_hold
+    assert result.retry_after_seconds is None
+    assert state["state"]=="policy_hold"
+    assert lab[6].ready_candidates(
+        OWNER,now=NOW+700000,authorized=True)==()
+    assert lab[0].db.execute(
+        "SELECT next_at FROM dragon_source_host_cooldown_v1 WHERE host=?",
+        (urlsplit(lab[8]).hostname,)).fetchone()==(4102444800,)
+    with pytest.raises(ValueError,match="already|active|completed"):
+        lab[6].schedule(OWNER,lab[7],now=NOW+1,
+                        ready_at=NOW+1,authorized=True,trusted_worker=True)
+
+
+def test_forged_robots_delay_is_not_accepted_from_untrusted_release(lab):
+    schedule(lab)
+    ticket=begin(lab)
+    attach(lab,ticket)
+    stop(lab,ticket)
+    with pytest.raises(ValueError,match="only uncaptured"):
+        lab[6].release(ticket,lab[3],now=NOW+1,capture_digest=None,
+                       deferred_seconds=600,deferred_reason="generic_retry",
+                       authorized=True,trusted_worker=True)
+    with pytest.raises(ValueError,match="unbounded robots"):
+        lab[6].release(ticket,lab[3],now=NOW+1,capture_digest=None,
+                       deferred_reason="robots_delay_exceeds_limit",
+                       deferred_seconds=600,policy_hold=True,
+                       authorized=True,trusted_worker=True)
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="leased"
+    lab[6].release(ticket,lab[3],now=NOW+1,capture_digest=None,
+                   authorized=True,trusted_worker=True)
+    assert lab[6].inspect(OWNER,lab[7],authorized=True)["state"]=="retry_wait"

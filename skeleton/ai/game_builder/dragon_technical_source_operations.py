@@ -92,8 +92,9 @@ class DragonSourceOperations:
             None:{"scheduled"},
             "scheduled":{"leased"},
             "retry_wait":{"leased"},
-            "leased":{"completed","retry_wait","quarantined"},
+            "leased":{"completed","retry_wait","quarantined","policy_hold"},
             "quarantined":{"acknowledged_stop"},
+            "policy_hold":set(),
             "acknowledged_stop":{"scheduled"},
             "completed":set(),
         }
@@ -153,8 +154,8 @@ class DragonSourceOperations:
         # cross-process concurrent admissions and host cooldown.
         valid={
             None:{"scheduled"},"scheduled":{"leased"},
-            "retry_wait":{"leased"},"leased":{"completed","retry_wait","quarantined"},
-            "quarantined":{"acknowledged_stop"},
+            "retry_wait":{"leased"},"leased":{"completed","retry_wait","quarantined","policy_hold"},
+            "quarantined":{"acknowledged_stop"},"policy_hold":set(),
             "acknowledged_stop":{"scheduled"},"completed":set(),
         }
         before=history[-1]["state"] if history else None
@@ -314,14 +315,33 @@ class DragonSourceOperations:
     def release(self,ticket: HatchlingWorkerTicket,
                 admission: DragonNestWorkerAdmission, *,
                 now: int,capture_digest: str | None,
-                authorized: bool,trusted_worker: bool) -> dict:
-        """Call only AFTER synchronous worker exit + global-resource stop ack."""
+                authorized: bool,trusted_worker: bool,
+                deferred_seconds: int | None = None,
+                deferred_reason: str | None = None,
+                policy_hold: bool = False) -> dict:
+        """Call only AFTER synchronous worker exit + global-resource stop ack.
+
+        Long robots crawl-delay is retained in SQLite, not slept through on a
+        short-lived resource grant. A delay exceeding 7 days is quarantined as
+        a manual policy hold; it is never retried automatically.
+        """
         if not isinstance(ticket,HatchlingWorkerTicket):
             raise TypeError("typed article ticket required")
         _auth(ticket.owner,authorized)
         if trusted_worker is not True:
             raise PermissionError("trusted stop acknowledgement required")
         _integer(now,"worker release time",0,4_102_444_800)
+        if type(policy_hold) is not bool:
+            raise ValueError("explicit policy-hold flag required")
+        if policy_hold:
+            if deferred_seconds is not None or deferred_reason!="robots_delay_exceeds_limit" or capture_digest is not None:
+                raise ValueError("unbounded robots delay requires manual hold")
+        if deferred_seconds is not None:
+            _integer(deferred_seconds,"real robots delay",6,604800)
+            if deferred_reason!="robots_crawl_delay" or capture_digest is not None:
+                raise ValueError("only uncaptured, observed robots delay can defer")
+        elif deferred_reason is not None and not policy_hold:
+            raise ValueError("deferral reason without measured delay")
         if (not isinstance(admission,DragonNestWorkerAdmission)
             or admission.feed.almanacs is not self.captures.a
             or admission.session.tenant!=ticket.owner
@@ -346,14 +366,36 @@ class DragonSourceOperations:
                     ticket.owner,ticket.source_id,host,"completed",now=now,
                     details={"capture_digest":capture_digest,
                              "review_status":"independent_review_pending"})
+            elif policy_hold:
+                evt=self._append(
+                    ticket.owner,ticket.source_id,host,"policy_hold",now=now,
+                    details={"reason":"robots_delay_exceeds_limit",
+                             "stop_acknowledged":True,
+                             "manual_rights_review_required":True})
             else:
                 attempts=sum(e["state"]=="leased" for e in chain)
-                delay=min(3600,30*(2**min(attempts-1,6)))
+                delay=(deferred_seconds if deferred_seconds is not None
+                       else min(3600,30*(2**min(attempts-1,6))))
+                if now+delay>4_102_444_800:
+                    raise ValueError("delay passes supported epoch ceiling")
                 evt=self._append(
                     ticket.owner,ticket.source_id,host,"retry_wait",
                     now=now,ready_at=now+delay,
                     details={"retry_number":attempts,
-                             "stop_acknowledged":True})
+                             "stop_acknowledged":True,
+                             "retry_cause":deferred_reason or "bounded_worker_retry",
+                             "robots_delay_seconds":deferred_seconds})
+            if deferred_seconds is not None or policy_hold:
+                cooldown=self.db.execute(
+                    "SELECT next_at FROM dragon_source_host_cooldown_v1 "
+                    "WHERE host=?",(host,)).fetchone()
+                next_ready=max((4_102_444_800 if policy_hold else now+deferred_seconds),
+                               cooldown[0] if cooldown else 0)
+                self.db.execute(
+                    """INSERT INTO dragon_source_host_cooldown_v1(host,next_at)
+                       VALUES(?,?) ON CONFLICT(host)
+                       DO UPDATE SET next_at=max(next_at,excluded.next_at)""",
+                    (host,next_ready))
             self.db.execute("COMMIT")
         except Exception:
             self.db.execute("ROLLBACK")
@@ -361,6 +403,7 @@ class DragonSourceOperations:
         return {"state":evt["state"],"event_digest":evt["digest"],
                 "next_ready_at":evt["ready_at"],
                 "review_required":evt["state"]=="completed",
+                "manual_policy_review_required":evt["state"]=="policy_hold",
                 "network_authorized":False,"training_authorized":False}
 
     def quarantine_expired(self, owner: str, *, now: int,

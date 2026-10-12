@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
+from math import ceil, isfinite
 from typing import Callable
 from urllib.parse import urlsplit
 
@@ -32,6 +33,8 @@ class SourceAcquisitionResult:
     revision: dict | None
     requests_performed: int
     model_promotion_authorized: bool = False
+    retry_after_seconds: int | None = None
+    source_policy_hold: bool = False
 
 
 def _epoch(value: str) -> int:
@@ -120,6 +123,9 @@ def acquire_canonical_technical_article(
                                   or operations.captures is not captures):
         raise PermissionError("same canonical durable capture authority required")
     recorded_capture=None
+    deferred_seconds=None
+    deferred_reason=None
+    manual_policy_hold=False
     try:
         if reference_storage_permitted is not True:
             raise PermissionError("explicit reference text retention permission required")
@@ -168,11 +174,31 @@ def acquire_canonical_technical_article(
             return SourceAcquisitionResult(ticket.owner,ticket.source_id,False,
                                            "robots_unavailable_or_disallowed",None,
                                            guarded.requests)
-        delay=max(1.0,engine.robots.crawl_delay(ticket.source_url) or 0.0)
+        reported_delay=engine.robots.crawl_delay(ticket.source_url)
+        if (reported_delay is not None
+            and (type(reported_delay) not in (int,float)
+                 or not isfinite(reported_delay) or reported_delay<0)):
+            manual_policy_hold=True
+            deferred_reason="robots_delay_exceeds_limit"
+            return SourceAcquisitionResult(
+                ticket.owner,ticket.source_id,False,
+                "invalid_robots_crawl_delay_manual_review",None,guarded.requests,
+                source_policy_hold=True)
+        delay=max(1.0,reported_delay or 0.0)
+        if delay>604800:
+            manual_policy_hold=True
+            deferred_reason="robots_delay_exceeds_limit"
+            return SourceAcquisitionResult(
+                ticket.owner,ticket.source_id,False,
+                "robots_delay_exceeds_week_manual_review",None,guarded.requests,
+                source_policy_hold=True)
         if delay>5.0:
-            return SourceAcquisitionResult(ticket.owner,ticket.source_id,False,
-                                           "requires_external_delayed_worker",None,
-                                           guarded.requests)
+            deferred_seconds=ceil(delay)
+            deferred_reason="robots_crawl_delay"
+            return SourceAcquisitionResult(
+                ticket.owner,ticket.source_id,False,
+                "deferred_for_robots_crawl_delay",None,guarded.requests,
+                retry_after_seconds=deferred_seconds)
         sleep(delay)
         # Permission, task relevance, idle and global resource grants are
         # rechecked inside guarded.fetch_once for the actual page request.
@@ -215,4 +241,7 @@ def acquire_canonical_technical_article(
             operations.release(
                 ticket,admission,now=_epoch(at_provider()),
                 capture_digest=recorded_capture,
-                authorized=True,trusted_worker=True)
+                authorized=True,trusted_worker=True,
+                deferred_seconds=deferred_seconds,
+                deferred_reason=deferred_reason,
+                policy_hold=manual_policy_hold)
