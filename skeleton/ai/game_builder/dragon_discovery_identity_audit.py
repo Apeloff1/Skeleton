@@ -47,10 +47,12 @@ def audit_raw_discovery_identity(registry: dict, *, detail_limit: int = 15) -> d
     receipt_ids = set()
     manifest_paths = []
     manifest_summaries = []
-    for name in MANIFESTS:
-        file = root / name
+    for manifest_name in MANIFESTS:
+        file = root / manifest_name
+        if file.is_symlink() or not file.is_file():
+            raise ValueError("raw identity manifest regular file required")
         raw = file.read_bytes()
-        if not 1 <= len(raw) <= 2_000_000 or file.is_symlink():
+        if not 1 <= len(raw) <= 2_000_000:
             raise ValueError("raw identity manifest byte or file custody invalid")
         try:
             manifest = json.loads(raw.decode("utf-8"))
@@ -87,17 +89,17 @@ def audit_raw_discovery_identity(registry: dict, *, detail_limit: int = 15) -> d
                     or type(item["count"]) is not int
                     or not 0 < item["count"] <= 10_000):
                 raise ValueError("raw source Git blob identity changed")
-            name, doc = _supplement(path)
-            if name != item["path"] or len(doc["candidates"]) != item["count"]:
+            source_path, doc = _supplement(path)
+            if source_path != item["path"] or len(doc["candidates"]) != item["count"]:
                 raise ValueError("raw source manifest count or pathname changed")
             current.extend(row["source_id"] for row in doc["candidates"])
             claimed.append(item["path"])
         if sorted(current) != ordered_ids or receipt_ids.intersection(ordered_ids):
             raise ValueError("raw identity manifest no longer matches accepted links")
         receipt_ids.update(ordered_ids)
-        manifest_paths.append(name)
+        manifest_paths.append(manifest_name)
         manifest_summaries.append({
-            "manifest": name,
+            "manifest": manifest_name,
             "verified_raw_links": len(ordered_ids),
             "verified_source_files": len(manifest["source_files"]),
             "source_contents_verified": False,
