@@ -118,6 +118,8 @@ def produce_goods(economy: Economy,society: Society,*,authorized: bool) -> Econo
         raise PermissionError("world profession shift needs authority")
     if economy.society_digest!=society.world_digest:
         raise EconomyError("resources belong to another original world")
+    if type(economy.turn) is not int or society.turn<=economy.turn:
+        raise EconomyError("profession production requires a new authoritative world turn")
     if len(economy.accounts)!=len(society.profiles):
         raise EconomyError("missing exact per-NPC resource account")
     results=[]
@@ -127,15 +129,16 @@ def produce_goods(economy: Economy,society: Society,*,authorized: bool) -> Econo
             raise EconomyError("resource production has mismatched citizen identity")
         goods=dict(a.goods)
         output,consumes,count=PRODUCTION.get(p.profession,("food","grain",1))
-        if m.intent=="work" and m.scene==p.workplace and (
-            consumes is None or goods.get(consumes,0)>=1
-        ):
+        if (m.intent=="work" and m.scene==p.workplace
+                and (consumes is None or goods.get(consumes,0)>=1)
+                and goods.get(output,0)+count<=255):
+            # Validate the output slot before committing any input debit.
+            # A full workshop cannot silently destroy raw materials.
             if consumes:
                 goods[consumes]-=1
-            if goods.get(output,0)+count<=255:
-                goods[output]=goods.get(output,0)+count
-                events.append(MarketEvent(society.turn,"produce",p.key,p.key,
-                                          output,count,0))
+            goods[output]=goods.get(output,0)+count
+            events.append(MarketEvent(society.turn,"produce",p.key,p.key,
+                                      output,count,0))
         results.append(replace(a,goods=tuple(sorted(goods.items()))))
     if len(events)>4096:
         raise EconomyError("economy history requires controlled archival")
