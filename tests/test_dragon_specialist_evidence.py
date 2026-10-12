@@ -461,6 +461,9 @@ def test_mother_dragon_synergy_links_only_exact_video_and_delta_evidence(context
     assert not triad_packet["agreement_verified"]
     assert not triad_packet["training_authorized"]
     assert not triad_packet["shadow_weights_authorized"]
+    assert first["risk_lenses"]["agreement_verified"] is False
+    assert first["risk_lenses"]["independent_source_review_required"] is True
+    assert len(first["risk_lenses"]["lens_digest"])==64
     assert triad_packet["xp_awarded"]==0
     assert triad.mother_review(
         OWNER,article_source_id=sid,video_source_id=lead.source_id,
