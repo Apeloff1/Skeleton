@@ -1,0 +1,89 @@
+name: Original Fast Verified Chunk Snapshot Forks
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_fast_chunk_snapshot.py"
+      - "skeleton/ai/game_builder/advanced_chunked_world_timeline.py"
+      - "skeleton/ai/game_builder/advanced_chunked_npc_world.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_fast_chunk_snapshot.py"
+      - ".github/workflows/game-builder-fast-chunk-snapshots.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fast-chunk-snapshots-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  exact-replay:
+    name: Original checkpoint suffix replay parity (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 22
+    env:
+      PYTHONUTF8: "1"
+      PYTHONPATH: "."
+      EXPECTED_HEAD: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact source without persisted GitHub credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_fast_chunk_snapshot.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Exact-head compiler and source check
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          python -m py_compile \
+            skeleton/ai/game_builder/advanced_fast_chunk_snapshot.py \
+            skeleton/ai/game_builder/advanced_chunked_world_timeline.py \
+            skeleton/ai/game_builder/system_editor_cli.py \
+            skeleton/ai/game_builder/game_workspace_server.py \
+            skeleton/ai/game_builder/game_workspace_ui.py \
+            tests/test_game_builder_fast_chunk_snapshot.py
+      - name: Execute real in-process fast forks and adversarial full replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_game_builder_fast_chunk_snapshot -v
+      - name: Prove full-replay equal saved identity on four source seeds
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from skeleton.ai.game_builder.advanced_chunked_npc_world import run_chunked_npc_world
+          from skeleton.ai.game_builder.advanced_chunked_world_timeline import (
+              make_chunked_bookmarks, continue_chunked_world,verify_chunked_continuation)
+          from skeleton.ai.game_builder.advanced_fast_chunk_snapshot import prepare_verified_chunk_snapshot
+          for seed in (0,1,5,9):
+              rules={"chunks_per_side":5,"citizens":32,"active_limit":6,"chunk_radius":0}
+              source=make_chunked_bookmarks(run_chunked_npc_world(["wait"]*8,
+                      seed=seed,options=rules))
+              prepared=prepare_verified_chunk_snapshot(source,cursor=8)
+              for suffix in (["wait"],["move:west","move:east"]):
+                  fast=prepared.fork(suffix)
+                  slow=continue_chunked_world(source,suffix,cursor=8)
+                  assert fast==slow
+                  assert verify_chunked_continuation(fast)
+                  print("ACTUAL_TRUSTED_FAST_FORK_FULL_PARITY",seed,len(suffix),
+                        fast["result_world_digest"])
+          PY
