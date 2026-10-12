@@ -91,11 +91,18 @@ class AppwideCapabilityTests(unittest.TestCase):
         path="backend/core/universal_forge.py"
         self.assertEqual(self.inv.source(path)["content"],"source test\n")
         (self.root/path).unlink()
-        (self.root/path).symlink_to(self.root/".env")
-        with self.assertRaises(JeevesAppwideError):
-            self.inv.source(path)
-        self.inv.scan()
-        self.assertGreaterEqual(self.inv.report()["skipped_paths"],2)
+        try:
+            (self.root/path).symlink_to(self.root/".env")
+        except (OSError,NotImplementedError):
+            # Windows runners may not enable unprivileged developer symlinks.
+            (self.root/path).write_text("changed after scan\n",encoding="utf8")
+            with self.assertRaises(JeevesAppwideError):
+                self.inv.source(path)
+        else:
+            with self.assertRaises(JeevesAppwideError):
+                self.inv.source(path)
+            self.inv.scan()
+            self.assertGreaterEqual(self.inv.report()["skipped_paths"],2)
 
     def test_actual_editor_forge_companion_and_crawler_are_bound_with_receipts(self):
         catalog=self.run.invoke("editor.catalog",{})
