@@ -1431,6 +1431,97 @@ let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="economy"){
+  const state=advancedSession.state;
+  const label=document.createElement("label");
+  label.textContent="Original trade economy · "+state.active_market_count+
+   " detailed markets · "+state.active_goods.length+" playable products";
+  const select=document.createElement("select");
+  select.id="original-economy-action";
+  for(const action of actions){
+   const option=document.createElement("option");
+   option.value=action;option.textContent=action.replaceAll("_"," ");
+   select.append(option);
+  }
+  label.append(select);target.append(label);
+  const play=document.createElement("button");
+  play.type="button";play.textContent="Perform verified market action";
+  play.disabled=Boolean(advancedSession.terminal);
+  play.addEventListener("click",()=>advanceAdvanced(select.value));
+  target.append(play);
+  const info=document.createElement("small");
+  info.textContent="Market "+state.position+" · "+state.active_goods[state.focus]+
+   " · cash "+state.cash+" · cargo "+state.cargo.reduce((a,b)=>a+b,0)+
+   " · imports sold "+state.imports_sold+
+   (state.checkpoint?" · trade milestone earned; trading continues":"");
+  target.append(info);
+  const retireLabel=document.createElement("label");
+  const retire=document.createElement("input");retire.type="checkbox";
+  retireLabel.append(retire," Retire after earned milestone");
+  target.append(retireLabel);
+  const planBtn=document.createElement("button");planBtn.type="button";
+  planBtn.textContent="AI trade director: prove finite-market cooperation";
+  planBtn.disabled=Boolean(advancedSession.terminal);
+  const proof=document.createElement("pre");
+  proof.setAttribute("role","status");
+  proof.setAttribute("aria-live","polite");
+  planBtn.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="economy"||systemEditor().id!=="economy")
+     throw Error("Source editor changed while preparing trade plan");
+    const scene=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(scene.seed!==advancedSession.seed)
+     throw Error("Trade scene seed changed during source review");
+    const result=await api("/api/economy-plan",{
+     scene,settings:advancedSettings,max_actions:100,retire:retire.checked
+    });
+    const plan=result.plan;
+    proof.textContent=JSON.stringify({
+     status:plan.status,actions:plan.actions,
+     imports_sold:plan.imported_deliveries,
+     manufactured:plan.manufactured_units,audits:plan.verified_audits,
+     ending_cash:plan.final_cash,source_digest:plan.source_digest,
+     independently_replayed:plan.independent_replay_verified,
+     receipt_digest:plan.digest,native_hardware_verified:false
+    },null,2);
+    target.querySelector("#trade-economy-adopt-proof")?.remove();
+    if(plan.status!=="replay_verified_trade"){
+     status("Original economic plan inconclusive; no false trade success awarded.");
+     return;
+    }
+    const adopt=document.createElement("button");
+    adopt.id="trade-economy-adopt-proof";adopt.type="button";
+    adopt.textContent="Explicitly replay verified original trade milestone";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="economy"||systemEditor().id!=="economy"||
+         advancedCommands.length!==0||advancedSession.seed!==scene.seed)
+       throw Error("Trade adoption requires unchanged initial reviewed source");
+      const checked=await api("/api/economy-plan-verify",{
+       record:plan,scene,settings:advancedSettings
+      });
+      if(!checked.verified)throw Error("Source trade proof could not be verified");
+      const played=await api("/api/advanced-play",{
+       editor:"economy",settings:advancedSettings,actions:plan.actions,
+       seed:scene.seed,scene
+      });
+      if(played.session.digest!==plan.replay_digest||
+         !played.session.state.checkpoint||
+         played.session.state.retired!==plan.retired)
+       throw Error("Original replay did not earn verified trade milestone");
+      advancedCommands=plan.actions.slice();
+      advancedScene=scene;
+      showAdvanced(played);
+      status("Independent economic replay adopted by explicit operator choice.");
+     }catch(error){status("Trade milestone adoption refused: "+error.message);}
+    });
+    target.append(adopt);
+    status("Verified original trade plan ready for explicit player adoption.");
+   }catch(error){proof.textContent="";status("Economic director refused: "+error.message);}
+  });
+  target.append(planBtn);target.append(proof);
+  return;
+ }
  if(advancedSession?.editor==="npc_society"||
     advancedSession?.editor==="ecosystem"){
   const state=advancedSession.state;
