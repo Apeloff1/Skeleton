@@ -88,6 +88,32 @@ def test_article_requires_existing_approved_lesson_and_exact_document_hash():
             "web-1", "e" * 64, "f" * 64, NOW + 20), authorized=True)
 
 
+def test_trusted_producer_cannot_cross_owner_in_family_or_almanakk():
+    db = sqlite3.connect(":memory:")
+    bridge = DragonFamilyCustodyBridge(db, OWNER)
+    doc = document("Owner-specific original game design insight")
+    grant(db, sid="web-1", digest=doc.content_hash)
+    source, result = bridge.article(snap("web-1"), doc)
+    family = bridge.family()
+    with pytest.raises(PermissionError,match="another owner"):
+        family.enroll("different-owner", (source,), authorized=True, now=NOW+1)
+    with pytest.raises(PermissionError,match="another owner"):
+        family.snapshot("different-owner", authorized=True)
+    family.enroll(OWNER,(source,),authorized=True,now=NOW+2)
+    family.seal_inventory(OWNER,authorized=True,now=NOW+3)
+    family.consume(OWNER,result,authorized=True)
+    lane = bridge.almanakk(wiki_verify=lambda *args: True)
+    with pytest.raises(PermissionError,match="another owner"):
+        lane.projection("different-owner",authorized=True)
+    from skeleton.ai.webcrawler.dragon_family_almanakk import WikiEvidence
+    with pytest.raises(PermissionError,match="another owner"):
+        lane.wiki_review("different-owner","parent","web-1",
+                         doc.content_hash,WikiEvidence("b"*64,NOW+5,3,True,
+                         "cross-tenant invalid"),authorized=True)
+    assert lane.projection(OWNER,authorized=True)["counts"]["collected"]==1
+    db.close()
+
+
 def test_article_tampered_capture_and_untrusted_url_are_refused():
     db = sqlite3.connect(":memory:")
     bridge = DragonFamilyCustodyBridge(db, OWNER)
