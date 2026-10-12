@@ -18,6 +18,9 @@ export interface DragonIdleFamilyProjection {
  configured:boolean;idle_only:true;
  host_state:'not_connected'|'not_observed';
  max_tasks_per_tick:number;
+ history:readonly {sequence:number;at:string;dragon:DragonFamilyRole;
+   source_id:string;outcome:'changed'|'unchanged'|'failed'|'paused';
+   change:string;digest:string}[];
  workers:Partial<Record<DragonFamilyRole,{
    known_sources:number;failed:number;incomplete_leases:number;
    last_changes:number;unchanged:number;earliest_due_at:string|null;
@@ -90,6 +93,13 @@ export function validateDragonFamily(input:unknown):DragonFamilyProjection|null 
       typeof w.configured!=='boolean'||w.idle_only!==true||
       !['not_connected','not_observed'].includes(w.host_state)||
       !count(w.max_tasks_per_tick)||w.max_tasks_per_tick<1||w.max_tasks_per_tick>3||
+      !Array.isArray(w.history)||w.history.length>15||
+      !w.history.every((e,i)=>e&&count(e.sequence)&&e.sequence>0&&utc(e.at)&&
+        ['article','video','monitor'].includes(e.dragon)&&
+        typeof e.source_id==='string'&&e.source_id.length<=128&&
+        ['changed','unchanged','failed','paused'].includes(e.outcome)&&
+        typeof e.change==='string'&&e.change.length<=200&&
+        HEX.test(e.digest)&&(i===0||e.sequence<w.history[i-1].sequence))||
       !w.workers||typeof w.workers!=='object'||Array.isArray(w.workers)||
       Object.keys(w.workers).some(k=>!['article','video','monitor'].includes(k)))return null;
     for(const role of ['article','video','monitor'] as const){
