@@ -98,7 +98,8 @@ class DragonIdleAcquisitionService:
                  monitor_capture: CaptureAdapter | None = None,
                  task_topics: tuple[str, ...],
                  adjacent_topics: tuple[str, ...] = (),
-                 commit_gate: Callable[[float], bool] | None = None) -> dict[str, object]:
+                 commit_gate: Callable[[float], bool] | None = None,
+                 revisit_source_ids: tuple[str, ...] = ()) -> dict[str, object]:
         """One authorized idle tick; not a daemon, scheduled timer or fetcher."""
         callbacks = {
             "article": article_capture,
@@ -117,7 +118,8 @@ class DragonIdleAcquisitionService:
         return self.coordinator.run_once(
             self.bridge.owner,authorized=authorized,idle_state=idle_state,
             gatherers=adapters,task_topics=task_topics,
-            adjacent_topics=adjacent_topics,commit_gate=commit_gate)
+            adjacent_topics=adjacent_topics,commit_gate=commit_gate,
+            revisit_source_ids=revisit_source_ids)
 
     def health(self, *, authorized: bool) -> dict[str,object]:
         """Owner-locked read of last known attempts; never live-device proof."""
