@@ -176,6 +176,28 @@ def test_revoked_consent_blocks_delivery_after_fetch_even_while_idle():
     db.close()
 
 
+def test_revocation_in_final_source_commit_window_is_fenced_atomically():
+    db,bridge,family,host,grant=make()
+    activate(host,grant)
+    item=current_capture(db)
+    bound_family=host.acquisition.coordinator.family
+    original=bound_family.digest_idle
+    def revoke_on_commit(*args,**kwargs):
+        # Simulate revocation AFTER the post-fetch idle observer passed,
+        # but BEFORE the final immutable source-reading transaction.
+        host.consent.revoke(OWNER,grant.consent_id,
+                            now=T+719,authorized=True)
+        return original(*args,**kwargs)
+    bound_family.digest_idle=revoke_on_commit
+    report=host.tick(authorized=True,host_idle_state=idle,
+                     article_capture=lambda task:item)
+    assert report["paused"] is True
+    assert report["changed"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    assert host.status(at=T+721,authorized=True)["active"] is False
+    db.close()
+
+
 def test_foreground_event_interrupts_acquisition_without_growth():
     db,bridge,family,host,grant=make()
     activate(host,grant)
