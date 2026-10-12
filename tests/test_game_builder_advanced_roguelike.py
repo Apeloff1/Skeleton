@@ -293,6 +293,48 @@ class OriginalRoguelikeRunTests(unittest.TestCase):
         self.assertEqual(assembly["authored_scene_evidence"][0]["editor"],"roguelike")
         self.assertFalse(assembly["ready_for_release"])
 
+
+    def test_original_roguelike_studio_has_live_map_and_reviewed_floor_painter(self):
+        from skeleton.ai.game_builder.game_workspace_ui import (
+            render_workspace_html,SCRIPT,
+        )
+        html=render_workspace_html("A"*32).decode("utf-8")
+        for phrase in ("roguelike-player-command",
+                       "Execute verified dungeon action","paintRoguelikeCell",
+                       "wall_toggle","chest_toggle","enemy_toggle",
+                       "toggle_elite","reserve_up","trap_damage_down",
+                       "Original signed 6×6 procedural dungeon source"):
+            self.assertIn(phrase,html)
+        self.assertIn("Dungeon source changed. Validate original enemies",SCRIPT)
+        scene=make_advanced_scene("roguelike",self.easy(),seed=4)
+        altered=deepcopy(scene)
+        altered["layout"]["ambient"]="temple" if scene["layout"]["ambient"]!="temple" else "crypt"
+        with self.assertRaises(SceneError):
+            validate_advanced_scene(altered,self.easy())
+        revised=make_advanced_scene("roguelike",self.easy(),seed=4,
+                                    layout=altered["layout"])
+        self.assertNotEqual(revised["digest"],scene["digest"])
+        self.assertTrue(verify_advanced_session(
+            run_advanced_session("roguelike",self.easy(),seed=4,scene=revised),
+            self.easy()))
+
+    def test_authored_boss_identity_and_elite_unlock_are_enforced(self):
+        original=self.easy()
+        config=make_editor_document("roguelike",original)["settings"]
+        layout=default_layout(config,0)
+        forged=deepcopy(layout)
+        forged["enemies"][0]["kind"]="guardian"
+        with self.assertRaises(RoguelikeActionError):
+            normalize_layout(config,forged)
+        forged=deepcopy(layout)
+        forged["enemies"][0]["is_boss"]=True
+        with self.assertRaises(RoguelikeActionError):
+            normalize_layout(config,forged)
+        scene=make_advanced_scene("roguelike",original,seed=0)
+        with self.assertRaises(SceneError):
+            validate_advanced_scene(scene,{**original,"lockpicks":0})
+        self.assertFalse(scene["layout"]["enemies"][0]["is_boss"])
+
     def test_offline_cli_returns_original_non_native_receipt(self):
         from skeleton.ai.game_builder.system_editor_cli import main
         output=io.StringIO()
