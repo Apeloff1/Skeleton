@@ -318,6 +318,40 @@ class DragonIdleCoordinator:
             VALUES(?,?,?,?,?,?,?,?,?)""",
             (owner,sequence,at,role,sid,outcome,note,prior,fingerprint))
 
+    def fence_owner_leases(self, owner: str, *, authorized: bool,
+                           at: float, max_fences: int = 1000) -> int:
+        """Stop owned in-flight jobs now; invalidate every selected token.
+
+        Called only by the authenticated host after durable opt-out. The work
+        adapter still owns actual network cancellation. Fencing guarantees
+        any later result cannot be admitted as verified Dragon knowledge.
+        """
+        self.family._assert_owner(owner)
+        if not authorized:
+            raise PermissionError("authenticated idle cancellation required")
+        at=_epoch(at)
+        if type(max_fences) is not int or not 1<=max_fences<=1000:
+            raise ValueError("invalid cancellation batch limit")
+        self.db.execute("BEGIN IMMEDIATE")
+        with self.db:
+            rows=self.db.execute("""SELECT role,source_id,next_due
+                FROM dragon_family_idle_leases WHERE owner=?
+                  AND last_outcome='running' AND lease_token<>''
+                ORDER BY role,source_id LIMIT ?""",
+                (owner,max_fences)).fetchall()
+            for role,sid,due in rows:
+                changed=self.db.execute("""UPDATE dragon_family_idle_leases
+                    SET lease_token='',lease_expires=0,
+                        next_due=?,last_completed=?,last_outcome='paused'
+                    WHERE owner=? AND role=? AND source_id=?
+                      AND last_outcome='running' AND lease_token<>''""",
+                    (max(due,at+self.policy.transient_backoff_seconds),
+                     at,owner,role,sid)).rowcount
+                if changed!=1:
+                    raise RuntimeError("idle cancellation lost source fence")
+                self._record_attempt(owner,role,sid,at,"paused")
+        return len(rows)
+
     def reconcile_expired_leases(self, owner: str, *, authorized: bool,
                                  at: float, max_recover: int = 100) -> int:
         """Fence abandoned host work after crash/restart, without replaying it.
