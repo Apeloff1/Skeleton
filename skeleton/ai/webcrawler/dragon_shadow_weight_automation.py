@@ -31,7 +31,8 @@ from .dragon_human_review import DragonHumanReviewLedger
 from .dragon_memory_promotion_worker import MemoryPromotionOutput
 from .dragon_knowledge_normalization_worker import NormalizedKnowledge, normalization_records_fingerprint
 from .dragon_knowledge_manifest import canonical_knowledge_id
-from .dragon_adversarial_review_worker import AdversarialReviewOutput
+from .dragon_adversarial_review_worker import AdversarialReviewOutput, execute_adversarial_review
+from .dragon_analysis_execution import LayerDispatch
 from .dragon_nest_progression import _id, _instant, _iso
 from .dragon_resource_session import HardwareSample, plan_resources
 
@@ -504,6 +505,7 @@ class ShadowWeightAutomation:
         normalized_knowledge_id: str, receipts: tuple[LayerReceipt, ...],
         normalized_records: tuple[NormalizedKnowledge, ...],
         adversarial_output: AdversarialReviewOutput,
+        adversarial_dispatch: LayerDispatch,
         at: str, idle_since: str, hardware: HardwareSample,
         hardware_now: float, consented: bool, authorized: bool,
         privacy_clear: bool,
@@ -524,12 +526,23 @@ class ShadowWeightAutomation:
                 or not normalized_records or len(normalized_records) > 1024
                 or any(not isinstance(r, NormalizedKnowledge) for r in normalized_records)
                 or not isinstance(adversarial_output, AdversarialReviewOutput)
+                or not isinstance(adversarial_dispatch, LayerDispatch)
+                or adversarial_dispatch.layer is not AnalysisLayer.ADVERSARIAL_REVIEW
+                or adversarial_dispatch.input_fingerprints != (
+                    receipts[8].output_fingerprint,
+                )
                 or adversarial_output.receipt != receipts[-1]
                 or normalized_knowledge_id not in adversarial_output.surviving_knowledge_ids
                 or normalization_records_fingerprint(
                     receipts[8].input_fingerprints, normalized_records,
                 ) != receipts[8].output_fingerprint):
             raise ValueError("normalized evidence or adversarial survivors not bound to receipts")
+        verified_adversarial = execute_adversarial_review(
+            adversarial_dispatch, normalized_records,
+            normalization_receipt=receipts[8], authorized=True,
+        )
+        if verified_adversarial != adversarial_output:
+            raise ValueError("adversarial worker findings differ from deterministic replay")
         record = next((r for r in normalized_records
                        if r.knowledge_id == normalized_knowledge_id), None)
         if (record is None or record.knowledge_id != canonical_knowledge_id(record)
