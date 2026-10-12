@@ -144,7 +144,10 @@ def chapter_context(
         ids.add(scene_id)
         line = (f"\n[ACT {scene['act']} SCENE {scene_id} "
                 f"RECEIPT {scene['digest']}] {str(scene.get('summary', ''))[:600]}\n"
-                f"Plot IDs: {','.join(p['id'] for p in scene.get('plot_points', []))[:500]}\n")
+                f"Stage: {scene.get('scene_kind', 'story')}\n"
+                f"Plot IDs: {','.join(p['id'] for p in scene.get('plot_points', []))[:250]}\n"
+                f"Emotion: {','.join(str(m.get('kind')) + ':' + str(m.get('intensity')) for m in scene.get('story_moments', []))[:250]}\n"
+                f"Threads: {','.join(str(t.get('thread_id')) + ':' + str(t.get('role')) for t in scene.get('thread_beats', []))[:350]}\n")
         if len(line) > remaining:
             break
         parts.append(line)
