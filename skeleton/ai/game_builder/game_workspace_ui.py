@@ -1015,8 +1015,11 @@ function drawAdvancedGame(session){
   for(const fixture of state.fixtures){
    c.fillStyle="#6a777c";
    const p=fixture.position,h=fixture.half_size;
-   c.fillRect(sx+(p[0]-h[0])/100*scale,sy+(p[1]-h[1])/100*scale,
+   c.save();c.translate(sx+p[0]/100*scale,sy+p[1]/100*scale);
+   c.rotate((fixture.orientation||0)*Math.PI/180000);
+   c.fillRect(-h[0]/100*scale,-h[1]/100*scale,
               h[0]/50*scale,h[1]/50*scale);
+   c.restore();
   }
   for(const [i,anchor] of state.anchors.entries()){
    c.fillStyle="#ecce8d";c.fillRect(sx+anchor[0]/100*scale-3,
@@ -1061,7 +1064,7 @@ function drawAdvancedGame(session){
     c.fillText(String(body.position[2]/100),bx-5,by-8);}
   }
   const tx=Math.min(345,sx+scale*(state.width-1)+12);
-  c.font="11px monospace";c.fillStyle="#d6e5e9";
+  c.font="10px monospace";c.fillStyle="#d6e5e9";
   [
    "Contact: "+state.contacts,
    "Battery: "+state.battery,
@@ -1075,8 +1078,13 @@ function drawAdvancedGame(session){
    "Pair CCD: "+state.continuous_pair_contacts,
    "Angular: "+state.max_angular_speed_seen,
    "Cable ext: "+state.peak_cable_extension,
-   "SAT hits: "+state.oriented_contacts
-  ].forEach((line,i)=>c.fillText(line,tx,54+i*20));
+   "SAT hits: "+state.oriented_contacts,
+   "Sweep hits: "+state.rotating_swept_contacts,
+   "Broadphase: "+(state.broadphase_pairs+state.broadphase_fixtures),
+   "Pruned: "+state.broadphase_pruned,
+   "SAT probes: "+state.oriented_sat_evaluations,
+   "Asleep: "+state.sleeping_bodies
+  ].forEach((line,i)=>c.fillText(line,tx,47+i*14));
  }
  if(editor==="flight"){
   const ox=15,trackY=83,trackW=W-188,trackH=154;
