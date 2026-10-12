@@ -111,7 +111,7 @@ def story_bible_template(project):
     ident(project, "project")
     return {"schema": BIBLE, "project": project, "phase": "foundation",
             "title": "", "story": {"premise": "", "conflict": "",
-                                   "themes": [], "planned_acts": 1},
+                                   "themes": [], "planned_chapters": 100, "planned_acts": 1000},
             "world": {"era": "", "geography": "", "laws": []},
             "characters": [], "regions": [], "assets": [], "inspiration": [],
             "rights_reviewed": False, "digest": None}
@@ -127,7 +127,9 @@ def validate_story_bible(doc):
     story = shape(doc["story"], ("premise", "conflict", "themes", "planned_acts"), "story")
     text(story["premise"], "central premise", 4000)
     text(story["conflict"], "narrative conflict", 2000)
-    number(story["planned_acts"], 1, 100, "game acts")
+    number(story["planned_acts"], 1, 1000, "game acts")
+    if "planned_chapters" in story:
+        number(story["planned_chapters"], 1, 100, "game chapters")
     for theme in array(story["themes"], 40, "original motifs", 1):
         text(theme, "original narrative motif", 100)
     world = shape(doc["world"], ("era", "geography", "laws"), "world")
@@ -220,18 +222,23 @@ def validate_story_bible(doc):
     return doc
 
 
-def story_scene_template(bible, *, sequence=1, act=1, scene=1):
+def story_scene_template(bible, *, sequence=1, chapter=None, act=1, scene=1):
     validate_story_bible(bible)
     return {"schema": SCENE, "bible_digest": bible["digest"],
-            "sequence": sequence, "act": act, "scene": scene,
+            "sequence": sequence, **({"chapter": chapter} if chapter is not None else {}),
+            "act": act, "scene": scene,
             "prior_digest": None, "title": "", "region": None,
             "cast": [], "looks": [], "assets": [], "beats": [],
             "dialogue": [], "interactions": [], "events": [], "digest": None}
 
 
 def scene_path(doc):
-    number(doc["act"], 1, 100, "act index")
+    number(doc["act"], 1, 1000, "act index")
     number(doc["scene"], 1, 999999, "scene within act")
+    if "chapter" in doc:
+        number(doc["chapter"], 1, 100, "chapter index")
+        return (f"story/chapters/chapter_{doc['chapter']:03d}/"
+                f"acts/act_{doc['act']:04d}/scene_{doc['scene']:06d}.json")
     return f"story/scenes/act_{doc['act']:04d}/scene_{doc['scene']:06d}.json"
 
 
@@ -239,6 +246,7 @@ def _check_scene(bible, doc, previous, history, state, indexes):
     signed(doc, SCENE, ("bible_digest", "sequence", "act", "scene",
                         "prior_digest", "title", "region", "cast", "looks",
                         "assets", "beats", "dialogue", "interactions", "events")
+           + (("chapter", "storytelling") if "chapter" in doc else ())
            + (("assurance",) if "assurance" in doc else ()))
     require(bible["phase"] == "design" and bible["rights_reviewed"],
             "no production scene before story, cast and design review")
@@ -247,6 +255,10 @@ def _check_scene(bible, doc, previous, history, state, indexes):
     number(doc["sequence"], 1, MAX_SCENES, "ordered global scene")
     number(doc["act"], 1, bible["story"]["planned_acts"], "act number")
     number(doc["scene"], 1, 999999, "scene number")
+    if "chapter" in doc:
+        number(doc["chapter"], 1, 100, "chapter number")
+        require(doc["chapter"] == (doc["act"]-1)//10+1,
+                "chapter must contain exactly ten consecutive global acts")
     require(doc["sequence"] == (previous["sequence"]+1 if previous else 1),
             "missing scene in sequential story history")
     require(doc["prior_digest"] == (previous["digest"] if previous else None),
