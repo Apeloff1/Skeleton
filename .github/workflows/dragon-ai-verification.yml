@@ -109,6 +109,7 @@ jobs:
             tests/test_dragon_discovery_portfolio.py \
             tests/test_dragon_research_campaigns.py \
             tests/test_dragon_discovery_admission.py \
+            tests/test_dragon_staged_supplements.py \
             tests/test_dragon_discovery_census.py \
             tests/test_dragon_platform_coverage.py \
             tests/test_dragon_discovery_identity_audit.py \
