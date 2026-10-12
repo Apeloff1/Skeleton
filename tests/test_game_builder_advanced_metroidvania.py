@@ -257,6 +257,73 @@ class OriginalConnectedWorldTests(unittest.TestCase):
         step(equipped,settings,"guard")
         self.assertGreater(equipped["health"],base["health"])
 
+
+    def test_ai_planner_earns_abilities_and_completes_rehearsed_world_boss(self):
+        from skeleton.ai.game_builder.advanced_world_planner import plan_original_world
+        for region_count in (8,24):
+            settings={"regions":region_count,"hazard_damage":2,"foe_damage":3}
+            scene=make_advanced_scene("metroidvania",settings,seed=3)
+            proof=plan_original_world(scene,settings,max_states=50000)
+            with self.subTest(regions=region_count):
+                self.assertEqual(proof["feasibility"],"verified_diagnostic_route")
+                self.assertTrue(proof["rehearsal_verified"])
+                self.assertEqual(len(proof["rehearsal_digest"]),64)
+                self.assertEqual(proof["original_source_digest"],scene["digest"])
+                self.assertIn("claim",proof["route"])
+                self.assertEqual(proof["route"][-1],"attack")
+                self.assertLessEqual(proof["route_turn_count"],128)
+                self.assertFalse(proof["original_play_survivability_verified"])
+                self.assertFalse(proof["native_execution_verified"])
+                self.assertFalse(proof["source_mutated"])
+                self.assertEqual(proof,plan_original_world(
+                    scene,settings,max_states=50000))
+
+    def test_ai_planner_rejects_budget_and_circular_source_forgery(self):
+        from skeleton.ai.game_builder.advanced_world_planner import (
+            ExplorationPlanningError,plan_original_world,
+        )
+        scene=make_advanced_scene("metroidvania",{"regions":8},seed=1)
+        for n in (0,True,199,100001):
+            with self.assertRaises(ExplorationPlanningError):
+                plan_original_world(scene,{"regions":8},max_states=n)
+        for n in (0,True,129):
+            with self.assertRaises(ExplorationPlanningError):
+                plan_original_world(scene,{"regions":8},max_actions=n)
+        for n in (1,3):
+            bounded=plan_original_world(scene,{"regions":8},max_actions=n)
+            self.assertFalse(bounded["rehearsal_verified"])
+            self.assertFalse(bounded["route"])
+        tampered=deepcopy(scene);tampered["layout"]["guardian_health"]=1
+        with self.assertRaises(SceneError):
+            plan_original_world(tampered,{"regions":8})
+        with self.assertRaises(SceneError):
+            plan_original_world(scene,{"regions":9})
+
+    def test_ai_world_planning_cli_and_studio_do_not_auto_approve_source(self):
+        import io,json,tempfile
+        from contextlib import redirect_stdout
+        from pathlib import Path
+        from skeleton.ai.game_builder.system_editor_cli import main
+        from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
+        cfg={"regions":8}
+        scene=make_advanced_scene("metroidvania",cfg,seed=0)
+        with tempfile.TemporaryDirectory() as tmp:
+            file=Path(tmp)/"world.json";settings=Path(tmp)/"settings.json"
+            file.write_text(json.dumps(scene),encoding="utf-8")
+            settings.write_text(json.dumps(cfg),encoding="utf-8")
+            stream=io.StringIO()
+            with redirect_stdout(stream):
+                self.assertEqual(main(["plan-original-world","--scene",str(file),
+                                       "--settings",str(settings)]),0)
+            proof=json.loads(stream.getvalue())
+            self.assertTrue(proof["rehearsal_verified"])
+            self.assertFalse(proof["source_mutated"])
+            self.assertFalse(proof["native_execution_verified"])
+        page=render_workspace_html("A"*32).decode("utf-8")
+        for t in ("world-progression-plan","world-progression-proof",
+                  "/api/world-plan","original_play_survivability_verified"):
+            self.assertIn(t,page)
+
     def test_typed_actuation_and_resource_edge_cases(self):
         for bad in ("teleport","force_win","travel:24","set_hp:1000",
                     "fast:-1","break:infinite","claim"):
