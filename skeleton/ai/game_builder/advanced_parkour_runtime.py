@@ -188,9 +188,15 @@ def step(state,config,action):
     events=[]
     # No client-supplied x, score, medals, coordinates or damage is authoritative.
     cost=_required_stamina(config,action)
+    if state["style"]=="industrial" and action in ("vault","wall_run"):
+        cost+=2  # tighter precision, higher effort on machinery
+    if state["style"]=="highland" and action in ("jump","climb","grapple"):
+        cost+=2  # elevation gain in rugged terrain is costly
     if cost>state["stamina"]:
         raise ParkourActionError("actual runner stamina cannot pay traversal cost")
-    if action=="double_jump" and (not config["double_jump"] or state["cooldown"]>0):
+    if action=="double_jump" and (
+        not config["double_jump"] or state["cooldown"]>0 or state["height"]<=0
+    ):
         raise ParkourActionError("double jump requires earned ability and cooldown")
     if action in ("grapple","swing") and (
         config["grapple_reach"]<=0 or state["grapple_charges"]<=0
@@ -240,7 +246,7 @@ def step(state,config,action):
     if action in MOBILITY:
         multiplier=MOBILITY[action]
         # 3 style envelopes alter actual longitudinal acceleration.
-        accel={"rooftops":2,"industrial":1,"highland":1}[state["style"]]
+        accel={"rooftops":3,"industrial":2,"highland":1}[state["style"]]
         momentum=(state["momentum"]+
                   (config["sprint_gain"] if action=="sprint" else accel))
         state["momentum"]=min(config["max_velocity"],momentum)
