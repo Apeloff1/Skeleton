@@ -35,6 +35,12 @@ from .advanced_parkour_planner import plan_parkour_route, verify_parkour_plan
 from .advanced_sports_coach import plan_original_sports_match, verify_original_sports_plan
 from .advanced_maze_planner import plan_original_maze, verify_original_maze_plan
 from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg_plan
+from .advanced_npc_society_planner import (
+    plan_original_civic_milestone, verify_original_civic_plan,
+)
+from .advanced_ecosystem_planner import (
+    plan_original_ecology, verify_original_ecology_plan,
+)
 from .advanced_procedural_world_planner import (
     plan_original_frontier, verify_original_frontier_plan,
 )
@@ -151,6 +157,28 @@ def parser() -> argparse.ArgumentParser:
     frontier_check.add_argument("--record",required=True)
     frontier_check.add_argument("--scene",required=True)
     frontier_check.add_argument("--settings")
+    civic=commands.add_parser("plan-civic",
+        help="Prove original NPC town witness resolution with finite player actions")
+    civic.add_argument("--scene",required=True)
+    civic.add_argument("--settings")
+    civic.add_argument("--max-actions",type=int,default=100)
+    civic.add_argument("--retire",action="store_true")
+    civic_verify=commands.add_parser("verify-civic-plan",
+        help="Re-run NPC social witnesses and verify exact source-bound evidence")
+    civic_verify.add_argument("--record",required=True)
+    civic_verify.add_argument("--scene",required=True)
+    civic_verify.add_argument("--settings")
+    ecology=commands.add_parser("plan-ecology",
+        help="Prove a living ecosystem conservation checkpoint through real play")
+    ecology.add_argument("--scene",required=True)
+    ecology.add_argument("--settings")
+    ecology.add_argument("--max-actions",type=int,default=100)
+    ecology.add_argument("--retire",action="store_true")
+    ecology_verify=commands.add_parser("verify-ecology-plan",
+        help="Independently replay and re-evaluate a funded conservation plan")
+    ecology_verify.add_argument("--record",required=True)
+    ecology_verify.add_argument("--scene",required=True)
+    ecology_verify.add_argument("--settings")
     world_plan=commands.add_parser("plan-original-world",
         help="Search and independently replay a safe original world ability path")
     world_plan.add_argument("--scene",required=True)
@@ -335,6 +363,24 @@ def main(argv=None) -> int:
                 max_actions=args.max_actions,retire=args.retire)
         elif args.operation == "verify-frontier-plan":
             output={"verified":verify_original_frontier_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-civic":
+            output=plan_original_civic_milestone(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_actions=args.max_actions,retire=args.retire)
+        elif args.operation == "verify-civic-plan":
+            output={"verified":verify_original_civic_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-ecology":
+            output=plan_original_ecology(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_actions=args.max_actions,retire=args.retire)
+        elif args.operation == "verify-ecology-plan":
+            output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
         elif args.operation == "plan-original-world":
