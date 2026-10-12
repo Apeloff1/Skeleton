@@ -14,7 +14,7 @@ on:
       - "skeleton/ai/game_builder/system_editor_cli.py"
       - "skeleton/ai/game_builder/game_workspace_server.py"
       - "skeleton/ai/game_builder/game_workspace_ui.py"
-      - "tests/test_game_builder_advanced_colony_godot.py"
+      - "tests/test_game_builder_advanced_colony.py"
       - ".github/workflows/game-builder-advanced-colony-native.yml"
   workflow_dispatch:
 permissions:
@@ -48,7 +48,7 @@ jobs:
             skeleton/ai/capability_map.py
             skeleton/ai/game_builder/
             tests/__init__.py
-            tests/test_game_builder_advanced_colony_godot.py
+            tests/test_game_builder_advanced_colony.py
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -67,7 +67,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           godot --version
           python -m py_compile skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_colony_runtime.py skeleton/ai/game_builder/advanced_godot_export.py skeleton/ai/game_builder/advanced_colony_godot.py
-          python -m unittest tests.test_game_builder_advanced_colony_godot -v
+          python -m unittest tests.test_game_builder_advanced_colony -v
       - name: Build eight real authored colony production chains and resource scenarios
         shell: bash
         run: |
