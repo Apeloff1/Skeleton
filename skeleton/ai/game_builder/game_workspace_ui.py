@@ -771,6 +771,7 @@ function drawAdvancedGame(session){
    c.fillStyle="#f7f5dc";
    if(t.building)c.fillText(glyph[t.building]||"?",x+6,y+16);
    else if(t.animal)c.fillText(t.tamed?"a":"w",x+7,y+15);
+   else if(t.sapling)c.fillText("s",x+8,y+15);
    else if(t.crop)c.fillText(String(t.crop),x+8,y+16);
    if(t.fire){
     c.fillStyle="#fc9c4c";c.fillRect(x+19,y+1,4,5);
@@ -790,6 +791,8 @@ function drawAdvancedGame(session){
   c.fillText("Settlers "+state.settlers.length+" · housing "+state.houses,cols,175);
   c.fillText("Seasons "+state.season+" · achievement "+
    state.achievements.length,cols,197);
+  c.fillText("NPC witnesses "+state.observations.length+" · open quests "+
+   state.quests.filter(q=>q.status==="open").length,cols,219);
   c.fillStyle="#a6dcc0";
   c.fillText("Draw / play only in source-validated original cells.",12,247);
  }
@@ -1052,7 +1055,7 @@ const PAINT_TOOLS={
           "clay_plus","clay_minus","ore_plus","ore_minus","water_plus",
           "water_minus","fish_plus","fish_minus","forage_plus",
           "forage_minus","soil_toggle","crop_up","crop_down",
-          "moisture_plus","animal_toggle","tamed_toggle",
+          "moisture_plus","animal_toggle","tamed_toggle","sapling_toggle",
           "fire_up","fire_down","pollution_down",
           "structure_next","spawn","settler_toggle","weather_next",
           "credits_plus","credits_minus"],
@@ -1131,7 +1134,7 @@ function renderSceneAuthoring(){
    ctx.fillStyle=ink[t.terrain]||"#506977";ctx.fillRect(x,y,25,22);
    ctx.fillStyle="#f1f3db";
    let symbol=t.id===world.spawn?"P":t.building?
-    t.building.slice(0,1).toUpperCase():t.animal?"w":t.crop?"c":"";
+    t.building.slice(0,1).toUpperCase():t.animal?"w":t.sapling?"s":t.crop?"c":"";
    ctx.fillText(symbol,x+7,y+15);
    if(t.fire){ctx.fillStyle="#f8a058";ctx.fillRect(x+20,y+1,4,5);}
    if(world.settler_spawns.includes(t.id)){
@@ -1300,6 +1303,7 @@ function paintSandboxCell(index){
   tile.terrain=terrain[(terrain.indexOf(tile.terrain)+1)%terrain.length];
   for(const k of ["wood","stone","clay","ore","water","fish","forage"])
    tile[k]=0;
+  tile.sapling=0;
   if(tile.terrain==="forest"){tile.wood=6;tile.forage=2;}
   else if(tile.terrain==="ridge"){tile.stone=6;tile.ore=3;}
   else if(["marsh","lake"].includes(tile.terrain)){
@@ -1313,7 +1317,10 @@ function paintSandboxCell(index){
  else if(tool==="crop_up"||tool==="crop_down"){
   limit("crop",tool==="crop_up"?1:-1,8);
  }else if(tool==="moisture_plus")limit("moisture",1,10);
- else if(tool==="animal_toggle"){
+ else if(tool==="sapling_toggle"){
+  tile.sapling=tile.sapling?0:1;
+  if(tile.sapling){tile.terrain="forest";tile.wood=0;tile.crop=0;}
+ }else if(tool==="animal_toggle"){
   tile.animal=tile.animal?0:1;if(!tile.animal)tile.tamed=false;
  }else if(tool==="tamed_toggle")tile.tamed=!tile.tamed;
  else if(tool==="fire_up"||tool==="fire_down"){
