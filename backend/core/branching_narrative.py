@@ -577,7 +577,9 @@ def simulate(plan: Mapping[str, Any], choices: Sequence[str]) -> dict:
     touched_factions = {
         k.split(":", 2)[2] for k in state["meters"]
         if k.startswith(("reputation:faction:", "reputation:gang:",
-                         "reputation:government:", "reputation:law:"))
+                         "reputation:government:", "reputation:law:",
+                         "law_heat:region:", "law_heat:city:",
+                         "law_heat:government:", "law_heat:law:"))
     }
     unresolved_factions = sorted(touched_factions - set(
         ending["faction_conclusions"] if ending else {}))
