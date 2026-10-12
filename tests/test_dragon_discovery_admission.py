@@ -131,3 +131,38 @@ def test_real_registry_plus_supplements_remains_unapproved(tmp_path, baseline):
         assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner='alice'").fetchone()[0] == canonical_count
         assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE owner='alice'").fetchone()[0] == canonical_count
         assert a.library._rows("alice") == []
+
+
+def test_evidence_loader_rejects_duplicate_json_and_symlink(tmp_path):
+    path = tmp_path / "dragon-source-expansion-malformed.json"
+    path.write_text('{"schema":"x","schema":"y"}', encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate"):
+        _supplement(path)
+    path.write_text('{"schema":"x","inf":NaN}', encoding="utf-8")
+    with pytest.raises(ValueError, match="nonfinite"):
+        _supplement(path)
+    original = tmp_path / "real.json"
+    original.write_text('{"schema":"x"}', encoding="utf-8")
+    link = tmp_path / "alias.json"
+    try:
+        link.symlink_to(original)
+    except OSError:
+        pytest.skip("symlinks unavailable on this filesystem")
+    with pytest.raises(ValueError, match="regular bounded"):
+        _supplement(link)
+
+
+def test_source_receipts_are_verified_during_idempotent_replay(tmp_path, baseline, chain):
+    with ReviewedKnowledgeStore(tmp_path / "receipt.sqlite") as store:
+        ingress = DragonDiscoveryAdmission(DragonAlmanacs(store))
+        first = ingress.import_chain("owner", baseline, chain, authorized=True)
+        assert first["new_provenance_receipts"] == 964
+        # A DB editor can change a stored receipt but must not have that
+        # history silently accepted as an already verified source discovery.
+        store.db.execute("""UPDATE dragon_almanac_supplement_receipts_v2
+                            SET body='{"forged":true}'
+                            WHERE rowid=(SELECT MIN(rowid)
+                                         FROM dragon_almanac_supplement_receipts_v2)""")
+        with pytest.raises(ValueError, match="corrupt"):
+            ingress.import_chain("owner", baseline, chain, authorized=True)
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_supplement_receipts_v2").fetchone()[0] == 964
