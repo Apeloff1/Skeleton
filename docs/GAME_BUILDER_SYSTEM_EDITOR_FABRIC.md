@@ -1165,7 +1165,7 @@ qualified housing/population settlement milestone. Survival and
 creative modes are separate editorial choices, including independent
 resource finite/renewable/unlimited policies.
 
-The original editor expands from five to **65 typed gameplay-affecting
+The original editor expands from five to **76 typed gameplay-affecting
 controls** covering world size, game duration, resource policy,
 creative/survival, physical movement and labor energy, available NPCs,
 regional job radius, ecological regeneration, finite resources,
@@ -1182,7 +1182,7 @@ power, credits and achievements. An accessible tile picker replaces
 thousands of unmanageable resource/building buttons with **selected-cell
 actions** plus independent global operations. Clicking the canvas
 chooses the cell, but never teleports the player or bypasses proximity.
-A separate **29-operation local authored-scene painter** edits
+A separate **30-operation local authored-scene painter** edits
 original biomes, water/ore/wood/fish/forage, animals and taming,
 crop/soil, buildings, settlements, player spawn, starting credits,
 fire/pollution and climate, all under typed scene review.
@@ -1205,3 +1205,75 @@ store-ready publisher asset. Each future engine, content, platform,
 frame-time and asset claim requires separate independent evidence.
 Source projects are built only from original material with the
 existing human-reviewed, fail-closed offline custody workflow.
+
+
+### Witness-driven events, quests and non-inflationary local stories
+
+In the same standalone sandbox, a separate original system
+(advanced_sandbox_story.py) now produces a **causal narrative evidence
+chain** from real witnessed actions, rather than an LLM inventing
+completed quests, NPC experiences or grants. This is wired directly
+to successful original gameplay transitions and the physical region.
+
+Each live settler has a geographic region, actual position and health,
+so a witness report is possible only for a current-region worker that
+physically saw a nearby act within the typed sight radius, or heard
+an acoustically recognizable event within the independently authored
+hearing range. Storms reduce direct visual reach. Logged evidence
+records the source action, world region, cell, day/turn, witness IDs,
+perception mode, distances, source category, exact immutable digest,
+and the preceding observation's digest. A bounded live ledger may
+compact old messages while retaining the cryptographic chain head and
+quest-specific originating evidence digest.
+
+Witness observations open five distinct finite original quests:
+
+- **Forest restoration:** a worker observes real local logging; the
+  damaged/depleted habitat must be actually replanted using legitimate
+  seed and water. New saplings survive seasons, can burn in real fires
+  and mature into finite real source wood. No duplicated historical
+  restoration reward is allowed for the same site.
+- **Wildlife stewardship:** a witness observes actual wildlife hunting;
+  live animals must genuinely be domesticated in the same region.
+- **Fire safety:** nearby settlers observe/ hear a real ignition,
+  and completion requires an actual corresponding fire-extinguishing
+  operation using paid carried water.
+- **Civic reconstruction:** a settler witnesses real demolition and
+  asks the player to rebuild on that exact location. The rebuilt
+  structure must exist in the authoritative map before payment.
+- **Community relief:** real local settler hunger/dehydration produces
+  a direct self-reported observation and a need-based request. The
+  player must transfer *actual carried supplies* to community stores,
+  restoring their configured real food/water thresholds.
+
+Quests are content-identified by region, site and objective type;
+completed historical requests do not regenerate merely because a
+player repeats damage and repair. Active quest count, visible
+observation count, sight/hearing radius, seeded grant reserve, finite
+quest reward, seed and sapling growth days, mature forest yield,
+community relief minimums and donated supply amounts are governed
+by **eleven additional typed editorial axes**, for 76 total.
+
+Money is not minted by completing or repeating story commands:
+the civic grant fund is bounded by the unallocated original build
+budget at world creation. Each successful quest deducts its payment
+from this physical remaining reserve, and only then transfers that
+amount into credits. In particular, creative-mode supply overrides
+do not make donated supplies materialize: donations always deduct
+the real carried items.
+
+The Studio world HUD now shows the live NPC witness ledger count and
+open quests; the authoring palette includes original sapling age
+states and the replay receipts expose the entire bounded NPC event
+and quest state. Dedicated adversarial tests cover unseen and
+heard incidents, forest recovery over time, limited grants and
+duplicate-event suppression, local civic demolition/reconstruction,
+relief deliveries, historical source custody, observable witness IDs
+and chain-integrity tamper resistance.
+
+**Scope caveat:** this implements five concrete original, spatially
+caused story templates. It does not yet claim unrestricted human-level
+NPC personality, thousands of moral/social behaviors, sophisticated
+acoustical ray tracing, learned agent policy, authored voice acting,
+full quest dialogue production or cross-game canonical memory.
+Those are independent extensions and verification obligations.
