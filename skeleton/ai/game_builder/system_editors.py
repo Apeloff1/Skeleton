@@ -6106,8 +6106,85 @@ for _entry in CATALOG:
             ],
         }[_entry["id"]]
         _entry["fields"].extend(_extended)
+# Executable source-defined society and living ecosystem controls.
+for _entry in CATALOG:
+    if _entry["id"] in ("npc_society","ecosystem"):
+        _extension={
+            "npc_society":[
+                {"key":"initial_food","kind":"int","default":90,"minimum":0,"maximum":600,"options":[]},
+                {"key":"food_capacity","kind":"int","default":500,"minimum":10,"maximum":1000,"options":[]},
+                {"key":"initial_materials","kind":"int","default":30,"minimum":0,"maximum":500,"options":[]},
+                {"key":"material_capacity","kind":"int","default":400,"minimum":10,"maximum":1000,"options":[]},
+                {"key":"initial_gold","kind":"int","default":50,"minimum":0,"maximum":1000,"options":[]},
+                {"key":"player_energy","kind":"int","default":100,"minimum":10,"maximum":300,"options":[]},
+                {"key":"dialogue_bond","kind":"int","default":3,"minimum":1,"maximum":15,"options":[]},
+                {"key":"help_food","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
+                {"key":"help_bond","kind":"int","default":5,"minimum":1,"maximum":20,"options":[]},
+                {"key":"accusation_penalty","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
+                {"key":"trade_cost","kind":"int","default":3,"minimum":1,"maximum":30,"options":[]},
+                {"key":"trade_food","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
+                {"key":"work_energy","kind":"int","default":5,"minimum":1,"maximum":30,"options":[]},
+                {"key":"farm_yield","kind":"int","default":8,"minimum":1,"maximum":40,"options":[]},
+                {"key":"work_yield","kind":"int","default":6,"minimum":1,"maximum":40,"options":[]},
+                {"key":"donation_gold","kind":"int","default":4,"minimum":1,"maximum":30,"options":[]},
+                {"key":"donation_trust","kind":"int","default":3,"minimum":1,"maximum":15,"options":[]},
+                {"key":"mediation_trust","kind":"int","default":12,"minimum":1,"maximum":50,"options":[]},
+                {"key":"checkpoint_trust","kind":"int","default":10,"minimum":1,"maximum":100,"options":[]},
+                {"key":"checkpoint_food","kind":"int","default":10,"minimum":0,"maximum":100,"options":[]},
+                {"key":"day_length","kind":"int","default":8,"minimum":4,"maximum":32,"options":[]},
+                {"key":"coarse_period","kind":"int","default":4,"minimum":2,"maximum":16,"options":[]},
+                {"key":"background_cohort","kind":"int","default":100,"minimum":10,"maximum":1000,"options":[]},
+                {"key":"hunger_rate","kind":"int","default":1,"minimum":0,"maximum":10,"options":[]},
+                {"key":"fatigue_rate","kind":"int","default":1,"minimum":0,"maximum":10,"options":[]},
+                {"key":"meal_threshold","kind":"int","default":20,"minimum":5,"maximum":80,"options":[]},
+                {"key":"meal_relief","kind":"int","default":15,"minimum":1,"maximum":80,"options":[]},
+                {"key":"rest_relief","kind":"int","default":4,"minimum":1,"maximum":30,"options":[]},
+                {"key":"focus_radius","kind":"int","default":2,"minimum":1,"maximum":8,"options":[]},
+                {"key":"scarcity_unrest","kind":"int","default":3,"minimum":1,"maximum":30,"options":[]},
+                {"key":"rest_energy","kind":"int","default":15,"minimum":1,"maximum":60,"options":[]},
+                {"key":"turn_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
+            ],
+            "ecosystem":[
+                {"key":"initial_population","kind":"int","default":5,"minimum":1,"maximum":40,"options":[]},
+                {"key":"carrying_capacity","kind":"int","default":50,"minimum":5,"maximum":1000,"options":[]},
+                {"key":"seed_bank","kind":"int","default":25,"minimum":0,"maximum":300,"options":[]},
+                {"key":"starting_water","kind":"int","default":20,"minimum":0,"maximum":200,"options":[]},
+                {"key":"medicine","kind":"int","default":4,"minimum":0,"maximum":100,"options":[]},
+                {"key":"credits","kind":"int","default":40,"minimum":0,"maximum":1000,"options":[]},
+                {"key":"food_regrowth","kind":"int","default":5,"minimum":0,"maximum":40,"options":[]},
+                {"key":"drought_threshold","kind":"int","default":25,"minimum":2,"maximum":80,"options":[]},
+                {"key":"evaporation","kind":"int","default":1,"minimum":0,"maximum":10,"options":[]},
+                {"key":"individuals_per_food","kind":"int","default":8,"minimum":1,"maximum":100,"options":[]},
+                {"key":"reproduction_period","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
+                {"key":"hunt_period","kind":"int","default":5,"minimum":1,"maximum":30,"options":[]},
+                {"key":"predation_rate","kind":"int","default":1,"minimum":1,"maximum":12,"options":[]},
+                {"key":"disease_resistance","kind":"int","default":10,"minimum":1,"maximum":100,"options":[]},
+                {"key":"migration_period","kind":"int","default":5,"minimum":2,"maximum":30,"options":[]},
+                {"key":"observation_budget","kind":"int","default":40,"minimum":1,"maximum":128,"options":[]},
+                {"key":"seed_cost","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
+                {"key":"plant_food","kind":"int","default":12,"minimum":1,"maximum":100,"options":[]},
+                {"key":"water_cost","kind":"int","default":1,"minimum":1,"maximum":20,"options":[]},
+                {"key":"watering_gain","kind":"int","default":15,"minimum":1,"maximum":50,"options":[]},
+                {"key":"restoration_cost","kind":"int","default":5,"minimum":1,"maximum":40,"options":[]},
+                {"key":"restoration_heal","kind":"int","default":15,"minimum":1,"maximum":60,"options":[]},
+                {"key":"protection_cost","kind":"int","default":3,"minimum":1,"maximum":30,"options":[]},
+                {"key":"protection_ticks","kind":"int","default":6,"minimum":1,"maximum":32,"options":[]},
+                {"key":"treatment_strength","kind":"int","default":10,"minimum":1,"maximum":100,"options":[]},
+                {"key":"corridor_cost","kind":"int","default":5,"minimum":1,"maximum":50,"options":[]},
+                {"key":"feed_cost","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
+                {"key":"feed_units","kind":"int","default":10,"minimum":1,"maximum":100,"options":[]},
+                {"key":"reintroduction_food","kind":"int","default":5,"minimum":1,"maximum":40,"options":[]},
+                {"key":"reintroduction_cost","kind":"int","default":8,"minimum":1,"maximum":100,"options":[]},
+                {"key":"reintroduction_population","kind":"int","default":3,"minimum":1,"maximum":50,"options":[]},
+                {"key":"minimum_interventions","kind":"int","default":1,"minimum":1,"maximum":8,"options":[]},
+                {"key":"minimum_living_population","kind":"int","default":5,"minimum":1,"maximum":500,"options":[]},
+                {"key":"turn_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
+                {"key":"natural_corridors","kind":"bool","default":True,"minimum":None,"maximum":None,"options":[]},
+            ],
+        }[_entry["id"]]
+        _entry["fields"].extend(_extension)
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6200,6 +6277,32 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
         normalized["board_width"], normalized["board_height"]
     ):
         raise SystemEditorError("tactics range exceeds available board dimensions")
+    if editor_id == "npc_society":
+        if normalized["active_npcs"]>normalized["population"]:
+            raise SystemEditorError("active NPC budget cannot exceed authored population")
+        if normalized["initial_food"]>normalized["food_capacity"]:
+            raise SystemEditorError("initial society food exceeds actual town capacity")
+        if normalized["initial_materials"]>normalized["material_capacity"]:
+            raise SystemEditorError("initial society materials exceed storage")
+        if normalized["work_energy"]>normalized["player_energy"]:
+            raise SystemEditorError("source citizen cannot perform actual labor")
+        if normalized["help_food"]>normalized["food_capacity"]:
+            raise SystemEditorError("helping must consume bounded food")
+        if normalized["checkpoint_food"]>normalized["food_capacity"]:
+            raise SystemEditorError("civic checkpoint must be physically achievable")
+        if normalized["memory_records"]==0 and normalized["relationship_factors"]>50:
+            raise SystemEditorError("complex witness scoring requires nonzero memory records")
+    if editor_id == "ecosystem":
+        if normalized["predators"]>normalized["species"]:
+            raise SystemEditorError("predator species cannot exceed authored species count")
+        if normalized["initial_population"]>normalized["carrying_capacity"]:
+            raise SystemEditorError("starting wildlife exceeds physical carrying capacity")
+        if normalized["reintroduction_population"]>normalized["carrying_capacity"]:
+            raise SystemEditorError("reintroduced wildlife cannot exceed habitat capacity")
+        if normalized["minimum_living_population"]>normalized["species"]*normalized["carrying_capacity"]:
+            raise SystemEditorError("target biodiversity exceeds aggregate species capacity")
+        if normalized["seed_cost"]>normalized["seed_bank"] and normalized["minimum_interventions"]>0 and normalized["credits"]==0:
+            raise SystemEditorError("ecosystem cannot fund an ecological intervention")
     if editor_id == "rpg":
         if normalized["max_obstacles"] >= normalized["world_width"]*normalized["world_height"]//3:
             raise SystemEditorError("original RPG obstacles cannot seal most of the world")
