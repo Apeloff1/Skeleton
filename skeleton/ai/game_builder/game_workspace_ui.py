@@ -1149,7 +1149,11 @@ function drawAdvancedGame(session){
       "Passes "+state.passes,tx,177);
   c.fillText(state.mode==="turn_based"?"AP "+state.ap_remaining:
       "Tempo "+state.tempo,tx,200);
-  c.fillText("Tick "+state.tick+"/"+state.match_limit,tx,223);
+  c.fillText("Clock "+state.elapsed_minutes+"/"+state.match_minutes+"m",tx,223);
+  if(state.finished){
+   c.fillStyle="#dfefc1";
+   c.fillText("Outcome "+state.winner,12,247);
+  }
   c.fillStyle="#a7e6cc";
   c.fillText("Original rule-specific scoring · source-replayed state",12,264);
  }
