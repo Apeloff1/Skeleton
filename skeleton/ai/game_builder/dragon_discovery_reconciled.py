@@ -3,7 +3,8 @@
 The previous independent batch 0024 and orphaned batch 0030 do not form a
 consecutive custody chain. Their pinned catalog discoveries were reconciled
 into audited consecutive batches 0031..0037; further, twelve new source
-catalogs extend this custody lineage through 0038..0042, including seven\nmore retro, Godot, Unity and game-editor reference collections. Excluded orphans
+catalogs extend this custody lineage through 0038..0042, including seven
+more retro, Godot, Unity and game-editor reference collections. Excluded orphans
 never appear as asserted ancestors or training grants.
 """
 from __future__ import annotations
