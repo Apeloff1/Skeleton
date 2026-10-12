@@ -221,13 +221,13 @@ class AdvancedProofTests(unittest.TestCase):
                 with self.assertRaises(AdvancedRuntimeError):
                     verify_advanced_session(bad)
 
-    def test_no_fake_support_for_38_other_systems(self):
-        with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("maze")
-        with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("rpg")
-        with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("nonexistent")
+    def test_no_fake_support_for_remaining_authoring_only_systems(self):
+        # Maze and RPG now have genuine reference runtimes. Authoring-only
+        # systems must remain explicitly unsupported by the game engine.
+        for editor in ("dialogue", "networking", "nonexistent"):
+            with self.subTest(editor=editor):
+                with self.assertRaises(AdvancedRuntimeError):
+                    run_advanced_session(editor)
 
 
 class AdvancedCliTests(unittest.TestCase):
