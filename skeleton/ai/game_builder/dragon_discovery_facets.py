@@ -198,7 +198,8 @@ class DiscoveryFacetIndex:
         total = self.db.execute(
             """SELECT COUNT(*) FROM dragon_almanac_sources s
                JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source
-               WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked')""",
+               WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked')
+               AND j.input_digest=s.digest""",
             (owner,),
         ).fetchone()[0]
         covered = self.db.execute(
@@ -209,8 +210,15 @@ class DiscoveryFacetIndex:
                WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked')""",
             (owner,),
         ).fetchone()[0]
+        stale_job_inputs = self.db.execute(
+            """SELECT COUNT(*) FROM dragon_almanac_sources s
+               JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source
+               WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked')
+               AND j.input_digest!=s.digest""", (owner,)
+        ).fetchone()[0]
         return {
             "owner": owner, "policy_stage_sources": total,
+            "stale_job_inputs": stale_job_inputs,
             "source_digest_current_indexed": covered,
             "unindexed_or_changed": total-covered,
             "coverage_complete": covered == total,
@@ -219,7 +227,8 @@ class DiscoveryFacetIndex:
         }
 
     def matching_rows(self, owner: str, tokens: frozenset[str], *,
-                      authorized: bool, limit: int, topic: str | None = None
+                      authorized: bool, limit: int, topic: str | None = None,
+                      weights: dict[str,int] | None = None
                       ) -> tuple[list[tuple],dict]:
         """Use the inverted index across the entire materialized corpus.
 
@@ -237,26 +246,36 @@ class DiscoveryFacetIndex:
         if not tokens or len(tokens) > 256 or any(
                 not isinstance(t, str) or not TERMS.fullmatch(t) for t in tokens):
             raise ValueError("bounded token query required")
-        matching = ",".join("?" for _ in tokens)
+        if weights is None:
+            weights = {token: 1 for token in tokens}
+        if (not isinstance(weights, dict) or set(weights) != tokens
+                or any(type(v) is not int or not 1 <= v <= 1_000_000
+                       for v in weights.values())):
+            raise ValueError("invalid bounded mission term weights")
+        mission_terms = sorted(weights.items())
+        bound_terms = ",".join("(?,?)" for _ in mission_terms)
         condition = (
             "AND EXISTS(SELECT 1 FROM dragon_almanac_members m WHERE "
             "m.owner=s.owner AND m.source=s.source AND m.topic=?)"
             if topic is not None else ""
         )
         sql = (
+            "WITH mission_terms(token,weight) AS (VALUES " + bound_terms + ") "
             "SELECT s.source,s.body,s.digest,j.stage,j.state "
-            "FROM dragon_discovery_facet_terms t "
+            "FROM mission_terms q "
+            "JOIN dragon_discovery_facet_terms t ON t.token=q.token "
             "JOIN dragon_discovery_facet_records i "
             "ON i.owner=t.owner AND i.source=t.source "
             "JOIN dragon_almanac_sources s ON s.owner=i.owner "
             "AND s.source=i.source AND s.digest=i.source_digest "
             "JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source "
-            "WHERE s.owner=? AND t.token IN (" + matching + ") "
-            "AND j.stage=0 AND j.state IN ('pending','blocked') "
+            "WHERE s.owner=? AND j.stage=0 "
+            "AND j.state IN ('pending','blocked') AND j.input_digest=s.digest "
             + condition + " GROUP BY s.source "
-            "ORDER BY COUNT(DISTINCT t.token) DESC,s.source LIMIT ?"
+            "ORDER BY SUM(q.weight) DESC,s.source LIMIT ?"
         )
-        params = [owner, *sorted(tokens)]
+        params = [v for term,weight in mission_terms for v in (term,weight)]
+        params.append(owner)
         if topic is not None:
             params.append(topic)
         params.append(limit)
