@@ -1898,3 +1898,82 @@ As elsewhere, this new gameplay remains a **reference
 implementation** pending exact-head Windows/Linux CI,
 hardware/controller testing and independent native build
 certification.
+
+
+## Twentieth advanced reference family — NPC Quest & Event Director
+
+The original World-family Quest & Event Director has progressed from a
+five-field catalog into **62 actual typed controls** and a source-bound
+Python reference game. This raises executable reference gameplay to
+**20 of 43 families (46.5%)**, with 23 remaining authoring-only.
+The bounded 7x7 reference world is neither a native game nor a
+production-scale or console-certified NPC simulation.
+
+### Genuine witnessed events and original geography
+
+Every scene contains original bounded geography, walkable obstacles,
+four finite original sites (settlement, bridge, grove, archive),
+actual player/NPC spawns, geography-specific resources and original
+climate and day phases. A real player walks adjacent cells and must
+be physically present at a source to help, harm, collect or repair,
+using real energy, material stock and site integrity. Strict scene
+validation rejects overlap, invalid identity, inaccessible sites,
+source budget violations, forged scene hashes and arbitrary
+external scripts.
+
+NPC residents have independent original professions, actual positions,
+personal finite energy and supplies, gained cargo, trust, suspicion,
+memory histories and eyewitness knowledge. Autonomous caretakers,
+scouts, merchants and scribes perform real bounded acts at their
+nearby original source sites. NPC-caused incidents can independently
+initiate real quests **only when another legitimate resident sees
+the act**. The actor cannot witness its own act, and NPC acts do not
+grant the player a fabricated physical quest step or reputation gain.
+
+Eyewitness eligibility requires spatial range, authenticated line
+of sight with blocking terrain, physical day/night visibility,
+climate (highland vs rainforest) and authored perception. Rumors
+propagate only over bounded physical resident-to-resident edges,
+with snapshot knowledge to prevent instant unlimited gossip chains.
+They retain source event ID and the explicit rumor-only authority
+label; hearsay cannot be promoted to first-hand testimony.
+Direct observations and rumors have independent finite memories
+and optional decay.
+
+### Real procedural quests, branching endings and persistent worlds
+
+Each original quest binds a physical incident, actual originating
+actor, event ID, witnesses, cause type, source location, procedural
+rule ID, and independently attested testimony. The player must
+physically meet a trustworthy non-suspicious eyewitness, commit
+a support/exploit branch, perform further source-site actions,
+and return to that actual site to resolve the outcome. It cannot
+auto-approve from rumor, skip site actions or rewrite a committed
+choice. Alternative resolutions consume resources, change actual
+landmark integrity, grant different bounded rewards and modify
+NPC/public standing; incomplete events may expire. Campaign
+victory may be terminal or allow ongoing play, quests and new
+NPC events through the separate persistent nonterminal world option.
+
+The original Studio now displays an actual 49-tile grid with
+player, source sites, NPC positions, eyewitness and hearsay
+symbols; a 12-tool source painter, site/NPC selection, real
+registered world actions, recorded causal events, testimony
+and active quest completion status. Edited sources require
+renewed exact scene validation and digest review.
+
+Original regression coverage on the Windows/Linux advanced
+game workflow now includes eyewitness geography, daylight,
+climate, believable suspicion/trust, non-omniscient rumors,
+autonomous NPC-caused quests, finite resources, alternative
+choices, postgame activity, signed save/continue, hybrid
+assembly and forged source/state rejection.
+
+### Evidence and release boundary
+
+Committed tests are not passing verification: at the latest
+observed branch head GitHub reports zero PR workflow jobs
+or commit status checks, and PR #3642 remains draft and
+nonmergeable. The reference simulation is not native
+hardware proof, online multiplayer, a large-scale
+AI-trained character society or console/store readiness.
