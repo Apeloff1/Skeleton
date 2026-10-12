@@ -43,7 +43,7 @@ def _portfolio_request(args, parser):
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-verify", "discovery-census", "platform-matrix", "discovery-identity-audit", "import-reconciled", "discovery-topics", "discovery-sources", "discovery-receipts"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-verify", "discovery-census", "platform-matrix", "discovery-identity-audit", "stage-preview", "import-reconciled", "discovery-topics", "discovery-sources", "discovery-receipts"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
@@ -73,11 +73,34 @@ def main():
     parser.add_argument("--source", help="Exact source ID for raw discovery receipts")
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--supplement", action="append", default=[], help="Discovery evidence JSON in chain order")
+    parser.add_argument("--stage-file", help="Exact repo-staged unreviewed catalog metadata JSON")
+    parser.add_argument("--first-batch", type=int, default=51)
+    parser.add_argument("--batch-size", type=int, default=600)
     parser.add_argument("--query", help="Reviewed mechanic or design research question")
     parser.add_argument("--design", type=Path, help="Strict native game design JSON")
     args = parser.parse_args()
     if not args.trusted_local_operator:
         parser.error("local authenticated operator acknowledgement required")
+    if args.command == "stage-preview":
+        from .dragon_discovery_reconciled import _chain
+        from .dragon_staged_supplements import (
+            build_catalog_supplements, read_staged_catalog_snapshot)
+        if not args.stage_file:
+            parser.error("stage-preview requires --stage-file")
+        registry = read_source_registry(args.registry)
+        prepared = build_catalog_supplements(
+            registry, _chain(), read_staged_catalog_snapshot(args.stage_file),
+            first_batch=args.first_batch, batch_size=args.batch_size)
+        result = {
+            key: value for key, value in prepared.items() if key != "supplements"
+        }
+        result["proposed_evidence_paths"] = [
+            path for path, _ in prepared["supplements"]]
+        result["full_chain_replayed"] = True
+        result["database_opened"] = False
+        result["evidence_written"] = False
+        print(canonical_json(result))
+        return
     with ReviewedKnowledgeStore(args.database) as library:
         almanacs = DragonAlmanacs(library)
         worker = SequentialAlmanacWorker(almanacs)
