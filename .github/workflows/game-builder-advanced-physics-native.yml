@@ -4,12 +4,15 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/ai/game_builder/advanced_physics_godot.py"
+      - "skeleton/ai/game_builder/advanced_physics_interop.py"
+      - "skeleton/ai/game_builder/advanced_physics_interop_godot.py"
       - "docs/GAME_BUILDER_NATIVE_PHYSICS_LAB.md"
       - "skeleton/ai/game_builder/advanced_physics_runtime.py"
       - "skeleton/ai/game_builder/advanced_godot_export.py"
       - "skeleton/ai/game_builder/game_workspace_server.py"
       - "skeleton/ai/game_builder/game_workspace_ui.py"
       - "tests/test_game_builder_advanced_physics_godot.py"
+      - "tests/test_game_builder_advanced_physics_interop_godot.py"
       - ".github/workflows/game-builder-advanced-physics-native.yml"
   workflow_dispatch:
 permissions:
@@ -44,6 +47,7 @@ jobs:
             skeleton/ai/game_builder/
             tests/__init__.py
             tests/test_game_builder_advanced_physics_godot.py
+            tests/test_game_builder_advanced_physics_interop_godot.py
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -61,8 +65,8 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           godot --version
-          python -m py_compile skeleton/ai/game_builder/advanced_physics_godot.py
-          python -m unittest tests.test_game_builder_advanced_physics_godot -v
+          python -m py_compile skeleton/ai/game_builder/advanced_physics_godot.py skeleton/ai/game_builder/advanced_physics_interop_godot.py
+          python -m unittest tests.test_game_builder_advanced_physics_godot tests.test_game_builder_advanced_physics_interop_godot -v
       - name: Author four different real original native physics games
         shell: bash
         run: |
@@ -120,13 +124,26 @@ jobs:
               package=render_physics_godot_package(session,settings,authorized=True)
               write_advanced_godot_package(package,root/name,authorized=True)
               print("NATIVE_PHYSICS_AUTHORED",name,session["head_digest"])
+          # Independently executable original platformer, racing and sandbox
+          # physical encounters, each provenance-bound to the source genre.
+          from skeleton.ai.game_builder.advanced_physics_interop import rehearse_physics_encounter
+          from skeleton.ai.game_builder.advanced_physics_interop_godot import render_interop_godot_package
+          for editor,controls in (
+              ("platformer",()),("racing",("steer_right",)),("sandbox",())
+          ):
+              scene=make_advanced_scene(editor,seed=1)
+              source=run_advanced_session(editor,actions=controls,seed=1,scene=scene)
+              encounter=rehearse_physics_encounter(source)
+              package=render_interop_godot_package(encounter,source,authorized=True)
+              write_advanced_godot_package(package,root/("interop_"+editor),authorized=True)
+              print("NATIVE_ORIGINAL_GENRE_PHYSICAL_SOURCE",editor,encounter["digest"])
           PY
       - name: Execute independent source in real Godot 4 on Windows and Linux
         shell: bash
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/native-original-physics"
-          for scenario in movement signed_impulses real_goal open_ended gravity_drop fixture_impact fixture_ignored_mask; do
+          for scenario in movement signed_impulses real_goal open_ended gravity_drop fixture_impact fixture_ignored_mask interop_platformer interop_racing interop_sandbox; do
             project="$root/$scenario/godot"
             if [[ "$RUNNER_OS" == "Windows" ]]; then
               # The Godot setup action provides a Git Bash launcher, not a
