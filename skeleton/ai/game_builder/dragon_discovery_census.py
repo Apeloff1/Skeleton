@@ -126,7 +126,7 @@ def discovery_census(registry: dict, *, top_hosts: int = 25) -> dict:
             for name, urls in sorted(source_catalogs.items(),
                                      key=lambda item: (-len(item[1]), item[0]))
         ],
-        "verified_document_identity_not_link_content": True,
+        "catalog_identity_is_pinned_claim_not_independent_attestation": True,
         "host_diversity_not_source_independence": True,
         "rights_keyword_hit_not_legal_finding": True,
         "crawler_authorized": False,
