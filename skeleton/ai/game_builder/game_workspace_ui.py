@@ -874,6 +874,47 @@ function drawAdvancedGame(session){
   c.fillStyle="#a3d8c2";
   c.fillText("All movement, mining and conquest uses real map cells",12,252);
  }
+ if(editor==="rhythm"){
+  const chart=state.chart,notes=chart.notes,clock=state.clock_ms;
+  const laneCount=chart.lanes,ox=14,oy=44,lw=28;
+  c.fillStyle="#e2f0eb";
+  c.fillText("Original synthesized rhythm chart · "+chart.bpm+" BPM · "+
+     chart.meter+"/4",12,33);
+  for(let j=0;j<laneCount;j++){
+   c.fillStyle=j%2?"#304d60":"#23435a";
+   c.fillRect(ox+j*lw,oy,lw-2,185);
+   c.fillStyle="#f2ede0";c.fillText(String(j+1),ox+j*lw+8,oy+178);
+  }
+  c.strokeStyle="#fee09c";c.lineWidth=3;c.beginPath();
+  c.moveTo(ox,oy+151);c.lineTo(ox+laneCount*lw,oy+151);c.stroke();
+  for(const n of notes){
+   if(state.judgements[n.id]!==null)continue;
+   const t=n.at+chart.offset_ms-clock;
+   if(t< -200||t>1500)continue;
+   const y=oy+151-t/9;
+   if(y<oy||y>oy+185)continue;
+   const x=ox+n.lane*lw;
+   c.fillStyle=n.kind==="mine"?"#f88a81":
+    n.kind==="hold"?"#bba6f2":
+    n.kind==="slide"?"#9cddec":
+    n.kind==="chord"?"#e3c985":"#80e9b7";
+   c.fillRect(x+4,y-4,20,8);
+   if(n.kind==="chord"&&n.partner!==null)
+    c.fillRect(ox+n.partner*lw+4,y-4,20,8);
+   if(n.kind==="hold")c.fillRect(x+10,y-n.duration/9,8,n.duration/9);
+  }
+  c.fillStyle="#edf2e8";const tx=205;
+  c.fillText("Clock "+clock+"ms · beat "+chart.beats,tx,48);
+  c.fillText("Score "+state.score+" · combo "+state.combo,tx,72);
+  c.fillText("Perfect "+state.perfect+" · great "+state.great,tx,96);
+  c.fillText("Good "+state.good+" · missed "+state.miss,tx,120);
+  c.fillText("HP "+state.health+" · stray "+state.stray,tx,144);
+  c.fillText("Mines "+state.mines_avoided+"/"+state.mines_hit,tx,168);
+  c.fillText("Progress "+state.judgements.filter(v=>v!==null).length+
+    "/"+notes.length,tx,192);
+  c.fillText("Held "+state.held.length+" · rank "+state.rank,tx,216);
+  c.fillText("Game time advances only via verified wait actions.",12,254);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
@@ -900,11 +941,73 @@ document.addEventListener("keydown",event=>{
  advanceAdvanced(mode+"_"+direction);
 });
 let originalRoguelikeLongrunRecord=null;
+let selectedRhythmNote=0;
 let selectedRTSCell=27;
 let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="rhythm"){
+  const s=advancedSession.state;
+  const instructions=document.createElement("small");
+  instructions.textContent="Original game clock "+s.clock_ms+
+    "ms · tap with keys 1–6, chart time is advanced with bounded wait commands.";
+  target.append(instructions);
+  const laneLabel=document.createElement("label");
+  laneLabel.textContent="Original note lane";
+  const lane=document.createElement("select");lane.id="rhythm-play-lane";
+  for(let i=0;i<s.chart.lanes;i++){
+   const option=document.createElement("option");option.value=String(i);
+   option.textContent="Lane "+(i+1);lane.append(option);
+  }
+  laneLabel.append(lane);target.append(laneLabel);
+  const kindLabel=document.createElement("label");
+  kindLabel.textContent="Real timed key action";
+  const kind=document.createElement("select");kind.id="rhythm-play-kind";
+  for(const name of ["tap","press","release","flick","chord"]){
+   const option=document.createElement("option");
+   option.value=name;option.textContent=name;kind.append(option);
+  }
+  kindLabel.append(kind);target.append(kindLabel);
+  const partnerLabel=document.createElement("label");
+  partnerLabel.textContent="Second chord key";
+  const partner=document.createElement("select");partner.id="rhythm-play-partner";
+  for(let j=0;j<s.chart.lanes;j++){
+   const opt=document.createElement("option");opt.value=String(j);
+   opt.textContent="Lane "+(j+1);partner.append(opt);
+  }
+  partnerLabel.append(partner);target.append(partnerLabel);
+  const send=document.createElement("button");send.type="button";
+  send.textContent="Submit original timed note";
+  send.disabled=Boolean(advancedSession.terminal);
+  send.addEventListener("click",()=>{
+   const a=Number(lane.value),b=Number(partner.value);
+   if(kind.value==="chord"&&a===b)throw Error("Chords require two distinct lanes");
+   advanceAdvanced(kind.value+":"+a+(kind.value==="chord"?":"+b:""));
+  });
+  target.append(send);
+  const travel=document.createElement("label");
+  travel.textContent="Advance original song clock by milliseconds";
+  const delta=document.createElement("select");delta.id="rhythm-time-step";
+  for(const ms of [10,20,25,50,100,125,250,500,1000,2000]){
+   const opt=document.createElement("option");opt.value=String(ms);
+   opt.textContent=ms+" ms";if(ms===500)opt.selected=true;
+   delta.append(opt);
+  }
+  travel.append(delta);target.append(travel);
+  const wait=document.createElement("button");wait.type="button";
+  wait.textContent="Run verified song clock";
+  wait.disabled=Boolean(advancedSession.terminal);
+  wait.addEventListener("click",()=>advanceAdvanced("wait:"+delta.value));
+  target.append(wait);
+  const finish=document.createElement("button");finish.type="button";
+  finish.textContent="Finalize genuinely judged beat chart";
+  finish.disabled=Boolean(advancedSession.terminal);
+  finish.addEventListener("click",()=>advanceAdvanced("finish"));
+  target.append(finish);
+  return;
+ }
+
  if(advancedSession?.editor==="rts"){
   const troop=document.createElement("label");
   troop.textContent="Player-owned unit";
@@ -1278,6 +1381,10 @@ async function advanceAdvanced(action){
 // Visual paint works only on the local draft JSON. It cannot bypass the
 // server's canonical validation, exact-file review, or human commit.
 const PAINT_TOOLS={
+ rhythm:["lane_next","kind_next","partner_next","accent_toggle",
+         "timestamp_earlier","timestamp_later","title_next",
+         "original_meter_remark"],
+
  rts:["obstacle_toggle","wood_node","ore_node","energy_node",
        "remove_node","wood_plus","ore_plus","energy_plus",
        "friendly_base","enemy_base","relay","friendly_spawn",
@@ -1364,6 +1471,38 @@ function renderSceneAuthoring(){
   shape=sceneGridShape(source);
  }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
 
+ if(source.editor==="rhythm"){
+  const m=source.layout,notes=m.notes,from=Math.floor(
+     selectedRhythmNote/16)*16;
+  ctx.fillText("Original rhythm chart · 16 authored beat events per sheet",12,18);
+  const cellWidth=28,laneHeight=23;
+  for(let row=0;row<m.lanes;row++){
+   ctx.fillStyle="#dbe9ea";
+   ctx.fillText(String(row+1),13,45+row*laneHeight);
+  }
+  for(let i=0;i<16&&from+i<notes.length;i++){
+   const n=notes[from+i],x=38+i*28,y=32+n.lane*laneHeight;
+   ctx.fillStyle=n.kind==="mine"?"#fca29a":
+     n.kind==="hold"?"#c4a5f7":
+     n.kind==="slide"?"#99dcee":
+     n.kind==="chord"?"#f1cd88":"#91e3b9";
+   ctx.fillRect(x+2,y,23,16);
+   if(n.kind==="chord"&&n.partner!==null)
+    ctx.fillRect(x+2,32+n.partner*laneHeight,23,16);
+   ctx.fillStyle="#f6f6d4";
+   ctx.fillText(String(n.id),x+5,29);
+   if(n.id===selectedRhythmNote){
+    ctx.strokeStyle="#fff3a7";ctx.strokeRect(x,y-1,25,18);
+   }
+  }
+  ctx.fillStyle="#d6ebe6";
+  ctx.fillText("Tempo "+m.bpm+" BPM · notes "+notes.length+
+    " · lanes "+m.lanes,12,198);
+  ctx.fillText("Beat sheet "+(Math.floor(from/16)+1)+
+    " · selected "+selectedRhythmNote,12,220);
+  ctx.fillText("Select note by clicking its beat column; validate source digest",12,242);
+  return;
+ }
  if(source.editor==="rts"){
   const m=source.layout;
   ctx.fillText("Original 8×8 original strategic resource/capture map",12,18);
@@ -1587,6 +1726,43 @@ function renderSceneAuthoring(){
  }
 }
 
+function paintRhythmBeat(noteIndex){
+ const scene=JSON.parse($("advanced-scene-json").value);
+ if(scene.editor!=="rhythm"||systemEditor().id!=="rhythm")
+  throw Error("Only matching original rhythm scene may be changed");
+ const layout=scene.layout,settings=systemSettings();
+ const n=layout.notes[noteIndex],tool=$("advanced-paint-tool").value;
+ if(!n)throw Error("Beat selection is outside original authored chart");
+ const kinds=["tap",...(settings.hold_notes?["hold"]:[]),
+              ...(settings.slides?["slide"]:[]),
+              ...(settings.chords?["chord"]:[]),
+              ...(settings.mines?["mine"]:[])];
+ if(tool==="lane_next"){
+  n.lane=(n.lane+1)%layout.lanes;
+  if(n.kind==="chord"&&n.partner===n.lane)
+   n.partner=(n.lane+1)%layout.lanes;
+ }else if(tool==="kind_next"){
+  n.kind=kinds[(kinds.indexOf(n.kind)+1)%kinds.length];
+  n.partner=n.kind==="chord"?(n.lane+1)%layout.lanes:null;
+  n.duration=n.kind==="hold"?
+    Math.round(settings.hold_length_beats*60000/layout.bpm):0;
+ }else if(tool==="partner_next"){
+  if(n.kind!=="chord")throw Error("Only real chords can modify a second lane");
+  n.partner=(n.partner+1)%layout.lanes;
+  if(n.partner===n.lane)n.partner=(n.partner+1)%layout.lanes;
+ }else if(tool==="accent_toggle")n.accent=!n.accent;
+ else if(tool==="timestamp_earlier"||tool==="timestamp_later"){
+  n.at=Math.max(0,Math.round(Math.min(600000,n.at+
+    (tool==="timestamp_earlier"?-5:5))));
+ }else if(tool==="title_next"){
+  layout.title="Original Rhythm Study "+String(noteIndex);
+ }else if(tool==="original_meter_remark"){
+  layout.title="Original "+layout.meter+"-meter Chart "+String(noteIndex);
+ }else throw Error("Unsupported original beat-painting mode");
+ $("advanced-scene-json").value=JSON.stringify(scene,null,2);
+ renderSceneAuthoring();
+ status("Original rhythm source edited. Validate lane, meter, note windows and content digest before replay.");
+}
 function paintRTSCell(cell){
  const doc=JSON.parse($("advanced-scene-json").value);
  if(doc.editor!=="rts"||systemEditor().id!=="rts")
@@ -1928,6 +2104,16 @@ $("advanced-scene-grid").addEventListener("click",event=>{
   if(!text)throw Error("Generate a scene document first");
   const doc=JSON.parse(text),shape=sceneGridShape(doc);
   const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  if(doc.editor==="rhythm"){
+   const px=(event.clientX-rect.left)*canvas.width/rect.width;
+   const index=Math.floor((px-38)/28);
+   if(index<0||index>=16)return;
+   const absolute=Math.floor(selectedRhythmNote/16)*16+index;
+   if(absolute>=doc.layout.notes.length)return;
+   selectedRhythmNote=absolute;
+   paintRhythmBeat(selectedRhythmNote);
+   return;
+  }
   if(doc.editor==="rts"){
    const px=(event.clientX-rect.left)*canvas.width/rect.width;
    const py=(event.clientY-rect.top)*canvas.height/rect.height;
