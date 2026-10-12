@@ -3345,6 +3345,105 @@ $("advanced-unified-save-import").addEventListener("change",async()=>{
  }catch(error){status("Untrusted mixed original world save rejected: "+error.message);}
  finally{$("advanced-unified-save-import").value="";}
 });
+$("advanced-interleave-build").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastScene || !verifiedSourceEpisodes.length ||
+     !verifiedGenreEvents.length)
+   throw Error("Requires a signed physical campaign and verified source genre sessions");
+  if(verifiedSourceEpisodes.some(e=>e.world_actions.length))
+   throw Error("Interleaving requires new source episodes without already-played NPC actions");
+  const physical=[],genre=[];
+  for(const [index,spec] of verifiedSourceEpisodes.entries()){
+   const response=await api("/api/advanced-physics-multi-npc",{
+    session:spec.source_session,
+    settings:spec.source_settings,
+    world_scene:episodicLastScene,
+    physics_actions:spec.physics_actions,
+    bindings:spec.bindings,
+    world_actions:[]
+   });
+   if(!response.proof || response.proof.source_session_digest!==spec.source_session.digest ||
+      response.proof.quest_scene_digest!==episodicLastScene.digest)
+    throw Error("Unverified original physics episode "+index);
+   physical.push(response.proof.incidents.map((_,event_index)=>({
+    lane:"physical",source_index:index,event_index
+   })));
+  }
+  for(const [index,spec] of verifiedGenreEvents.entries()){
+   const response=await api("/api/advanced-cross-genre-npc-world",{
+    session:spec.source_session,source_settings:spec.source_settings,
+    world_scene:episodicLastScene,bindings:spec.bindings,world_actions:[]
+   });
+   if(!response.report ||
+      response.report.source_session_digest!==spec.source_session.digest ||
+      response.report.world_scene_digest!==episodicLastScene.digest)
+    throw Error("Unverified original genre session "+index);
+   genre.push(response.report.earned_events.map((_,event_index)=>({
+    lane:"genre",source_index:index,event_index
+   })));
+  }
+  const schedule=[];
+  let remaining=true;
+  while(remaining){
+   remaining=false;
+   for(const queue of [...physical,...genre]){
+    if(queue.length){
+     schedule.push({at:schedule.length,...queue.shift()});remaining=true;
+    }
+   }
+  }
+  if(!schedule.length || schedule.length>96)
+   throw Error("No original causal game events or timeline source budget exceeded");
+  $("advanced-interleave-editor").value=JSON.stringify(schedule,null,2);
+  $("advanced-interleave-proof").textContent=JSON.stringify({
+   original_physical_episodes:physical.length,
+   original_genre_sessions:genre.length,
+   authored_entries:schedule.length,
+   clock:"source-verified NPC world ticks",
+   edits:"Each scheduled event consumes one true game-world tick; insert world wait actions to advance time"
+  },null,2);
+  status("Authenticated cross-engine source events prepared for reviewed timeline authoring");
+ }catch(error){status("Interleaved original game draft rejected: "+error.message);}
+});
+$("advanced-interleave-run").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastScene || !verifiedSourceEpisodes.length ||
+     !verifiedGenreEvents.length)
+   throw Error("Original game scene and physical/genre sources are required");
+  const timeline=JSON.parse($("advanced-interleave-editor").value);
+  if(!Array.isArray(timeline)||!timeline.length||timeline.length>96)
+   throw Error("One to 96 reviewed source-clock entries are required");
+  const result=await api("/api/advanced-interleaved-world",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,timeline
+  });
+  const proof=result.proof;
+  if(!proof || result.source_project_files_changed ||
+     result.automatic_rewards_granted || result.native_hardware_certified ||
+     proof.world_scene_digest!==episodicLastScene.digest ||
+     proof.physical_source_count!==verifiedSourceEpisodes.length ||
+     proof.genre_source_count!==verifiedGenreEvents.length ||
+     proof.original_projects_modified || proof.free_rewards_granted)
+   throw Error("Cross-engine NPC world event replay evidence did not authenticate");
+  drawNPCForensicMap(proof.world_state);
+  $("advanced-interleave-proof").textContent=JSON.stringify({
+   source_event_clock:proof.timeline,
+   authentic_physical_collisions:proof.authentic_physical_event_count,
+   earned_genre_achievements:proof.authentic_genre_event_count,
+   actually_played_npc_actions:proof.scheduled_world_actions,
+   real_world_sites:proof.world_state.sites,
+   real_npc_memories:proof.world_state.npcs.map(n=>({
+    id:n.id,cell:n.cell,direct:n.memories,rumors:n.heard
+   })),
+   quests:proof.world_state.quests,
+   world_time:proof.world_state.tick,
+   audited_replay_digest:proof.digest,
+   original_source_files_unchanged:true
+  },null,2);
+  status("Original physics, genre achievements and NPC actions actually replayed on one world clock");
+ }catch(error){status("Interleaved original game source rejected: "+error.message);}
+});
 $("advanced-genre-queue-clear").addEventListener("click",()=>{
  verifiedGenreEvents=[];lastUnifiedGenreProof=null;unifiedWorldFollowups=[];
  $("advanced-genre-queue-list").textContent="";
@@ -4150,6 +4249,20 @@ local until typed revalidation and an explicit human-approved file commit.</smal
       </button>
       <pre id="advanced-genre-queue-list" role="status" aria-live="polite"></pre>
       <pre id="advanced-unified-proof" role="status" aria-live="polite"></pre>
+      <fieldset aria-label="One-clock interleaved authored worlds">
+       <legend>Original cross-engine NPC event scheduler</legend>
+       <button id="advanced-interleave-build" type="button">
+        Derive authentic physics + genre event order
+       </button>
+       <label>Author world-clock event order JSON
+        <textarea id="advanced-interleave-editor" rows="11"
+         placeholder='[{"at":0,"lane":"physical","source_index":0,"event_index":0}]'></textarea>
+       </label>
+       <button id="advanced-interleave-run" type="button">
+        Replay authored cross-engine event timeline
+       </button>
+       <pre id="advanced-interleave-proof" role="status" aria-live="polite"></pre>
+      </fieldset>
       <fieldset aria-label="Portable mixed-source campaign save">
         <legend>Save / restore combined physical + genre NPC world</legend>
         <button id="advanced-unified-save-export" type="button">
