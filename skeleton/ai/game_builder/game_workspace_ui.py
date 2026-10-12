@@ -1818,6 +1818,8 @@ $("advanced-canvas").addEventListener("click",event=>{
 function showAdvanced(reply){
  advancedSession=reply.session;
  advancedAvailableActions=reply.available_actions;
+ $("advanced-physics-handoff").disabled=![
+  "platformer","racing","flight","sailing"].includes(advancedSession.editor);
  const nativeSourceFamilies=new Set(["puzzle","platformer","deck_battler",
   "shooter","tactics","tower_defense","racing","survival","farming",
   "factory","colony","physics"]);
@@ -2978,6 +2980,36 @@ $("advanced-scene-stage").addEventListener("click",async()=>{
   status("Authored scene staged: review source and commit. Its system configuration must already be approved.");
  }catch(error){status("Scene staging blocked: "+error.message);}
 });
+$("advanced-physics-handoff").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession||!advancedSettings)
+   throw Error("An original reviewed game session is required");
+  if(!["platformer","racing","flight","sailing"].includes(advancedSession.editor))
+   throw Error("Physics practice requires a supported motion game");
+  const reply=await api("/api/physics-handoff",{
+   session:advancedSession,settings:advancedSettings,
+   actions:["inspect","step:4"]});
+  if(!reply.verified||reply.origin_game_mutated||reply.weights_promoted||
+     reply.native_parity_verified)
+   throw Error("Physics handoff evidence contract mismatch");
+  const e=reply.handoff;
+  if(e.origin_session_digest!==advancedSession.digest ||
+     e.origin_editor!==advancedSession.editor)
+   throw Error("Physics practice source digest changed");
+  $("advanced-state").textContent=JSON.stringify({
+   original_engine:advancedSession.editor,
+   original_source_digest:e.origin_session_digest,
+   derived_physics_scene:e.physics_scene.digest,
+   original_obstacles_reinterpreted:e.derived_obstacle_count,
+   physics_state:e.physics_session.state,
+   physics_replay_digest:e.physics_session.digest,
+   gameplay_rules_modified:false,
+   training_weights_promoted:false
+  },null,2);
+  status("Original motion mapped into a separately executed and verified physics exercise. "+
+   "This does not modify your game or promote training weights.");
+ }catch(error){status("Physics practice blocked: "+error.message);}
+});
 $("advanced-godot-export").addEventListener("click",async()=>{
  try{
   if(!advancedSession||(!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)&&advancedSession.editor!=="colony"&&advancedSession.editor!=="physics"))
@@ -3137,6 +3169,7 @@ local until typed revalidation and an explicit human-approved file commit.</smal
 <button id="advanced-start" type="button">Start advanced scenario</button>
 <button id="advanced-save" type="button">Download verified savegame</button>
 <button id="advanced-godot-export" type="button">Download playable Godot 4 game project</button>
+<button id="advanced-physics-handoff" type="button">Practice game physics from this scenario</button>
 <label>Restore portable savegame<input id="advanced-load" type="file" accept=".json,application/json"></label>
 <button id="advanced-verify" type="button">Independently verify replay</button>
 <div id="advanced-actions" aria-label="Advanced gameplay actions"></div>
