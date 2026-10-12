@@ -135,16 +135,37 @@ class SignedPhysicsWitnessWorldTests(unittest.TestCase):
                 run_physical_witness_world(
                     source,world,quest_settings=self.options(),binding=binding)
 
-    def test_multiple_solid_sources_are_not_attributed_by_guessing(self):
-        # The current Physics receipt reports contact kinds, not fixture ID.
-        # Refuse attribution to one of multiple possible authored spike sites.
+    def test_multiple_solid_sources_use_real_contacted_fixture_ids(self):
+        # A reviewed world can have several hazards; only the object with an
+        # independently recorded fixture hit can generate this bound incident.
         scene=make_advanced_scene("platformer",seed=1)
         source=run_advanced_session("platformer",seed=1,scene=scene)
+        from skeleton.ai.game_builder.advanced_physics_interop import (
+            rehearse_physics_encounter,)
+        physical=rehearse_physics_encounter(source)
+        self.assertGreater(len(physical["witnesses"]),1)
+        self.assertTrue(physical["source_fixture_impacts"])
+        hit=physical["source_fixture_impacts"][0]
         world=self.world(self.options())
-        with self.assertRaises(PhysicalWitnessError):
-            run_physical_witness_world(
+        proof=run_physical_witness_world(
+            source,world,quest_settings=self.options(),
+            binding={"source_id":hit["source_id"],"site_id":0})
+        self.assertGreater(proof["actual_bound_impacts"],0)
+        self.assertEqual(proof["incident"]["physical_source"]["source_id"],
+                         hit["source_id"])
+        self.assertEqual(proof["source_fixture_impacts"],
+                         physical["source_fixture_impacts"])
+        self.assertTrue(verify_physical_witness_world(
+            proof,source,world,quest_settings=self.options()))
+        avoided=next((w for w in physical["witnesses"]
+            if all(hit["source_id"]!=w["source_id"]
+                   for hit in physical["source_fixture_impacts"])),None)
+        if avoided:
+            no_harm=run_physical_witness_world(
                 source,world,quest_settings=self.options(),
-                binding={"source_id":scene["layout"]["hazards"][0],"site_id":0})
+                binding={"source_id":avoided["source_id"],"site_id":0})
+            self.assertIsNone(no_harm["incident"])
+            self.assertEqual(no_harm["actual_bound_impacts"],0)
 
     def test_forged_incident_testimony_quest_and_reward_are_denied(self):
         source=self.source()
