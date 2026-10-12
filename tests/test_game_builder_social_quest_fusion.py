@@ -147,6 +147,7 @@ class SocialQuestFusionTests(unittest.TestCase):
             lambda r: r["worlds"]["dialogue"]["state"].__setitem__("checkpoint", True),
             lambda r: r["worlds"]["npc_society"]["state"]["residents"][0].__setitem__("bond", 99),
             lambda r: r["narrative_links"][0].__setitem__("physical_event", 5),
+            lambda r: r["bindings"][0].__setitem__("quest_site", 3),
             lambda r: r["narrative_links"][0]["quest_firsthand_memory"].__setitem__("source", "rumor"),
             lambda r: r["narrative_links"][1].__setitem__("finite_civic_food_paid", 0),
             lambda r: r.__setitem__("earned_narrative_resolutions", 50),
@@ -161,6 +162,19 @@ class SocialQuestFusionTests(unittest.TestCase):
             with self.subTest(attack=attack):
                 with self.assertRaises(SocialFusionError):
                     verify_social_quest_fusion(forged)
+
+    def test_reviewing_a_receipt_cannot_poison_authoritative_role_definitions(self):
+        clean = run_social_quest_fusion(REAL_INTERVIEW)
+        inspected = deepcopy(clean)
+        inspected["bindings"][0]["quest_site"] = 3
+        with self.assertRaises(SocialFusionError):
+            verify_social_quest_fusion(inspected)
+        from skeleton.ai.game_builder.advanced_social_quest_fusion import ROLE_BINDINGS
+        self.assertEqual(ROLE_BINDINGS[0]["quest_site"], 0)
+        self.assertEqual(ROLE_BINDINGS[0]["dialogue_topic"], 0)
+        self.assertTrue(verify_social_quest_fusion(
+            run_social_quest_fusion(REAL_INTERVIEW)
+        ))
 
     def test_external_source_scene_and_budget_constraints_fail_closed(self):
         for malformed in (None, "fake", {"nonexistent": {}}, {"dialogue": []}):
