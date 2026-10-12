@@ -230,8 +230,10 @@ def test_audit_history_detects_tampering_and_enforces_owner():
 
 def test_independent_source_validation_fails_closed_without_review_callback():
     db,family,_=setup()
-    with pytest.raises(PermissionError):
-        DragonGleanMatrix(family,finding_verify=None)
+    reader=DragonGleanMatrix(family)
+    assert reader.projection(OWNER,authorized=True)["insights"]==0
+    with pytest.raises(PermissionError,match="verifier not installed"):
+        reader.record(OWNER,finding(),authorized=True)
     with pytest.raises(PermissionError):
         DragonGleanMatrix(DragonFamily(db,approval=lambda x:True),
                           finding_verify=lambda *args:True)
