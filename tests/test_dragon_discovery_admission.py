@@ -390,11 +390,11 @@ def test_reconciled_operator_projection_keeps_orphans_quarantined(baseline):
         verify_reconciled_chain, SOURCE_BATCHES, EXCLUDED_ORPHANS,
     )
     projection = verify_reconciled_chain(baseline)
-    assert len(SOURCE_BATCHES) == 11
-    assert projection["raw_url_leads"] == 10551
-    assert projection["raw_new"] == 6146
+    assert len(SOURCE_BATCHES) == 15
+    assert projection["raw_url_leads"] == 12777
+    assert projection["raw_new"] == 8372
     assert projection["canonical_new"] <= projection["raw_new"]
-    assert projection["canonical_candidate_sources"] <= 10551
+    assert projection["canonical_candidate_sources"] <= 12777
     assert projection["excluded_orphan_paths"] == list(EXCLUDED_ORPHANS)
     assert not any(path in projection["evidence_batch_paths"]
                    for path in EXCLUDED_ORPHANS)
@@ -415,3 +415,71 @@ def test_reconciled_import_requires_exact_authorized_owner(tmp_path, baseline):
                 almanacs, "studio", baseline, authorized=False)
         assert store.db.execute(
             "SELECT COUNT(*) FROM dragon_almanac_sources").fetchone()[0] == 0
+
+
+EXTENDED_BATCHES = tuple(
+    ROOT / f"docs/ai/evidence/dragon-source-expansion-20261012-batch-{n:04d}.json"
+    for n in (38, 39, 40, 41)
+)
+
+
+def test_twelve_new_pinned_catalogs_extend_reconciled_chain_without_approval(baseline, chain):
+    """The 2,226 new leads are cumulative, not a parallel/orphan fork."""
+    historical = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    prior = [_supplement(path) for path in RECONCILED_BATCHES]
+    additional = [_supplement(path) for path in EXTENDED_BATCHES]
+    assert [len(doc["candidates"]) for _, doc in additional] == [600, 600, 600, 426]
+    assert [doc["counts"]["raw_provisional_urls"] for _, doc in additional] == [
+        11151, 11751, 12351, 12777]
+    assert all(doc["status"] == "raw_discovery_only_not_ingested_into_canonical_queue"
+               and len(doc["catalogs"]) == 12 for _, doc in additional)
+    full = validate_discovery_chain(baseline, [*historical, *prior, *additional])
+    assert full["raw_new"] == 8372
+    assert full["raw_total_discovered"] == 12777
+    assert full["total_discovered"] <= full["raw_total_discovered"]
+    assert all(row["training_authorized"] is False and
+               row["independence"] == "not_assessed" and
+               row["rights"] == "not_assessed"
+               for row in full["sources"].values())
+
+
+def test_extended_chain_does_not_accept_missing_or_forged_pins(baseline, chain):
+    historical = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    prior = [_supplement(path) for path in RECONCILED_BATCHES]
+    extra = [_supplement(path) for path in EXTENDED_BATCHES]
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*historical, *prior, extra[-1]])
+    malformed = deepcopy(extra)
+    malformed[0][1]["candidates"][0]["training_authorized"] = True
+    with pytest.raises(ValueError, match="authority"):
+        validate_discovery_chain(baseline, [*historical, *prior, *malformed])
+    malformed = deepcopy(extra)
+    malformed[1][1]["candidates"][0]["discoveries"][0]["readme_blob_sha"] = "f" * 40
+    with pytest.raises(ValueError, match="pinned"):
+        validate_discovery_chain(baseline, [*historical, *prior, *malformed])
+    malformed = deepcopy(extra)
+    malformed[2][1]["counts"]["raw_provisional_urls"] += 1
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*historical, *prior, *malformed])
+
+
+def test_extended_catalog_batch_hashes_and_parent_history_are_exact(baseline, chain):
+    old = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    prior = [_supplement(path) for path in RECONCILED_BATCHES]
+    latest = [_supplement(path) for path in EXTENDED_BATCHES]
+    paths = [p for p, _ in (*old, *prior)]
+    raw_urls = {item["url"] for _, doc in (*old, *prior)
+                for item in doc["candidates"]}
+    for path, doc in latest:
+        assert doc["parents"] == paths
+        assert doc["counts"]["previous_raw_provisional_urls"] == 4405 + len(raw_urls)
+        for entry in doc["candidates"]:
+            assert entry["url"] not in raw_urls
+            assert entry["source_id"] == "source-" + sha256(entry["url"].encode()).hexdigest()
+            assert entry["training_authorized"] is False
+            raw_urls.add(entry["url"])
+        paths.append(path)
+    assert len(raw_urls) == 8372
