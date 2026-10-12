@@ -45,6 +45,22 @@ export default function DragonFamilyNest({family}:{family?:DragonFamilyProjectio
     'Detects verified changes in known sources'} · idle only</Text>
    <Text style={s.muted}>New information acquired: {child.discoveries} · Last growth: {safeDate(child.last_grew_at)}</Text>
    <Text style={s.privacy}>Only grows while the host confirms idle time, consent, and resource capacity. Updated or adjacent knowledge must be independently verified.</Text></View>
+  {f.almanakk&&<View style={s.details} accessibilityLabel="Almanakk verified research pipeline">
+   <Text style={s.title}>📚 Almanakk · Wiki knowledge journey</Text>
+   <Text style={s.muted}>Dragon → Almanakk → Wiki → HOAG/Jeeves → Game Builder</Text>
+   <View style={s.top}>
+    <Text style={s.role}>Collected: {f.almanakk.counts.collected}</Text>
+    <Text style={s.role}>Wiki: {f.almanakk.counts.wiki_verified}</Text>
+    <Text style={s.role}>Shadow tested: {f.almanakk.counts.shadow_validated}</Text>
+    <Text style={s.role}>Handoffs: {f.almanakk.counts.weight_handoff}</Text>
+   </View>
+   {f.almanakk.items.slice(0,3).map(e=><View key={e.source_id} style={s.event}>
+    <Text style={s.title}>{e.source_id} · {e.stage.replaceAll('_',' ')}</Text>
+    <Text style={s.muted}>Evidence: {e.dragon} · {safeDate(e.last_acquired_at)}</Text>
+    {e.measured_gain!==null&&<Text style={s.when}>(improved: +{(e.measured_gain*100).toFixed(1)}% measured held-out quality)</Text>}
+   </View>)}
+   <Text style={s.privacy}>Shadow-tested knowledge requires independent Wiki and sandbox review. Handoff never implies that model weights were modified.</Text>
+  </View>}
   <Pressable accessibilityRole="button" accessibilityState={{expanded:showHistory}}
    onPress={()=>setShowHistory(v=>!v)} style={s.historyButton}>
    <Text style={s.historyTitle}>{showHistory?'Hide':'Show'} timestamped evolution history ({f.history.length} recent)</Text>
