@@ -1,0 +1,210 @@
+"""Deterministic expansion of Git-pinned catalog *observations* into Dragon leads.
+
+This module accepts an operator-provided, already captured catalog metadata
+snapshot. It does not retrieve URLs, attest a license, produce training data,
+or instruct the acquisition worker to fetch the referenced destinations.
+
+All emitted batches are verified together against the existing accepted chain
+before they may be written to disk. A duplicate by canonical URL is not a new
+lead, even when its raw link syntax differs.
+"""
+from __future__ import annotations
+
+from collections import Counter
+from hashlib import sha256
+import re
+from urllib.parse import urlsplit
+
+from .dragon_discovery_admission import (
+    MAX_SUPPLEMENTS, SCHEMA, STATUS_RAW, validate_discovery_chain,
+)
+from .dragon_source_catalog import canonical_source_url
+
+STAGE_SCHEMA = "skeleton.dragon.raw_catalog_link_observations.v1"
+STAGE_STATUS = "staged_raw_catalog_links_not_admitted"
+_REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
+_SHA = re.compile(r"[0-9a-f]{40}\Z")
+_BANNED_EXT = re.compile(
+    r"\.(?:rom|iso|nds|3ds|cia|gba|gbc|gb|bin|bios|exe|msi|apk|ipa|"
+    r"zip|7z|rar|tar|gz|tgz)(?:$|[?#])", re.I,
+)
+_NOISY_HOSTS = frozenset({
+    "img.shields.io", "shields.io", "badgen.net", "api.travis-ci.org",
+    "github.com", "raw.githubusercontent.com",
+})
+_MAX_OBSERVATIONS = 20_000
+
+
+def build_catalog_supplements(
+    registry: dict, accepted: list[tuple[str, dict]],
+    stage: dict, *, first_batch: int, batch_size: int = 600,
+    date_slug: str = "20261012",
+) -> dict:
+    """Compile a validated append-only batch plan, with no file/database writes.
+
+    The caller must explicitly supply the authoritative accepted chain and the
+    exact next batch number. The returned pair list is suitable for a separate
+    reviewed atomic on-disk materialization and a full chain replay.
+    """
+    if type(first_batch) is not int or not 1 <= first_batch <= 9999:
+        raise ValueError("invalid first batch index")
+    if type(batch_size) is not int or not 1 <= batch_size <= 1000:
+        raise ValueError("invalid source supplement size")
+    if not isinstance(date_slug, str) or not re.fullmatch(r"20[0-9]{6}", date_slug):
+        raise ValueError("invalid source batch date")
+    earlier = validate_discovery_chain(registry, accepted)
+    if (not isinstance(stage, dict) or stage.get("schema") != STAGE_SCHEMA
+            or stage.get("status") != STAGE_STATUS
+            or stage.get("fetch_authorized") is not False
+            or stage.get("rights_approved") is not False
+            or stage.get("training_authorized") is not False):
+        raise ValueError("only unreviewed staged catalog metadata is admissible")
+    catalogs = stage.get("catalogs")
+    if not isinstance(catalogs, list) or not 1 <= len(catalogs) <= 64:
+        raise ValueError("invalid staged catalog count")
+    previous_raw = {
+        row["url"] for _, doc in accepted for row in doc["candidates"]
+    }
+    old_normalized = {row["url"] for row in registry["sources"]}
+    old_normalized.update(
+        canonical_source_url(raw) for raw in previous_raw
+    )
+    retained = {}
+    seen_catalogs = set()
+    skipped = Counter()
+    visited = 0
+    for catalog in catalogs:
+        if not isinstance(catalog, dict):
+            raise ValueError("invalid catalog entry")
+        repo, commit, blob = (
+            catalog.get("repository"), catalog.get("commit_sha"),
+            catalog.get("readme_blob_sha"),
+        )
+        path = catalog.get("readme_path")
+        observed = catalog.get("observed")
+        if (not isinstance(repo, str) or not _REPO.fullmatch(repo)
+                or not isinstance(commit, str) or not _SHA.fullmatch(commit)
+                or not isinstance(blob, str) or not _SHA.fullmatch(blob)
+                or not isinstance(path, str) or not 1 <= len(path) <= 256
+                or path.startswith("/") or ".." in path.split("/")
+                or "\\" in path
+                or not isinstance(observed, list)
+                or len(observed) > 3000):
+            raise ValueError("invalid Git-pinned staged README catalog")
+        if (repo, commit, blob, path) in seen_catalogs:
+            raise ValueError("duplicated staged catalog identity")
+        seen_catalogs.add((repo, commit, blob, path))
+        for row in observed:
+            visited += 1
+            if visited > _MAX_OBSERVATIONS or not isinstance(row, dict):
+                raise ValueError("staged source observation budget exceeded")
+            raw = row.get("url")
+            line = row.get("line")
+            headers = row.get("headers", [])
+            if (not isinstance(raw, str) or not 10 <= len(raw) <= 2048
+                    or type(line) is not int or not 1 <= line <= 1_000_000
+                    or not isinstance(headers, list) or len(headers) > 12
+                    or any(not isinstance(h, str) or not h.strip()
+                           or len(h) > 2048 or any(ord(c) < 32 for c in h)
+                           for h in headers)):
+                raise ValueError("invalid staged link or observed heading")
+            # Reject invalid or private URLs rather than silently claiming an
+            # unreadable source to be a usable game-engine destination.
+            url = canonical_source_url(raw)
+            parsed = urlsplit(url)
+            if (_BANNED_EXT.search(parsed.path)
+                    or parsed.hostname in _NOISY_HOSTS
+                    and parsed.path.startswith(("/sindresorhus/awesome", "/badges/"))
+                    or "/actions/workflows/" in parsed.path):
+                skipped["binary_or_badge"] += 1
+                continue
+            if raw in previous_raw or url in old_normalized:
+                skipped["previously_seen"] += 1
+                continue
+            origin = {
+                "repository": repo, "commit_sha": commit,
+                "readme_blob_sha": blob, "exact_url": raw,
+                "line": line, "headers": headers,
+            }
+            if url in retained:
+                if len(retained[url]["discoveries"]) >= 32:
+                    raise ValueError("excessive catalog provenance for one URL")
+                retained[url]["discoveries"].append(origin)
+                skipped["same_canonical_new_link"] += 1
+                continue
+            retained[url] = {
+                "url": raw,
+                "source_id": "source-" + sha256(raw.encode("utf-8")).hexdigest(),
+                "availability": "not_checked",
+                "rights": "not_assessed",
+                "independence": "not_assessed",
+                "canonical_admission": False,
+                "training_authorized": False,
+                "discoveries": [origin],
+            }
+    if stage.get("raw_observation_count") is not None and (
+            type(stage["raw_observation_count"]) is not int
+            or stage["raw_observation_count"] != visited):
+        raise ValueError("staged observation count conflicts with supplied catalogs")
+    staged_catalogs = [
+        {"repository": c["repository"], "commit_sha": c["commit_sha"],
+         "readme_blob_sha": c["readme_blob_sha"], "readme_path": c["readme_path"]}
+        for c in catalogs
+    ]
+    rows = sorted(retained.values(), key=lambda row: (
+        canonical_source_url(row["url"]), row["url"]
+    ))
+    batch_count = (len(rows) + batch_size - 1) // batch_size
+    if len(accepted) + batch_count > MAX_SUPPLEMENTS:
+        raise ValueError("source campaign exceeds finite evidence-chain budget")
+    parents = [path for path, _ in accepted]
+    batches = []
+    total = earlier["raw_total_discovered"]
+    for i in range(batch_count):
+        part = rows[i*batch_size:(i+1)*batch_size]
+        next_total = total + len(part)
+        name = (
+            "docs/ai/evidence/dragon-source-expansion-"
+            + date_slug + "-batch-" + f"{first_batch+i:04d}.json"
+        )
+        if name in parents:
+            raise ValueError("source batch filename collides with prior evidence")
+        document = {
+            "schema": SCHEMA,
+            "status": STATUS_RAW,
+            "recorded_on": date_slug[:4]+"-"+date_slug[4:6]+"-"+date_slug[6:],
+            "baseline_registry_digest": registry["catalog_digest"],
+            "requested_total_urls": registry["unique_urls"]*10,
+            "target_interpretation": "Unreviewed canonical-distinct Git-pinned catalog link leads",
+            "parents": parents[:], "catalogs": staged_catalogs,
+            "counts": {
+                "previous_raw_provisional_urls": total,
+                "new_raw_candidate_urls": len(part),
+                "raw_provisional_urls": next_total,
+            },
+            "candidates": part,
+            "limitations": [
+                "Git identities are catalog metadata claims, not fetched-target proof.",
+                "No linked source, game ROM, media, legal right or content has been approved.",
+                "No crawler job or model-memory promotion is authorized.",
+            ],
+        }
+        batches.append((name, document))
+        parents.append(name)
+        total = next_total
+    if batches:
+        checked = validate_discovery_chain(registry, [*accepted, *batches])
+        if checked["raw_total_discovered"] != total:
+            raise ValueError("generated discovery evidence chain does not reconcile")
+    return {
+        "schema": "skeleton.dragon.staged_discovery_compilation.v1",
+        "staged_observations": visited,
+        "new_canonical_link_leads": len(rows),
+        "start_raw_leads": earlier["raw_total_discovered"],
+        "end_raw_leads": total,
+        "skipped": dict(sorted(skipped.items())),
+        "supplements": batches,
+        "staged_rights_approved": False,
+        "crawler_authorized": False,
+        "training_authorized": False,
+    }
