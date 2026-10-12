@@ -43,7 +43,7 @@ def _portfolio_request(args, parser):
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "import-supplements", "discovery-topics", "discovery-sources", "discovery-receipts"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-topics", "discovery-sources", "discovery-receipts"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
@@ -114,7 +114,7 @@ def main():
             result = MissionPortfolio(almanacs).build(
                 args.owner, _portfolio_request(args, parser),
                 authorized=True, topic=args.topic)
-        elif args.command in {"campaign-record", "campaign-inspect"}:
+        elif args.command in {"campaign-record", "campaign-inspect", "campaign-refresh"}:
             from .dragon_research_campaigns import DiscoveryCampaigns
             if not args.campaign:
                 parser.error("campaign command requires --campaign")
@@ -123,6 +123,10 @@ def main():
                 result = ledger.record(
                     args.owner, args.campaign, _portfolio_request(args, parser),
                     authorized=True, topic=args.topic,
+                    expected_parent=args.expected_parent)
+            elif args.command == "campaign-refresh":
+                result = ledger.refresh(
+                    args.owner, args.campaign, authorized=True,
                     expected_parent=args.expected_parent)
             else:
                 result = ledger.inspect(
