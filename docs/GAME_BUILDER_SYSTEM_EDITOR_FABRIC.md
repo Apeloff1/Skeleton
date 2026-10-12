@@ -800,3 +800,77 @@ Operator examples (create your own JSON actions and reviewed receipt):
     python -m skeleton.ai.game_builder.system_editor_cli scene-template --editor colony --seed 5
     python -m skeleton.ai.game_builder.system_editor_cli play --editor colony --seed 5 --actions authored-colony-commands.json
     python -m skeleton.ai.game_builder.system_editor_cli godot-export --session reviewed-colony-session.json --output /tmp/new-colony --trusted-local-operator
+
+
+## Twelfth original advanced family — City & Infrastructure (12 October 2026)
+
+The typed City & Infrastructure editor now has a real original executable
+Python city simulation, not a zoning form masquerading as gameplay.
+**12/43 (27.9%)** now have reference gameplay; **31/43** remain authoring-only.
+This twelfth family is **reference-only** pending an independent native
+implementation and hardware validation. The earlier tenth Native Factory
+is historically verified; native Colony is still awaiting its new CI parity
+gates. We do not equate reference coverage with native certification.
+
+### Fifteen decision-bearing advanced controls
+
+The five existing urban editor settings (regional citizen demand, maximum
+zoned sites, utility-node count, traffic simulation, planned/mixed/market
+economics) now combine with municipal opening budget, housing density,
+road capacity, power output, waterworks output, industrial emissions,
+disaster interval/on-off switch, development policy (transport/industrial/
+ecology), and endless/campaign ending mode. These settings influence actual
+game transitions and are protected by strict bounded typed source schemas.
+
+### Real spatial city game
+
+- A **4×4 authored municipal map** with original biome/terrain tiles,
+  unique transport hub, finite aquifer, bounded forestry and quarry
+  reserves, flooding risk and distinct regional demand.
+- Every road/bridge is an actual connected-graph asset. A player cannot
+  zone distant isolated land or construct a service plant that does not
+  join the real street network. Bridges require actual water terrain and
+  priced materials.
+- Eleven construction types: roads, river crossings, housing, business,
+  industry, parks, power, waterworks, firehouses, clinics, schools.
+  Development, upgrades, demolition/salvage and exploration harvest
+  actually mutate the city and cost credits/wood/stone.
+- Resident growth is constrained by usable, road-connected housing,
+  employment, functional power, usable finite water and regional demand.
+  City utilities cannot serve an unreachable zone. Waterworks gradually
+  draw down the **authored finite aquifer**; city growth will eventually
+  fail if the municipality cannot secure more sustainable supplies.
+- Traffic congestion depends on resident and employment demand and
+  connected roadway capacity; transit policy reduces pressure. Industry
+  introduces real pollution; parks, environmental policy and public
+  services change resident satisfaction.
+- Tax modes, urban policy, bond debt, interest/maintenance, budget,
+  paid supply imports, flood losses and bankruptcy create meaningful
+  alternatives and expensive consequences. No arbitrary client state
+  or free-money console calls grant unearned success.
+- Functional-city and prosperous-city achievements are based on
+  actual power/water, road access, population, employment, service
+  investment, budget and morale. Default cities remain playable
+  after achievements. Only explicitly authored campaign policy
+  ends after the prosperity objective.
+
+The visual local Game Studio draws the live 4×4 zoning map, transit,
+utilities, finances, population, pollution and milestone telemetry, and
+adds a **parcel-addressed command composer** instead of hundreds of
+unusable action buttons. The separate original terrain authoring canvas
+supports painting geological types, relocating the road hub and editing
+finite source supplies and flooding; source edits are unsigned and
+cannot become gameplay until revalidated through the human review chain.
+
+The new advanced_city_runtime.py and tests/test_game_builder_advanced_city.py
+cover deterministic command replay, independent receipt re-creation, save
+and resume, finite resource exhaustion, road connectivity, backed debt,
+scene-source checksum custody, city assembly, original CLI and visual
+map authoring. Existing broad Game Builder Advanced System Engines
+CI runs these regressions on Linux and Windows.
+
+**Proof truth:** this is a bounded original advanced urban gameplay
+reference, not an independently executed Godot city engine or commercial
+municipal simulation. Console/hardware targets, depth of city types,
+ongoing hydrology and climate adaptation, sophisticated 3D traffic,
+production art, third-party rights and retail release remain unfinished.
