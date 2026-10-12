@@ -58,6 +58,23 @@ class JeevesAllAppCapabilityTests(unittest.TestCase):
         with self.assertRaises(JeevesAppCapabilityError):
             app_atlas(family="studio",limit=999999)
 
+    def test_actual_frontend_backend_native_and_jeeves_app_roots_are_mapped(self):
+        atlas=app_atlas()
+        families={f["id"]:f for f in atlas["families"]}
+        for key in ("frontend","frontend_features","backend_gameforge",
+                    "jeeves_app","windows_packaging","java_accelerators"):
+            with self.subTest(family=key):
+                self.assertIn(key,families)
+                self.assertTrue(families[key]["present"])
+                result=app_atlas(family=key,offset=0,limit=40)
+                self.assertGreater(result["total_entries"],0)
+                self.assertTrue(all(not item["execution_adapter"] for item
+                                    in result["entries"]))
+        feature=app_atlas(family="frontend_features",offset=0,limit=40)
+        self.assertTrue(feature["entries"][0]["relative_path"]
+                        .startswith("frontend/features/"))
+        self.assertNotIn("shell", [x["id"] for x in atlas["operator_adapters"]])
+
     def test_nested_installed_filetree_is_indexed_without_executing_modules(self):
         result=self.call("atlas.deep",{
             "family":"studio","query":None,
