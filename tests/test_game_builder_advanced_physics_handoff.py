@@ -177,12 +177,13 @@ class AdvancedCrossEnginePhysicsTests(unittest.TestCase):
 
     def test_original_source_with_signed_level_is_respected(self):
         editor="platformer"
-        scene=make_advanced_scene(editor,seed=4,layout={
+        scene=make_advanced_scene(editor,{"level_width":16},seed=4,layout={
             "spawn_x":0,"exit_x":15,"hazards":[4,7],
             "collectibles":[6,11],"checkpoints":[8,12]})
-        origin=run_advanced_session(editor,actions=("right","jump_right"),
+        origin=run_advanced_session(editor,{"level_width":16},
+                                    actions=("right","jump_right"),
                                     seed=4,scene=scene)
-        record=run_physics_handoff(origin)
+        record=run_physics_handoff(origin,{"level_width":16})
         self.assertEqual(record["origin_scene_digest"],scene["digest"])
         self.assertEqual(record["derived_obstacle_count"],2)
         self.assertEqual(
