@@ -86,6 +86,22 @@ def weave_tapestry(
                       "Emotional moment must point to a highlighted script passage.")
             moment_names.add(kind)
             hits[kind] += 1
+        moment_obligations = {
+            "cliffhanger": "cliffhanger",
+            "red_herring": "red_herring",
+            "surprise": "surprise",
+        }
+        for moment_kind, required_role in moment_obligations.items():
+            if moment_kind in moment_names and not any(
+                x.get("role") == required_role and x.get("plot_id") in {
+                    m.get("plot_id") for m in moments if m.get("kind") == moment_kind
+                } for x in beats
+            ):
+                issue("untracked_" + moment_kind, n, None,
+                      "Emotional hook needs a named global plot thread and highlighted receipt.")
+        if not moment_names:
+            issue("entertainment_unmarked", n, None,
+                  "No emotional, dramatic or entertaining purpose is marked for this scene.")
         if role == "epilogue" and "epilogue" not in moment_names:
             issue("unmarked_epilogue", n, None, "Epilogue must identify its emotional closing passage.")
         if role == "finale" and "climax" not in moment_names:
