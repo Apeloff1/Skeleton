@@ -89,9 +89,9 @@ def parser() -> argparse.ArgumentParser:
         help="Search actual original traversal and independently prove any completed route")
     parkour_plan.add_argument("--scene",required=True)
     parkour_plan.add_argument("--settings")
-    parkour_plan.add_argument("--max-states",type=int,default=12000)
+    parkour_plan.add_argument("--max-states",type=int,default=20000)
     parkour_plan.add_argument("--max-depth",type=int,default=96)
-    parkour_plan.add_argument("--beam-width",type=int,default=90)
+    parkour_plan.add_argument("--beam-width",type=int,default=64)
     parkour_verify=commands.add_parser("verify-parkour-plan",
         help="Re-search a source-verified original course and verify an exact planner receipt")
     parkour_verify.add_argument("--record",required=True)
