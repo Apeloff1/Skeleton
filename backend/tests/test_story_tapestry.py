@@ -139,3 +139,14 @@ def test_historical_branch_end_requires_explicit_epilogue_not_sequel_excuse():
     m[-1]["scene_kind"] = "postgame"
     result = weave_tapestry(m, final_scene=4)
     assert "epilogue_missing" in codes(result)
+
+
+
+def test_highlighted_causal_plot_cannot_be_omitted_from_global_tapestry():
+    chapters = complete_story()
+    chapters[0]["plot_points"].append({
+        "id": "unlinked_promise", "anchor": "some promise", "kind": "promise",
+    })
+    result = weave_tapestry(chapters, final_scene=4)
+    assert "unwoven_plot_point" in codes(result)
+    assert result["closure_ready"] is False
