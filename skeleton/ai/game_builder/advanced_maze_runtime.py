@@ -41,8 +41,14 @@ def default_layout(config,seed):
     w,h,lv=config["width"],config["height"],config["levels"]
     stairs=[[w-3,1,z] for z in range(lv)]
     key_points=[]
+    portals=([
+        {"entry":[1,h-3,0],"destination":[w-3,h-3,lv-1]}
+    ] if config["topology"]=="non_euclidean" else [])
     reserved={(1,1,0),(w-2,h-2,lv-1),(w-2,h-3,lv-1),
               *(tuple(p) for p in stairs)}
+    for portal in portals:
+        reserved.add(tuple(portal["entry"]))
+        reserved.add(tuple(portal["destination"]))
     # Deterministic, finite enumeration: stop after the authored budget.
     for z in range(lv):
         for y in range(1,h-1):
@@ -59,7 +65,7 @@ def default_layout(config,seed):
         for x in range(2,w-1):
             p=(x,y,0)
             if p not in reserved and (x+y+seed)%4==0:
-                walls.append({"at":list(p),"phase":len(walls)%2})
+                walls.append({"at":list(p),"phase":len(walls)%2 if config["topology"]=="moving" else 0})
                 reserved.add(p)
             if len(walls)>=min(config["wall_budget"],16):break
         if len(walls)>=min(config["wall_budget"],16):break
@@ -74,9 +80,6 @@ def default_layout(config,seed):
             if len(hazards)>=config["hazards"]:break
         if len(hazards)>=config["hazards"]:break
     if config["hazards"]==0:hazards=[]
-    portals=([
-        {"entry":[1,h-3,0],"destination":[w-3,h-3,lv-1]}
-    ] if config["topology"]=="non_euclidean" else [])
     # Portals are not privileged shortcuts to the exit: entering their
     # authored source cell and paying a finite action is compulsory.
     return {
@@ -143,8 +146,7 @@ def normalize_layout(config,layout):
         if tuple(p) in used:
             raise MazeActionError("walls cannot overwrite objectives or overlap")
         if topology!="moving" and phase!=0:
-            # Static walls are phase independent outside moving labyrinths.
-            phase=0
+            raise MazeActionError("static maze cannot forge shifting wall phases")
         safe_walls.append({"at":p,"phase":phase})
         used.add(tuple(p))
     safe_hazards=[]
