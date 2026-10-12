@@ -202,27 +202,23 @@ def inspect_png_against_canon(bible, asset_id, data, *, max_channel_delta=0):
     return {**proof,"digest":digest(proof)}
 
 
-def compare_reused_asset(first,last):
-    """Exact visual identity lock: scene 500 may not silently recolor scene 1."""
-    required={
-        "schema","asset","asset_spec_digest","world_bible_digest",
-        "region","binary_sha256","width","height","channels",
-        "allowed_channel_delta","actual_binary_inspected",
-        "copyright_clearance_proven","commercial_release_approved","digest"
-    }
-    for item in (first,last):
-        _reject(type(item) is dict and required <= set(item),
-                "real source-pixel proof required")
-        _reject(digest({k:v for k,v in item.items() if k!="digest"}) ==
-                item["digest"] and item["actual_binary_inspected"] is True,
-                "source pixel identity checksum invalid")
-    for key in ("asset","asset_spec_digest","world_bible_digest","region",
-                "binary_sha256","width","height","channels",
-                "allowed_channel_delta"):
-        _reject(first[key]==last[key],
-                "reused original visual asset changed without a new reviewed identity")
+def compare_reused_asset(bible, asset_id, first_png, later_png, *,
+                         max_channel_delta=0):
+    """Independently re-decode BOTH scene renders before comparing identity.
+
+    Bare hashes or user-submitted receipts cannot establish continuity.
+    Every purported scene occurrence must present its actual binary source.
+    """
+    first=inspect_png_against_canon(
+        bible,asset_id,first_png,max_channel_delta=max_channel_delta)
+    later=inspect_png_against_canon(
+        bible,asset_id,later_png,max_channel_delta=max_channel_delta)
+    _reject(first["binary_sha256"]==later["binary_sha256"],
+            "scene 500 recolored or replaced a scene-one original visual asset")
     return {"same_approved_render":True,
             "asset":first["asset"],
-            "reference_binary_sha256":first["binary_sha256"],
+            "original_scene_binary_sha256":first["binary_sha256"],
+            "later_scene_binary_sha256":later["binary_sha256"],
             "strict_pixel_identity_review":True,
+            "independent_binary_reinspection":True,
             "copyright_clearance_proven":False}
