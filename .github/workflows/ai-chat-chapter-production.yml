@@ -9,6 +9,8 @@ on:
       - "backend/core/story_production_manifest.py"
       - "backend/core/story_tapestry.py"
       - "backend/core/branching_narrative.py"
+      - "backend/core/outcome_chapter_weave.py"
+      - "backend/tests/test_outcome_chapter_weave.py"
       - "backend/core/outcome_weaving_matrices.py"
       - "backend/routes/story_outcomes.py"
       - "backend/tests/test_branching_narrative.py"
@@ -77,6 +79,7 @@ jobs:
           backend/core/story_production_manifest.py
           backend/core/story_tapestry.py
           backend/core/branching_narrative.py
+          backend/core/outcome_chapter_weave.py
           backend/core/outcome_weaving_matrices.py
           backend/routes/story_outcomes.py
           backend/core/story_review_matrices.py
@@ -87,6 +90,7 @@ jobs:
           backend/tests/test_story_production_manifest.py
           backend/tests/test_story_tapestry.py
           backend/tests/test_branching_narrative.py
+          backend/tests/test_outcome_chapter_weave.py
           backend/tests/test_outcome_weaving_matrices.py
           backend/tests/test_story_outcomes_routes.py
           backend/tests/test_story_review_matrices.py
@@ -99,6 +103,7 @@ jobs:
           backend/tests/test_story_production_manifest.py
           backend/tests/test_story_tapestry.py
           backend/tests/test_branching_narrative.py
+          backend/tests/test_outcome_chapter_weave.py
           backend/tests/test_outcome_weaving_matrices.py
           backend/tests/test_story_outcomes_routes.py
           backend/tests/test_story_review_matrices.py
