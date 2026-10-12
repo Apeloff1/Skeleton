@@ -218,8 +218,8 @@ func _step(command: String) -> bool:
         if int(state["harvest_stock"])<1:
             return false
         var batch: int=int(state["harvest_stock"])
-        var price: int=3+int(state["market_multiplier"])+
-            (1 if int(state["season"])==2 else 0)
+        var price: int=(3+int(state["market_multiplier"])
+            +(1 if int(state["season"])==2 else 0))
         state["coins"]=int(state["coins"])+batch*price
         state["harvest_stock"]=0
         state["reputation"]=int(state["reputation"])+1
