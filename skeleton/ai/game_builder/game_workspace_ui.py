@@ -1616,6 +1616,26 @@ function renderAdvancedActions(actions){
     "followup:0","followup:0","resolve:0"
   ],null,1);
   worldLabel.append(worldInput);target.append(worldLabel);
+  const storyPreset=document.createElement("select");
+  storyPreset.id="unified-npc-narrative-branch";
+  storyPreset.setAttribute("aria-label","Choose authored restorative or exploitative one-world path");
+  for(const [id,name] of [
+    ["restoration","Restorative social quest · material aid"],
+    ["exploitation","Exploitative social quest · limited resource loss"]
+  ]){
+    const option=document.createElement("option");
+    option.value=id;option.textContent=name;storyPreset.append(option);
+  }
+  storyPreset.addEventListener("change",()=>{
+    const exploit=storyPreset.value==="exploitation";
+    worldInput.value=JSON.stringify([
+      "move:south","move:east","discover:0","speak:0",
+      exploit?"challenge:0":"support:0",
+      ...Array.from({length:5},()=>exploit?"sabotage:0":"followup:0"),
+      "resolve:0"
+    ],null,1);
+  });
+  target.append(storyPreset);
   const runWorld=document.createElement("button");
   runWorld.type="button";
   runWorld.textContent="Execute and replay canonical NPC world";
@@ -1655,6 +1675,9 @@ function renderAdvancedActions(actions){
         paid_social_choices:world.choices,
         resources:world.resources,
         resolved_quests:world.resolved_count,
+        route_outcome:world.quests.map(x=>({site:x.site_id,ending:x.ending,
+          followup_count:x.followups,evidence:x.testimonies})),
+        citizen_councils:world.councils,
         ordered_action_receipts:outcome.record.event_frames.map(x=>({
           action:x.action,tick:x.tick,npc_moves:x.npc_moves,
           recorded_events:x.source_events,state_digest:x.after
