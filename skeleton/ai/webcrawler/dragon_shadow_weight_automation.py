@@ -805,6 +805,7 @@ class ShadowWeightAutomation:
             raise ValueError("shadow registry hard capacity exceeded")
         status = {stage: 0 for stage in STAGES}
         stale = []
+        stale_active = 0
         last_heads = []
         for (cid,) in rows:
             verified = self._read(owner, cid)
@@ -815,16 +816,14 @@ class ShadowWeightAutomation:
             last_heads.append((cid, events[-1].digest))
             if stage in ("shadow", "tested", "active") and not self._current(shadow):
                 stale.append(cid)
+                stale_active += int(stage == "active")
         return {
             "schema": "skeleton.dragon.shadow_registry_health.v1",
             "owner": owner,
             "total": len(rows),
             "stages": status,
             "stale_candidate_ids": tuple(stale),
-            "routable_active": status["active"] - sum(
-                cid in set(stale) for cid, in rows
-                if self._read(owner, cid)[1] == "active"
-            ),
+            "routable_active": status["active"] - stale_active,
             "history_digest": _hash(last_heads),
             "neural_training_authorized": False,
         }
