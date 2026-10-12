@@ -1023,7 +1023,60 @@ function renderAdvancedActions(actions){
   target.append(submit);
   const hint=document.createElement("small");
   hint.textContent="Arrows: approach, retreat and sidestep. J: jab · K: kick · P: parry · Space: jump. Hits require actual lanes, distance and finite stamina.";
-  target.append(hint);return;
+  target.append(hint);
+  const intro=document.createElement("label");
+  intro.textContent="Original two-peer authoritative rollback laboratory";
+  target.append(intro);
+  const participants=[
+    ["Blue physical actions","fighting-blue-actions",'["inspect","inspect"]'],
+    ["Predicted opposing actions","fighting-predicted-actions",'["inspect","inspect"]'],
+    ["Received authoritative opposing actions","fighting-real-actions",'["inspect","approach"]']
+  ];
+  const editors=[];
+  for(const [name,id,placeholder] of participants){
+    const label=document.createElement("label");label.textContent=name;
+    const area=document.createElement("textarea");area.id=id;
+    area.setAttribute("aria-label",name);area.rows=2;
+    area.placeholder=placeholder;
+    label.append(area);target.append(label);editors.push(area);
+  }
+  const run=document.createElement("button");run.type="button";
+  run.id="fighting-rollback-reconcile";
+  run.textContent="Reexecute authenticated fighting rollback";
+  const proof=document.createElement("pre");proof.id="fighting-rollback-proof";
+  proof.setAttribute("role","status");proof.setAttribute("aria-live","polite");
+  run.addEventListener("click",async()=>{
+    try{
+      const [blue,predicted,authoritative]=editors.map(a=>JSON.parse(a.value));
+      if(![blue,predicted,authoritative].every(Array.isArray))
+        throw Error("Peer input streams must be valid JSON action lists");
+      if(advancedEditor!==systemEditor().id)
+        throw Error("Restart the game after changing the original fighting editor");
+      const answer=await api("/api/fighting-rollback",{
+        settings:advancedSettings,seed:advancedSession.seed,scene:advancedScene,
+        blue_actions:blue,predicted_red:predicted,
+        authoritative_red:authoritative
+      });
+      const evidence=answer.report;
+      proof.textContent=JSON.stringify({
+        frames:evidence.authoritative_match.frames,
+        corrected_frames:evidence.reconciled_indices,
+        correction_window:evidence.rollback_window_frames,
+        authoritative_digest:evidence.authoritative_match.digest,
+        winner:evidence.authoritative_match.state.reason,
+        player_health:evidence.authoritative_match.state.player.hp,
+        opposing_health:evidence.authoritative_match.state.opponent.hp,
+        replay_verified:answer.independently_verified,
+        network_certified:answer.network_transport_certified,
+        native_hardware_certified:answer.native_hardware_certified,
+        game_files_mutated:answer.game_files_mutated
+      },null,2);
+      status("Original two-peer rollback replay verified. Prediction rejected as authority; no online networking or native certification implied.");
+    }catch(error){
+      status("Peer input reconciliation rejected: "+error.message);
+    }
+  });
+  target.append(run);target.append(proof);return;
  }
 
  if(advancedSession?.editor==="rhythm"){
