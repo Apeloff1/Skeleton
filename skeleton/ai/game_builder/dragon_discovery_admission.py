@@ -129,7 +129,7 @@ def validate_discovery_chain(registry: dict, named_documents: list[tuple[str, di
                     raise ValueError("invalid discovery origin")
                 if "repository" in origin:
                     key = (origin.get("repository"), origin.get("commit_sha"), origin.get("readme_blob_sha"))
-                    if key not in known_sources or origin.get("exact_url") != url:
+                    if key not in known_sources or canonical_source_url(origin.get("exact_url", "")) != url:
                         raise ValueError("discovery not tied to pinned repository")
                     repositories.add(key[0])
                 else:
