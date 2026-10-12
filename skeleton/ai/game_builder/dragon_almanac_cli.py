@@ -43,7 +43,7 @@ def _portfolio_request(args, parser):
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-verify", "discovery-census", "platform-matrix", "import-reconciled", "discovery-topics", "discovery-sources", "discovery-receipts"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-verify", "discovery-census", "platform-matrix", "discovery-identity-audit", "import-reconciled", "discovery-topics", "discovery-sources", "discovery-receipts"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
@@ -81,7 +81,7 @@ def main():
     with ReviewedKnowledgeStore(args.database) as library:
         almanacs = DragonAlmanacs(library)
         worker = SequentialAlmanacWorker(almanacs)
-        if args.command in {"discovery-verify", "discovery-census", "platform-matrix", "import-reconciled"}:
+        if args.command in {"discovery-verify", "discovery-census", "platform-matrix", "discovery-identity-audit", "import-reconciled"}:
             from .dragon_discovery_reconciled import (
                 verify_reconciled_chain, import_reconciled_chain)
             registry = read_source_registry(args.registry)
@@ -96,6 +96,9 @@ def main():
                 from .dragon_platform_coverage import platform_discovery_matrix
                 result = platform_discovery_matrix(
                     registry, samples_per_platform=args.samples_per_platform)
+            elif args.command == "discovery-identity-audit":
+                from .dragon_discovery_identity_audit import audit_raw_discovery_identity
+                result = audit_raw_discovery_identity(registry, detail_limit=args.limit)
             else:
                 result = import_reconciled_chain(
                     almanacs, args.owner, registry, authorized=True)
