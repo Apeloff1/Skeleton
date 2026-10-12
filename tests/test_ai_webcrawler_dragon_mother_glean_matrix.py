@@ -39,7 +39,7 @@ def document(source, *, group=None, at=T0, statement=ALL_MEANING,
         ("design_reference",), "qualified-reviewer", True,
         (ReviewedNote("note-" + source, "movement", statement, 0, 8,
                       stance, 975000, group or ("group-" + source),
-                      ("movement", "gameplay")),),
+                      ("gameplay", "movement")),),
     )
 
 
