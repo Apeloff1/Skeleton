@@ -8,6 +8,7 @@ from .contracts import canonical_json
 from .dragon_almanacs import DragonAlmanacs
 from .dragon_technical_source_atlas import CATALOG, CATALOG_DIGEST, DragonTechnicalSources
 from .dragon_technical_source_captures import DragonSourceCaptures
+from .dragon_technical_source_analysis import DragonTechnicalGlean
 from .reviewed_knowledge import ReviewedKnowledgeStore
 
 
@@ -15,13 +16,15 @@ def main():
     parser=argparse.ArgumentParser(description="Policy-stage technical source metadata")
     parser.add_argument("command",choices=("census","import","plan","history",
                                                   "capture-history","capture-review",
-                                                  "capture-census"))
+                                                  "capture-census","glean-preview","glean-handoff"))
     parser.add_argument("--database",required=True)
     parser.add_argument("--owner",required=True)
     parser.add_argument("--trusted-local-operator",action="store_true")
     parser.add_argument("--recorded-at",type=int)
     parser.add_argument("--query")
     parser.add_argument("--source-id")
+    parser.add_argument("--capture-digest")
+    parser.add_argument("--peer-source-id",action="append",default=[])
     parser.add_argument("--limit",type=int,default=20)
     parser.add_argument("--max-per-host",type=int,default=2)
     parser.add_argument("--direct-only",action="store_true")
@@ -52,7 +55,20 @@ def main():
             report=atlas.history(args.owner,args.source_id,authorized=True)
         else:
             captures=DragonSourceCaptures(atlas.a)
-            if args.command=="capture-census":
+            if args.command in ("glean-preview","glean-handoff"):
+                if not args.source_id:
+                    parser.error("--source-id required for glean inspection")
+                glean=DragonTechnicalGlean(captures)
+                if args.command=="glean-preview":
+                    if not args.capture_digest:
+                        parser.error("--capture-digest required")
+                    report=glean.preview(args.owner,args.source_id,
+                        capture_digest=args.capture_digest,
+                        peers=tuple(args.peer_source_id),authorized=True)
+                else:
+                    report=glean.handoff(args.owner,args.source_id,
+                        authorized=True,include_quotes=args.include_captured_text)
+            elif args.command=="capture-census":
                 rows=store.db.execute(
                     "SELECT DISTINCT source FROM dragon_technical_captures_v1 "
                     "WHERE owner=? ORDER BY source",(args.owner,)
