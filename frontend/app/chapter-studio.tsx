@@ -13,9 +13,9 @@ import { authHeaders, checkMe } from '../src/auth/gameforgeAuth';
 import { validProjectId } from '../src/product/worldWorkspace';
 import { HANDOFF_KEY } from '../features/Jeeves/workbench/types';
 import {
-  CHAPTER_SCENE_HANDOFF_KEY, PLOT_KINDS, acceptProof,
+  CHAPTER_SCENE_HANDOFF_KEY, PLOT_KINDS, SCENE_KINDS, parseNarrativeBeats, acceptProof,
   chapterChatHandoff, chapterForAct, highlightedParts,
-  integer, localPlotAnchors, parseChapterSceneHandoff, parsePlotPoints,
+  integer, localPlotAnchors, parseChapterSceneHandoff, SceneKind, parsePlotPoints,
   slug, validateSceneCoordinates, voiceCast,
 } from '../features/Jeeves/chapterStudio';
 import type {
@@ -56,6 +56,11 @@ const HIGHLIGHT_COLORS: Record<PlotKind, string> = {
   promise: '#27576c', resolution: '#256258', dialogue: '#4b5374',
   motif: '#405e4d', historical_detail: '#6b563c',
   visual_identity: '#574e7d', voice_identity: '#643f64',
+  prologue: '#53546b', epilogue: '#315e4a', cliffhanger: '#8b3047',
+  surprise: '#bd532a', emotional_turn: '#6e3f8d', red_herring: '#6e6733',
+  misdirection_reveal: '#87543b', dramatic_irony: '#455f88',
+  comic_relief: '#37786d', choice: '#674e77', romance: '#9c4970',
+  betrayal: '#913b45', tension_release: '#2d7461',
 };
 export default function ChapterStudioScreen() {
   const router = useRouter();
@@ -80,6 +85,17 @@ export default function ChapterStudioScreen() {
   const [threadKeys, setThreadKeys] = useState('');
   const [sourceId, setSourceId] = useState('creator-reviewed');
   const [plotJson, setPlotJson] = useState('[]');
+  const [sceneKind, setSceneKind] = useState<SceneKind>('story');
+  const [storyMomentsJson, setStoryMomentsJson] = useState('[]');
+  const [threadBeatsJson, setThreadBeatsJson] = useState('[]');
+  const [tapestry, setTapestry] = useState<any>(null);
+  const [matrixCoverage, setMatrixCoverage] = useState<any>(null);
+  const [matrixId, setMatrixId] = useState('engagement.cliffhanger_fairness');
+  const [matrixLevel, setMatrixLevel] = useState('100');
+  const [reviewVerdict, setReviewVerdict] = useState<'pass' | 'fail' | 'unknown'>('unknown');
+  const [reviewQuote, setReviewQuote] = useState('');
+  const [reviewRationale, setReviewRationale] = useState('');
+  const [reviewPlotId, setReviewPlotId] = useState('');
   const [newPlotId, setNewPlotId] = useState('');
   const [newPlotKind, setNewPlotKind] = useState<PlotKind>('setup');
   const [newPlotAnchor, setNewPlotAnchor] = useState('');
@@ -145,7 +161,8 @@ export default function ChapterStudioScreen() {
       setSummary('Reviewed from Jeeves: ' + pending.messageId);
     } else {
       setSummary(''); setScript(''); setCharacters(''); setThreadKeys('');
-      setPlotJson('[]');
+      setPlotJson('[]'); setSceneKind('story');
+      setStoryMomentsJson('[]'); setThreadBeatsJson('[]');
     }
     setNotice('Loaded chapter revision ' + note.revision + ' with receipt ' + note.digest.slice(0, 12) + '.');
   };
@@ -209,6 +226,10 @@ export default function ChapterStudioScreen() {
     setCharacters((item.characters || []).join(','));
     setThreadKeys((item.thread_keys || []).join(','));
     setSourceId(item.source_message_id); setPlotJson(draftPoints(item.plot_points || []));
+    setSceneKind(item.scene_kind || 'story');
+    setStoryMomentsJson(draftPoints(item.story_moments || []));
+    setThreadBeatsJson(draftPoints(item.thread_beats || []));
+    setMatrixCoverage(null);
     setProof(item.proof || null);
     setNotice('Loaded scene ' + no + ', revision ' + item.revision +
       '. Edit to draft a new revision or review its current proof.');
@@ -240,13 +261,14 @@ export default function ChapterStudioScreen() {
     if (new Set(characterIds).size !== characterIds.length ||
         new Set(threadIds).size !== threadIds.length) throw new Error('Duplicate character or thread.');
     const points = parsePlotPoints(plotJson, script);
+    const narrative = parseNarrativeBeats(storyMomentsJson, threadBeatsJson, points, sceneKind);
     const res = await api.put<any>(
       base() + '/scenes/' + no,
       {
         expected_revision: scene?.scene === no ? scene.revision : 0,
         branch_id: branch, chapter: chapter.chapter, act,
         summary: summary.trim(), text: script, characters: characterIds,
-        thread_keys: threadIds, plot_points: points,
+        thread_keys: threadIds, plot_points: points, ...narrative,
         chapter_revision: chapter.revision, chapter_digest: chapter.digest,
         source_message_id: slug(sourceId, 'Chat source'),
       },
