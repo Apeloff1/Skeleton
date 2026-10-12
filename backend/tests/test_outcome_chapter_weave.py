@@ -1,5 +1,6 @@
 """No dual canon: RPG choice scenes, NPCs and place lore bind to Chapter Studio."""
 import pytest
+from copy import deepcopy
 from core.branching_narrative import validate_plan
 from core.outcome_chapter_weave import audit_chapter_weave
 from test_branching_narrative import plan
@@ -12,7 +13,7 @@ def canon(compiled):
     }]
     scenes = [{
         "scene": node["scene"], "chapter": node["chapter"], "act": node["act"],
-        "text": node["text"], "plot_points": node["plot_points"],
+        "text": node["text"], "plot_points": deepcopy(node["plot_points"]),
         "chapter_digest": "chapter-receipt", "chapter_revision": 3,
         "characters": ["aria"], "digest": "scene-" + str(node["scene"]),
         "status": "approved_for_production",
