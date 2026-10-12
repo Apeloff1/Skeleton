@@ -4009,6 +4009,177 @@ CATALOG = json.loads(r'''[
           "2d",
           "3d"
         ]
+      },
+      {
+        "key": "speed_limit",
+        "kind": "int",
+        "default": 90,
+        "minimum": 20,
+        "maximum": 400,
+        "options": []
+      },
+      {
+        "key": "air_drag",
+        "kind": "int",
+        "default": 7,
+        "minimum": 0,
+        "maximum": 80,
+        "options": []
+      },
+      {
+        "key": "floor_friction",
+        "kind": "int",
+        "default": 15,
+        "minimum": 0,
+        "maximum": 90,
+        "options": []
+      },
+      {
+        "key": "wall_restitution",
+        "kind": "int",
+        "default": 20,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "impulse_strength",
+        "kind": "int",
+        "default": 160,
+        "minimum": 1,
+        "maximum": 500,
+        "options": []
+      },
+      {
+        "key": "impulse_budget",
+        "kind": "int",
+        "default": 30,
+        "minimum": 0,
+        "maximum": 128,
+        "options": []
+      },
+      {
+        "key": "initial_battery",
+        "kind": "int",
+        "default": 40,
+        "minimum": 0,
+        "maximum": 512,
+        "options": []
+      },
+      {
+        "key": "fan_force",
+        "kind": "int",
+        "default": 16,
+        "minimum": 0,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "magnet_range",
+        "kind": "int",
+        "default": 450,
+        "minimum": 50,
+        "maximum": 3200,
+        "options": []
+      },
+      {
+        "key": "magnet_force",
+        "kind": "int",
+        "default": 40,
+        "minimum": 0,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "rope_length",
+        "kind": "int",
+        "default": 500,
+        "minimum": 100,
+        "maximum": 3000,
+        "options": []
+      },
+      {
+        "key": "rope_strength",
+        "kind": "int",
+        "default": 200,
+        "minimum": 1,
+        "maximum": 2000,
+        "options": []
+      },
+      {
+        "key": "attach_range",
+        "kind": "int",
+        "default": 600,
+        "minimum": 100,
+        "maximum": 4000,
+        "options": []
+      },
+      {
+        "key": "buoyancy",
+        "kind": "int",
+        "default": 50,
+        "minimum": 0,
+        "maximum": 1500,
+        "options": []
+      },
+      {
+        "key": "water_drag",
+        "kind": "int",
+        "default": 30,
+        "minimum": 0,
+        "maximum": 90,
+        "options": []
+      },
+      {
+        "key": "substeps",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "brake_strength",
+        "kind": "int",
+        "default": 75,
+        "minimum": 0,
+        "maximum": 99,
+        "options": []
+      },
+      {
+        "key": "goal_radius",
+        "kind": "int",
+        "default": 50,
+        "minimum": 10,
+        "maximum": 150,
+        "options": []
+      },
+      {
+        "key": "goal_speed",
+        "kind": "int",
+        "default": 30,
+        "minimum": 0,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "goal_dwell_frames",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 15,
+        "options": []
+      },
+      {
+        "key": "completion_mode",
+        "kind": "enum",
+        "default": "challenge",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "challenge",
+          "sandbox"
+        ]
       }
     ],
     "preview": null
@@ -5940,7 +6111,7 @@ for _entry in CATALOG:
             {"key": "vessel_class", "kind": "enum", "default": "sloop", "minimum": None, "maximum": None, "options": ["skiff", "sloop", "schooner"]},
         ])
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "physics"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
