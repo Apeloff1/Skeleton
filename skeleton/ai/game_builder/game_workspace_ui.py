@@ -182,6 +182,7 @@ $("plan").addEventListener("click",async()=>{
  }catch(error){status("Prompt routing failed: "+error.message);}
 });
 
+let storyChatSession=null;
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -317,6 +318,50 @@ $("story-context").addEventListener("click",async()=>{
  }catch(error){status("Jeeves history lookup blocked: "+error.message);}
 });
 
+
+$("story-chat-reset").addEventListener("click",()=>{
+ storyChatSession=null;
+ $("story-chat-receipt").textContent="Fresh chat. Approved chapter history remains in source.";
+ status("Conversation receipt reset; story canon and previous chapters were not changed.");
+});
+$("story-chat-send").addEventListener("click",async()=>{
+ try{
+  const project=storyProject();
+  if(storyChatSession && storyChatSession.project!==project)
+   throw Error("Different project selected; explicitly reset the chat.");
+  const cast=$("story-cast").value.split(",").map(x=>x.trim()).filter(Boolean);
+  const region=$("story-region").value.trim();
+  const response=await api("/api/jeeves-chapter-chat",{
+   project,prompt:$("story-instruction").value.trim(),
+   session:storyChatSession,
+   cast:cast.length?cast:null,
+   region:region||null,
+  });
+  storyChatSession=response.session;
+  const chapter=response.active_chapter;
+  const progress=(chapter?"Chapter "+chapter.chapter+"/100 · "+
+    chapter.chapter_scene_count+" approved scenes":"Foundation/cast/design stage");
+  $("story-chat-receipt").textContent=[
+   "JEEVES SOURCE-GROUNDED CHAT · "+progress,
+   "Turn "+storyChatSession.turns.length+" · "+
+     "chain "+storyChatSession.digest,
+   "Next stage "+response.work_order.stage,
+   "Required original source "+response.work_order.target_path,
+   chapter?"Plot highlighters "+chapter.chapter_highlighters.length:"No approved plot memory yet",
+   chapter?"Unresolved prior plot threads "+
+      chapter.all_unresolved_prior_highlighter_count:"Canon not yet locked",
+   "Draft instructions only — no live model or scene publication",
+  ].join("\n");
+  storyShow({
+   chat_receipt:response.session.digest,
+   stage:response.work_order.stage,
+   required_path:response.work_order.target_path,
+   chapter_context:chapter,
+   source_template:response.work_order.source_template,
+  });
+  status("Verified chapter chat context prepared for Jeeves; no model execution or silent source edits.");
+ }catch(error){status("Jeeves chat blocked: "+error.message);}
+});
 $("story-work-order").addEventListener("click",async()=>{
  try{
   const plan=await api("/api/jeeves-work-order",{
@@ -4046,6 +4091,9 @@ regional appearance. It does not invent model output or write hidden files.</sma
 <label>Source-backed plot highlighter ID<input id="story-highlight-id" placeholder="highlight_27"></label>
 <button id="story-highlight-source" type="button">Inspect exact historic plot point and receipt</button>
 <button id="story-work-order" type="button">Plan next Jeeves production work order</button>
+<button id="story-chat-send" type="button">Chat with Jeeves — source-bound next chapter task</button>
+<button id="story-chat-reset" type="button">Begin a fresh verified chapter chat</button>
+<pre id="story-chat-receipt" role="status" aria-live="polite"></pre>
 <button id="story-assets-queue" type="button">Plan AI original asset generation queue</button>
 <label>Historical bookmark IDs (comma-separated)
 <input id="story-bookmarks" placeholder="line_1, exchange_500"></label>
