@@ -6181,6 +6181,8 @@ for _entry in CATALOG:
                 {"key":"outbreak_period","kind":"int","default":12,"minimum":2,"maximum":40,"options":[]},
                 {"key":"infection_rate","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
                 {"key":"protection_strength","kind":"int","default":1,"minimum":1,"maximum":12,"options":[]},
+                {"key":"cohort_period","kind":"int","default":8,"minimum":2,"maximum":32,"options":[]},
+                {"key":"cohort_food_divisor","kind":"int","default":80,"minimum":10,"maximum":500,"options":[]},
                 {"key":"turn_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
                 {"key":"natural_corridors","kind":"bool","default":True,"minimum":None,"maximum":None,"options":[]},
             ],
