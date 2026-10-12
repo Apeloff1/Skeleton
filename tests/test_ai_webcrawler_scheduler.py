@@ -25,16 +25,21 @@ def test_delayed_host_does_not_block_ready_other_host():
                "https://b.example/one":response("https://b.example/one")})
     e=engine(f);e.enqueue("https://a.example/one");e.enqueue("https://a.example/two");e.enqueue("https://b.example/one")
     assert e.step(now=0)
-    assert e.step(now=1)
+    # Equal-content documents are deduplicated, but the ready second host
+    # must still receive its request rather than being starved by host A.
+    assert e.step(now=1) is None
     assert f.calls[:2]==["https://a.example/one","https://b.example/one"]
 
 def test_retry_after_controls_429_reschedule():
     url="https://a.example/one"
     f=Fetcher({url:[response(url,429,headers={"content-type":"text/plain","retry-after":"30"}),response(url)]})
     e=engine(f,retry_base_seconds=2)
+    assert e.enqueue(url)
     assert e.step(now=0) is None
     assert e.step(now=29) is None
-    assert e.step(now=30)
+    assert e.step(now=30) is None  # minimum host delay is 100 seconds
+    assert e.step(now=99) is None
+    assert e.step(now=100)
     assert f.calls==[url,url]
 
 def test_retry_after_is_capped():
@@ -43,7 +48,9 @@ def test_retry_after_is_capped():
     e=engine(f,max_retry_delay_seconds=60)
     e.enqueue(url);assert e.step(now=0) is None
     assert e.step(now=59) is None
-    assert e.step(now=60)
+    assert e.step(now=60) is None  # capped Retry-After cannot override host delay
+    assert e.step(now=99) is None
+    assert e.step(now=100)
 
 def test_link_admission_is_bounded():
     links="".join(f'<a href="/{i}">x</a>' for i in range(20)).encode()
