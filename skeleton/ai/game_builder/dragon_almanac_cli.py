@@ -15,7 +15,7 @@ from .reviewed_knowledge import ReviewedKnowledgeStore
 
 def main():
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
-    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "import-supplements", "discovery-topics", "discovery-sources", "discovery-receipts"))
+    parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "import-supplements", "discovery-topics", "discovery-sources", "discovery-receipts"))
     parser.add_argument("--database", required=True)
     parser.add_argument("--owner", required=True)
     parser.add_argument("--trusted-local-operator", action="store_true")
@@ -70,6 +70,11 @@ def main():
                 result = discovery.provenance_page(
                     args.owner, args.source, limit=args.limit, offset=args.offset,
                     authorized=True)
+        elif args.command == "mission-audit":
+            from .dragon_discovery_facets import DiscoveryFacetIndex
+            result = DiscoveryFacetIndex(almanacs).audit(
+                args.owner, authorized=True, limit=args.limit,
+                after_source=args.after_source)
         elif args.command == "mission-index":
             from .dragon_discovery_facets import DiscoveryFacetIndex
             result = DiscoveryFacetIndex(almanacs).refresh(
