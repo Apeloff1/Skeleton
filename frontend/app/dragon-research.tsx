@@ -31,6 +31,31 @@ type SourceCatalog = {
   schema: string; entries: SourceOption[];
   has_more: boolean; next_after_source: string | null;
 };
+type ResearchMission = {
+  lane: Lane; source_id: string; label: string; host: string;
+  action: string; next_step: string; evidence_digest: string | null;
+  observed_at: number | null; requires_idle: boolean;
+  requires_operator_authorization: boolean;
+  requires_independent_wiki_review: boolean;
+};
+type ResearchWorkboard = {
+  schema: string; missions: ResearchMission[];
+  has_more: boolean; next_after_source: string | null;
+  read_only: boolean; network_requests: number;
+  workers_started: number; training_authorized: boolean;
+};
+type HistoryEvent = {
+  lane: Lane; source_id: string; event_digest: string;
+  observation_at: number; sequence: number;
+  kind: string; change_note: string;
+};
+type FamilyHistory = {
+  schema: string; entries: HistoryEvent[];
+  total_events: number; truncated: boolean;
+  event_counts: Record<Lane, number>;
+  read_only: boolean; xp_awarded: number;
+  training_authorized: boolean;
+};
 const ID = /^source-[0-9a-f]{64}$/;
 const LANES: ReadonlyArray<{ lane: Lane; label: string; activity: string }> = [
   { lane: 'article', label: '📖 Article hatchling', activity: 'Exact web article citations' },
@@ -48,6 +73,10 @@ function ResearchScreen() {
   const [available, setAvailable] = React.useState<SourceOption[]>([]);
   const [catalogCursor, setCatalogCursor] = React.useState<string | null>(null);
   const [catalogLoaded, setCatalogLoaded] = React.useState(false);
+  const [missions, setMissions] = React.useState<ResearchMission[]>([]);
+  const [workboardLoaded, setWorkboardLoaded] = React.useState(false);
+  const [workboardCursor, setWorkboardCursor] = React.useState<string | null>(null);
+  const [history, setHistory] = React.useState<FamilyHistory | null>(null);
   const [catalogSearch, setCatalogSearch] = React.useState("");
   const [error, setError] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -62,8 +91,53 @@ function ResearchScreen() {
     controller.current?.abort();
     attempt.current += 1;
     setSources(prev => ({ ...prev, [lane]: raw.trim().toLowerCase() }));
-    setBusy(false); setFamily(null); setReview(null); setShowQuotes(false); setError('');
+    setBusy(false); setFamily(null); setReview(null);
+    setHistory(null); setShowQuotes(false); setError('');
   };
+  const reviewWorkboard = async (cursor: string | null = null) => {
+    if (busy) return;
+    const id = ++attempt.current;
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    setBusy(true); setError('');
+    try {
+      const path = '/api/dragon-research/workboard?limit=30'
+        + (cursor ? '&after_source=' + encodeURIComponent(cursor) : '');
+      const result = await api.get<ResearchWorkboard>(path, {
+        timeoutMs: 12000, retries: 0, signal: abort.signal,
+        headers: getAuthToken() ? authHeaders() : {},
+      });
+      if (abort.signal.aborted || id !== attempt.current) return;
+      if (!result.ok || result.data?.schema !==
+          'skeleton.dragon.research_workboard.v1'
+        || result.data.read_only !== true
+        || result.data.training_authorized !== false
+        || result.data.workers_started !== 0) {
+        setError('Review workboard unavailable or returned untrusted state.');
+        return;
+      }
+      const verified = result.data.missions.filter(m =>
+        ID.test(m.source_id) && LANES.some(l => l.lane === m.lane));
+      setMissions(existing => {
+        const previous = cursor ? existing : [];
+        const seen = new Map<string, ResearchMission>();
+        for (const task of [...previous,...verified])
+          seen.set(task.source_id + ':' + task.lane, task);
+        return Array.from(seen.values());
+      });
+      setWorkboardCursor(result.data.has_more
+        ? result.data.next_after_source : null);
+      setWorkboardLoaded(true);
+    } catch {
+      if (!abort.signal.aborted && id === attempt.current)
+        setError('Research workboard unavailable. No research was started.');
+    } finally {
+      if (id === attempt.current) setBusy(false);
+      if (controller.current === abort) controller.current = null;
+    }
+  };
+
   const discover = async (cursor: string | null = null) => {
     if (busy) return;
     const id = ++attempt.current;
@@ -155,6 +229,40 @@ function ResearchScreen() {
       if (controller.current === abort) controller.current = null;
     }
   };
+  const readHistory = async () => {
+    if (!valid || busy) return;
+    const id = ++attempt.current;
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    setBusy(true); setError('');
+    const query = 'article=' + encodeURIComponent(sources.article)
+      + '&video=' + encodeURIComponent(sources.video)
+      + '&updates=' + encodeURIComponent(sources.updates);
+    try {
+      const result = await api.get<FamilyHistory>(
+        '/api/dragon-research/history?' + query + '&limit=100',
+        { timeoutMs: 12000, retries: 0, signal: abort.signal,
+          headers: getAuthToken() ? authHeaders() : {} });
+      if (abort.signal.aborted || id !== attempt.current) return;
+      if (!result.ok || result.data?.schema !==
+          'skeleton.dragon.three_hatchling_history.v1'
+          || result.data.read_only !== true
+          || result.data.xp_awarded !== 0
+          || result.data.training_authorized !== false) {
+        setError('Historical evidence could not be verified.');
+        return;
+      }
+      setHistory(result.data);
+    } catch {
+      if (!abort.signal.aborted && id === attempt.current)
+        setError('Historical evidence unavailable. No worker was started.');
+    } finally {
+      if (id === attempt.current) setBusy(false);
+      if (controller.current === abort) controller.current = null;
+    }
+  };
+
   const inspectMother = async () => {
     if (!family || busy || !valid) return;
     const id = ++attempt.current;
@@ -284,6 +392,54 @@ function ResearchScreen() {
             {busy ? 'Reading evidence…' : 'Inspect all three hatchlings'}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityRole="button" testID="dragon-research-workboard"
+          disabled={busy} style={[styles.button, busy && styles.disabled]}
+          onPress={() => { void reviewWorkboard(null); }}>
+          <Text style={styles.buttonText}>Review all hatchling research work</Text>
+        </TouchableOpacity>
+        {workboardLoaded && (
+          <View style={styles.card}>
+            <Text style={styles.heading}>📋 Research workboard</Text>
+            <Text style={styles.warning}>Suggested work is not approved knowledge or permission to crawl.</Text>
+            {LANES.map(item => (
+              <View key={item.lane}>
+                <Text style={styles.heading}>{item.label}</Text>
+                {missions.filter(m => m.lane === item.lane).slice(0, 30)
+                  .map(m => (
+                    <View style={styles.evidence}
+                      key={m.lane + ':' + m.source_id}>
+                      <Text style={styles.muted}>{m.label + ' · ' + m.host}</Text>
+                      <Text style={styles.quote}>{m.next_step}</Text>
+                      {m.observed_at != null && (
+                        <Text style={styles.muted}>
+                          {'Observed: ' + new Date(m.observed_at * 1000).toISOString()}
+                        </Text>
+                      )}
+                      <Text style={styles.muted}>
+                        {m.requires_idle
+                          ? 'Only an idle, independently admitted worker may execute.'
+                          : m.requires_independent_wiki_review
+                            ? 'Requires independent Wiki review.'
+                            : 'No autonomous action authorized.'}
+                      </Text>
+                    </View>
+                  ))}
+              </View>
+            ))}
+            {missions.length === 0 && (
+              <Text style={styles.muted}>No eligible research sources on this page.</Text>
+            )}
+            {!!workboardCursor && (
+              <TouchableOpacity accessibilityRole="button"
+                disabled={busy} onPress={() => {
+                  void reviewWorkboard(workboardCursor);
+                }}>
+                <Text style={styles.action}>More research work</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
         {busy && <ActivityIndicator />}
         {!!error && <Text accessibilityRole="alert" style={styles.warning}>{error}</Text>}
         {family && (
@@ -298,6 +454,36 @@ function ResearchScreen() {
                 + ' · Distinct source identities: ' + family.distinct_source_count}
             </Text>
             <Text style={styles.warning}>Three roles do not imply three independent sources.</Text>
+            <TouchableOpacity accessibilityRole="button"
+              testID="dragon-history-refresh" disabled={busy}
+              onPress={() => { void readHistory(); }}>
+              <Text style={styles.action}>View timestamped hatchling changes</Text>
+            </TouchableOpacity>
+            {history && (
+              <View style={styles.evidence}>
+                <Text style={styles.heading}>
+                  {'Family change history · ' + history.total_events + ' audited events'}
+                </Text>
+                {history.truncated && (
+                  <Text style={styles.warning}>
+                    Only the 100 most recent events are displayed.
+                  </Text>
+                )}
+                {history.entries.map(event => (
+                  <View key={event.event_digest} style={styles.evidence}>
+                    <Text style={styles.muted}>
+                      {event.lane.toUpperCase() + ' · '
+                        + new Date(event.observation_at * 1000).toISOString()}
+                    </Text>
+                    <Text style={styles.quote}>{event.change_note}</Text>
+                    <Text style={styles.muted}>
+                      {'Change: ' + event.kind + ' · Source evidence ' +
+                        event.event_digest.slice(0, 12)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
             {!review && (
               <TouchableOpacity accessibilityRole="button"
                 testID="dragon-inspect-mother-evidence" disabled={busy}

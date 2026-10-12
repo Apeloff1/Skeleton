@@ -79,6 +79,29 @@ def source_catalog(
             ) from None
 
 
+@router.get("/workboard")
+def research_workboard(
+    request: Request,
+    response: Response,
+    limit: int = Query(30, ge=1, le=60),
+    after_source: str | None = Query(None, min_length=71, max_length=71),
+    owner: str = Depends(_principal),
+) -> dict:
+    """Bounded, source-backed needs for article, video and update hatchlings."""
+    if after_source is not None:
+        _identity(after_source, "source cursor")
+    response.headers["Cache-Control"] = "private, no-store"
+    with _runtime(request) as coordinator:
+        try:
+            return coordinator.workboard(
+                owner,authorized=True,limit=limit,after_source=after_source)
+        except (ValueError, PermissionError, LookupError):
+            raise HTTPException(
+                status_code=409,
+                detail="Research workboard integrity verification failed",
+            ) from None
+
+
 @router.get("/status")
 def three_hatchlings_status(
     request: Request,
@@ -103,6 +126,36 @@ def three_hatchlings_status(
         except (ValueError, PermissionError, LookupError):
             raise HTTPException(
                 status_code=409, detail="Research evidence not available for these sources"
+            ) from None
+
+
+@router.get("/history")
+def family_research_history(
+    request: Request,
+    response: Response,
+    article: str = Query(..., min_length=71, max_length=71),
+    video: str = Query(..., min_length=71, max_length=71),
+    updates: str = Query(..., min_length=71, max_length=71),
+    limit: int = Query(40, ge=1, le=100),
+    owner: str = Depends(_principal),
+) -> dict:
+    """Show verified historical changes with digests, never raw article text."""
+    source_ids=(
+        _identity(article,"article"),_identity(video,"video"),
+        _identity(updates,"updates"),
+    )
+    response.headers["Cache-Control"]="private, no-store"
+    with _runtime(request) as coordinator:
+        try:
+            return coordinator.family_history(
+                owner,article_source_id=source_ids[0],
+                video_source_id=source_ids[1],
+                update_source_id=source_ids[2],
+                authorized=True,limit=limit,
+            )
+        except (ValueError,PermissionError,LookupError):
+            raise HTTPException(
+                status_code=409,detail="Dragon historical custody verification failed"
             ) from None
 
 
