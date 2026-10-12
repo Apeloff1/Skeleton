@@ -173,6 +173,9 @@ export default function StoryIndexScreen() {
             <Text style={styles.sectionTitle}>Story Continuity Index</Text>
             <Text style={styles.muted}>Jeeves scene bookmarks, witnesses, character facts and causal threads</Text>
           </View>
+          <Action label="Chapter Studio" icon="albums-outline" onPress={() => router.push({
+            pathname: '/chapter-studio', params: { game: gameId },
+          })} />
           <Action label="Back" icon="arrow-back-outline" onPress={() => router.back()} />
         </View>
         <Section title="Select the canonical game" subtitle="Only game-specific indexed evidence is shown.">
