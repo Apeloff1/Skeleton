@@ -281,6 +281,10 @@ class DragonFamily:
         at = _epoch(receipt.observed_at)
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
+            # The original approval may have been revoked between preflight
+            # and acquiring the write lock. Deny stale consent before mutation.
+            if self.approval is None or self.approval(receipt) is not True:
+                raise PermissionError("source approval changed during admission")
             row = self.db.execute("""SELECT parent_digest FROM dragon_family_sources
                 WHERE owner=? AND source_id=?""",
                 (owner, receipt.source_id)).fetchone()
@@ -351,6 +355,8 @@ class DragonFamily:
             raise ValueError("receipt outside active idle window")
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
+            if self.approval is None or self.approval(receipt) is not True:
+                raise PermissionError("source approval changed during idle admission")
             if not self.db.execute("SELECT 1 FROM dragon_family_broods WHERE owner=?", (owner,)).fetchone():
                 raise PermissionError("brood has not been laid")
             source = self.db.execute("""SELECT media,topics_json,parent_digest FROM dragon_family_sources
@@ -477,9 +483,13 @@ class IdleBroodRunner:
         _owner(owner)
         self.family._writer(None, authorized=authorized)
         stats = {"attempted": 0, "grown": 0, "paused": False}
-        for dragon, fetch in tasks:
-            if stats["attempted"] >= self.max_per_tick:
+        dispatched: set[str] = set()
+        # Bound even an untrusted infinite generator of duplicate role names.
+        for scan, (dragon, fetch) in enumerate(tasks):
+            if scan >= self.max_per_tick * 12 or len(dispatched) >= self.max_per_tick:
                 break
+            if dragon in dispatched:
+                continue
             start = idle_state()
             if not isinstance(start, IdleWindow) or not start.permitted(
                     min_idle_seconds=self.family.min_idle_seconds):
@@ -487,6 +497,7 @@ class IdleBroodRunner:
                 break
             if dragon not in ROLES or not callable(fetch):
                 raise ValueError("invalid idle gatherer task")
+            dispatched.add(dragon)
             receipt = fetch()
             # A user action while the network adapter ran invalidates the result.
             end = idle_state()
