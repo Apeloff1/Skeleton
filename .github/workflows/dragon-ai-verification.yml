@@ -191,6 +191,7 @@ jobs:
             skeleton/ai/webcrawler/dragon_rss_freshness_scheduler.py \
             skeleton/ai/webcrawler/dragon_video_tool_research.py \
             skeleton/ai/webcrawler/dragon_weight_tier_sandbox.py \
+            skeleton/ai/webcrawler/dragon_weight_deployment_vault.py \
             skeleton/ai/webcrawler/dragon_video_inspiration.py \
             skeleton/ai/webcrawler/dragon_rss_update_queue.py \
             skeleton/ai/webcrawler/dragon_weekly_research_export.py \

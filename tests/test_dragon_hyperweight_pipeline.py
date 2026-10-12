@@ -14,6 +14,8 @@ from skeleton.ai.webcrawler.dragon_hundred_matrix_scrutiny import (
 from skeleton.ai.webcrawler.dragon_cross_source_factchecking import (
     ClaimSubject,SourceWitness,SignedClaimAdjudication,witness_set_digest,
 )
+from skeleton.ai.webcrawler.dragon_weight_deployment_vault import (
+    DragonDurableWeightVault, SignedRollbackOrder)
 from skeleton.ai.webcrawler.dragon_weight_tier_sandbox import (
     HoldoutTrial,SealedTierEvaluation,SignedOverlayApproval,
     JeevesWeightOverlay,qualify_tier)
@@ -481,3 +483,127 @@ def test_signed_hundred_matrix_is_required_before_existing_shadow_dispatch():
             run_hundred_matrix_mother_to_shadow(
                 **{**args,"background_allowed":False})
         dispatch.assert_called_once()
+
+
+
+def _vault_activation(generation, tier, entries, previous, mother,
+                      mother_args, eval_key, eval_pub, op_key, op_pub):
+    digest=canonical_digest([[ident,list(words)] for ident,words in entries])
+    evaluation=make_eval(
+        eval_key,digest,tier=tier,prior=previous,
+        matrix_report_digest=mother["report_digest"])
+    verdict=qualify_tier(
+        evaluation,evaluator_public_key=eval_pub,evaluator="independent-mirror",
+        key_id="eval-1",now=150,**mother_args)
+    approval=SignedOverlayApproval(
+        "studio",tier,digest,verdict["verdict_digest"],"operator",
+        "operator-1",800,"")
+    approval=replace(approval,signature_hex=sign(op_key,approval.body()))
+    kwargs=dict(verdict=verdict,approval=approval,evaluation=evaluation,
+        evaluator_public_key=eval_pub,evaluator="independent-mirror",
+        evaluator_key_id="eval-1",operator_public_key=op_pub,
+        operator="operator",key_id="operator-1",now=150,**mother_args)
+    return digest,kwargs
+
+
+def test_durable_jeeves_two_tier_activation_restart_and_signed_rollback(tmp_path):
+    eval_key,eval_pub=keypair()
+    operator,operator_pub=keypair()
+    mother,mother_args=trusted_mother()
+    dbfile=tmp_path/"durable-weights.sqlite"
+    key=b"tenant-retrieval-ledger-independent-custody-key-64bytes"
+    entries1=(("b"*64,("physics","npc")),)
+    entries2=(("c"*64,("physics","npc","gameboy")),)
+    digest1,kwargs1=_vault_activation(0,"shadow_to_weight",entries1,"0"*64,
+        mother,mother_args,eval_key,eval_pub,operator,operator_pub)
+    digest2,kwargs2=_vault_activation(1,"weight_to_hyper",entries2,digest1,
+        mother,mother_args,eval_key,eval_pub,operator,operator_pub)
+    with sqlite3.connect(dbfile) as db:
+        vault=DragonDurableWeightVault(db,owner="studio",signing_key=key)
+        assert vault.audit()["generation"]==0
+        assert vault.publish(entries=entries1,activation_kwargs=kwargs1,
+                             expected_generation=0)["durably_committed"]
+        with pytest.raises(PermissionError,match="stale"):
+            vault.publish(entries=entries1,activation_kwargs=kwargs1,
+                          expected_generation=0)
+        assert vault.publish(entries=entries2,activation_kwargs=kwargs2,
+                             expected_generation=1)["generation"]==2
+        assert vault.route("gameboy physics",now=150)["bookmarked_retrieval_ids"]==[
+            "c"*64]
+        assert vault.audit()["generation"]==2
+        foreign=DragonDurableWeightVault(db,owner="unrelated-studio",
+                                         signing_key=key)
+        assert foreign.audit()["generation"]==0
+        assert foreign.route("physics",now=150)["bookmarked_retrieval_ids"]==[]
+    with sqlite3.connect(dbfile) as reopened:
+        restarted=DragonDurableWeightVault(
+            reopened,owner="studio",signing_key=key)
+        assert restarted.route("gameboy",now=151)["bookmarked_retrieval_ids"]==[
+            "c"*64]
+        order=SignedRollbackOrder(
+            "studio",2,digest2,digest1,"operator","operator-1",
+            151,650,"f"*64,"")
+        order=replace(order,signature_hex=sign(operator,order.body()))
+        with pytest.raises(PermissionError,match="signature"):
+            restarted.rollback(replace(order,reason_digest="e"*64),
+                public_key=operator_pub,operator="operator",
+                key_id="operator-1",now=151)
+        restored=restarted.rollback(order,public_key=operator_pub,
+            operator="operator",key_id="operator-1",now=151)
+        assert restored["generation"]==3
+        assert restored["restored_digest"]==digest1
+        assert restarted.route("gameboy",now=152)["bookmarked_retrieval_ids"]==[]
+        assert restarted.route("physics",now=152)["bookmarked_retrieval_ids"]==[
+            "b"*64]
+        assert restarted.route("physics",now=651)["bookmarked_retrieval_ids"]==[]
+        assert restarted.audit()["history_verified"] is True
+        with pytest.raises(PermissionError,match="stale"):
+            restarted.rollback(order,public_key=operator_pub,
+                operator="operator",key_id="operator-1",now=152)
+
+
+def test_durable_weight_vault_detects_rewritten_history_and_missing_head():
+    key=b"owner-specific-hmac-separately-provisioned-64bytes-here"
+    with sqlite3.connect(":memory:") as db:
+        vault=DragonDurableWeightVault(db,owner="studio",signing_key=key)
+        initial=dict(schema="skeleton.jeeves.weight_vault_event.v1",
+            owner="studio",generation=1,action="activate",
+            tier="shadow_to_weight",previous_digest="0"*64,
+            index_digest=canonical_digest([["f"*64,["physics"]]]),
+            entries=[["f"*64,["physics"]]],
+            holdout_digest="a"*64,matrix_digest="b"*64,
+            approval_digest="c"*64,expires_at=900,observed_at=150)
+        db.execute("BEGIN IMMEDIATE")
+        vault._append(event=initial,seq=1,previous_event_digest="0"*64)
+        db.commit()
+        assert vault.route("physics",now=151)["bookmarked_retrieval_ids"]==[
+            "f"*64]
+        db.execute("UPDATE dragon_weight_vault_events_v1 "
+                   "SET payload='{}' WHERE owner='studio' AND sequence=1")
+        with pytest.raises(ValueError,match="custody"):
+            vault.audit()
+        with pytest.raises(ValueError,match="custody"):
+            vault.route("physics",now=152)
+        db.rollback()
+
+
+def test_durable_vault_missing_or_swapped_operator_key_never_publishes():
+    eval_key,eval_pub=keypair()
+    op_key,op_pub=keypair()
+    _,wrong_pub=keypair()
+    mother,mother_args=trusted_mother()
+    entries=(("f"*64,("physics",)),)
+    _,kwargs=_vault_activation(0,"shadow_to_weight",entries,"0"*64,
+        mother,mother_args,eval_key,eval_pub,op_key,op_pub)
+    with sqlite3.connect(":memory:") as db:
+        vault=DragonDurableWeightVault(
+            db,owner="studio",signing_key=b"durable-vault-key-very-long-and-separate")
+        with pytest.raises(PermissionError,match="operator approval signature"):
+            vault.publish(entries=entries,expected_generation=0,
+                activation_kwargs={**kwargs,"operator_public_key":wrong_pub})
+        assert vault.audit()["generation"]==0
+        with pytest.raises(PermissionError,match="100 independently signed"):
+            vault.publish(entries=entries,expected_generation=0,
+                activation_kwargs={**kwargs,
+                    "mother_findings":mother_args["mother_findings"][:-1]})
+        assert vault.audit()["generation"]==0
