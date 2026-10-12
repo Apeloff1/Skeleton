@@ -3057,6 +3057,39 @@ $("advanced-load").addEventListener("change",async()=>{
  finally{$("advanced-load").value="";}
 });
 $("advanced-start").addEventListener("click",startAdvanced);
+$("advanced-physics-native").addEventListener("click",async()=>{
+ try{
+  // A local convenience flow; source validation remains entirely on the server.
+  if($("system-kind").value!=="physics"){
+   $("system-kind").value="physics";renderSystemControls();
+  }
+  if(systemEditor()?.id!=="physics")throw Error("Physics editor is not loaded");
+  const preset={dimension:"2d",collision_geometry:"aabb",
+                max_bodies:1,substeps:1,initial_battery:0};
+  for(const [key,value] of Object.entries(preset)){
+   const input=[...$("system-fields").querySelectorAll("[data-system-field]")]
+    .find(node=>node.dataset.systemField===key);
+   if(!input)throw Error("Missing native profile control "+key);
+   if(input.type==="checkbox")input.checked=value;
+   else input.value=String(value);
+  }
+  const settings=systemSettings();
+  const seedRaw=$("advanced-seed").value;
+  if(!/^[0-9]+$/.test(seedRaw))throw Error("Valid integer seed required");
+  const seed=Number(seedRaw);
+  const template=await api("/api/advanced-scene-template",{
+   editor:"physics",settings,seed,scene_id:"native_physics_demo"
+  });
+  const layout=JSON.parse(JSON.stringify(template.scene.layout));
+  layout.fixtures=[];
+  const approved=await api("/api/advanced-scene-template",{
+   editor:"physics",settings,seed,layout,scene_id:"native_physics_demo"
+  });
+  $("advanced-scene-json").value=JSON.stringify(approved.scene,null,2);
+  await startAdvanced();
+  status("Original native physics demo prepared and replayed. Export stays supervised; device validation is separate.");
+ }catch(error){status("Native physics preparation blocked: "+error.message);}
+});
 $("advanced-verify").addEventListener("click",async()=>{
  try{
   if(!advancedSession)throw Error("Start an advanced reference game first");
@@ -3148,6 +3181,7 @@ Other editor families remain authoring-only, not falsely certified engines.</sma
 <p><small>Graphical cell painting: shooter, tactics, puzzle, Colony, City and Stealth. Scene edits stay
 local until typed revalidation and an explicit human-approved file commit.</small></p>
 <button id="advanced-start" type="button">Start advanced scenario</button>
+<button id="advanced-physics-native" type="button">Prepare native physics demo</button>
 <button id="advanced-save" type="button">Download verified savegame</button>
 <button id="advanced-godot-export" type="button">Download playable Godot 4 game project</button>
 <label>Restore portable savegame<input id="advanced-load" type="file" accept=".json,application/json"></label>
