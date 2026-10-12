@@ -396,3 +396,38 @@ def test_git_pinned_discovery_has_valid_raw_identity_and_cannot_self_approve(bas
     forked[-1][1]["parents"] = forked[-1][1]["parents"][:-1]
     with pytest.raises(ValueError, match="chain"):
         validate_discovery_chain(baseline, forked)
+
+
+def test_git_pinned_expansion_imports_into_policy_only_queue(tmp_path, baseline, chain):
+    """Integration of new README pins with actual owner-scoped SQLite custody."""
+    extended = [
+        *chain,
+        _supplement(
+            ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json"),
+        _supplement(NEW_PINNED_BATCHES[0]),
+    ]
+    validated = validate_discovery_chain(baseline, extended)
+    assert validated["raw_total_discovered"] == 6238
+    with ReviewedKnowledgeStore(tmp_path / "pinned-import.sqlite") as store:
+        ingress = DragonDiscoveryAdmission(DragonAlmanacs(store))
+        output = ingress.import_chain("homebrew", baseline, extended, authorized=True)
+        assert output["new_discovery_sources"] == validated["new"]
+        assert output["new_provenance_receipts"] == validated["raw_new"]
+        assert output["new_policy_stage_jobs"] == validated["new"]
+        assert output["approved_sources"] == 0
+        assert output["training_authorized"] is False
+        assert store.db.execute(
+            "SELECT COUNT(*) FROM dragon_almanac_jobs "
+            "WHERE owner='homebrew' AND stage=0 AND state='pending'"
+        ).fetchone()[0] == validated["new"]
+        assert store.db.execute(
+            "SELECT COUNT(*) FROM dragon_almanac_supplement_receipts_v2 "
+            "WHERE owner='homebrew'"
+        ).fetchone()[0] == validated["raw_new"]
+        assert store.db.execute(
+            "SELECT COUNT(*) FROM dragon_almanac_jobs "
+            "WHERE state!='pending' OR stage!=0"
+        ).fetchone()[0] == 0
+        assert ingress.import_chain(
+            "homebrew", baseline, extended, authorized=True
+        )["new_policy_stage_jobs"] == 0
