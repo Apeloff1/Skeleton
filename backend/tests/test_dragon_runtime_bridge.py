@@ -48,11 +48,20 @@ def test_http_exception_cleans_foreground_count():
     assert pool.status()['foreground_requests']==0
 
 
-def test_lifespan_mount_reuses_accounting_and_keeps_unconfigured_app_closed():
+def test_lifespan_mount_reuses_accounting_and_keeps_unconfigured_app_closed(monkeypatch):
     from types import SimpleNamespace
     from core.dragon_runtime_bridge import mount_configured_dragon_runtime
+    # No app-local research authority and no explicit operator opt-in:
+    # never create databases, an unsigned nest, or a synthetic research UI.
+    monkeypatch.delenv("SKL_DRAGON_RESEARCH_DASHBOARD_ENABLED",raising=False)
     app=FastAPI();authority=SimpleNamespace(dragon_projection=None)
-    assert mount_configured_dragon_runtime(app,authority)=={'resource_runtime_mounted':False,'conversation_binding_mounted':False}
+    assert mount_configured_dragon_runtime(app,authority)=={
+        'resource_runtime_mounted':False,
+        'conversation_binding_mounted':False,
+        'research_dashboard_mounted':False,
+    }
+    assert not hasattr(app.state,'dragon_research_dashboard')
+    assert not hasattr(app.state,'dragon_research_coordinator')
     assert not hasattr(app.state,'dragon_practice_executor_factory')
     _,_,scheduler,envelope=configured_app()
     app.state.global_resource_scheduler=scheduler
@@ -60,9 +69,25 @@ def test_lifespan_mount_reuses_accounting_and_keeps_unconfigured_app_closed():
     assert mount_configured_dragon_runtime(app,authority)['resource_runtime_mounted']
     original=app.state.dragon_execution_pool
     original.executor('alice').governor.tokens=10
-    mount_configured_dragon_runtime(app,authority)
+    status=mount_configured_dragon_runtime(app,authority)
+    assert status['resource_runtime_mounted'] is True
+    assert status['research_dashboard_mounted'] is False
     assert app.state.dragon_execution_pool is original
     assert original.executor('alice').governor.tokens==10
+
+
+def test_research_dashboard_opt_in_never_creates_unconfigured_storage(monkeypatch):
+    from types import SimpleNamespace
+    from core.dragon_runtime_bridge import mount_configured_dragon_runtime
+    monkeypatch.setenv("SKL_DRAGON_RESEARCH_DASHBOARD_ENABLED","1")
+    monkeypatch.delenv("SKL_DRAGON_KNOWLEDGE_DB_PATH",raising=False)
+    monkeypatch.delenv("SKL_DRAGON_PRACTICE_DB_PATH",raising=False)
+    app=FastAPI()
+    with pytest.raises(ValueError,match="existing canonical"):
+        mount_configured_dragon_runtime(
+            app,SimpleNamespace(dragon_projection=None))
+    assert not hasattr(app.state,'dragon_research_dashboard')
+    assert not hasattr(app.state,'dragon_research_coordinator')
 
 
 def test_real_http_foreground_applies_and_restores_hardware_context_budget():
