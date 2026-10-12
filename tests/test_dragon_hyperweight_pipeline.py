@@ -15,6 +15,9 @@ from skeleton.ai.webcrawler.dragon_weight_tier_sandbox import (
     HoldoutTrial,SealedTierEvaluation,SignedOverlayApproval,
     JeevesWeightOverlay,qualify_tier)
 from skeleton.ai.webcrawler.dragon_video_inspiration import digest_video_inspiration
+from skeleton.ai.webcrawler.dragon_video_tool_research import (
+    SignedVisualPacketReview, index_video_tool_research,
+)
 from skeleton.ai.webcrawler.dragon_mother_hundred_handoff import run_hundred_matrix_mother_to_shadow
 from skeleton.ai.webcrawler.dragon_nest_research_scheduler import IdleResearchPlan
 from skeleton.ai.webcrawler.dragon_rss_update_queue import (
@@ -263,6 +266,90 @@ def test_video_inspiration_creates_timecoded_frame_bookmarks_not_weights():
             "source-"+"1"*64,source_url,chunks,features,
             (replace(obs[0],source_id="forged"),),frames,
             consent_verified=True,authorized=True)
+
+def _signed_visual_review(key, packet, *, decision="research"):
+    receipt=SignedVisualPacketReview(
+        owner="studio",source_id=packet["source_id"],
+        packet_digest=packet["bookmark_digest"],
+        reviewer="independent-video-reviewer",key_id="video-review-1",
+        issued_at=100,expires_at=1000,decision=decision,signature_hex="")
+    return replace(receipt,signature_hex=sign(key,receipt.body()))
+
+
+def test_video_tool_backlog_binds_timecoded_visual_frames_to_signed_review():
+    source_url,frames,features,chunks,obs=visual_packet()
+    packet=digest_video_inspiration(
+        "source-"+"1"*64,source_url,chunks,features,obs,frames,
+        consent_verified=True,authorized=True)
+    key,pub=keypair()
+    signed=_signed_visual_review(key,packet)
+    index=index_video_tool_research(
+        "studio",((packet,signed),),reviewer_public_key=pub,
+        reviewer="independent-video-reviewer",key_id="video-review-1",
+        now=200,task_terms=("editor",),limit=10)
+    assert index["schema"]=="skeleton.dragon.video_tool_research_index.v1"
+    assert index["reviewed_video_sources"]==1
+    assert index["distinct_tool_topics"]>=1
+    editor=next(i for i in index["entries"] if i["tool_topic"]=="editor")
+    assert editor["task_topic_match"]
+    assert editor["bookmarks"][0]["source_id"]==packet["source_id"]
+    assert editor["bookmarks"][0]["frame_digest"]=="c"*64
+    assert editor["bookmarks"][0]["clip_digest"]==packet["notes"][0]["clip_digest"]
+    assert editor["observed_video_sources"]==1
+    assert not editor["approved_software_recommendation"]
+    assert not index["weight_promotion_authorized"]
+    assert not index["hyperweight_promotion_authorized"]
+    assert not index["neural_training_authorized"]
+    assert index["network_requests"]==0
+    assert len(index["index_digest"])==64
+    md,weekly = render_weekly_backlog(
+        "studio",datetime(2026,10,12,tzinfo=timezone.utc),
+        visual=(),rss=(),matrix_reports=(),
+        video_tool_indexes=(index,))
+    assert "Software" in md
+    assert "editor" in md
+    assert weekly["items"][0]["lane"]=="software"
+    assert weekly["items"][0]["source_id"]==packet["source_id"]
+    with pytest.raises(ValueError,match="tampered"):
+        render_weekly_backlog(
+            "studio",datetime(2026,10,12,tzinfo=timezone.utc),
+            visual=(),rss=(),matrix_reports=(),
+            video_tool_indexes=(dict(index,checked_at=201),))
+
+
+
+def test_visual_tool_leads_reject_duplicate_sources_stale_consent_or_forgery():
+    source_url,frames,features,chunks,obs=visual_packet()
+    packet=digest_video_inspiration(
+        "source-"+"1"*64,source_url,chunks,features,obs,frames,
+        consent_verified=True,authorized=True)
+    key,pub=keypair()
+    receipt=_signed_visual_review(key,packet)
+    opts=dict(reviewer_public_key=pub,
+              reviewer="independent-video-reviewer",
+              key_id="video-review-1",now=200)
+    with pytest.raises(ValueError,match="repeated video packet"):
+        index_video_tool_research(
+            "studio",((packet,receipt),(packet,receipt)),**opts)
+    forged=dict(packet,normal_weight_promotion_authorized=True)
+    with pytest.raises(ValueError,match="custody"):
+        index_video_tool_research("studio",((forged,receipt),),**opts)
+    with pytest.raises(PermissionError,match="wrong tenant"):
+        index_video_tool_research("other",((packet,receipt),),**opts)
+    with pytest.raises(ValueError,match="stale"):
+        index_video_tool_research(
+            "studio",((packet,receipt),),
+            **{**opts,"now":1000})
+    with pytest.raises(PermissionError,match="forged"):
+        index_video_tool_research(
+            "studio",((packet,replace(receipt,decision="reject")),),**opts)
+    rejected=_signed_visual_review(key,packet,decision="reject")
+    result=index_video_tool_research(
+        "studio",((packet,rejected),),**opts)
+    assert result["review_rejections"]==1
+    assert result["entries"]==[]
+    assert not result["neural_training_authorized"]
+
 
 def rss_xml():
     return b'<rss version="2.0"><channel><item><title>New game physics guide</title><link>https://updates.example/game-physics</link><guid>update-1</guid><pubDate>Mon, 12 Oct 2026 08:00:00 GMT</pubDate></item></channel></rss>'

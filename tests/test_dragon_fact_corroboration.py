@@ -1,5 +1,7 @@
 """Adversarial cross-source verification for Dragon mother-to-shadow admission."""
 from dataclasses import replace
+from datetime import datetime, timezone
+from skeleton.ai.webcrawler.dragon_weekly_research_export import render_weekly_backlog
 from unittest.mock import patch
 from types import SimpleNamespace
 import pytest
@@ -163,3 +165,29 @@ def test_strict_mother_dispatch_requires_complete_article_fact_review():
             run_correlated_mother_to_shadow(
                 **{**args, "background_allowed": False})
         worker.assert_not_called()
+
+
+def test_corroboration_and_unresolved_claims_enter_weekly_upgrade_backlog():
+    claim, witnesses, adjudication, opts, _ = _evidence()
+    accepted = verify_cross_source_claims(
+        "studio", "c"*64, (claim,), witnesses, (adjudication,), **opts)
+    markdown,index = render_weekly_backlog(
+        "studio",datetime(2026,10,12,tzinfo=timezone.utc),
+        visual=(),rss=(),matrix_reports=(),
+        article_fact_reports=(accepted,))
+    assert "Factcheck" in markdown
+    assert "game-physics" in markdown
+    assert index["item_count"] == 1
+    assert index["items"][0]["lane"] == "factcheck"
+    disputed = verify_cross_source_claims(
+        "studio", "c"*64, (claim,), witnesses, (), **opts)
+    md,_ = render_weekly_backlog(
+        "studio",datetime(2026,10,12,tzinfo=timezone.utc),
+        visual=(),rss=(),matrix_reports=(),
+        article_fact_reports=(disputed,))
+    assert "disputed or incomplete" in md
+    with pytest.raises(ValueError, match="tampered"):
+        render_weekly_backlog(
+            "studio",datetime(2026,10,12,tzinfo=timezone.utc),
+            visual=(),rss=(),matrix_reports=(),
+            article_fact_reports=(dict(accepted,checked_at=160),))

@@ -20,14 +20,16 @@ def _digest(value):
     return value
 
 def render_weekly_backlog(owner:str,week_start:datetime,*,visual:tuple[dict,...],
-                          rss:tuple[dict,...],matrix_reports:tuple[dict,...])->tuple[str,dict]:
+                          rss:tuple[dict,...],matrix_reports:tuple[dict,...],
+                          video_tool_indexes:tuple[dict,...]=(),
+                          article_fact_reports:tuple[dict,...]=())->tuple[str,dict]:
     if (type(owner) is not str or not 1<=len(owner)<=128
         or any(c in owner for c in "\\/:\n\r") or
         not isinstance(week_start,datetime) or week_start.tzinfo is None
         or week_start.weekday()!=0 or week_start.hour!=0
         or week_start.minute!=0 or week_start.second!=0
         or any(type(x) is not tuple or len(x)>2000
-                for x in (visual,rss,matrix_reports))):
+                for x in (visual,rss,matrix_reports,video_tool_indexes,article_fact_reports))):
         raise ValueError("bounded week-start/owner research export required")
     week=week_start.astimezone(timezone.utc)
     if week.weekday()!=0 or week.time()!=datetime.min.time():
@@ -63,6 +65,53 @@ def render_weekly_backlog(owner:str,week_start:datetime,*,visual:tuple[dict,...]
                          "title":entry["title"][:160],
                          "topics":[],"observed_at":entry["observed_at"],
                          "next_step":"Check article rights, freshness and independent corroboration"})
+    # Every supplemental index must come from a trusted importer, retain
+    # its complete canonical digest and make *no* approval claims.
+    for packet in video_tool_indexes:
+        if (not isinstance(packet,dict)
+            or packet.get("schema")!="skeleton.dragon.video_tool_research_index.v1"
+            or packet.get("owner")!=owner
+            or packet.get("weight_promotion_authorized") is not False
+            or packet.get("neural_training_authorized") is not False):
+            raise ValueError("canonical unapproved video-tool index required")
+        digest=_digest(packet.get("index_digest"))
+        if canonical_digest({k:v for k,v in packet.items() if k!="index_digest"})!=digest:
+            raise ValueError("tampered video tool index")
+        for entry in packet["entries"]:
+            if len(rows)>=3000:raise ValueError("weekly backlog budget exceeded")
+            bookmarks=entry["bookmarks"]
+            if not bookmarks:
+                raise ValueError("software lead without original clip")
+            rows.append({"lane":"software","source_id":bookmarks[0]["source_id"],
+                         "receipt_digest":digest,
+                         "evidence_id":bookmarks[0]["clip_digest"],
+                         "title":entry["tool_topic"]+" ("+entry["tool_family"]+")",
+                         "topics":[entry["tool_family"]],
+                         "observed_at":bookmarks[0]["start_ms"],
+                         "next_step":entry["next_step"]})
+    for packet in article_fact_reports:
+        if (not isinstance(packet,dict)
+            or packet.get("schema")!="skeleton.dragon.signed_cross_source_fact_review.v1"
+            or packet.get("owner")!=owner
+            or packet.get("neural_training_authorized") is not False
+            or packet.get("normal_weight_promotion_authorized") is not False):
+            raise ValueError("canonical reviewed article-fact report required")
+        digest=_digest(packet.get("report_digest"))
+        if canonical_digest({k:v for k,v in packet.items() if k!="report_digest"})!=digest:
+            raise ValueError("tampered cross-source fact report")
+        for claim in packet["claims"]:
+            if len(rows)>=3000:raise ValueError("weekly backlog budget exceeded")
+            rows.append({"lane":"factcheck","source_id":claim["claim_digest"],
+                         "receipt_digest":digest,
+                         "evidence_id":claim["witness_set_digest"],
+                         "title":claim["topic"]+": "+
+                             ("cross-source reviewed" if claim["corroboration_review_eligible"]
+                              else "disputed or incomplete"),
+                         "topics":[claim["topic"]],
+                         "observed_at":packet["checked_at"],
+                         "next_step":("Preserve evidence and test measured usefulness"
+                             if claim["corroboration_review_eligible"]
+                             else "Acquire independent source review and resolve contradictions")})
     for packet in matrix_reports:
         if (not isinstance(packet,dict) or packet.get("schema")!=
                 "skeleton.dragon.hundred_matrix_scrutiny.v1"
@@ -100,11 +149,14 @@ def render_weekly_backlog(owner:str,week_start:datetime,*,visual:tuple[dict,...]
         "**No research item below is an approved neural weight or independently verified fact.**",
         "",
     ]
-    for lane in ("video","updates","mother"):
+    for lane in ("video","software","updates","factcheck","mother"):
         matches=[r for r in rows if r["lane"]==lane]
         lines.extend(["## "+lane.title()+" ("+str(len(matches))+")",""])
         for r in matches:
-            title=r["title"].replace("\n"," ").replace("\r"," ")
+            # Never interpret the untrusted research title as Markdown or
+            # HTML. Only operator-authored static text can create links.
+            title=re.sub(r"[\\\\`*_[\\]{}()#+!.<>|]", "", r["title"])
+            title=" ".join(title.split())[:160]
             lines.extend([
                 "- "+title,
                 "  - (Next: "+r["next_step"]+")",
@@ -120,13 +172,17 @@ def render_weekly_backlog(owner:str,week_start:datetime,*,visual:tuple[dict,...]
     return "\n".join(lines),index
 
 def export_weekly(root:Path,owner:str,week_start:datetime,*,visual:tuple[dict,...],
-                  rss:tuple[dict,...],matrix_reports:tuple[dict,...])->dict:
+                  rss:tuple[dict,...],matrix_reports:tuple[dict,...],
+                  video_tool_indexes:tuple[dict,...]=(),
+                  article_fact_reports:tuple[dict,...]=())->dict:
     # Trusted operator supplies a dedicated local root; no untrusted relative
     # paths or HTML source text are used as filenames.
     if not isinstance(root,Path) or not root.is_absolute() or root.is_symlink():
         raise ValueError("absolute trusted weekly export root required")
     markdown,index=render_weekly_backlog(
-        owner,week_start,visual=visual,rss=rss,matrix_reports=matrix_reports)
+        owner,week_start,visual=visual,rss=rss,matrix_reports=matrix_reports,
+        video_tool_indexes=video_tool_indexes,
+        article_fact_reports=article_fact_reports)
     folder=root/index["iso_week"]
     folder.mkdir(mode=0o700,parents=True,exist_ok=True)
     if folder.is_symlink():

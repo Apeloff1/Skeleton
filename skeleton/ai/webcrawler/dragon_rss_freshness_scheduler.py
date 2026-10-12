@@ -155,7 +155,7 @@ class DragonRssFreshnessScheduler:
         _identity(owner, source_id, feed_url)
         _hash(policy_receipt_digest)
         if operator_authorized is not True:
-            raise PermissionError("trusted RSS source subscription required")
+            raise PermissionError("trusted operator authorization for RSS source subscription required")
         if (type(priority) is not int or not 0 <= priority <= 5
             or type(period_seconds) is not int
             or not 3600 <= period_seconds <= 7*86400

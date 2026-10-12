@@ -189,6 +189,7 @@ jobs:
             skeleton/ai/webcrawler/dragon_cross_source_factchecking.py \
             skeleton/ai/webcrawler/dragon_correlated_mother_handoff.py \
             skeleton/ai/webcrawler/dragon_rss_freshness_scheduler.py \
+            skeleton/ai/webcrawler/dragon_video_tool_research.py \
             skeleton/ai/webcrawler/dragon_weight_tier_sandbox.py \
             skeleton/ai/webcrawler/dragon_video_inspiration.py \
             skeleton/ai/webcrawler/dragon_rss_update_queue.py \
