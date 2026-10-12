@@ -448,5 +448,27 @@ class OriginalLiveStrategyTests(unittest.TestCase):
             run_advanced_session("rts",actions=["inspect"]*129)
 
 
+    def test_autonomous_ranged_stance_does_not_crash_on_blocked_line_of_fire(self):
+        cfg=make_editor_document("rts",self.rules(
+             fog_of_war=False,line_of_sight=True,
+        ))["settings"]
+        state=start(cfg,0)
+        ranger=state["units"][1]
+        ranger["kind"]="ranger"
+        ranger["stance"]="aggressive"
+        ranger["cell"]=10
+        enemy=state["enemies"][0]
+        enemy["cell"]=26
+        self.assertIn(18,state["map"]["obstacles"])
+        health=enemy["hp"]
+        step(state,cfg,"inspect")
+        self.assertEqual(enemy["hp"],health)
+        self.assertIn("original_autonomous_stance_refused_blocked_attack",
+                      state["events"])
+        self.assertFalse(state["finished"])
+        self.assertFalse(state["failed"])
+
+
+
 if __name__=="__main__":
     unittest.main()
