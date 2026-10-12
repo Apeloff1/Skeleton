@@ -134,6 +134,28 @@ def test_shadow_gate_blocks_false_quality_and_regression(change):
     db.close()
 
 
+def test_signed_weight_handoff_is_idempotent_and_cannot_be_substituted():
+    db,_,lane,_=setup()
+    lane.wiki_review(OWNER,"article","article-1",D,wiki(),authorized=True)
+    lane.sandbox_review(OWNER,"article","article-1",D,evaluation(),authorized=True)
+    receipt=lane.authorize_weight_handoff(
+        OWNER,"article","article-1",D,
+        signed_receipt=A,approved_at=AT+900,authorized=True)
+    assert receipt==lane.authorize_weight_handoff(
+        OWNER,"article","article-1",D,
+        signed_receipt=A,approved_at=AT+900,authorized=True)
+    permissive=DragonAlmanakkLane(
+        db,source_approval=lambda r:True,
+        handoff_verify=lambda *_:True,
+    )
+    with pytest.raises(ValueError,match="persisted signed"):
+        permissive.authorize_weight_handoff(
+            OWNER,"article","article-1",D,
+            signed_receipt=E,approved_at=AT+905,authorized=True)
+    assert len(lane.history(OWNER,authorized=True))==3
+    db.close()
+
+
 def test_retraction_and_new_revision_invalidate_stale_predecessor():
     db,family,lane,enabled=setup()
     lane.wiki_review(OWNER,"article","article-1",D,wiki(),authorized=True)
