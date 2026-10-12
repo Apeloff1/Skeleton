@@ -188,7 +188,7 @@ async def get_outcome_matrix_instruction(
         if ending_id not in record["compiled"]["endings"]:
             raise HTTPException(status_code=404, detail="Target ending is not part of this plan")
         row = instruction(matrix_id, level, ending_id=ending_id,
-                          player_history_digest=record["source_digest"])
+                          player_history_digest=None)
         return {"ok": True, "game_id": pid, "branch_id": branch_id,
                 "plan_digest": record["source_digest"], "instruction": row}
     except HTTPException:
