@@ -10,7 +10,8 @@ from copy import deepcopy
 from .story_canon_fabric import (
     BIBLE, PHASES, StoryCanonError, digest, require, text,
     story_bible_template, story_scene_template, scene_path)
-from .story_workspace import load_story_workspace, story_workspace_brief
+from .story_workspace import (load_story_workspace, load_continuity_contract,
+                              story_workspace_brief)
 
 
 WORK_UNITS = {
@@ -34,6 +35,15 @@ WORK_UNITS = {
         "Specify original character, item, skill, prop, environment and UI assets",
         "Specify animation, sound, music and cinematic requirements by asset identity",
         "Review provenance and mark individual assets approved only after rights review",
+    ),
+    "continuity_lock": (
+        "Approve exactly 100 acts and 9999 individually confirmed scenes",
+        "Lock source voice ID and voice master hash for every character",
+        "Lock permanent facial geometry and dialogue-to-expression rules",
+        "Approve clothing variants, cloth textures, items and historical owners",
+        "Lock regional era, architecture, material vocabulary and hex palettes",
+        "Review asset/voice rights before any scene production",
+        "Require uninterrupted exact-source and confirmation digest chains",
     ),
     "scene": (
         "Retrieve exact prior dialogue, interaction and causal event bookmarks",
@@ -74,6 +84,15 @@ def work_order(workspace, project, user_message, *, cast=None, region=None,
         requires = [bible["digest"]]
         context = {"previous_phase": bible["phase"],
                    "previous_bible_digest": bible["digest"]}
+    elif not load_continuity_contract(workspace, project) and not scenes:
+        from .story_continuity_assurance import contract_template
+        stage = "continuity_lock"
+        blank = contract_template(bible)
+        target = "game/continuity_contract.json"
+        requires = [bible["digest"]]
+        context = {"approved_design_bible": bible["digest"],
+                   "immutable_voice_and_face_identity_required": True,
+                   "planned_acts": 100, "planned_scenes": 9999}
     else:
         stage = "scene"
         if act is None:
@@ -83,6 +102,16 @@ def work_order(workspace, project, user_message, *, cast=None, region=None,
                      if scenes and act == scenes[-1]["act"] else 1)
         if type(act) is not int or type(scene) is not int:
             raise StoryCanonError("scene coordinates must be exact integers")
+        if load_continuity_contract(workspace, project) is not None:
+            from .story_continuity_assurance import SCENE_TARGET
+            if len(scenes) >= SCENE_TARGET:
+                raise StoryCanonError("9999 meticulously verified scenes completed")
+            if not scenes and (act,scene) != (1,1):
+                raise StoryCanonError("strict story production begins at act 1 scene 1")
+            if scenes and not ((act == scenes[-1]["act"] and
+                                scene == scenes[-1]["scene"]+1) or
+                               (act == scenes[-1]["act"]+1 and scene == 1)):
+                raise StoryCanonError("Jeeves must author one exact next scene at a time")
         blank = story_scene_template(bible, sequence=len(scenes)+1,
                                      act=act, scene=scene)
         blank["prior_digest"] = index["head_digest"]
@@ -92,7 +121,11 @@ def work_order(workspace, project, user_message, *, cast=None, region=None,
         context = {"history_head_digest": index["head_digest"],
                    "history_index_digest": index["digest"],
                    "accepted_scenes": len(scenes),
-                   "required_act": act, "required_scene": scene}
+                   "required_act": act, "required_scene": scene,
+                   "strict_identity_contract_digest":
+                       (load_continuity_contract(workspace,project) or {}).get("digest"),
+                   "legacy_source_history_unlocked":
+                       load_continuity_contract(workspace,project) is None}
         if cast is not None or region is not None:
             require(type(cast) is list and region is not None,
                     "Jeeves scene instructions need both cast and region")
