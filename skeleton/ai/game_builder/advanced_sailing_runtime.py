@@ -280,8 +280,15 @@ def step(state, cfg, action):
                      (2 if angle == 0 else 1 if angle in (1, 3) else 0))
             if state["sails"] == "reefed":
                 speed = min(speed, 1)
-            if wind >= 30 and cfg["sail_efficiency"] >= 7 and state["sails"] == "full":
-                speed = min(3, speed + 1) if angle != 2 else 0
+            elif cfg["sail_efficiency"] <= 3:
+                speed = min(speed, 1)
+            elif wind >= 20 and cfg["sail_efficiency"] >= 7 and angle != 2:
+                speed = min(3, speed + 1)
+            # Hull displacement plus loaded goods impacts achievable speed.
+            if cfg["ship_mass"] + state["cargo"] * 8 > 70:
+                speed = max(0, speed - 1)
+            if cfg["sea_state"] >= 9 and state["weather"] == "rough":
+                speed = max(0, speed - 1)
             if speed == 0:
                 events.append("becalmed_or_headwind")
         for _ in range(speed):
@@ -327,7 +334,7 @@ def step(state, cfg, action):
         (state["seed"] + state["tick"] // cfg["weather_period"]) % 4
     ]
     if not state["docked"] and state["tick"] % cfg["ration_period"] == 0:
-        consumption = 1 + (1 if state["rescued"] else 0)
+        consumption = 1 + state["crew"] // 20 + (1 if state["rescued"] else 0)
         if state["supplies"] >= consumption:
             state["supplies"] -= consumption
             events.append("crew_rations_consumed")
@@ -336,10 +343,6 @@ def step(state, cfg, action):
             _damage(state, cfg["starvation_damage"], "crew_starvation", events)
     _pirate_turn(state, cfg, events)
     mission = cfg["mission_type"]
-    objective = (
-        (mission in ("trade", "mixed") and state["delivered"] >= state["warehouse"] + state["delivered"])
-        or mission == "rescue"
-    )
     # The original warehouse starts finite; deliveries must not create stock.
     cargo_done = state["warehouse"] == 0 and state["cargo"] == 0 and state["delivered"] > 0
     rescue_done = state["passengers_ashore"] > 0
