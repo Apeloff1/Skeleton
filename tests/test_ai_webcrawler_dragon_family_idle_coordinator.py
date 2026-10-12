@@ -9,7 +9,7 @@ from skeleton.ai.webcrawler.dragon_family import (
     DragonFamily, IdleWindow, SourceSeed, SourceReceipt,
 )
 from skeleton.ai.webcrawler.dragon_family_idle_coordinator import (
-    DragonIdleCoordinator, IdleCoordinatorPolicy, read_idle_family_health,
+    DragonIdleCoordinator, IdleCoordinatorPolicy, read_idle_family_health, read_idle_family_history,
 )
 
 OWNER="accepted-owner"
@@ -129,6 +129,32 @@ def test_no_children_until_complete_parent_and_owner_locked():
         worker.health(OWNER,authorized=False)
     with pytest.raises(PermissionError):
         DragonIdleCoordinator(DragonFamily(db,approval=lambda r:True))
+    db.close()
+
+
+def test_idle_attempt_journal_is_utc_timestamped_and_tamper_evident():
+    db,family,worker=make()
+    outcome=worker.run_once(OWNER,authorized=True,idle_state=idle,
+         gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+         task_topics=("game_engine",))
+    assert outcome["changed"]==1
+    events=read_idle_family_history(db,OWNER,authorized=True)
+    assert len(events)==1
+    assert events[0]["at"].endswith("Z")
+    assert events[0]["change"].startswith("(improved:")
+    assert events[0]["outcome"]=="changed"
+    assert len(events[0]["digest"])==64
+    status=read_idle_family_health(db,OWNER,authorized=True)
+    assert status["history"]==events
+    with pytest.raises(PermissionError):
+        read_idle_family_history(db,OWNER,authorized=False)
+    db.execute("""UPDATE dragon_family_idle_attempt_events
+        SET details='counterfeit research' WHERE owner=? AND sequence=1""",(OWNER,))
+    db.commit()
+    with pytest.raises(ValueError,match="integrity"):
+        read_idle_family_history(db,OWNER,authorized=True)
+    with pytest.raises(ValueError,match="integrity"):
+        read_idle_family_health(db,OWNER,authorized=True)
     db.close()
 
 
