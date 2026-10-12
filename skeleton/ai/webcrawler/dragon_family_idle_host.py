@@ -24,6 +24,7 @@ from .dragon_family_custody_bridge import DragonFamilyCustodyBridge
 from .dragon_family_idle_coordinator import IdleCoordinatorPolicy
 from .dragon_family_idle_integration import CaptureAdapter, DragonIdleAcquisitionService
 from .dragon_family_glean_matrix import DragonGleanMatrix
+from .dragon_family_recrawl_planner import DragonFamilyRecrawlPlanner
 
 SCHEMA = "skeleton.ai.dragon.idle.host.v1"
 
@@ -304,6 +305,16 @@ class DragonIdleHostControl:
             if brief["action"]=="revisit_conflicting_sources"
             for sid in brief["source_ids"]
         }))[:64]
+        recrawl=DragonFamilyRecrawlPlanner(
+            self.acquisition.coordinator.family).plan(
+                self.owner,authorized=True,at=first.now,
+                task_topics=tuple(json.loads(initial[2])),
+                adjacent_topics=tuple(json.loads(initial[3])))
+        # Reviewed contradictions remain first priority, followed by truly
+        # overdue registered sources. These are scheduling hints ONLY.
+        overdue_ids=tuple(item["source_id"] for item in recrawl["items"]
+                          if item["due"])
+        prioritized=tuple(dict.fromkeys((*contested_ids,*overdue_ids)))[:64]
         return self.acquisition.run_once(
             authorized=True,idle_state=checked_state,
             article_capture=article_capture,
@@ -315,7 +326,7 @@ class DragonIdleHostControl:
             # reading. Consent revocation on another connection cannot race
             # past this final durable check.
             commit_gate=lambda at: bool(self._require(at,generation)),
-            revisit_source_ids=contested_ids)
+            revisit_source_ids=prioritized)
 
     def status(self, *, at: float, authorized: bool) -> dict[str,object]:
         if not authorized:
