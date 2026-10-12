@@ -230,6 +230,15 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/jeeves-chapter-chat":
+            from .jeeves_chapter_chat import chat_turn
+            result=chat_turn(studio,values["project"],values["prompt"],
+                             session=values.get("session"),
+                             cast=values.get("cast"),
+                             region=values.get("region"),
+                             act=values.get("act"),
+                             scene=values.get("scene"))
+            return self._json(200,result)
         if path=="/api/jeeves-work-order":
             from .jeeves_production_director import work_order
             return self._json(200,work_order(
