@@ -6,6 +6,7 @@ commercial game audio. The one-screen game has a one-time reward latch; the
 scrolling world triggers a distinct chime on each newly moved collectible.
 """
 from __future__ import annotations
+import re
 
 APU_ROUTINES=r"""
 ; Game Boy NR52 power, NR50 master volume, NR51 output, NR11 duty,
@@ -51,11 +52,15 @@ def enrich_native_gb_sound(source:str,*,scrolling:bool)->str:
     if scrolling:
         # Called on a new collectible; the goal is moved on success,
         # therefore repeated frame-by-frame false rewards are avoided.
-        trigger="    ld a,$1B\n    ldh [rOBP0],a"
-        if trigger not in source:raise ValueError("scrolling game reward unavailable")
-        source=source.replace(trigger,trigger+"\n    call PlayReward",1)
+        # RGBDS source generators differ in comma spacing; match the
+        # exact pair of hardware instructions rather than literal styling.
+        trigger=(r"(?m)^[ \t]*ld a,\s*\$1B[ \t]*\n"
+                 r"[ \t]*ldh \[rOBP0\],\s*a(?:[ \t]*;[^\n]*)?$")
+        source,count=re.subn(trigger,lambda m:m.group(0)+"\n    call PlayReward",source,count=1)
+        if count!=1:raise ValueError("scrolling game reward unavailable")
     else:
-        trigger="    ld a, $1B\n    ldh [rOBP0], a"
-        if trigger not in source:raise ValueError("cartridge reward unavailable")
-        source=source.replace(trigger,trigger+"\n    call PlayRewardOnce",1)
+        trigger=(r"(?m)^[ \t]*ld a,\s*\$1B[ \t]*\n"
+                 r"[ \t]*ldh \[rOBP0\],\s*a(?:[ \t]*;[^\n]*)?$")
+        source,count=re.subn(trigger,lambda m:m.group(0)+"\n    call PlayRewardOnce",source,count=1)
+        if count!=1:raise ValueError("cartridge reward unavailable")
     return source

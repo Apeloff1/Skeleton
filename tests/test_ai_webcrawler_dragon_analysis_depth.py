@@ -3,7 +3,7 @@ import pytest
 from skeleton.ai.webcrawler.dragon_probabilistic_distillation import EvidencePass
 from skeleton.ai.webcrawler.dragon_belief_stress import stress_test_belief
 from skeleton.ai.webcrawler.dragon_mechanic_causal_analysis import (
-    MechanicTrial, analyze_mechanic_trials,
+    MechanicTrial, TrialProtocol, analyze_mechanic_trials,
 )
 
 
@@ -56,11 +56,39 @@ def trials(randomized=True, treated_success=True):
     ) for i in range(40))
 
 
-def test_randomized_trials_support_causal_interpretation():
-    report = analyze_mechanic_trials(trials(), authorized=True)
-    assert report.causal_claim_permitted
-    assert report.observed_difference == 1
-    assert report.difference_interval[0] > 0
+def test_randomized_trials_require_verified_protocol_before_causal_claim():
+    # Apparent randomization without a registered, checked protocol is not
+    # sufficient evidence to promote a causal conclusion.
+    estimate = analyze_mechanic_trials(trials(), authorized=True)
+    assert estimate.randomized_effect_estimate_eligible
+    assert not estimate.causal_claim_permitted
+    assert estimate.observed_difference == 1
+    assert estimate.difference_interval[0] > 0
+    assert any("No verified experimental protocol" in x for x in estimate.warnings)
+
+    protocol = TrialProtocol(
+        protocol_id="dragon-jump-buffer-a-b-v1",
+        assignment_digest="c" * 64,
+        preregistered=True,
+        allocation_verified=True,
+        outcome_definition_locked=True,
+        attrition_accounted=True,
+        interference_assessed=True,
+    )
+    eligible = analyze_mechanic_trials(trials(), authorized=True, protocol=protocol)
+    assert eligible.causal_claim_permitted
+    assert eligible.randomized_effect_estimate_eligible
+    assert eligible.protocol_id == protocol.protocol_id
+
+    missing = TrialProtocol(
+        protocol_id=protocol.protocol_id,assignment_digest=protocol.assignment_digest,
+        preregistered=True,allocation_verified=True,
+        outcome_definition_locked=True,attrition_accounted=False,
+        interference_assessed=True,
+    )
+    withheld = analyze_mechanic_trials(trials(), authorized=True, protocol=missing)
+    assert not withheld.causal_claim_permitted
+    assert any("protocol" in x.lower() for x in withheld.warnings)
 
 
 def test_observational_trials_not_called_causal():
