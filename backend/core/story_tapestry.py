@@ -73,6 +73,19 @@ def weave_tapestry(
             ending.append({"scene": n, "stage": role})
         moments = scene.get("story_moments", [])
         beats = scene.get("thread_beats", [])
+        # Do not allow an author to mark a promise, clue, red herring or
+        # payoff without registering its global causal thread.
+        obligation_kinds = {
+            "setup", "foreshadow", "promise", "cliffhanger",
+            "red_herring", "payoff", "resolution", "surprise",
+            "misdirection_reveal",
+        }
+        linked_ids = {b.get("plot_id") for b in beats}
+        for p in scene.get("plot_points", []):
+            if p.get("kind") in obligation_kinds and p.get("id") not in linked_ids:
+                issue("unwoven_plot_point", n, None,
+                      "The highlighted plot obligation " + str(p.get("id")) +
+                      " is not connected to a cross-scene thread.")
         moment_names: set[str] = set()
         for m in moments:
             kind = m.get("kind")
