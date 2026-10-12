@@ -12,7 +12,7 @@ from hashlib import sha256
 import re
 from urllib.parse import urlsplit
 
-from .dragon_nest_review_bridge import VIDEO_HOSTS
+from .dragon_nest_research_scheduler import VIDEO_HOSTS
 
 from skeleton.ai.game_builder.contracts import canonical_digest
 from skeleton.ai.game_builder.reviewed_knowledge import (
