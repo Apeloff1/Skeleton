@@ -281,19 +281,22 @@ class DragonTechnicalGlean:
             "SELECT body,digest FROM dragon_almanac_steps "
             "WHERE owner=? AND source=? AND stage=3",
             (owner,source_id)).fetchone()
-        # After canonical review the queue input is the reviewed revision,
-        # while _verify_prefix is intentionally defined only for live stages
-        # 0..4. Verify the first four steps against the analyze output, then
-        # separately verify the final sealed review receipt.
+        # A completed job has FIVE receipts (0..4), not the four
+        # pre-review receipts used by a live canonical_review claim. Check
+        # the full chain against the reviewed job head before examining the
+        # independently admitted Wiki evidence; partial prefixes must not
+        # be mistaken for a sealed canonical review.
         if stage==5:
+            if state!="reviewed":
+                raise ValueError("completed job lacks reviewed state")
+            self.worker._verify_prefix(
+                owner,source_id,5,input_digest,
+                body["url"],source_digest,4_102_444_800)
             if row is None:
                 raise ValueError("missing reviewed analysis receipt")
             pending=json.loads(row[0])
             if canonical_digest(pending)!=row[1]:
                 raise ValueError("corrupt reviewed analysis receipt")
-            self.worker._verify_prefix(
-                owner,source_id,4,pending["output_digest"],
-                body["url"],source_digest,4_102_444_800)
             final=self.db.execute(
                 "SELECT body,digest FROM dragon_almanac_steps "
                 "WHERE owner=? AND source=? AND stage=4",
@@ -308,7 +311,20 @@ class DragonTechnicalGlean:
                 or verified.get("input_digest")!=pending["output_digest"]
                 or verified.get("output_digest")!=input_digest
                 or verified.get("training_authorized") is not False
-                or state!="reviewed"):
+                or not isinstance(verified.get("evidence"),dict)
+                or verified["evidence"].get("human_independent_review") is not True
+                or verified["evidence"].get("model_promotion_authorized") is not False
+                or type(verified["evidence"].get("independent_groups")) is not int
+                or verified["evidence"]["independent_groups"]<2
+                or verified["evidence"].get("analysis_digest")!=pending["output_digest"]
+                or verified["evidence"].get("input_digest")!=pending["output_digest"]
+                or verified["evidence"].get("output_digest")!=input_digest
+                or verified["evidence"].get("capture_digest")!=
+                   pending["evidence"].get("capture_digest")
+                or not isinstance(verified["evidence"].get("wiki_review_digest"),str)
+                or not _HEX.fullmatch(verified["evidence"]["wiki_review_digest"])
+                or not isinstance(verified["evidence"].get("wiki_reviewer_grant_digest"),str)
+                or not _HEX.fullmatch(verified["evidence"]["wiki_reviewer_grant_digest"])):
                 raise ValueError("canonical review lineage invalid")
         else:
             self.worker._verify_prefix(owner,source_id,stage,input_digest,

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+import json
 import sqlite3
 
 import pytest
@@ -337,6 +338,57 @@ def test_canonical_review_requires_existing_signed_independent_wiki_evidence(lab
     sealed=glean.handoff(OWNER,sid,authorized=True)
     assert sealed["status"]=="canonical_wiki_review_verified"
     assert sealed["training_authorized"] is False
+
+    # The finished source has exactly five canonical receipts, not four.
+    receipts=library.db.execute(
+        "SELECT stage,body,digest FROM dragon_almanac_steps "
+        "WHERE owner=? AND source=? ORDER BY stage",(OWNER,sid)).fetchall()
+    assert [stage for stage,_,_ in receipts]==[0,1,2,3,4]
+    assert worker._verify_prefix(OWNER,sid,5,
+        library.db.execute("SELECT input_digest FROM dragon_almanac_jobs "
+                           "WHERE owner=? AND source=?",(OWNER,sid)).fetchone()[0],
+        url,library.db.execute("SELECT digest FROM dragon_almanac_sources "
+                               "WHERE owner=? AND source=?",(OWNER,sid)).fetchone()[0],
+        T0+14)==T0+13
+
+    # Even if a malicious writer recalculates the *unkeyed* receipt hash,
+    # a false claim of independent Wiki review must never pass handoff.
+    original=receipts[-1]
+    forged=json.loads(original[1])
+    forged["evidence"]["human_independent_review"]=False
+    library.db.execute(
+        "UPDATE dragon_almanac_steps SET body=?,digest=? "
+        "WHERE owner=? AND source=? AND stage=4",
+        (canonical_json(forged),canonical_digest(forged),OWNER,sid))
+    with pytest.raises(ValueError,match="canonical review lineage"):
+        glean.handoff(OWNER,sid,authorized=True)
+    library.db.execute(
+        "UPDATE dragon_almanac_steps SET body=?,digest=? "
+        "WHERE owner=? AND source=? AND stage=4",
+        (original[1],original[2],OWNER,sid))
+    assert glean.handoff(OWNER,sid,authorized=True)==sealed
+
+    # Extra steps are not part of a reviewed source's completed lineage.
+    library.db.execute(
+        "INSERT INTO dragon_almanac_steps VALUES(?,?,?,?,?)",
+        (OWNER,sid,5,original[1],original[2]))
+    with pytest.raises(ValueError,match="missing or extra"):
+        glean.handoff(OWNER,sid,authorized=True)
+    library.db.execute(
+        "DELETE FROM dragon_almanac_steps WHERE owner=? AND source=? "
+        "AND stage=5",(OWNER,sid))
+    assert glean.handoff(OWNER,sid,authorized=True)==sealed
+
+    # Missing intermediate receipts must not become implicitly optional.
+    library.db.execute(
+        "DELETE FROM dragon_almanac_steps WHERE owner=? AND source=? "
+        "AND stage=2",(OWNER,sid))
+    with pytest.raises(ValueError,match="missing or extra"):
+        glean.handoff(OWNER,sid,authorized=True)
+    library.db.execute(
+        "INSERT INTO dragon_almanac_steps VALUES(?,?,?,?,?)",
+        (OWNER,sid,2,receipts[2][1],receipts[2][2]))
+    assert glean.handoff(OWNER,sid,authorized=True)==sealed
 
 
 def test_forged_wiki_evidence_cannot_close_canonical_review(lab):

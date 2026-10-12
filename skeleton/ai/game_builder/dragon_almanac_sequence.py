@@ -64,7 +64,10 @@ class SequentialAlmanacWorker:
         still owns identity, network policy, rights review and resource admission.
         Older receipts retain their original digest and require no migration.
         """
-        _integer(stage, "job stage", 0, len(STAGES) - 1)
+        # Active jobs use a prefix of 0..4 receipts. A *reviewed* job
+        # advances to stage 5 and must verify all five sealed receipts,
+        # including canonical_review, before historical handoff or renewal.
+        _integer(stage, "job stage", 0, len(STAGES))
         _digest(input_digest, "stage input")
         rows = self.db.execute("""SELECT stage,
           CASE WHEN length(CAST(body AS BLOB))<=32768 THEN body ELSE NULL END,digest
