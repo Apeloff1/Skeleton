@@ -1232,6 +1232,35 @@ $("advanced-scene-template").addEventListener("click",async()=>{
   status("Authored scene template validated. Modify terrain/regions, then validate again.");
  }catch(error){status("Authored scene rejected: "+error.message);}
 });
+
+$("stealth-mission-plan").addEventListener("click",async()=>{
+ try{
+  if(systemEditor().id!=="stealth")
+   throw Error("Spatial route planning supports the original stealth editor only");
+  const raw=$("advanced-scene-json").value.trim();
+  if(!raw)throw Error("Generate and validate an authored stealth scene first");
+  const source=JSON.parse(raw);
+  const output=await api("/api/stealth-plan",{
+   scene:source,settings:systemSettings(),max_states:30000,max_depth:96
+  });
+  const plan=output.plan;
+  $("stealth-plan-proof").textContent=JSON.stringify({
+   mission:plan.mission,feasibility:plan.feasibility,
+   route:plan.route,route_turn_count:plan.route_turn_count,
+   states_explored:plan.states_explored,
+   rehearsal_verified:plan.rehearsal_verified,
+   original_source_mutated:plan.source_mutated,
+   actual_security_evasion_verified:plan.actual_security_evasion_verified,
+   proof_digest:plan.digest
+  },null,2);
+  status(plan.rehearsal_verified?
+   "A bounded original route passed threat-free gameplay replay. Guards and cameras can still defeat it; review before use.":
+   "No safe spatial feasibility proof within the bounded search. Improve original map or budget and revalidate.");
+ }catch(error){
+  $("stealth-plan-proof").textContent="";
+  status("Stealth route planner rejected: "+error.message);
+ }
+});
 $("advanced-puzzle-solve").addEventListener("click",async()=>{
  try{
   if(systemEditor().id!=="puzzle")
@@ -1427,6 +1456,8 @@ Other editor families remain authoring-only, not falsely certified engines.</sma
 <button id="advanced-scene-template" type="button">Create / validate authored scene</button>
 <button id="advanced-scene-stage" type="button">Stage authored scene for review</button>
 <button id="advanced-puzzle-solve" type="button">Prove puzzle solution / detect impossible state</button>
+<button id="stealth-mission-plan" type="button">AI: rehearse authored stealth mission route</button>
+<pre id="stealth-plan-proof" role="status" aria-live="polite"></pre>
 <pre id="advanced-puzzle-proof" role="status" aria-live="polite"></pre>
 <label>Editable scene geometry and resource JSON
 <textarea id="advanced-scene-json" rows="6" spellcheck="false"
@@ -1434,7 +1465,7 @@ Other editor families remain authoring-only, not falsely certified engines.</sma
 <label>Graphical scene painting tool<select id="advanced-paint-tool" aria-label="Scene cell paint operation"></select></label>
 <canvas id="advanced-scene-grid" width="470" height="285" role="img"
  aria-label="Editable tactical scene cell grid"></canvas>
-<p><small>Graphical cell painting: shooter, tactics and puzzle. Scene edits stay
+<p><small>Graphical cell painting: shooter, tactics, puzzle, Colony, City and Stealth. Scene edits stay
 local until typed revalidation and an explicit human-approved file commit.</small></p>
 <button id="advanced-start" type="button">Start advanced scenario</button>
 <button id="advanced-save" type="button">Download verified savegame</button>
