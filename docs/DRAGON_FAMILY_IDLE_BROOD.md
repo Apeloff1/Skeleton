@@ -550,3 +550,63 @@ A source-level cooldown now applies to **all** three hatchlings: a source
 just inspected by Ember cannot be immediately re-fetched by Scout merely
 because Scout has a separate role queue. This conserves bandwidth, reduces
 repetitive acquisition, and preserves the game's novelty requirement.
+
+
+## Real local-input observer capability (2026-10-12 UTC)
+
+The optional host adapter `dragon_family_native_idle.py` can now sample
+**local OS input inactivity** rather than requiring a fabricated browser
+idle number. It does not independently start a worker or observe the user's
+screen content.
+
+| Platform | Source of recent input | Safety rule |
+|---|---|---|
+| Windows desktop | Native `GetLastInputInfo` and `GetTickCount64` | Reject API failures and stale/out-of-range results |
+| macOS desktop | Quartz `CGEventSourceSecondsSinceLastEventType` | Reject unavailable permission/library/invalid readings |
+| Linux X11 | `XScreenSaverQueryInfo` on an accessible `DISPLAY` | Reject missing/unavailable X11 library/display |
+| Linux Wayland | No trusted universal compositor signal available here | **Deny** rather than accept XWayland-only activity |
+| Unknown/headless/remote | No trustworthy native input source | **Deny** by default |
+
+The authenticated native host must additionally provide
+`NativeHostSignals(session_unlocked=...,user_foreground_active=...,
+running_foreground_jobs=...,resources_available=...,
+research_consent_active=...)`. It must derive all fields from trusted local
+session/job/consent infrastructure, never browser-submitted booleans. Locked
+or unconfirmed sessions refuse activity admission. A stale/slow native
+measurement, clock regression, missing library, untrusted signal or more
+than one day of unconfirmed input time refuses activity admission.
+
+A native host's existing event loop can now run:
+
+```python
+from skeleton.ai.webcrawler.dragon_family_native_idle import (
+    NativeDragonIdleProbe, NativeHostSignals,
+)
+
+probe = NativeDragonIdleProbe(
+    host_signals=read_authoritative_local_jobs_consent_session_and_resources,
+)
+# Only on a trusted, authenticated OS host after explicit scope-bound opt-in:
+host.tick(
+    authorized=True,
+    host_idle_state=probe.observe,
+    article_capture=approved_article_fetch_and_review,
+    video_capture=licensed_video_capture_and_review,
+    monitor_capture=consented_revision_review,
+)
+```
+
+The source capture callbacks remain necessary and are intentionally NOT
+invented in this adapter. They must enforce SSRF protection, redirects and
+public-host DNS checks, robots/terms/license/DRM rights, bandwidth and
+deadline restrictions, independent human review, and revocable authorization.
+`NativeDragonIdleProbe` samples only input duration and boolean host state;
+it does not record key presses, typed text, screen content or user-window titles.
+
+```bash
+python -m pytest -q --noconftest tests/test_ai_webcrawler_dragon_family_native_idle.py
+```
+
+This still does **not** install a daemon, connect an OS idle-event scheduler
+in production, or represent legal/rights approval for arbitrary sources.
+The host is responsible for how and when it invokes the bounded tick.
