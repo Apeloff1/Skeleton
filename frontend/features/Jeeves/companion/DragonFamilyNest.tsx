@@ -1,0 +1,125 @@
+/** Server-owned Dragon brood: presentation only. No UI action creates evidence or XP. */
+import React, {useState} from 'react';
+import {Pressable, StyleSheet, Text, View} from 'react-native';
+
+const HEX=/^[0-9a-f]{64}$/;
+type Role='article'|'video'|'monitor';
+type Stage='unborn'|'egg'|'hatchling'|'juvenile'|'dragon';
+export interface DragonFamilyProjection {
+ schema:'skeleton.ai.dragon.family.v1';
+ parent:{stage:string;consumed:number;source_total:number;complete:boolean;laid_at:string|null};
+ children:readonly {id:Role;name:string;specialty:string;stage:Stage;level:number;
+  discoveries:number;last_grew_at:string|null;idle_only:true}[];
+ history:readonly {sequence:number;at:string;dragon:string;action:string;
+  source_id:string;change:string;digest:string}[];
+ pending_source_count:number;
+ knowledge_authority:string;
+ update_policy:string;
+}
+const number=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0;
+const validTime=(v:unknown)=>v===null||(typeof v==='string'&&
+ /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(v));
+export function validateDragonFamily(v:unknown):DragonFamilyProjection|null{
+ if(!v||typeof v!=='object')return null;
+ const f=v as DragonFamilyProjection;
+ if(f.schema!=='skeleton.ai.dragon.family.v1'||!f.parent||
+  !number(f.parent.consumed)||!number(f.parent.source_total)||
+  f.parent.consumed>f.parent.source_total||typeof f.parent.complete!=='boolean'||
+  !validTime(f.parent.laid_at)||!number(f.pending_source_count)||
+  !Array.isArray(f.children)||f.children.length!==3||
+  !Array.isArray(f.history)||f.history.length>100)return null;
+ const roles=['article','video','monitor'];
+ if(!f.children.every((c,i)=>c&&c.id===roles[i]&&
+  typeof c.name==='string'&&c.name.length<=50&&typeof c.specialty==='string'&&
+  ['unborn','egg','hatchling','juvenile','dragon'].includes(c.stage)&&
+  number(c.level)&&c.level<=30&&number(c.discoveries)&&
+  c.idle_only===true&&validTime(c.last_grew_at)))return null;
+ if(!f.history.every(h=>h&&number(h.sequence)&&h.sequence>0&&
+   typeof h.at==='string'&&validTime(h.at)&&
+   typeof h.dragon==='string'&&h.dragon.length<=25&&
+   typeof h.action==='string'&&h.action.length<=50&&
+   typeof h.source_id==='string'&&h.source_id.length<=128&&
+   typeof h.change==='string'&&h.change.length<=500&&
+   typeof h.digest==='string'&&HEX.test(h.digest)))return null;
+ return f;
+}
+const glyph=(stage:Stage)=>stage==='unborn'?'·':stage==='egg'?'🥚':stage==='hatchling'?'🐣':stage==='juvenile'?'🐲':'🐉';
+const safeDate=(value:string|null)=>value?value.replace('T',' ').replace('Z',' UTC'):'No new evidence yet';
+
+export default function DragonFamilyNest({family}:{family?:DragonFamilyProjection|null}){
+ const [selected,setSelected]=useState<Role>('article');
+ const [showHistory,setShowHistory]=useState(false);
+ const f=validateDragonFamily(family);
+ if(!f)return <View style={s.root}><Text style={s.heading}>🥚 Dragon Family</Text>
+   <Text style={s.muted}>Awaiting a verified source inventory. The nest cannot advance on animations or page views.</Text>
+  </View>;
+ const child=f.children.find(c=>c.id===selected)??f.children[0];
+ const percent=f.parent.source_total?
+  Math.round(100*f.parent.consumed/f.parent.source_total):0;
+ return <View style={s.root} accessibilityLabel="Dragon Family knowledge game">
+  <View style={s.top}><Text style={s.heading}>🐲 Dragon Family · Research Nest</Text>
+   <Text style={s.flag}>{f.parent.complete?'3 EGGS LAID':'SOURCE QUEST'}</Text></View>
+  <Text style={s.muted}>{f.parent.complete?
+   'The parent completed its approved inventory and laid three specialist eggs.':
+   'The parent matures by consuming verified sources from its original inventory.'}</Text>
+  <View style={s.mother}>
+   <Text style={s.motherGlyph}>{f.parent.complete?'🐉':f.parent.consumed===0?'🥚':'🐲'}</Text>
+   <View style={s.flex}><Text style={s.title}>Mother dragon · {f.parent.stage}</Text>
+    <Text style={s.muted}>{f.parent.consumed} / {f.parent.source_total} sources consumed</Text>
+    <View accessibilityRole="progressbar" accessibilityValue={{min:0,max:100,now:percent}}
+      style={s.track}><View style={[s.fill,{width:`${percent}%`}]}/></View></View>
+  </View>
+  <View style={s.brood}>{f.children.map(c=><Pressable key={c.id}
+     accessibilityRole="button" accessibilityState={{selected:c.id===selected}}
+     accessibilityLabel={`${c.name}, ${c.specialty}, ${c.stage}, level ${c.level}`}
+     onPress={()=>setSelected(c.id)} style={[s.creature,c.id===selected&&s.selected]}>
+    <Text style={s.creatureGlyph}>{glyph(c.stage)}</Text>
+    <Text style={s.name}>{c.name}</Text>
+    <Text style={s.role}>{c.specialty}</Text>
+    <Text style={s.level}>{c.stage==='unborn'?'Not born':c.stage==='egg'?'Waiting':'Lv '+c.level}</Text>
+  </Pressable>)}</View>
+  <View style={s.details}><Text style={s.title}>{child.name} · {child.stage}</Text>
+   <Text style={s.muted}>{child.id==='article'?'Digests newly approved web articles':
+    child.id==='video'?'Digests newly approved video evidence':
+    'Detects verified changes in known sources'} · idle only</Text>
+   <Text style={s.muted}>New information acquired: {child.discoveries} · Last growth: {safeDate(child.last_grew_at)}</Text>
+   <Text style={s.privacy}>Only grows while the host confirms idle time, consent, and resource capacity. Updated or adjacent knowledge must be independently verified.</Text></View>
+  <Pressable accessibilityRole="button" accessibilityState={{expanded:showHistory}}
+   onPress={()=>setShowHistory(v=>!v)} style={s.historyButton}>
+   <Text style={s.historyTitle}>{showHistory?'Hide':'Show'} timestamped evolution history ({f.history.length} recent)</Text>
+  </Pressable>
+  {showHistory&&<View style={s.history}>{f.history.length===0?
+   <Text style={s.muted}>No source changes recorded.</Text>:
+   f.history.slice(0,15).map(h=><View key={h.digest} style={s.event}>
+    <Text style={s.when}>{safeDate(h.at)}</Text>
+    <Text style={s.title}>{h.dragon} · {h.action.replaceAll('_',' ')}</Text>
+    <Text style={s.muted}>{h.change}</Text>
+    {!!h.source_id&&<Text numberOfLines={1} style={s.source}>Source: {h.source_id}</Text>}
+   </View>)}</View>}
+  <Text style={s.privacy}>Gathered evidence does not automatically train the AI, approve game designs, or grant independent crawler permissions.</Text>
+ </View>;
+}
+const s=StyleSheet.create({
+ root:{backgroundColor:'#171828',borderWidth:1,borderColor:'#725c3c',borderRadius:18,padding:12,gap:10},
+ top:{flexDirection:'row',alignItems:'center',gap:8,flexWrap:'wrap'},
+ heading:{fontSize:15,fontWeight:'900',color:'#fef3c7',flexGrow:1},
+ flag:{fontSize:9,color:'#fde68a',letterSpacing:1,fontWeight:'800'},
+ mother:{backgroundColor:'#282036',borderRadius:14,padding:10,flexDirection:'row',alignItems:'center',gap:12},
+ motherGlyph:{fontSize:40},flex:{flex:1,gap:6},title:{fontSize:12,color:'#f8fafc',fontWeight:'800'},
+ track:{height:7,backgroundColor:'#544357',borderRadius:8,overflow:'hidden'},
+ fill:{height:'100%',backgroundColor:'#fb923c',borderRadius:8},
+ brood:{flexDirection:'row',gap:6,flexWrap:'wrap'},
+ creature:{flexGrow:1,flexBasis:'30%',minWidth:84,alignItems:'center',justifyContent:'center',
+  borderRadius:13,borderWidth:1,borderColor:'#41445c',backgroundColor:'#22283d',padding:7,gap:3},
+ selected:{borderColor:'#fbbf24',backgroundColor:'#36304b'},
+ creatureGlyph:{fontSize:34},name:{color:'#fff7ed',fontSize:12,fontWeight:'900'},
+ role:{color:'#bac8dc',fontSize:9,textAlign:'center'},
+ level:{color:'#fcd34d',fontSize:10,fontWeight:'700'},
+ details:{padding:10,borderRadius:10,backgroundColor:'#232b3c',gap:5},
+ muted:{fontSize:11,color:'#bac8dc',lineHeight:16},
+ privacy:{fontSize:10,color:'#94a3b8',lineHeight:16},
+ historyButton:{padding:10,backgroundColor:'#3c3244',borderRadius:9},
+ historyTitle:{color:'#fef3c7',fontSize:11,fontWeight:'800'},
+ history:{gap:6},event:{backgroundColor:'#242737',padding:9,borderRadius:8,gap:3},
+ when:{fontSize:9,color:'#fcd34d'},source:{fontSize:9,color:'#94a3b8'},
+});
