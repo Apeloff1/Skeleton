@@ -42,6 +42,7 @@ export default function StoryOutcomesStudio() {
   const [choices, setChoices] = useState<string[]>([]);
   const [simulation, setSimulation] = useState<StorySimulation | null>(null);
   const [audit, setAudit] = useState<OutcomeAudit | null>(null);
+  const [chapterWeave, setChapterWeave] = useState<any>(null);
   const [page, setPage] = useState<Page>('author');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
@@ -56,6 +57,7 @@ export default function StoryOutcomesStudio() {
     setGameId(nextGame); setBranch(nextBranch);
     setRevision(0); setPlanDigest(''); setAuthorKey('');
     setDoc(null); setSimulation(null); setChoices([]); setAudit(null);
+    setChapterWeave(null);
     setMatrixItems([]); setNotice('');
   };
   const base = useCallback(() => {
@@ -165,6 +167,25 @@ export default function StoryOutcomesStudio() {
     setNotice(result.all_paths_verified
       ? 'Every enumerated decision path reaches a closed authored ending.'
       : 'Some branch paths fail closure or coverage is incomplete. Inspect issues.');
+  };
+  const auditChapterWeave = async () => {
+    confirmCurrent();
+    const response = await api.get<any>(
+      base() + '/chapter-weave?branch_id=' + encodeURIComponent(branch),
+      { headers: authHeaders(), retries: 0, timeoutMs: 30000 },
+    );
+    if (!response.ok || !response.data?.ok ||
+        response.data.game_id !== gameId.trim() ||
+        response.data.branch_id !== branch ||
+        response.data.plan_digest !== planDigest ||
+        response.data.chapter_weave?.schema_version !== 'jeeves.outcome-chapter-weave.v1') {
+      throw new Error('Choice-to-chapter canon weave could not be confirmed.');
+    }
+    setChapterWeave(response.data.chapter_weave);
+    setPage('outcomes');
+    setNotice(response.data.chapter_weave.canon_weave_ready
+      ? 'Every decision node is grounded in an approved chapter scene and registered lore.'
+      : 'Some choices, highlights, NPC identities or story places are not yet present in chapter canon.');
   };
   const loadMatrices = async () => {
     confirmCurrent();
@@ -374,6 +395,24 @@ export default function StoryOutcomesStudio() {
         <Action label="Enumerate actually available player paths"
           icon="git-branch-outline" disabled={busy || !planDigest}
           onPress={() => { void withOperation(auditPaths); }} />
+        <Action label="Verify every branching choice against approved chapters and canonical NPC/place lore"
+          icon="shield-checkmark-outline" disabled={busy || !planDigest}
+          onPress={() => { void withOperation(auditChapterWeave); }} />
+        {chapterWeave && <>
+          <Text style={chapterWeave.canon_weave_ready ? styles.label : styles.error}>
+            Chapter narrative weave: {chapterWeave.canon_weave_ready ? 'verified' : 'incomplete'}
+            · {chapterWeave.confirmed_approved_nodes}/{chapterWeave.graph_nodes} approved decision scenes
+            · {chapterWeave.issue_count} alignment issues
+          </Text>
+          {(chapterWeave.issues || []).slice(0, 35).map((item: any, i: number) =>
+            <Text key={item.code + i} style={styles.error}>
+              {item.code} ({item.reference}): {item.detail}
+            </Text>)}
+          <Text style={styles.small}>
+            Cross-source receipt: {chapterWeave.receipt_digest}.
+            This is a structural authority check, not a guarantee of reader enjoyment.
+          </Text>
+        </>}
         {audit && <>
           <Text style={audit.all_paths_verified ? styles.label : styles.error}>
             {audit.paths_inspected} histories examined ·
