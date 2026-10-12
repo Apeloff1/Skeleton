@@ -12,7 +12,11 @@ from __future__ import annotations
 
 from collections import Counter
 from hashlib import sha256
+import json
+import os
+from pathlib import Path
 import re
+import stat
 from urllib.parse import urlsplit
 
 from .dragon_discovery_admission import (
@@ -33,6 +37,68 @@ _NOISY_HOSTS = frozenset({
     "github.com", "raw.githubusercontent.com",
 })
 _MAX_OBSERVATIONS = 20_000
+
+
+def read_staged_catalog_snapshot(path: str | Path) -> dict:
+    """Load only a regular, bounded repository evidence file with strict JSON.
+
+    The received file has no network or rights authority; SHA identifiers in
+    its catalog entries are claims to be checked by a separate acquisition
+    control before source content may be fetched.
+    """
+    file = Path(path)
+    root = Path(__file__).resolve().parents[3]
+    try:
+        resolved = file.resolve().relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ValueError("staged evidence must be inside the repository") from exc
+    if not (resolved.startswith("docs/ai/evidence/dragon-new-catalog-metadata-")
+            and resolved.endswith(".json")):
+        raise ValueError("only staged Dragon catalog evidence is accepted")
+    try:
+        stat_before = file.lstat()
+        if not stat.S_ISREG(stat_before.st_mode) or not 1 <= stat_before.st_size <= 2_000_000:
+            raise ValueError("regular bounded staged catalog required")
+        fd = os.open(file, os.O_RDONLY |
+                     getattr(os, "O_NOFOLLOW", 0) |
+                     getattr(os, "O_CLOEXEC", 0))
+        with os.fdopen(fd, "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            raw = stream.read(2_000_001)
+            closed = os.fstat(stream.fileno())
+        stat_after = file.lstat()
+    except OSError as exc:
+        raise ValueError("staged catalog changed while reading") from exc
+    if (not stat.S_ISREG(opened.st_mode)
+            or (stat_before.st_dev, stat_before.st_ino) !=
+               (opened.st_dev, opened.st_ino)
+            or (stat_after.st_dev, stat_after.st_ino) !=
+               (opened.st_dev, opened.st_ino)
+            or (opened.st_size, opened.st_mtime_ns) !=
+               (closed.st_size, closed.st_mtime_ns)
+            or len(raw) != opened.st_size or len(raw) > 2_000_000):
+        raise ValueError("staged catalog byte or file identity changed")
+    def strict_object(pairs):
+        seen = {}
+        for key, value in pairs:
+            if key in seen:
+                raise ValueError("duplicate staged catalog key")
+            seen[key] = value
+        return seen
+    try:
+        document = json.loads(raw.decode("utf-8"), object_pairs_hook=strict_object,
+                              parse_constant=lambda x: (_ for _ in ()).throw(
+                                  ValueError("nonfinite staged catalog constant")))
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
+        raise ValueError("staged catalog JSON is malformed or ambiguous") from exc
+    if (not isinstance(document, dict)
+            or document.get("schema") != STAGE_SCHEMA
+            or document.get("status") != STAGE_STATUS
+            or document.get("training_authorized") is not False
+            or document.get("rights_approved") is not False
+            or document.get("fetch_authorized") is not False):
+        raise ValueError("unapproved staged catalog required")
+    return document
 
 
 def build_catalog_supplements(
