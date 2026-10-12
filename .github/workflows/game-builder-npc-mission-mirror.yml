@@ -1,0 +1,98 @@
+name: Original NPC Mission Adversarial Mirror
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_npc_mission_mirror.py"
+      - "skeleton/ai/game_builder/advanced_npc_waypoint_mission.py"
+      - "skeleton/ai/game_builder/advanced_npc_dynamic_route_planner.py"
+      - "skeleton/ai/game_builder/advanced_chunked_npc_world.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_npc_mission_mirror.py"
+      - ".github/workflows/game-builder-npc-mission-mirror.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: original-npc-mission-mirror-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  independent-source:
+    name: Actual original NPC mission contenders (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 29
+    env:
+      PYTHONUTF8: "1"
+      PYTHONPATH: "."
+      EXPECTED_HEAD: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact source checkout with no persisted GitHub credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_npc_mission_mirror.py
+      - name: Configure Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Confirm exact head and compile actual mission review/runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          python -m py_compile \
+            skeleton/ai/game_builder/advanced_npc_mission_mirror.py \
+            skeleton/ai/game_builder/advanced_npc_waypoint_mission.py \
+            skeleton/ai/game_builder/advanced_npc_dynamic_route_planner.py \
+            skeleton/ai/game_builder/system_editor_cli.py \
+            skeleton/ai/game_builder/game_workspace_server.py \
+            skeleton/ai/game_builder/game_workspace_ui.py \
+            tests/test_game_builder_npc_mission_mirror.py
+      - name: Execute source-derived contender rankings, real paid quests and forged shortcut regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_game_builder_npc_mission_mirror -v
+      - name: Reprove eight physically sourced contender pairs with denied rewards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from skeleton.ai.game_builder.advanced_chunked_npc_world import run_chunked_npc_world
+          from skeleton.ai.game_builder.advanced_npc_mission_mirror import (
+              analyze_original_npc_missions,verify_original_npc_mission_mirror)
+          for seed in (0,1,5,9):
+              for chunks in (3,5):
+                  game=run_chunked_npc_world([],seed=seed,options={
+                      "chunks_per_side":chunks,"citizens":64,
+                      "active_limit":8,"chunk_radius":1,"lod_policy":"fair"})
+                  variants=[
+                      {"id":"authentic_harvest","waypoints":[
+                          {"kind":"site","index":0,"action":"harvest"}],
+                       "max_steps_per_leg":12},
+                      {"id":"illegal_claim","waypoints":[
+                          {"kind":"site","index":0,"action":"claim"}],
+                       "max_steps_per_leg":12},
+                  ]
+                  review=analyze_original_npc_missions(game,variants)
+                  assert verify_original_npc_mission_mirror(review)
+                  assert review["accepted_actual_routes"]==1
+                  assert review["rejected_actual_routes"]==1
+                  assert review["first_reviewed_candidate"]=="authentic_harvest"
+                  assert not review["invalid_or_unproven_routes_promoted"]
+                  print("ACTUAL_NPC_MISSION_MIRROR_OK",seed,chunks,review["digest"])
+          PY
