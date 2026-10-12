@@ -109,3 +109,22 @@ Both commands use `dragon_discovery_reconciled.py`, now bound to the 12,777-lead
 ### Source-diversity caution
 
 Some new collections contain many entries from GitHub, academic preprint hosts and video services. Several links may refer to the same underlying work or to unavailable destinations. Domain count is not independent-evidence count; raw URL growth is not machine knowledge growth. Source-level legal and factual scrutiny remains necessary before any ingestion, distillation or Wiki/HOAG memory promotion.
+
+
+## Latest cross-platform source cohort — 15,175 raw leads
+
+After the 12,777-lead fifteen-batch milestone, a seventh specialist catalog cohort adds **2,398 nonrepeating raw links** from `8bitworkshop/awesome-8bitgamedev`, `Calinou/awesome-godot`, `StefanoCecere/awesome-opensource-unity`, `mikeroyal/Unity-Guide`, `ellisonleao/magictools`, `kjaylee/awesome-game-design`, and `OTFCG/Awesome-Game-Analysis`. The catalogs contribute 3,187 bounded, original README-link/line observations; **562** URLs were already represented in the accepted historical supplements, and **227** were repeated within this new set. The accepted result is **15,175 / 44,050 = 34.45%** of the raw-link target, not 15,175 verified independently useful works.
+
+The staged `docs/ai/evidence/dragon-catalog-metadata-20261012-round3.json` file retains the exact README Git commit/blob identities, observed link URLs, source line numbers and bounded heading ancestry. It is **staging evidence**, not an imported source list or source-use grant. The final `docs/ai/evidence/dragon-source-expansion-20261012-batch-0042.json` incorporates **2,398 new raw URLs** in one ordered batch. Existing accepted batches 0020–0023 and 0031–0041 remain its immutable parents. The rejected orphan/fork batches 0024 and 0030 are still excluded.
+
+`discovery-verify` and `import-reconciled` now point to the strict **sixteen-file accepted chain**. A trusted operator must first validate this entire chain; any substituted source digest, missing ancestor, changed count, training authorization or rights claim must fail closed. Even after metadata import, all newly created jobs begin at the policy-review stage, not at fetch or training.
+
+The new `discovery-census` operator command reports host concentration, canonical URL deduplication, provisional source categories and words in URL paths that warrant manual rights review. It distinguishes raw-lead counts from canonical source identities and treats every domain-diversity or risk observation as a heuristic rather than a finding about independent knowledge or legal use:
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-census \
+  --database /path/to/staging-dragon.sqlite --owner studio \
+  --trusted-local-operator --limit 30
+```
+
+The census reads and validates the checked-in evidence without network access, writes no source-crawl permits and authorizes no Wiki/HOAG memory or model-weight promotion. Exact-head CI and the policy executor's separate legal, robots and SSRF gates are still required.
