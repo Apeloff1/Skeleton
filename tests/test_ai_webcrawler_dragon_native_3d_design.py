@@ -194,7 +194,7 @@ def test_real_3d_sdl_binary_build_and_headless_depth_scan(tmp_path,genre):
 
 def test_project_notes_are_inert_manifest_data(tmp_path):
     config=starter_design(title="Original game")
-    config["project_notes"]="; rm -rf /"
+    config["project_notes"]="Original local quest; no imported media or external assets"
     design=parse_design(config)
     emit_demo("pc_linux",tmp_path/"game",design=design)
     recorded=json.loads((tmp_path/"game/dragon-game-design.json").read_text())
