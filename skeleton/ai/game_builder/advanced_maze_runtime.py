@@ -64,7 +64,7 @@ def default_layout(config,seed):
     for y in range(2,h-1):
         for x in range(2,w-1):
             p=(x,y,0)
-            if p not in reserved and (x+y+seed)%4==0:
+            if config["wall_budget"] and p not in reserved and (x+y+seed)%4==0:
                 walls.append({"at":list(p),"phase":len(walls)%2 if config["topology"]=="moving" else 0})
                 reserved.add(p)
             if len(walls)>=min(config["wall_budget"],16):break
