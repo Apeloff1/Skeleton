@@ -8,7 +8,7 @@ from pymongo.errors import DuplicateKeyError
 
 from core.branching_narrative import validate_plan
 from routes import outcome_reviews as route
-from test_branching_narrative import plan as authored_plan
+from backend.tests.test_branching_narrative import plan as authored_plan
 
 USER = {"email": "author@example.org", "tenant_id": "studio", "role": "editor"}
 
