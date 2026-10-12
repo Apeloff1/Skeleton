@@ -70,7 +70,9 @@ jobs:
             skeleton/ai/webcrawler/
             skeleton/kernel/
             frontend/features/
-            backend/gameforge/
+            backend/gameforge/__init__.py
+            backend/gameforge/forges/
+            skeleton/forge/
             apps/jeeves/
             packaging/windows/
             java-accelerators/
