@@ -4,6 +4,10 @@ from __future__ import annotations
 from copy import deepcopy
 import json
 import unittest
+import http.client
+import tempfile
+from pathlib import Path
+import threading
 
 from skeleton.ai.game_builder.advanced_gameplay_runtime import (
     run_advanced_session, verify_advanced_session,
@@ -13,7 +17,8 @@ from skeleton.ai.game_builder.advanced_physics_handoff import (
     ORIGINS, PhysicsHandoffError, run_physics_handoff, verify_physics_handoff,
 )
 from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
-from skeleton.ai.game_builder.game_workspace_server import _StudioHandler
+from skeleton.ai.game_builder.game_workspace_server import _StudioHandler, create_workspace_server
+from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 
 
 class AdvancedCrossEnginePhysicsTests(unittest.TestCase):
@@ -207,6 +212,55 @@ class AdvancedCrossEnginePhysicsTests(unittest.TestCase):
         self.assertEqual(converted,evidence)
         self.assertTrue(verify_physics_handoff(converted))
         self.assertLess(len(json.dumps(evidence).encode()),110000)
+
+
+
+class CrossEngineStudioBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        workspace=GameWorkspace.create(Path(self.temp.name)/"studio",authorized=True)
+        workspace.create_project("physics_bridge_original","platformer",authorized=True)
+        self.server=create_workspace_server(workspace,port=0)
+        thread=threading.Thread(target=self.server.serve_forever,daemon=True)
+        thread.start()
+        self.addCleanup(self.server.shutdown)
+        self.addCleanup(self.server.server_close)
+
+    def request(self,payload,*,authorized=True,route="/api/physics-handoff"):
+        conn=http.client.HTTPConnection("127.0.0.1",self.server.server_port,
+                                        timeout=9)
+        headers={"Content-Type":"application/json"}
+        if authorized:
+            headers["X-Game-Studio-Token"]=self.server.secret
+        conn.request("POST",route,json.dumps(payload),headers)
+        response=conn.getresponse()
+        data=json.loads(response.read())
+        status=response.status
+        conn.close()
+        return status,data
+
+    def test_authenticated_studio_creates_actual_replayed_physics_from_game(self):
+        source=run_advanced_session("platformer",actions=("right","jump_right"))
+        status,response=self.request({"session":source,"actions":["inspect","step:4"]})
+        self.assertEqual(status,200)
+        self.assertTrue(response["verified"])
+        self.assertFalse(response["origin_game_mutated"])
+        self.assertFalse(response["weights_promoted"])
+        self.assertFalse(response["native_parity_verified"])
+        self.assertTrue(verify_physics_handoff(response["handoff"]))
+        self.assertEqual(response["handoff"]["origin_session_digest"],source["digest"])
+        self.assertEqual(response["handoff"]["physics_session"]["editor"],"physics")
+
+    def test_unauthorized_and_forged_studio_requests_are_denied(self):
+        source=run_advanced_session("racing",actions=("accelerate",))
+        self.assertEqual(self.request({"session":source},authorized=False)[0],403)
+        forged=deepcopy(source)
+        forged["state"]["speed"]=1000000
+        self.assertEqual(self.request({"session":forged})[0],400)
+        self.assertEqual(self.request({"session":source,
+                                       "physics_options":{"dimension":"3d"}})[0],400)
+
 
 
 if __name__=="__main__":
