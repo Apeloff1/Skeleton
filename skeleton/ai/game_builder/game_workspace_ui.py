@@ -3190,6 +3190,63 @@ $("advanced-interop-godot").addEventListener("click",async()=>{
    " physical Godot encounter exported. It independently plays Physics only; native genre release requires a separate gate.");
  }catch(error){status("Native original physical encounter export blocked: "+error.message);}
 });
+$("advanced-npc-rule-editor").value=JSON.stringify([{
+ id:"relief_when_witnessed",quest_id:0,
+ when:{all:[
+  {fact:"external_physical_origin",op:"eq",value:1},
+  {fact:"source_eyewitnesses",op:"gte",value:1},
+  {fact:"player_supplies",op:"gte",value:1},
+  {any:[
+   {fact:"site_integrity",op:"lte",value:11},
+   {fact:"quest_active",op:"eq",value:1}
+  ]}
+ ]},
+ do:"aid"
+}],null,2);
+async function runNPCConditionalRules(mode){
+ if(!episodicLastProof || !episodicLastScene || !verifiedSourceEpisodes.length)
+  throw Error("A signed original episodic NPC world must be replayed first");
+ const authored=JSON.parse($("advanced-npc-rule-editor").value);
+ if(!Array.isArray(authored) || !authored.length || authored.length>12)
+  throw Error("Only one to twelve reviewed source NPC rules are permitted");
+ const before=episodicLastProof.digest;
+ const reply=await api("/api/advanced-npc-conditional-world",{
+  episodes:verifiedSourceEpisodes,world_scene:episodicLastScene,
+  rules:authored,mode
+ });
+ const proof=reply.report;
+ if(!proof || reply.original_project_files_modified ||
+    reply.native_hardware_verified || reply.automatic_promotion_approved ||
+    proof.mode!==mode || proof.source_campaign_digest!==before ||
+    proof.world_scene_digest!==episodicLastScene.digest ||
+    proof.source_game_files_mutated || proof.unearned_npc_rewards_granted)
+  throw Error("Typed original NPC conditional replay cannot be trusted");
+ $("advanced-npc-rule-proof").textContent=JSON.stringify({
+  mode:proof.mode,rule_evaluations:proof.rule_results,
+  applied_earned_actions:proof.applied_effects,
+  world_receipt:proof.final_campaign_digest,
+  original_source_files_unchanged:true,
+  no_automatic_ai_promotion:true
+ },null,2);
+ if(mode==="commit" && proof.applied_effects>0){
+  verifiedSourceEpisodes=proof.episodes;
+  episodicLastProof=null;
+  verifiedInvestigationRoute=null;
+  $("advanced-episodic-play").click();
+  status("Reviewed original NPC rules committed earned commands and requested full world replay");
+ }else{
+  status(mode==="preview"?"Typed original NPC conditions evaluated without mutation":
+    "No independently earned original world commands were applied");
+ }
+}
+$("advanced-npc-rule-preview").addEventListener("click",async()=>{
+ try{await runNPCConditionalRules("preview");}
+ catch(error){status("NPC rule preview rejected: "+error.message);}
+});
+$("advanced-npc-rule-commit").addEventListener("click",async()=>{
+ try{await runNPCConditionalRules("commit");}
+ catch(error){status("NPC rule application rejected: "+error.message);}
+});
 let verifiedSourceEpisodes=[];
 let episodicLastProof=null,episodicLastScene=null;
 let verifiedInvestigationRoute=null;
@@ -3793,6 +3850,19 @@ local until typed revalidation and an explicit human-approved file commit.</smal
        accept=".json,application/json"/>
     </label>
     <pre id="advanced-episodic-save-receipt" role="status" aria-live="polite"></pre>
+  <fieldset aria-label="Typed living-world condition rules">
+    <legend>NPC world rules · source facts and earned actions</legend>
+    <label>Original if / all / any / not rule JSON
+      <textarea id="advanced-npc-rule-editor" rows="9"></textarea>
+    </label>
+    <button id="advanced-npc-rule-preview" type="button">
+      Preview original world rule outcomes
+    </button>
+    <button id="advanced-npc-rule-commit" type="button">
+      Commit verified source actions into current campaign
+    </button>
+    <pre id="advanced-npc-rule-proof" role="status" aria-live="polite"></pre>
+  </fieldset>
   </fieldset>
   <fieldset aria-label="Forensic NPC route navigator">
    <legend>Playable eyewitness and physical investigation routes</legend>
