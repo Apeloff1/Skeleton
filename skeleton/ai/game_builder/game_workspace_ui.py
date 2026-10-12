@@ -1246,6 +1246,75 @@ function renderAdvancedActions(actions){
     (state.mode==="racket"?" · rally "+(state.rally?"live":"waiting serve"):"")+
     " · all results independently replayable";
   target.append(info);
+  const coach=document.createElement("button");
+  coach.type="button";
+  coach.textContent="AI coach: search actual original winning match strategy";
+  coach.disabled=Boolean(advancedSession.terminal);
+  const evidence=document.createElement("pre");
+  evidence.id="sports-coach-proof";
+  evidence.setAttribute("role","status");
+  evidence.setAttribute("aria-live","polite");
+  coach.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="sports"||systemEditor().id!=="sports")
+     throw Error("AI coach requires current original sports editor");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("Authored match scene does not match gameplay seed");
+    const report=await api("/api/sports-coach",{
+      scene:source,settings:advancedSettings,
+      max_states:6000,max_depth:48,beam_width:36
+    });
+    const plan=report.plan;
+    evidence.textContent=JSON.stringify({
+      rules:plan.rules,status:plan.status,
+      commands:plan.actions,
+      home_score:plan.final_home_score??plan.best_observed_home_score,
+      away_score:plan.final_away_score??plan.best_observed_away_score,
+      expanded:plan.expanded_transitions,
+      proven_original_replay:plan.independently_verified,
+      source_digest:plan.source_digest,
+      proof_digest:plan.digest,
+      native_hardware_certified:false
+    },null,2);
+    target.querySelector("#sports-coach-adopt")?.remove();
+    if(plan.status!=="replay_verified_win"){
+      status("Original AI coach search was inconclusive. No false claim that the game is unwinnable.");
+      return;
+    }
+    const adopt=document.createElement("button");
+    adopt.type="button";adopt.id="sports-coach-adopt";
+    adopt.textContent="Play independently proven original match strategy";
+    adopt.addEventListener("click",async()=>{
+      try{
+        if(advancedEditor!=="sports"||systemEditor().id!=="sports"||
+           advancedSession.seed!==source.seed||advancedCommands.length!==0)
+          throw Error("Coach strategy can only start from the reviewed unchanged initial match");
+        const checked=await api("/api/sports-coach-verify",{
+          record:plan,scene:source,settings:advancedSettings
+        });
+        if(!checked.verified)throw Error("AI match coach proof failed re-search");
+        const replay=await api("/api/advanced-play",{
+          editor:"sports",settings:advancedSettings,
+          actions:plan.actions,seed:source.seed,scene:source
+        });
+        if(replay.session.digest!==plan.original_replay_digest||
+           !replay.session.state.finished||!replay.session.state.victory)
+          throw Error("Proposed coach strategy did not earn actual match victory");
+        advancedCommands=plan.actions.slice();
+        advancedScene=source;
+        showAdvanced(replay);
+        status("Original AI coach match fully replay-verified. No untrusted score, hardware release or automatic file mutation.");
+      }catch(error){status("AI coach strategy refused: "+error.message);}
+    });
+    target.append(adopt);
+    status("AI coach proved a winning original strategy. Review its actions, then explicitly adopt.");
+   }catch(error){
+    evidence.textContent="";
+    status("AI sports coach rejected: "+error.message);
+   }
+  });
+  target.append(coach);target.append(evidence);
   return;
  }
 
