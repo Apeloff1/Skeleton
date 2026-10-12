@@ -12,6 +12,9 @@ import json
 from typing import Mapping, Sequence
 
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_fighting_runtime import (ACTIONS as FIGHT_ACTIONS, FightingActionError,
+                                        start as fight_start, step as fight_step,
+                                        apply_scene as apply_fight_scene)
 from .advanced_rhythm_runtime import (ACTIONS as RHYTHM_ACTIONS, RhythmActionError,
                                       start as rhythm_start, step as rhythm_step,
                                       apply_scene as apply_rhythm_scene)
@@ -48,7 +51,7 @@ from .advanced_genre_engines import (
 )
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -75,6 +78,7 @@ ACTION_HELP = {
     "roguelike": ROGUE_ACTIONS,
     "rts": RTS_ACTIONS,
     "rhythm": RHYTHM_ACTIONS,
+    "fighting": FIGHT_ACTIONS,
     **GENRE_ACTIONS,
 }
 
@@ -686,12 +690,13 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "roguelike":rogue_start,
         "rts":rts_start,
         "rhythm":rhythm_start,
+        "fighting":fight_start,
         **GENRE_STARTS,
     }
     try:
         state=starts[editor](rules,seed)
     except (GenreActionError,FarmingActionError,FactoryActionError,
-            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError) as exc:
+            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError) as exc:
         raise AdvancedRuntimeError(str(exc)) from exc
     if scene is not None:
         from .advanced_level_scenes import validate_advanced_scene
@@ -741,6 +746,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             apply_rts_scene(state,rules,layout)
         elif editor=="rhythm":
             apply_rhythm_scene(state,rules,layout)
+        elif editor=="fighting":
+            apply_fight_scene(state,rules,layout)
         else:
             apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
@@ -767,11 +774,12 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "roguelike":rogue_step,
             "rts":rts_step,
             "rhythm":rhythm_step,
+            "fighting":fight_step,
             **GENRE_STEPS,
         }
         try:
             events=steps[editor](state,rules,action)
-        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError) as exc:
+        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
