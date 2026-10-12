@@ -1890,6 +1890,69 @@ function renderAdvancedActions(actions){
   target.append(checkpointButton);target.append(cursorSelect);
   target.append(branchInput);target.append(branchButton);
   target.append(timelineOutput);
+  const fastTitle=document.createElement("h4");
+  fastTitle.textContent="Fast Branch Lab · verified in-memory checkpoint/suffix simulation";
+  target.append(fastTitle);
+  const fastInput=document.createElement("textarea");
+  fastInput.rows=5;
+  fastInput.id="original-fast-branches-input";
+  fastInput.setAttribute("aria-label","Up to twelve independently verifiable original history forks");
+  fastInput.value=JSON.stringify([
+    {name:"western_path",actions:["move:west","wait"]},
+    {name:"eastern_path",actions:["move:east","wait"]},
+    {name:"patient_world",actions:["wait","wait"]}
+  ],null,1);
+  target.append(fastInput);
+  const fastRun=document.createElement("button");
+  fastRun.type="button";
+  fastRun.textContent="Run source-verified fast multi-world history comparison";
+  const fastOutput=document.createElement("pre");
+  fastOutput.id="original-fast-branch-verification";
+  fastOutput.setAttribute("role","status");
+  fastOutput.setAttribute("aria-live","polite");
+  fastRun.addEventListener("click",async()=>{
+    try{
+      if(!latestStreamCheckpoint)
+       throw Error("Create independently verified source bookmarks first");
+      const branches=JSON.parse(fastInput.value);
+      if(!Array.isArray(branches)||branches.length<1||branches.length>12)
+       throw Error("Specify one to twelve real source histories");
+      const cursor=Number(cursorSelect.value);
+      const response=await api("/api/fast-chunk-forks",{
+        checkpoint:latestStreamCheckpoint,branches,cursor
+      });
+      if(!response.verified||response.source_files_mutated||
+         response.speed_certified||response.record.core_model_weights_promoted)
+       throw Error("Fast fork claims or physical source outcome failed review");
+      const second=await api("/api/fast-chunk-forks-verify",{record:response.record});
+      if(!second.verified)throw Error("Independent full world histories diverged");
+      const batch=response.record;
+      fastOutput.textContent=JSON.stringify({
+        source_cursor:batch.source_cursor,
+        authentication_passes_during_preparation:batch.original_prefix_authentications,
+        divergent_actions_executed:batch.suffix_transitions_executed,
+        repeated_prefix_actions_during_forks:batch.prefix_transitions_reexecuted_during_branch_forks,
+        full_source_replayed_for_untrusted_verification:true,
+        scope:batch.trust_scope,
+        hardware_speed_certified:false,
+        original_worlds:batch.results.map(row=>({
+          branch:row.name,actions:row.appended_actions,
+          result_digest:row.result_digest,
+          tick:row.state.tick,player:row.state.player,
+          actor_count:row.state.physical_actor_count,
+          detailed_updates:row.state.detailed_updates,
+          physical_moves:row.state.physical_moves,
+          source_quests_resolved:row.state.quests_resolved
+        })),
+        project_mutated:false,model_weights_promoted:false
+      },null,2);
+      status("Fast divergent game worlds converged with independent from-genesis proof.");
+    }catch(error){
+      fastOutput.textContent="";
+      status("Fast Branch Lab rejected: "+error.message);
+    }
+  });
+  target.append(fastRun);target.append(fastOutput);
   return;
  }
  if(advancedSession?.editor==="economy"){
