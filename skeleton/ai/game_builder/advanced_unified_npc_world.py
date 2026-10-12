@@ -25,8 +25,9 @@ MOVES = {"north": -SIDE, "south": SIDE, "east": 1, "west": -1}
 ACTOR_PREFIX = "original_npc:"
 ACTIONS = ("inspect", "wait", "rest", "retire") + tuple(
     f"{kind}:{i}"
-    for kind in ("speak", "support", "observe", "discover", "help", "harm",
-                 "followup", "resolve", "council")
+    for kind in ("speak", "support", "challenge", "observe",
+                 "discover", "help", "harm", "followup", "sabotage",
+                 "resolve", "council")
     for i in range(4)
 ) + tuple("move:" + k for k in MOVES)
 
@@ -145,7 +146,7 @@ def _initial(config,scenes):
             "trust":config["dialogue"]["starting_trust"],
             "patience":alias["initial_patience"] if alias else
                        config["dialogue"]["speaker_patience"],
-            "bond":0,"supported":0,"heard_firsthand":[],
+            "bond":0,"supported":0,"challenged":0,"heard_firsthand":[],
             "witness_memories":[],"dialogue_memories":[],
             "last_spoke":None,"conversations":0,
             "suspicion":0,
@@ -234,6 +235,7 @@ def _event(state,config,kind,site,occurrences):
             "id":qid,"site_id":site["id"],"source_event":eid,
             "trigger":kind,"direct_witnesses":observers,
             "testimonies":[],"pledges":[],"followups":0,
+            "material_actions":[],
             "choice":None,"status":"active","ending":None,
             "created_tick":state["tick"],"resolved_at":None,
         }
@@ -284,7 +286,7 @@ def _simulate_action(state,config,action):
         occurrences.append("optional_verified_original_epilogue")
     else:
         verb,index=action.split(":");i=int(index)
-        if verb in ("speak","support","observe"):
+        if verb in ("speak","support","challenge","observe"):
             actor=_actor(state,i)
             _require_near(state["player"],actor["position"])
             if verb=="observe":
@@ -321,31 +323,41 @@ def _simulate_action(state,config,action):
                 occurrences.append("source_npc_speaks_from_one_real_physical_body")
             else:
                 if not d["choice_consequences"] or not actor["conversations"]:
-                    raise UnifiedWorldError("material social support requires actual prior speech")
+                    raise UnifiedWorldError("binding original social choice needs real earlier dialogue")
                 if actor["patience"]<1:
                     raise UnifiedWorldError("social participant refuses exhausted conversation")
-                _charge(state,"influence",d["support_cost"])
-                _charge(state,"supplies",q["help_supplies"])
-                actor["patience"]-=1
-                actor["trust"]=min(d["trust_cap"],actor["trust"]+d["support_trust_gain"])
-                actor["bond"]+=config["npc_society"]["help_bond"]
-                actor["supported"]+=1
-                state["resources"]["reputation"]+=d["support_reputation"]
                 quest=_quest_from_memory(state,actor)
                 if not quest or i not in quest["testimonies"]:
-                    raise UnifiedWorldError("paid support cannot create unwitnessed quest evidence")
-                if quest["choice"] is not None and quest["choice"]!="support":
-                    raise UnifiedWorldError("cannot rewrite an existing causal branch")
-                quest["choice"]="support"
+                    raise UnifiedWorldError("social choice cannot create unwitnessed quest evidence")
+                chosen="support" if verb=="support" else "exploit"
+                if quest["choice"] is not None:
+                    raise UnifiedWorldError("original player narrative branch cannot be rewritten")
+                influence_cost=d["support_cost"] if verb=="support" else d["challenge_cost"]
+                material_cost=q["help_supplies"] if verb=="support" else 0
+                _charge(state,"influence",influence_cost)
+                _charge(state,"supplies",material_cost)
+                actor["patience"]-=1
+                if verb=="support":
+                    actor["trust"]=min(d["trust_cap"],actor["trust"]+d["support_trust_gain"])
+                    actor["bond"]+=config["npc_society"]["help_bond"]
+                    actor["supported"]+=1
+                    state["resources"]["reputation"]+=d["support_reputation"]
+                else:
+                    actor["trust"]=max(0,actor["trust"]-d["challenge_trust_loss"])
+                    actor["bond"]-=config["npc_society"]["accusation_penalty"]
+                    actor["challenged"]+=1
+                    actor["suspicion"]+=1
+                    state["resources"]["reputation"]-=d["challenge_reputation"]
+                quest["choice"]=chosen
                 quest["pledges"].append(i)
                 state["choices"].append({
                     "actor":actor["id"],"quest_id":quest["id"],
-                    "influence_paid":d["support_cost"],
-                    "supplies_paid":q["help_supplies"],
-                    "tick":state["tick"],"branch":"support",
+                    "influence_paid":influence_cost,
+                    "supplies_paid":material_cost,
+                    "tick":state["tick"],"branch":chosen,
                 })
-                occurrences.append("single_world_social_choice_paid_and_committed")
-        elif verb in ("discover","help","harm","followup","resolve","council"):
+                occurrences.append("single_world_paid_social_branch_"+chosen)
+        elif verb in ("discover","help","harm","followup","sabotage","resolve","council"):
             site=_site(state,i)
             _require_near(state["player"],site["cell"])
             if verb in ("discover","help","harm"):
@@ -367,32 +379,54 @@ def _simulate_action(state,config,action):
                         raise UnifiedWorldError("already collapsed original civic site cannot be harmed")
                     site["integrity"]=max(0,site["integrity"]-q["harm_power"])
                     _event(state,config,"harm",site,occurrences)
-            elif verb=="followup":
+            elif verb in ("followup","sabotage"):
+                chosen="support" if verb=="followup" else "exploit"
                 quest=next((a for a in state["quests"] if a["site_id"]==i and
-                            a["status"]=="active" and a["choice"]=="support"),None)
+                            a["status"]=="active" and a["choice"]==chosen),None)
                 if quest is None or not quest["testimonies"] or not quest["pledges"]:
-                    raise UnifiedWorldError("material quest followup requires real testimony and pledge")
+                    raise UnifiedWorldError("material original quest action needs matched real source branch")
                 _charge(state,"stamina",q["action_stamina"])
-                _charge(state,"supplies",q["help_supplies"])
-                site["aid_received"]+=q["help_supplies"]
+                if verb=="followup":
+                    _charge(state,"supplies",q["help_supplies"])
+                    site["aid_received"]+=q["help_supplies"]
+                else:
+                    if site["stock"]<q["gather_units"]:
+                        raise UnifiedWorldError("cannot exploit empty original real site stock")
+                    site["stock"]-=q["gather_units"]
+                    state["resources"]["supplies"]+=q["gather_units"]
+                    state["resources"]["reputation"]-=q["reputation_loss"]
                 quest["followups"]+=1
-                occurrences.append("real_paid_followup_advanced_verified_quest")
+                quest["material_actions"].append({
+                    "tick":state["tick"],"kind":verb,
+                    "site_id":i,"supplies_changed":(
+                        -q["help_supplies"] if verb=="followup" else q["gather_units"]
+                    ),
+                })
+                occurrences.append("real_finite_"+verb+"_advanced_original_quest")
             elif verb=="resolve":
                 quest=next((a for a in state["quests"] if a["site_id"]==i and
-                            a["status"]=="active" and a["choice"]=="support"
+                            a["status"]=="active" and a["choice"] in ("support","exploit")
                             and a["pledges"] and a["testimonies"]),None)
                 if quest is None or quest["followups"]<q["consequence_depth"]:
-                    raise UnifiedWorldError("unified quest needs all finite material obligations")
-                quest["status"]="resolved";quest["ending"]="restored"
+                    raise UnifiedWorldError("unified quest requires full finite chosen material obligations")
+                correct_kind="followup" if quest["choice"]=="support" else "sabotage"
+                if any(row["kind"]!=correct_kind for row in quest["material_actions"]):
+                    raise UnifiedWorldError("material actions do not match original narrative branch")
+                quest["status"]="resolved"
+                quest["ending"]="restored" if quest["choice"]=="support" else "exploited"
                 quest["resolved_at"]=state["tick"]
                 state["resolved_count"]+=1
-                state["resources"]["gold"]+=q["reward_gold"]
-                state["resources"]["reputation"]+=q["reputation_gain"]
-                occurrences.append("canonical_quest_resolved_from_paid_real_actions")
+                if quest["ending"]=="restored":
+                    state["resources"]["gold"]+=q["reward_gold"]
+                    state["resources"]["reputation"]+=q["reputation_gain"]
+                else:
+                    state["resources"]["gold"]+=q["exploit_gold"]
+                    state["resources"]["reputation"]-=q["reputation_loss"]
+                occurrences.append("canonical_"+quest["ending"]+"_quest_from_finite_real_actions")
             else:
                 quest=next((a for a in state["quests"] if a["site_id"]==i and
                             a["status"]=="resolved"),None)
-                if quest is None or i in state["councils"]:
+                if quest is None or quest["ending"]!="restored" or i in state["councils"]:
                     raise UnifiedWorldError("unique social council requires resolved original site")
                 if len(set(quest["testimonies"]))<2:
                     raise UnifiedWorldError("council cannot forge two independent direct witnesses")
