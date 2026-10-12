@@ -35,7 +35,7 @@ class OriginalLiveStrategyTests(unittest.TestCase):
         spec=next(x for x in catalog() if x["id"]=="rts")
         self.assertEqual(spec["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(spec["progression_floor"],"advanced")
-        self.assertEqual(len(spec["fields"]),62)
+        self.assertEqual(len(spec["fields"]),63)
         self.assertGreater(len(ACTIONS),500)
         self.assertEqual(len(set(ACTIONS)),len(ACTIONS))
 
