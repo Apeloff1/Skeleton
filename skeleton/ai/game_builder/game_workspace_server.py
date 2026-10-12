@@ -35,6 +35,7 @@ from .advanced_roguelike_longrun import (replay_long_roguelike,
 from .advanced_world_planner import plan_original_world
 from .advanced_stealth_planner import plan_stealth_route
 from .advanced_parkour_planner import plan_parkour_route, verify_parkour_plan
+from .advanced_sports_coach import plan_original_sports_match, verify_original_sports_plan
 from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
@@ -377,6 +378,20 @@ class _StudioHandler(BaseHTTPRequestHandler):
             valid=verify_parkour_plan(values["record"],values["scene"],
                                       values.get("settings"))
             return self._json(200,{"verified":valid,"original_source_mutated":False})
+        if path=="/api/sports-coach":
+            plan=plan_original_sports_match(
+                values["scene"],values.get("settings"),
+                max_states=values.get("max_states",16000),
+                max_depth=values.get("max_depth",64),
+                beam_width=values.get("beam_width",48))
+            return self._json(200,{"plan":plan,
+                                   "original_source_mutated":False,
+                                   "native_hardware_certified":False})
+        if path=="/api/sports-coach-verify":
+            verified=verify_original_sports_plan(
+                values["record"],values["scene"],values.get("settings"))
+            return self._json(200,{"verified":verified,
+                                   "original_source_mutated":False})
         if path=="/api/advanced-play":
             result=run_advanced_session(
                 values["editor"], values.get("settings"),
