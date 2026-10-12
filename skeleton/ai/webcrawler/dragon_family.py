@@ -180,6 +180,10 @@ class DragonFamily:
         prev = self.db.execute("""SELECT sequence,event_hash FROM dragon_family_events
              WHERE owner=? ORDER BY sequence DESC LIMIT 1""", (owner,)).fetchone()
         seq, previous = (prev[0] + 1, prev[1]) if prev else (1, ZERO)
+        last = self.db.execute("""SELECT at FROM dragon_family_events
+            WHERE owner=? ORDER BY sequence DESC LIMIT 1""", (owner,)).fetchone()
+        if last and at < last[0]:
+            raise ValueError("family timestamps must be monotonic")
         if seq > self.max_events:
             raise ValueError("dragon history capacity exceeded")
         payload = [owner, seq, at, dragon, action, source_id, details, previous]
@@ -343,7 +347,7 @@ class DragonFamily:
         current = _tokens(task_topics)
         adjacent = _tokens(adjacent_topics)
         at = _epoch(receipt.observed_at)
-        if at > window.now or at < window.last_user_activity_at:
+        if at > window.now or at < window.last_user_activity_at or window.now - at > 300:
             raise ValueError("receipt outside active idle window")
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
@@ -361,9 +365,11 @@ class DragonFamily:
             near = bool(source_topics.intersection(adjacent))
             if not (direct or near):
                 raise ValueError("source unrelated to task or approved adjacent topics")
-            latest = self.db.execute("""SELECT content_digest FROM dragon_family_readings
-                WHERE owner=? AND dragon=? AND source_id=? ORDER BY observed_at DESC,rowid DESC LIMIT 1""",
-                (owner, dragon, receipt.source_id)).fetchone()
+            latest = self.db.execute("""SELECT content_digest,observed_at FROM dragon_family_readings
+                WHERE owner=? AND source_id=? ORDER BY observed_at DESC,rowid DESC LIMIT 1""",
+                (owner, receipt.source_id)).fetchone()
+            if latest and at <= latest[1]:
+                raise ValueError("source observation must advance its revision clock")
             baseline = latest[0] if latest else parent_digest
             if baseline == receipt.content_digest:
                 return False
@@ -371,8 +377,8 @@ class DragonFamily:
                 # Source has never been acquired; an update cannot be claimed.
                 return False
             previous = self.db.execute("""SELECT 1 FROM dragon_family_readings
-                WHERE owner=? AND dragon=? AND source_id=? AND content_digest=?""",
-                (owner, dragon, receipt.source_id, receipt.content_digest)).fetchone()
+                WHERE owner=? AND source_id=? AND content_digest=?""",
+                (owner, receipt.source_id, receipt.content_digest)).fetchone()
             if previous:
                 return False
             # Reject content replays already known to the parent even if the child
