@@ -374,7 +374,7 @@ def _compile_original_game(project,args,mode):
     if mode in ("native","mirror"):
         package=render_dual_runtime_package(compiled,authorized=True)
     if mode=="mirror":
-        from .dual_rival_forge import review_playable_project
+        from .mirror_room_runtime import review_playable_project
         # The existing mirror reviewer has a bounded attempt count.
         mirror=review_playable_project(
             compiled,package,authorized=True,attempts=64)
