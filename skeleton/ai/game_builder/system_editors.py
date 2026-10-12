@@ -2468,6 +2468,14 @@ CATALOG = json.loads(r'''[
         "minimum": 0,
         "maximum": 20,
         "options": []
+      },
+      {
+        "key": "kill_experience",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
       }
     ],
     "preview": null
