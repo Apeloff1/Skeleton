@@ -17,6 +17,9 @@ from .advanced_gameplay_runtime import (
 )
 from .system_editors import make_editor_document, SystemEditorError
 from .advanced_genre_engines import STARTS as GENRE_STARTS, CARDS, puzzle_default_layout
+from .advanced_factory_runtime import (default_layout as factory_layout,
+                                       normalize_layout as validate_factory_layout,
+                                       FactoryActionError)
 from .advanced_farming_runtime import (default_layout as farm_layout,
                                        normalize_layout as validate_farm_layout,
                                        FarmingActionError)
@@ -116,12 +119,19 @@ def _default_layout(engine, config, seed):
         return puzzle_default_layout(config)
     if engine == "farming":
         return farm_layout(config,seed)
+    if engine == "factory":
+        return factory_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
 def _normalize_layout(engine, config, layout):
     if type(layout) is not dict:
         raise SceneError("authored layout must be a JSON object")
+    if engine=="factory":
+        try:
+            return validate_factory_layout(config,layout)
+        except FactoryActionError as exc:
+            raise SceneError(str(exc)) from exc
     if engine=="farming":
         try:
             return validate_farm_layout(config,layout)
