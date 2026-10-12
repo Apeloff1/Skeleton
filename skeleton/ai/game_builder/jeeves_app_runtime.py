@@ -43,7 +43,8 @@ PROTECTED = re.compile(
     r"(^|[_.-])(secret|credential|password|api.?key|token|private|vault|"
     r"ssh|oauth|session|cookie|auth|license.?key)([_.-]|$)",re.I)
 WRITE_ROOTS = ("systems/", "story/", "scenes/", "game/", "missions/",
-               "world/", "npc/", "assets/", "design/")
+               "world/", "npc/", "npcs/", "assets/", "design/",
+               "dialogue/", "cinematics/", "engine/", "almanacs/", "notes/")
 HIGH_RISK = frozenset(("process","filesystem","network","training",
                       "publication","secrets","provider","hardware"))
 
@@ -103,6 +104,7 @@ ACTION_DEFS = (
     ("studio.editor.catalog", "Discover all typed game system editors", "read", False),
     ("studio.editor.preview", "Validate editor configuration and run existing deterministic preview", "simulate", False),
     ("studio.editor.stage", "Prepare a single exact-source system edit requiring human commit", "propose", True),
+    ("studio.source.propose", "Stage any project-scoped editor/director/forge file under exact-SHA human review", "propose", True),
     ("studio.assembly", "Compile reviewed game systems with explicit missing runtime gates", "simulate", False),
     ("studio.route", "Map creative request to exact module/source targets", "plan", False),
     ("jeeves.director", "Plan a phase-correct original Jeeves game production task", "plan", False),
@@ -399,6 +401,38 @@ def _compile_original_game(project,args,mode):
     return {**body,"digest":canonical_digest(body)}
 
 
+def _propose_source(workspace,project,args,authorized):
+    """The common guarded write gateway for all project-owned editor families.
+
+    Full 3D, character, dialogue, world, cinematic, quest, forge and director
+    authoring is possible as source proposals without a generic write primitive.
+    Existing Studio validators still run on BOTH proposal and human commit.
+    Every source is revision-bound and cannot edit app Python outside the
+    active project source tree.
+    """
+    if not authorized:
+        raise PermissionError("operator authorization is needed for project source proposals")
+    _exact(args,("path","content","expected_sha256","reason"),
+           "Jeeves whole-studio source proposal")
+    path=args["path"]
+    if type(path) is not str or not any(path.startswith(p) for p in WRITE_ROOTS):
+        raise PermissionError("Jeeves project edits must stay inside reviewed editor directories")
+    if PROTECTED.search(path):
+        raise PermissionError("cannot propose credential material as a game source")
+    content=_plain(args["content"],"reviewable UTF-8 original source",128000)
+    sha=_sha(args["expected_sha256"],"optimistic source revision")
+    reason=_plain(args["reason"],"specific designer review reason",1000)
+    if len(reason)<10:
+        raise JeevesAppCapabilityError("authored source must have a detailed review reason")
+    result=workspace.propose(project,path,content,
+                             expected_sha256=sha,
+                             reason=reason,
+                             authorized=True)
+    return {**result,"source_file_compiled":False,
+            "human_commit_required":True,
+            "no_undocumented_filesystem_write":True}
+
+
 def _simulate_companion(args):
     _exact(args,("owner","events"),"Dragon companion rehearsal")
     from skeleton.ai.webcrawler.dragon_companion_runtime import (
@@ -595,6 +629,8 @@ def dispatch_app_action(workspace,project,action,args,*,authorized=False):
         result=preview_editor(args["editor"],args["settings"])
     elif action=="studio.editor.stage":
         result=_stage_editor(workspace,project,args,authorized)
+    elif action=="studio.source.propose":
+        result=_propose_source(workspace,project,args,authorized)
     elif action=="studio.assembly":
         _exact(args,(),"approved engine assembly")
         result=assemble_workspace_systems(workspace,project,authorized=True)
