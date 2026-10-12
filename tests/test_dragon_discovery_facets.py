@@ -333,8 +333,12 @@ def test_receipt_mutation_invalidates_facets_until_provenance_reindex(indexed_st
     assert idx.health("studio", authorized=True)["unindexed_or_changed"] == 1
     _populate(idx)
     assert idx.health("studio", authorized=True)["coverage_complete"]
-    assert sid not in {x["source_id"] for x in result["selection"]
-                       if x["source_id"] != sid}  # no new fetch, no approval
+    retired = MissionSourceScout(almanacs).propose(
+        "studio", SourceMission("cavern shader", limit=3),
+        authorized=True, indexed=True)
+    assert sid not in {x["source_id"] for x in retired["selection"]}
+    assert all(not x["training_authorized"] and not x["network_authorized"]
+               for x in retired["selection"])
 
 
 def test_discovery_facet_trigger_creation_keeps_caller_transaction(indexed_studio):
