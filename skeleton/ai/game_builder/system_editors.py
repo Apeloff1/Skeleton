@@ -3784,109 +3784,6 @@ CATALOG = json.loads(r'''[
         "minimum": 0,
         "maximum": 100,
         "options": []
-      }
-    ],
-    "preview": "rhythm"
-  },
-  {
-    "id": "deck_battler",
-    "group": "Creative",
-    "title": "Deck Battler",
-    "description": "Spend energy, attack, block and progress against an enemy.",
-    "fields": [
-      {
-        "key": "starting_health",
-        "kind": "int",
-        "default": 25,
-        "minimum": 1,
-        "maximum": 100,
-        "options": []
-      },
-      {
-        "key": "enemy_health",
-        "kind": "int",
-        "default": 30,
-        "minimum": 1,
-        "maximum": 100,
-        "options": []
-      },
-      {
-        "key": "energy_per_turn",
-        "kind": "int",
-        "default": 3,
-        "minimum": 1,
-        "maximum": 10,
-        "options": []
-      },
-      {
-        "key": "attack_damage",
-        "kind": "int",
-        "default": 6,
-        "minimum": 1,
-        "maximum": 100,
-        "options": []
-      },
-      {
-        "key": "block_value",
-        "kind": "int",
-        "default": 5,
-        "minimum": 0,
-        "maximum": 100,
-        "options": []
-      }
-    ],
-    "preview": "deck_battler"
-  },
-  {
-    "id": "narrative",
-    "group": "Creative",
-    "title": "Branching Narrative",
-    "description": "Choice forks, flags, continuity and multiple legitimate endings.",
-    "fields": [
-      {
-        "key": "branch_depth",
-        "kind": "int",
-        "default": 8,
-        "minimum": 1,
-        "maximum": 128,
-        "options": []
-      },
-      {
-        "key": "ending_count",
-        "kind": "int",
-        "default": 5,
-        "minimum": 1,
-        "maximum": 100,
-        "options": []
-      },
-      {
-        "key": "state_flags",
-        "kind": "int",
-        "default": 16,
-        "minimum": 1,
-        "maximum": 256,
-        "options": []
-      },
-      {
-        "key": "postgame_play",
-        "kind": "bool",
-        "default": true,
-        "minimum": null,
-        "maximum": null,
-        "options": []
-      },
-      {
-        "key": "structure",
-        "kind": "enum",
-        "default": "branching",
-        "minimum": null,
-        "maximum": null,
-        "options": [
-          "linear",
-          "branching",
-          "emergent",
-          "endless"
-        ]
       },
       {
         "key": "lane_count",
@@ -4198,6 +4095,109 @@ CATALOG = json.loads(r'''[
           "none",
           "visual",
           "expanded"
+        ]
+      }
+    ],
+    "preview": "rhythm"
+  },
+  {
+    "id": "deck_battler",
+    "group": "Creative",
+    "title": "Deck Battler",
+    "description": "Spend energy, attack, block and progress against an enemy.",
+    "fields": [
+      {
+        "key": "starting_health",
+        "kind": "int",
+        "default": 25,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "enemy_health",
+        "kind": "int",
+        "default": 30,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "energy_per_turn",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "attack_damage",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "block_value",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      }
+    ],
+    "preview": "deck_battler"
+  },
+  {
+    "id": "narrative",
+    "group": "Creative",
+    "title": "Branching Narrative",
+    "description": "Choice forks, flags, continuity and multiple legitimate endings.",
+    "fields": [
+      {
+        "key": "branch_depth",
+        "kind": "int",
+        "default": 8,
+        "minimum": 1,
+        "maximum": 128,
+        "options": []
+      },
+      {
+        "key": "ending_count",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "state_flags",
+        "kind": "int",
+        "default": 16,
+        "minimum": 1,
+        "maximum": 256,
+        "options": []
+      },
+      {
+        "key": "postgame_play",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "structure",
+        "kind": "enum",
+        "default": "branching",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "linear",
+          "branching",
+          "emergent",
+          "endless"
         ]
       }
     ],
