@@ -214,3 +214,83 @@ def test_campaign_rejects_planned_url_that_differs_from_canonical_store(campaign
     assert ledger.db.execute(
         "SELECT COUNT(*) FROM dragon_discovery_campaigns"
     ).fetchone()[0] == 0
+
+
+def test_saved_campaign_refresh_is_idempotent_and_preserves_owner(campaign_studio):
+    _, a, topic, ids = campaign_studio
+    campaigns = DiscoveryCampaigns(a)
+    initial = campaigns.record(
+        "studio", "resumable", _request(include_rights=True),
+        authorized=True, topic=topic)
+    repeat = campaigns.refresh("studio", "resumable", authorized=True,
+                               expected_parent=initial["digest"])
+    assert repeat["unchanged"] is True and repeat["revision"] == 0
+    assert repeat["reused_saved_request"] is True
+    assert repeat["crawl_authorized"] is False
+    assert repeat["source_rights_approved"] is False
+    with pytest.raises(ValueError, match="expected parent"):
+        campaigns.refresh("studio", "resumable", authorized=True,
+                          expected_parent="f" * 64)
+    with pytest.raises(PermissionError):
+        campaigns.refresh("studio", "resumable", authorized=False)
+    with pytest.raises(ValueError, match="unknown owner campaign"):
+        campaigns.refresh("other", "resumable", authorized=True)
+
+
+def test_refresh_discovers_new_rights_source_and_versions_gap_delta(campaign_studio):
+    store, a, topic, ids = campaign_studio
+    campaigns = DiscoveryCampaigns(a)
+    first = campaigns.record(
+        "studio", "rights-gap", _request(include_rights=True),
+        authorized=True, topic=topic)
+    assert first["discovery_gaps"] == ["rights"]
+    url = canonical_source_url(
+        "https://new-source.example/original-game-rights-licenses")
+    sid = "source-" + sha256(url.encode("utf-8")).hexdigest()
+    source = {
+        "source_id": sid, "url": url, "kind": "web_candidate",
+        "rights": "not_assessed", "training_authorized": False,
+        "discoveries": [
+            {"catalog_id": "rights", "line": 1, "headers": ["Licensing"]}],
+    }
+    store.db.execute(
+        "INSERT INTO dragon_almanac_sources VALUES(?,?,?,?)",
+        ("studio", sid, canonical_json(source), canonical_digest(source)))
+    store.db.execute(
+        "INSERT INTO dragon_almanac_members VALUES(?,?,?)",
+        ("studio", topic, sid))
+    SequentialAlmanacWorker(a).seed("studio", authorized=True)
+    store.db.commit()
+    DiscoveryFacetIndex(a).refresh("studio", authorized=True, limit=100)
+    improved = campaigns.refresh(
+        "studio", "rights-gap", authorized=True,
+        expected_parent=first["digest"])
+    assert improved["unchanged"] is False
+    assert improved["revision"] == 1
+    assert improved["discovery_gaps"] == []
+    view = campaigns.inspect("studio", "rights-gap", authorized=True)
+    assert view["gap_delta_since_previous"]["rights"] == -1
+    assert sid in view["selected_added_since_previous"]
+    assert view["source_rights_approved"] is False
+    assert view["training_authorized"] is False
+
+
+def test_refresh_rejects_forged_saved_input_even_when_hashes_are_recomputed(campaign_studio):
+    store, a, topic, ids = campaign_studio
+    campaigns = DiscoveryCampaigns(a)
+    campaigns.record("studio", "forged-typed", _request(),
+                     authorized=True, topic=topic)
+    raw = store.db.execute(
+        "SELECT body FROM dragon_discovery_campaigns "
+        "WHERE owner='studio' AND campaign='forged-typed'").fetchone()[0]
+    body = json.loads(raw)
+    body["request"]["mission"]["unauthorized_execution"] = True
+    store.db.execute(
+        "UPDATE dragon_discovery_campaigns SET body=?,digest=? "
+        "WHERE owner='studio' AND campaign='forged-typed'",
+        (canonical_json(body), canonical_digest(body)))
+    store.db.commit()
+    with pytest.raises(ValueError, match="schema mismatch"):
+        campaigns.refresh("studio", "forged-typed", authorized=True)
+    assert campaigns.inspect(
+        "studio", "forged-typed", authorized=True)["training_authorized"] is False
