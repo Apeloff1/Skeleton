@@ -4228,6 +4228,25 @@ CATALOG = json.loads(r'''[
         "minimum": null,
         "maximum": null,
         "options": []
+      },
+      {
+        "key": "collision_geometry",
+        "kind": "enum",
+        "default": "aabb",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "aabb",
+          "oriented_box"
+        ]
+      },
+      {
+        "key": "contact_friction",
+        "kind": "int",
+        "default": 25,
+        "minimum": 0,
+        "maximum": 95,
+        "options": []
       }
     ],
     "preview": null
