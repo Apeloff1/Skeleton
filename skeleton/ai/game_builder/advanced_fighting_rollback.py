@@ -62,7 +62,13 @@ def _perform(state,cfg,side,command,events):
         if command in ("retreat","backdash"):distance=-distance
         dx=0 if command.startswith("sidestep") else toward*distance
         dy=1 if command=="sidestep_down" else -1 if command=="sidestep_up" else 0
-        _move(state,cfg,fighter,dx,dy,events)
+        if command in ("dash","backdash") and (
+            fighter["stamina"]<cfg["move_stamina"]+cfg["dash_stamina_cost"]):
+            raise FightingRollbackError("peer cannot dash without real stamina budget")
+        moved=_move(state,cfg,fighter,dx,dy,events)
+        if moved and command in ("dash","backdash"):
+            fighter["stamina"]-=cfg["dash_stamina_cost"]
+            events.append("peer_paid_extra_original_dash_stamina")
     elif command in ("guard_high","guard_low"):
         fighter["guard_high"]=command=="guard_high"
         fighter["guard_low"]=command=="guard_low"
@@ -103,8 +109,11 @@ def _perform(state,cfg,side,command,events):
         if fighter["stamina"]<cfg["feint_stamina"]:
             raise FightingRollbackError("insufficient real stamina for peer feint")
         fighter["stamina"]-=cfg["feint_stamina"]
-        enemy["guard_high"]=False;enemy["guard_low"]=False
-        events.append("peer_paid_real_stamina_for_guard_breaking_feint")
+        if _distance(fighter,enemy)<=cfg["feint_range"]:
+            enemy["guard_high"]=False;enemy["guard_low"]=False
+            events.append("peer_close_range_feint_paid_to_disrupt_guard")
+        else:
+            events.append("peer_distant_original_feint_did_not_mint_guard_break")
     elif command in ("wait:60","wait:240","inspect"):
         events.append("peer_executed_authoritative_no_hit_or_clock_input")
     else:
