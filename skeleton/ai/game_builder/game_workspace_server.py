@@ -40,6 +40,8 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_physics_episodic_save import (export_episodic_savegame,
+    import_episodic_savegame,continue_episodic_savegame)
 from .advanced_physics_episodic_world import (run_episodic_physics_world,
     verify_episodic_physics_world)
 from .advanced_physics_multi_incident_world import (run_multi_incident_world,
@@ -435,6 +437,32 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-physics-episodic-save-export":
+            document=export_episodic_savegame(
+                values["episodes"],values["world_scene"],values.get("world_settings"))
+            return self._json(200,{
+                "save":document,"original_source_modified":False,
+                "native_hardware_certified":False,
+                "automatic_publication_approved":False,
+            })
+        if path=="/api/advanced-physics-episodic-save-import":
+            recovered=import_episodic_savegame(values["save"])
+            return self._json(200,{
+                "restored":recovered,"original_source_modified":False,
+                "native_hardware_certified":False,
+                "automatic_publication_approved":False,
+            })
+        if path=="/api/advanced-physics-episodic-save-continue":
+            advanced=continue_episodic_savegame(
+                values["save"],
+                additional_episodes=values.get("additional_episodes",[]),
+                additional_world_actions=values.get("additional_world_actions",[]))
+            recovered=import_episodic_savegame(advanced)
+            return self._json(200,{
+                "save":advanced,"restored":recovered,
+                "original_source_modified":False,
+                "automatic_publication_approved":False,
             })
         if path=="/api/advanced-physics-episodic-npc":
             world=run_episodic_physics_world(
