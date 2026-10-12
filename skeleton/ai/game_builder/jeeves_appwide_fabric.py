@@ -204,7 +204,8 @@ class AppwideInventory:
             "domains":dict(sorted(domains.items())),
             "root_counts":dict(sorted(roots.items())),
             "snapshot_digest":self._digest,
-            "all_regular_files_discoverable":True,
+            "visible_regular_files_discoverable":True,
+            "excluded_and_unreadable_paths_are_not_executable":True,
             "all_files_executable":False,
             "all_features_working":False,
             "source_edits_require_review":True,
@@ -323,6 +324,11 @@ OPERATIONS = {
     "source.propose":("proposal", "exact-file reviewed code edit",True),
     "editor.catalog":("read", "typed original-game editors",False),
     "editor.preview":("compute", "isolated editor simulation",False),
+    "editor.template":("compute", "validated editable system template",False),
+    "forge.tools":("read", "typed forge and studio tool discovery",False),
+    "director.rpg":("compute", "bounded verified RPG chapter director",False),
+    "director.world":("compute", "deterministic world-route director",False),
+    "studio.assembly":("compute", "approved system integration audit",False),
     "studio.tree":("read", "active project files",False),
     "studio.file":("read", "active project source",False),
     "studio.propose":("proposal", "targeted human-reviewed project edit",True),
@@ -386,12 +392,41 @@ class JeevesAppwideRuntime:
         elif action=="editor.preview":
             from .system_editors import preview_editor
             result=preview_editor(params["editor"],params.get("settings"))
+        elif action=="editor.template":
+            from .system_editors import make_editor_document,editor_path
+            name=params["editor"]
+            result={"path":editor_path(name),
+                    "document":make_editor_document(name,params.get("settings")),
+                    "staged":False,"requires_approval":True}
+        elif action=="forge.tools":
+            from .studio_tool_fabric import ToolFabric,Actor,Phase
+            who=Actor(params.get("actor","jeeves"))
+            phase=Phase(params.get("phase","original"))
+            result={"actor":who.value,"phase":phase.value,
+                    "tools":[t.to_payload() for t in
+                             ToolFabric().discover(actor=who,phase=phase)],
+                    "any_tool_executed":False,
+                    "backend_forge_binding_not_automatically_assumed":True}
+        elif action=="director.rpg":
+            from .advanced_rpg_planner import plan_original_rpg_chapter
+            result=plan_original_rpg_chapter(
+                params["scene"],params.get("settings"),
+                max_nodes=params.get("max_nodes",8000))
+        elif action=="director.world":
+            from .advanced_world_planner import plan_original_world
+            result=plan_original_world(
+                params["scene"],params.get("settings"),
+                max_states=params.get("max_states",50000))
         elif action in ("studio.tree","studio.file","studio.propose",
+                        "studio.assembly",
                         "jeeves.work_order","jeeves.chapter_chat"):
             if ws is None or project != ws.active():
                 raise JeevesAppwideError("explicitly selected current project required")
             if action=="studio.tree":
                 result=ws.tree()
+            elif action=="studio.assembly":
+                from .system_editor_assembly import assemble_workspace_systems
+                result=assemble_workspace_systems(ws,project,authorized=True)
             elif action=="studio.file":
                 result=ws.read("current",project,params["path"])
             elif action=="studio.propose":
@@ -444,7 +479,7 @@ class JeevesAppwideRuntime:
                 re.fullmatch(r"[a-f0-9]{64}",e["source_digest"]) and
                 type(e["claim"]) is str and 12<=len(e["claim"])<=1000
                 for e in evidence):
-                raise JeevesAppwideError("two corroborated bounded evidence claims required")
+                raise JeevesAppwideError("two separately cited evidence claims required")
             proposed=inv.propose_source_revision(
                 path=params["path"],expected_sha256=target["sha256"],
                 replacement=params["replacement"],reason=params["reason"],
@@ -452,6 +487,7 @@ class JeevesAppwideRuntime:
             result={
                 "source_patch":proposed,
                 "evidence":evidence,
+                "evidence_claims_independently_verified":False,
                 "requires_mirror_adversarial_tests":True,
                 "requires_independent_benchmark_improvement":True,
                 "shadow_weights_promoted":False,
@@ -467,7 +503,8 @@ class JeevesAppwideRuntime:
             "input_digest":digest(params),
             "inventory_digest":inv._digest,
             "result":result,
-            "read_only_or_review_only":operation[0]!="compute" or action!="editor.preview",
+            "read_only_or_review_only":action not in ("studio.propose",) and
+                                   operation[0]!="external_effect",
             "unregistered_execution_denied":True,
             "operator_authorized":authorized is True,
         }
