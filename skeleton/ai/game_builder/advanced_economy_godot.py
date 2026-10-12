@@ -71,7 +71,7 @@ func _ready() -> void:
     if layout["markets"].size() < 2 or layout["markets"].size() > 16:
         _fail("unbounded or absent physical markets")
         return
-    if min(int(rules["goods"]), int(rules["active_goods_budget"]), 8) < 3:
+    if mini(8, mini(int(rules["goods"]), int(rules["active_goods_budget"]))) < 3:
         _fail("no physically manufacturable source goods")
         return
     _reset()
@@ -346,7 +346,12 @@ func _verify() -> void:
     ):
         _fail("source and proof configuration identity mismatch")
         return
-    var actions: Array = proof.get("actions", [])
+    var history: Variant = proof.get("actions")
+    var expected_data: Variant = proof.get("expected")
+    if typeof(history) != TYPE_ARRAY or typeof(expected_data) != TYPE_DICTIONARY:
+        _fail("native proof must include typed actions and state")
+        return
+    var actions: Array = history
     if actions.size() > MAX_ACTIONS:
         _fail("source action replay budget exceeded")
         return
@@ -372,7 +377,7 @@ func _verify() -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-    if not playable or not event.pressed or event.echo:
+    if not playable or not event is InputEventKey or not event.pressed or event.echo:
         return
     var action: String = ""
     match event.keycode:
@@ -406,6 +411,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO,size), Color("#112130"))
+    if not playable:
+        return
     _write(Vector2(16,32),"ORIGINAL ECONOMY  /  INDEPENDENT GODOT MARKET",
         20,Color("#ddf2ee"))
     _write(Vector2(16,57),str(state["title"])+"  |  Tick "+str(state["tick"]),
