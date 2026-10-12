@@ -263,6 +263,37 @@ class DragonDurableWeightVault:
                 "index_digest": events[-1]["index_digest"],
                 "read_only": True, "neural_weights_changed": False}
 
+    def route_version(self, query: str, *, index_digest: str,
+                      now: int, limit: int = 5) -> dict:
+        """Serve only current or immediately previous verified approved index.
+
+        This supports opt-in canary control with a real prior version, not an
+        invented baseline. Older revisions are not exposed as routing targets.
+        """
+        if (type(index_digest) is not str or not HEX.fullmatch(index_digest)
+            or type(query) is not str or len(query)>600
+            or type(now) is not int or now<0
+            or type(limit) is not int or not 1<=limit<=20):
+            raise ValueError("bounded versioned query required")
+        with self._lock:
+            seq,_,_,events=self._verify()
+            candidates=[e for e in events[-2:]
+                        if e["index_digest"]==index_digest
+                        and now<e["expires_at"]]
+            if not candidates:
+                raise PermissionError("requested prior index not approved or expired")
+            event=candidates[-1]
+            entries=[(ident,tuple(words)) for ident,words in event["entries"]]
+            postings=self._postings(entries)
+        scores={}
+        for word in set(WORD.findall(query.casefold())):
+            for identity in postings.get(word,()):
+                scores[identity]=scores.get(identity,0)+1
+        ranked=sorted(scores,key=lambda x:(-scores[x],x))
+        return {"generation":seq,"selected_index_digest":index_digest,
+                "bookmarked_retrieval_ids":ranked[:limit],
+                "read_only":True,"neural_weights_changed":False}
+
     def rollback(self, order: SignedRollbackOrder, *, public_key: bytes,
                  operator: str, key_id: str, now: int) -> dict:
         if not isinstance(order, SignedRollbackOrder):

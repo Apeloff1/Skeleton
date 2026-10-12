@@ -16,6 +16,8 @@ from skeleton.ai.webcrawler.dragon_cross_source_factchecking import (
 )
 from skeleton.ai.webcrawler.dragon_weight_deployment_vault import (
     DragonDurableWeightVault, SignedRollbackOrder)
+from skeleton.ai.webcrawler.dragon_weight_canary import (
+    DragonWeightCanary, SignedCanaryPlan, SignedCanaryPair)
 from skeleton.ai.webcrawler.dragon_weight_tier_sandbox import (
     HoldoutTrial,SealedTierEvaluation,SignedOverlayApproval,
     JeevesWeightOverlay,qualify_tier)
@@ -607,3 +609,156 @@ def test_durable_vault_missing_or_swapped_operator_key_never_publishes():
                 activation_kwargs={**kwargs,
                     "mother_findings":mother_args["mother_findings"][:-1]})
         assert vault.audit()["generation"]==0
+
+
+
+def _canary_setup(db):
+    eval_key,eval_pub=keypair()
+    operator,operator_pub=keypair()
+    reviewer,reviewer_pub=keypair()
+    mother,mother_args=trusted_mother()
+    vault=DragonDurableWeightVault(
+        db,owner="studio",
+        signing_key=b"independent-custody-service-hmac-key-2026-vault")
+    past="0"*64
+    for i,(tier,entries) in enumerate((
+        ("shadow_to_weight",(("b"*64,("physics","npc")),)),
+        ("weight_to_hyper",(("c"*64,("gameboy","physics")),)),
+    )):
+        digest,kwargs=_vault_activation(
+            i,tier,entries,past,mother,mother_args,
+            eval_key,eval_pub,operator,operator_pub)
+        vault.publish(entries=entries,activation_kwargs=kwargs,
+                      expected_generation=i)
+        if i==0:
+            baseline=digest
+        past=digest
+    plan=SignedCanaryPlan(
+        "studio",past,baseline,15,12,1.05,
+        "operator","operator-1",100,700,"")
+    plan=replace(plan,signature_hex=sign(operator,plan.body()))
+    kwargs=dict(vault=vault,plan=plan,operator_public_key=operator_pub,
+        operator="operator",operator_key_id="operator-1",
+        assessor_public_key=reviewer_pub,assessor="independent-canary",
+        assessor_key_id="canary-1",
+        signing_key=b"canary-observations-separate-secret-2026-long-key")
+    governor=DragonWeightCanary(db,**kwargs)
+    return governor,kwargs,reviewer,operator
+
+
+def _canary_pair(plan,reviewer,i,*,regression=False):
+    observed=SignedCanaryPair(
+        owner="studio",plan_digest=canonical_digest(plan.body()),
+        case_digest=canonical_digest({"case":i}),
+        task_family=("physics","npc","platform")[i%3],
+        source_group_digest=canonical_digest({"origin":i%3}),
+        baseline_correct=i<7,
+        candidate_correct=False if regression else i<9,
+        baseline_latency_ms=50,candidate_latency_ms=48,
+        assessor="independent-canary",assessor_key_id="canary-1",
+        observed_at=150,signature_hex="")
+    return replace(observed,signature_hex=sign(reviewer,observed.body()))
+
+
+def test_durable_canary_balances_real_versions_and_gates_full_rollout():
+    with sqlite3.connect(":memory:") as db:
+        canary,kwargs,reviewer,_=_canary_setup(db)
+        assert canary.audit(now=150)["status"]=="canary_running"
+        assert not canary.audit(now=150)["full_rollout_authorized"]
+        selected=set()
+        for i in range(120):
+            cohort=canonical_digest({"cohort":i})
+            result=canary.select("gameboy physics",cohort_digest=cohort,
+                                 now=150)
+            selected.add(result["selected_index_digest"])
+            assert result["candidate_selected"] == (
+                result["selected_index_digest"]==kwargs["plan"].candidate_digest)
+            assert not result["full_rollout_authorized"]
+        assert selected=={kwargs["plan"].candidate_digest,
+                         kwargs["plan"].control_digest}
+        for i in range(12):
+            status=canary.observe(
+                _canary_pair(kwargs["plan"],reviewer,i),now=151)
+        assert status["candidate_pairs"]==12
+        assert status["newly_correct"]==2 and status["regressions"]==0
+        assert status["status"]=="ready_for_operator_review"
+        assert status["candidate_exposure_permitted"]
+        assert not status["full_rollout_authorized"]
+        recovered=DragonWeightCanary(db,**kwargs)
+        assert recovered.audit(now=152)==canary.audit(now=152)
+        with pytest.raises(sqlite3.IntegrityError):
+            canary.observe(_canary_pair(kwargs["plan"],reviewer,0),now=152)
+        with pytest.raises(PermissionError,match="not current"):
+            canary.select("physics",cohort_digest="a"*64,now=701)
+        assert canary.audit(now=701)["status"]=="expired"
+
+
+def test_canary_signed_regression_halts_all_candidate_traffic():
+    with sqlite3.connect(":memory:") as db:
+        canary,kwargs,reviewer,operator=_canary_setup(db)
+        different=replace(kwargs["plan"],traffic_percent=25,signature_hex="")
+        different=replace(different,signature_hex=sign(operator,different.body()))
+        settings={**kwargs,"plan":different}
+        canary=DragonWeightCanary(db,**settings)
+        result=canary.observe(
+            _canary_pair(different,reviewer,3,regression=True),now=151)
+        assert result["status"]=="halted_regression"
+        assert result["regressions"]==1
+        for i in range(30):
+            selected=canary.select(
+                "physics gameboy",
+                cohort_digest=canonical_digest({"cohort":i}),now=151)
+            assert selected["selected_index_digest"]==different.control_digest
+            assert not selected["candidate_selected"]
+        with pytest.raises(PermissionError,match="halted"):
+            canary.observe(_canary_pair(different,reviewer,4),now=152)
+        with pytest.raises(PermissionError,match="signature"):
+            canary.observe(replace(
+                _canary_pair(different,reviewer,4),
+                candidate_latency_ms=60),now=152)
+        db.execute(
+            "UPDATE dragon_canary_pairs_v1 SET payload='{}' "
+            "WHERE owner=? AND plan_digest=?",
+            ("studio",canary.plan_digest))
+        with pytest.raises(ValueError,match="custody|trial"):
+            canary.audit(now=153)
+
+
+def test_canary_rejects_unsigned_plan_wrong_operator_and_unapproved_versions():
+    with sqlite3.connect(":memory:") as db:
+        canary,kwargs,_,_=_canary_setup(db)
+        with pytest.raises(PermissionError,match="signature"):
+            DragonWeightCanary(
+                db,**{**kwargs,"plan":replace(kwargs["plan"],traffic_percent=4)})
+        with pytest.raises(ValueError,match="bounded"):
+            DragonWeightCanary(
+                db,**{**kwargs,"plan":replace(kwargs["plan"],traffic_percent=26)})
+        with pytest.raises(ValueError,match="bounded"):
+            DragonWeightCanary(
+                db,**{**kwargs,"operator":"unrecognized-operator"})
+        with pytest.raises(ValueError,match="digest"):
+            canary.select("gameboy",cohort_digest="../secret",now=150)
+        with pytest.raises(PermissionError,match="requested prior"):
+            kwargs["vault"].route_version(
+                "physics",index_digest="a"*64,now=151)
+
+
+
+def test_signed_canary_latency_spike_halts_even_correct_candidates():
+    with sqlite3.connect(":memory:") as db:
+        _,kwargs,reviewer,operator=_canary_setup(db)
+        plan=replace(kwargs["plan"],traffic_percent=18,signature_hex="")
+        plan=replace(plan,signature_hex=sign(operator,plan.body()))
+        canary=DragonWeightCanary(db,**{**kwargs,"plan":plan})
+        slow=_canary_pair(plan,reviewer,10)
+        slow=replace(slow,candidate_latency_ms=60,signature_hex="")
+        slow=replace(slow,signature_hex=sign(reviewer,slow.body()))
+        status=canary.observe(slow,now=152)
+        assert status["status"]=="halted_regression"
+        assert status["regressions"]==0
+        assert status["max_latency_ratio_observed"]==1.2
+        assert not status["candidate_exposure_permitted"]
+        for i in range(20):
+            out=canary.select("gameboy physics",
+                cohort_digest=canonical_digest({"case":i}),now=152)
+            assert out["selected_index_digest"]==plan.control_digest
