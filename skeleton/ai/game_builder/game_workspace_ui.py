@@ -915,12 +915,59 @@ function drawAdvancedGame(session){
   c.fillText("Held "+state.held.length+" · rank "+state.rank,tx,216);
   c.fillText("Game time advances only via verified wait actions.",12,254);
  }
+ if(editor==="fighting"){
+  const arena=state.arena,ox=12,oy=48,cell=19,laneH=53;
+  c.fillStyle="#e4efe4";
+  c.fillText("Original frame-bounded arena · round "+state.round+
+    " · frame "+state.clock_frames,12,35);
+  for(let y=0;y<arena.lanes;y++){
+   for(let x=0;x<arena.width;x++){
+    c.fillStyle=y%2?"#345b5b":"#28434e";
+    c.fillRect(ox+x*cell,oy+y*laneH,cell-2,laneH-3);
+    const hazard=arena.hazards.find(h=>h.x===x&&h.lane===y);
+    if(hazard){c.fillStyle="#d17f61";c.fillRect(ox+x*cell,oy+y*laneH+40,cell-2,8);}
+    const cover=arena.cover.find(v=>v.x===x&&v.lane===y&&v.hp>0);
+    if(cover){c.fillStyle="#a5a9aa";c.fillRect(ox+x*cell+3,oy+y*laneH+12,12,25);}
+   }
+  }
+  for(const fighter of [state.opponent,state.player]){
+   const x=ox+fighter.x*cell,y=oy+fighter.lane*laneH;
+   c.fillStyle=fighter.side==="blue"?"#96f3c0":"#ffc0a9";
+   c.fillRect(x+2,y+8,13,32);
+   c.fillStyle="#122631";
+   c.fillText(fighter.side==="blue"?"P":"A",x+4,y+28);
+   if(fighter.airborne){c.fillStyle="#f2e78d";c.fillText("↑",x+3,y+7);}
+   if(fighter.parry){c.strokeStyle="#fbe5a1";c.strokeRect(x,y+5,17,38);}
+  }
+  c.fillStyle="#eef0dd";const px=328;
+  c.fillText("Player HP "+state.player.hp+"/"+state.player.max_hp,px,55);
+  c.fillText("Enemy HP "+state.opponent.hp+"/"+state.opponent.max_hp,px,79);
+  c.fillText("Stamina "+state.player.stamina,px,103);
+  c.fillText("Special "+state.player.meter,px,127);
+  c.fillText("Guard "+state.player.guard,px,151);
+  c.fillText("Combo "+state.player.combo+" · stun "+state.player.stun,px,175);
+  c.fillText("Rounds "+state.blue_rounds+" — "+state.red_rounds,px,199);
+  c.fillText("Ringouts "+state.ringouts+" · turns "+state.turn,px,223);
+  c.fillStyle="#a9dccc";
+  c.fillText("Original sprites are drawn primitives; collision and judging are backend-owned.",12,258);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
  }
 }
 
+document.addEventListener("keydown",event=>{
+ if(!advancedSession||advancedSession.editor!=="fighting"||advancedSession.terminal)return;
+ if(event.target&&(["INPUT","TEXTAREA","SELECT"].includes(event.target.tagName)||
+    event.target.isContentEditable))return;
+ const actions={ArrowRight:"approach",ArrowLeft:"retreat",
+   ArrowUp:"sidestep_up",ArrowDown:"sidestep_down",
+   j:"jab",k:"kick",p:"parry"," ":"jump"};
+ const action=actions[event.key];
+ if(!action)return;
+ event.preventDefault();advanceAdvanced(action);
+});
 document.addEventListener("keydown",event=>{
  if(!advancedSession||advancedSession.editor!=="rhythm"||advancedSession.terminal)return;
  if(event.target&&(["INPUT","TEXTAREA","SELECT"].includes(event.target.tagName)||
@@ -957,6 +1004,28 @@ let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="fighting"){
+  const label=document.createElement("label");
+  label.textContent="Original arena strike / defense / movement";
+  const command=document.createElement("select");
+  command.id="fighting-registered-action";
+  command.setAttribute("aria-label","Select registered original tactical fighting action");
+  for(const action of actions){
+   const option=document.createElement("option");
+   option.value=action;option.textContent=action.replaceAll("_"," ");
+   command.append(option);
+  }
+  label.append(command);target.append(label);
+  const submit=document.createElement("button");submit.type="button";
+  submit.textContent="Execute original arena frame";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.addEventListener("click",()=>advanceAdvanced(command.value));
+  target.append(submit);
+  const hint=document.createElement("small");
+  hint.textContent="Arrows: approach, retreat and sidestep. J: jab · K: kick · P: parry · Space: jump. Hits require actual lanes, distance and finite stamina.";
+  target.append(hint);return;
+ }
+
  if(advancedSession?.editor==="rhythm"){
   const s=advancedSession.state;
   const instructions=document.createElement("small");
@@ -1465,6 +1534,10 @@ async function advanceAdvanced(action){
 // Visual paint works only on the local draft JSON. It cannot bypass the
 // server's canonical validation, exact-file review, or human commit.
 const PAINT_TOOLS={
+ fighting:["hazard_toggle","hazard_damage_up","cover_toggle",
+           "cover_hp_up","player_spawn","enemy_spawn",
+           "theme_next","weather_next"],
+
  rhythm:["lane_next","kind_next","partner_next","accent_toggle",
          "timestamp_earlier","timestamp_later","title_next",
          "original_meter_remark"],
@@ -1555,6 +1628,28 @@ function renderSceneAuthoring(){
   shape=sceneGridShape(source);
  }catch(_){ctx.fillText("Invalid or mismatched scene JSON: use Validate.",12,24);return;}
 
+ if(source.editor==="fighting"){
+  const arena=source.layout,ox=12,oy=41,sx=23,sy=52;
+  ctx.fillText("Original 3-lane arena · source-bound units and stage objects",12,23);
+  for(let y=0;y<3;y++)for(let x=0;x<arena.width;x++){
+   const px=ox+x*sx,py=oy+y*sy;
+   ctx.fillStyle=y%2?"#39686c":"#2b5362";
+   ctx.fillRect(px,py,sx-2,sy-3);
+   let token="";
+   if(arena.player_spawn[0]===x&&arena.player_spawn[1]===y)token="P";
+   else if(arena.enemy_spawn[0]===x&&arena.enemy_spawn[1]===y)token="A";
+   else if(arena.hazards.some(h=>h.x===x&&h.lane===y))token="!";
+   else if(arena.cover.some(h=>h.x===x&&h.lane===y))token="C";
+   if(token){
+    ctx.fillStyle=token==="!"?"#ffb09b":"#e2f3bd";
+    ctx.fillText(token,px+7,py+27);
+   }
+  }
+  ctx.fillStyle="#dbece3";
+  ctx.fillText("Theme "+arena.theme+" · weather "+arena.weather,12,224);
+  ctx.fillText("Source-bound fight rounds / hazard collision. Review before use.",12,245);
+  return;
+ }
  if(source.editor==="rhythm"){
   const m=source.layout,notes=m.notes,from=Math.floor(
      selectedRhythmNote/16)*16;
@@ -1810,6 +1905,45 @@ function renderSceneAuthoring(){
  }
 }
 
+function paintFightingCell(column,lane){
+ const doc=JSON.parse($("advanced-scene-json").value);
+ if(doc.editor!=="fighting"||systemEditor().id!=="fighting")
+  throw Error("Signed original arena editing requires matching fighting document");
+ const arena=doc.layout,tool=$("advanced-paint-tool").value;
+ const cfg=systemSettings();
+ if(column<0||column>=arena.width||lane<0||lane>=3)
+  throw Error("Selected arena geometry lies outside authored bounds");
+ const find=(array)=>array.findIndex(o=>o.x===column&&o.lane===lane);
+ if(tool==="hazard_toggle"){
+  const i=find(arena.hazards);
+  if(i>=0)arena.hazards.splice(i,1);
+  else arena.hazards.push({x:column,lane,damage:cfg.hazard_damage});
+ }else if(tool==="hazard_damage_up"){
+  const i=find(arena.hazards);
+  if(i<0)throw Error("Author a real physical hazard before changing its damage");
+  arena.hazards[i].damage=Math.min(cfg.hazard_damage,
+                                  arena.hazards[i].damage+1);
+ }else if(tool==="cover_toggle"){
+  const i=find(arena.cover);
+  if(i>=0)arena.cover.splice(i,1);
+  else arena.cover.push({x:column,lane,hp:cfg.cover_health});
+ }else if(tool==="cover_hp_up"){
+  const i=find(arena.cover);
+  if(i<0)throw Error("Author a real physical cover before modifying durability");
+  arena.cover[i].hp=Math.min(cfg.cover_health,arena.cover[i].hp+1);
+ }else if(tool==="player_spawn")arena.player_spawn=[column,lane];
+ else if(tool==="enemy_spawn")arena.enemy_spawn=[column,lane];
+ else if(tool==="theme_next"){
+  const names=["tournament","sky_garden","industrial","mountain"];
+  arena.theme=names[(names.indexOf(arena.theme)+1)%names.length];
+ }else if(tool==="weather_next"){
+  const names=["clear","rain","fog"];
+  arena.weather=names[(names.indexOf(arena.weather)+1)%names.length];
+ }else throw Error("Unregistered physical arena source tool");
+ $("advanced-scene-json").value=JSON.stringify(doc,null,2);
+ renderSceneAuthoring();
+ status("Original fighting stage edited. Validate signed arena collisions, configured budgets, and precise source digest before play.");
+}
 function paintRhythmBeat(noteIndex){
  const scene=JSON.parse($("advanced-scene-json").value);
  if(scene.editor!=="rhythm"||systemEditor().id!=="rhythm")
@@ -2188,6 +2322,14 @@ $("advanced-scene-grid").addEventListener("click",event=>{
   if(!text)throw Error("Generate a scene document first");
   const doc=JSON.parse(text),shape=sceneGridShape(doc);
   const canvas=$("advanced-scene-grid"),rect=canvas.getBoundingClientRect();
+  if(doc.editor==="fighting"){
+   const px=(event.clientX-rect.left)*canvas.width/rect.width;
+   const py=(event.clientY-rect.top)*canvas.height/rect.height;
+   const x=Math.floor((px-12)/23),y=Math.floor((py-41)/52);
+   if(x<0||x>=doc.layout.width||y<0||y>=3||
+     px>12+x*23+21||py>41+y*52+49)return;
+   paintFightingCell(x,y);return;
+  }
   if(doc.editor==="rhythm"){
    const px=(event.clientX-rect.left)*canvas.width/rect.width;
    const index=Math.floor((px-38)/28);
