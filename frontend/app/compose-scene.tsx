@@ -5,6 +5,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  SCENE_CHAT_HANDOFF_KEY, SCENE_RECIPES,
+  readSceneChatHandoff, sceneHandoffItems,
+} from '../features/Jeeves/sceneHandoff';
 import { validProjectId, projectHref } from '../src/product/worldWorkspace';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../utils/apiController';
@@ -20,23 +25,12 @@ const ERAS = [
   { key: '8bit', label: '8-Bit' }, { key: '16bit', label: '16-Bit' },
   { key: 'modern', label: 'Modern' }, { key: 'nextgen', label: 'Next-Gen' },
 ];
-// One-tap themed recipes
-const RECIPES: { key: string; icon: string; name: string; items: { category: string; count: number }[] }[] = [
-  { key: 'forest', icon: '🌲', name: 'Enchanted Forest', items: [{ category: 'tree', count: 12 }, { category: 'critter', count: 5 }, { category: 'boulder', count: 4 }, { category: 'plant', count: 6 }] },
-  { key: 'village', icon: '🏘️', name: 'Walled Village', items: [{ category: 'house', count: 8 }, { category: 'npc', count: 6 }, { category: 'chest', count: 3 }, { category: 'tree', count: 5 }] },
-  { key: 'squad', icon: '🛡️', name: 'Hero Squad', items: [{ category: 'character', count: 4 }, { category: 'sword', count: 4 }, { category: 'potion', count: 3 }] },
-  { key: 'armory', icon: '⚔️', name: 'Armory', items: [{ category: 'sword', count: 5 }, { category: 'axe', count: 3 }, { category: 'bow', count: 3 }, { category: 'chest', count: 4 }] },
-  { key: 'feast', icon: '🍞', name: 'Tavern Feast', items: [{ category: 'table', count: 3 }, { category: 'bread', count: 4 }, { category: 'cake', count: 2 }, { category: 'barrel', count: 4 }] },
-  { key: 'lab', icon: '🤖', name: 'Robotics Lab', items: [{ category: 'robot', count: 4 }, { category: 'machine', count: 3 }, { category: 'crate', count: 5 }, { category: 'turret', count: 2 }] },
-  { key: 'garden', icon: '🌸', name: 'Botanical Garden', items: [{ category: 'tree', count: 6 }, { category: 'rose_bush', count: 5 }, { category: 'sunflower', count: 5 }, { category: 'mushroom', count: 4 }, { category: 'fountain', count: 1 }] },
-  { key: 'shrine', icon: '⛩️', name: 'Sacred Shrine', items: [{ category: 'shrine', count: 2 }, { category: 'altar', count: 1 }, { category: 'obelisk', count: 2 }, { category: 'torch', count: 4 }, { category: 'banner', count: 4 }] },
-  { key: 'dungeon', icon: '🗝️', name: 'Dungeon Crawl', items: [{ category: 'chest', count: 4 }, { category: 'spike_trap', count: 4 }, { category: 'bat', count: 4 }, { category: 'torch', count: 5 }, { category: 'door', count: 3 }] },
-  { key: 'treasury', icon: '💎', name: 'Royal Treasury', items: [{ category: 'gold_coin', count: 6 }, { category: 'diamond', count: 4 }, { category: 'chest', count: 4 }, { category: 'medallion', count: 4 }] },
-];
+// One canonical shared recipe catalog also used by reviewed chat handoffs.
+const RECIPES = SCENE_RECIPES;
 
 export default function ComposeScene() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ build?: string|string[]; game?: string|string[] }>();
+  const params = useLocalSearchParams<{ build?: string|string[]; game?: string|string[]; chat_scene?: string|string[] }>();
   const linkedProject = validProjectId(Array.isArray(params.build) ? params.build[0] : params.build) ||
     validProjectId(Array.isArray(params.game) ? params.game[0] : params.game);
   const [cats, setCats] = useState<any[]>([]);
@@ -54,6 +48,42 @@ export default function ComposeScene() {
   const [axes, setAxes] = useState<Record<string, string>>({});
   const [treatment, setTreatment] = useState<string>('none');
   const [axisQuery, setAxisQuery] = useState('');
+  const [chatDraftNotice, setChatDraftNotice] = useState('');
+  const chatDraftId = Array.isArray(params.chat_scene) ? params.chat_scene[0] : params.chat_scene;
+
+  useEffect(() => {
+    if (!chatDraftId) return;
+    let active = true;
+    const readDraft = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(SCENE_CHAT_HANDOFF_KEY);
+        if (!active) return;
+        const draft = readSceneChatHandoff(raw, chatDraftId, linkedProject);
+        if (!draft) {
+          setChatDraftNotice('Chat scene draft expired or did not match this game. No preset was applied.');
+          return;
+        }
+        const items = sceneHandoffItems(draft);
+        if (!items.length) {
+          setChatDraftNotice('Chat scene draft has no supported forge items.');
+          return;
+        }
+        // Form state only; the existing Compose & mount button owns the actual API call.
+        setEra(draft.era);
+        setPicks(items.map(item => ({
+          category: item.category,
+          label: item.category.replace(/_/g, ' '),
+          count: item.count,
+        })));
+        setChatDraftNotice('Jeeves scene preset loaded. Review build, era, item counts and styling before composing.');
+        await AsyncStorage.removeItem(SCENE_CHAT_HANDOFF_KEY);
+      } catch {
+        if (active) setChatDraftNotice('Could not read the chat scene draft. No forge request was made.');
+      }
+    };
+    void readDraft();
+    return () => { active = false; };
+  }, [chatDraftId, linkedProject]);
 
   useEffect(() => {
     (async () => {
@@ -208,6 +238,10 @@ export default function ComposeScene() {
         <TextInput value={buildId} onChangeText={setBuildId} style={styles.input} placeholder="Build ID (no demo default)"
           placeholderTextColor={C.muted} testID="cs-build" autoCapitalize="none" />
 
+        {!!chatDraftNotice && <Text accessibilityRole="alert"
+          style={{ color: C.accent2, marginBottom: 12, fontSize: 13 }}>
+          {chatDraftNotice}
+        </Text>}
         <Text style={styles.lbl}>Era</Text>
         <View style={styles.chipWrap}>
           {ERAS.map((e) => (
