@@ -148,7 +148,7 @@ def test_video_digest_only_from_approved_timecoded_chunks():
         "modalities": chunk.modalities, "observations": chunk.observation_ids,
     }]
     digest = sha256(_canonical({"source": clip_url, "chunks": evidence})).hexdigest()
-    v = snap("vid-1", "video", url=clip_url)
+    v = snap("vid-1", "video", url=clip_url, claim="clip-review")
     with pytest.raises(PermissionError):
         bridge.video(v, (chunk,))
     grant(db, sid="vid-1", digest=digest, claim="clip-review")
