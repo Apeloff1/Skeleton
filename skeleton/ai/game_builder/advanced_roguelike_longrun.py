@@ -99,6 +99,7 @@ def replay_long_roguelike(settings=None,actions=(),*,seed=0,scene=None,
     result={
         **origin,
         "genesis_digest":genesis,
+        "scene":source,
         "actions":list(actions),
         "turn_count":len(actions),
         "checkpoints":chunks,
