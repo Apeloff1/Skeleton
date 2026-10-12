@@ -66,6 +66,8 @@ def _line_open(a,b,obstacles):
 
 def default_layout(config,seed):
     _integer(seed,0,2**31-1,"seed")
+    if config["starting_trust"]>config["trust_cap"]:
+        raise QuestDirectorError("original source trust cannot exceed NPC trust capacity")
     npc_cells=(9,17,25,33)
     return {
         "width":SIDE,"height":SIDE,"player_spawn":0,
@@ -249,11 +251,18 @@ def _emit(state,config,kind,site,events):
         if kind==wanted:
             quest["material_actions"]+=1
             events.append("existing_original_quest_advanced_by_real_followup")
-    if len(state["quests"])<config["active_quests"] and kind in EVENTS[:config["event_rules"]] and (
-        len(witnesses)>=config["witnesses_required"]):
+    if (len(state["quests"])<min(config["active_quests"],12)
+        and state["next_quest"]<12
+        and kind in EVENTS[:min(4,config["event_rules"])]
+        and len(witnesses)>=config["witnesses_required"]):
         # Only a source observed by enough real witnesses becomes a quest.
+        # Editor supports many procedural causal rule alternatives, while
+        # this 49-cell reference intentionally limits live quest IDs to 12.
+        rule_id=(state["seed"]*17+entry["id"]*31+
+                 site["id"]*997+EVENTS.index(kind)*131)%config["event_rules"]
         quest={
             "id":state["next_quest"],"origin_event":entry["id"],
+            "rule_id":rule_id,
             "site_id":site["id"],"trigger":kind,"status":"active",
             "witnesses":witnesses[:],"testimonies":[],
             "heard_from":[],"choice":None,"material_actions":0,
@@ -271,13 +280,19 @@ def _rumors(state,config,events):
     delivered=0
     # Original source-aware rumors travel along real physical NPC edges,
     # never creating an eyewitness or rewriting the original direct list.
+    # Snapshot knowledge first: one rumor can cross only a single physical
+    # peer edge per propagation tick, not a magic whole-population chain.
+    available={
+        n["id"]:list(n["memories"])+list(n["heard"])
+        for n in state["npcs"]
+    }
     for sender in state["npcs"]:
         for receiver in state["npcs"]:
             if sender is receiver or _distance(sender["cell"],receiver["cell"])>config["rumor_radius"]:
                 continue
             if receiver["trust"]<config["rumor_trust_floor"]:
                 continue
-            for evidence in sender["memories"]+sender["heard"]:
+            for evidence in available[sender["id"]]:
                 if delivered>=config["rumor_per_tick"]:return
                 source=next((ev for ev in state["events_log"]
                              if ev["id"]==evidence["event_id"]),None)
@@ -376,7 +391,10 @@ def step(state,config,action):
                                   site["integrity"]+config["repair_power"])
             _emit(state,config,"repair",site,events)
     elif action.startswith("speak:"):
-        npc=state["npcs"][int(action.split(":")[1])]
+        index=int(action.split(":")[1])
+        if index>=len(state["npcs"]):
+            raise QuestDirectorError("no original NPC is authored at this identifier")
+        npc=state["npcs"][index]
         if not _adjacent(state,npc["cell"]):
             raise QuestDirectorError("cannot remotely interview an NPC that is not present")
         if npc["trust"]<config["testimony_trust_floor"]:
@@ -424,13 +442,15 @@ def step(state,config,action):
         state["quest_archive"].append(quest["id"])
         if quest["ending"]=="restored":
             state["quests_completed"]+=1
-            state["gold"]+=config["reward_gold"]
+            state["gold"]+=config["reward_gold"]+(
+                quest["rule_id"]%config["rule_bonus_modulus"])
             state["reputation"]=min(config["reputation_cap"],
                   state["reputation"]+config["reputation_gain"])
             events.append("real_original_evidence_based_support_resolution")
         else:
             state["quests_exploited"]+=1
-            state["gold"]+=config["exploit_gold"]
+            state["gold"]+=config["exploit_gold"]+(
+                quest["rule_id"]%config["rule_bonus_modulus"])
             state["reputation"]=max(-config["reputation_cap"],
                   state["reputation"]-config["reputation_loss"])
             events.append("real_original_exploit_resolution_with_world_consequence")
