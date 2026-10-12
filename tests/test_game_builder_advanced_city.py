@@ -81,7 +81,7 @@ class AdvancedOriginalCityGameTests(unittest.TestCase):
             "aquifer":2,
         })
         with_supply=run_advanced_session(
-            "city_builder",actions+["build:power:3","build:waterworks:9",
+            "city_builder",actions+["build:road:8","build:power:3","build:waterworks:9",
                                     "tick:4"],scene=scene)
         self.assertLessEqual(with_supply["state"]["population"],2)
         self.assertGreaterEqual(with_supply["state"]["aquifer"],0)
