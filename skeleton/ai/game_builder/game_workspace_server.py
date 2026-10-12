@@ -41,6 +41,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_economy_planner import (
+    plan_original_trade, verify_original_trade_plan,
+)
 from .advanced_ecosystem_planner import (
     plan_original_ecology, verify_original_ecology_plan,
 )
@@ -466,6 +469,19 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":validated,
                                    "original_source_mutated":False})
+        if path=="/api/economy-plan":
+            plan=plan_original_trade(
+                values["scene"],values.get("settings"),
+                max_actions=values.get("max_actions",100),
+                retire=values.get("retire",False))
+            return self._json(200,{"plan":plan,
+                "original_source_mutated":False,
+                "native_hardware_verified":False})
+        if path=="/api/economy-plan-verify":
+            valid=verify_original_trade_plan(
+                values["record"],values["scene"],values.get("settings"))
+            return self._json(200,{"verified":valid,
+                "original_source_mutated":False})
         if path=="/api/advanced-play":
             result=run_advanced_session(
                 values["editor"], values.get("settings"),
