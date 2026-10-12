@@ -1467,6 +1467,91 @@ function renderAdvancedActions(actions){
     (state.community_checkpoint?"civic objective earned; optional retirement":
      "proximity and direct witness proof required"));
   target.append(info);
+  const retireLabel=document.createElement("label");
+  const retire=document.createElement("input");
+  retire.type="checkbox";
+  retireLabel.append(retire," Include optional home retirement");
+  target.append(retireLabel);
+  const planBtn=document.createElement("button");planBtn.type="button";
+  planBtn.textContent=ecological?
+    "AI conservationist: prove a living biome recovery milestone":
+    "AI civic director: prove an original two-witness resolution";
+  planBtn.disabled=Boolean(advancedSession.terminal);
+  const proof=document.createElement("pre");
+  proof.setAttribute("role","status");
+  proof.setAttribute("aria-live","polite");
+  planBtn.addEventListener("click",async()=>{
+   try{
+    const name=ecological?"ecosystem":"npc_society";
+    if(advancedEditor!==name||systemEditor().id!==name)
+     throw Error("The source editor changed while preparing AI planning");
+    const scene=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(scene.seed!==advancedSession.seed)
+     throw Error("Reviewed scene seed is not the current gameplay session");
+    const url=ecological?"/api/ecology-plan":"/api/civic-plan";
+    const result=await api(url,{
+     scene,settings:advancedSettings,
+     max_actions:100,retire:retire.checked
+    });
+    const plan=result.plan;
+    proof.textContent=JSON.stringify({
+     result:plan.status,
+     source_digest:plan.source_digest,
+     actions:plan.actions,
+     witness_ids:plan.witnesses,
+     conservation_surveys:plan.surveys,
+     population:plan.live_population,
+     trust:plan.trust,
+     world_still_playable:plan.world_still_playable,
+     independent_replay_verified:plan.independent_replay_verified,
+     proof_digest:plan.digest,
+     native_hardware_verified:false
+    },null,2);
+    target.querySelector("#living-world-adopt-proof")?.remove();
+    const required=ecological?
+     "replay_verified_conservation":"replay_verified_civic_resolution";
+    if(plan.status!==required){
+     status("AI search inconclusive; the original living world remains playable.");
+     return;
+    }
+    const adopt=document.createElement("button");
+    adopt.type="button";adopt.id="living-world-adopt-proof";
+    adopt.textContent="Explicitly replay independently proven living-world milestone";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!==name||systemEditor().id!==name||
+         advancedCommands.length!==0||advancedSession.seed!==scene.seed)
+       throw Error("AI plan requires unchanged initial reviewed living-world state");
+      const verify=await api(ecological?
+       "/api/ecology-plan-verify":"/api/civic-plan-verify",{
+       record:plan,scene,settings:advancedSettings
+      });
+      if(!verify.verified)
+       throw Error("Living-world planner failed independent verification");
+      const played=await api("/api/advanced-play",{
+       editor:name,settings:advancedSettings,
+       actions:plan.actions,seed:scene.seed,scene
+      });
+      const earned=ecological?
+       played.session.state.conservation_checkpoint:
+       played.session.state.community_checkpoint;
+      if(played.session.digest!==plan.replay_digest||!earned||
+         played.session.state.retired!==plan.retired)
+       throw Error("Real simulation did not prove the authored milestone");
+      advancedCommands=plan.actions.slice();
+      advancedScene=scene;
+      showAdvanced(played);
+      status("Source-bound society/ecology milestone independently replayed.");
+     }catch(error){status("Living-world proof refused: "+error.message);}
+    });
+    target.append(adopt);
+    status("Real original milestone verified. Human adoption remains explicit.");
+   }catch(error){
+    proof.textContent="";
+    status("Living-world director rejected: "+error.message);
+   }
+  });
+  target.append(planBtn);target.append(proof);
   return;
  }
  if(advancedSession?.editor==="rpg"){
