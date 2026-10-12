@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.branching_narrative import validate_plan, simulate, audit_outcomes
+from core.dialogue_projection import project_dialogue
 from core.outcome_weaving_matrices import catalog, instruction
 from core.outcome_chapter_weave import audit_chapter_weave
 from routes.story_index import _scope
@@ -150,6 +151,44 @@ async def simulate_outcomes(pid: str, body: SimulateIn,
         raise HTTPException(status_code=409, detail=str(exc))
     except (PyMongoError, OSError):
         raise HTTPException(status_code=503, detail="Branch simulation unavailable")
+
+
+@router.post("/{pid}/outcomes/dialogue")
+async def get_player_dialogue(pid: str, body: SimulateIn,
+                              user=Depends(require_role("viewer"))):
+    """Only unlocked replies and reached outcomes; never a hidden-story dump."""
+    scope = _scope(pid, user)
+    try:
+        record = await _find(scope, body.branch_id)
+        snapshot = project_dialogue(record["compiled"], body.choices)
+        return {"ok": True, "game_id": pid, "branch_id": body.branch_id,
+                "revision": record["revision"], "dialogue": snapshot}
+    except HTTPException:
+        raise
+    except (ValueError, TypeError, KeyError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except (PyMongoError, OSError):
+        raise HTTPException(status_code=503, detail="Player dialogue unavailable")
+
+
+@router.post("/{pid}/outcomes/dialogue/diagnostics")
+async def get_creator_dialogue_diagnostics(
+    pid: str, body: SimulateIn, user=Depends(require_role("editor")),
+):
+    """Opt-in authoring view; never feed unrevealed guards into player chat."""
+    scope = _scope(pid, user)
+    try:
+        record = await _find(scope, body.branch_id)
+        snapshot = project_dialogue(
+            record["compiled"], body.choices, creator_diagnostics=True)
+        return {"ok": True, "game_id": pid, "branch_id": body.branch_id,
+                "revision": record["revision"], "dialogue": snapshot}
+    except HTTPException:
+        raise
+    except (ValueError, TypeError, KeyError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except (PyMongoError, OSError):
+        raise HTTPException(status_code=503, detail="Creator dialogue inspection unavailable")
 
 
 @router.get("/{pid}/outcomes/audit")
