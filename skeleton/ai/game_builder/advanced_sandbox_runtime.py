@@ -66,6 +66,7 @@ def _tile(i,terrain,seed):
         "clay":(2+v%5 if terrain in ("marsh","sand") else 0),
         "ore":(2+v%4 if terrain=="ridge" else 0),
         "water":(8+v%9 if terrain in ("lake","marsh") else 0),
+        "fish":(3+v%5 if terrain in ("lake","marsh") else 0),
         "forage":(2+v%3 if terrain in ("grass","forest") else 0),
         "soil":0,"crop":0,"moisture":(2 if terrain in ("marsh","lake") else 0),
         "animal":(1 if terrain in ("grass","forest") and v%6==0 else 0),
@@ -84,6 +85,7 @@ def generated_chunk(seed,region):
         biome=TERRAINS[v%len(TERRAINS)]
         if i==0:biome="grass"
         if i==1:biome="forest"
+        if i in (2,3):biome="grass"
         if i==8:biome="ridge"
         if i==9:biome="marsh"
         tiles.append(_tile(i,biome,value))
@@ -112,7 +114,7 @@ def normalize_layout(config,layout):
         raise SandboxActionError("original sandbox must author exactly 64 terrain cells")
     source=layout["tiles"];tiles=[]
     stock_limits={"wood":1000,"stone":1000,"clay":1000,"ore":1000,
-                  "water":1000,"forage":1000,"soil":1,"crop":8,
+                  "water":1000,"forage":1000,"fish":1000,"soil":1,"crop":8,
                   "moisture":10,"animal":1,"fire":8,"pollution":1000}
     for i,t in enumerate(source):
         required={"id","terrain","building","level","tamed"}|set(stock_limits)
@@ -164,8 +166,8 @@ def normalize_layout(config,layout):
     }
 
 
-def _new_settler(index,cell):
-    return {"id":index,"cell":cell,"job":"idle","health":100,
+def _new_settler(index,cell,region=0):
+    return {"id":index,"cell":cell,"region":region,"job":"idle","health":100,
             "morale":70,"skill":0,"worked":0}
 
 
@@ -254,7 +256,7 @@ def _structures(state,kind):
 def _work(state,config,events):
     tiles=_tiles(state)
     for worker in state["settlers"]:
-        if worker["health"]==0:
+        if worker["health"]==0 or worker["region"]!=state["region"]:
             continue
         if worker["job"]=="idle":
             worker["morale"]=min(100,worker["morale"]+1)
@@ -420,7 +422,15 @@ def step(state,config,action):
             else:
                 if tile["terrain"] not in ("lake","marsh"):
                     raise SandboxActionError("fish require real aquatic terrain")
-                stock,item,n="forage","food",config["fishing_yield"]
+                stock,item,n="fish","food",config["fishing_yield"]
+            if config["resource_policy"]=="unlimited" and not (
+                tile[stock]>0 or
+                (verb=="chop" and tile["terrain"]=="forest") or
+                (verb=="quarry" and tile["terrain"]=="ridge") or
+                (verb=="dig_clay" and tile["terrain"] in ("sand","marsh")) or
+                (verb=="gather" and tile["terrain"] in ("grass","forest")) or
+                (verb in ("draw_water","fish") and tile["terrain"] in ("lake","marsh"))):
+                raise SandboxActionError("unlimited materials still require original matching terrain")
             _cost_energy(state,config,config["work_energy"])
             gained=_mutate_resource(state,config,tile,stock,item,n)
             events.append("original_local_resource_extracted_"+item+"_"+str(gained))
@@ -559,13 +569,15 @@ def step(state,config,action):
     elif action=="recruit":
         if len(state["settlers"])>=config["settler_count"]:
             raise SandboxActionError("recruiting exceeds realistic local population ceiling")
-        if _residence(state)*config["house_capacity"]<=len(state["settlers"]):
+        local_homes=sum(t["building"]=="house" for t in _tiles(state))
+        local_workers=sum(s["region"]==state["region"] for s in state["settlers"])
+        if local_homes*config["house_capacity"]<=local_workers:
             raise SandboxActionError("new resident needs actual built housing")
         if state["credits"]<config["recruit_fee"]:
             raise SandboxActionError("settlement recruiting needs finite budget")
         state["credits"]-=config["recruit_fee"]
         key=state["next_settler_id"]
-        state["settlers"].append(_new_settler(key,state["position"]))
+        state["settlers"].append(_new_settler(key,state["position"],state["region"]))
         state["next_settler_id"]+=1
         events.append("original_settler_housed_and_recruited")
     elif action=="release":
@@ -576,7 +588,8 @@ def step(state,config,action):
     elif action.startswith("assign:"):
         if not state["settlers"]:
             raise SandboxActionError("cannot assign a job without actual original workers")
-        worker=next((s for s in state["settlers"] if s["cell"]==state["position"]),None)
+        worker=next((s for s in state["settlers"] if s["region"]==state["region"]
+                     and s["cell"]==state["position"]),None)
         if worker is None:
             raise SandboxActionError("assign work only to physically colocated original settler")
         worker["job"]=fields[1]
@@ -595,7 +608,9 @@ def step(state,config,action):
             state["credits"]-=config["seed_price"]
             state["inventory"]["seed"]+=3
         else:
-            _spend(state,config,{"ore":2},"commercial ore sale")
+            if state["inventory"]["ore"]<2:
+                raise SandboxActionError("market cannot sell ore that does not exist")
+            state["inventory"]["ore"]-=2
             state["credits"]+=config["ore_price"]
         events.append("finite_original_market_trade")
     elif action=="toggle:ecology":
