@@ -70,7 +70,7 @@ def scenario(tmp_path):
     for sid in ("alpha", "beta", "gamma"):
         nest = feed_parent(
             nest, sid, content_sha256=by_id[sid].source_text_digest,
-            at=T0, authorized=True, reviewed=True, lawful=True,
+            at=T1, authorized=True, reviewed=True, lawful=True,
         )
     receipts = []
     for lane, sid in (("article", "alpha"), ("video", "beta"), ("updates", "gamma")):
