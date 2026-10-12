@@ -70,15 +70,13 @@ class OriginalMaterialRecoveryTests(unittest.TestCase):
         for mutate in (
             lambda p:p["world_state"]["relief_deliveries"][0].update(
                 finite_supplies_distributed=999),
-            lambda p:p["world_state"]["supplies"].__class__,
             lambda p:p["world_state"]["relief_deliveries"].clear(),
             lambda p:p["episodes"][0].update(quests_completed=999),
         ):
             altered=deepcopy(proof)
             mutate(altered)
-            if altered!=proof:
-                with self.assertRaises(EpisodicWorldError):
-                    verify_episodic_physics_world(altered,episodes,scene,rules)
+            with self.assertRaises(EpisodicWorldError):
+                verify_episodic_physics_world(altered,episodes,scene,rules)
 
     def test_zero_cost_no_effect_help_cannot_mint_quest_rewards(self):
         cfg=make_editor_document("quest_director",self.config(
@@ -115,7 +113,7 @@ class OriginalMaterialRecoveryTests(unittest.TestCase):
     def test_relief_quest_not_disguised_as_unearned_player_damage(self):
         original,_,_,_=self.campaign()
         outcome,episodes,scene,rules=self.campaign(actions=("east","help:0"))
-        self.assertEqual(outcome["world_state"]["reputation"]>0,True)
+        self.assertGreater(outcome["world_state"]["reputation"],0)
         self.assertEqual(outcome["world_state"]["events_log"][0]["actor"],
                          "external:physics")
         later=outcome["world_state"]["events_log"][-1]
