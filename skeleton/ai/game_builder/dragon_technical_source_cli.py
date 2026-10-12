@@ -15,6 +15,7 @@ from .dragon_source_refresh_planner import DragonSourceRefreshPlanner
 from .dragon_source_health import DragonSourceHealth
 from .dragon_pilot_budget import DragonPilotBudget
 from .dragon_source_delta_ledger import DragonSourceDeltaLedger
+from .dragon_article_hatchling import DragonArticleHatchling
 from .reviewed_knowledge import ReviewedKnowledgeStore
 
 
@@ -26,7 +27,8 @@ def main():
                                                   "operations-inspect","operations-review","operations-ready",
                                                   "policy-renewal-pending","refresh-inspect",
                                                   "refresh-census","operations-health","pilot-budget",
-                                                  "delta-preview","delta-review"))
+                                                  "delta-preview","delta-review",
+                                                  "article-review","article-census"))
     parser.add_argument("--database",required=True)
     parser.add_argument("--owner",required=True)
     parser.add_argument("--trusted-local-operator",action="store_true")
@@ -110,6 +112,17 @@ def main():
                 else:
                     report=operations.review_queue(args.owner,authorized=True,
                                                    limit=args.limit)
+            elif args.command in ("article-review","article-census"):
+                article=DragonArticleHatchling(captures)
+                if args.command=="article-census":
+                    report=article.census(args.owner,authorized=True,
+                        limit=args.limit,after_source=args.after_source)
+                else:
+                    if not args.source_id:
+                        parser.error("--source-id required for article review")
+                    report=article.review_packet(
+                        args.owner,args.source_id,authorized=True,
+                        include_quotes=args.include_captured_text)
             elif args.command in ("delta-preview","delta-review"):
                 if not args.source_id:
                     parser.error("--source-id required for revision comparison")

@@ -88,3 +88,17 @@ def test_mother_dragon_cross_media_remains_review_only():
     )
     with pytest.raises(TypeError,match="canonical"):
         DragonMotherEvidenceSynergy(None,None)
+
+
+
+def test_all_three_dragon_hatchlings_are_first_class_and_never_self_train():
+    from skeleton.ai.game_builder.dragon_article_hatchling import (
+        DragonArticleHatchling,
+    )
+    from skeleton.ai.game_builder.dragon_three_hatchling_coordinator import (
+        DragonThreeHatchlingCoordinator,
+    )
+    with pytest.raises(TypeError,match="canonical"):
+        DragonArticleHatchling(None)
+    with pytest.raises(TypeError,match="canonical"):
+        DragonThreeHatchlingCoordinator(None,None,None)

@@ -21,6 +21,8 @@ from skeleton.ai.game_builder.dragon_video_transcript_ledger import (
 )
 from skeleton.ai.game_builder.dragon_source_delta_ledger import DragonSourceDeltaLedger
 from skeleton.ai.game_builder.dragon_mother_evidence_synergy import DragonMotherEvidenceSynergy
+from skeleton.ai.game_builder.dragon_article_hatchling import DragonArticleHatchling
+from skeleton.ai.game_builder.dragon_three_hatchling_coordinator import DragonThreeHatchlingCoordinator
 from skeleton.ai.game_builder.dragon_source_catalog import canonical_source_url
 from skeleton.ai.game_builder.reviewed_knowledge import (
     ReviewedKnowledgeStore,ReviewedDocument,ReviewedNote,
@@ -426,6 +428,43 @@ def test_mother_dragon_synergy_links_only_exact_video_and_delta_evidence(context
     assert not packet["training_authorized"]
     with pytest.raises(ValueError,match="unregistered"):
         mother.preview("other-tenant",lead.source_id,sid,authorized=True)
+
+    # The mother must incorporate ALL THREE independent hatchling roles:
+    # article exact citations + video timecodes + changed-source scrutiny.
+    triad=DragonThreeHatchlingCoordinator(
+        DragonArticleHatchling(captures),videos,updates,feed.nest)
+    statuses=triad.status(
+        OWNER,article_source_id=sid,video_source_id=lead.source_id,
+        update_source_id=sid,authorized=True)
+    assert [h["lane"] for h in statuses["hatchlings"]]==[
+        "article","video","updates"]
+    assert statuses["lane_count"]==3
+    assert statuses["review_ready_count"]==3
+    assert statuses["distinct_source_count"]==2
+    assert statuses["mother_stage"]=="adult"
+    assert statuses["mother_level"]>=1
+    assert all(h["growth"]["level"]==0 for h in statuses["hatchlings"])
+    assert all(h["growth"]["accepted_evidence_count"]==0
+               for h in statuses["hatchlings"])
+    triad_packet=triad.mother_review(
+        OWNER,article_source_id=sid,video_source_id=lead.source_id,
+        update_source_id=sid,authorized=True)
+    assert triad_packet["status"]=="three_lane_research_questions"
+    assert triad_packet["hypotheses"]
+    first=triad_packet["hypotheses"][0]
+    assert set(first["source_ids"])=={"article","video","updates"}
+    assert {"hardware","gameboy"} & set(first["shared_terms"])
+    assert first["video"]["exact_quote"] in {x.text for x in cues}
+    assert first["article"]["exact_quote"] in new
+    assert first["updates"]["exact_quote"] in new
+    assert not triad_packet["source_independence_verified"]
+    assert not triad_packet["agreement_verified"]
+    assert not triad_packet["training_authorized"]
+    assert not triad_packet["shadow_weights_authorized"]
+    assert triad_packet["xp_awarded"]==0
+    assert triad.mother_review(
+        OWNER,article_source_id=sid,video_source_id=lead.source_id,
+        update_source_id=sid,authorized=True)==triad_packet
     assert resources.active_grants()==()
 
 
@@ -441,3 +480,95 @@ def test_mother_synergy_rejects_mismatched_authority(context):
         DragonMotherEvidenceSynergy(
             videos,DragonSourceDeltaLedger(captures)
         ).preview(OWNER,sid,sid,authorized=True)
+
+
+
+def test_article_hatchling_preserves_material_evidence_after_unchanged_observation(context):
+    captures,sid,url,old,new,prior,latest=prepare_article_revisions(context)
+    articles=DragonArticleHatchling(captures)
+    first=articles.review_packet(
+        OWNER,sid,authorized=True,include_quotes=True)
+    assert first["lane"]=="article"
+    assert first["candidate_capture_digest"]==latest["capture_digest"]
+    assert first["observation_count"]==2
+    assert first["passages"]
+    for span in first["passages"]:
+        assert new[span["start"]:span["end"]]==span["exact_quote"]
+    assert first["xp_awarded"]==0 and not first["knowledge_approved"]
+    masked=articles.review_packet(OWNER,sid,authorized=True)
+    assert all(span["exact_quote"] is None for span in masked["passages"])
+    assert all(len(span["quote_sha256"])==64 for span in masked["passages"])
+    add_capture(captures,sid,url,new,epoch(T0)+4,"unchanged-recrawl")
+    retained=articles.review_packet(
+        OWNER,sid,authorized=True,include_quotes=True)
+    assert retained["candidate_capture_digest"]==latest["capture_digest"]
+    assert retained["observation_count"]==3
+    assert retained["unchanged_rechecks_after_candidate"]==1
+    assert retained["latest_observation_change"]=="unchanged"
+    assert retained["latest_observation_digest"]!=latest["capture_digest"]
+    assert retained["passages"]==first["passages"]
+    assert "unchanged rechecks" in retained["improvements"][0]
+    census=articles.census(OWNER,authorized=True)
+    assert census["count_this_page"]==1
+    assert census["items"][0]["candidate_capture_digest"]==latest["capture_digest"]
+    assert not census["training_authorized"]
+    assert context[4].active_grants()==()
+
+
+def test_article_hatchling_refuses_unregistered_owner_and_tampered_citations(context):
+    captures,sid,url,old,new,prior,latest=prepare_article_revisions(context)
+    articles=DragonArticleHatchling(captures)
+    with pytest.raises(PermissionError):
+        articles.review_packet(OWNER,sid,authorized=False)
+    with pytest.raises(ValueError,match="unregistered"):
+        articles.review_packet("other-tenant",sid,authorized=True)
+    with pytest.raises(ValueError,match="canonical"):
+        articles.census(OWNER,authorized=True,after_source="../../foreign")
+    context[0].db.execute(
+        "UPDATE dragon_technical_captures_v1 SET body='{}' "
+        "WHERE owner=? AND source=? AND sequence=2",(OWNER,sid))
+    with pytest.raises(Exception):
+        articles.review_packet(OWNER,sid,authorized=True)
+
+
+def test_three_hatchling_coordinator_incomplete_lanes_do_not_promote(context):
+    captures,sid,url,old,new,_,_=prepare_article_revisions(context)
+    videos,key=transcript_ledger(context)
+    lead=add_video(context)
+    triad=DragonThreeHatchlingCoordinator(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures),context[2].nest)
+    status=triad.status(
+        OWNER,article_source_id=sid,video_source_id=lead.source_id,
+        update_source_id=sid,authorized=True)
+    assert status["lane_count"]==3
+    assert status["review_ready_count"]==1
+    assert [h["status"] for h in status["hatchlings"]]==[
+        "review_ready","awaiting_licensed_transcript","awaiting_material_revision"]
+    review=triad.mother_review(
+        OWNER,article_source_id=sid,video_source_id=lead.source_id,
+        update_source_id=sid,authorized=True)
+    assert review["status"]=="awaiting_three_reviewable_lanes"
+    assert review["hypotheses"]==[]
+    assert review["xp_awarded"]==0
+    assert not review["training_authorized"]
+    with pytest.raises(ValueError,match="differ"):
+        triad.status(
+            OWNER,article_source_id=sid,video_source_id=sid,
+            update_source_id=sid,authorized=True)
+    with pytest.raises(PermissionError):
+        triad.status(
+            OWNER,article_source_id=sid,video_source_id=lead.source_id,
+            update_source_id=sid,authorized=False)
+
+
+def test_article_hatchling_has_no_spurious_findings_without_captures(context):
+    article=DragonArticleHatchling(
+        DragonSourceCaptures(context[1]))
+    url=next(item["url"] for item in CATALOG if item["slug"]=="pandocs")
+    sid="source-"+sha256(url.encode()).hexdigest()
+    packet=article.review_packet(OWNER,sid,authorized=True)
+    assert packet["status"]=="not_yet_captured"
+    assert packet["passages"]==[]
+    assert packet["xp_awarded"]==0
+    assert not packet["training_authorized"]

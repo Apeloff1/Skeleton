@@ -164,6 +164,8 @@ jobs:
             skeleton/ai/game_builder/dragon_video_transcript_ledger.py \
             skeleton/ai/game_builder/dragon_source_delta_ledger.py \
             skeleton/ai/game_builder/dragon_mother_evidence_synergy.py \
+            skeleton/ai/game_builder/dragon_article_hatchling.py \
+            skeleton/ai/game_builder/dragon_three_hatchling_coordinator.py \
             skeleton/ai/game_builder/dragon_source_permission_authority.py \
             skeleton/ai/game_builder/dragon_source_health.py \
             skeleton/ai/game_builder/dragon_research_pilot.py \
