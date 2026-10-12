@@ -7,6 +7,8 @@ regions without allocating the whole world. No imported assets or scripting.
 """
 from __future__ import annotations
 from collections import deque
+from .advanced_sandbox_story import (observe_game_action,
+    observe_community_shortage,settle_observed_quests)
 
 SIZE=8
 CELLS=SIZE*SIZE
@@ -27,11 +29,11 @@ COSTS={
 }
 ACTIONS=(
  tuple(f"{verb}:{i}" for verb in ("move","chop","quarry","dig_clay",
-  "gather","draw_water","fish","mine_ore","till","sow","reap","irrigate",
+  "gather","draw_water","fish","mine_ore","plant_tree","till","sow","reap","irrigate",
   "tame","feed","hunt","ignite","extinguish","demolish","inspect") for i in range(CELLS))
  +tuple(f"build:{name}:{i}" for name in BUILDINGS for i in range(CELLS))
  +tuple(f"terraform:{name}:{i}" for name in TERRAINS for i in range(CELLS))
- +("tick","tick:4","rest","eat","drink","craft:plank","craft:brick",
+ +("tick","tick:4","rest","eat","drink","donate:food","donate:water","craft:plank","craft:brick",
    "craft:tool","craft:fuel","craft:food","trade:buy_food",
    "trade:sell_ore","trade:buy_seed","region:next","region:previous",
    "portal:next","recruit","release","assign:idle","assign:farmer",
@@ -68,7 +70,7 @@ def _tile(i,terrain,seed):
         "water":(8+v%9 if terrain in ("lake","marsh") else 0),
         "fish":(3+v%5 if terrain in ("lake","marsh") else 0),
         "forage":(2+v%3 if terrain in ("grass","forest") else 0),
-        "soil":0,"crop":0,"moisture":(2 if terrain in ("marsh","lake") else 0),
+        "soil":0,"crop":0,"sapling":0,"moisture":(2 if terrain in ("marsh","lake") else 0),
         "animal":(1 if terrain in ("grass","forest") and v%6==0 else 0),
         "tamed":False,
         "fire":0,"pollution":0,
@@ -114,7 +116,7 @@ def normalize_layout(config,layout):
         raise SandboxActionError("original sandbox must author exactly 64 terrain cells")
     source=layout["tiles"];tiles=[]
     stock_limits={"wood":1000,"stone":1000,"clay":1000,"ore":1000,
-                  "water":1000,"forage":1000,"fish":1000,"soil":1,"crop":8,
+                  "water":1000,"forage":1000,"fish":1000,"soil":1,"crop":8,"sapling":8,
                   "moisture":10,"animal":1,"fire":8,"pollution":1000}
     for i,t in enumerate(source):
         required={"id","terrain","building","level","tamed"}|set(stock_limits)
@@ -138,6 +140,8 @@ def normalize_layout(config,layout):
             raise SandboxActionError("non-bridge structures cannot begin on lake water")
         if t["crop"] and not t["soil"]:
             raise SandboxActionError("authored crops require prepared soil")
+        if t["sapling"] and (t["terrain"]!="forest" or t["crop"]):
+            raise SandboxActionError("authored young trees need original unoccupied forest")
         tiles.append(dict(t))
     spawn=_int(layout["spawn"],0,CELLS-1,"player spawn")
     if tiles[spawn]["terrain"]=="lake":
@@ -178,6 +182,8 @@ def apply_scene(state,config,layout):
     state["region_names"]={"0":source["region_name"]}
     state["weather"]=source["starting_weather"]
     state["credits"]=source["starting_credits"]
+    state["civic_grant_reserve"]=min(config["civic_grant_reserve"],
+        config["build_budget"]-state["credits"])
     state["settlers"]=[_new_settler(i,p) for i,p in enumerate(source["settler_spawns"])]
     state["visited_regions"]=[0]
     return state
@@ -196,6 +202,8 @@ def start(config,seed):
       "community_food":10,"community_water":12,"tamed_animals":0,
       "ecology":True,"trade":True,"research":0,"power":0,
       "emissions":0,"houses":0,"achievements":[],
+      "turn":0,"witness_sequence":0,"observations":[],"quests":[],
+      "civic_grant_reserve":0,
       "events":[],"failed":False,"finished":False,"death_reason":"",
     }
     return apply_scene(state,config,default_layout(config,seed))
@@ -329,6 +337,13 @@ def _tick(state,config):
     tiles=_tiles(state)
     ecology=state["ecology"] and config["ecology_enabled"]
     for t in tiles:
+        if t["sapling"]>0:
+            if t["sapling"]>=config["sapling_days"]:
+                t["sapling"]=0
+                t["wood"]=min(1000,t["wood"]+config["sapling_wood_yield"])
+                events.append("real_planted_tree_matured_and_replenished_wood")
+            else:
+                t["sapling"]+=1
         if t["crop"] and t["soil"] and t["crop"]<config["crop_days"]:
             if t["moisture"] or state["weather"]=="rain":
                 t["crop"]=min(config["crop_days"],t["crop"]+
@@ -455,15 +470,17 @@ def step(state,config,action):
     if state["failed"] or state["finished"]:
         raise SandboxActionError("ended original simulation cannot accept orders")
     events=[]
+    witness_site=None
     tiles=_tiles(state)
     fields=action.split(":")
     verb=fields[0]
     if verb in ("move","chop","quarry","dig_clay","gather","draw_water",
-                "fish","mine_ore","till","sow","reap","irrigate","tame","feed","hunt",
+                "fish","mine_ore","plant_tree","till","sow","reap","irrigate","tame","feed","hunt",
                 "ignite","extinguish","demolish","inspect","build","terraform"):
         kind=fields[1] if verb in ("build","terraform") else None
         index=int(fields[2] if kind is not None else fields[1])
         tile=tiles[index]
+        witness_site=index
         if not _local(state,index,1):
             raise SandboxActionError("world manipulation requires direct geographic adjacency")
         if verb=="move":
@@ -516,6 +533,15 @@ def step(state,config,action):
             _spend(state,config,{"water":config["extinguish_water"]},"real fire suppression")
             tile["fire"]=0
             events.append("original_terrain_fire_extinguished")
+        elif verb=="plant_tree":
+            if tile["terrain"] not in ("grass","forest") or tile["wood"]>0 \
+                 or tile["animal"] or tile["building"] or tile["crop"] or tile["sapling"]:
+                raise SandboxActionError("replant only genuinely depleted, open forest or grass habitat")
+            _spend(state,config,{"seed":1,"water":1},"reforestation")
+            _cost_energy(state,config,config["work_energy"])
+            tile["terrain"]="forest"
+            tile["sapling"]=1
+            events.append("original_seed_and_water_planted_real_tree_sapling")
         elif verb=="till":
             if tile["terrain"] not in ("grass","marsh") or tile["building"] not in (None,"farm"):
                 raise SandboxActionError("cultivation needs viable unblocked original soil")
@@ -617,6 +643,14 @@ def step(state,config,action):
         if action=="rest":
             state["energy"]=min(config["starting_energy"],state["energy"]+config["rest_energy"])
             events.append("original_explorer_recovered_real_energy")
+    elif action in ("donate:food","donate:water"):
+        item=action.split(":")[1]
+        amount=config["donation_amount"]
+        if state["inventory"][item]<amount:
+            raise SandboxActionError("community donations must be genuinely carried supplies")
+        state["inventory"][item]-=amount
+        state["community_"+item]+=amount
+        events.append("player_delivered_actual_"+item+"_to_original_community")
     elif action=="eat":
         _spend(state,config,{"food":1},"eating")
         state["hunger"]=max(0,state["hunger"]-config["food_relief"])
@@ -712,6 +746,11 @@ def step(state,config,action):
             events.append("optional_original_sandbox_campaign_completion")
     else:
         raise SandboxActionError("unhandled original game action")
+    settle_observed_quests(state,config,action,witness_site,events)
+    observe_game_action(state,config,action,witness_site,events)
+    if verb in ("tick","rest"):
+        observe_community_shortage(state,config,events)
+    state["turn"]+=1
     state["houses"]=_residence(state)
     state["events"]=events
     return events
