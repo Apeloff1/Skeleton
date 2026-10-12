@@ -197,6 +197,26 @@ def test_replay_failure_wrong_owner_invalid_signature_and_history_tamper():
     db.close()
 
 
+def test_all_sources_are_counted_even_above_1000_without_ui_overflow():
+    db=sqlite3.connect(":memory:")
+    family=DragonFamily(db,approval=lambda p: p.review_digest==A)
+    catalog=tuple(SourceSeed(f"source-{i:04d}",f"https://example.org/{i}",
+                             "article",("game_design",)) for i in range(1003))
+    for start in range(0,len(catalog),500):
+        family.enroll(OWNER,catalog[start:start+500],
+                      authorized=True,now=AT+start)
+    family.seal_inventory(OWNER,authorized=True,now=AT+1004)
+    for i,source in enumerate(catalog):
+        family.consume(OWNER,proof(source.source_id,B,AT+1005+i),
+                       authorized=True)
+    report=DragonAlmanakkLane(db).projection(OWNER,authorized=True,limit=5)
+    assert report["counts"]["collected"]==1003
+    assert len(report["items"])==5
+    assert report["items"][0]["source_id"]=="source-1002"
+    assert report["counts"]["wiki_verified"]==0
+    db.close()
+
+
 def test_no_almanakk_write_permission_and_no_fabricated_source_history():
     db,_,_,_=setup()
     lane=DragonAlmanakkLane(db)
