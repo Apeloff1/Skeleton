@@ -5,6 +5,8 @@ on:
       - feat/dragon-wisdom-review-20261010
     paths:
       - "skeleton/ai/webcrawler/dragon_mother_*.py"
+      - "skeleton/ai/webcrawler/dragon_nest_review_bridge.py"
+      - "tests/test_ai_webcrawler_dragon_nest_review_bridge.py"
       - "tests/test_ai_webcrawler_dragon_mother_*.py"
       - "backend/routes/dragon_academy.py"
       - "backend/tests/test_dragon_academy_routes.py"
@@ -16,6 +18,8 @@ on:
     branches: [main]
     paths:
       - "skeleton/ai/webcrawler/dragon_mother_*.py"
+      - "skeleton/ai/webcrawler/dragon_nest_review_bridge.py"
+      - "tests/test_ai_webcrawler_dragon_nest_review_bridge.py"
       - "tests/test_ai_webcrawler_dragon_mother_*.py"
       - "backend/routes/dragon_academy.py"
       - "backend/tests/test_dragon_academy_routes.py"
@@ -55,10 +59,10 @@ jobs:
         run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
       - name: Compile mother and child orchestration
         run: |
-          python -m compileall -q skeleton/ai/webcrawler/dragon_mother_glean_matrix.py skeleton/ai/webcrawler/dragon_mother_glean_ledger.py skeleton/ai/webcrawler/dragon_mother_shadow_handoff.py
+          python -m compileall -q skeleton/ai/webcrawler/dragon_mother_glean_matrix.py skeleton/ai/webcrawler/dragon_mother_glean_ledger.py skeleton/ai/webcrawler/dragon_mother_shadow_handoff.py skeleton/ai/webcrawler/dragon_nest_review_bridge.py
       - name: Verify cross-source subtext and signed lineage
         run: |
-          python -m pytest -q --noconftest tests/test_ai_webcrawler_dragon_mother_glean_matrix.py tests/test_ai_webcrawler_dragon_mother_shadow_handoff.py
+          python -m pytest -q --noconftest tests/test_ai_webcrawler_dragon_mother_glean_matrix.py tests/test_ai_webcrawler_dragon_mother_shadow_handoff.py tests/test_ai_webcrawler_dragon_nest_review_bridge.py
 
       - name: Install authenticated API test requirements
         run: >
