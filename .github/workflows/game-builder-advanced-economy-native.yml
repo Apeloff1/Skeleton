@@ -137,6 +137,42 @@ jobs:
                   if result.returncode:
                       raise SystemExit("Godot rejected "+name+" "+str(args))
           PY
+      - name: Native engine must reject forged rewards and invalid physical cargo commands
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import os,sys,json,shutil,subprocess
+          root=Path(os.environ["RUNNER_TEMP"])/"original-native-economy"
+          base=root/"trade"/"godot"
+          for name,edit in (
+              ("forged_cash",lambda p:p["expected"].__setitem__(
+                  "cash",p["expected"]["cash"]+1000000)),
+              ("forged_milestone",lambda p:p["expected"].__setitem__(
+                  "checkpoint",False)),
+              ("invalid_route",lambda p:p["actions"].__setitem__(
+                  4,"travel:15")),
+          ):
+              dest=root/("negative_"+name)/"godot"
+              shutil.copytree(base,dest)
+              record=dest/"proof.json"
+              body=json.loads(record.read_text(encoding="utf-8"))
+              edit(body)
+              record.write_text(json.dumps(body,sort_keys=True),encoding="utf-8")
+              args=["--headless","--path",str(dest),"--","--verify-economy"]
+              cmd=(["godot",*args] if sys.platform!="win32" else [
+                  str(Path(os.environ["ProgramFiles"])/"Git"/"bin"/"bash.exe"),
+                  "-c",'godot "$@"',"godot",*args])
+              result=subprocess.run(cmd,capture_output=True,text=True,
+                                    encoding="utf-8",errors="replace",timeout=75)
+              output=result.stdout+"\n"+result.stderr
+              (root/("negative_"+name)/"denied-replay.log").write_text(
+                  output,encoding="utf-8")
+              print(name,result.returncode,output,flush=True)
+              if result.returncode==0 or "NATIVE_ADVANCED_ECONOMY_OK" in output:
+                  raise SystemExit("tampered Godot market proof was accepted: "+name)
+          PY
       - name: Export and execute Linux economy desktop game
         if: runner.os == 'Linux'
         shell: bash
