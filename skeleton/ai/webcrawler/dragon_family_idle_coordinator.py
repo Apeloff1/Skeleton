@@ -15,7 +15,7 @@ from typing import Callable, Mapping
 import json
 import sqlite3
 
-from .dragon_family import DragonFamily, IdleWindow, SourceReceipt, ROLES, _epoch, _owner, _source_id, _utc
+from .dragon_family import DragonFamily, IdleWindow, SourceReceipt, ROLES, _epoch, _owner, _source_id, _utc, _hash
 
 @dataclass(frozen=True)
 class IdleTask:
@@ -123,6 +123,12 @@ class DragonIdleCoordinator:
             ON dragon_family_idle_leases(owner,role,next_due,lease_expires)""")
         self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_family_idle_scan_cursor(
             owner TEXT PRIMARY KEY, last_source_id TEXT NOT NULL)""")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_family_idle_attempt_events(
+            owner TEXT NOT NULL, sequence INTEGER NOT NULL, at REAL NOT NULL,
+            role TEXT NOT NULL, source_id TEXT NOT NULL,
+            outcome TEXT NOT NULL, details TEXT NOT NULL,
+            previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL,
+            PRIMARY KEY(owner,sequence))""")
         self.db.commit()
 
     def _window(self, read: Callable[[], IdleWindow]) -> IdleWindow:
@@ -225,6 +231,30 @@ class DragonIdleCoordinator:
             (owner,role,sid,key)).fetchone()
         return bool(row and now < row[0])
 
+    def _record_attempt(self, owner: str, role: str, sid: str,
+                        at: float, outcome: str) -> None:
+        notes = {
+            "changed": "(improved: independently reviewed new source content acquired)",
+            "unchanged": "(checked: no novel verified source information)",
+            "failed": "(deferred: adapter failed; bounded retry scheduled)",
+            "paused": "(paused: user activity, consent, capacity, or lease fence)",
+        }
+        if outcome not in notes:
+            raise ValueError("unknown idle research outcome")
+        previous=self.db.execute("""SELECT sequence,event_hash,at
+            FROM dragon_family_idle_attempt_events WHERE owner=?
+            ORDER BY sequence DESC LIMIT 1""",(owner,)).fetchone()
+        sequence,prior=(previous[0]+1,previous[1]) if previous else (1,"0"*64)
+        if sequence>100000:
+            raise ValueError("idle attempt history capacity exhausted")
+        if previous and at<previous[2]:
+            raise ValueError("idle research event time regressed")
+        note=notes[outcome]
+        fingerprint=_hash([owner,sequence,at,role,sid,outcome,note,prior])
+        self.db.execute("""INSERT INTO dragon_family_idle_attempt_events
+            VALUES(?,?,?,?,?,?,?,?,?)""",
+            (owner,sequence,at,role,sid,outcome,note,prior,fingerprint))
+
     def _finish(self, owner: str, role: str, sid: str, key: str,
                 now: float, outcome: str) -> None:
         if outcome not in ("changed","unchanged","failed","paused"):
@@ -246,6 +276,7 @@ class DragonIdleCoordinator:
                 failures=?,last_completed=?,last_outcome=?,lease_token='',lease_expires=0
                 WHERE owner=? AND role=? AND source_id=? AND lease_token=?""",
                 (now+due,errors,now,outcome,owner,role,sid,key))
+            self._record_attempt(owner,role,sid,now,outcome)
 
     def run_once(self, owner: str, *,
                  authorized: bool,
