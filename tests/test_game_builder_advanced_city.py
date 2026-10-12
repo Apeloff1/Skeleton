@@ -144,6 +144,39 @@ class AdvancedOriginalCityGameTests(unittest.TestCase):
         self.assertEqual(assembly["authored_scene_evidence"][0]["editor"],"city_builder")
         self.assertFalse(assembly["ready_for_release"])
 
+    def test_visual_city_authoring_and_urban_command_composer(self):
+        from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html, SCRIPT
+        page=render_workspace_html("A"*32).decode("utf-8")
+        for piece in ("paintCityCell","terrain_plain","aquifer_plus",
+                      "road_hub","city-target-cell","city-registered-action",
+                      "Issue verified city order","function drawAdvancedGame"):
+            self.assertIn(piece,page)
+        self.assertIn("City geography changed",SCRIPT)
+        self.assertIn("selectedCityParcel",SCRIPT)
+        # Draft source cannot bypass the Studio scene validation.
+        scene=make_advanced_scene("city_builder",seed=5)
+        changed=deepcopy(scene)
+        changed["layout"]["terrain"][1]="forest"
+        with self.assertRaises(SceneError):
+            validate_advanced_scene(changed)
+        signed=make_advanced_scene("city_builder",seed=5,layout=changed["layout"])
+        self.assertNotEqual(scene["digest"],signed["digest"])
+        self.assertTrue(verify_advanced_session(
+            run_advanced_session("city_builder",seed=5,scene=signed)))
+
+    def test_original_urban_cli_emits_gameplay_without_hidden_project_writes(self):
+        import io, json
+        from contextlib import redirect_stdout
+        from skeleton.ai.game_builder.system_editor_cli import main
+        output=io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main(["play","--editor","city_builder","--seed","5"]),0)
+        session=json.loads(output.getvalue())
+        self.assertTrue(verify_advanced_session(session))
+        self.assertFalse(session["native_hardware_verified"])
+        self.assertFalse(session["publication_certified"])
+        self.assertEqual(session["state"]["day"],1)
+
     def test_budget_debt_damage_and_policy_constrain_cheats(self):
         for illegal in ("build:park:999","materialize:free",
                         "tax:infinite","bridge:teleport"):
