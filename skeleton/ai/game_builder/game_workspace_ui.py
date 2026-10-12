@@ -627,6 +627,34 @@ function drawAdvancedGame(session){
   c.fillStyle="#dbecef";
   c.fillText(state.mode+"  ·  undo "+state.undo_available,16,H-12);
  }
+ if(editor==="colony"){
+  const pad=14;
+  c.fillStyle="#d5e8e0";
+  c.fillText("Day "+state.day+"  ·  Settlers "+state.population+
+   "  ·  Injured "+state.injured+"  ·  Morale "+state.morale,16,42);
+  c.fillStyle="#e8deb2";
+  c.fillText("Food "+state.food+"  Water "+state.water+
+   "  Wood "+state.wood+"  Stone "+state.stone+
+   "  Credits "+state.credits,16,61);
+  state.districts.forEach((sector,index)=>{
+   const col=index%3,row=Math.floor(index/3),x=pad+col*149,y=74+row*66;
+   c.fillStyle=index===state.district?"#205b65":"#294251";
+   c.fillRect(x,y,142,61);
+   c.fillStyle="#e6f0ec";c.fillText((index+1)+" · "+sector.biome,x+6,y+16);
+   const stock=sector.wood+sector.stone+sector.food+sector.water;
+   c.fillStyle="#b6e1ba";c.fillRect(x+6,y+24,Math.min(129,stock),5);
+   c.fillStyle="#dce5ed";
+   c.fillText("W"+sector.wood+" S"+sector.stone+" F"+sector.food+
+    " H"+sector.water,x+6,y+45);
+  });
+  const names=Object.entries(state.workers).filter(([,count])=>count>0)
+   .map(([name,count])=>name.slice(0,3)+":"+count).join("  ");
+  c.fillStyle="#cae9e1";c.fillText("Jobs  "+(names||"unassigned"),16,213);
+  c.fillStyle="#dfd7a5";
+  c.fillText(state.milestones.length?
+   state.milestones.join(" · ").slice(0,69):
+   "No milestones yet · build, farm, defend, explore",16,232);
+ }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
   c.fillText(state.finished?"Completed":"Defeat",W-100,20);
