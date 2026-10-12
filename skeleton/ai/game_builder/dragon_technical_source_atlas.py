@@ -58,7 +58,9 @@ _DAYS = {"engine":14, "runtime":14, "graphics":30, "audio":60,
     "formats":60, "production":30}
 _WORD = re.compile(r"[a-z0-9]+")
 _ID = re.compile(r"source-[0-9a-f]{64}\Z")
-_SLUG = re.compile(r"[a-z][a-z0-9-]{1,39}\Z")
+# Public research-source slugs may legitimately start with a digit (e.g. 8bitworkshop).
+# Keep lowercase ASCII, conservative length and unique canonical identities.
+_SLUG = re.compile(r"[a-z0-9][a-z0-9-]{1,39}\Z")
 
 
 def _curate():

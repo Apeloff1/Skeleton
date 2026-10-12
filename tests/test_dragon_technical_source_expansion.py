@@ -30,6 +30,17 @@ def test_research_cohort_expands_without_rewriting_original_leads():
     assert len(CATALOG_DIGEST) == 64
 
 
+def test_numeric_first_brand_slug_is_valid_curated_metadata():
+    # Regression: 8bitworkshop was a genuine research candidate but an
+    # overly restrictive slug validator crashed CATALOG during module import.
+    row=next(item for item in CATALOG if item["slug"]=="8bitworkshop")
+    assert row["url"]=="https://8bitworkshop.com/docs/"
+    assert row["family"]=="homebrew"
+    assert row["crawler_authorized"] is False
+    assert row["training_authorized"] is False
+    assert len(CATALOG)==248
+
+
 def test_source_families_are_multidisciplinary_not_engines_only():
     by_family = Counter(row["family"] for row in CATALOG)
     assert len(by_family) == 22
