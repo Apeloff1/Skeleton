@@ -65,7 +65,7 @@ jobs:
             skeleton/ai/forge/universal.py
             skeleton/ai/forge/__init__.py
             skeleton/ai/webcrawler/__init__.py
-            skeleton/ai/webcrawler/dragon_companion_runtime.py
+            skeleton/ai/webcrawler/
             skeleton/kernel/
             tests/__init__.py
             tests/test_game_builder_story_canon_fabric.py
