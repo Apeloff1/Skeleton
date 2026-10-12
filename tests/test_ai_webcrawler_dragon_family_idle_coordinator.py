@@ -180,6 +180,30 @@ def test_repeated_unchanged_receipt_is_cooldown_only():
     db.close()
 
 
+def test_keyset_rotation_reaches_sources_beyond_initial_window():
+    db=sqlite3.connect(":memory:")
+    family=DragonFamily(db,owner_scope=OWNER,approval=lambda r:r.review_digest==REVIEW)
+    family.enroll(OWNER,(seed("parent-source",topics=("misc",)),),authorized=True,now=NOW)
+    family.seal_inventory(OWNER,authorized=True,now=NOW+1)
+    family.consume(OWNER,receipt("parent-source",ORIGINAL,NOW+2),authorized=True)
+    additions=tuple(seed(f"source-{i:03d}",topics=("misc",) if i<24 else ("game_engine",))
+                    for i in range(25))
+    family.enroll(OWNER,additions,authorized=True,now=NOW+10)
+    worker=DragonIdleCoordinator(family,policy=IdleCoordinatorPolicy(max_eligible_scan=10))
+    calls=[]
+    for tick in range(4):
+        result=worker.run_once(OWNER,authorized=True,idle_state=lambda tick=tick:idle(NOW+720+tick*20),
+              gatherers={"article":lambda task:(calls.append(task.source_id) or
+                  receipt(task.source_id,ART,NOW+719+tick*20))},
+              task_topics=("game_engine",))
+        if calls:
+            break
+    assert calls==["source-024"]
+    assert result["changed"]==1
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    db.close()
+
+
 def test_budget_refuses_policy_bypass_and_unscoped_family():
     for values in ({"max_tasks":4},{"min_idle_seconds":1},
                    {"lease_seconds":5000},{"max_eligible_scan":2},
