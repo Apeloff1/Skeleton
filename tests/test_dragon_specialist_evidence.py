@@ -636,20 +636,26 @@ def test_research_catalog_owner_isolation_bad_cursors_and_corrupt_source(context
 
 
 def test_three_hatchlings_new_owner_without_signed_nest_reports_real_zero_progress(context):
-    from unittest.mock import patch
+    from contextlib import closing
     captures,sid,url,old,new,_,_=prepare_article_revisions(context)
     lead=add_video(context)
     videos,_=transcript_ledger(context)
-    nest=context[2].nest
-    triad=DragonThreeHatchlingCoordinator(
-        DragonArticleHatchling(captures),videos,
-        DragonSourceDeltaLedger(captures),nest)
-    # Simulate a genuinely new account without an initialized signed nest.
-    # This must not become a failure or auto-mint a progress event.
-    with patch.object(nest,"read",return_value=None):
+    # Use a REAL empty signed-nest SQLite database. This catches failures
+    # that mocking read() would conceal, including accidental XP creation.
+    with closing(sqlite3.connect(":memory:")) as empty_db:
+        nest=DragonNestStore(
+            empty_db,signing_key=b"fresh-dragon-nest-test-signing-key-minimum-32-bytes")
+        assert nest.read(OWNER,authorized=True) is None
+        triad=DragonThreeHatchlingCoordinator(
+            DragonArticleHatchling(captures),videos,
+            DragonSourceDeltaLedger(captures),nest)
         status=triad.status(
             OWNER,article_source_id=sid,video_source_id=lead.source_id,
             update_source_id=sid,authorized=True)
+        assert nest.read(OWNER,authorized=True) is None
+        assert empty_db.execute(
+            "SELECT COUNT(*) FROM dragon_nest_history"
+        ).fetchone()[0]==0
     assert status["mother_stage"]=="not_initialized"
     assert status["mother_level"] is None
     assert status["lane_count"]==3
@@ -660,3 +666,21 @@ def test_three_hatchlings_new_owner_without_signed_nest_reports_real_zero_progre
                for child in status["hatchlings"])
     assert status["xp_awarded"]==0
     assert status["model_training_authorized"] is False
+
+
+def test_existing_signed_nest_with_tampered_head_is_not_mistaken_for_new_egg(context):
+    captures,sid,url,old,new,_,_=prepare_article_revisions(context)
+    lead=add_video(context)
+    videos,_=transcript_ledger(context)
+    nest=context[2].nest
+    triad=DragonThreeHatchlingCoordinator(
+        DragonArticleHatchling(captures),videos,
+        DragonSourceDeltaLedger(captures),nest)
+    assert nest.read(OWNER,authorized=True) is not None
+    nest.db.execute(
+        "UPDATE dragon_nest_state SET head=? WHERE owner=?",
+        ("f"*64,OWNER))
+    with pytest.raises(ValueError,match="signature|history|head|invalid"):
+        triad.status(
+            OWNER,article_source_id=sid,video_source_id=lead.source_id,
+            update_source_id=sid,authorized=True)
