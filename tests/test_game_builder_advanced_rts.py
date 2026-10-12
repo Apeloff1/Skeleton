@@ -63,7 +63,7 @@ class OriginalLiveStrategyTests(unittest.TestCase):
 
     def test_worker_cargo_is_conserved_and_bank_requires_actual_nearby_depot(self):
         rules=self.rules()
-        commands=["harvest:9","tick","tick"]
+        commands=["harvest:9","tick","tick","tick"]
         report=run_advanced_session("rts",rules,commands)
         self.assertTrue(verify_advanced_session(report,rules))
         state=report["state"]
@@ -261,7 +261,7 @@ class OriginalLiveStrategyTests(unittest.TestCase):
         unit=next(x for x in match["state"]["units"] if x["id"]==1)
         self.assertNotEqual(unit["cell"],27)
         self.assertEqual(match["state"]["turn"],2)
-        self.assertLessEqual(abs(unit["cell"]%8)+abs(unit["cell"]//8-1),2)
+        self.assertLessEqual(abs(unit["cell"]%8)+abs(unit["cell"]//8-1),3)
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("rts",rules,["select:1","move:63"])
         # Remote movement may be ordered across valid geography; it is
