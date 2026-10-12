@@ -99,7 +99,7 @@ class OriginalRoguelikeRunTests(unittest.TestCase):
             with self.subTest(action=action):
                 with self.assertRaises(AdvancedRuntimeError):
                     run_advanced_session("roguelike",cfg,[action])
-        journey=["move_east"]*5+["move_south"]*5
+        journey=["move_south"]*5+["move_east"]*5
         # Without defeating elite, lockpick opens exit on a genuine physical
         # tile, but cannot stand in for final guardian victory.
         with self.assertRaises(AdvancedRuntimeError):
@@ -175,9 +175,7 @@ class OriginalRoguelikeRunTests(unittest.TestCase):
         self.assertEqual(s["attack"],cfg["attack_power"])
 
     def test_paid_revival_differs_from_authoritative_permadeath(self):
-        base=self.easy(foe_attack=12,armor=0,starting_health=5,
-                       encounter_count=1) if False else self.easy(
-                       foe_attack=12,armor=0,starting_health=5)
+        base=self.easy(foe_attack=12,armor=0,starting_health=5)
         for death in (True,False):
             cfg=make_editor_document("roguelike",
                   {**base,"permadeath":death,"revive_relic_cost":1})["settings"]
@@ -216,7 +214,7 @@ class OriginalRoguelikeRunTests(unittest.TestCase):
         initial=s["map"]["reserve"]
         self.assertGreater(initial,0)
         total=len(s["map"]["enemies"])+initial
-        step(s,cfg,"inspect")
+        step(s,cfg,"cast_east")
         self.assertEqual(len(s["map"]["enemies"])+s["map"]["reserve"],total)
         self.assertLess(s["map"]["reserve"],initial)
         self.assertLessEqual(len(s["map"]["enemies"]),16)
