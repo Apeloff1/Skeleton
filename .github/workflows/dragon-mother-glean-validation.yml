@@ -70,7 +70,7 @@ jobs:
         env:
           PYTHONPATH: ".:backend"
         run: |
-          python -m pytest -q --noconftest backend/tests/test_dragon_academy_routes.py -k mother_glean_read
+          python -m pytest -q --noconftest backend/tests/test_dragon_academy_routes.py -k mother_glean
   frontend:
     name: Mother Dragon companion TypeScript
     runs-on: ubuntu-24.04
