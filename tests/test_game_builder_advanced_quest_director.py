@@ -283,9 +283,11 @@ class LivingOriginalQuestTests(unittest.TestCase):
                           ending_policy="persistent")
         itinerary=["south","east","help:0","speak:0",
                    "choose:0:support","help:0","resolve:0"]
-        sample=run_advanced_session("quest_director",common,itinerary)
+        # Nonzero original seed gives a meaningful rule-id difference
+        # while preserving the same source actions and real eyewitness path.
+        sample=run_advanced_session("quest_director",common,itinerary,seed=4)
         one=run_advanced_session("quest_director",
-                  {**common,"event_rules":1},itinerary)
+                  {**common,"event_rules":1},itinerary,seed=4)
         self.assertTrue(verify_advanced_session(sample,common))
         self.assertTrue(verify_advanced_session(one,{**common,"event_rules":1}))
         self.assertEqual(one["state"]["quests"][0]["rule_id"],0)
