@@ -181,6 +181,9 @@ class DragonAlmanakkLane:
                     digest: str, decision: WikiEvidence, *, authorized: bool) -> bool:
         self._assert_owner(owner)
         self._identity(owner,role,source_id,digest)
+        # Reject nonexistent, superseded or revoked evidence before invoking any
+        # external Wiki, sandbox or handoff validator. Recheck under write lock.
+        self._admit(owner,role,source_id,digest)
         if not isinstance(decision,WikiEvidence):
             raise ValueError("independent Wiki receipt required")
         _digest(decision.fingerprint)
@@ -198,6 +201,9 @@ class DragonAlmanakkLane:
                        digest: str, evaluation: SandboxEvidence, *, authorized: bool) -> bool:
         self._assert_owner(owner)
         self._identity(owner,role,source_id,digest)
+        # Reject nonexistent, superseded or revoked evidence before invoking any
+        # external Wiki, sandbox or handoff validator. Recheck under write lock.
+        self._admit(owner,role,source_id,digest)
         if not isinstance(evaluation,SandboxEvidence):
             raise ValueError("sandbox evaluation receipt required")
         _digest(evaluation.fingerprint)
@@ -224,6 +230,9 @@ class DragonAlmanakkLane:
         """Produces an integration request, NEVER mutates model parameters."""
         self._assert_owner(owner)
         self._identity(owner,role,source_id,digest)
+        # Reject nonexistent, superseded or revoked evidence before invoking any
+        # external Wiki, sandbox or handoff validator. Recheck under write lock.
+        self._admit(owner,role,source_id,digest)
         _digest(signed_receipt)
         _epoch(approved_at)
         if self.handoff_verify is None or self.handoff_verify(owner,digest,signed_receipt) is not True:
