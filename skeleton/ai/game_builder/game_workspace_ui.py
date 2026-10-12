@@ -1177,6 +1177,39 @@ function drawAdvancedGame(session){
   c.fillText(state.conservation_checkpoint?"Restored · nonterminal biodiversity study":
     "Source habitats · predator-prey dynamics · finite restoration",12,269);
  }
+ if(editor==="dialogue"){
+  c.fillStyle="#e8eef8";
+  c.fillText(state.title+" · original first-hand conversation · turn "+state.tick,13,34);
+  for(let i=0;i<3;i++){
+   const x=18+i*132,y=69;
+   const located=state.position===i;
+   c.fillStyle=located?"#326d6d":"#32475f";
+   c.fillRect(x,y,120,166);
+   c.fillStyle="#f3e2b6";
+   c.fillText(state.locations[i],x+8,y+19);
+   const local=state.speakers.filter(s=>s.location===i);
+   for(let j=0;j<Math.min(5,local.length);j++){
+    const voice=local[j];
+    c.fillStyle=voice.heard?"#a6e8ca":"#cddbec";
+    c.fillText("#"+voice.id+" "+voice.name.slice(0,13),x+8,y+43+j*22);
+    c.fillStyle="#efddad";
+    c.fillText("T"+voice.trust+" · "+voice.patience+" turns",x+8,y+55+j*22);
+   }
+   if(located){c.strokeStyle="#ffcf78";c.lineWidth=3;c.strokeRect(x+1,y+1,118,164);c.lineWidth=1;}
+  }
+  const x=W-187;
+  c.fillStyle="#edeee3";
+  c.fillText("Influence "+state.influence,x,62);
+  c.fillText("Reputation "+state.reputation,x,84);
+  c.fillText("Sources "+state.direct_statements.length,x,106);
+  c.fillText("Corroborated "+state.corroborations.length,x,128);
+  c.fillText("Supported "+state.support_count,x,150);
+  c.fillText("Choices "+state.choices.length,x,172);
+  c.fillText("Detailed "+state.active_speakers,x,194);
+  c.fillStyle="#bee6d6";
+  c.fillText(state.checkpoint?"Social agreement earned · optional epilogue":
+   "Listen to multiple sources; compare evidence at archive",14,269);
+ }
  if(editor==="economy"){
   const left=14,top=57,cellW=90,cellH=42;
   c.fillStyle="#eff6df";
@@ -1467,6 +1500,57 @@ let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="dialogue"){
+  const state=advancedSession.state;
+  const info=document.createElement("p");
+  info.textContent="Living original conversations · "+
+   state.active_speakers+" locally simulated speakers, "+
+   state.unmodeled_speakers+" explicitly unmodeled · mode "+state.text_delivery+
+   " · "+state.direct_statements.length+" direct statements · "+
+   state.corroboborations;
+  // Source statements, rather than an assistant's guessed speech, determine
+  // which choices become legal. The backend remains the authority.
+  info.textContent="Speakers "+state.active_speakers+
+   " · station "+state.locations[state.position]+
+   " · direct statements "+state.direct_statements.length+
+   " · verified topics "+state.corroborations.length+
+   " · patience and influence are finite.";
+  target.append(info);
+  const label=document.createElement("label");
+  label.textContent="Local speaker / archived testimony / original social action";
+  const select=document.createElement("select");
+  select.id="original-dialogue-command";
+  select.setAttribute("aria-label","Choose original dialogue action");
+  const recommended=actions.filter(action=>{
+   if(action.startsWith("travel:"))
+    return Math.abs(Number(action.split(":")[1])-state.position)===1;
+   if(action.startsWith("speak:")||action.startsWith("support:")||
+      action.startsWith("challenge:")){
+    const id=Number(action.split(":")[1]);
+    const speaker=state.speakers[id];
+    return speaker&&speaker.location===state.position;
+   }
+   if(action.startsWith("compare:"))return state.position===2;
+   return true;
+  });
+  for(const action of recommended){
+   const option=document.createElement("option");
+   option.value=action;
+   option.textContent=action.replaceAll("_"," ");
+   select.append(option);
+  }
+  label.append(select);target.append(label);
+  const execute=document.createElement("button");
+  execute.type="button";
+  execute.textContent="Perform source-bound social choice";
+  execute.disabled=Boolean(advancedSession.terminal)||!recommended.length;
+  execute.addEventListener("click",()=>advanceAdvanced(select.value));
+  target.append(execute);
+  const hint=document.createElement("small");
+  hint.textContent="First-hand testimony cannot be copied; compare two distinct original sources in the archive. Trust, patience and influence actually change.";
+  target.append(hint);
+  return;
+ }
  if(advancedSession?.editor==="economy"){
   const state=advancedSession.state;
   const label=document.createElement("label");
