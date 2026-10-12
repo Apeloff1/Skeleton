@@ -320,6 +320,74 @@ def _normalize_lore(entries: Any, kind: str) -> dict[str, dict]:
     return result
 
 
+def _ending_variants(raw: Any, characters: Mapping[str, Any],
+                     places: Mapping[str, Any]) -> list[dict]:
+    """Validated condition-driven ending slides, never implicit AI-generated outcomes."""
+    if not isinstance(raw, list) or len(raw) > 100:
+        raise ValueError("Ending has too many conditional variants.")
+    normalized = []
+    used: set[str] = set()
+    fields = {"epilogue", "consequences", "character_conclusions",
+              "place_conclusions", "quest_conclusions", "faction_conclusions"}
+    for element in raw:
+        item = _plain(element, "ending variant")
+        _exact(item, {"id", "guard", "overrides"}, location="ending variant")
+        key = identifier(item.get("id"), kind="ending variant")
+        if key in used:
+            raise ValueError("Duplicate ending variant ID.")
+        used.add(key)
+        source = _plain(item.get("overrides"), "ending variation")
+        _exact(source, fields, location="ending variations")
+        if not source:
+            raise ValueError("Ending variant must change an authored consequence.")
+        changes = {}
+        for field, value in source.items():
+            if field in ("epilogue", "consequences"):
+                changes[field] = _text(value, "conditional " + field, 6000, 20)
+            else:
+                rows = _plain(value, field)
+                if len(rows) > 1000:
+                    raise ValueError("Ending variant has too many outcomes.")
+                if field == "character_conclusions" and set(rows) - set(characters):
+                    raise ValueError("Conditional ending references unknown character.")
+                if field == "place_conclusions" and set(rows) - set(places):
+                    raise ValueError("Conditional ending references unknown place.")
+                changes[field] = {
+                    identifier(subject, kind="variation subject"): _text(fate, "ending fate", 1500)
+                    for subject, fate in rows.items()
+                }
+        normalized.append({"id": key, "guard": validate_condition(item.get("guard")),
+                           "overrides": changes})
+    return sorted(normalized, key=lambda x: x["id"])
+
+
+def _resolve_ending(ending: Mapping[str, Any], state: Mapping[str, Any]) -> tuple[dict, list[str]]:
+    """Apply matching authored variants; overlapping rules are explicit errors."""
+    result = deepcopy(ending)
+    variants = result.pop("variants", [])
+    selected: list[str] = []
+    modified: set[tuple[str, str | None]] = set()
+    for variant in variants:
+        if not holds(variant["guard"], state):
+            continue
+        selected.append(variant["id"])
+        for field, patch in variant["overrides"].items():
+            if isinstance(patch, dict):
+                for subject, fate in patch.items():
+                    address = (field, subject)
+                    if address in modified:
+                        raise ValueError("Conflicting conditional ending variants change the same fate.")
+                    modified.add(address)
+                    result[field][subject] = fate
+            else:
+                address = (field, None)
+                if address in modified:
+                    raise ValueError("Conflicting conditional ending variants change the same epilogue.")
+                modified.add(address)
+                result[field] = patch
+    return result, selected
+
+
 def validate_plan(raw: Mapping[str, Any]) -> dict:
     plan = _plain(raw, "narrative plan")
     _exact(plan, {"schema_version", "entry_node", "nodes", "endings", "characters",
@@ -347,7 +415,8 @@ def validate_plan(raw: Mapping[str, Any]) -> dict:
         item = _plain(entry, "ending")
         _exact(item, {"id", "title", "tone", "epilogue", "consequences",
                       "character_conclusions", "place_conclusions",
-                      "quest_conclusions", "faction_conclusions", "required_lore"},
+                      "quest_conclusions", "faction_conclusions", "required_lore",
+                      "variants"},
                location="ending")
         key = identifier(item.get("id"), kind="ending")
         if key in end_map:
@@ -368,7 +437,9 @@ def validate_plan(raw: Mapping[str, Any]) -> dict:
         required_lore = item.get("required_lore", [])
         if not isinstance(required_lore, list) or len(required_lore) > 500:
             raise ValueError("Required ending lore must be a bounded list.")
+        variants = _ending_variants(item.get("variants", []), characters, places)
         end_map[key] = {
+            "variants": variants,
             "quest_conclusions": {
                 identifier(k, kind="ending quest"): _text(v, "quest ending", 900)
                 for k, v in quest_outcomes.items()
@@ -574,7 +645,10 @@ def simulate(plan: Mapping[str, Any], choices: Sequence[str]) -> dict:
     if terminal and len(steps) < len(choices):
         raise ValueError("Cannot choose further actions after an ending.")
     incomplete = [k for k, t in threads.items() if t["status"] == "open"]
-    ending = plan["endings"].get(terminal) if terminal else None
+    ending, selected_variants = (
+        _resolve_ending(plan["endings"][terminal], state)
+        if terminal else (None, [])
+    )
     missing_lore = (sorted(set(ending["required_lore"]) -
                            set(state["known_lore"])) if ending else [])
     touched_characters = {s["character"] for s in steps if s.get("character")}
@@ -609,6 +683,7 @@ def simulate(plan: Mapping[str, Any], choices: Sequence[str]) -> dict:
         "position": None if terminal else current,
         "available_options": [] if terminal else available_options(plan, current, state),
         "ending": deepcopy(ending), "ending_id": terminal,
+        "ending_variants_selected": selected_variants,
         "unresolved_threads": sorted(incomplete),
         "missing_ending_lore": missing_lore,
         "unresolved_character_arcs": unresolved_characters,
@@ -619,7 +694,8 @@ def simulate(plan: Mapping[str, Any], choices: Sequence[str]) -> dict:
         "story_quality_guaranteed": False,
         "receipt_digest": receipt({"plan": plan["source_digest"], "steps": steps,
                                   "state": state, "threads": threads,
-                                  "ending": terminal}),
+                                  "ending": terminal,
+                                  "ending_variants": selected_variants}),
     }
 
 
