@@ -40,6 +40,8 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_interleaved_counterfactual import (run_counterfactual_lab,
+    verify_counterfactual_lab)
 from .advanced_interleaved_save import (export_interleaved_save,
     import_interleaved_save,continue_interleaved_save)
 from .advanced_interleaved_world import (run_interleaved_world,
@@ -449,6 +451,23 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-interleaved-counterfactual":
+            analysis=run_counterfactual_lab(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["timeline"],
+                values.get("world_settings"),
+                max_candidates=values.get("max_candidates",8))
+            if not verify_counterfactual_lab(
+                    analysis,values["physical_episodes"],
+                    values["genre_sessions"],values["world_scene"],
+                    values["timeline"],values.get("world_settings")):
+                raise ValueError("game causal trial replay did not match original world")
+            return self._json(200,{
+                "analysis":analysis,
+                "original_project_files_mutated":False,
+                "counterfactuals_promoted":False,
+                "native_all_engines_certified":False,
             })
         if path=="/api/advanced-interleaved-save-export":
             saved=export_interleaved_save(
