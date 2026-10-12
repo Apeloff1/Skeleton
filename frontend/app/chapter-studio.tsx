@@ -84,6 +84,7 @@ export default function ChapterStudioScreen() {
   const [newPlotKind, setNewPlotKind] = useState<PlotKind>('setup');
   const [newPlotAnchor, setNewPlotAnchor] = useState('');
   const [proof, setProof] = useState<ProofReceipt | null>(null);
+  const [manifest, setManifest] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [page, setPage] = useState<'chapter' | 'scenes' | 'production'>('chapter');
@@ -308,6 +309,22 @@ export default function ChapterStudioScreen() {
     setNotice('Narrative scene approved with proof receipt ' + receipt.slice(0, 20) +
       '. Assets, audio, voice and gameplay still require independent production checks.');
   };
+  const verifyProductionManifest = async () => {
+    const result = await api.get<any>(
+      base() + '/chapters/production-manifest?branch_id=' + encodeURIComponent(branch),
+      { headers: authHeaders(), timeoutMs: 30000, retries: 0 },
+    );
+    if (!result.ok || !result.data?.ok || result.data.game_id !== gameId.trim() ||
+        result.data.branch_id !== branch ||
+        result.data.manifest?.schema_version !== 'jeeves.story.production-manifest.v1') {
+      throw new Error('Full-story production manifest could not be verified.');
+    }
+    setManifest(result.data.manifest);
+    setNotice(result.data.manifest.structural_ready
+      ? 'All structural story records are present. Independent creative, voice, visual and historic QA remains required.'
+      : 'Missing chapter, act, scene or receipt evidence. The story is not structurally complete.');
+  };
+
   const discussChapter = async () => {
     if (!chapter) throw new Error('Select a saved chapter.');
     // Re-fetch the latest version and citations before opening a new chat.
@@ -491,6 +508,37 @@ export default function ChapterStudioScreen() {
         {scene && <Text style={styles.muted}>
           Scene revision {scene.revision} · {scene.status} · immutable content receipt {scene.digest.slice(0, 24)}
         </Text>}
+      </Section>}
+      {page === 'production' && <Section title="Whole-story production coverage"
+        subtitle="Independently verify all 100 chapters, 1,000 acts and 9,999 scene receipt chains.">
+        <Action label="Audit complete project production manifest" icon="checkmark-done-outline"
+          disabled={busy} onPress={() => { void withOperation(verifyProductionManifest); }} />
+        {manifest && <>
+          <Text style={styles.label}>
+            {manifest.coverage.structural_completion_pct}% recorded structural progress
+            · {manifest.structural_ready ? 'all structural receipts present' : 'incomplete'}
+          </Text>
+          <Text style={styles.text}>
+            {manifest.coverage.chapter_notes}/100 chapters · {manifest.coverage.acts_with_scenes}/1000 acts
+            · {manifest.coverage.scenes_approved}/9999 approved scenes
+            · {manifest.coverage.scenes_proofed}/9999 current 100k proofs
+          </Text>
+          <Text style={styles.muted}>
+            Missing chapters: {(manifest.missing_chapters || []).slice(0, 20).join(', ') || 'none'}.
+            Missing acts: {manifest.missing_acts_count}.
+            Missing scenes: {manifest.missing_scenes_count}.
+            Recorded structural problems: {manifest.issue_count}.
+          </Text>
+          {(manifest.issues || []).slice(0, 20).map((issue: any, i: number) =>
+            <Text key={issue.kind + ':' + i} style={styles.error}>
+              {issue.kind} at #{issue.number}: {issue.detail}
+            </Text>)}
+          <Text style={styles.small}>Manifest receipt: {manifest.receipt_digest}</Text>
+          <Text style={styles.muted}>
+            Even at 100% structural coverage, creative, historical, voice and visual
+            consistency cannot be guaranteed without independent review of the produced game.
+          </Text>
+        </>}
       </Section>}
       {page === 'production' && <Section title="100,000-inspection scene proofreading"
         subtitle="Deterministic rules are repeated and counted. They do not certify 100% semantic or artistic perfection.">
