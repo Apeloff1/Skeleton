@@ -1842,6 +1842,17 @@ function showAdvanced(reply){
   "This family has no independently running native Godot source adapter";
  $("advanced-physics-interop").disabled=!["platformer","racing","sandbox"].includes(
   advancedSession.editor)||!advancedSession.scene;
+ $("advanced-linked-step").disabled=!["platformer","racing","sandbox"].includes(
+   advancedSession.editor)||!advancedSession.scene;
+ const sourceChoice=$("advanced-linked-action");
+ const oldChoice=sourceChoice.value;
+ sourceChoice.replaceChildren();
+ for(const value of reply.available_actions){
+  const option=document.createElement("option");
+  option.value=value;option.textContent=value.replaceAll("_"," ");
+  sourceChoice.append(option);
+ }
+ if(reply.available_actions.includes(oldChoice))sourceChoice.value=oldChoice;
  $("advanced-state").textContent=JSON.stringify({
    session_digest:advancedSession.digest,
    turns:advancedSession.validated_turn_count,
@@ -3098,6 +3109,53 @@ $("advanced-physics-native").addEventListener("click",async()=>{
   status("Original native physics demo prepared and replayed. Export stays supervised; device validation is separate.");
  }catch(error){status("Native physics preparation blocked: "+error.message);}
 });
+let linkedCampaignTurns=[];
+let linkedCampaignKey=null;
+$("advanced-linked-reset").addEventListener("click",()=>{
+ linkedCampaignTurns=[];linkedCampaignKey=null;
+ $("advanced-linked-state").textContent="";
+ status("Started a fresh opt-in physics-linked campaign");
+});
+$("advanced-linked-step").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession || !advancedSession.scene ||
+     !["platformer","racing","sandbox"].includes(advancedSession.editor))
+   throw Error("A signed original platformer, racing or sandbox scene is required");
+  const key=advancedSession.editor+":"+advancedSession.scene.digest+
+            ":"+advancedSession.seed+":"+JSON.stringify(advancedSettings);
+  if(linkedCampaignKey!==null && linkedCampaignKey!==key)
+   throw Error("Original authored source changed; reset linked campaign first");
+  const movement=$("advanced-linked-physical").value==="impact"?
+   Array(8).fill("push:east"):["inspect"];
+  const next=[...linkedCampaignTurns,{
+   source_action:$("advanced-linked-action").value,
+   physical_actions:movement,
+   ability:$("advanced-linked-ability").value
+  }];
+  const answer=await api("/api/advanced-physics-linked",{
+   editor:advancedSession.editor,scene:advancedSession.scene,
+   settings:advancedSettings,turns:next
+  });
+  if(!answer.game || answer.source_file_mutated ||
+     answer.game.source_scene_digest!==advancedSession.scene.digest)
+   throw Error("Linked gameplay source receipt did not match signed original");
+  linkedCampaignTurns=next;linkedCampaignKey=key;
+  $("advanced-linked-state").textContent=JSON.stringify({
+   mode:answer.game.editor,
+   health_or_durability:answer.game.linked_state.vital,
+   physical_impacts:answer.game.linked_state.physical_impacts,
+   repairs:answer.game.linked_state.repair_kits,
+   braces:answer.game.linked_state.brace_charges,
+   outcome:answer.game.linked_state.game_status,
+   source_gameplay_digest:answer.game.source_gameplay_digest,
+   linked_head:answer.game.head_hash,
+   original_save_unchanged:true,
+  },null,2);
+  if(answer.game.linked_state.terminal)
+   $("advanced-linked-step").disabled=true;
+  status("Played source and physical commands under separate audited authorities");
+ }catch(error){status("Linked physical campaign blocked: "+error.message);}
+});
 $("advanced-physics-interop").addEventListener("click",async()=>{
  try{
   if(!advancedSession || !["platformer","racing","sandbox"].includes(advancedSession.editor)
@@ -3216,6 +3274,21 @@ local until typed revalidation and an explicit human-approved file commit.</smal
 <button id="advanced-start" type="button">Start advanced scenario</button>
 <button id="advanced-physics-native" type="button">Prepare native physics demo</button>
 <button id="advanced-physics-interop" type="button">Rehearse authored physical encounters</button>
+<fieldset aria-label="Opt-in linked physical campaign">
+ <legend>Linked physical campaign · real health and durability</legend>
+ <label>Original game action<select id="advanced-linked-action"></select></label>
+ <label>Physics maneuver<select id="advanced-linked-physical">
+  <option value="impact">Impact route</option>
+  <option value="avoid">Avoid collision (inspect)</option>
+ </select></label>
+ <label>Mitigation<select id="advanced-linked-ability">
+  <option value="none">None</option><option value="brace">Brace</option>
+  <option value="repair">Use repair kit</option>
+ </select></label>
+ <button id="advanced-linked-step" type="button">Play linked turn</button>
+ <button id="advanced-linked-reset" type="button">Reset linked campaign</button>
+ <pre id="advanced-linked-state" role="status" aria-live="polite"></pre>
+</fieldset>
 <button id="advanced-save" type="button">Download verified savegame</button>
 <button id="advanced-godot-export" type="button">Download playable Godot 4 game project</button>
 <label>Restore portable savegame<input id="advanced-load" type="file" accept=".json,application/json"></label>
