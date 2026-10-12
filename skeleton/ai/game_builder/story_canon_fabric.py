@@ -124,7 +124,9 @@ def validate_story_bible(doc):
     ident(doc["project"], "project")
     require(doc["phase"] in PHASES, "authoring must progress foundation -> cast -> design")
     text(doc["title"], "game title", 140)
-    story = shape(doc["story"], ("premise", "conflict", "themes", "planned_acts"), "story")
+    story = shape(doc["story"], ("premise", "conflict", "themes", "planned_acts")
+                  + (("planned_chapters",) if "planned_chapters" in doc["story"] else ()),
+                  "story")
     text(story["premise"], "central premise", 4000)
     text(story["conflict"], "narrative conflict", 2000)
     number(story["planned_acts"], 1, 1000, "game acts")
