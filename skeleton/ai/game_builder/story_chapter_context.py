@@ -251,6 +251,33 @@ def chapter_context(bible, contract, scenes, *, chapter=None, max_prior_capsules
              if data["chapter"]==chapter]
     carry=[{"id":key,**data} for key,data in projection["highlights"].items()
            if data["chapter"]<chapter and not data["closed"]]
+    # Model context has an explicit, honest byte budget. Historical facts are
+    # fully replayed regardless. No hidden truncation: oversize chapters retain
+    # their complete source addresses and require exact-source pagination.
+    import json
+    full=[{
+        "sequence":sc["sequence"],"chapter":sc["chapter"],
+        "act":sc["act"],"scene":sc["scene"],"digest":sc["digest"],
+        "receipt":sc["assurance"]["digest"],
+        "region":sc["region"],"cast":sc["cast"],
+        "looks":sc["looks"],"assets":sc["assets"],
+        "storytelling":sc["storytelling"],
+        "events":sc["events"],"dialogue":sc["dialogue"],
+        "interactions":sc["interactions"],"beats":sc["beats"],
+    } for sc in within]
+    full_bytes=len(json.dumps(full,ensure_ascii=True,
+                   separators=(",",":")).encode("utf-8"))
+    all_in_context=full_bytes<=1_500_000
+    if not all_in_context:
+        full=[{
+            "sequence":sc["sequence"],"chapter":sc["chapter"],
+            "act":sc["act"],"scene":sc["scene"],"digest":sc["digest"],
+            "receipt":sc["assurance"]["digest"],
+            "region":sc["region"],"cast":sc["cast"],
+            "storytelling":sc["storytelling"],
+            "dialogue_refs":[x["id"] for x in sc["dialogue"]],
+            "event_refs":[x["id"] for x in sc["events"]],
+        } for sc in within]
     output = {
         "schema":"skeleton.game_builder.jeeves_chapter_context.v1",
         "project":bible["project"],"chapter":chapter,"chapter_total":CHAPTERS,
@@ -260,13 +287,10 @@ def chapter_context(bible, contract, scenes, *, chapter=None, max_prior_capsules
         "verified_source_head":confirmation["verified_source_head"],
         "verified_receipt_head":confirmation["verified_receipt_head"],
         "chapter_scene_count":len(within),
-        "chapter_scene_sources":[{
-            "sequence":s["sequence"],"act":s["act"],"scene":s["scene"],
-            "digest":s["digest"],"receipt":s["assurance"]["digest"],
-            "storytelling":s["storytelling"],
-            "dialogue_refs":[x["id"] for x in s["dialogue"]],
-            "event_refs":[x["id"] for x in s["events"]],
-        } for s in within],
+        "chapter_scene_sources":full,
+        "full_chapter_scene_text_in_model_context":all_in_context,
+        "chapter_scene_text_bytes":full_bytes,
+        "exact_source_pages_required_if_oversize":not all_in_context,
         "chapter_highlighters":markers,
         "unresolved_prior_highlighters":carry,
         "prior_chapter_endings":prior[-max_prior_capsules:],
@@ -278,3 +302,36 @@ def chapter_context(bible, contract, scenes, *, chapter=None, max_prior_capsules
         "fiction_quality_automatically_certified":False,
     }
     return {**output,"digest":digest(output)}
+
+
+def highlight_source(bible, contract, scenes, highlight):
+    """Exact source-linked plot point lookup for chat, Jeeves and Studio."""
+    ident(highlight,"plot highlight bookmark")
+    from .story_continuity_assurance import verify_production_history
+    verification=verify_production_history(bible,contract,scenes)
+    projection=validate_chapter_history(scenes)
+    if highlight not in projection["highlights"]:
+        raise StoryCanonError("no source-backed highlighter with that identity")
+    selected=projection["highlights"][highlight]
+    scene=scenes[selected["sequence"]-1]
+    require(scene["digest"]==selected["source_digest"] and
+            scene["sequence"]==selected["sequence"],
+            "highlighter index references corrupted historical source")
+    source=next((x for group in ("events","dialogue","interactions","beats")
+                 for x in scene[group] if x["id"]==selected["reference"]),None)
+    require(source is not None,"highlight citation absent from original scene")
+    body={
+        "schema":"skeleton.game_builder.chapter_highlight_source.v1",
+        "project":bible["project"],"highlight":highlight,
+        "kind":selected["kind"],"color":selected["color"],
+        "importance":selected["importance"],"note":selected["note"],
+        "closed":selected["closed"],"chapter":scene["chapter"],
+        "act":scene["act"],"scene":scene["scene"],
+        "sequence":scene["sequence"],"scene_digest":scene["digest"],
+        "confirmation_receipt":scene["assurance"]["digest"],
+        "source_reference":selected["reference"],"source_content":source,
+        "historical_head":verification["verified_receipt_head"],
+        "original_source_reparsed":True,
+    }
+    return {**body,"digest":digest(body)}
+
