@@ -76,10 +76,16 @@ jobs:
           )
           original=["move:south","move:east","discover:0",
                     "speak:0","support:0"]+["followup:0"]*5+["resolve:0"]
+          exploit=["move:south","move:east","discover:0",
+                   "speak:0","challenge:0"]+["sabotage:0"]*5+["resolve:0"]
           for seed in (0,1,2,7):
-              record=run_unified_npc_world(original,seed=seed)
-              assert verify_unified_npc_world(record)
-              assert record["state"]["resolved_count"]==1
-              assert not record["native_unified_engine_executed"]
-              print("UNIFIED_NPC_WORLD_VERIFIED",seed,record["digest"])
+              for branch,commands,ending in (
+                  ("restoration",original,"restored"),
+                  ("exploitation",exploit,"exploited")):
+                  record=run_unified_npc_world(commands,seed=seed)
+                  assert verify_unified_npc_world(record)
+                  assert record["state"]["resolved_count"]==1
+                  assert record["state"]["quests"][0]["ending"]==ending
+                  assert not record["native_unified_engine_executed"]
+                  print("UNIFIED_NPC_WORLD_VERIFIED",seed,branch,record["digest"])
           PY
