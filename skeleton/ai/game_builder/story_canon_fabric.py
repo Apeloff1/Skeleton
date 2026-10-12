@@ -16,7 +16,7 @@ SCENE = "skeleton.game_builder.story_scene.v1"
 ID = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 COLOR = re.compile(r"^#[A-Fa-f0-9]{6}$")
 SHA = re.compile(r"^[a-f0-9]{64}$")
-MAX_SCENES = 12000
+MAX_SCENES = 9999
 PHASES = ("foundation", "cast", "design")
 FIELDS = ("status", "location", "affiliation", "outfit")
 
@@ -238,7 +238,8 @@ def scene_path(doc):
 def _check_scene(bible, doc, previous, history, state, indexes):
     signed(doc, SCENE, ("bible_digest", "sequence", "act", "scene",
                         "prior_digest", "title", "region", "cast", "looks",
-                        "assets", "beats", "dialogue", "interactions", "events"))
+                        "assets", "beats", "dialogue", "interactions", "events")
+           + (("assurance",) if "assurance" in doc else ()))
     require(bible["phase"] == "design" and bible["rights_reviewed"],
             "no production scene before story, cast and design review")
     require(doc["bible_digest"] == bible["digest"],
