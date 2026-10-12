@@ -23,8 +23,10 @@ from skeleton.ai.game_builder.system_editor_assembly import compile_system_assem
 class OriginalLabyrinthTests(unittest.TestCase):
     @staticmethod
     def small(topology="grid",levels=1,**extra):
-        return dict(width=7,height=7,levels=levels,hazards=0,
-                    wall_budget=0,key_count=1,topology=topology,**extra)
+        values=dict(width=7,height=7,levels=levels,hazards=0,
+                    wall_budget=0,key_count=1,topology=topology)
+        values.update(extra)
+        return values
 
     def test_five_distinct_topologies_are_source_playable(self):
         self.assertIn("maze",ENGINES)
