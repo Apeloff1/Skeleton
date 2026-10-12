@@ -428,6 +428,9 @@ def _tick(state,config):
         if enemy is not None:
             _damage(state,config,u,enemy["cell"],events)
             events.append("original_owned_unit_stance_selected_real_opponent")
+    if state["finished"] or state["failed"]:
+        _refresh(state,config)
+        return events
     if config["supply_model"]=="logistics":
         demand=max(1,state["supply_used"]//config["logistics_divisor"])+(
             config["desert_logistics_penalty"] if state["map"]["environment"]=="desert" else 0)
