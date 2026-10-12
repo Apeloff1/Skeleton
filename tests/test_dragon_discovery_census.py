@@ -30,14 +30,14 @@ def census(registry):
 
 def test_source_census_counts_full_pinned_lineage_not_orphans(registry, census):
     verified = verify_reconciled_chain(registry)
-    assert census["raw_url_leads"] == verified["raw_url_leads"] == 15175
+    assert census["raw_url_leads"] == verified["raw_url_leads"] == 19228
     assert census["baseline_raw_leads"] == 4405
-    assert census["supplement_raw_leads"] == 10770
+    assert census["supplement_raw_leads"] == 14823
     assert census["canonical_distinct_urls"] == verified[
         "canonical_candidate_sources"]
     assert census["raw_to_canonical_collisions"] == (
-        15175 - census["canonical_distinct_urls"])
-    assert len(SOURCE_BATCHES) == 16
+        19228 - census["canonical_distinct_urls"])
+    assert len(SOURCE_BATCHES) == 21
     assert all(path not in SOURCE_BATCHES for path in EXCLUDED_ORPHANS)
     assert sum(census["category_counts_canonical"].values()) == census[
         "canonical_distinct_urls"]
