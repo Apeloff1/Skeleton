@@ -16,6 +16,7 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.branching_narrative import validate_plan, simulate, audit_outcomes
 from core.outcome_weaving_matrices import catalog, instruction
+from core.outcome_chapter_weave import audit_chapter_weave
 from routes.story_index import _scope
 from routes.chapter_studio import _existing_game
 from routes.gameforge_auth import require_role
@@ -196,3 +197,33 @@ async def get_outcome_matrix_instruction(
         raise HTTPException(status_code=422, detail=str(exc))
     except (PyMongoError, OSError):
         raise HTTPException(status_code=503, detail="Outcome review instruction unavailable")
+
+
+
+@router.get("/{pid}/outcomes/chapter-weave")
+async def get_chapter_weave_audit(
+    pid: str, branch_id: str = Query("main", pattern=ID),
+    user=Depends(require_role("viewer")),
+):
+    """Adversarially verify that conditional choices really exist in Chapter Studio."""
+    scope = _scope(pid, user)
+    try:
+        record = await _find(scope, branch_id)
+        chapters = await _db.game_story_chapters.find({
+            **scope, "branch_id": branch_id,
+        }).limit(101).to_list(length=101)
+        scenes = await _db.game_story_scenes.find({
+            **scope, "branch_id": branch_id,
+        }).limit(10000).to_list(length=10000)
+        complete = len(chapters) <= 100 and len(scenes) <= 9999
+        if not complete:
+            raise HTTPException(status_code=409, detail="Canonical scene inventory exceeds authorized capacity")
+        findings = audit_chapter_weave(record["compiled"], chapters, scenes, complete_source=True)
+        return {"ok": True, "game_id": pid, "branch_id": branch_id,
+                "plan_digest": record["source_digest"],
+                "chapter_weave": findings}
+    except HTTPException:
+        raise
+    except (PyMongoError, OSError):
+        logger.exception("Canonical story weave audit unavailable")
+        raise HTTPException(status_code=503, detail="Story-chapter alignment unavailable")
