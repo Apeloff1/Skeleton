@@ -25,6 +25,14 @@ from .advanced_fighting_runtime import (default_layout as fight_layout,
 from .advanced_rhythm_runtime import (default_layout as rhythm_layout,
                                       normalize_layout as validate_rhythm_layout,
                                       RhythmActionError)
+from .advanced_npc_society_runtime import (
+    default_layout as society_layout, normalize_layout as validate_society_layout,
+    SocietyActionError,
+)
+from .advanced_ecosystem_runtime import (
+    default_layout as ecosystem_layout, normalize_layout as validate_ecosystem_layout,
+    EcosystemActionError,
+)
 from .advanced_rpg_runtime import (
     default_layout as rpg_layout, normalize_layout as validate_rpg_layout,
     RPGActionError,
@@ -212,6 +220,10 @@ def _default_layout(engine, config, seed):
         return rpg_layout(config,seed)
     if engine == "procedural_world":
         return proc_layout(config,seed)
+    if engine == "npc_society":
+        return society_layout(config,seed)
+    if engine == "ecosystem":
+        return ecosystem_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -257,6 +269,16 @@ def _normalize_layout(engine, config, layout):
         try:
             return validate_proc_layout(config,layout)
         except ProceduralWorldActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="npc_society":
+        try:
+            return validate_society_layout(config,layout)
+        except SocietyActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="ecosystem":
+        try:
+            return validate_ecosystem_layout(config,layout)
+        except EcosystemActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="fighting":
         try:
