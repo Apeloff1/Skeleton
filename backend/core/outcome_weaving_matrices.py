@@ -89,7 +89,7 @@ def matrix(matrix_id: str) -> dict:
     raise ValueError("Unknown outcome matrix.")
 
 
-def instruction(matrix_id: str, level: int, *, ending_id: str, player_history_digest: str) -> dict:
+def instruction(matrix_id: str, level: int, *, ending_id: str, player_history_digest: str | None) -> dict:
     entry = matrix(matrix_id)
     level_info = scrutiny_level(level)
     text = (
@@ -106,7 +106,12 @@ def instruction(matrix_id: str, level: int, *, ending_id: str, player_history_di
         "schema_version": SCHEMA,
         "matrix_id": matrix_id, "level": level, "ending_id": ending_id,
         "player_history_digest": player_history_digest,
-        "prompt": text, "review_status": "unexecuted",
+        "history_witnessed": bool(player_history_digest),
+        "prompt": text if player_history_digest else (
+            "NO PLAYER PATH WITNESS SUPPLIED. This is a plan-level review only; "
+            "do not assert conditional reachability or that a named ending "
+            "was actually experienced by a player.\n" + text
+        ), "review_status": "unexecuted",
         "creator_signoff_required": True,
         "instruction_receipt": receipt({"matrix": matrix_id, "level": level,
                                         "ending": ending_id, "history": player_history_digest,
