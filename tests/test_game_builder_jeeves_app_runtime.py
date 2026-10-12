@@ -9,7 +9,7 @@ import tempfile
 import threading
 import unittest
 
-from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
+from skeleton.ai.game_builder.game_project_workspace import GameWorkspace, WorkspaceError
 from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
 from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 from skeleton.ai.game_builder.jeeves_app_runtime import (
