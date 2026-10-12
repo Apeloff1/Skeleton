@@ -237,7 +237,8 @@ def _ecological_turn(state,config):
             if balance==0:break
         shortage=need-consumed
         lost=min(state["dormant_population"],shortage)
-        birth=1 if lost==0 and state["dormant_population"]<(
+        birth=1 if lost==0 and state["dormant_population"]>0 and (
+            state["dormant_population"]<
             state["dormant_species"]*config["carrying_capacity"]
         ) else 0
         state["dormant_population"]+=birth-lost
