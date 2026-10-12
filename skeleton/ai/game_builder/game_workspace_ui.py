@@ -1039,8 +1039,17 @@ function drawAdvancedGame(session){
       index===state.selected?"#fff1c5":
       body.material==="metal"?"#b9c7d8":
       body.material==="glass"?"#93d6d4":"#a5c68a";
-   c.beginPath();c.arc(bx,by,Math.max(3,body.radius/100*scale),
+   if(state.geometry_mode==="oriented_box"){
+    const theta=body.orientation*Math.PI/180000,
+          xRadius=body.shape_half[0]/100*scale,
+          yRadius=body.shape_half[1]/100*scale;
+    c.save();c.translate(bx,by);c.rotate(theta);
+    c.fillRect(-xRadius,-yRadius,2*xRadius,2*yRadius);
+    c.restore();
+   }else{
+    c.beginPath();c.arc(bx,by,Math.max(3,body.radius/100*scale),
                         0,Math.PI*2);c.fill();
+   }
    // Orientation comes from source-replayed angular state, not client drag.
    const arm=Math.max(3,body.radius/100*scale);
    const angle=body.orientation*Math.PI/180000;
@@ -1065,7 +1074,8 @@ function drawAdvancedGame(session){
    "Max speed: "+state.max_velocity_seen,
    "Pair CCD: "+state.continuous_pair_contacts,
    "Angular: "+state.max_angular_speed_seen,
-   "Cable ext: "+state.peak_cable_extension
+   "Cable ext: "+state.peak_cable_extension,
+   "SAT hits: "+state.oriented_contacts
   ].forEach((line,i)=>c.fillText(line,tx,54+i*20));
  }
  if(editor==="flight"){
