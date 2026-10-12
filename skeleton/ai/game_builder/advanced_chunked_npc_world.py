@@ -443,7 +443,12 @@ def _schedule(state,rules,opts):
     active, chunks = _visible(state, opts)
     ids = {a["index"] for a in active}
     occupied = {a["position"] for a in state["actors"]}
-    obstacles = set(state["obstacles"])
+    # Quest interaction anchors remain accessible to the player. Workers
+    # can perform duties while adjacent, but cannot park their body directly
+    # on an authored objective cell and block a source-verified game route.
+    obstacles = set(state["obstacles"]) | {
+        site["cell"] for site in state["sites"]
+    }
     period = rules["npc_society"]["day_length"]
     working = state["tick"] % period < period // 2
     moves = []
