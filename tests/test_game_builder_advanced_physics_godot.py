@@ -187,6 +187,79 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
         with self.assertRaises(AdvancedGodotExportError):
             render_physics_godot_package(session,settings,authorized=True)
 
+    def test_native_godot_proof_contains_actual_source_fixture_ids(self):
+        settings=self.profile(gravity=0,air_drag=0,
+                              impulse_strength=500,speed_limit=400,
+                              wall_restitution=0)
+        source=default_layout(make_editor_document("physics",settings)["settings"],4)
+        source["fixtures"]=[{"position":[430,900,0],
+                             "half_size":[10,100,40],"layer":3}]
+        scene=make_advanced_scene("physics",settings,seed=4,layout=source)
+        session=run_advanced_session("physics",settings,
+                       ("push:east","push:east"),seed=4,scene=scene)
+        self.assertTrue(verify_advanced_session(session,settings))
+        pack=render_physics_godot_package(session,settings,authorized=True)
+        expected=json.loads(pack.files["godot/proof.json"])["expected"]
+        self.assertGreater(expected["fixture_contact_counts"][0],0)
+        self.assertEqual(expected["fixture_contact_counts"],
+                         session["state"]["fixture_contact_counts"])
+        self.assertEqual(expected["fixture_contact_events"],
+                         session["state"]["fixture_contact_events"])
+        self.assertEqual(sum(expected["fixture_contact_counts"]),
+                         len(expected["fixture_contact_events"]))
+        for event in expected["fixture_contact_events"]:
+            self.assertEqual(event["fixture_index"],0)
+            self.assertEqual(event["body_id"],"payload")
+            self.assertIn(event["kind"],("swept_fixture_contact","fixture_contact"))
+        script=pack.files["godot/scripts/main.gd"].decode("utf-8")
+        self.assertIn('func _record_fixture(index: int,kind: String',script)
+        self.assertIn('_record_fixture(fixture_index,"swept_fixture_contact"',script)
+        self.assertIn('counts[index]=int(counts[index])+1',script)
+        self.assertIn('ledger.pop_front()',script)
+
+    def test_ignored_fixture_does_not_forge_native_source_collision_id(self):
+        settings=self.profile(gravity=0,air_drag=0,
+                              impulse_strength=500,speed_limit=400,
+                              wall_restitution=0)
+        source=default_layout(make_editor_document("physics",settings)["settings"],1)
+        source["fixtures"]=[{"position":[430,900,0],
+                             "half_size":[10,100,40],"layer":2}]
+        source["bodies"][0]["mask"]=1
+        scene=make_advanced_scene("physics",settings,seed=1,layout=source)
+        session=run_advanced_session("physics",settings,
+                       ("push:east","push:east"),seed=1,scene=scene)
+        pack=render_physics_godot_package(session,settings,authorized=True)
+        result=json.loads(pack.files["godot/proof.json"])["expected"]
+        self.assertEqual(result["fixture_contact_counts"],[0])
+        self.assertEqual(result["fixture_contact_events"],[])
+
+    def test_native_no_fixture_source_receipts_are_exactly_empty(self):
+        settings,_,session=self.generate({},("inspect",))
+        pack=render_physics_godot_package(session,settings,authorized=True)
+        result=json.loads(pack.files["godot/proof.json"])["expected"]
+        self.assertEqual(result["fixture_contact_counts"],[])
+        self.assertEqual(result["fixture_contact_events"],[])
+        self.assertEqual(set(result),set(PROOF_FIELDS))
+
+    def test_forged_source_fixture_evidence_is_not_accepted_as_original(self):
+        settings=self.profile(gravity=0,air_drag=0,
+                              impulse_strength=500,speed_limit=400)
+        layout=default_layout(make_editor_document("physics",settings)["settings"],2)
+        layout["fixtures"]=[{"position":[430,900,0],
+                             "half_size":[10,100,40],"layer":3}]
+        scene=make_advanced_scene("physics",settings,seed=2,layout=layout)
+        authentic=run_advanced_session("physics",settings,
+                       ("push:east","push:east"),seed=2,scene=scene)
+        self.assertTrue(authentic["state"]["fixture_contact_events"])
+        for key in ("fixture_index","body_id","kind"):
+            forged=deepcopy(authentic)
+            forged["state"]["fixture_contact_events"][0][key]=(
+                500 if key=="fixture_index" else
+                "imaginary_collision" if key=="kind" else "unapproved_body")
+            from skeleton.ai.game_builder.advanced_gameplay_runtime import AdvancedRuntimeError
+            with self.assertRaises(AdvancedRuntimeError):
+                render_physics_godot_package(forged,settings,authorized=True)
+
     def test_native_gravity_has_real_airborne_acceleration_and_floor_contact(self):
         settings=self.profile(gravity=8,tick_hz=40,air_drag=0,
                               wall_restitution=0,floor_friction=0)
