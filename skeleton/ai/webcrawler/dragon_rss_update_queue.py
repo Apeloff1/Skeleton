@@ -6,6 +6,7 @@ at ingestion time; no standalone network access or source license is granted.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+from contextlib import nullcontext
 from hashlib import sha256
 from datetime import datetime,timezone
 import re,sqlite3
@@ -108,7 +109,10 @@ class DragonRssUpdateQueue:
     def ingest(self,ticket:HatchlingWorkerTicket,admission:DragonNestWorkerAdmission,
                xml:bytes,receipt:SignedRssSnapshot,*,reviewer_public_key:bytes,
                trusted_issuer:str,key_id:str,now:int,
-               admission_kwargs:dict,authorized:bool)->dict:
+               admission_kwargs:dict,authorized:bool,
+               transaction_managed:bool=False)->dict:
+        if type(transaction_managed) is not bool:
+            raise TypeError("trusted transaction ownership required")
         if (authorized is not True or not isinstance(ticket,HatchlingWorkerTicket)
             or ticket.lane!="updates" or not isinstance(admission,DragonNestWorkerAdmission)
             or not isinstance(receipt,SignedRssSnapshot)):
@@ -139,7 +143,7 @@ class DragonRssUpdateQueue:
         if not admission.authorize_chunk(ticket,**admission_kwargs):
             raise PermissionError("Updates idle permission revoked before commit")
         receipt_digest=canonical_digest(receipt.body())
-        with self.db:
+        with (nullcontext() if transaction_managed else self.db):
             row=self.db.execute(
                 "SELECT receipt_digest FROM dragon_rss_poll_v1 "
                 "WHERE owner=? AND source_id=? AND xml_sha=?",

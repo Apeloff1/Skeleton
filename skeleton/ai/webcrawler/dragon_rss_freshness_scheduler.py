@@ -13,6 +13,7 @@ import json
 import sqlite3
 from urllib.parse import urlsplit
 from dataclasses import dataclass
+from contextlib import nullcontext
 
 from skeleton.ai.game_builder.contracts import canonical_json, canonical_digest
 from .dragon_nest_worker_admission import HatchlingWorkerTicket, DragonNestWorkerAdmission
@@ -240,7 +241,10 @@ class DragonRssFreshnessScheduler:
                     admission: DragonNestWorkerAdmission, *,
                     admission_kwargs: dict, expected_revision: int,
                     now: int, succeeded: bool,
-                    snapshot_digest: str | None, authorized: bool) -> dict:
+                    snapshot_digest: str | None, authorized: bool,
+                    transaction_managed: bool = False) -> dict:
+        if type(transaction_managed) is not bool:
+            raise TypeError("trusted poll transaction ownership required")
         if (authorized is not True or not isinstance(ticket, HatchlingWorkerTicket)
             or ticket.lane != "updates"
             or not isinstance(admission, DragonNestWorkerAdmission)
@@ -256,7 +260,7 @@ class DragonRssFreshnessScheduler:
             raise ValueError("failed fetch must not claim a signed snapshot")
         if not admission.authorize_chunk(ticket, **admission_kwargs):
             raise PermissionError("idle worker stopped before RSS poll recording")
-        with self.db:
+        with (nullcontext() if transaction_managed else self.db):
             state = self._current(ticket.owner, ticket.source_id)
             if state is None or state["revision"] != expected_revision:
                 raise PermissionError("stale RSS poll scheduler generation")
