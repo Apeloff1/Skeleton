@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import os
+import stat
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
@@ -28,15 +30,46 @@ MAX_CANDIDATES = 50_000
 MAX_BYTES = 8_000_000
 
 
+def _strict_object(pairs: list[tuple[str, object]]) -> dict:
+    body = {}
+    for key, value in pairs:
+        if key in body:
+            raise ValueError("duplicate evidence JSON object key")
+        body[key] = value
+    return body
+
+
 def _supplement(path: str | Path) -> tuple[str, dict]:
     file = Path(path)
-    if not file.is_file() or file.suffix != ".json":
+    if file.suffix != ".json":
         raise ValueError("a JSON discovery supplement file is required")
-    with file.open("rb") as stream:
-        raw = stream.read(MAX_BYTES + 1)
-    if len(raw) > MAX_BYTES:
-        raise ValueError("supplement exceeds byte budget")
-    doc = json.loads(raw)
+    # Keep the original path identity across opening and reading. A symlink or
+    # concurrently replaced file cannot silently become a source of authority.
+    try:
+        before = file.lstat()
+        if not stat.S_ISREG(before.st_mode) or not 1 <= before.st_size <= MAX_BYTES:
+            raise ValueError("regular bounded discovery evidence required")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        fd = os.open(file, flags)
+        with os.fdopen(fd, "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            raw = stream.read(MAX_BYTES + 1)
+            after = os.fstat(stream.fileno())
+        now = file.lstat()
+    except OSError as exc:
+        raise ValueError("evidence path changed or is not readable") from exc
+    if (not stat.S_ISREG(opened.st_mode)
+            or (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino)
+            or (now.st_dev, now.st_ino) != (opened.st_dev, opened.st_ino)
+            or (opened.st_size, opened.st_mtime_ns) != (after.st_size, after.st_mtime_ns)
+            or len(raw) != opened.st_size or len(raw) > MAX_BYTES):
+        raise ValueError("evidence file identity changed or byte budget exceeded")
+    try:
+        doc = json.loads(raw.decode("utf-8", "strict"),
+                         object_pairs_hook=_strict_object,
+                         parse_constant=lambda _: (_ for _ in ()).throw(ValueError("nonfinite evidence number")))
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
+        raise ValueError("malformed, duplicate-key or nonfinite evidence JSON") from exc
     if not isinstance(doc, dict) or doc.get("schema") != SCHEMA or doc.get("status") != STATUS:
         raise ValueError("unreviewed discovery supplement required")
     root = Path(__file__).resolve().parents[3]
@@ -227,11 +260,17 @@ class DragonDiscoveryAdmission:
                     raw = canonical_json(claimed)
                     digest = canonical_digest(claimed)
                     previous = self.db.execute(
-                        """SELECT digest FROM dragon_almanac_supplement_receipts_v2
+                        """SELECT body,digest FROM dragon_almanac_supplement_receipts_v2
                            WHERE owner=? AND origin_source=? AND supplement_digest=?""",
                         (owner, item["source_id"], supplement_digest)).fetchone()
-                    if previous and previous[0] != digest:
-                        raise ValueError("conflicting supplemental receipt")
+                    if previous:
+                        try:
+                            previously_stored = json.loads(previous[0])
+                            valid_stored = canonical_digest(previously_stored) == previous[1]
+                        except (TypeError, ValueError, UnicodeError, RecursionError):
+                            valid_stored = False
+                        if not valid_stored or previous[1] != digest:
+                            raise ValueError("corrupt or conflicting supplemental receipt")
                     if previous is None:
                         self.db.execute(
                             "INSERT INTO dragon_almanac_supplement_receipts_v2 VALUES(?,?,?,?,?,?)",
