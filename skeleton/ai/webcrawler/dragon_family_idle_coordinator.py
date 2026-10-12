@@ -130,7 +130,8 @@ class DragonIdleCoordinator:
     are never valid admission signals. Multi-host deployments must share the
     same canonical SQLite file or use an equivalent transactional coordinator.
     """
-    def __init__(self, family: DragonFamily, *, policy: IdleCoordinatorPolicy = IdleCoordinatorPolicy()):
+    def __init__(self, family: DragonFamily, *, policy: IdleCoordinatorPolicy = IdleCoordinatorPolicy(),
+                 reserve_budget: Callable[[str, str, float], None] | None = None):
         policy.validate()
         if not isinstance(family, DragonFamily) or family.owner_scope is None:
             raise PermissionError("idle coordinator requires an owner-locked trusted family")
@@ -141,6 +142,9 @@ class DragonIdleCoordinator:
         self.family = family
         self.db = family.db
         self.policy = policy
+        if reserve_budget is not None and not callable(reserve_budget):
+            raise ValueError("trusted reservation budget hook must be callable")
+        self.reserve_budget = reserve_budget
         self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_family_idle_leases(
             owner TEXT NOT NULL, role TEXT NOT NULL, source_id TEXT NOT NULL,
             next_due REAL NOT NULL DEFAULT 0,
@@ -247,6 +251,11 @@ class DragonIdleCoordinator:
                 (owner,role,sid)).fetchone()
             if row and (row[0] > start or row[1] > start):
                 return None
+            # The owner/role admission budget is debited in the SAME SQLite
+            # transaction as the lease. No concurrent host can overrun quota
+            # by claiming work before its usage counter becomes visible.
+            if self.reserve_budget is not None:
+                self.reserve_budget(owner,role,start)
             self.db.execute("""INSERT INTO dragon_family_idle_leases
                 (owner,role,source_id,next_due,failures,attempts,last_started,
                  lease_token,lease_expires,last_outcome)
