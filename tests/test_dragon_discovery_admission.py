@@ -203,3 +203,68 @@ def test_malicious_or_overlong_heading_is_not_a_fake_topic():
     normalized = _evidence_headers({"headers": [heading]})[0]
     assert len(normalized) <= 160
     assert normalized.endswith(sha256(heading.encode()).hexdigest()[:12])
+
+
+
+def test_readonly_almanac_browser_reports_real_heading_and_provenance(tmp_path, baseline, chain):
+    with ReviewedKnowledgeStore(tmp_path / "browse.sqlite") as store:
+        ingress = DragonDiscoveryAdmission(DragonAlmanacs(store))
+        ingress.import_chain("alice", baseline, chain, authorized=True)
+        roots = ingress.topic_page("alice", authorized=True)
+        assert roots["topics"] and roots["topics"][0]["headers"] == ["Sources"]
+        sources = roots["topics"][0]
+        assert sources["source_count"] > 0
+        second = ingress.topic_page("alice", authorized=True, parent=sources["topic"])
+        provisional = next(x for x in second["topics"] if x["headers"] == ["Sources", "Provisional"])
+        assert provisional["source_count"] > 0
+        assert ingress.source_page(
+            "alice", provisional["topic"], authorized=True, limit=1)["sources"]
+        # Canonical URL identity is one job even when raw discovery receipts
+        # preserve fragment/hostname variants.
+        duplicates = store.db.execute(
+            """SELECT normalized_source FROM dragon_almanac_supplement_receipts_v2
+               WHERE owner='alice' GROUP BY normalized_source
+               HAVING COUNT(*) > 1 ORDER BY normalized_source LIMIT 1""").fetchone()
+        assert duplicates is not None
+        duplicate_source = duplicates[0]
+        body = store.db.execute(
+            "SELECT body FROM dragon_almanac_sources WHERE owner='alice' AND source=?",
+            (duplicate_source,)).fetchone()
+        assert body
+        # Membership reaches the Sources/Provisional ancestor.
+        page = ingress.source_page("alice", provisional["topic"],
+                                   authorized=True, limit=100, offset=0)
+        assert page["scope"] == "discovery_metadata_only"
+        assert all(s["training_authorized"] is False
+                   and s["reviewed_knowledge_inferred"] is False for s in page["sources"])
+        assert all(s["stage_index"] == 0 and s["stage_state"] == "pending"
+                   for s in page["sources"])
+        with pytest.raises(PermissionError):
+            ingress.topic_page("alice", authorized=False)
+        with pytest.raises(ValueError, match="unknown owner topic"):
+            ingress.source_page("bob", provisional["topic"], authorized=True)
+
+
+def test_browse_rejects_tampered_source_record(tmp_path, baseline, chain):
+    with ReviewedKnowledgeStore(tmp_path / "browse-tamper.sqlite") as store:
+        ingress = DragonDiscoveryAdmission(DragonAlmanacs(store))
+        ingress.import_chain("owner", baseline, chain, authorized=True)
+        root = ingress.topic_page("owner", authorized=True)["topics"][0]["topic"]
+        store.db.execute(
+            """UPDATE dragon_almanac_sources SET digest=?
+               WHERE owner='owner' AND source=(
+               SELECT source FROM dragon_almanac_members WHERE owner='owner' AND topic=?
+               ORDER BY source LIMIT 1)""", ("f" * 64, root))
+        store.db.commit()
+        with pytest.raises(ValueError, match="corrupt"):
+            ingress.source_page("owner", root, authorized=True, limit=1)
+
+
+def test_topic_and_source_pagination_reject_type_confusion(tmp_path):
+    with ReviewedKnowledgeStore(tmp_path / "empty.sqlite") as store:
+        ingress = DragonDiscoveryAdmission(DragonAlmanacs(store))
+        for value in (True, -1, 1001, "1"):
+            with pytest.raises(ValueError):
+                ingress.topic_page("owner", authorized=True, limit=value)
+            with pytest.raises(ValueError):
+                ingress.source_page("owner", "topic-missing", authorized=True, limit=value)
