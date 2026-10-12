@@ -9,6 +9,7 @@ on:
       - "skeleton/ai/game_builder/story_memory.py"
       - "skeleton/ai/game_builder/story_continuity_assurance.py"
       - "skeleton/ai/game_builder/story_chapter_context.py"
+      - "skeleton/ai/game_builder/jeeves_chapter_chat.py"
       - "skeleton/ai/game_builder/story_detail_history.py"
       - "skeleton/ai/game_builder/story_asset_pixels.py"
       - "tests/test_game_builder_story_asset_pixels.py"
@@ -22,6 +23,7 @@ on:
       - "tests/test_game_builder_jeeves_production.py"
       - "tests/test_game_builder_story_continuity_assurance.py"
       - "tests/test_game_builder_story_chapter_context.py"
+      - "tests/test_game_builder_jeeves_chapter_chat.py"
       - "docs/JEEVES_100_ACT_9999_SCENE_CONSISTENCY_LAW.md"
       - "docs/JEEVES_100_CHAPTER_1000_ACT_9999_SCENE_STUDIO_STANDARD.md"
       - ".github/workflows/game-builder-jeeves-story-canon.yml"
@@ -62,6 +64,7 @@ jobs:
             tests/test_game_builder_jeeves_production.py
             tests/test_game_builder_story_continuity_assurance.py
             tests/test_game_builder_story_chapter_context.py
+            tests/test_game_builder_jeeves_chapter_chat.py
             tests/test_game_builder_story_asset_pixels.py
             tests/test_game_builder_system_editors.py
       - name: Setup Python
@@ -75,8 +78,8 @@ jobs:
       - name: Compile project canon and editor glue
         shell: bash
         run: |
-          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
+          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
       - name: Check 100 chapters, 1000 acts, 9999 scenes, suspense, color/voice identity and receipt forgery
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context -v
+          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat -v
