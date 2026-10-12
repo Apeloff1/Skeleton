@@ -359,6 +359,9 @@ def validate_plan(raw: Mapping[str, Any]) -> dict:
                 k: _text(v, "conclusion", 1500) for k, v in rows.items()}
         quest_outcomes = _plain(item.get("quest_conclusions", {}), "quest conclusions")
         faction_outcomes = _plain(item.get("faction_conclusions", {}), "faction conclusions")
+        required_lore = item.get("required_lore", [])
+        if not isinstance(required_lore, list) or len(required_lore) > 500:
+            raise ValueError("Required ending lore must be a bounded list.")
         end_map[key] = {
             "quest_conclusions": {
                 identifier(k, kind="ending quest"): _text(v, "quest ending", 900)
@@ -372,11 +375,7 @@ def validate_plan(raw: Mapping[str, Any]) -> dict:
             "tone": tone, "epilogue": _text(item.get("epilogue"), "epilogue", 6000, 40),
             "consequences": _text(item.get("consequences"), "lasting consequences", 3000, 20),
             "required_lore": sorted({
-                identifier(x, kind="required lore") for x in (
-                    item.get("required_lore") if isinstance(item.get("required_lore"), list)
-                    and len(item["required_lore"]) <= 500 else
-                    (_ for _ in ()).throw(ValueError("Required ending lore must be a bounded list."))
-                )
+                identifier(x, kind="required lore") for x in required_lore
             }),
             **conclusions,
         }
