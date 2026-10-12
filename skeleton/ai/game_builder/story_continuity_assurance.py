@@ -222,6 +222,9 @@ def _check_attestation(bible, contract, scene, history_state, post_state,
                 "every audible line must have a verified matching face expression")
         rule = {x["intent"]:x["expression"] for x in identity["expressions"]}
         seen_lines = set()
+        require([line.get("line_id") for line in row["dialogue_expressions"]] ==
+                [utterance["id"] for utterance in utterances],
+                "facial/emotional cues must follow the actual spoken-line order")
         for line in row["dialogue_expressions"]:
             shape(line, ("line_id","intent","expression"),
                   "line-by-line facial/voice synchronization intent")
@@ -258,10 +261,19 @@ def _check_attestation(bible, contract, scene, history_state, post_state,
         require(key in items and key not in touched,
                 "item ownership may be updated once per scene with evidence")
         touched.add(key)
+        witness = next((event for event in scene["events"]
+                        if event["id"] == move["event_ref"]), None)
         require(move["from_owner"] == owned[key] and
                 (move["to_owner"] in identities or move["to_owner"] == "world") and
-                move["event_ref"] in event_ids,
-                "unrecorded item teleportation, duplication or ownership transfer")
+                (move["from_owner"] == "world" or
+                 move["from_owner"] in scene["cast"]) and
+                (move["to_owner"] == "world" or
+                 move["to_owner"] in scene["cast"]) and
+                witness is not None and witness["kind"] == "item_transfer" and
+                key in witness["summary"].casefold() and
+                (move["from_owner"] == "world" or
+                 witness["actor"] == move["from_owner"]),
+                "item transfer needs an explicit onstage authored transfer event")
         text(move["reason"], "item change explanation", 300)
         owned[key] = move["to_owner"]
     observed = set()
