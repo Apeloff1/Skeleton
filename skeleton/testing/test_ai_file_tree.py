@@ -15,6 +15,45 @@ def _module():
     return module
 
 
+def test_native_contract_export_overlay_is_declared_and_additive() -> None:
+    import json
+
+    from scripts.check_traceability_spine import _contract_export_mirror_valid
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    canonical = (ROOT / "skeleton/contracts/__init__.py").read_bytes()
+    mirrored = (ROOT / "skeleton/ai/runtime/contracts/__init__.py").read_bytes()
+    assert _contract_export_mirror_valid(canonical, mirrored, manifest)
+
+    appendix = (
+        b"\nfrom .execution_authority import (\n"
+        b"    ResourceBudget,\n"
+        b")\n\n__all__ += [\n"
+        b"    \"ResourceBudget\",\n"
+        b"]\n"
+    )
+    base = b"__all__ = []\n"
+    assert _contract_export_mirror_valid(base, base + appendix, manifest)
+    assert not _contract_export_mirror_valid(
+        base, base + appendix + b"__import__('os').system('false')\n", manifest
+    )
+    assert not _contract_export_mirror_valid(
+        base, base + appendix.replace(b'"ResourceBudget"', b'"UnboundSymbol"'), manifest
+    )
+    assert not _contract_export_mirror_valid(
+        base, base + appendix.replace(b"ResourceBudget,", b"ResourceBudget as Unsafe,"), manifest
+    )
+    assert not _contract_export_mirror_valid(
+        b"__all__ = [1]\n", base + appendix, manifest
+    )
+    missing_owner = dict(manifest)
+    missing_owner["native_ai_owners"] = [
+        item for item in manifest["native_ai_owners"]
+        if item.get("path") != "skeleton/ai/runtime/contracts/execution_authority.py"
+    ]
+    assert not _contract_export_mirror_valid(base, base + appendix, missing_owner)
+
+
 def test_ai_file_tree_manifest_is_valid_and_drift_free() -> None:
     assert _module().validate() == []
 
@@ -86,7 +125,7 @@ def test_ai_file_tree_native_and_path_audit() -> None:
     mapping_by_id = {item["id"]: item for item in manifest["mappings"]}
     assert mapping_by_id["AIFT-NATIVE"]["source"] == "skeleton/native"
     assert mapping_by_id["AIFT-NATIVE"]["destination"] == "skeleton/ai/runtime/native"
-    assert mapping_by_id["AIFT-NATIVE"]["volume_refs"] == ["VOL-032"]
+    assert mapping_by_id["AIFT-NATIVE"]["volume_refs"] == ["VOL-032", "VOL-033"]
     assert (ROOT / "skeleton/ai/runtime/native/registry.py").is_file()
 
     audit = manifest["planned_path_audit"]
@@ -204,6 +243,13 @@ def test_ai_file_tree_overlay_children_are_separately_governed() -> None:
     mappings = manifest["mappings"]
     destinations = {item["destination"] for item in mappings}
     sources = {item["source"] for item in mappings}
+    native = {
+        item["path"]: item
+        for item in manifest["native_ai_owners"]
+        if item.get("ownership_mode") == "canonical_native"
+        and item.get("kind") == "file"
+        and item.get("residual_only") is False
+    }
     overlay_count = 0
     for item in mappings:
         for child in item.get("overlay_children", []):
@@ -214,7 +260,10 @@ def test_ai_file_tree_overlay_children_are_separately_governed() -> None:
                 candidate == full_source or candidate.startswith(full_source.rstrip("/") + "/")
                 for candidate in sources
             )
-            assert full_destination in destinations or source_governed
+            # Original AI-native execution authorities are independent owners,
+            # not legacy mirror destinations; generic residual roots do not
+            # qualify as ownership of a shadowed canonical child.
+            assert full_destination in destinations or source_governed or full_destination in native
     assert overlay_count >= 12
 
 
@@ -297,7 +346,12 @@ def test_ai_file_tree_canonical_migration_sources_are_current() -> None:
 
     assert mappings["AIFT-APPLICATION"]["source"] == "skeleton/app/runtime"
     assert mappings["AIFT-BUILD-PLANNING"]["source"] == "skeleton/automation/shift_supervisor"
-    assert mappings["AIFT-PERSISTENCE"]["source_exclusions"] == ["core"]
+    persistence = mappings["AIFT-PERSISTENCE"]
+    assert persistence["source_exclusions"] == ["core", "scatter10240"]
+    assert "scatter10240" in persistence["source_exclusion_notes"]
+    retained = {item["path"]: item for item in manifest["retained_outside_ai_tree"]}
+    excluded = f"{persistence['source']}/scatter10240"
+    assert retained[excluded]["owner"].startswith("AIFT-PERSISTENCE")
     assert mappings["AIFT-CONTEXT"]["source_exclusions"] == ["domains"]
     assert mappings["AIFT-AUTOMATION"]["source_exclusions"] == [
         "agents",
@@ -307,7 +361,10 @@ def test_ai_file_tree_canonical_migration_sources_are_current() -> None:
         "swarm",
     ]
     assert mappings["AIFT-FOUNDATION"]["source_exclusions"] == ["architecture"]
-    assert mappings["AIFT-PROVENANCE"]["source_exclusions"] == ["chronicle"]
+    provenance = mappings["AIFT-PROVENANCE"]
+    assert provenance["source_exclusions"] == ["chronicle", "scatter10240"]
+    retained = {item["path"]: item for item in manifest["retained_outside_ai_tree"]}
+    assert f"{provenance['source']}/scatter10240" in retained
     assert mappings["AIFT-KNOWLEDGE"]["source_exclusions"] == ["graphs"]
     assert mappings["AIFT-TOOLS"]["source_exclusions"] == ["integrations"]
     assert mappings["AIFT-DISTRIBUTED"]["source_exclusions"] == [

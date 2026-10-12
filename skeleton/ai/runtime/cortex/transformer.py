@@ -570,7 +570,12 @@ class TinyTransformer:
 
     def _logits_window(self, ids: Sequence[int], cache: Optional[KVCache] = None) -> List[float]:
         window = list(ids[-self.ctx:] or [self.unk])
-        if cache is None:
+        # Incremental steps implement the dense CPU graph only. MoD routing and
+        # accelerated backends must execute their full graph until equivalent
+        # incremental implementations are available.
+        if cache is None or self.use_mod or self._accel is not None:
+            if cache is not None:
+                cache.reset()
             return self._logits(window)
         if cache.primed_for(window):
             return self._step(window[-1], cache)
