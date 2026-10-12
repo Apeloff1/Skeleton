@@ -62,12 +62,15 @@ export type PlanCatalog = {
     options: unknown[];
   }[];
   characters: {
-    id: string; name: string; backstory: string; goals: string;
+    id: string; name: string; source_scene: number; backstory: string; goals: string;
     personal_ending: string; dialogue_style: string;
+    relationships: string[]; factions: string[];
+    known_secrets: string[]; plot_threads: string[];
   }[];
   places: {
-    id: string; name: string; kind: string; history: string;
-    culture: string; regional_conflicts: string;
+    id: string; name: string; source_scene: number; kind: string; history: string;
+    culture: string; regional_conflicts: string; factions: string[];
+    plot_threads: string[]; discovered_by: string[];
   }[];
   endings: StoryEnding[];
 };
