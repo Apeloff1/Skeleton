@@ -254,6 +254,7 @@ $("story-next").addEventListener("click",async()=>{
  try{
   const response=await api("/api/story-scene-template",{
    project:storyProject(),
+   chapter:Number($("story-chapter").value),
    act:Number($("story-act").value),scene:Number($("story-scene").value)});
   storyShow(response);
   await stageStorySource(response.path,response.document);
@@ -280,6 +281,7 @@ $("story-work-order").addEventListener("click",async()=>{
    project:storyProject(),prompt:$("story-instruction").value.trim(),
    cast:$("story-cast").value.split(",").map(x=>x.trim()).filter(Boolean),
    region:$("story-region").value.trim()||null,
+   chapter:Number($("story-chapter").value),
    act:Number($("story-act").value),scene:Number($("story-scene").value)});
   storyShow(plan);
   status("Jeeves work order prepared with exact source dependencies. A model draft and explicit review are still required.");
@@ -3987,7 +3989,8 @@ regional appearance. It does not invent model output or write hidden files.</sma
 <button id="story-foundation" type="button">Show blank story/world foundation</button>
 <button id="story-continuity-contract" type="button">Lock original voices, faces, wardrobe, items and regional style</button>
 <p><small>Strict mode: 100 acts / 9999 sequential scenes. Each committed scene has a signed, cross-reparsed confirmation receipt. A metadata voice hash is not an acoustic verification.</small></p>
-<label>Next act<input type="number" id="story-act" min="1" max="100" value="1"></label>
+<label>Chapter (1–100)<input type="number" id="story-chapter" min="1" max="100" value="1"></label>
+<label>Global act (1–1000)<input type="number" id="story-act" min="1" max="1000" value="1"></label>
 <label>Next scene within act<input type="number" id="story-scene" min="1" max="9999" value="1"></label>
 <button id="story-next" type="button">Prepare next canon-bound scene</button>
 <label>Cast IDs, comma-separated<input id="story-cast" placeholder="alina,boren"></label>
