@@ -12,7 +12,7 @@ class ResearchStateStore:
   with self.db:self.db.execute("INSERT INTO temporal_fragments VALUES(?,?) ON CONFLICT(fragment_id) DO UPDATE SET payload=excluded.payload",(row.fragment_id,raw))
  def get_temporal(self,fragment_id):
   r=self.db.execute("SELECT payload FROM temporal_fragments WHERE fragment_id=?",(fragment_id,)).fetchone()
-  return TemporalFragment(**json.loads(r[0])) if r else None
+  return TemporalFragment(**{**json.loads(r[0]), "event_years": tuple(json.loads(r[0])["event_years"])}) if r else None
  def put_revision(self,row:RevisionReceipt):
   raw=json.dumps(asdict(row),sort_keys=True,separators=(",",":"))
   with self.db:self.db.execute("INSERT OR IGNORE INTO evidence_revisions VALUES(?,?)",(row.revision_id,raw))
