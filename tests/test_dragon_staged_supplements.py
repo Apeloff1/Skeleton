@@ -13,6 +13,7 @@ from skeleton.ai.game_builder.dragon_discovery_admission import (
 from skeleton.ai.game_builder.dragon_staged_supplements import (
     STAGE_SCHEMA, STAGE_STATUS, build_catalog_supplements,
 )
+from skeleton.ai.game_builder.dragon_staged_research_triage import rank_staged_research_leads
 
 
 def _source(url):
@@ -146,6 +147,13 @@ def test_rejects_forged_git_metadata_and_source_observation(accepted, stage):
         ("repository", "owner/-repo"),
         ("repository", "/absolute"),
         ("readme_path", "../README.md"),
+        ("readme_path", "./README.md"),
+        ("readme_path", "docs//README.md"),
+        ("readme_path", "docs/./README.md"),
+        ("readme_path", "docs/../README.md"),
+        ("readme_path", "C:/README.md"),
+        ("readme_path", "docs/README.md\nINJECTED"),
+        ("readme_path", "/absolute/README.md"),
     ):
         invalid = deepcopy(stage)
         invalid["catalogs"][0][field] = value
@@ -310,3 +318,64 @@ def test_materialization_failure_rolls_back_only_writer_owned_files(
     assert sentinel.read_text() == "existing trusted data"
     assert list(evidence.iterdir()) == [sentinel]
     assert attempts["count"] == 2
+
+
+
+def test_task_focused_staging_triage_is_deterministic_without_rights(accepted, stage):
+    registry, earlier = accepted
+    kwargs = dict(task_terms=("original", "game", "engines", "physics"),
+                  first_batch=2, limit=10, batch_size=2)
+    direct = rank_staged_research_leads(registry, earlier, stage, **kwargs)
+    reversed_stage = deepcopy(stage)
+    reversed_stage["catalogs"][0]["observed"].reverse()
+    reverse = rank_staged_research_leads(
+        registry, earlier, reversed_stage, **kwargs)
+    assert direct == reverse
+    assert direct["candidate_urls_from_staging"] == 3
+    assert direct["candidate_urls_in_page"] == 3
+    assert direct["unique_observed_hosts"] == 1
+    assert direct["source_observations"] == 7
+    assert len(direct["triage_digest"]) == 64
+    assert any("physics" in c["task_terms_matched"]
+               for c in direct["candidates"])
+    assert all(not c["rights_approved"] and
+               not c["catalog_identity_verified"] and
+               not c["independent_sources_verified"] and
+               not c["crawler_authorized"] and
+               not c["training_authorized"]
+               for c in direct["candidates"])
+    assert direct["network_requests"] == 0 and direct["xp_awarded"] == 0
+
+
+def test_staging_triage_spreads_first_round_across_hosts(accepted, stage):
+    registry, earlier = accepted
+    mixed = deepcopy(stage)
+    mixed["catalogs"][0]["observed"][2]["url"] = "https://physics.example/guide"
+    ranked = rank_staged_research_leads(
+        registry, earlier, mixed, task_terms=("original", "game", "engines"),
+        first_batch=2, limit=2)
+    assert ranked["candidate_urls_in_page"] == 2
+    assert len({row["host"] for row in ranked["candidates"]}) == 2
+    assert ranked["truncated"]
+    assert ranked["host_diversity_only_not_source_independence"]
+
+
+def test_staging_triage_rejects_unsafe_tasks_and_rights_claims(accepted, stage):
+    registry, earlier = accepted
+    for terms in ((), ["physics"], ("physics", "physics"),
+                  ("../../../",), (42,), ("",)):
+        with pytest.raises(ValueError, match="task terms"):
+            rank_staged_research_leads(
+                registry, earlier, stage,
+                first_batch=2, task_terms=terms)
+    for bad in (False, 0, 101):
+        with pytest.raises(ValueError, match="limit"):
+            rank_staged_research_leads(
+                registry, earlier, stage, first_batch=2,
+                task_terms=("game",), limit=bad)
+    forged = deepcopy(stage)
+    forged["rights_approved"] = True
+    with pytest.raises(ValueError, match="unreviewed"):
+        rank_staged_research_leads(
+            registry, earlier, forged,
+            first_batch=2, task_terms=("game",))
