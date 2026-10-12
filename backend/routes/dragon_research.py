@@ -102,6 +102,39 @@ def research_workboard(
             ) from None
 
 
+@router.get("/task-plan")
+def game_task_research_plan(
+    request: Request,
+    response: Response,
+    task: str = Query(..., min_length=3, max_length=160),
+    max_sources: int = Query(300, ge=1, le=300),
+    limit: int = Query(12, ge=1, le=18),
+    owner: str = Depends(_principal),
+) -> dict:
+    """Suggest owner-scoped research, never approve or dispatch a worker."""
+    terms=tuple(t for t in re.split(r"[,\s]+",task.strip()) if t)
+    from skeleton.ai.game_builder.dragon_task_research_planner import (
+        DragonTaskResearchPlanner,
+    )
+    try:
+        DragonTaskResearchPlanner._terms(terms)
+    except ValueError:
+        raise HTTPException(
+            status_code=422, detail="One to eight unique lowercase game task terms required",
+        ) from None
+    response.headers["Cache-Control"]="private, no-store"
+    with _runtime(request) as coordinator:
+        try:
+            return coordinator.task_research_plan(
+                owner, authorized=True, task_terms=terms,
+                max_sources=max_sources, limit=limit,
+            )
+        except (ValueError, PermissionError, LookupError):
+            raise HTTPException(
+                status_code=409,detail="Dragon task research evidence cannot be verified",
+            ) from None
+
+
 @router.get("/status")
 def three_hatchlings_status(
     request: Request,

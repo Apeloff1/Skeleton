@@ -44,6 +44,23 @@ type ResearchWorkboard = {
   read_only: boolean; network_requests: number;
   workers_started: number; training_authorized: boolean;
 };
+type TaskSuggestion = {
+  lane: Lane; source_id: string; label: string; host: string;
+  action: string; next_step: string; source_family: string;
+  task_terms_matched: string[]; adjacent_terms_matched: string[];
+  lexical_priority_signal: number; observed_at: number | null;
+  requires_idle: boolean; requires_operator_authorization: boolean;
+  requires_independent_wiki_review: boolean;
+};
+type TaskPlan = {
+  schema: string; task_terms: string[]; suggestions: TaskSuggestion[];
+  matched_task_terms: string[]; unmatched_task_terms: string[];
+  search_scope_exhausted: boolean; scanned_registered_sources: number;
+  represented_hatchlings: Lane[]; distinct_source_ids: number;
+  read_only: boolean; network_requests: number; workers_started: number;
+  permissions_granted: number; xp_awarded: number;
+  training_authorized: boolean; knowledge_approved: boolean;
+};
 type HistoryEvent = {
   lane: Lane; source_id: string; event_digest: string;
   observation_at: number; sequence: number;
@@ -77,6 +94,8 @@ function ResearchScreen() {
   const [workboardLoaded, setWorkboardLoaded] = React.useState(false);
   const [workboardCursor, setWorkboardCursor] = React.useState<string | null>(null);
   const [history, setHistory] = React.useState<FamilyHistory | null>(null);
+  const [gameTask, setGameTask] = React.useState('');
+  const [taskPlan, setTaskPlan] = React.useState<TaskPlan | null>(null);
   const [catalogSearch, setCatalogSearch] = React.useState("");
   const [error, setError] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -94,6 +113,53 @@ function ResearchScreen() {
     setBusy(false); setFamily(null); setReview(null);
     setHistory(null); setShowQuotes(false); setError('');
   };
+  const planForGameTask = async () => {
+    if (busy) return;
+    const terms = gameTask.trim().toLowerCase().split(/[\s,]+/).filter(Boolean);
+    if (terms.length < 1 || terms.length > 8
+      || new Set(terms).size !== terms.length
+      || terms.some(term => !/^[a-z0-9][a-z0-9-]{1,39}$/.test(term))) {
+      setError('Enter 1–8 unique game-building topics using lowercase words.');
+      setTaskPlan(null);
+      return;
+    }
+    const id = ++attempt.current;
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    setBusy(true); setError(''); setTaskPlan(null);
+    try {
+      const result = await api.get<TaskPlan>(
+        '/api/dragon-research/task-plan?task='
+          + encodeURIComponent(terms.join(' '))
+          + '&max_sources=300&limit=12',
+        { timeoutMs: 12000, retries: 0, signal: abort.signal,
+          headers: getAuthToken() ? authHeaders() : {} });
+      if (abort.signal.aborted || id !== attempt.current) return;
+      if (!result.ok || result.data?.schema !==
+          'skeleton.dragon.task_research_plan.v1'
+          || result.data.read_only !== true
+          || result.data.network_requests !== 0
+          || result.data.workers_started !== 0
+          || result.data.permissions_granted !== 0
+          || result.data.xp_awarded !== 0
+          || result.data.training_authorized !== false
+          || result.data.knowledge_approved !== false
+          || result.data.task_terms.join(',') !== terms.join(','))
+      {
+        setError('Task plan unavailable or its evidence safeguards did not verify.');
+        return;
+      }
+      setTaskPlan(result.data);
+    } catch {
+      if (!abort.signal.aborted && id === attempt.current)
+        setError('Task research planning unavailable. No worker was started.');
+    } finally {
+      if (id === attempt.current) setBusy(false);
+      if (controller.current === abort) controller.current = null;
+    }
+  };
+
   const reviewWorkboard = async (cursor: string | null = null) => {
     if (busy) return;
     const id = ++attempt.current;
@@ -398,6 +464,81 @@ function ResearchScreen() {
           onPress={() => { void reviewWorkboard(null); }}>
           <Text style={styles.buttonText}>Review all hatchling research work</Text>
         </TouchableOpacity>
+        <View style={styles.card}>
+          <Text style={styles.heading}>🎯 Mother Dragon · Research for this game</Text>
+          <Text style={styles.muted}>
+            Choose game-building topics (for example: gameboy physics, quest dialogue).
+            The Dragon ranks registered sources and identifies knowledge gaps.
+          </Text>
+          <TextInput
+            testID="dragon-task-topics"
+            accessibilityLabel="Game-building research topics"
+            style={styles.input} value={gameTask}
+            onChangeText={value => {
+              controller.current?.abort(); attempt.current += 1;
+              setGameTask(value); setBusy(false); setTaskPlan(null); setError('');
+            }}
+            placeholder="e.g. homebrew sprites physics"
+            placeholderTextColor="#8397a8"
+            autoCapitalize="none" autoCorrect={false} maxLength={160}
+          />
+          <TouchableOpacity
+            testID="dragon-plan-task" accessibilityRole="button"
+            disabled={busy || gameTask.trim().length < 3}
+            style={[styles.button,
+              (busy || gameTask.trim().length < 3) && styles.disabled]}
+            onPress={() => { void planForGameTask(); }}>
+            <Text style={styles.buttonText}>Prioritize all three hatchlings</Text>
+          </TouchableOpacity>
+          {taskPlan && (
+            <View style={styles.evidence}>
+              <Text style={styles.muted}>
+                {'Registered sources inspected: '
+                  + taskPlan.scanned_registered_sources
+                  + (taskPlan.search_scope_exhausted ? ' · Full registered scan'
+                    : ' · Partial scan')}
+              </Text>
+              {taskPlan.unmatched_task_terms.length > 0 && (
+                <Text style={styles.warning}>
+                  {'Research gaps (within inspected sources): '
+                    + taskPlan.unmatched_task_terms.join(', ')}
+                </Text>
+              )}
+              {LANES.map(lane => (
+                <View key={lane.lane} style={styles.evidence}>
+                  <Text style={styles.heading}>{lane.label}</Text>
+                  {taskPlan.suggestions.filter(s => s.lane === lane.lane)
+                    .map(item => (
+                    <View key={item.lane + ':' + item.source_id}
+                      style={styles.evidence}>
+                      <Text style={styles.quote}>
+                        {item.label + ' · ' + item.host}
+                      </Text>
+                      <Text style={styles.muted}>
+                        {'Topic matches: '
+                          + (item.task_terms_matched.join(', ') || 'not established')
+                          + ' · Adjacent: '
+                          + (item.adjacent_terms_matched.join(', ') || 'none')}
+                      </Text>
+                      <Text style={styles.muted}>{item.next_step}</Text>
+                      <Text style={styles.warning}>
+                        {item.requires_independent_wiki_review
+                          ? 'Independent Wiki review required'
+                          : item.requires_operator_authorization
+                            ? 'Separate operator authorization required'
+                            : 'Research suggestion only'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ))}
+              <Text style={styles.warning}>
+                Lexical priority is not verified knowledge, independent corroboration,
+                crawling permission, or AI training.
+              </Text>
+            </View>
+          )}
+        </View>
         {workboardLoaded && (
           <View style={styles.card}>
             <Text style={styles.heading}>📋 Research workboard</Text>
