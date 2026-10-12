@@ -43,6 +43,7 @@ class DragonFamilyTests(unittest.TestCase):
 
     def complete(self, *sources: SourceSeed) -> None:
         self.family.enroll(OWNER, tuple(sources), authorized=True, now=BASE)
+        self.assertTrue(self.family.seal_inventory(OWNER, authorized=True, now=BASE + 0.5))
         for index, item in enumerate(sources):
             self.assertTrue(self.family.consume(
                 OWNER, receipt(item.source_id, "original-" + item.source_id, BASE + index + 10),
@@ -51,6 +52,10 @@ class DragonFamilyTests(unittest.TestCase):
     def test_parent_hatches_levels_and_lays_exactly_three_eggs(self) -> None:
         sources = tuple(seed("web-" + str(i)) for i in range(5))
         self.family.enroll(OWNER, sources, authorized=True, now=BASE)
+        with self.assertRaises(PermissionError):
+            self.family.consume(OWNER, receipt(sources[0].source_id, "premature", BASE + 1),
+                                authorized=True)
+        self.assertTrue(self.family.seal_inventory(OWNER, authorized=True, now=BASE + 0.5))
         self.assertEqual(self.family.snapshot(OWNER, authorized=True)["parent"]["stage"], "egg")
         for i, expected in enumerate(("hatchling", "juvenile", "adolescent", "adolescent", "adult")):
             proof = receipt(sources[i].source_id, "original-" + str(i), BASE + i + 1)
@@ -121,6 +126,40 @@ class DragonFamilyTests(unittest.TestCase):
             task_topics=("game",), adjacent_topics=("physics",)))
         self.assertTrue(any("adjacent task knowledge" in h["change"]
                             for h in self.family.history(OWNER, authorized=True)))
+
+    def test_global_revision_novelty_and_monotonic_source_observation(self) -> None:
+        self.complete(seed("web-1"))
+        new = receipt("web-1", "rev2", BASE + 700)
+        self.assertTrue(self.family.digest_idle(
+            OWNER, "monitor", new, authorized=True, window=idle(), task_topics=("game",)))
+        # A second sibling cannot farm the identical captured bytes.
+        self.assertFalse(self.family.digest_idle(
+            OWNER, "article", receipt("web-1", "rev2", BASE + 701),
+            authorized=True, window=idle(), task_topics=("game",)))
+        with self.assertRaisesRegex(ValueError, "advance"):
+            self.family.digest_idle(
+                OWNER, "article", receipt("web-1", "rev3", BASE + 699),
+                authorized=True, window=idle(), task_topics=("game",))
+        self.assertTrue(self.family.digest_idle(
+            OWNER, "article", receipt("web-1", "rev3", BASE + 702),
+            authorized=True, window=idle(), task_topics=("game",)))
+        self.assertEqual([c["discoveries"] for c in self.family.snapshot(
+            OWNER, authorized=True)["children"]], [1, 0, 1])
+
+    def test_sealed_source_quest_never_prematurely_lays_eggs(self) -> None:
+        self.family.enroll(OWNER, (seed("web-1"),), authorized=True, now=BASE)
+        with self.assertRaisesRegex(PermissionError, "sealed"):
+            self.family.consume(OWNER, receipt("web-1", "one", BASE + 1),
+                                authorized=True)
+        self.family.enroll(OWNER, (seed("web-2"),), authorized=True, now=BASE + 1)
+        self.family.seal_inventory(OWNER, authorized=True, now=BASE + 2)
+        with self.assertRaisesRegex(PermissionError, "sealed"):
+            self.family.enroll(OWNER, (seed("web-3"),), authorized=True, now=BASE + 3)
+        self.family.consume(OWNER, receipt("web-1", "one", BASE + 4), authorized=True)
+        self.assertFalse(self.family.snapshot(OWNER, authorized=True)["parent"]["complete"])
+        self.family.consume(OWNER, receipt("web-2", "two", BASE + 5), authorized=True)
+        self.assertTrue(self.family.snapshot(OWNER, authorized=True)["parent"]["complete"])
+        self.assertFalse(self.family.seal_inventory(OWNER, authorized=True, now=BASE + 6))
 
     def test_no_ingest_without_authority_and_no_rogue_promotion(self) -> None:
         reader = DragonFamily(self.db)
