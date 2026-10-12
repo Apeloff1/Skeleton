@@ -222,9 +222,16 @@ class DragonWeightCanary:
                     or not hmac.compare_digest(stored_mac,self._mac(
                         "pair",{"body":raw,"signature":sig}))):
                     raise ValueError("canary trial custody corrupted")
-                pair=SignedCanaryPair(**{**payload,"signature_hex":sig,
-                    "owner":payload["owner"],
-                    "plan_digest":payload["plan_digest"]})
+                # Persisted bodies include the canonical schema discriminator,
+                # which is *not* a dataclass constructor field. Validate the
+                # complete shape before decoding rather than dropping any
+                # unexpected field that could hide a journal substitution.
+                required=set(SignedCanaryPair.__dataclass_fields__) - {"signature_hex"}
+                if (payload.get("schema")!="skeleton.jeeves.canary_pair.v1"
+                    or set(payload)!=(required | {"schema"})):
+                    raise ValueError("signed canary pair schema/custody invalid")
+                pair=SignedCanaryPair(**{k:payload[k] for k in required},
+                                      signature_hex=sig)
                 self._validate_pair(pair,now,check_fresh=False)
                 cases.add(ident)
                 pairs.append(pair)
