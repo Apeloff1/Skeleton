@@ -272,6 +272,25 @@ class _StudioHandler(BaseHTTPRequestHandler):
             from .story_memory import asset_identity_history
             return self._json(200,asset_identity_history(
                 studio,values["project"],values["asset"]))
+        if path=="/api/story-continuity-template":
+            from .story_continuity_assurance import contract_template
+            from .story_workspace import load_story_workspace
+            bible,scenes,_=load_story_workspace(studio,values["project"])
+            if bible is None or scenes:
+                raise WorkspaceError("voice/face contract requires approved design before scene one")
+            return self._json(200,{
+                "path":"game/continuity_contract.json",
+                "document":contract_template(bible),
+                "model_inference_performed":False,"write_authorized":False})
+        if path=="/api/story-stage-confirmation":
+            from .story_continuity_assurance import confirm_stage
+            return self._json(200,confirm_stage(studio,values["project"]))
+        if path=="/api/story-detail-timeline":
+            from .story_detail_history import detail_timeline
+            return self._json(200,detail_timeline(
+                studio,values["project"],character=values.get("character"),
+                item=values.get("item"),region=values.get("region"),
+                offset=values.get("offset",0),limit=values.get("limit",48)))
         if path=="/api/story-foundation-template":
             from .story_canon_fabric import story_bible_template
             return self._json(200,{"path":"game/story_bible.json",
@@ -290,14 +309,26 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 max_bookmarks=values.get("max_bookmarks",48)))
         if path=="/api/story-sign":
             from .story_canon_fabric import BIBLE,SCENE,sign
-            from .story_workspace import validate_story_workspace_source
+            from .story_workspace import (
+                validate_story_workspace_source,load_story_workspace,
+                load_continuity_contract)
+            from .story_continuity_assurance import CONTRACT,seal_production_scene
             source_path=values["path"]
             schema=(BIBLE if source_path=="game/story_bible.json"
+                    else CONTRACT if source_path=="game/continuity_contract.json"
                     else SCENE if source_path.startswith("story/scenes/")
                     else None)
             if schema is None:
-                raise WorkspaceError("Jeeves signing only permits source-bound story files")
-            document=sign(values["document"],schema)
+                raise WorkspaceError("Jeeves signing only permits exact approved story sources")
+            if schema==SCENE and load_continuity_contract(
+                    studio,values["project"]) is not None:
+                bible,history,_=load_story_workspace(studio,values["project"])
+                contract=load_continuity_contract(studio,values["project"])
+                document=seal_production_scene(
+                    bible,contract,history,values["document"],
+                    values["observations"])
+            else:
+                document=sign(values["document"],schema)
             evidence=validate_story_workspace_source(
                 studio,values["project"],source_path,document)
             return self._json(200,{"path":source_path,"document":document,
