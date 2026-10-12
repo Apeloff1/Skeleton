@@ -22,7 +22,8 @@ MAX_TURNS=24
 ABILITIES=("none","brace","repair")
 INITIAL_RESOURCES={"platformer":(5,2,5),"racing":(100,3,100),
                    "sandbox":(100,3,100)}
-HIT_DAMAGE={"platformer":2,"racing":15,"sandbox":12}
+HIT_DAMAGE={"platformer":1,"racing":15,"sandbox":12}
+MAX_HIT_DAMAGE={"platformer":2,"racing":25,"sandbox":20}
 REPAIR_POINTS={"platformer":1,"racing":20,"sandbox":25}
 
 
@@ -107,7 +108,9 @@ def run_linked_physics_game(editor,source_scene,source_settings=None,turns=()):
             mitigation=1 if ability=="brace" else 0
             if ability=="brace":
                 guard-=1
-            raw=HIT_DAMAGE[editor]*hits
+            # Multiple contacts in one physical step are real, but
+            # game damage is clamped to a source-defined per-turn budget.
+            raw=min(MAX_HIT_DAMAGE[editor],HIT_DAMAGE[editor]*hits)
             damage=max(0,raw-mitigation*HIT_DAMAGE[editor])
             # Repairs cannot turn a contact into a health gain.
             heal=0
