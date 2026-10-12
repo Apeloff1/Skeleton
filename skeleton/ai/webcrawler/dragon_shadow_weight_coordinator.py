@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore
 from .dragon_adversarial_review_worker import AdversarialReviewOutput
 from .dragon_analysis_chains import LayerReceipt
+from .dragon_analysis_execution import LayerDispatch
 from .dragon_knowledge_normalization_worker import NormalizedKnowledge
 from .dragon_memory_promotion_worker import MemoryPromotionOutput
 from .dragon_nest_progression import _id, _iso
@@ -32,6 +33,7 @@ class ReviewedAcquisition:
     normalized_records: tuple[NormalizedKnowledge, ...]
     analysis_receipts: tuple[LayerReceipt, ...]
     adversarial_output: AdversarialReviewOutput
+    adversarial_dispatch: LayerDispatch
     benchmark: SealedHoldoutSuite | None = None
     promoted_memory: MemoryPromotionOutput | None = None
     human_review_id: str = ""
@@ -128,6 +130,7 @@ def run_shadow_automation(
                 normalized_records=candidate.normalized_records,
                 receipts=candidate.analysis_receipts,
                 adversarial_output=candidate.adversarial_output,
+                adversarial_dispatch=candidate.adversarial_dispatch,
                 at=now, idle_since=idle_since, hardware=hardware,
                 hardware_now=hardware_now, consented=consented,
                 authorized=True, privacy_clear=privacy_clear,
