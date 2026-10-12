@@ -4,6 +4,10 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/ai/game_builder/advanced_sports_runtime.py"
+      - "skeleton/ai/game_builder/advanced_sports_coach.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "tests/test_game_builder_advanced_sports_coach.py"
       - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
       - "skeleton/ai/game_builder/advanced_level_scenes.py"
       - "skeleton/ai/game_builder/system_editors.py"
@@ -44,6 +48,7 @@ jobs:
             skeleton/ai/game_builder/
             tests/__init__.py
             tests/test_game_builder_advanced_sports.py
+            tests/test_game_builder_advanced_sports_coach.py
       - name: Python 3.11
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -52,7 +57,7 @@ jobs:
         shell: bash
         run: |
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          python -m py_compile skeleton/ai/game_builder/advanced_sports_runtime.py skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_level_scenes.py skeleton/ai/game_builder/system_editors.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/game_workspace_ui.py tests/test_game_builder_advanced_sports.py
+          python -m py_compile skeleton/ai/game_builder/advanced_sports_runtime.py skeleton/ai/game_builder/advanced_sports_coach.py skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_level_scenes.py skeleton/ai/game_builder/system_editors.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/system_editor_cli.py tests/test_game_builder_advanced_sports.py tests/test_game_builder_advanced_sports_coach.py
       - name: Check actual Studio JavaScript is parseable
         shell: bash
         run: |
@@ -66,4 +71,4 @@ jobs:
           node --check "$RUNNER_TEMP/original_sports_view.js"
       - name: Prove real sport-specific game and forged-score resistance
         shell: bash
-        run: python -m unittest tests.test_game_builder_advanced_sports -v
+        run: python -m unittest tests.test_game_builder_advanced_sports tests.test_game_builder_advanced_sports_coach -v
