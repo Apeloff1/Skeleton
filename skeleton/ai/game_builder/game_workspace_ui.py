@@ -2469,6 +2469,85 @@ function renderAdvancedActions(actions){
     }
   });
   target.append(missionRun);target.append(missionOutput);
+  const mirrorTitle=document.createElement("h4");
+  mirrorTitle.textContent="NPC Mission Mirror · adversarial actual-quest alternatives and finite costs";
+  target.append(mirrorTitle);
+  const mirrorInput=document.createElement("textarea");
+  mirrorInput.id="original-npc-mission-mirror-candidates";
+  mirrorInput.rows=9;
+  mirrorInput.setAttribute("aria-label","One to eight original physical mission candidate itineraries");
+  mirrorInput.value=JSON.stringify([
+    {
+      id:"real_restoration",
+      waypoints:[
+        {kind:"site",index:0,action:"harvest"},
+        {kind:"npc",index:0,action:"speak"},
+        {kind:"npc",index:0,action:"support"},
+        ...Array.from({length:5},()=>({kind:"site",index:0,action:"repair"})),
+        {kind:"site",index:0,action:"claim"}
+      ],
+      max_steps_per_leg:24
+    },
+    {
+      id:"paid_material_harvest",
+      waypoints:[{kind:"site",index:0,action:"harvest"}],
+      max_steps_per_leg:12
+    },
+    {
+      id:"unearned_shortcut",
+      waypoints:[{kind:"site",index:0,action:"claim"}],
+      max_steps_per_leg:12
+    }
+  ],null,1);
+  const mirrorRun=document.createElement("button");
+  mirrorRun.type="button";
+  mirrorRun.textContent="Execute, audit and compare real original mission alternatives";
+  const mirrorOutput=document.createElement("pre");
+  mirrorOutput.id="original-npc-mission-mirror-evidence";
+  mirrorOutput.setAttribute("role","status");
+  mirrorOutput.setAttribute("aria-live","polite");
+  mirrorRun.addEventListener("click",async()=>{
+    try{
+      if(!latestStreamRecord)
+        throw Error("Run and independently verify the original source world first");
+      const candidates=JSON.parse(mirrorInput.value);
+      if(!Array.isArray(candidates)||candidates.length<1||candidates.length>8)
+        throw Error("Choose one to eight independently reviewable mission contenders");
+      const outcome=await api("/api/analyze-original-npc-missions",{
+        record:latestStreamRecord,candidates
+      });
+      if(!outcome.verified||outcome.source_files_mutated||
+         outcome.model_weights_promoted||outcome.native_hardware_certified)
+        throw Error("Comparative source world is not independently authenticated");
+      const check=await api("/api/verify-original-npc-mission-mirror",{
+        record:outcome.record
+      });
+      if(!check.verified)
+        throw Error("Mission results, rejection reasons or Pareto evidence diverged");
+      const report=outcome.record;
+      if(report.invalid_or_unproven_routes_promoted||
+         report.candidate_set_exhaustively_proven_optimal)
+        throw Error("Unproven mission or global optimality falsely promoted");
+      mirrorOutput.textContent=JSON.stringify({
+        authentic_source_digest:report.source_world_digest,
+        candidates_submitted:report.submitted,
+        real_routes_accepted:report.accepted_actual_routes,
+        invalid_routes_rejected:report.rejected_actual_routes,
+        source_consequence_reviews:report.reviews,
+        actual_multiobjective_frontier:report.pareto_source_verified_ids,
+        bounded_review_order:report.review_order,
+        globally_optimal_claimed:false,
+        actual_source_replayed:true,
+        game_files_mutated:false,
+        ai_model_weights_promoted:false
+      },null,2);
+      status("Real NPC mission choices cross-checked; invalid shortcuts not awarded outcomes.");
+    }catch(error){
+      mirrorOutput.textContent="";
+      status("NPC Mission Mirror rejected: "+error.message);
+    }
+  });
+  target.append(mirrorInput);target.append(mirrorRun);target.append(mirrorOutput);
   return;
  }
  if(advancedSession?.editor==="economy"){
