@@ -38,6 +38,10 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_chunked_world_timeline import (
+    make_chunked_bookmarks, verify_chunked_bookmarks,
+    continue_chunked_world, verify_chunked_continuation,
+)
 from .advanced_chunked_npc_world import (
     run_chunked_npc_world, verify_chunked_npc_world,
 )
@@ -196,6 +200,21 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    checkpoint=commands.add_parser("chunked-world-checkpoint",
+        help="Create source-verified original streaming-game save cursors")
+    checkpoint.add_argument("--record",required=True)
+    checkpoint.add_argument("--interval",type=int,default=8)
+    checkpoint_verify=commands.add_parser("verify-chunked-world-checkpoint",
+        help="Independently reconstruct historical timeline bookmark evidence")
+    checkpoint_verify.add_argument("--record",required=True)
+    timeline_continue=commands.add_parser("chunked-world-continue",
+        help="Explicitly append or fork an original streamed game from a verified bookmark")
+    timeline_continue.add_argument("--checkpoint",required=True)
+    timeline_continue.add_argument("--actions",required=True)
+    timeline_continue.add_argument("--cursor",type=int)
+    timeline_verify=commands.add_parser("verify-chunked-world-continuation",
+        help="Verify exact alternate social history, physical NPCs and resources")
+    timeline_verify.add_argument("--record",required=True)
     streamed=commands.add_parser("chunked-npc-world",
         help="Play bounded original 21x21/35x35 resident world with recorded active simulation LOD")
     streamed.add_argument("--actions",required=True)
@@ -450,6 +469,15 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "chunked-world-checkpoint":
+            output=make_chunked_bookmarks(_load(args.record),interval=args.interval)
+        elif args.operation == "verify-chunked-world-checkpoint":
+            output={"verified":verify_chunked_bookmarks(_load(args.record))}
+        elif args.operation == "chunked-world-continue":
+            output=continue_chunked_world(
+                _load(args.checkpoint),_load(args.actions),cursor=args.cursor)
+        elif args.operation == "verify-chunked-world-continuation":
+            output={"verified":verify_chunked_continuation(_load(args.record))}
         elif args.operation == "chunked-npc-world":
             output=run_chunked_npc_world(
                 _load(args.actions),
