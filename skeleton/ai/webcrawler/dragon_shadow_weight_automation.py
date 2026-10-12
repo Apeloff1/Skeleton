@@ -313,6 +313,10 @@ class ShadowWeightAutomation:
                 raise ValueError("concurrent shadow mutation detected")
 
     def _current(self, shadow: ShadowWeight) -> bool:
+        # A new contradictory, retracted or revised canonical source changes
+        # the root. Do not keep previously admitted weights live after drift.
+        if self.library.snapshot_root(shadow.owner, authorized=True) != shadow.knowledge_root:
+            return False
         rows = self.library._rows(shadow.owner)
         for source in rows:
             if (source["source_id"] == shadow.source_id
