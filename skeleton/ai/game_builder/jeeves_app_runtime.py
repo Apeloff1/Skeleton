@@ -109,6 +109,9 @@ ACTION_DEFS = (
     ("jeeves.chapter_chat", "Recall approved chapter history and prepare one governed chat turn", "plan", False),
     ("forge.kinds", "Inspect the real registered universal forge component kinds", "read", False),
     ("forge.graph", "Compose and structurally verify an original universal forge graph", "simulate", False),
+    ("game.compile.original", "Actually compile a small original playable browser game with winning replay", "simulate", True),
+    ("game.compile.native", "Actually compile original browser plus Godot source with bounded replay proof", "simulate", True),
+    ("game.mirror.review", "Run original game browser/native replay plus the independent adversarial mirror", "simulate", True),
     ("tool.fabric", "Inspect actual game tool contracts versus executable handlers", "read", False),
     ("tool.plan", "Validate a finite typed Jeeves tool plan without executing it", "plan", True),
     ("companion.simulate", "Rehearse consent-bound Dragon growth and idle state transitions", "simulate", False),
@@ -336,6 +339,66 @@ def _stage_editor(workspace,project,args,authorized):
             "no_unreviewed_commit":True,"source_was_committed":False}
 
 
+def _compile_original_game(project,args,mode):
+    """Concrete original game builder, audited and bounded, no filesystem writes.
+
+    Uses the existing canonical game compiler and native source renderer, not
+    a second engine. An original playable browser game is actually compiled,
+    solved and replayed. Native mode emits Godot source in memory, NOT a
+    certified executable installer or a completed commercial game.
+    """
+    _exact(args,("intent",),"one original game compiler request")
+    values=args["intent"]
+    if type(values) is not dict:
+        raise JeevesAppCapabilityError("typed game intent must be a bounded object")
+    allowed=("title","subtitle","seed","width","height","levels",
+             "collectibles_per_level","hazards_per_level","theme",
+             "starting_health")
+    if set(values)-set(allowed) or not {"title","subtitle","seed"}<=set(values):
+        raise JeevesAppCapabilityError("unrecognized/absent original game parameters")
+    from .playable_world import GameBuildIntent
+    from .playable_compiler import compile_original_game
+    from .dual_runtime_export import render_dual_runtime_package
+    from .playable_export import PlayableHTML
+    intent=GameBuildIntent(project_id=project,**values)
+    # Additional app/Jeeves request budget: the game compiler itself supports
+    # larger bounded worlds; the app agent is deliberately constrained.
+    if intent.levels>3 or intent.width>25 or intent.height>25 or \
+       intent.hazards_per_level>10:
+        raise JeevesAppCapabilityError(
+            "Jeeves synchronous preview budget: <=3 levels, <=25 tiles/axis, <=10 hazards")
+    compiled=compile_original_game(intent,authorized=True)
+    record=compiled.receipt()
+    package=None
+    mirror=None
+    if mode in ("native","mirror"):
+        package=render_dual_runtime_package(compiled,authorized=True)
+    if mode=="mirror":
+        from .dual_rival_forge import review_playable_project
+        # The existing mirror reviewer has a bounded attempt count.
+        mirror=review_playable_project(
+            compiled,package,authorized=True,attempts=64)
+        if not mirror.passed:
+            raise JeevesAppCapabilityError(
+                "independent original game replay/mirror rejected the candidate")
+    body={
+        "schema":"skeleton.game_builder.jeeves_original_runtime_result.v1",
+        "project":project,"mode":mode,"intent":intent.to_payload(),
+        "compiled_source_receipt":record,
+        "browser_html_sha256":compiled.playable.html_sha256,
+        "original_world_sha256":compiled.world.digest,
+        "winning_replay_sha256":compiled.proof.digest,
+        "native_source_manifest_digest":
+            package.manifest["manifest_digest"] if package else None,
+        "mirror_receipt_digest":mirror.digest if mirror else None,
+        "gameplay_proof_executed":True,
+        "native_godot_executable_executed":False,
+        "source_exported_to_disk":False,"consumer_release_certified":False,
+        "external_model_or_network_used":False,
+    }
+    return {**body,"digest":canonical_digest(body)}
+
+
 def _simulate_companion(args):
     _exact(args,("owner","events"),"Dragon companion rehearsal")
     from skeleton.ai.webcrawler.dragon_companion_runtime import (
@@ -554,6 +617,12 @@ def dispatch_app_action(workspace,project,action,args,*,authorized=False):
         from skeleton.ai.forge.universal import Forge
         result={"component_kinds":Forge().available_kinds(),
                 "blueprint_materialization_executed":False}
+    elif action=="game.compile.original":
+        result=_compile_original_game(project,args,"browser")
+    elif action=="game.compile.native":
+        result=_compile_original_game(project,args,"native")
+    elif action=="game.mirror.review":
+        result=_compile_original_game(project,args,"mirror")
     elif action=="forge.graph":
         result=_review_forge_graph(args)
     elif action=="tool.fabric":
