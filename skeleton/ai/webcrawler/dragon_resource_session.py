@@ -104,7 +104,7 @@ class SessionTask:
 
     def request(self) -> ResourceRequest:
         if (not isinstance(self.task_id, str) or not 1 <= len(self.task_id) <= 128
-                or any(ord(ch) < 32 or ord(ch) == 127 or ch == "\\\\" for ch in self.task_id)
+                or any(ord(ch) < 32 or ord(ch) == 127 or ch == "\\" for ch in self.task_id)
                 or not isinstance(self.lane, str) or self.lane not in PRIORITIES
                 or type(self.checkpointable) is not bool):
             raise ValueError("invalid task identity or workload lane")
