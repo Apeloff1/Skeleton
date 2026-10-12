@@ -216,9 +216,15 @@ def _local(state,index,limit=1):
 
 def _mutate_resource(state,config,tile,stock,item,amount):
     if config["resource_policy"]=="unlimited":
+        if not config["creative_mode"] and sum(state["inventory"].values())+amount>(
+          config["carry_capacity"]+len(_structures(state,"storehouse"))*config["storage_bonus"]):
+            raise SandboxActionError("unlimited deposits cannot bypass actual storage budget")
         state["inventory"][item]+=amount
         return amount
     count=min(tile[stock],amount)
+    if not config["creative_mode"] and sum(state["inventory"].values())+count>(
+         config["carry_capacity"]+len(_structures(state,"storehouse"))*config["storage_bonus"]):
+        raise SandboxActionError("physical carried inventory exceeds built storage capacity")
     if count==0:
         raise SandboxActionError("finite source stock exhausted: "+stock)
     tile[stock]-=count
@@ -333,6 +339,10 @@ def _tick(state,config):
               and (state["day"]+t["id"])%config["regrowth_period"]==0:
                 t["wood"]+=1
                 events.append("original_forest_regrowth")
+            if t["terrain"] in ("lake","marsh") and t["fish"]<config["regrowth_cap"] \
+               and (state["day"]+t["id"])%config["regrowth_period"]==0:
+                t["fish"]+=1
+                events.append("finite_aquatic_population_regenerated")
             if t["terrain"] in ("lake","marsh") and t["water"]<config["regrowth_cap"] \
               and state["weather"]=="rain":
                 t["water"]+=config["rain_replenishment"]
@@ -342,9 +352,11 @@ def _tick(state,config):
             if t["wood"]:
                 t["wood"]=max(0,t["wood"]-config["fire_damage"])
             t["pollution"]=min(1000,t["pollution"]+config["fire_damage"])
-        if t["building"]=="generator":
+        if t["building"]=="generator" and state["inventory"]["fuel"]>0:
+            state["inventory"]["fuel"]-=1
             state["power"]+=config["generator_output"]
             state["emissions"]+=config["generator_emissions"]
+            events.append("actual_generator_burned_finite_fuel")
     # A well is only useful if physically connected to a finite source,
     # including rainy replenishment under the explicit renewable policy.
     for well in (t for t in tiles if t["building"]=="well"):
