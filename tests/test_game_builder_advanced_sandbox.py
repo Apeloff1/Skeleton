@@ -158,7 +158,7 @@ class OriginalEndlessSandboxTests(unittest.TestCase):
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("sandbox",{"world_regions":1},["region:next"])
         with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("sandbox",["region:previous"])
+            run_advanced_session("sandbox",actions=["region:previous"])
 
     def test_settler_forester_actually_exhausts_nearby_source_and_not_other_chunk(self):
         cfg=make_editor_document("sandbox")["settings"]
