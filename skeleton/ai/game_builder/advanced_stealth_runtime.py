@@ -135,6 +135,8 @@ def normalize_layout(config,layout):
     def interactable(p):
         return any(abs(p[0]-x)+abs(p[1]-y)<=1
                    for x,y in reachable_with_unlocks)
+    if config["mission"]=="sabotage" and config["hacking_charges"]==0:
+        raise StealthActionError("security sabotage needs a real available terminal hack")
     if config["mission"]=="sabotage" and not any(interactable(c) for c in cameras):
         raise StealthActionError("sabotage needs reachable physical security equipment")
     if config["mission"]=="intelligence" and sum(interactable(p) for p in intel)<config["intel_target"]:
