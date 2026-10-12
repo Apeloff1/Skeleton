@@ -253,6 +253,32 @@ def _unit_at(state,cell):
                  if u["hp"]>0 and u["cell"]==cell),None)
 
 
+def _actual_line_of_fire(state,source,target):
+    """Deterministic Bresenham LOS; no shots through mountains, buildings or units.
+
+    The destination itself may be an enemy or its building. All intermediary
+    cells must be open; this deliberately forbids allied-body pass-through.
+    """
+    x0,y0=source%SIZE,source//SIZE
+    x1,y1=target%SIZE,target//SIZE
+    dx=abs(x1-x0);dy=abs(y1-y0)
+    sx=1 if x0<x1 else -1
+    sy=1 if y0<y1 else -1
+    error=dx-dy
+    blocked=set(state["map"]["obstacles"])
+    blocked.update(b["cell"] for b in state["buildings"] if b["hp"]>0)
+    blocked.update(u["cell"] for u in _alive(state,"blue")+_alive(state,"red"))
+    while (x0,y0)!=(x1,y1):
+        doubled=2*error
+        if doubled>-dy:
+            error-=dy;x0+=sx
+        if doubled<dx:
+            error+=dx;y0+=sy
+        if (x0,y0)!=(x1,y1) and y0*SIZE+x0 in blocked:
+            return False
+    return True
+
+
 def _damage(state,config,attacker,cell,events):
     if cell not in state["visible"] and attacker["side"]=="blue":
         raise RTSActionError("cannot attack unknown fog-covered cell")
@@ -268,6 +294,12 @@ def _damage(state,config,attacker,cell,events):
     if _distance(attacker["cell"],cell)>max_range:
         raise RTSActionError("original combat target is physically out of range")
     if max_range==0:raise RTSActionError("support medic cannot be ordered to attack")
+    if attacker["kind"] in ("ranger","siege") and config["line_of_sight"] and not (
+        _actual_line_of_fire(state,attacker["cell"],cell)):
+        raise RTSActionError("real ranged unit cannot fire through intervening geometry or allied bodies")
+    if state["map"]["environment"]=="rain" and attacker["kind"] in ("ranger","siege") and (
+        _distance(attacker["cell"],cell)>max(1,max_range-config["rain_range_penalty"])):
+        raise RTSActionError("rainfall actually limits ranged original combat targeting")
     dmg={"worker":config["worker_attack"],"soldier":config["soldier_attack"],
          "ranger":config["ranger_attack"],"siege":config["siege_attack"]}.get(
             attacker["kind"],0)+state["tech"]["weapons"]*config["weapon_bonus"]
@@ -397,7 +429,8 @@ def _tick(state,config):
             _damage(state,config,u,enemy["cell"],events)
             events.append("original_owned_unit_stance_selected_real_opponent")
     if config["supply_model"]=="logistics":
-        demand=max(1,state["supply_used"]//config["logistics_divisor"])
+        demand=max(1,state["supply_used"]//config["logistics_divisor"])+(
+            config["desert_logistics_penalty"] if state["map"]["environment"]=="desert" else 0)
         if state["energy"]>=demand:
             state["energy"]-=demand
             events.append("real_logistics_fuel_paid_per_strategy_tick")
@@ -421,6 +454,18 @@ def _tick(state,config):
                        and p not in state["map"]["obstacles"]),None)
                     if candidate is not None:
                         _go(state,config,enemy,candidate,events)
+            # The opposing army is allowed to actually win by breaking
+            # an undefended command HQ; no remote/magic building damage.
+            home=next((b for b in state["buildings"] if b["kind"]=="command"
+              and b["side"]=="blue" and b["hp"]>0),None)
+            if home is not None and _distance(enemy["cell"],home["cell"])<=config["enemy_siege_range"]:
+                home["hp"]=max(0,home["hp"]-config["enemy_siege_damage"])
+                events.append("actual_original_opposing_faction_assaulted_blue_command")
+                if home["hp"]==0:
+                    state["failed"]=True
+                    state["reason"]="physical_opposing_command_base_assault"
+                    events.append("original_friendly_command_destroyed_by_hostile_units")
+                    break
     for structure in state["buildings"]:
         if structure["side"]!="blue" or structure["hp"]==0:
             continue
@@ -436,6 +481,10 @@ def _tick(state,config):
     relay=state["map"]["relay"]
     friendly=any(u["cell"]==relay for u in _alive(state,"blue"))
     enemy=any(u["cell"]==relay for u in _alive(state,"red"))
+    if state["failed"]:
+        state["scan_ticks"]=max(0,state["scan_ticks"]-1)
+        _refresh(state,config)
+        return events
     if friendly and not enemy and state["capture_committed"]:
         state["relay_progress"]=min(config["capture_ticks"],state["relay_progress"]+1)
         if state["relay_progress"]==config["capture_ticks"]:
