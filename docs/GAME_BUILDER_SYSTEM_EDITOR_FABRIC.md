@@ -152,6 +152,61 @@ engines. It never equates successful reference simulation with a certified
 Godot export or native executable. Integration of the actual other 40
 game engines and producer-grade scene/node editors remains outstanding.
 
+## Ninth actual original gameplay family: Godot 4 Farming & Ecology
+
+This is a **new game**, not a ninth adapter for an existing reference
+engine. `advanced_farming_runtime.py` introduces independently replayable
+deterministic farming commands and game rules, while
+`advanced_farming_godot.py` implements those rules again in genuinely
+executable offline GDScript. Typed editor `farming` is now a real game,
+not just the old parameters (`crop_types`, `growth_days`, `field_tiles`,
+`seasons`, `livestock`).
+
+Core runtime: one to four playable field sectors from the configured
+bounded acreage, authored individual soil and moisture, deterministic
+weather and seven-day seasons, three crop classes selected from available
+crop types, growth stages dependent on moisture and fertility, periodic
+pests, irrigation and compost, finite seeds and fertilizer, harvest yield
+and soil depletion, finite market purchase and sales, optional livestock
+with finite feed, hunger and products, contracts and reputation, and a
+meaningful victory threshold (**80 coins, 8 actual harvested units, 2
+completed market contracts**). Unsustainable farms can bankrupt under
+strict conditions; impossible commands fail closed before state mutation.
+
+The authored farm scene permits only canonical sequential plot IDs,
+integer soil/moisture bounds, approved weather and market multipliers;
+it is content addressed and settings-bound. Every original game source is
+shipped with an immutable proof transcript and hashes. In Godot
+`--verify-farming` mode, the independent GDScript engine reconstructs
+the same authored land, separately executes player commands, and checks
+**every final economy/field/weather/livestock/contract state field**, not
+just an end banner. Crop plot metadata is normalized at the proof
+boundary for Godot's JSON int/float interoperability.
+
+The reviewed offline CLI and local token-gated Game Studio can now
+download **nine** independently authored native game project source ZIP
+families, using distinct `original-godot-farming/` custody. Exporting
+source is **not** native runtime verification, authorized console SDK
+use, third-party art/IP rights or a commercial release certification.
+
+The new `game-builder-advanced-farming-native.yml` workflow includes
+eight original farm scenarios, with real planted/harvested crops, weather,
+saturation, profitable market win, livestock products, fertilizer use,
+season toggles, pests and scarce acreage. It executes the Godot game on
+both Linux and Windows and exports and independently executes both
+desktop game binaries. The full advanced regression workflow includes
+the ninth reference engine, native source, authorized API/CLI/Studio,
+forged receipt resistance and strict authored-scene checks.
+
+Status is evidence-gated: **nine of 43** typed editors have a real Python
+reference engine, and the original prior **eight of eight** native
+engine families are already independently verified. Promote Farming
+from candidate to ninth native-verifiable game only after its dedicated
+exact-head Godot and executable jobs actually succeed on both OSes.
+The remaining 34 typed families require equally substantive original
+gameplay and native development; editor parameter counts do not count
+as finished games.
+
 ## Eighth original native gameplay candidate: Godot 4 open-ended Survival
 
 `advanced_survival_godot.py` provides an independent, genuinely playable
