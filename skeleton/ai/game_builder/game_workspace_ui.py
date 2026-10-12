@@ -1041,6 +1041,12 @@ function drawAdvancedGame(session){
       body.material==="glass"?"#93d6d4":"#a5c68a";
    c.beginPath();c.arc(bx,by,Math.max(3,body.radius/100*scale),
                         0,Math.PI*2);c.fill();
+   // Orientation comes from source-replayed angular state, not client drag.
+   const arm=Math.max(3,body.radius/100*scale);
+   const angle=body.orientation*Math.PI/180000;
+   c.strokeStyle=body.broken?"#eed0d0":"#263f54";
+   c.lineWidth=2;c.beginPath();c.moveTo(bx,by);
+   c.lineTo(bx+Math.cos(angle)*arm,by+Math.sin(angle)*arm);c.stroke();
    if(state.depth>1){
     c.fillStyle="#f1e1ac";c.font="9px monospace";
     c.fillText(String(body.position[2]/100),bx-5,by-8);}
@@ -1056,7 +1062,10 @@ function drawAdvancedGame(session){
    "Fractures: "+state.fractures,
    "Selected: "+state.selected,
    "Goal dwell: "+state.goal_frames,
-   "Max speed: "+state.max_velocity_seen
+   "Max speed: "+state.max_velocity_seen,
+   "Pair CCD: "+state.continuous_pair_contacts,
+   "Angular: "+state.max_angular_speed_seen,
+   "Cable ext: "+state.peak_cable_extension
   ].forEach((line,i)=>c.fillText(line,tx,54+i*20));
  }
  if(editor==="flight"){
