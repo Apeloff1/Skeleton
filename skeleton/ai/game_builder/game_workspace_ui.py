@@ -2836,7 +2836,7 @@ function showAdvanced(reply){
  advancedAvailableActions=reply.available_actions;
  const nativeSourceFamilies=new Set(["puzzle","platformer","deck_battler",
   "shooter","tactics","tower_defense","racing","survival","farming",
-  "factory","colony","economy"]);
+  "factory","colony","economy","dialogue"]);
  $("advanced-godot-export").disabled=!nativeSourceFamilies.has(advancedSession.editor);
  $("advanced-godot-export").title=nativeSourceFamilies.has(advancedSession.editor)?
   "Package original Godot source; native hardware verification is a separate CI gate":
