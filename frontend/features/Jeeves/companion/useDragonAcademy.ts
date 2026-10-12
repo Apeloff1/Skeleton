@@ -73,7 +73,7 @@ export function useDragonAcademy(){
    const me=await checkMe();
    if(!alive.current)return;
    if(!me.authenticated||!getAuthToken()){
-    setAuthenticated(false);setProgress(null);setWisdomReview(null);setKnowledgeView(null);setNest(null);setMotherGlean(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
+    setAuthenticated(false);setProgress(null);setWisdomReview(null);setKnowledgeView(null);setNest(null);setMotherGlean(null);setMotherGlean(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
     setTelemetry(undefined);sessionRef.current=null;journal.current=EMPTY_COMPANION_JOURNAL;
     setError('Sign in through Studio to connect Dragon Academy.');
     return;
@@ -107,7 +107,7 @@ export function useDragonAcademy(){
     setCurriculum(normalizeNativeCurriculum(course.data));
    setSubscription(snapshot.subscription);setAuthenticated(true);setError('');
   }catch(e){
-   if(alive.current){setAuthenticated(false);setProgress(null);setWisdomReview(null);setKnowledgeView(null);setNest(null);
+   if(alive.current){setAuthenticated(false);setProgress(null);setWisdomReview(null);setKnowledgeView(null);setNest(null);setMotherGlean(null);
     setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
     setError(e instanceof Error?e.message:'Could not connect to Dragon Academy.');}
   }
