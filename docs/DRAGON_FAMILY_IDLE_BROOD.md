@@ -203,3 +203,66 @@ custody evidence or a strong signed transparency receipt.
 scheduler, media adapter, explicit opt-in and metering, exact-head CI,
 device/browser acceptance, DB backup/restore and production release signing
 still need independent integration proof. A queued/skipped check is not a pass.
+
+
+## Almanakk, Wiki, HOAG: confirmed terminology and review ladder
+
+**Terminology decision (2026-10-12 UTC):** No explicit repository or
+Dragon-product rename was authorized in prior user instructions.
+Keep `Skeleton`, `Dragon` and the companion family; present
+`Almanakk` (graded knowledge), `Wiki` (adversarial fact verifier),
+and `HOAG/Jeeves` (user-facing knowledge/LLM layer) as system names.
+The three child dragon display names Ember, Flicker, and Scout are
+currently UI labels, **not** hardcoded storage identities. The durable
+role IDs remain `article`, `video`, and `monitor`.
+
+**Implemented in this PR:**
+
+- `DragonAlmanakkLane.projection` reads actual revisions from the Dragon
+  research ledger without persisting a fake separate acquisition source
+  (improved: same source identity across parent and all three children).
+- `DragonFamilyCustodyBridge.almanakk(...)` builds the owner-locked review
+  lane on the shared crawler/practice DB
+  (improved: no cross-tenant shadow permission confusion).
+- `wiki_review` requires an independent Wiki validator receipt, at least
+  two independent corroborating groups, and source-rights clearance;
+  every revision is checked against current canonical human review
+  (improved: disputed and legally restricted source material stays pending).
+- `sandbox_review` requires a holdout-evaluator receipt, 30+ independent
+  cases, positive measured quality delta and **zero critical regressions**
+  (improved: no promotion for restatements, duplicates or regressions).
+- `authorize_weight_handoff` requires a separately signed authority.
+  It returns a deterministic handoff *intent*, not changes to underlying
+  model weights. The exact signed receipt is replay-fenced
+  (improved: no phantom weight-approval receipts).
+- Source revisions invalidate prior stage eligibility; the earlier
+  evaluation remains audit history but is not current evidence
+  (improved: update-aware, reversible review decisions).
+- The authenticated companion exposes the measured, read-only counts in
+  `DragonFamilyNest` alongside their UTC source history
+  (improved: players can see what the dragons actually learned).
+
+### Acceptance and incomplete integrations
+
+1. Wire trusted canonical crawl and video producer calls directly into the
+   host's recorded source-acquisition events, including cancellation,
+   publisher rules, source permissions, deadlines and actual hardware
+   capacity. The sidecar cannot autonomously download, transcribe, or
+   approve sources.
+2. Wire a real authorized idle scheduler with current user/activity
+   signals, prioritizing foreground UX; per-child batch caps and
+   role-separated callbacks exist, but service deployment is not yet proof.
+3. Use the actual Wiki, shadow sandbox and signed-model promoter
+   verification services as the three evaluator callbacks; never
+   substitute UI claims, simple digests, or permissive test lambdas.
+4. Prove database migrations, backup/restore and UTC audit replay,
+   exact-head Dragon Python + frontend, full Webcrawler, App Assembly,
+   and all inherited build gates. No signed release while these fail.
+5. The product game builder must only act on verified knowledge through
+   existing rights checks. A shadow handoff cannot bypass copyright,
+   licensing, human review, or anti-plagiarism controls.
+
+**Engineering report, 2026-10-12 UTC:** Family + Almanakk + Wiki/shadow
+source-projection and tests are committed to a draft PR. Release
+qualification is pending; no production deployment or model-weight
+change should be inferred from this status.
