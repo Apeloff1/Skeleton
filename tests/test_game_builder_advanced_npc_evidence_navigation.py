@@ -84,6 +84,29 @@ class AuthoredForensicRouteTests(unittest.TestCase):
         self.assertTrue(verify_investigation_navigation(
             result,proof,episodes,scene,rules))
 
+    def test_earned_corroborated_material_quest_resolves_after_actual_walk(self):
+        rules=self.settings(consequence_depth=1,evidence_min=1)
+        proof,episodes,scene,rules=self.campaign(
+            rules,world_actions=(
+                "east","east","speak:0","choose:0:support",
+                "west","repair:0"))
+        active=next(q for q in proof["world_state"]["quests"] if
+                    q["id"]==0)
+        self.assertEqual(active["choice"],"support")
+        self.assertGreaterEqual(active["material_actions"],1)
+        self.assertGreaterEqual(len(active["testimonies"]),1)
+        result=navigate_verified_investigation(
+            proof,episodes,scene,rules,quest_id=0,objective="resolve")
+        self.assertEqual(result["outcome"],"original_quest_resolved")
+        self.assertEqual(result["next_quest_state"]["ending"],"restored")
+        self.assertEqual(result["next_quest_state"]["status"],"resolved")
+        self.assertEqual(result["end_world_state"]["quests_completed"],
+                         proof["world_state"]["quests_completed"]+1)
+        self.assertGreater(result["end_world_state"]["gold"],
+                           proof["world_state"]["gold"])
+        self.assertTrue(verify_investigation_navigation(
+            result,proof,episodes,scene,rules))
+
     def test_unearned_quest_resolution_is_denied_even_when_site_is_nearby(self):
         proof,episodes,scene,rules=self.campaign()
         result=navigate_verified_investigation(
@@ -114,14 +137,11 @@ class AuthoredForensicRouteTests(unittest.TestCase):
             lambda x:x["planned_and_simulated_actions"].append("teleport"),
             lambda x:x["route_steps"][0].update(player=48),
             lambda x:x["route_steps"][0].update(head_hash="0"*64),
-            lambda x:x["end_world_state"]["reputation"].__class__,
             lambda x:x["next_quest_state"].update(testimonies=[999]),
             lambda x:x.update(outcome="original_quest_resolved"),
             lambda x:x.update(original_campaign_mutated=True),
         )
-        for index,edit in enumerate(attempts):
-            if index==3:
-                continue
+        for edit in attempts:
             forged=deepcopy(approved)
             edit(forged)
             with self.assertRaises(EvidenceNavigationError):
