@@ -11,7 +11,7 @@ from collections import deque
 WIDTH, HEIGHT = 10, 8
 DIRECTIONS = {"north":(0,-1),"south":(0,1),"west":(-1,0),"east":(1,0)}
 SECURITY_ACTIONS = ("hide","emerge","wait","rest","disguise",
-                    "hack_terminal","hack_door","steal","disable_camera",
+                    "hack_terminal","hack_door","collect_keycard","steal","disable_camera",
                     "neutralize","deploy_smoke","deploy_emp","collect_intel",
                     "extract","use_medkit")
 ACTIONS = (SECURITY_ACTIONS
@@ -128,6 +128,12 @@ def normalize_layout(config,layout):
     reached=_reachable(spawn,wallset)
     if any(tuple(p) not in reached for p in (exit_at,objective,terminal)):
         raise StealthActionError("authored mission objective, terminal and extraction require physical routes")
+    if config["mission"]=="sabotage" and not cameras:
+        raise StealthActionError("sabotage requires a real camera security target")
+    if config["mission"]=="intelligence" and len(intel)<config["intel_target"]:
+        raise StealthActionError("authored intelligence mission requires enough finite caches")
+    if config["mission"]=="archive" and not keycards and config["hacking_charges"]==0:
+        raise StealthActionError("archive needs at least one genuine unlock path")
     if layout["lighting"] not in ("day","night","storm"):
         raise StealthActionError("unregistered original stealth lighting")
     _integer(layout["alarm_budget"],1,30,"alarm_budget")
@@ -220,8 +226,6 @@ def _see(state,config,observer,player,facing):
     distance=_distance(observer,player)
     if distance==0:
         return True
-    if not config["line_of_sight"]:
-        return False
     # 90-degree directed field, except immediately adjacent threats.
     if distance>1:
         dx,dy=DIRECTIONS[facing]
@@ -242,7 +246,7 @@ def _see(state,config,observer,player,facing):
         radius=max(1,radius-config["shadow_bonus"])
     if state["hidden"] or distance>radius:
         return False
-    return _line_of_sight(state,observer,player)
+    return not config["line_of_sight"] or _line_of_sight(state,observer,player)
 
 
 def _shortest_step(state,origin,target):
@@ -272,8 +276,6 @@ def _security_update(state,config,noise,origin):
     events=[]
     state["turn"]+=1
     player=state["player"]
-    if state["smoke_turns"]:
-        state["smoke_turns"]-=1
     sensed=False
     for guard in state["guards"]:
         if guard["disabled"]:
@@ -318,6 +320,8 @@ def _security_update(state,config,noise,origin):
                  _line_of_sight(state,camera["position"],player))):
             sensed=True
             events.append("active_camera_alert")
+    if state["smoke_turns"]:
+        state["smoke_turns"]-=1
     if sensed:
         state["alarm"]=min(100,state["alarm"]+config["alarm_gain"])
         events.append("security_alarm_escalated")
@@ -427,6 +431,13 @@ def step(state,config,action):
         state["open_doors"].sort()
         events.append("spatial_security_door_unlocked")
         noise=1
+    elif action=="collect_keycard":
+        target=next((p for p in state["keycards"] if _nearby(state,p)),None)
+        if target is None:
+            raise StealthActionError("security keycard must be physically recovered once")
+        state["keycards"].remove(target)
+        state["keycards_owned"]+=1
+        events.append("finite_keycard_recovered_from_authored_scene")
     elif action=="steal":
         if not _nearby(state,state["objective"]) or state["archive"]:
             raise StealthActionError("archive must be physically reached once")
