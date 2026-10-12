@@ -221,14 +221,36 @@ def _audit(owner: str, candidate: str, number: int, at: str,
     return ShadowAudit(number, at, before, after, action, improvement, prev, digest)
 
 
-def _route(weights: tuple[ShadowWeight, ...], query: str) -> str | None:
-    tokens = set(WORD.findall(query.casefold()))
-    scores: Counter[str] = Counter()
+def _compile_postings(
+    weights: tuple[ShadowWeight, ...],
+) -> dict[str, tuple[tuple[str, int], ...]]:
+    """Compile a bounded, deterministic in-memory inverted index once per run.
+
+    Retains the previous integer scoring semantics exactly, including multiple
+    approved notes from one source. Runtime route only sees approved entries.
+    """
+    postings: dict[str, list[tuple[str, int]]] = {}
+    if len(weights) > MAX_ITEMS:
+        raise ValueError("active sparse routing budget exceeded")
     for weight in weights:
-        score = sum(value for term, value in weight.terms if term in tokens)
-        if score:
-            scores[weight.source_id] += score
+        for term, score in weight.terms:
+            postings.setdefault(term, []).append((weight.source_id, score))
+    return {term: tuple(sorted(entries))
+            for term, entries in sorted(postings.items())}
+
+
+def _rank_postings(
+    postings: dict[str, tuple[tuple[str, int], ...]], query: str,
+) -> str | None:
+    scores: Counter[str] = Counter()
+    for token in sorted(set(WORD.findall(query.casefold()))):
+        for source, score in postings.get(token, ()):
+            scores[source] += score
     return min(scores, key=lambda source: (-scores[source], source)) if scores else None
+
+
+def _route(weights: tuple[ShadowWeight, ...], query: str) -> str | None:
+    return _rank_postings(_compile_postings(weights), query)
 
 
 def _benchmark(shadow: ShadowWeight, active: tuple[ShadowWeight, ...],
@@ -259,11 +281,13 @@ def _benchmark(shadow: ShadowWeight, active: tuple[ShadowWeight, ...],
     if any(x.source_id not in expected_sources for x in active):
         raise ValueError("all existing live sources need regression canaries")
     base = tuple(sorted(active, key=lambda x: x.candidate_id))
+    baseline_index = _compile_postings(base)
+    proposed_index = _compile_postings((*base, shadow))
     before, after, gained, lost = 0, 0, 0, 0
     for case in cases:
         expected_source = None if case.expected_source_id == "_abstain" else case.expected_source_id
-        original = _route(base, case.query) == expected_source
-        proposed = _route((*base, shadow), case.query) == expected_source
+        original = _rank_postings(baseline_index, case.query) == expected_source
+        proposed = _rank_postings(proposed_index, case.query) == expected_source
         before += int(original)
         after += int(proposed)
         gained += int(proposed and not original)
