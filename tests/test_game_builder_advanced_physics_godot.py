@@ -248,7 +248,7 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
         html=render_workspace_html("B"*32).decode("utf-8")
         self.assertIn('id="advanced-physics-native"',html)
         self.assertIn("native_physics_demo",html)
-        self.assertIn("layout.fixtures=[]",html)
+        self.assertIn('layout.fixtures=[{"position":[430,900,0]',html)
         self.assertIn("Authenticated authored native profile was not replayed",html)
         self.assertIn('advancedSettings?.max_bodies===1',html)
         self.assertIn('advancedSettings?.initial_battery===0',html)
