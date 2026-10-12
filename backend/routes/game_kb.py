@@ -871,3 +871,7 @@ router.include_router(_chapter_studio_router)
 # Model critiques are candidates; only reviewed evidence is eligible for scene quality coverage.
 from routes.story_review import router as _story_review_router
 router.include_router(_story_review_router)
+
+# Authenticated, deterministic multi-ending RPG/adventure story planning and simulation.
+from routes.story_outcomes import router as _story_outcomes_router
+router.include_router(_story_outcomes_router)
