@@ -21,6 +21,8 @@ from .system_editor_assembly import assemble_workspace_systems
 from .advanced_gameplay_runtime import run_advanced_session, verify_advanced_session
 from .advanced_level_scenes import make_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_roguelike_longrun import (replay_long_roguelike,
+    verify_long_roguelike,continue_long_roguelike)
 from .advanced_world_planner import plan_original_world
 from .advanced_stealth_planner import plan_stealth_route
 from .advanced_godot_export import (
@@ -82,6 +84,22 @@ def parser() -> argparse.ArgumentParser:
     world_plan.add_argument("--settings")
     world_plan.add_argument("--max-states",type=int,default=50000)
     world_plan.add_argument("--max-actions",type=int,default=128)
+    marathon=commands.add_parser("roguelike-marathon",
+        help="Execute thousands of original dungeon actions with independently verifiable checkpoints")
+    marathon.add_argument("--actions",required=True)
+    marathon.add_argument("--settings")
+    marathon.add_argument("--scene")
+    marathon.add_argument("--seed",type=int,default=0)
+    marathon.add_argument("--checkpoint-interval",type=int,default=64)
+    marathon_verify=commands.add_parser("roguelike-marathon-verify",
+        help="Recompute longrun from original seed, authored scene and entire command log")
+    marathon_verify.add_argument("--record",required=True)
+    marathon_verify.add_argument("--settings")
+    marathon_more=commands.add_parser("roguelike-marathon-continue",
+        help="Resume a full-replay-verified original longrun ledger")
+    marathon_more.add_argument("--record",required=True)
+    marathon_more.add_argument("--actions",required=True)
+    marathon_more.add_argument("--settings")
     native=commands.add_parser("godot-export",help="Real offline native Godot 4 puzzle source, proof and export presets")
     native.add_argument("--session",required=True)
     native.add_argument("--settings")
@@ -154,6 +172,19 @@ def main(argv=None) -> int:
                 _load(args.scene),
                 _load(args.settings) if args.settings else None,
                 max_states=args.max_states,max_actions=args.max_actions)
+        elif args.operation == "roguelike-marathon":
+            output=replay_long_roguelike(
+                _load(args.settings) if args.settings else None,
+                _load(args.actions),seed=args.seed,
+                scene=_load(args.scene) if args.scene else None,
+                checkpoint_interval=args.checkpoint_interval)
+        elif args.operation == "roguelike-marathon-verify":
+            output={"verified":verify_long_roguelike(
+                _load(args.record),_load(args.settings) if args.settings else None)}
+        elif args.operation == "roguelike-marathon-continue":
+            output=continue_long_roguelike(
+                _load(args.record),_load(args.actions),
+                _load(args.settings) if args.settings else None)
         elif args.operation == "godot-export":
             receipt=_load(args.session)
             settings=_load(args.settings) if args.settings else None
