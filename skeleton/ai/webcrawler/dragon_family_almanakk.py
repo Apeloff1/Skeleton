@@ -269,25 +269,35 @@ class DragonAlmanakkLane:
         history = self.history(owner,authorized=authorized,limit=limit)
         # Also verify Dragon custody journal; do not mask lineage tampering.
         DragonFamily(self.db).history(owner,authorized=True,limit=1)
-        rows = self.db.execute("""SELECT r.source_id,r.dragon,r.content_digest,r.observed_at,
-            s.topics_json FROM dragon_family_readings r
-            JOIN dragon_family_sources s ON s.owner=r.owner AND s.source_id=r.source_id
-            WHERE r.owner=? AND r.rowid IN (
-                SELECT r2.rowid FROM dragon_family_readings r2
-                WHERE r2.owner=? AND r2.source_id=r.source_id
-                ORDER BY r2.observed_at DESC,r2.rowid DESC LIMIT 1
-            ) ORDER BY r.observed_at DESC,r.source_id""", (owner,owner)).fetchall()
+        # One indexed/windowed scan counts *all* current sources (not just
+        # the first 1000). Paging the user-visible list never changes totals.
+        # A LEFT JOIN avoids one SQLite round trip per source revision.
+        cursor = self.db.execute("""WITH latest AS (
+            SELECT r.source_id,r.dragon,r.content_digest,r.observed_at,
+              ROW_NUMBER() OVER (
+                PARTITION BY r.source_id ORDER BY r.observed_at DESC,r.rowid DESC
+              ) AS rank
+            FROM dragon_family_readings r WHERE r.owner=?
+          )
+          SELECT r.source_id,r.dragon,r.observed_at,s.topics_json,
+                 a.stage,a.quality_delta
+          FROM latest r
+          JOIN dragon_family_sources s ON s.owner=? AND s.source_id=r.source_id
+          LEFT JOIN dragon_almanakk_reviews a
+            ON a.owner=? AND a.dragon=r.dragon
+            AND a.source_id=r.source_id AND a.content_digest=r.content_digest
+          WHERE r.rank=1 ORDER BY r.observed_at DESC,r.source_id""",
+            (owner,owner,owner))
         entries=[]
         stages={x:0 for x in _STAGES}
-        for sid,role,revision,at,topics in rows[:1000]:
-            reviewed=self._row(owner,role,sid,revision)
-            stage=reviewed[0] if reviewed else "collected"
+        for sid,role,at,topics,approved_stage,gain in cursor:
+            stage=approved_stage if approved_stage in _STAGES else "collected"
             stages[stage]+=1
             if len(entries)<limit:
                 entries.append(dict(source_id=sid,dragon=role,stage=stage,
                                     last_acquired_at=_utc(at),
                                     topics=tuple(json.loads(topics)),
-                                    measured_gain=round(reviewed[4],4) if reviewed else None))
+                                    measured_gain=round(gain,4) if approved_stage is not None else None))
         return dict(schema=SCHEMA,
                     architecture="Dragon → Almanakk → Wiki → HOAG/Jeeves → Game Builder",
                     counts=stages,
