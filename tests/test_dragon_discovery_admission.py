@@ -66,7 +66,10 @@ def test_imports_into_owner_scoped_policy_queue_idempotently(tmp_path, baseline,
         assert first["training_authorized"] is False
         assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE owner='alice'").fetchone()[0] == distinct_destinations
         assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_supplement_receipts_v2 WHERE owner='alice'").fetchone()[0] == 964
-        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner='alice'").fetchone()[0] == 964
+        assert store.db.execute("""SELECT COUNT(*) FROM (
+            SELECT normalized_source FROM dragon_almanac_supplement_receipts_v2
+            GROUP BY normalized_source HAVING COUNT(*) > 1)""").fetchone()[0] > 0
+        assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner='alice'").fetchone()[0] == distinct_destinations
         assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_members WHERE owner='alice'").fetchone()[0] >= distinct_destinations
         assert store.db.execute("SELECT COUNT(*) FROM dragon_almanac_jobs WHERE state!='pending'").fetchone()[0] == 0
         second = ingress.import_chain("alice", baseline, chain, authorized=True)
