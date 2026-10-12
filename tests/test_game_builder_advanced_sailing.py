@@ -183,5 +183,60 @@ class AdvancedMaritimeTests(unittest.TestCase):
             run_advanced_session("sailing", actions=("row",))
 
 
+    def test_rescue_only_requires_no_fabricated_cargo_sale(self):
+        cfg = self.rules(mission_type="rescue")
+        route = (
+            ("undock",) + ("row",) * 9 + ("starboard",) + ("row",) * 2 +
+            ("rescue", "port") + ("row",) * 4 + ("starboard",) +
+            ("row",) * 5 + ("dock", "disembark")
+        )
+        result = run_advanced_session("sailing", cfg, route)
+        self.assertTrue(result["terminal"])
+        self.assertTrue(result["state"]["finished"])
+        self.assertEqual(result["state"]["delivered"], 0)
+        self.assertEqual(result["state"]["passengers_ashore"], 1)
+        self.assertEqual(result["state"]["warehouse"], 3)
+        self.assertTrue(verify_advanced_session(result, cfg))
+
+    def test_buoyancy_ingress_and_real_paid_bilge_work(self):
+        cfg = self.rules(hull_integrity=40, collision_damage=15,
+                         leak_threshold=3, pump_capacity=20)
+        damaged = ("undock", "port", "row", "row", "row", "wait")
+        before = run_advanced_session("sailing", cfg, damaged)["state"]
+        after = run_advanced_session("sailing", cfg, damaged + ("pump",))["state"]
+        self.assertGreater(before["flooding"], after["flooding"])
+        self.assertEqual(after["pumps_used"], 1)
+        self.assertLess(after["supplies"], before["supplies"])
+        self.assertEqual(after["hull"], before["hull"])
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("sailing", cfg, ("pump",))
+
+    def test_flotation_limit_prevents_weightless_forged_cargo(self):
+        cfg = self.rules(buoyancy_capacity=40, overload_damage=5)
+        loaded = run_advanced_session("sailing", cfg, ("load", "load", "load"))
+        state = loaded["state"]
+        self.assertLess(state["buoyancy_margin"], 0)
+        self.assertGreater(state["displacement"], 40)
+        self.assertLess(state["hull"], 100)
+
+    def test_savegame_replay_and_continuation_rejects_forged_inventories(self):
+        from skeleton.ai.game_builder.advanced_gameplay_save import (
+            SavegameError, export_advanced_savegame, import_advanced_savegame,
+            continue_advanced_savegame,
+        )
+        cfg = self.rules()
+        original = run_advanced_session("sailing", cfg, ("load", "undock", "row"))
+        saved = export_advanced_savegame(original, cfg)
+        imported = import_advanced_savegame(saved)
+        self.assertEqual(imported["session"], original)
+        continued = continue_advanced_savegame(saved, ("row", "row"))
+        self.assertEqual(import_advanced_savegame(continued)["session"]["state"]["position"],
+                         [5, 2])
+        forged = deepcopy(saved)
+        forged["actions"] = ["load", "load", "load", "undock", "row"]
+        with self.assertRaises(SavegameError):
+            import_advanced_savegame(forged)
+
+
 if __name__ == "__main__":
     unittest.main()
