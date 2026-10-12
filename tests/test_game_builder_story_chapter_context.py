@@ -6,7 +6,8 @@ import unittest
 from skeleton.ai.game_builder.story_canon_fabric import SCENE,sign,StoryCanonError
 from skeleton.ai.game_builder.story_chapter_context import (
     ACTS,CHAPTERS,SCENES,HIGHLIGHT_PALETTE,chapter_context,
-    chapter_of_act,validate_chapter_history,validate_storytelling)
+    chapter_of_act,validate_chapter_history,validate_storytelling,
+    highlight_source)
 from skeleton.ai.game_builder.story_continuity_assurance import (
     _receipt,_history_root,_advance_root,verify_production_history,
     seal_production_scene)
@@ -100,6 +101,16 @@ class ChapterDramaturgyTests(unittest.TestCase):
         self.assertEqual(active["prior_chapter_endings"][0]["ending"],"cliffhanger")
         self.assertEqual(len(active["unresolved_prior_highlighters"]),100)
         self.assertEqual(active["verified_receipt_head"],head)
+        self.assertTrue(active["full_chapter_scene_text_in_model_context"])
+        self.assertEqual(active["chapter_scene_sources"][0]["dialogue"][0]["id"],
+                         "line_101")
+        exact=highlight_source(self.bible,self.contract,scenes,"highlight_100")
+        self.assertEqual(exact["chapter"],1)
+        self.assertEqual(exact["source_reference"],"visit_100")
+        self.assertEqual(exact["source_content"]["id"],"visit_100")
+        self.assertEqual(exact["confirmation_receipt"],scenes[99]["assurance"]["digest"])
+        with self.assertRaises(StoryCanonError):
+            highlight_source(self.bible,self.contract,scenes,"fabricated_clue")
         previous_context=chapter_context(self.bible,self.contract,scenes,chapter=1)
         self.assertEqual(previous_context["chapter_scene_count"],100)
         self.assertEqual(previous_context["chapter_highlighters"][0]["color"],
