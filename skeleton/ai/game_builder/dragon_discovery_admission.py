@@ -176,11 +176,13 @@ class DragonDiscoveryAdmission:
         self.almanacs = almanacs
         self.db = almanacs.db
         self.worker = SequentialAlmanacWorker(almanacs)
-        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_almanac_supplement_receipts (
-            owner TEXT NOT NULL, source TEXT NOT NULL,
-            supplement_digest TEXT NOT NULL, body TEXT NOT NULL,
-            digest TEXT NOT NULL,
-            PRIMARY KEY (owner, source, supplement_digest))""")
+        # v2 keys by *original* recorded link ID. Several distinct historical
+        # fragment URLs collapse to the same canonical acquisition destination.
+        self.db.execute("""CREATE TABLE IF NOT EXISTS dragon_almanac_supplement_receipts_v2 (
+            owner TEXT NOT NULL, origin_source TEXT NOT NULL,
+            normalized_source TEXT NOT NULL, supplement_digest TEXT NOT NULL,
+            body TEXT NOT NULL, digest TEXT NOT NULL,
+            PRIMARY KEY (owner, origin_source, supplement_digest))""")
 
     def import_chain(self, owner: str, registry: dict,
                      named_documents: list[tuple[str, dict]], *, authorized: bool) -> dict:
@@ -195,8 +197,19 @@ class DragonDiscoveryAdmission:
             for name, doc in named_documents:
                 supplement_digest = canonical_digest(doc)
                 for item in doc["candidates"]:
-                    sid = item["source_id"]
-                    canonical = parsed["sources"][item["url"]]
+                    url = canonical_source_url(item["url"])
+                    sid = "source-" + sha256(url.encode("utf-8")).hexdigest()
+                    canonical = parsed["sources"].get(url)
+                    if canonical is None:
+                        canonical = {
+                            "source_id": sid, "url": url,
+                            "host": urlsplit(url).hostname,
+                            "kind": "video_candidate" if urlsplit(url).hostname in
+                                {"www.youtube.com", "youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"}
+                                else "web_candidate",
+                            "availability": "not_checked", "rights": "not_assessed",
+                            "independence": "not_assessed", "training_authorized": False,
+                            "discoveries": [], "provisional_discovery": True}
                     old = self.db.execute(
                         "SELECT body,digest FROM dragon_almanac_sources WHERE owner=? AND source=?",
                         (owner, sid)).fetchone()
@@ -208,20 +221,21 @@ class DragonDiscoveryAdmission:
                                         (owner, sid, body, canonical_digest(canonical)))
                         inserted += 1
                     claimed = {"evidence_path": name, "candidate": item,
+                               "normalized_url": url, "normalized_source_id": sid,
                                "supplement_digest": supplement_digest,
                                "authority": "unreviewed_discovery_only"}
                     raw = canonical_json(claimed)
                     digest = canonical_digest(claimed)
                     previous = self.db.execute(
-                        """SELECT digest FROM dragon_almanac_supplement_receipts
-                           WHERE owner=? AND source=? AND supplement_digest=?""",
-                        (owner, sid, supplement_digest)).fetchone()
+                        """SELECT digest FROM dragon_almanac_supplement_receipts_v2
+                           WHERE owner=? AND origin_source=? AND supplement_digest=?""",
+                        (owner, item["source_id"], supplement_digest)).fetchone()
                     if previous and previous[0] != digest:
                         raise ValueError("conflicting supplemental receipt")
                     if previous is None:
                         self.db.execute(
-                            "INSERT INTO dragon_almanac_supplement_receipts VALUES(?,?,?,?,?)",
-                            (owner, sid, supplement_digest, raw, digest))
+                            "INSERT INTO dragon_almanac_supplement_receipts_v2 VALUES(?,?,?,?,?,?)",
+                            (owner, item["source_id"], sid, supplement_digest, raw, digest))
                         receipts += 1
                     for origin in item["discoveries"]:
                         repo = origin.get("repository")
@@ -238,13 +252,19 @@ class DragonDiscoveryAdmission:
                             topic = self.db.execute(
                                 "SELECT parent FROM dragon_almanac_topics WHERE owner=? AND topic=?",
                                 (owner, topic)).fetchone()[0]
+            count = self.db.execute(
+                "SELECT COUNT(*) FROM dragon_almanac_sources WHERE owner=?", (owner,)).fetchone()[0]
+            if count > 100_000:
+                raise ValueError("owner source capacity exceeded")
             queued = self.worker.seed(owner, authorized=True)
             self.db.execute("COMMIT")
         except Exception:
             self.db.execute("ROLLBACK")
             raise
         return {"new_discovery_sources": inserted, "new_provenance_receipts": receipts,
-                "new_policy_stage_jobs": queued, "total_discovered_urls": parsed["total_discovered"],
+                "new_policy_stage_jobs": queued, "canonical_discovered_urls": parsed["total_discovered"],
+                "raw_provisional_urls": parsed["raw_total_discovered"],
+                "normalized_new_against_baseline": parsed["new"],
                 "approved_sources": 0, "training_authorized": False,
                 "status": "policy_review_required_before_any_network_fetch"}
 
