@@ -234,7 +234,7 @@ class NativeStudioDownloadTests(unittest.TestCase):
         html=render_workspace_html("A"*32).decode()
         self.assertIn('id="advanced-godot-export"',html)
         self.assertIn("/api/advanced-godot-package",html)
-        self.assertIn("Native Godot export requires a verified advanced gameplay session in one of the nine playable native genres",html)
+        self.assertIn("Native Godot export requires a verified advanced gameplay session in one of the ten playable native genres",html)
         self.assertIn("Content-Security-Policy",html)
 
 
