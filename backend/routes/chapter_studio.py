@@ -80,9 +80,9 @@ class SceneIn(BaseModel):
     act: int = Field(ge=1, le=1000)
     summary: str = Field(min_length=1, max_length=600)
     text: str = Field(min_length=1, max_length=16000)
-    characters: list[str] = Field(default_factory=list, max_length=30)
+    characters: list[str] = Field(default_factory=list, min_length=1, max_length=30)
     thread_keys: list[str] = Field(default_factory=list, max_length=100)
-    plot_points: list[PlotPointIn] = Field(default_factory=list, max_length=200)
+    plot_points: list[PlotPointIn] = Field(default_factory=list, min_length=1, max_length=200)
     chapter_revision: int = Field(ge=1)
     chapter_digest: str = Field(min_length=64, max_length=64, pattern="^[a-f0-9]{64}$")
     source_message_id: str = Field(min_length=1, pattern=SLUG)
@@ -207,6 +207,24 @@ async def save_chapter(
         await _existing_game(pid, scope)
         incoming = body.model_dump(exclude={"expected_revision"})
         await _global_style_guard(scope, body.branch_id, incoming, chapter)
+        existing_note = await _db.game_story_chapters.find_one({
+            "_id": _id(scope, body.branch_id, "chapter", chapter),
+        })
+        if existing_note:
+            for character, voice in existing_note.get("voice_cast", {}).items():
+                if character in incoming["voice_cast"] and incoming["voice_cast"][character] != voice:
+                    raise HTTPException(status_code=409, detail=(
+                        "Existing character voice identity cannot be silently replaced"
+                    ))
+            if existing_note.get("payload_digest") != digest(incoming):
+                approved = await _db.game_story_scenes.find_one({
+                    **scope, "branch_id": body.branch_id, "chapter": chapter,
+                    "status": "approved_for_production",
+                })
+                if approved:
+                    raise HTTPException(status_code=409, detail=(
+                        "Approved scenes lock their chapter notes. Fork a branch to revise."
+                    ))
         revision = body.expected_revision + 1
         chapter_doc = {
             "_id": _id(scope, body.branch_id, "chapter", chapter),
@@ -295,6 +313,14 @@ async def save_scene(
                     "No stable voice identity is recorded for character " + actor
                 ))
         incoming = body.model_dump(exclude={"expected_revision"})
+        existing_scene = await _db.game_story_scenes.find_one({
+            "_id": _id(scope, body.branch_id, "scene", scene),
+        })
+        if existing_scene and existing_scene.get("status") == "approved_for_production":
+            if existing_scene.get("payload_digest") != digest(incoming):
+                raise HTTPException(status_code=409, detail=(
+                    "Approved scenes are immutable. Fork a story branch to revise canon."
+                ))
         revision = body.expected_revision + 1
         record = {
             "_id": _id(scope, body.branch_id, "scene", scene),
@@ -389,10 +415,16 @@ async def proofread_scene(
         record = await _scene(scope, branch_id, scene)
         ch = await _chapter(scope, branch_id, record["chapter"])
         history = await _audit_previous(scope, branch_id, scene)
+        predecessor = None
+        if scene > 1:
+            predecessor = await _db.game_story_scenes.find_one({
+                "_id": _id(scope, branch_id, "scene", scene - 1), **scope,
+            })
         proof = proofreading_checks(
             record, ch,
             history_complete=history["complete"],
             history_issues=history["issues"],
+            predecessor=predecessor,
         )
         # A proof is for the exact script revision. Concurrent edits must not
         # make the proof look current; CAS binds the resulting stored receipt.
@@ -422,6 +454,17 @@ async def approve_scene(
         record = await _scene(scope, body.branch_id, scene)
         ch = await _chapter(scope, body.branch_id, record["chapter"])
         proof = record.get("proof") or {}
+        predecessor = None
+        if scene > 1:
+            predecessor = await _db.game_story_scenes.find_one({
+                "_id": _id(scope, body.branch_id, "scene", scene - 1), **scope,
+            })
+        expected_previous_receipt = predecessor.get("digest") if predecessor else None
+        previous_approved = (scene == 1 or (
+            predecessor is not None and
+            predecessor.get("status") == "approved_for_production" and
+            predecessor.get("act", 0) <= record["act"]
+        ))
         if record["status"] == "approved_for_production" and (
             proof.get("receipt_digest") == body.proof_digest
         ):
@@ -435,6 +478,8 @@ async def approve_scene(
             or proof.get("status") != "machine_checks_passed"
             or proof.get("inspections_executed") != 100000
             or proof.get("history_complete") is not True
+            or not previous_approved
+            or proof.get("predecessor_scene_digest") != expected_previous_receipt
             or proof.get("blocking_issues")
         ):
             raise HTTPException(status_code=409, detail=(
