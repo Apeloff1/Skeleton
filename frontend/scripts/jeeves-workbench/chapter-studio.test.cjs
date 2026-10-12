@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const { assert } = require('./helpers.cjs');
 const {
   CHAPTER_LIMIT, ACT_LIMIT, SCENE_LIMIT, PROOFREAD_COUNT,
-  chapterForAct, validateSceneCoordinates, integer, voiceCast,
+  chapterForAct, validateSceneCoordinates, integer, voiceCast, parseNarrativeBeats, SCENE_KINDS,
   localPlotAnchors, highlightedParts, parsePlotPoints, acceptProof,
   chapterChatHandoff, parseChapterSceneHandoff,
 } = require('../../features/Jeeves/chapterStudio.ts');
@@ -164,4 +164,49 @@ test('pending Jeeves scene handoff is project, chapter and TTL scoped', () => {
   assert.equal(parseChapterSceneHandoff(JSON.stringify({ ...source, chapter: 99 }), 10001), null);
   assert.equal(parseChapterSceneHandoff(JSON.stringify({ ...source, gameId: '../secret' }), 10001), null);
   assert.equal(parseChapterSceneHandoff(JSON.stringify({ ...source, messageId: 'bad/command' }), 10001), null);
+});
+
+
+test('prologue, emotional cliffs, surprise and epilogue are distinct editable stages', () => {
+  assert.deepEqual(SCENE_KINDS, [
+    'prologue', 'story', 'side_story', 'chapter_climax', 'finale', 'epilogue', 'postgame',
+  ]);
+  const plots = [point({ id: 'king_hurt' }),
+    point({ id: 'epilogue_memory', anchor: 'They remember his sacrifice' })];
+  const moments = [{
+    kind: 'cliffhanger', plot_id: 'king_hurt', intensity: 93,
+    objective: 'Show a hero being lost at the chapter climax.',
+    audience_effect: 'Players want to discover how their hero survives.',
+  }];
+  const obligations = [{
+    thread_id: 'king_survival', role: 'cliffhanger', plot_id: 'king_hurt',
+  }];
+  const result = parseNarrativeBeats(
+    JSON.stringify(moments), JSON.stringify(obligations), plots, 'chapter_climax');
+  assert.equal(result.scene_kind, 'chapter_climax');
+  assert.equal(result.story_moments[0].kind, 'cliffhanger');
+  assert.equal(result.thread_beats[0].thread_id, 'king_survival');
+});
+
+test('epilogue requires a highlighted emotional closing beat', () => {
+  assert.throws(() => parseNarrativeBeats('[]', '[]', [point()], 'epilogue'));
+  assert.throws(() => parseNarrativeBeats('[]', '[]', [point()], 'finale'));
+  const success = parseNarrativeBeats(JSON.stringify([{
+    kind: 'epilogue', plot_id: 'king_hurt', intensity: 42,
+    objective: 'Make the aftermath and healing meaningful.',
+    audience_effect: 'Give the player a coherent emotional release.',
+  }]), '[]', [point({ id: 'king_hurt' })], 'epilogue');
+  assert.equal(success.story_moments[0].kind, 'epilogue');
+});
+
+test('narrative beats fail closed on phantom highlights, fabricated emotion and malformed JSON', () => {
+  const plots = [point()];
+  for (const moments of [
+    '[{"kind":"cliffhanger","plot_id":"phantom","intensity":90,"objective":"Valid sentence length","audience_effect":"Valid sentence length"}]',
+    '[{"kind":"cliffhanger","plot_id":"key_reveal","intensity":101,"objective":"Valid sentence length","audience_effect":"Valid sentence length"}]',
+    '[{"kind":"imaginary","plot_id":"key_reveal","intensity":30,"objective":"Valid sentence length","audience_effect":"Valid sentence length"}]',
+    'invalid json',
+  ]) assert.throws(() => parseNarrativeBeats(moments, '[]', plots, 'story'));
+  assert.throws(() => parseNarrativeBeats('[]',
+    '[{"thread_id":"king","role":"payoff","plot_id":"phantom"}]', plots, 'story'));
 });
