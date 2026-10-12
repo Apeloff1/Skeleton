@@ -169,11 +169,16 @@ def _move(state,side,steps):
     origin=state[side]
     sign=1 if side=="home" else -1
     x=max(1,min(state["width"]-3,origin[0]+sign*steps))
-    # Swept cover in occupied lane prevents tunneling through an obstacle.
-    for cell in state["cover"]:
-        if cell[1]==origin[1] and min(origin[0],x)<cell[0]<=max(origin[0],x):
-            x=cell[0]-sign
-            break
+    # Always resolve the NEAREST physical obstacle along the swept path,
+    # regardless of authored JSON order. A farther wall cannot erase a
+    # nearer collision or let high-speed athletes tunnel through cover.
+    crossed=[
+        cell[0] for cell in state["cover"]
+        if cell[1]==origin[1]
+        and 0<(cell[0]-origin[0])*sign<=abs(x-origin[0])
+    ]
+    if crossed:
+        x=(min(crossed) if sign>0 else max(crossed))-sign
     state[side]=[x,origin[1]]
     # Roster support exists at a bounded chart location. Movement cannot
     # instantly transport that second athlete; if overtaken, they trail behind.
