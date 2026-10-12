@@ -23,6 +23,8 @@ from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
 
 EARNED = ["move:south","move:east","discover:0",
           "speak:0","support:0"]+["followup:0"]*5+["resolve:0"]
+EXPLOITED = ["move:south","move:east","discover:0",
+             "speak:0","challenge:0"]+["sabotage:0"]*5+["resolve:0"]
 
 
 class UnifiedOriginalWorldTests(unittest.TestCase):
@@ -72,6 +74,48 @@ class UnifiedOriginalWorldTests(unittest.TestCase):
         self.assertTrue(retired["state"]["finished"])
         self.assertTrue(retired["state"]["retired"])
         self.assertTrue(verify_unified_npc_world(retired))
+
+    def test_real_exploit_branch_has_material_consequences_not_fake_victory(self):
+        exploited=run_unified_npc_world(EXPLOITED)
+        restored=run_unified_npc_world(EARNED)
+        self.assertTrue(verify_unified_npc_world(exploited))
+        state=exploited["state"]
+        self.assertEqual(state["resolved_count"],1)
+        self.assertEqual(state["quests"][0]["ending"],"exploited")
+        self.assertEqual(state["quests"][0]["choice"],"exploit")
+        self.assertEqual(state["quests"][0]["followups"],5)
+        self.assertTrue(all(x["kind"]=="sabotage"
+                            for x in state["quests"][0]["material_actions"]))
+        self.assertEqual(state["choices"][0]["branch"],"exploit")
+        self.assertEqual(state["choices"][0]["supplies_paid"],0)
+        self.assertEqual(state["actors"][0]["challenged"],1)
+        self.assertGreater(state["actors"][0]["suspicion"],0)
+        self.assertLess(state["actors"][0]["bond"],0)
+        self.assertLess(state["actors"][0]["trust"],
+                        restored["state"]["actors"][0]["trust"])
+        self.assertLess(state["resources"]["reputation"],
+                        restored["state"]["resources"]["reputation"])
+        self.assertEqual(
+            state["sites"][0]["stock"],
+            restored["state"]["sites"][0]["stock"]-
+            5*exploited["settings"]["quest_director"]["gather_units"])
+        self.assertEqual(state["resources"]["gold"],
+                         exploited["settings"]["quest_director"]["starting_gold"]+
+                         exploited["settings"]["quest_director"]["exploit_gold"])
+        self.assertFalse(state["finished"])
+        self.assertFalse(state["retired"])
+        for actions in (
+            EXPLOITED[:-1]+["council:0"],
+            EXPLOITED[:-1]+["followup:0"],
+            EARNED[:-1]+["sabotage:0"],
+            ["move:south","move:east","discover:0","speak:0",
+             "challenge:0","support:0"],
+            ["move:south","move:east","discover:0","speak:0",
+             "support:0","challenge:0"],
+        ):
+            with self.subTest(actions=actions):
+                with self.assertRaises(UnifiedWorldError):
+                    run_unified_npc_world(actions)
 
     def test_actor_id_and_physical_position_cannot_duplicate_or_teleport(self):
         commands=["wait"]*16
