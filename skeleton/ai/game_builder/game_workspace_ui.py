@@ -966,7 +966,7 @@ function drawAdvancedGame(session){
    const npc=state.npcs.find(n=>n.cell===i);
    if(site)token=site.kind==="settlement"?"S":site.kind==="bridge"?"B":
              site.kind==="grove"?"G":"A";
-   if(npc)token=npc.memories.length?"!":npc.heard.length?"?":"N";
+   if(npc)token=npc.memories.length?"!":npc.investigations?.length?"F":npc.heard.length?"?":"N";
    if(state.player===i)token="P";
    if(token){
     c.fillStyle=token==="P"?"#ffde98":token==="!"?"#a0f5c1":"#e2dfe2";
@@ -981,14 +981,14 @@ function drawAdvancedGame(session){
   c.fillText("Corroborated quests "+state.quests.length,tx,130);
   c.fillText("Resolved "+state.quests_completed+
      " · exploited "+state.quests_exploited,tx,154);
-  c.fillText("Rumor edges "+state.rumor_edges.length,tx,178);
-  c.fillText("Player location "+state.player,tx,202);
+  c.fillText("Rumors "+state.rumor_edges.length+" · forensics "+state.forensic_edges.length,tx,178);
+  c.fillText("Player "+state.player+" · NPC walks "+state.npc_walks,tx,202);
   const active=state.quests.find(q=>q.status==="active");
   if(active)c.fillText("Quest #"+active.id+" · "+
     (active.choice||"uncommitted")+
     " · evidence "+active.testimonies.length,tx,225);
   c.fillStyle="#a7dcc6";
-  c.fillText("Witness (!) is distinct from hearsay (?) · player P · authored sites S/B/G/A",12,256);
+  c.fillText("Witness (!) / forensic (F) / rumor (?) differ · original player P",12,256);
  }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
@@ -1071,7 +1071,8 @@ function renderAdvancedActions(actions){
   context.textContent="Selected world cell "+cell+
    (site?" · site #"+site.id+" "+site.kind+" HP "+site.integrity:"")+
    (npc?" · NPC #"+npc.id+" "+npc.role+
-     " direct:"+npc.memories.length+" rumor:"+npc.heard.length:"");
+     " direct:"+npc.memories.length+" rumor:"+npc.heard.length+
+     " forensic:"+(npc.investigations?.length||0)+" steps:"+(npc.walks||0):"");
   target.append(context);
   const nearby=document.createElement("label");
   nearby.textContent="NPC witness origin and current quest status";
@@ -1086,6 +1087,10 @@ function renderAdvancedActions(actions){
       hearsay:q.heard_from,choice:q.choice,
       physical_followups:q.material_actions
     })),
+    forensic_edges:state.forensic_edges.slice(-8),
+    physical_npc_walks:state.npc_walks,
+    npc_positions:state.npcs.map(n=>({id:n.id,cell:n.cell,energy:n.energy,
+      original_home:n.home,investigations:n.investigations})),
     milestones:state.milestones.slice(-4),
     completed:state.quests_completed,
     nonterminal_world:!advancedSession.terminal,
