@@ -29,7 +29,7 @@ from skeleton.ai.webcrawler.dragon_memory_promotion_worker import (
 )
 from skeleton.ai.webcrawler.dragon_resource_session import HardwareSample
 from skeleton.ai.webcrawler.dragon_shadow_weight_automation import (
-    BenchmarkCase, ShadowWeightAutomation,
+    BenchmarkCase, ShadowWeightAutomation, seal_holdout,
 )
 
 OWNER = "dragon-owner"
@@ -104,6 +104,7 @@ def setup(tmp_path):
     automation = ShadowWeightAutomation(
         db, knowledge, ledger,
         signing_key=b"isolated-shadow-routing-secret-of-32bytes",
+        holdout_key=b"trusted-benchmark-evaluator-service-key-32b",
     )
     for args in (
         ("alpha", "independent-a",
@@ -149,13 +150,26 @@ def offer(setup, source="alpha", **changes):
     return result, record, receipts, adv
 
 
-def suite(source="alpha"):
+def suite(setup, source="alpha", *, controls=()):
+    _, knowledge, _, _ = setup
     if source == "alpha":
-        cases = ("responsive jumping", "smooth climbing", "jump timing")
+        queries = ("responsive jumping", "smooth climbing", "jump timing")
     else:
-        cases = ("collision physics", "rigidbody constraints", "physics gameplay")
-    return tuple(BenchmarkCase(str(i), q, source)
-                 for i, q in enumerate(cases))
+        queries = ("collision physics", "rigidbody constraints", "physics gameplay")
+    cases = tuple(BenchmarkCase(str(i), q, source)
+                  for i, q in enumerate(queries))
+    cases += (
+        BenchmarkCase("abstain-a", "ocean currents satellite", "_abstain"),
+        BenchmarkCase("abstain-b", "distant astronomy nebulae", "_abstain"),
+    )
+    cases += tuple(BenchmarkCase("control-" + str(i), q, sid)
+                   for i, (q, sid) in enumerate(controls))
+    return seal_holdout(
+        OWNER, knowledge.snapshot_root(OWNER, authorized=True),
+        "independent-evaluator", cases,
+        created_at=T0, expires_at="2026-10-13T00:00:00Z",
+        evaluator_key=b"trusted-benchmark-evaluator-service-key-32b",
+    )
 
 
 def reviewed_promotion(setup, record, adversarial):
@@ -184,12 +198,12 @@ def reviewed_promotion(setup, record, adversarial):
 def complete(setup):
     automation, *_ = setup
     weight, record, receipts, adversarial = offer(setup)
-    result = automation.evaluate(OWNER, weight.candidate_id, suite(),
+    result = automation.evaluate(OWNER, weight.candidate_id, suite(setup),
                                  at=T2, authorized=True)
     assert result.accepted
     outcome, review_id = reviewed_promotion(setup, record, adversarial)
     automation.promote(
-        OWNER, weight.candidate_id, suite(),
+        OWNER, weight.candidate_id, suite(setup),
         memory_promotion=outcome, review_id=review_id,
         at=T3, authorized=True,
     )
@@ -234,13 +248,13 @@ def test_verified_acquisition_enters_shadow_not_production_until_review(setup):
     assert history[0].after == "shadow"
     assert history[0].improvement.startswith("(")
     verdict = automation.evaluate(
-        OWNER, weight.candidate_id, suite(), at=T2, authorized=True,
+        OWNER, weight.candidate_id, suite(setup), at=T2, authorized=True,
     )
     assert verdict.accepted and verdict.improved >= 1 and verdict.regressed == 0
     assert automation.route(OWNER, "responsive jumping", authorized=True)["source_id"] is None
     promotion, review_id = reviewed_promotion(setup, record, adversarial)
     approved = automation.promote(
-        OWNER, weight.candidate_id, suite(),
+        OWNER, weight.candidate_id, suite(setup),
         memory_promotion=promotion, review_id=review_id,
         at=T3, authorized=True,
     )
@@ -261,8 +275,17 @@ def test_verified_acquisition_enters_shadow_not_production_until_review(setup):
 def test_failed_benchmark_does_not_leave_quarantine(setup):
     automation, *_ = setup
     weight, _, _, _ = offer(setup)
-    unrelated = tuple(BenchmarkCase(str(i), q, "alpha")
-                      for i, q in enumerate(("castle", "music", "graphics")))
+    unrelated = seal_holdout(
+        OWNER, setup[1].snapshot_root(OWNER, authorized=True),
+        "independent-evaluator",
+        (BenchmarkCase("one", "castle", "alpha"),
+         BenchmarkCase("two", "music", "alpha"),
+         BenchmarkCase("abstain-a", "distant astronomy nebulae", "_abstain"),
+         BenchmarkCase("abstain-b", "ocean currents satellite", "_abstain"),
+         BenchmarkCase("five", "graphics", "_abstain")),
+        created_at=T0, expires_at="2026-10-13T00:00:00Z",
+        evaluator_key=b"trusted-benchmark-evaluator-service-key-32b",
+    )
     poor = automation.evaluate(
         OWNER, weight.candidate_id, unrelated, at=T2, authorized=True,
     )
@@ -294,18 +317,18 @@ def test_shadow_but_vetoes_genuinely_block_bad_acquisitions(setup, changes):
 def test_wrong_review_owner_or_record_cannot_approve_shadow(setup):
     automation, *_ = setup
     weight, record, _, adversarial = offer(setup)
-    automation.evaluate(OWNER, weight.candidate_id, suite(),
+    automation.evaluate(OWNER, weight.candidate_id, suite(setup),
                         at=T2, authorized=True)
     promotion, review_id = reviewed_promotion(setup, record, adversarial)
     with pytest.raises((KeyError, ValueError, PermissionError)):
         automation.promote(
-            "other-owner", weight.candidate_id, suite(),
+            "other-owner", weight.candidate_id, suite(setup),
             memory_promotion=promotion, review_id=review_id,
             at=T3, authorized=True,
         )
     with pytest.raises((PermissionError, ValueError)):
         automation.promote(
-            OWNER, weight.candidate_id, suite(),
+            OWNER, weight.candidate_id, suite(setup),
             memory_promotion=promotion, review_id="a" * 64,
             at=T3, authorized=True,
         )
@@ -373,18 +396,16 @@ def test_different_approved_baseline_must_be_rebenchmarked(setup):
     automation, *_ = setup
     complete(setup)
     weight, record, _, adversarial = offer(setup, "beta")
-    tests = (
-        BenchmarkCase("one", "collision physics", "beta"),
-        BenchmarkCase("two", "rigidbody constraints", "beta"),
-        BenchmarkCase("three", "responsive jumping", "alpha"),
-        BenchmarkCase("four", "smooth climbing", "alpha"),
-    )
+    tests = suite(setup, "beta", controls=(
+        ("responsive jumping", "alpha"),
+        ("smooth climbing", "alpha"),
+    ))
     checked = automation.evaluate(
         OWNER, weight.candidate_id, tests, at="2026-10-12T12:25:00Z",
         authorized=True,
     )
     assert checked.accepted and checked.regressed == 0
-    assert checked.before_hits == 2 and checked.after_hits == 4
+    assert checked.before_hits == 4 and checked.after_hits == 7
     assert automation.route(OWNER, "collision physics", authorized=True)["source_id"] is None
 
 
@@ -407,7 +428,7 @@ def test_orchestration_stages_then_activates_only_after_human_ledger_review(setu
     )
     candidate = ReviewedAcquisition(
         "alpha", "note-alpha", "movement", record.knowledge_id,
-        (record,), receipts, adversarial, suite(),
+        (record,), receipts, adversarial, suite(setup),
     )
     first = run_shadow_automation(
         automation, library, plan, (candidate,),
