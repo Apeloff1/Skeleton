@@ -83,7 +83,7 @@ def start(config, seed):
         "district": 0, "districts": [], "threat_level": 0,
         "caravan_stock": 0, "buildings": {name: 0 for name in BUILDINGS},
         "workers": {name: 0 for name in ROLES},
-        "fortification": 0, "injured": 0, "expeditions": 0,
+        "fortification": 0, "injured": 0, "ration_days": 0, "expeditions": 0,
         "threats_survived": 0, "starvation_days": 0,
         "milestones": [], "events": [], "finished": False, "failed": False,
     }, config, default_layout(config, seed))
@@ -136,6 +136,9 @@ def _advance(state, config):
     if farm or gathered or mined or drawn:
         events.append("assigned_labor_produced_finite_goods")
     appetite = max(1, (people + 3) // 4) + config["need_decay"] // 4
+    if state["ration_days"]:
+        appetite = max(1, appetite - 1)
+        state["ration_days"] -= 1
     for good in ("food", "water"):
         state[good] = max(0, state[good] - appetite)
     if state["food"] == 0 or state["water"] == 0:
@@ -188,6 +191,7 @@ def _advance(state, config):
         if "thriving_outpost" not in state["milestones"]:
             state["milestones"].append("thriving_outpost")
             events.append("thriving_outpost_milestone")
+    state["healthy"] = max(0, state["population"] - state["injured"])
     if state["population"] == 0:
         state["failed"] = True
         events.append("colony_abandoned")
@@ -220,6 +224,8 @@ def step(state, config, action):
         costs = {"farm": (4, 2), "well": (2, 4), "house": (5, 3),
                  "clinic": (4, 5), "watch": (5, 5), "workshop": (6, 7)}
         wood, stone = costs[name]
+        if state["wood"] < wood or state["stone"] < stone:
+            raise ColonyActionError("construction requires real wood and stone")
         _take(state, "wood", wood)
         _take(state, "stone", stone)
         state["buildings"][name] += 1
@@ -260,15 +266,20 @@ def step(state, config, action):
         state["health"] = min(100, state["health"] + 4)
         events.append("settlers_recovered")
     elif action == "ration":
-        _take(state, "food", 1)
+        if state["ration_days"] >= 4:
+            raise ColonyActionError("ration schedule is at bounded maximum")
+        state["ration_days"] += 1
         state["morale"] = max(0, state["morale"] - 2)
-        state["water"] += 1
-        events.append("resource_ration_reallocated")
+        events.append("temporary_consumption_rationing")
     elif action == "feast":
         _take(state, "food", max(2, state["population"] // 3))
         state["morale"] = min(100, state["morale"] + 10)
         events.append("community_feast_held")
     elif action == "fortify":
+        if state["fortification"] >= 20:
+            raise ColonyActionError("maximum finite perimeter fortification built")
+        if state["wood"] < 3 or state["stone"] < 2:
+            raise ColonyActionError("fortification needs real timber and stone")
         _take(state, "wood", 3)
         _take(state, "stone", 2)
         state["fortification"] = min(20, state["fortification"] + 2)
