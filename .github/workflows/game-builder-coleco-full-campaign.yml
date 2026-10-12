@@ -1,0 +1,110 @@
+name: Game Builder ColecoVision Eight-Stage Z80 Campaign
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_coleco_ci.py'
+      - 'scripts/game_builder/emulate_coleco_ci.py'
+      - 'skeleton/testing/test_game_builder_coleco_campaign.py'
+      - '.github/workflows/game-builder-coleco-full-campaign.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coleco-full-game-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  eight-stage-real-native-coleco:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_coleco_ci.py
+            /scripts/game_builder/emulate_coleco_ci.py
+            /skeleton/testing/test_game_builder_coleco_campaign.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Z80 assembler and independent CPU simulator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends z80asm make
+          python -m pip install --disable-pip-version-check 'z80-python==0.4.0' 'pytest>=8.4,<9'
+      - name: Prove eight original maps and 48 crystals fit physical Coleco RAM
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_coleco_campaign.py
+      - name: Assemble genuine 32KiB eight-stage Coleco game
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_coleco_ci.py --emit full-colegame --campaign > eight-stage-original-game-receipt.json
+          make -C full-colegame
+          python scripts/game_builder/native_coleco_ci.py \
+            --verify-rom full-colegame/build/original-coleco.col \
+            --source-bin full-colegame/build/original-coleco.bin > full-original-cartridge-evidence.json
+          python - <<'PY'
+          import json
+          e=json.load(open('eight-stage-original-game-receipt.json',encoding='utf-8'))
+          assert e['original_levels']==8
+          assert e['total_original_crystals']==48
+          assert e['actual_native_binary_compiled'] is False
+          proof=json.load(open('full-original-cartridge-evidence.json',encoding='utf-8'))
+          assert proof['binary_assembled'] is True
+          assert proof['bytes']==32768
+          PY
+      - name: Execute all eight levels through actual original Coleco Z80 code
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/game_builder/emulate_coleco_ci.py \
+            --rom full-colegame/build/original-coleco.col \
+            --source-bin full-colegame/build/original-coleco.bin \
+            --reference full-colegame/independent-guest-reference.json \
+            --manifest full-colegame/manifest.json \
+            --out coleco-eight-stage-guest-cpu-attestation.json
+          python - <<'PY'
+          import json
+          e=json.load(open('coleco-eight-stage-guest-cpu-attestation.json',encoding='utf-8'))
+          assert e['native_binary_matches_source_exactly'] is True
+          assert e['actual_coleco_z80_cpu_gameplay_verified'] is True
+          assert e['actual_original_8x8_video_art_verified'] is True
+          assert len(e['guest_vram_original_art_sha256'])==64
+          assert len(e['guest_vram_original_palette_sha256'])==64
+          assert e['original_levels_completed']==8
+          assert e['controller_actions_verified']>400
+          assert e['final_1kb_mirrored_guest_ram']['won']==1
+          assert e['final_1kb_mirrored_guest_ram']['score']==1280
+          assert e['complete_colecovision_emulator_verified'] is False
+          assert e['independent_distribution_rights_verified'] is False
+          print('COLECO_REAL_Z80_ALL_EIGHT_ORIGINAL_LEVELS_PASSED',e['controller_actions_verified'])
+          PY
+      - name: Preserve genuine independently proven native full-campaign source
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-coleco-eight-level-48-crystal-native-campaign
+          path: |
+            full-colegame/build/original-coleco.col
+            full-colegame/build/original-coleco.bin
+            full-colegame/manifest.json
+            full-colegame/independent-guest-reference.json
+            eight-stage-original-game-receipt.json
+            full-original-cartridge-evidence.json
+            coleco-eight-stage-guest-cpu-attestation.json
+          if-no-files-found: error
+          retention-days: 7

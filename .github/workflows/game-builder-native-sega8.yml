@@ -1,0 +1,482 @@
+name: Game Builder Native Sega 8-bit Cartridge
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/game-builder-native-sega8.yml"
+      - "skeleton/ai/game_builder/sega_8bit_native_export.py"
+      - "skeleton/ai/game_builder/sega_8bit_rom.py"
+      - "skeleton/ai/game_builder/native_game_cli.py"
+      - "skeleton/ai/game_builder/native_portfolio_cli.py"
+      - "skeleton/ai/game_builder/playable_world.py"
+      - "skeleton/ai/game_builder/port_planner.py"
+      - "scripts/game_builder/native_sega_8bit_ci.py"
+      - "scripts/game_builder/sega8_dual_homebrew_cli.py"
+      - "skeleton/testing/test_game_builder_sega8_dual_port.py"
+      - "scripts/game_builder/sega8_source_replay.py"
+      - "scripts/game_builder/emulate_sega8_sdcc_boot.py"
+      - "scripts/game_builder/sega8_real_z80_gameplay.py"
+      - "skeleton/testing/test_game_builder_sega8_real_z80_gameplay.py"
+      - "skeleton/testing/test_game_builder_sega8_route_security.py"
+      - "scripts/game_builder/sega8_port_parity.py"
+      - "skeleton/testing/test_game_builder_sega8_port_parity.py"
+      - "skeleton/testing/test_game_builder_sega8_sdcc_cpu_boot.py"
+      - "scripts/game_builder/sega8_host_shim.h"
+      - "scripts/game_builder/sega8_host_replay.c"
+      - "skeleton/testing/test_game_builder_sega8_host_replay.py"
+      - "skeleton/testing/test_game_builder_sega8_native_attract.py"
+      - "skeleton/testing/test_game_builder_sega8_stage_palette.py"
+      - "scripts/game_builder/sega_reproducibility_ci.py"
+      - "skeleton/ai/game_builder/sega_reproducibility.py"
+      - "skeleton/testing/test_game_builder_sega_reproducibility.py"
+      - "skeleton/testing/test_game_builder_sega_8bit_native.py"
+      - "skeleton/testing/test_game_builder_sega_8bit_rom.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-native-sega8-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-original-cartridge:
+    name: Real Z80 ROM build (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [sega_master_system, sega_game_gear]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout original homebrew source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout reviewed public-domain devkitSMS toolchain assets
+        uses: actions/checkout@v4
+        with:
+          repository: sverx/devkitSMS
+          ref: 533ae572c897cf44f1da865013ebf690134301a3
+          path: .external/devkitSMS
+          persist-credentials: false
+      - name: Install real Z80 C toolchain and host compiler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends sdcc gcc make
+          sdcc --version
+      - name: Check pinned public toolchain and source licenses
+        run: |
+          test "$(git -C .external/devkitSMS rev-parse HEAD)" = 533ae572c897cf44f1da865013ebf690134301a3
+          test -s .external/devkitSMS/LICENSES.txt
+          test -s .external/devkitSMS/crt0/crt0_sms.rel
+          test -s .external/devkitSMS/SMSlib/SMSlib.lib
+          test -s .external/devkitSMS/SMSlib/SMSlib_GG.lib
+          test -s .external/devkitSMS/SMSlib/src/SMSlib.h
+          grep -q 'special exception' .external/devkitSMS/LICENSES.txt
+      - name: Compile actual opensource IHX-to-ROM converter
+        run: |
+          make -C .external/devkitSMS/tools/makesms/src
+          test -x .external/devkitSMS/tools/makesms/src/makesms
+      - name: Create deterministic independent authorship receipt
+        run: |
+          printf '%s\n' 'Skeleton independently authored maze, glyphs and safe replay; CI demonstration, not legal certification.' > /tmp/original-sega-authorship.txt
+      - name: Generate distinct game source for the selected real console
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          python -m scripts.game_builder.native_sega_8bit_ci \
+            --target "$TARGET" --emit "output/$TARGET" \
+            --author-evidence /tmp/original-sega-authorship.txt \
+            --host-reference-out "/tmp/$TARGET-source-game-route.json" \
+            > "/tmp/$TARGET-generated-source.json"
+      - name: Host-compile actual original game C and replay authoritative actions
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          python -m scripts.game_builder.sega8_source_replay \
+            --source-dir "output/$TARGET" \
+            --reference "/tmp/$TARGET-source-game-route.json" \
+            --receipt-out "/tmp/$TARGET-host-gameplay-receipt.json"
+          python - <<'PY'
+          import json,os
+          target=os.environ["TARGET"]
+          r=json.load(open("/tmp/"+target+"-host-gameplay-receipt.json",encoding="utf-8"))
+          assert r["native_game_c_compiled_and_executed_on_host"] is True
+          assert r["all_level_completion_verified"] is True
+          assert r["original_companion_rank_progression_verified"] is True
+          assert r["original_score_and_screen_state_verified"] is True
+          assert r["original_controller_actions_verified"] > 50
+          assert r["original_native_solution_attract_mode_host_verified"] is True
+          assert r["original_demo_controller_actions_verified"] == r["original_controller_actions_verified"]
+          assert len(r["original_demo_screen_trace_sha256"]) == 64
+          assert r["full_console_emulator_playthrough_verified"] is False
+          assert r["physical_hardware_verified"] is False
+          assert r["release_approved"] is False
+          PY
+      - name: Independently regenerate original game source before native toolchain use
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          python -m scripts.game_builder.native_sega_8bit_ci \
+            --target "$TARGET" --emit "/tmp/$TARGET-independently-regenerated" \
+            --author-evidence /tmp/original-sega-authorship.txt > "/tmp/$TARGET-second-source.json"
+          python - <<'PY'
+          import json, os
+          from skeleton.ai.game_builder.sega_reproducibility import verify_separate_authoring_runs
+          target=os.environ["TARGET"]
+          with open("/tmp/"+target+"-generated-source.json",encoding="utf-8") as first:
+              original=json.load(first)
+          with open("/tmp/"+target+"-second-source.json",encoding="utf-8") as second:
+              regenerated=json.load(second)
+          assert regenerated["rights_evidence_sha256"]==original["rights_evidence_sha256"]
+          proof=verify_separate_authoring_runs(
+              "output/"+target, "/tmp/"+target+"-independently-regenerated",
+              target=target,expected_source_sha256=original["source_content_digest"],
+          )
+          assert proof["identical_source_bytes"] is True
+          assert proof["release_authorized"] is False
+          print("SEGA_AUTHORING_REGENERATION_MATCH",target,original["source_content_digest"])
+          PY
+      - name: Build actual original cartridge with SDCC and devkitSMS
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          make -C "output/$TARGET" \
+            SDCC=sdcc \
+            SMSLIB_DIR="$PWD/.external/devkitSMS/SMSlib" \
+            CRT0_SMS="$PWD/.external/devkitSMS/crt0/crt0_sms.rel" \
+            MAKESMS="$PWD/.external/devkitSMS/tools/makesms/src/makesms"
+      - name: Install independent Z80 instruction interpreter and adversarial test runner
+        run: |
+          python -m pip install --disable-pip-version-check "z80-python==0.4.0" "pytest>=8.4,<9"
+      - name: Exercise source-only dual-console original game porting
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_sega8_dual_port.py
+      - name: Check independent original Sega CPU and VDP test-bench invariants
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_sega8_sdcc_cpu_boot.py
+      - name: Execute compiled Z80 cartridge startup and inspect hardware-facing video output
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          case "$TARGET" in
+            sega_master_system) EXT=sms ;;
+            sega_game_gear) EXT=gg ;;
+            *) exit 3 ;;
+          esac
+          python -m scripts.game_builder.emulate_sega8_sdcc_boot \
+            --rom "output/$TARGET/build/skeleton-original.$EXT" \
+            --target "$TARGET" --receipt-out "/tmp/$TARGET-real-z80-boot.json"
+          python - <<'PY'
+          import json,os
+          target=os.environ["TARGET"]
+          with open("/tmp/"+target+"-real-z80-boot.json",encoding="utf-8") as stream:
+              receipt=json.load(stream)
+          assert receipt["hardware_boot_smoke_verified"] is True
+          assert receipt["game_hero_rendered"] is True
+          assert receipt["original_companion_rendered"] is True
+          assert receipt["zero_score_hud_verified"] is True
+          assert receipt["real_compiled_z80_cpu_instructions_executed"] > 0
+          assert receipt["entire_game_playthrough_verified"] is False
+          assert receipt["independent_cycle_exact_emulator_verified"] is False
+          assert receipt["physical_hardware_verified"] is False
+          assert receipt["release_approved"] is False
+          PY
+      - name: Run complete original winning route in actual native Z80 CPU cartridge
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          set -eu
+          case "$TARGET" in
+            sega_master_system) EXT=sms ;;
+            sega_game_gear) EXT=gg ;;
+            *) exit 3 ;;
+          esac
+          python -m scripts.game_builder.sega8_real_z80_gameplay \
+            --rom "output/$TARGET/build/skeleton-original.$EXT" \
+            --source-dir "output/$TARGET" \
+            --route "/tmp/$TARGET-source-game-route.json" \
+            --target "$TARGET" \
+            --receipt-out "/tmp/$TARGET-native-z80-gameplay.json"
+          python - <<'PY'
+          import json,os
+          target=os.environ["TARGET"]
+          with open("/tmp/"+target+"-native-z80-gameplay.json",encoding="utf-8") as stream:
+              r=json.load(stream)
+          assert r["original_source_game_verified_on_instruction_level_cpu"] is True
+          assert r["controller_actions_replayed"] > 50
+          assert r["hardware_screen_states_verified"] == r["controller_actions_replayed"] + 1
+          assert r["semantic_trace_steps_hashed"] == r["hardware_screen_states_verified"]
+          assert len(r["semantic_controller_screen_trace_sha256"]) == 64
+          assert r["total_instruction_budget_enforced"] is True
+          assert r["total_frame_budget_enforced"] is True
+          assert r["original_companion_rank_and_reward_verified"] is True
+          assert r["native_companion_pet_verified_on_guest_z80"] is True
+          assert r["native_pet_preserves_gameplay_verified"] is True
+          assert r["native_pause_blocks_gameplay_and_mutes_psg_verified"] is True
+          assert r["native_restart_restores_original_theme_verified"] is True
+          assert r["native_attract_demo_chord_started_from_victory"] is True
+          assert r["native_attract_demo_full_solution_verified_on_guest_z80"] is True
+          assert r["native_attract_demo_controller_free_actions_verified"] == r["controller_actions_replayed"]
+          assert r["native_attract_demo_semantic_trace_sha256"] == r["semantic_controller_screen_trace_sha256"]
+          assert r["native_attract_demo_screen_frames"] >= r["controller_actions_replayed"]
+          assert r["native_attract_demo_performed_first_original_move"] is True
+          assert r["native_attract_demo_user_cancel_restored_game"] is True
+          assert r["actual_victory_palette_verified"] is True
+          assert r["original_hardware_stage_color_accents_verified"] is True
+          assert r["original_hardware_stage_accents_verified_per_move"] == r["hardware_screen_states_verified"]
+          assert r["independent_cycle_exact_full_console_emulator_verified"] is False
+          assert r["physical_hardware_verified"] is False
+          assert r["release_approved"] is False
+          PY
+      - name: Verify binary bytes and bind exact source/target/commit evidence
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          case "$TARGET" in
+            sega_master_system) EXT=sms ;;
+            sega_game_gear) EXT=gg ;;
+            *) exit 3 ;;
+          esac
+          SOURCE_DIGEST="$(python -c 'import json,os; print(json.load(open("/tmp/"+os.environ["TARGET"]+"-generated-source.json", encoding="utf-8"))["source_content_digest"])')"
+          AUTHORSHIP_DIGEST="$(python -c 'import json,os; print(json.load(open("/tmp/"+os.environ["TARGET"]+"-generated-source.json", encoding="utf-8"))["rights_evidence_sha256"])')"
+          python -m scripts.game_builder.native_sega_8bit_ci \
+            --verify-rom "output/$TARGET/build/skeleton-original.$EXT" \
+            --source-dir "output/$TARGET" --target "$TARGET" \
+            --expected-source-sha256 "$SOURCE_DIGEST" \
+            --expected-authorship-sha256 "$AUTHORSHIP_DIGEST" \
+            --toolchain-revision 533ae572c897cf44f1da865013ebf690134301a3 \
+            --receipt-out "/tmp/$TARGET-compilation-evidence.json"
+          python -m json.tool "/tmp/$TARGET-compilation-evidence.json" >/dev/null
+          python - <<'PY'
+          import json, os
+          r=json.load(open("/tmp/"+os.environ["TARGET"]+"-compilation-evidence.json", encoding="utf-8"))
+          assert r["source_digest_matches_expected"] is True
+          assert r["source_authorship_hash_matches_expected"] is True
+          assert r["source_rights_independently_proven"] is False
+          assert r["source_digest_independently_attested"] is False
+          assert r["toolchain_revision_hash_algorithm"] == "git-sha1"
+          assert r["toolchain_source_authenticated"] is False
+          assert r["release_approved"] is False
+          PY
+      - name: Rebuild original machine code twice and prove identical cartridge bytes
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          set -eu
+          case "$TARGET" in
+            sega_master_system) EXT=sms ;;
+            sega_game_gear) EXT=gg ;;
+            *) exit 3 ;;
+          esac
+          FIRST_IMAGE="/tmp/$TARGET-first.$EXT"
+          cp "output/$TARGET/build/skeleton-original.$EXT" "$FIRST_IMAGE"
+          chmod 0400 "$FIRST_IMAGE"
+          BEFORE="$(sha256sum "output/$TARGET/build/skeleton-original.$EXT" | cut -d' ' -f1)"
+          make -C "output/$TARGET" clean
+          make -C "output/$TARGET" \
+            SDCC=sdcc \
+            SMSLIB_DIR="$PWD/.external/devkitSMS/SMSlib" \
+            CRT0_SMS="$PWD/.external/devkitSMS/crt0/crt0_sms.rel" \
+            MAKESMS="$PWD/.external/devkitSMS/tools/makesms/src/makesms"
+          AFTER="$(sha256sum "output/$TARGET/build/skeleton-original.$EXT" | cut -d' ' -f1)"
+          test "$BEFORE" = "$AFTER"
+          cmp "$FIRST_IMAGE" "output/$TARGET/build/skeleton-original.$EXT"
+          SOURCE_DIGEST="$(python -c 'import json,os; print(json.load(open("/tmp/"+os.environ["TARGET"]+"-generated-source.json", encoding="utf-8"))["source_content_digest"])')"
+          AUTHORSHIP_DIGEST="$(python -c 'import json,os; print(json.load(open("/tmp/"+os.environ["TARGET"]+"-generated-source.json", encoding="utf-8"))["rights_evidence_sha256"])')"
+          python -m scripts.game_builder.sega_reproducibility_ci \
+            --target "$TARGET" --source-dir "output/$TARGET" \
+            --first-rom "$FIRST_IMAGE" \
+            --rebuilt-rom "output/$TARGET/build/skeleton-original.$EXT" \
+            --first-evidence "/tmp/$TARGET-compilation-evidence.json" \
+            --source-sha256 "$SOURCE_DIGEST" \
+            --author-sha256 "$AUTHORSHIP_DIGEST" \
+            --toolchain-revision 533ae572c897cf44f1da865013ebf690134301a3 \
+            --receipt-out "/tmp/$TARGET-reproducibility.json"
+          python - <<'PY'
+          import json, os
+          with open("/tmp/"+os.environ["TARGET"]+"-reproducibility.json",encoding="utf-8") as stream:
+              evidence=json.load(stream)
+          assert evidence["checked_two_distinct_artifact_paths"] is True
+          assert evidence["exact_rom_bytes_match"] is True
+          assert evidence["source_and_authorship_digests_match"] is True
+          assert evidence["two_compiler_executions_independently_verified"] is False
+          assert evidence["source_rights_independently_verified"] is False
+          assert evidence["gameplay_execution_verified"] is False
+          assert evidence["publication_licensed"] is False
+          print("SEGA_NATIVE_REBUILD_FINGERPRINT_MATCH", evidence["cartridge_sha256"])
+          PY
+      - name: Compile full original eight-level campaign, 48 collectibles and all ranks
+        env:
+          TARGET: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            sega_master_system) EXT=sms ;;
+            sega_game_gear) EXT=gg ;;
+            *) exit 3 ;;
+          esac
+          CAMPAIGN="/tmp/original-$TARGET-eight-worlds"
+          python -m scripts.game_builder.native_sega_8bit_ci \
+            --target "$TARGET" --profile full_campaign \
+            --emit "$CAMPAIGN" \
+            --author-evidence /tmp/original-sega-authorship.txt \
+            --host-reference-out "/tmp/$TARGET-eight-worlds-route.json" \
+            > "/tmp/$TARGET-eight-worlds-source.json"
+          python -m scripts.game_builder.sega8_source_replay \
+            --source-dir "$CAMPAIGN" \
+            --reference "/tmp/$TARGET-eight-worlds-route.json" \
+            --receipt-out "/tmp/$TARGET-eight-worlds-host-replay.json"
+          make -C "$CAMPAIGN" \
+            SDCC=sdcc \
+            SMSLIB_DIR="$PWD/.external/devkitSMS/SMSlib" \
+            CRT0_SMS="$PWD/.external/devkitSMS/crt0/crt0_sms.rel" \
+            MAKESMS="$PWD/.external/devkitSMS/tools/makesms/src/makesms"
+          python -m scripts.game_builder.emulate_sega8_sdcc_boot \
+            --rom "$CAMPAIGN/build/skeleton-original.$EXT" \
+            --target "$TARGET" \
+            --receipt-out "/tmp/$TARGET-eight-worlds-z80-boot.json"
+          python -m scripts.game_builder.sega8_real_z80_gameplay \
+            --rom "$CAMPAIGN/build/skeleton-original.$EXT" \
+            --source-dir "$CAMPAIGN" \
+            --route "/tmp/$TARGET-eight-worlds-route.json" \
+            --target "$TARGET" \
+            --receipt-out "/tmp/$TARGET-eight-worlds-z80-gameplay.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from scripts.game_builder.native_sega_8bit_ci import verify
+          target=os.environ["TARGET"]
+          root=Path("/tmp/original-"+target+"-eight-worlds")
+          suffix="sms" if target=="sega_master_system" else "gg"
+          project=json.loads(Path("/tmp/"+target+"-eight-worlds-source.json").read_text())
+          route=json.loads(Path("/tmp/"+target+"-eight-worlds-route.json").read_text())
+          host=json.loads(Path("/tmp/"+target+"-eight-worlds-host-replay.json").read_text())
+          boot=json.loads(Path("/tmp/"+target+"-eight-worlds-z80-boot.json").read_text())
+          actual=json.loads(Path("/tmp/"+target+"-eight-worlds-z80-gameplay.json").read_text())
+          manifest=json.loads((root/"manifest.json").read_text())
+          native=verify(
+              target,root,root/"build"/("skeleton-original."+suffix),
+              toolchain_revision="533ae572c897cf44f1da865013ebf690134301a3",
+              expected_source_sha256=project["source_content_digest"],
+              expected_authorship_sha256=project["rights_evidence_sha256"],
+          )
+          assert project["original_campaign_profile"]=="full_campaign"
+          assert manifest["levels"]==8
+          assert manifest["original_demo_playback_steps"]==len(route["steps"])
+          assert manifest["companion_bond_ranks"]==8
+          assert route["steps"][-1]["score"]==1280
+          assert route["steps"][-1]["bond_rank"]==7
+          assert route["steps"][-1]["won"]==1
+          assert host["original_levels_verified"]==8
+          assert actual["original_levels_replayed"]==8
+          assert actual["controller_actions_replayed"]==len(route["steps"])
+          assert actual["hardware_screen_states_verified"]==len(route["steps"])+1
+          assert actual["original_hardware_stage_color_accents_verified"] is True
+          assert actual["original_hardware_stage_accents_verified_per_move"]==len(route["steps"])+1
+          assert actual["native_attract_demo_full_solution_verified_on_guest_z80"] is True
+          assert actual["native_attract_demo_controller_free_actions_verified"]==len(route["steps"])
+          assert actual["native_attract_demo_semantic_trace_sha256"]==actual["semantic_controller_screen_trace_sha256"]
+          assert actual["original_companion_rank_and_reward_verified"] is True
+          assert actual["rights_independently_verified"] is False
+          assert actual["release_approved"] is False
+          assert host["original_native_solution_attract_mode_host_verified"] is True
+          assert host["original_demo_controller_actions_verified"]==len(route["steps"])
+          assert boot["hardware_boot_smoke_verified"] is True
+          assert boot["rom_sha256"]==native["rom_sha256"]
+          assert native["rom_size"]==32768
+          assert native["real_rom_structure_verified"] is True
+          assert native["rom_header_checksum_verified"] is True
+          assert native["distribution_licensed"] is False
+          assert native["release_approved"] is False
+          print("EIGHT_STAGE_NATIVE_CARTRIDGE_VERIFIED",target,len(route["steps"]),native["rom_sha256"])
+          PY
+      - name: Publish limited, non-distribution CI evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-sega8-source-and-hash-evidence-${{ matrix.platform }}
+          path: |
+            output/${{ matrix.platform }}/manifest.json
+            /tmp/${{ matrix.platform }}-compilation-evidence.json
+            /tmp/${{ matrix.platform }}-reproducibility.json
+            /tmp/${{ matrix.platform }}-source-game-route.json
+            /tmp/${{ matrix.platform }}-host-gameplay-receipt.json
+            /tmp/${{ matrix.platform }}-real-z80-boot.json
+            /tmp/${{ matrix.platform }}-native-z80-gameplay.json
+            /tmp/${{ matrix.platform }}-eight-worlds-source.json
+            /tmp/${{ matrix.platform }}-eight-worlds-host-replay.json
+            /tmp/${{ matrix.platform }}-eight-worlds-z80-boot.json
+            /tmp/${{ matrix.platform }}-eight-worlds-z80-gameplay.json
+          if-no-files-found: error
+          retention-days: 7
+      # No ROM is published: legal review and real emulator or hardware
+      # gameplay acceptance are separate and remain fail-closed.
+
+  compare-original-ports:
+    name: Confirm authentic cross-console gameplay and source parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: [build-original-cartridge]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download non-distribution original-game evidence from both console builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: original-sega8-source-and-hash-evidence-*
+          path: original-port-evidence
+          merge-multiple: false
+      - name: Validate adversarial cross-hardware original port receipts
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_sega8_port_parity.py skeleton/testing/test_game_builder_sega8_route_security.py
+      - name: Verify identical game rules and independent ROM bytes
+        run: |
+          python -m scripts.game_builder.sega8_port_parity \
+            --evidence-root original-port-evidence \
+            --output original-sega8-crossport-equivalence.json
+          python - <<'PY'
+          import json
+          with open("original-sega8-crossport-equivalence.json",encoding="utf-8") as stream:
+              receipt=json.load(stream)
+          assert receipt["gameplay_parity_verified"] is True
+          assert receipt["independent_native_rom_formats_verified"] is True
+          assert receipt["real_z80_startup_checked_per_platform"] is True
+          assert receipt["original_stage_hardware_color_parity_verified"] is True
+          assert receipt["original_stage_color_accents_verified_per_console"] > 50
+          assert receipt["native_cartridge_rebuild_byte_equality_checked_per_platform"] is True
+          assert set(receipt["native_rebuild_provenance_sha256_by_platform"]) == {"sega_master_system", "sega_game_gear"}
+          assert all(len(value) == 64 for value in receipt["native_rebuild_provenance_sha256_by_platform"].values())
+          assert receipt["original_controller_actions_verified_per_platform"] > 50
+          assert receipt["full_native_z80_gameplay_replay_verified"] is True
+          assert len(receipt["native_guest_semantic_trace_sha256"]) == 64
+          assert receipt["native_guest_semantic_snapshots_verified_per_platform"] == receipt["native_z80_controller_actions_verified_per_platform"] + 1
+          assert receipt["native_z80_controller_actions_verified_per_platform"] > 50
+          assert receipt["extended_eight_worlds_gameplay_parity_verified"] is True
+          assert receipt["extended_eight_worlds_autonomous_replay_verified_on_both_platforms"] is True
+          assert receipt["extended_eight_worlds_native_controller_actions_verified_per_platform"] > 100
+          assert len(receipt["extended_eight_worlds_original_world_digest"]) == 64
+          assert len(receipt["extended_eight_worlds_native_z80_semantic_trace_sha256"]) == 64
+          assert receipt["release_approved"] is False
+          PY
+      - name: Retain only original cross-port identity receipt, never cartridge bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-sega8-crossport-identity-evidence
+          path: original-sega8-crossport-equivalence.json
+          if-no-files-found: error
+          retention-days: 7

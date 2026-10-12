@@ -1,0 +1,84 @@
+name: Game Builder Native ZX Spectrum 48K Tape
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_spectrum_ci.py'
+      - '.github/workflows/game-builder-native-spectrum.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-spectrum-${{ github.event.pull_request.number || github.ref }}
+  # Preserve the executing actual-hardware source qualification despite rapid
+  # multi-agent PR pushes. GitHub keeps only the newest pending run per group.
+  cancel-in-progress: false
+
+jobs:
+  original-sinclair-z80-game:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_spectrum_ci.py
+            /skeleton/testing/test_game_builder_spectrum_native.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install authentic Z80 assembler and tape packaging prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends z80asm make
+          z80asm -V
+      - name: Assemble original Z80 Spectrum maze with ULA keyboard and ROM graphics
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          python scripts/game_builder/native_spectrum_ci.py --emit original-zx-spectrum-source > original-zx-authoring-receipt.json
+          make -C original-zx-spectrum-source
+          test -s original-zx-spectrum-source/build/skeleton-original.bin
+          test -s original-zx-spectrum-source/build/skeleton-original.tap
+          python scripts/game_builder/native_spectrum_ci.py \
+            --verify-tap original-zx-spectrum-source/build/skeleton-original.tap \
+            --binary original-zx-spectrum-source/build/skeleton-original.bin > zx-tap-verification.json
+          python - <<'PY'
+          import json
+          receipt=json.load(open("zx-tap-verification.json",encoding="utf-8"))
+          assert receipt["native_z80_source_assembled"] is True
+          assert receipt["spectrum_native_header_verified"] is True
+          assert receipt["load_address"]==32768
+          assert receipt["zx_emulator_playthrough_verified"] is False
+          print("ORIGINAL_ZX_SPECTRUM_Z80_TAP_COMPILED",receipt["tape_sha256"])
+          PY
+      - name: Verify real ZX Spectrum source, legality and tape safety
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8.4,<9"
+          python -m pytest -q --noconftest skeleton/testing/test_game_builder_spectrum_native.py
+      - name: Publish original ZX Spectrum tape and rights-provenance artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-zx-spectrum-48k-tape
+          path: |
+            original-zx-spectrum-source/build/skeleton-original.bin
+            original-zx-spectrum-source/build/skeleton-original.tap
+            original-zx-spectrum-source/manifest.json
+            original-zx-spectrum-source/README.txt
+            zx-tap-verification.json
+            original-zx-authoring-receipt.json
+          if-no-files-found: error
+          retention-days: 7

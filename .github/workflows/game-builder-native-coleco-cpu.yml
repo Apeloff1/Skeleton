@@ -1,0 +1,103 @@
+name: Game Builder ColecoVision Native Z80 CPU Replay
+
+on:
+  pull_request:
+    paths:
+      - 'skeleton/ai/game_builder/**'
+      - 'scripts/game_builder/native_coleco_ci.py'
+      - 'scripts/game_builder/emulate_coleco_ci.py'
+      - '.github/workflows/game-builder-native-coleco-cpu.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-coleco-cpu-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  real-coleco-z80-gameplay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /skeleton/__init__.py
+            /skeleton/ai/__init__.py
+            /skeleton/ai/capability_map.py
+            /skeleton/ai/game_builder/
+            /scripts/game_builder/native_coleco_ci.py
+            /scripts/game_builder/emulate_coleco_ci.py
+            /skeleton/testing/test_game_builder_coleco_native.py
+            /skeleton/testing/test_game_builder_coleco_cpu.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Assemble original complete ColecoVision homebrew Z80 CPU cartridge
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends z80asm make
+          python scripts/game_builder/native_coleco_ci.py --emit native-coleco-cpu > coleco-source-provenance.json
+          make -C native-coleco-cpu
+          python scripts/game_builder/native_coleco_ci.py \
+            --verify-rom native-coleco-cpu/build/original-coleco.col \
+            --source-bin native-coleco-cpu/build/original-coleco.bin > real-coleco-boot-evidence.json
+          test -s native-coleco-cpu/independent-guest-reference.json
+      - name: Install independent oracle-tested Z80 processor without distributing Coleco OS7 ROM
+        run: |
+          python -m pip install --disable-pip-version-check 'z80-python==0.4.0' 'pytest>=8.4,<9'
+      - name: Reject forged BIOS, mirrored RAM, console device and source authority
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: |
+          python -m pytest -q --noconftest \
+            skeleton/testing/test_game_builder_coleco_native.py \
+            skeleton/testing/test_game_builder_coleco_cpu.py
+      - name: Replay every original Coleco joystick input in real native Z80 opcodes
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/game_builder/emulate_coleco_ci.py \
+            --rom native-coleco-cpu/build/original-coleco.col \
+            --reference native-coleco-cpu/independent-guest-reference.json \
+            --manifest native-coleco-cpu/manifest.json \
+            --source-bin native-coleco-cpu/build/original-coleco.bin \
+            --out coleco-native-z80-cpu-attestation.json
+          python - <<'PY'
+          import json
+          r=json.load(open("coleco-native-z80-cpu-attestation.json",encoding="utf-8"))
+          assert r["actual_coleco_z80_cpu_gameplay_verified"] is True
+          assert r["actual_original_8x8_video_art_verified"] is True
+          assert len(r["guest_vram_original_art_sha256"]) == 64
+          assert len(r["guest_vram_original_palette_sha256"]) == 64
+          assert r["original_levels_completed"] == 3
+          assert r["native_binary_matches_source_exactly"] is True
+          assert len(r["independent_assembled_z80_sha256"]) == 64
+          assert r["controller_actions_verified"] > 100
+          assert r["final_1kb_mirrored_guest_ram"]["won"] == 1
+          assert r["coleco_bios_stub_calls"]=={"MODE_1":1,"LOAD_ASCII":1}
+          assert r["complete_colecovision_emulator_verified"] is False
+          assert r["proprietary_coleco_bios_redistributed"] is False
+          print("REAL_COLECO_Z80_GUEST_GAMEPLAY_VERIFIED",r["controller_actions_verified"])
+          PY
+      - name: Preserve ROM, independent authored route and actual guest CPU RAM evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: skeleton-original-coleco-z80-cpu-hardware-evidence
+          path: |
+            native-coleco-cpu/build/original-coleco.col
+            native-coleco-cpu/build/original-coleco.bin
+            native-coleco-cpu/manifest.json
+            native-coleco-cpu/independent-guest-reference.json
+            coleco-native-z80-cpu-attestation.json
+            real-coleco-boot-evidence.json
+          if-no-files-found: error
+          retention-days: 7
