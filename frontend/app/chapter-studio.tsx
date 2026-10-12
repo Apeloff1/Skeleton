@@ -771,6 +771,25 @@ export default function ChapterStudioScreen() {
             {proof.status} · {proof.inspections_executed.toLocaleString()} checks
             · {proof.axes.length} review axes · {proof.history_complete ? 'indexed history scanned' : 'INCOMPLETE HISTORY'}
           </Text>
+          {!!proof.highlight_review_queue?.length && <>
+            <Text style={styles.label}>
+              {proof.highlight_review_queue.length} highlighted plot-point reviews queued
+              — model findings still require human scrutiny
+            </Text>
+            <View style={styles.wrap}>
+              {proof.highlight_review_queue.slice(0, 20).map((target, i) =>
+                <Action key={target.plot_point_id + target.matrix_id + i}
+                  label={target.plot_point_id + ' → ' + target.matrix_id}
+                  compact onPress={() => {
+                    setMatrixId(target.matrix_id);
+                    setMatrixLevel(String(target.suggested_level));
+                    setReviewQuote(target.anchor);
+                    setReviewPlotId(target.plot_point_id);
+                    setPage('production');
+                    setNotice('Highlighted review selected. Ask Jeeves for adversarial evidence.');
+                  }} />)}
+            </View>
+          </>}
           {proof.axes.map(axis => <Text key={axis.name} style={axis.failed ? styles.error : styles.small}>
             {axis.name}: {axis.executed.toLocaleString()} inspected, {axis.failed.toLocaleString()} failed
           </Text>)}
