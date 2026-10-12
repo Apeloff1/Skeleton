@@ -289,3 +289,57 @@ def test_ending_lore_requires_bounded_unique_knowledge_ids():
     story["endings"][0]["required_lore"] = "this string must not be read as a list"
     with pytest.raises(ValueError, match="bounded list"):
         validate_plan(story)
+
+
+
+def test_interlocking_city_person_faction_citizen_and_law_standings_unlock_options():
+    state = initial_state()
+    changes = [
+        reputation("glass_city", 35, "city"),
+        reputation("aria", 65, "person"),
+        reputation("citizens", 30, "citizens"),
+        reputation("council", 10, "government"),
+        reputation("silver_gang", -50, "gang"),
+        {"op": "meter_delta", "kind": "law_heat", "scope": "city",
+         "subject": "city_watch", "delta": 25},
+        {"op": "flag_set", "id": "council_invitation"},
+    ]
+    from core.branching_narrative import validate_effect
+    current, threads, logs = apply_effects(
+        state, {}, [validate_effect(e) for e in changes],
+        scene=2, plot_ids={"recognized"},
+    )
+    guard = validate_condition({"op": "all", "items": [
+        {"op": "meter", "kind": "reputation", "scope": "city",
+         "subject": "glass_city", "comparison": "gte", "value": 30},
+        {"op": "meter", "kind": "reputation", "scope": "person",
+         "subject": "aria", "comparison": "gte", "value": 60},
+        {"op": "meter", "kind": "reputation", "scope": "citizens",
+         "subject": "citizens", "comparison": "gte", "value": 20},
+        {"op": "meter", "kind": "reputation", "scope": "government",
+         "subject": "council", "comparison": "gte", "value": 5},
+        {"op": "meter", "kind": "reputation", "scope": "gang",
+         "subject": "silver_gang", "comparison": "lte", "value": -40},
+        {"op": "meter", "kind": "law_heat", "scope": "city",
+         "subject": "city_watch", "comparison": "lte", "value": 30},
+        {"op": "flag", "id": "council_invitation"},
+    ]})
+    assert holds(guard, current) is True
+    current["meters"]["reputation:person:aria"] = -20
+    assert holds(guard, current) is False
+
+
+def test_legal_heat_demands_specific_law_fate_in_epilogue():
+    story = plan()
+    story["nodes"][0]["options"][0]["effects"].append({
+        "op": "meter_delta", "kind": "law_heat", "scope": "city",
+        "subject": "city_watch", "delta": 50,
+    })
+    compiled = validate_plan(story)
+    result = simulate(compiled, ["help_aria", "good_ending"])
+    assert result["ending_accepted"] is False
+    assert result["unresolved_faction_conclusions"] == ["city_watch"]
+    story["endings"][0]["faction_conclusions"]["city_watch"] = (
+        "The city watch accepts the legal reforms and recalls the earlier conflict."
+    )
+    assert simulate(validate_plan(story), ["help_aria", "good_ending"])["ending_accepted"]
