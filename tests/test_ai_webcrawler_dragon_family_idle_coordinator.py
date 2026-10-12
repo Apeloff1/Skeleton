@@ -185,6 +185,22 @@ def test_reviewed_dispute_brief_gives_scout_first_known_source_only():
     db.close()
 
 
+def test_source_global_cooldown_prevents_duplicate_sibling_recrawls():
+    db,family,worker=make()
+    first=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+        task_topics=("game_engine",))
+    assert first["changed"]==1
+    # Scout's separate monitor role cannot immediately consume another
+    # bandwidth slot to re-fetch the just-verified same URL.
+    redundant=worker._reserve(OWNER,"monitor","article-1",NOW+900)
+    assert redundant is None
+    # After the *source-level* cooldown, Scout may legitimately check again.
+    later=worker._reserve(OWNER,"monitor","article-1",NOW+720+6*3600+1)
+    assert isinstance(later,str) and later
+    db.close()
+
+
 def test_crash_recovery_reclaims_old_leases_without_replaying_knowledge():
     db,family,worker=make()
     key=worker._reserve(OWNER,"article","article-1",NOW+720)
