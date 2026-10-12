@@ -433,7 +433,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Download non-distribution original-game evidence from both console builds
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: original-sega8-source-and-hash-evidence-*
           path: original-port-evidence
