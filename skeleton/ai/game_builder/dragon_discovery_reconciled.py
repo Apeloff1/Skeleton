@@ -16,12 +16,12 @@ from .dragon_discovery_admission import (
     DragonDiscoveryAdmission, _supplement, validate_discovery_chain,
 )
 
-EXPECTED_RAW_TOTAL = 19_228
+EXPECTED_RAW_TOTAL = 20_860
 SOURCE_BATCHES = (
     "docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json",
     *(
         f"docs/ai/evidence/dragon-source-expansion-20261012-batch-{n:04d}.json"
-        for n in (21, 22, 23, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47)
+        for n in (21, 22, 23, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50)
     ),
 )
 EXCLUDED_ORPHANS = (
