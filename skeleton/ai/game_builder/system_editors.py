@@ -4180,6 +4180,54 @@ CATALOG = json.loads(r'''[
           "challenge",
           "sandbox"
         ]
+      },
+      {
+        "key": "max_angular_speed",
+        "kind": "int",
+        "default": 9000,
+        "minimum": 100,
+        "maximum": 20000,
+        "options": []
+      },
+      {
+        "key": "angular_damping",
+        "kind": "int",
+        "default": 6,
+        "minimum": 0,
+        "maximum": 90,
+        "options": []
+      },
+      {
+        "key": "torque_strength",
+        "kind": "int",
+        "default": 180,
+        "minimum": 10,
+        "maximum": 2000,
+        "options": []
+      },
+      {
+        "key": "spin_transfer",
+        "kind": "int",
+        "default": 75,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "material_restitution",
+        "kind": "int",
+        "default": 80,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "continuous_pair_collision",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
       }
     ],
     "preview": null
