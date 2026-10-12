@@ -41,7 +41,7 @@ def run_physical_witness_world(source_session,quest_scene,
                                binding=None,world_actions=()):
     if type(binding) is not dict or set(binding)!={"source_id","site_id"}:
         raise PhysicalWitnessError("explicit original-object-to-world-site author binding required")
-    if (type(binding["source_id"]) is not int or
+    if (type(binding["source_id"]) is not int or not 0<=binding["source_id"]<=1000000 or
         type(binding["site_id"]) is not int or
         not 0<=binding["site_id"]<4):
         raise PhysicalWitnessError("author binding requires one bounded original object and site")
