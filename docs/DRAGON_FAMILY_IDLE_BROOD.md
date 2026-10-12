@@ -610,3 +610,85 @@ python -m pytest -q --noconftest tests/test_ai_webcrawler_dragon_family_native_i
 This still does **not** install a daemon, connect an OS idle-event scheduler
 in production, or represent legal/rights approval for arbitrary sources.
 The host is responsible for how and when it invokes the bounded tick.
+
+
+## Three linked milestones: atomic growth, source quarantine and adaptive recrawls (2026-10-12 UTC)
+
+The following implementations are code committed to the feature branch; they
+must still pass exact-head CI and do NOT imply a native app or autonomous
+crawler is installed on an end-user machine.
+
+### 1. Transactionally complete the entire accepted acquisition
+
+`DragonFamily.digest_idle` accepts a trusted `completion_hook`. Under its
+existing owner-scoped SQLite `BEGIN IMMEDIATE` transaction, the new source
+reading, growth event, source lease terminal state, due time, and SHA-256
+idle-attempt audit are accepted **together**. Duplicate reviewed revisions
+complete as unchanged without XP. An injected audit write failure reverses
+the new source reading and event; the coordinator separately records the
+failed attempt on its already-reserved lease.
+
+Only a host-attested, authorized, unexpired source lease may call the
+completion hook. The implementation preserves direct `digest_idle` callers
+that do not supply one.
+
+### 2. Typed crawler denials and independent source unblocking
+
+`dragon_family_idle_failures.py` defines policy-safe outcomes, not arbitrary
+untrusted exception text:
+
+| Host outcome | What the hatchlings do |
+| --- | --- |
+| Approved genuinely changed capture | Atomically record verified reading and growth |
+| Identical verified content | Record unchanged; no XP |
+| Network/transient failure | Bounded exponential retry |
+| HTTP 429 with valid 60-86400 second Retry-After | Respect the delay and give no XP |
+| Robots/rights/SSRF/media grant denied | Persist `policy_blocked`, quarantine that source across ALL specialist roles, no XP |
+| Later authorized re-review | `clear_source_policy_block` requires an independent host rights callback to return true before any new lease |
+
+A quota-exhausted or denied source cannot exploit a second hatchling to
+evade the owner/source-wide policy gate. Raw source headers, credentials,
+host exception messages, or user-submitted permissions are never written
+into the companion journal. The Academy's authenticated idle status
+provides blocked/rate-limited counts, and the nest displays review
+warnings without granting any UI write permission.
+
+### 3. Evidence-derived adaptive recrawl priorities
+
+`dragon_family_recrawl_planner.py` reuses the canonical mission scheduler's
+`plan_adaptive_recrawls`. It considers only source revisions previously
+admitted to the canonical family ledger, current human review validity,
+true recorded attempts, source topics and adjacent research relevance.
+An observed revision-to-attempt ratio is explicitly an **uncalibrated
+priority heuristic**, not a learned or empirically validated probability.
+The plan is read-only; it creates no new source grants, timers or network
+requests.
+
+During an authenticated native idle host tick, due reviewed sources and
+the Mother's independently corroborated Glean Matrix dispute briefs can
+elevate Scout's work ordering. Sources outside the approved catalog,
+unrelated task topics, revoked reviews, or policy-blocked leases remain
+unavailable. The normal resource, consent, license, host and retry gates
+are still enforced by the native host and trusted adapters.
+
+### New acceptance tests
+
+```bash
+PYTHONPATH=. python -m pytest -q --noconftest \
+  tests/test_ai_webcrawler_dragon_family_idle_coordinator.py \
+  tests/test_ai_webcrawler_dragon_family_idle_host.py \
+  tests/test_ai_webcrawler_dragon_family_recrawl_planner.py \
+  tests/test_ai_webcrawler_dragon_family_custody_bridge.py
+cd frontend && yarn test:dragon-companion && yarn typecheck
+```
+
+The tests verify: all-or-nothing evidence + journal commit; rollback on
+injected audit failure; no XP on duplicate or denied source; source-global
+policy-blocked quarantine and independently authorized release; bounded
+HTTP 429 Retry-After; no fabricated future recrawl recommendations;
+rights revocation; and no network authorization from read-only recrawl
+advice.
+
+Unresolved prior system-level Dragon, Webcrawler, App Assembly and release
+gates must still be repaired and verified before changing the PR from draft
+or releasing any installed research automation.
