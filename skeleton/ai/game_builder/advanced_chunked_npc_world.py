@@ -253,6 +253,11 @@ def _visible(state, opts):
         # Deferral debt wins gradually; inactive citizens remain at exact
         # last physical position and never mint unseen witness statements.
         nearby.sort(key=lambda a: (
+            # Citizens actually adjacent to the player must remain
+            # physically interactable even under heavy rotation. Preserve
+            # this small foreground cohort; distribute the remaining
+            # detail budget by deferral debt, not by fabricated actions.
+            0 if _dist(a["position"], state["player"], state["side"]) <= 1 else 1,
             _dist(a["position"], state["player"], state["side"]) -
             4 * a["deferred_streak"], a["index"],
         ))
