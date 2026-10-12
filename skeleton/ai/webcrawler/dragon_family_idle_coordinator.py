@@ -394,28 +394,36 @@ class DragonIdleCoordinator:
                 self._record_attempt(owner,role,sid,at,"recovered")
         return len(rows)
 
-    def _finish(self, owner: str, role: str, sid: str, key: str,
-                now: float, outcome: str) -> None:
+    def _finish_uncommitted(self, owner: str, role: str, sid: str,
+                            key: str, now: float, outcome: str) -> bool:
+        """Shared terminal transition; caller must already hold write lock."""
         if outcome not in ("changed","unchanged","failed","paused"):
             raise ValueError("invalid idle completion")
+        previous=self.db.execute("""SELECT failures FROM dragon_family_idle_leases
+            WHERE owner=? AND role=? AND source_id=? AND lease_token=?""",
+            (owner,role,sid,key)).fetchone()
+        if previous is None:
+            return False
+        errors=min(16,previous[0]+1) if outcome=="failed" else 0
+        due=(self.policy.changed_cooldown_seconds if outcome=="changed" else
+             self.policy.unchanged_cooldown_seconds if outcome=="unchanged" else
+             min(self.policy.maximum_backoff_seconds,
+                 self.policy.transient_backoff_seconds*(2**min(12,errors-1))) if outcome=="failed" else
+             self.policy.transient_backoff_seconds)
+        changed=self.db.execute("""UPDATE dragon_family_idle_leases SET next_due=?,
+            failures=?,last_completed=?,last_outcome=?,lease_token='',lease_expires=0
+            WHERE owner=? AND role=? AND source_id=? AND lease_token=?""",
+            (now+due,errors,now,outcome,owner,role,sid,key)).rowcount
+        if changed!=1:
+            raise RuntimeError("idle source finalization lost its lease")
+        self._record_attempt(owner,role,sid,now,outcome)
+        return True
+
+    def _finish(self, owner: str, role: str, sid: str, key: str,
+                now: float, outcome: str) -> bool:
         self.db.execute("BEGIN IMMEDIATE")
         with self.db:
-            previous=self.db.execute("""SELECT failures FROM dragon_family_idle_leases
-                WHERE owner=? AND role=? AND source_id=? AND lease_token=?""",
-                (owner,role,sid,key)).fetchone()
-            if previous is None:
-                return
-            errors = min(16,previous[0]+1) if outcome=="failed" else 0
-            due = (self.policy.changed_cooldown_seconds if outcome=="changed" else
-                   self.policy.unchanged_cooldown_seconds if outcome=="unchanged" else
-                   min(self.policy.maximum_backoff_seconds,
-                       self.policy.transient_backoff_seconds*(2**min(12,errors-1))) if outcome=="failed" else
-                   self.policy.transient_backoff_seconds)
-            self.db.execute("""UPDATE dragon_family_idle_leases SET next_due=?,
-                failures=?,last_completed=?,last_outcome=?,lease_token='',lease_expires=0
-                WHERE owner=? AND role=? AND source_id=? AND lease_token=?""",
-                (now+due,errors,now,outcome,owner,role,sid,key))
-            self._record_attempt(owner,role,sid,now,outcome)
+            return self._finish_uncommitted(owner,role,sid,key,now,outcome)
 
     def run_once(self, owner: str, *,
                  authorized: bool,
@@ -498,9 +506,16 @@ class DragonIdleCoordinator:
                         task_topics=task_topics,adjacent_topics=adjacent_topics,
                         lease_guard=lambda: (
                             self._owned(owner,role,sid,key,after.now) and
-                            (commit_gate is None or commit_gate(after.now) is True)))
+                            (commit_gate is None or commit_gate(after.now) is True)),
+                        completion_hook=lambda changed: (
+                            self._finish_uncommitted(
+                                owner,role,sid,key,after.now,
+                                "changed" if changed else "unchanged") or
+                            (_ for _ in ()).throw(RuntimeError(
+                                "idle source commit lost its worker token"))))
                     status="changed" if changed else "unchanged"
-                self._finish(owner,role,sid,key,after.now,status)
+                if receipt is None:
+                    self._finish(owner,role,sid,key,after.now,status)
                 stats[status] += 1
             except PermissionError:
                 # Losing consent/foreground/lease is terminal for this tick.
