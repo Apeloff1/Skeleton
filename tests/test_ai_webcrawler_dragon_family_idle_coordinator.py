@@ -251,6 +251,56 @@ def test_commit_guard_blocks_new_knowledge_without_affecting_other_sources():
     db.close()
 
 
+def test_atomic_growth_lease_and_audit_commit_or_roll_back_together(monkeypatch):
+    db,family,worker=make()
+    accepted=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+        task_topics=("game_engine",))
+    assert accepted["changed"]==1
+    row=db.execute("""SELECT last_outcome,lease_token FROM dragon_family_idle_leases
+        WHERE owner=? AND role='article' AND source_id='article-1'""",
+        (OWNER,)).fetchone()
+    assert row==("changed","")
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="changed"
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+1000)==0
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    db.close()
+
+
+def test_atomic_failure_rolls_back_new_knowledge_and_records_retry(monkeypatch):
+    db,family,worker=make()
+    original=worker._record_attempt
+    def crash_before_audit(owner,role,sid,at,outcome):
+        if outcome=="changed":
+            raise RuntimeError("injected SQLite audit failure")
+        return original(owner,role,sid,at,outcome)
+    monkeypatch.setattr(worker,"_record_attempt",crash_before_audit)
+    result=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+719)},
+        task_topics=("game_engine",))
+    assert result["failed"]==1 and result["changed"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="failed"
+    assert not db.execute("""SELECT 1 FROM dragon_family_readings
+        WHERE owner=? AND dragon='article' AND content_digest=?""",
+        (OWNER,ART)).fetchone()
+    db.close()
+
+
+def test_duplicate_reviewed_version_finalizes_unchanged_lease_atomically():
+    db,family,worker=make()
+    result=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"video":lambda task:receipt(task.source_id,ORIGINAL,NOW+719)},
+        task_topics=("game_engine",))
+    assert result["unchanged"]==1 and result["changed"]==0
+    row=db.execute("""SELECT last_outcome,lease_token FROM dragon_family_idle_leases
+        WHERE owner=? AND role='video' AND source_id='video-1'""",(OWNER,)).fetchone()
+    assert row==("unchanged","")
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="unchanged"
+    assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+2000)==0
+    db.close()
+
+
 def test_idle_attempt_journal_is_utc_timestamped_and_tamper_evident():
     db,family,worker=make()
     outcome=worker.run_once(OWNER,authorized=True,idle_state=idle,
