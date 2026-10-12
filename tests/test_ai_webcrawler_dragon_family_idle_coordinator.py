@@ -11,6 +11,9 @@ from skeleton.ai.webcrawler.dragon_family import (
 from skeleton.ai.webcrawler.dragon_family_idle_coordinator import (
     DragonIdleCoordinator, IdleCoordinatorPolicy, read_idle_family_health, read_idle_family_history,
 )
+from skeleton.ai.webcrawler.dragon_family_idle_failures import (
+    IdleResearchFailure,source_policy_denied,source_rate_limited,source_transport_failed,
+)
 
 OWNER="accepted-owner"
 NOW=1800000000.0
@@ -299,6 +302,66 @@ def test_duplicate_reviewed_version_finalizes_unchanged_lease_atomically():
     assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="unchanged"
     assert worker.reconcile_expired_leases(OWNER,authorized=True,at=NOW+2000)==0
     db.close()
+
+
+def test_rights_denial_quarantines_source_across_all_specialists_until_reapproved():
+    db,family,worker=make()
+    def denied(_task):
+        raise source_policy_denied()
+    outcome=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"article":denied},task_topics=("game_engine",))
+    assert outcome["policy_blocked"]==1
+    assert outcome["changed"]==0 and outcome["failed"]==0
+    assert worker._reserve(OWNER,"monitor","article-1",NOW+5000) is None
+    assert worker._reserve(OWNER,"article","article-1",NOW+5000) is None
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="policy_blocked"
+    with pytest.raises(PermissionError,match="reviewer"):
+        worker.clear_source_policy_block(OWNER,"article-1",authorized=True,
+            at=NOW+800,review=lambda *_:False)
+    with pytest.raises(PermissionError):
+        worker.clear_source_policy_block(OWNER,"article-1",authorized=False,
+            at=NOW+800,review=lambda *_:True)
+    assert worker.clear_source_policy_block(OWNER,"article-1",authorized=True,
+        at=NOW+800,review=lambda owner,sid:owner==OWNER and sid=="article-1")==1
+    assert worker.clear_source_policy_block(OWNER,"article-1",authorized=True,
+        at=NOW+801,review=lambda *_:True)==0
+    result=worker.run_once(OWNER,authorized=True,idle_state=lambda:idle(NOW+900),
+        gatherers={"article":lambda task:receipt(task.source_id,ART,NOW+899)},
+        task_topics=("game_engine",))
+    assert result["changed"]==1
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    assert read_idle_family_history(db,OWNER,authorized=True)[1]["outcome"]=="review_cleared"
+    db.close()
+
+
+def test_http_429_uses_bounded_retry_after_without_duplicate_xp():
+    db,family,worker=make()
+    def limited(task):
+        raise source_rate_limited(3600)
+    first=worker.run_once(OWNER,authorized=True,idle_state=idle,
+        gatherers={"video":limited},task_topics=("game_engine",))
+    assert first["rate_limited"]==1 and first["changed"]==0
+    row=db.execute("""SELECT next_due,last_outcome FROM dragon_family_idle_leases
+        WHERE owner=? AND role='video' AND source_id='video-1'""",(OWNER,)).fetchone()
+    assert row[1]=="rate_limited" and row[0]>=NOW+720+3600
+    repeated=worker.run_once(OWNER,authorized=True,idle_state=lambda:idle(NOW+1800),
+        gatherers={"video":limited},task_topics=("game_engine",))
+    assert repeated["attempted"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][1]["discoveries"]==0
+    assert read_idle_family_history(db,OWNER,authorized=True)[0]["outcome"]=="rate_limited"
+    db.close()
+
+
+def test_typed_source_retries_never_accept_unbounded_or_forged_delays():
+    for forbidden in (float("inf"),float("nan"),-10,1,86401,True,"300"):
+        with pytest.raises(ValueError):
+            source_rate_limited(forbidden)
+    for code in ("fictional","rights_approved","admin_override"):
+        with pytest.raises(ValueError):
+            IdleResearchFailure(code)
+    assert source_transport_failed().category=="transient"
+    assert source_policy_denied().category=="policy_blocked"
 
 
 def test_idle_attempt_journal_is_utc_timestamped_and_tamper_evident():
