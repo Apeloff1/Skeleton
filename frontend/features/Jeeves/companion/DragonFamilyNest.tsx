@@ -63,6 +63,13 @@ export default function DragonFamilyNest({family}:{family?:DragonFamilyProjectio
       {status?.earliest_due_at&&<Text style={s.when}>Next eligible: {safeDate(status.earliest_due_at)}</Text>}
      </View>;
    })}</View>
+   {f.idle_work.history.length>0&&<View style={s.history}>
+    <Text style={s.title}>Most recent research activity</Text>
+    {f.idle_work.history.slice(0,3).map(h=><View key={h.digest} style={s.event}>
+     <Text style={s.when}>{safeDate(h.at)} · {h.dragon}</Text>
+     <Text style={s.muted}>{h.outcome} · {h.source_id} {h.change}</Text>
+    </View>)}
+   </View>}
    <Text style={s.privacy}>Only the trusted host can attest idle time and authorize new research. Pending leases are not proof that anything is running now.</Text>
   </View>}
   {f.almanakk&&<View style={s.details} accessibilityLabel="Almanakk verified research pipeline">
