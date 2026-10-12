@@ -1107,6 +1107,67 @@ function drawAdvancedGame(session){
   c.fillStyle="#a4ebca";
   c.fillText("Verified course mechanics: climb · parkour · swing · grapple",12,265);
  }
+ if(editor==="maze"){
+  const ox=14,oy=56,tile=19,radiusX=6,radiusY=5;
+  const viewX=Math.max(1,state.position[0]-radiusX);
+  const viewY=Math.max(1,state.position[1]-radiusY);
+  const onFloor=point=>point[2]===state.position[2];
+  const at=(a,b)=>a[0]===b[0]&&a[1]===b[1]&&a[2]===b[2];
+  c.fillStyle="#d8e6e5";
+  c.fillText(state.title+" · "+state.topology+" · floor "+
+    (state.position[2]+1),12,34);
+  for(let row=0;row<10;row++){
+   for(let col=0;col<13;col++){
+    const px=viewX+col,py=viewY+row;
+    const loc=[px,py,state.position[2]];
+    const bx=ox+col*tile,by=oy+row*tile;
+    c.fillStyle=(px>0&&px<advancedSettings.width-1&&
+                 py>0&&py<advancedSettings.height-1)?
+                 "#27485b":"#101c29";
+    c.fillRect(bx,by,tile-1,tile-1);
+    if(state.walls.some(w=>at(w.at,loc)&&
+       (state.topology!=="moving"||w.phase===state.phase))){
+     c.fillStyle="#758395";c.fillRect(bx+2,by+2,tile-5,tile-5);
+    }
+    if(state.hazards.some(v=>at(v,loc))){
+     c.fillStyle="#e68c84";c.beginPath();c.arc(bx+9,by+9,5,0,Math.PI*2);c.fill();
+    }
+    if(state.stairs.some(v=>at(v,loc))){
+     c.fillStyle="#9ab5e7";c.fillText("⇅",bx+3,by+14);
+    }
+    if(state.portals.some(v=>at(v.entry,loc))){
+     c.fillStyle="#bc94ed";c.fillText("◎",bx+3,by+14);
+    }
+    if(state.keys.some(v=>at(v,loc))&&
+       !state.collected_keys.some(v=>at(v,loc))){
+     c.fillStyle="#f4d18b";c.fillText("◆",bx+3,by+14);
+    }
+    if(at(state.door,loc)){
+     c.fillStyle=state.door_open?"#9aefd2":"#cf8f8b";
+     c.fillText(state.door_open?"O":"D",bx+4,by+14);
+    }
+    if(at(state.exit,loc)){
+     c.fillStyle="#a8efa7";c.fillText("E",bx+4,by+14);
+    }
+    if(at(state.position,loc)){
+     c.fillStyle="#fbf5c6";c.beginPath();c.arc(bx+9,by+9,7,0,Math.PI*2);c.fill();
+     c.fillStyle="#213040";c.fillText("@",bx+4,by+13);
+    }
+   }
+  }
+  const tx=W-171;
+  c.fillStyle="#e5f1ef";
+  c.fillText("Health "+state.health,tx,62);
+  c.fillText("Stamina "+state.stamina,tx,86);
+  c.fillText("Keys "+state.collected_keys.length+"/"+state.keys.length,tx,110);
+  c.fillText("Floors "+state.floor_visits.length,tx,134);
+  c.fillText("Torches "+state.torches,tx,158);
+  c.fillText("Phase "+state.phase,tx,182);
+  c.fillText("Hazard hits "+state.hazard_hits,tx,206);
+  c.fillText("Visited "+state.explored.length,tx,230);
+  c.fillStyle="#b8eddd";
+  c.fillText("Source-bound levels · real doors · replayed transitions",12,270);
+ }
  if(editor==="sports"){
   const ox=14,oy=66,fw=W-181,fh=165;
   const scale=fw/Math.max(1,state.width);
@@ -1214,6 +1275,35 @@ let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="maze"){
+  const state=advancedSession.state;
+  const allowed=new Set(["north","south","east","west","ascend","descend",
+    "wait","open","light_torch","rest","inspect","finish"]);
+  if(state.topology==="braided")
+   for(const v of ["northeast","northwest","southeast","southwest"])allowed.add(v);
+  if(state.topology==="non_euclidean")allowed.add("warp");
+  const chooser=document.createElement("label");
+  chooser.textContent="Original "+state.topology+" maze command";
+  const command=document.createElement("select");
+  command.id="maze-physical-action";
+  for(const v of actions.filter(v=>allowed.has(v))){
+   const item=document.createElement("option");
+   item.value=v;item.textContent=v.replaceAll("_"," ");
+   command.append(item);
+  }
+  chooser.append(command);target.append(chooser);
+  const submit=document.createElement("button");submit.type="button";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.textContent="Apply source-verified maze move";
+  submit.addEventListener("click",()=>advanceAdvanced(command.value));
+  target.append(submit);
+  const legend=document.createElement("small");
+  legend.textContent="◆ key · D locked gate · ⇅ stairs · ◎ portal · E exit. "+
+    "Keys, walls and hazards use the original authored geometry. "+
+    "Moving walls change with simulated turns, not clock time.";
+  target.append(legend);
+  return;
+ }
  if(advancedSession?.editor==="sports"){
   const state=advancedSession.state;
   const byMode={
