@@ -386,3 +386,93 @@ def test_different_approved_baseline_must_be_rebenchmarked(setup):
     assert checked.accepted and checked.regressed == 0
     assert checked.before_hits == 2 and checked.after_hits == 4
     assert automation.route(OWNER, "collision physics", authorized=True)["source_id"] is None
+
+
+def test_orchestration_stages_then_activates_only_after_human_ledger_review(setup):
+    from skeleton.ai.webcrawler.dragon_nest_research_scheduler import (
+        IdleResearchPlan, ResearchAssignment,
+    )
+    from skeleton.ai.webcrawler.dragon_shadow_weight_coordinator import (
+        ReviewedAcquisition, run_shadow_automation,
+    )
+    automation, library, _, _ = setup
+    record, receipts, adversarial = scrutiny("alpha")
+    plan = IdleResearchPlan(
+        OWNER, T1, (
+            ResearchAssignment(
+                "article", "alpha", "https://alpha.example.org/research",
+                "task", 120,
+            ),
+        ), "worker_must_review", 1, 0,
+    )
+    candidate = ReviewedAcquisition(
+        "alpha", "note-alpha", "movement", record.knowledge_id,
+        (record,), receipts, adversarial, suite(),
+    )
+    first = run_shadow_automation(
+        automation, library, plan, (candidate,),
+        now=T1, idle_since=T0, hardware=sample(), hardware_now=1000,
+        consented=True, authorized=True, privacy_clear=True,
+    )
+    assert first.staged == 1 and first.benchmarked == 1
+    assert first.activated == 0
+    assert first.items[0].state == "tested"
+    assert first.items[0].reason == "awaiting_independent_human_promotion"
+    assert automation.route(
+        OWNER, "responsive jumping", authorized=True,
+    )["source_id"] is None
+    promoted_memory, review_id = reviewed_promotion(setup, record, adversarial)
+    ready = replace(candidate, promoted_memory=promoted_memory,
+                    human_review_id=review_id)
+    second = run_shadow_automation(
+        automation, library, plan, (ready,),
+        now=T1, idle_since=T0, hardware=sample(), hardware_now=1000,
+        consented=True, authorized=True, privacy_clear=True,
+    )
+    assert second.activated == 1
+    assert second.items[0].state == "active"
+    assert automation.route(
+        OWNER, "responsive jumping", authorized=True,
+    )["source_id"] == "alpha"
+    assert second.neural_training_authorized is False
+    assert second.execution_authorized is False
+
+
+def test_orchestration_rejects_unscheduled_or_duplicate_reviewed_sources(setup):
+    from skeleton.ai.webcrawler.dragon_nest_research_scheduler import (
+        IdleResearchPlan, ResearchAssignment,
+    )
+    from skeleton.ai.webcrawler.dragon_shadow_weight_coordinator import (
+        ReviewedAcquisition, run_shadow_automation,
+    )
+    automation, library, _, _ = setup
+    record, receipts, adversarial = scrutiny("alpha")
+    plan = IdleResearchPlan(
+        OWNER, T1, (
+            ResearchAssignment(
+                "article", "alpha", "https://alpha.example.org/research",
+                "task", 100,
+            ),
+        ), "needs_worker", 1, 0,
+    )
+    item = ReviewedAcquisition(
+        "beta", "note-beta", "movement", record.knowledge_id,
+        (record,), receipts, adversarial,
+    )
+    options = dict(now=T1, idle_since=T0, hardware=sample(),
+                   hardware_now=1000, consented=True,
+                   authorized=True, privacy_clear=True)
+    with pytest.raises(PermissionError, match="unscheduled"):
+        run_shadow_automation(
+            automation, library, plan, (item,), **options,
+        )
+    item = replace(item, source_id="alpha", note_id="note-alpha")
+    with pytest.raises(ValueError, match="duplicate"):
+        run_shadow_automation(
+            automation, library, plan, (item, item), **options,
+        )
+    with pytest.raises(ValueError, match="clock"):
+        run_shadow_automation(
+            automation, library, plan, (item,), **{**options, "now": T2},
+        )
+    assert automation.active_weights(OWNER, authorized=True) == ()
