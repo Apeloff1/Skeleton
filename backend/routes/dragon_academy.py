@@ -26,6 +26,7 @@ from skeleton.ai.webcrawler.dragon_family_custody_bridge import DragonFamilyCust
 from skeleton.ai.webcrawler.dragon_family_glean_matrix import DragonGleanMatrix
 from skeleton.ai.webcrawler.dragon_family_almanakk import DragonAlmanakkLane
 from skeleton.ai.webcrawler.dragon_family_idle_coordinator import read_idle_family_health
+from skeleton.ai.webcrawler.dragon_family_idle_host import read_idle_host_projection
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
 from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
@@ -112,6 +113,7 @@ def _snapshot(lab: DragonPracticeLab, cycles: DragonPracticeCycles,
             "glean": DragonGleanMatrix(family).projection(owner,authorized=True,limit=12),
             "almanakk": DragonAlmanakkLane(lab.db).projection(owner,authorized=True,limit=15),
             "idle_work": read_idle_family_health(lab.db,owner,authorized=True),
+            "idle_host": read_idle_host_projection(lab.db,owner,at=time.time(),authorized=True),
         },
         "attempts": [asdict(a) for a in lab.attempts(owner,authorized=True,limit=50)],
         "native_attempts": [asdict(a) for a in DragonNativePracticeLab(lab.db,lab).list(owner,authorized=True)],
