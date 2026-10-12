@@ -128,7 +128,7 @@ class RealCausalWhatIfTests(unittest.TestCase):
     def test_unsourced_gameplay_and_missing_real_events_cannot_seed_experiment(self):
         p,g,scene,cfg,schedule=self.input()
         for actions in (
-            schedule[:-1],
+            schedule[:2],  # omit the required authenticated genre source event
             [dict(schedule[0],at=5)]+deepcopy(schedule[1:]),
             [dict(schedule[0],lane="mint_gold")]+deepcopy(schedule[1:]),
         ):
