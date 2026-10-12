@@ -22,6 +22,10 @@ from .dragon_technical_source_acquisition import (
     SourceAcquisitionResult, acquire_canonical_technical_article, _epoch,
 )
 from .dragon_technical_source_captures import DragonSourceCaptures
+from .dragon_pilot_budget import DragonPilotBudget
+from .dragon_external_rights import (
+    DragonExternalRightsVerifier, IndependentRightsAttestation,
+)
 
 
 @dataclass(frozen=True,slots=True)
@@ -40,23 +44,31 @@ class DragonResearchPilot:
     """Mandatory permission/grant boundary for *pilot-mode* source execution."""
 
     def __init__(self,supervisor:DragonResearchSupervisor,
-                 authority:DragonSourcePermissionAuthority):
+                 authority:DragonSourcePermissionAuthority,
+                 rights_verifier:DragonExternalRightsVerifier):
         if not isinstance(supervisor,DragonResearchSupervisor):
             raise TypeError("existing Dragon resource supervisor required")
         if (not isinstance(authority,DragonSourcePermissionAuthority)
             or supervisor.operations.captures is not authority.captures):
             raise TypeError("same canonical reviewed source custody required")
+        if not isinstance(rights_verifier,DragonExternalRightsVerifier):
+            raise PermissionError("independent rights public-key verifier required")
         self.supervisor=supervisor
         self.authority=authority
+        self.rights_verifier=rights_verifier
         self.captures=authority.captures
+        self.budget=DragonPilotBudget(self.captures)
 
     def preview(self,grant:SourceCaptureGrant,*,now:int,
-                authorized:bool)->SourcePilotPreview:
+                authorized:bool,
+                rights_attestation:IndependentRightsAttestation)->SourcePilotPreview:
         if not isinstance(grant,SourceCaptureGrant):
             raise PermissionError("typed owner-bound reference permit required")
         permitted=self.authority.verify(
             grant,owner=grant.owner,source_id=grant.source_id,
             now=now,authorized=authorized)
+        self.rights_verifier.verify(
+            rights_attestation,grant,now=now,authorized=True)
         ready=self.supervisor.operations.ready_candidates(
             grant.owner,now=now,authorized=True,limit=64)
         return SourcePilotPreview(
@@ -73,7 +85,8 @@ class DragonResearchPilot:
                 clock:Callable[[],float],sleep:Callable[[float],None],
                 capture_id:str,authorized:bool,trusted_worker:bool,
                 live_network_approved:bool,
-                reference_storage_permitted:bool) -> SourceAcquisitionResult | None:
+                reference_storage_permitted:bool,
+                rights_attestation:IndependentRightsAttestation) -> SourceAcquisitionResult | None:
         """Returns None if no safe idle slot; never manufactures a site grant.
 
         The caller must explicitly authorize this pilot at each invocation.
@@ -97,15 +110,36 @@ class DragonResearchPilot:
         self.authority.verify(
             grant,owner=grant.owner,source_id=grant.source_id,
             now=now,authorized=True)
+        self.rights_verifier.verify(
+            rights_attestation,grant,now=now,authorized=True)
         flags=consent_provider()
         if (not isinstance(flags,dict)
             or set(flags)!={"consented","article_consent","video_consent","updates_consent"}
             or flags["consented"] is not True
             or flags["article_consent"] is not True):
             raise PermissionError("current article pilot consent missing")
+        # Do not debit quota for a source that is not policy-ready or
+        # for a foreground/thermal/consent denial. The final supervisor
+        # independently checks these conditions again before admission.
+        ready=self.supervisor.operations.ready_candidates(
+            grant.owner,now=now,authorized=True,limit=64)
+        if grant.source_id not in ready:
+            return None
         sample=sample_provider()
         idle_since=idle_since_provider()
         now_seconds=clock()
+        early=self.supervisor.admission.feed.preview(
+            grant.owner,sample=sample,at=at,idle_since=idle_since,
+            now_seconds=now_seconds,authorized=True,consented=True,
+            article_consent=False,video_consent=False,
+            updates_consent=False,eligible_source_ids=())
+        if early.plan.reason!="untrusted_intents_require_separate_worker_admission":
+            return None
+        # Cross-process attempt ID is consumed BEFORE global CPU/RAM and I/O,
+        # even when subsequent network steps are denied or crash.
+        self.budget.reserve(
+            grant.owner,grant.source_id,grant_digest=grant.digest,
+            attempt_id=capture_id,now=now,authorized=True)
         preview=self.supervisor.reserve_next(
             grant.owner,sample=sample,at=at,
             idle_since=idle_since,now_seconds=now_seconds,
@@ -127,4 +161,6 @@ class DragonResearchPilot:
             reference_storage_permitted=True,
             operations=self.supervisor.operations,
             source_authority=self.authority,source_grant=grant,
+            rights_verifier=self.rights_verifier,
+            rights_attestation=rights_attestation,
         )

@@ -25,6 +25,9 @@ from .dragon_technical_source_operations import DragonSourceOperations
 from .dragon_source_permission_authority import (
     DragonSourcePermissionAuthority, SourceCaptureGrant,
 )
+from .dragon_external_rights import (
+    DragonExternalRightsVerifier, IndependentRightsAttestation,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +56,8 @@ class _AdmittedHTTP:
     def __init__(self, fetcher: SafeHttpFetcher, admission: DragonNestWorkerAdmission,
                  ticket: HatchlingWorkerTicket, *, sample_provider, consent_provider,
                  idle_since_provider, at_provider, clock, operations=None,
-                 source_authority=None, source_grant=None):
+                 source_authority=None, source_grant=None,
+                 rights_verifier=None, rights_attestation=None):
         self.fetcher=fetcher
         self.admission=admission
         self.ticket=ticket
@@ -65,6 +69,8 @@ class _AdmittedHTTP:
         self.operations=operations
         self.source_authority=source_authority
         self.source_grant=source_grant
+        self.rights_verifier=rights_verifier
+        self.rights_attestation=rights_attestation
         self.requests=0
         self.page_bytes=None
 
@@ -75,6 +81,9 @@ class _AdmittedHTTP:
             self.source_authority.verify(
                 self.source_grant,owner=self.ticket.owner,
                 source_id=self.ticket.source_id,
+                now=_epoch(self.at_provider()),authorized=True)
+            self.rights_verifier.verify(
+                self.rights_attestation,self.source_grant,
                 now=_epoch(self.at_provider()),authorized=True)
         flags=self.consent_provider()
         if not isinstance(flags,dict) or set(flags)!={
@@ -117,6 +126,8 @@ def acquire_canonical_technical_article(
     operations: DragonSourceOperations | None = None,
     source_authority: DragonSourcePermissionAuthority | None = None,
     source_grant: SourceCaptureGrant | None = None,
+    rights_verifier: DragonExternalRightsVerifier | None = None,
+    rights_attestation: IndependentRightsAttestation | None = None,
 ) -> SourceAcquisitionResult:
     """Fetch and stage ONE editorial article, then acknowledge the worker stop.
 
@@ -142,6 +153,13 @@ def acquire_canonical_technical_article(
         or not isinstance(source_grant,SourceCaptureGrant)
         or source_authority.captures is not captures):
         raise PermissionError("same canonical signed pilot authority required")
+    if source_authority is not None and (
+        not isinstance(rights_verifier,DragonExternalRightsVerifier)
+        or not isinstance(rights_attestation,IndependentRightsAttestation)):
+        raise PermissionError("independent external-rights public-key receipt required")
+    if source_authority is None and (
+        rights_verifier is not None or rights_attestation is not None):
+        raise PermissionError("unpaired external rights attestation")
     recorded_capture=None
     deferred_seconds=None
     deferred_reason=None
@@ -169,7 +187,9 @@ def acquire_canonical_technical_article(
                              at_provider=at_provider,clock=clock,
                              operations=operations,
                              source_authority=source_authority,
-                             source_grant=source_grant)
+                             source_grant=source_grant,
+                             rights_verifier=rights_verifier,
+                             rights_attestation=rights_attestation)
         requests=0
         now=_epoch(at_provider())
         # A URL in the catalog is not permission. Require a canonical policy
@@ -181,6 +201,8 @@ def acquire_canonical_technical_article(
             source_authority.verify(source_grant,owner=ticket.owner,
                                     source_id=ticket.source_id,
                                     now=now,authorized=True)
+            rights_verifier.verify(rights_attestation,source_grant,
+                                   now=now,authorized=True)
         captures._policy(ticket.owner,ticket.source_id,ticket.source_url,
                          observed_at=now)
         engine=CrawlEngine(
@@ -241,6 +263,8 @@ def acquire_canonical_technical_article(
             source_authority.verify(source_grant,owner=ticket.owner,
                                     source_id=ticket.source_id,
                                     now=now,authorized=True)
+            rights_verifier.verify(rights_attestation,source_grant,
+                                   now=now,authorized=True)
         flags=consent_provider()
         if not isinstance(flags,dict) or flags.get("consented") is not True:
             raise PermissionError("consent lost before reference capture")
