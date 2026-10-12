@@ -14,6 +14,7 @@ from .dragon_source_policy_renewal import DragonSourcePolicyRenewal
 from .dragon_source_refresh_planner import DragonSourceRefreshPlanner
 from .dragon_source_health import DragonSourceHealth
 from .dragon_pilot_budget import DragonPilotBudget
+from .dragon_source_delta_ledger import DragonSourceDeltaLedger
 from .reviewed_knowledge import ReviewedKnowledgeStore
 
 
@@ -24,7 +25,8 @@ def main():
                                                   "capture-census","glean-preview","glean-handoff",
                                                   "operations-inspect","operations-review","operations-ready",
                                                   "policy-renewal-pending","refresh-inspect",
-                                                  "refresh-census","operations-health","pilot-budget"))
+                                                  "refresh-census","operations-health","pilot-budget",
+                                                  "delta-preview","delta-review"))
     parser.add_argument("--database",required=True)
     parser.add_argument("--owner",required=True)
     parser.add_argument("--trusted-local-operator",action="store_true")
@@ -108,6 +110,13 @@ def main():
                 else:
                     report=operations.review_queue(args.owner,authorized=True,
                                                    limit=args.limit)
+            elif args.command in ("delta-preview","delta-review"):
+                if not args.source_id:
+                    parser.error("--source-id required for revision comparison")
+                deltas=DragonSourceDeltaLedger(captures)
+                report=(deltas.preview(args.owner,args.source_id,authorized=True)
+                        if args.command=="delta-preview" else
+                        deltas.review_packet(args.owner,args.source_id,authorized=True))
             elif args.command in ("glean-preview","glean-handoff"):
                 if not args.source_id:
                     parser.error("--source-id required for glean inspection")

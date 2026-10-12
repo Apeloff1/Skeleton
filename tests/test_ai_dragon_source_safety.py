@@ -62,3 +62,29 @@ def test_external_attestation_is_not_a_license_or_model_weight():
         retention_permitted=True,signature_hex="0"*128)
     assert proof.body()["crawler_training_authorized"] is False
     assert proof.body()["model_training_authorized"] is False
+
+
+
+def test_three_specialist_evidence_processors_keep_review_boundaries():
+    from skeleton.ai.game_builder.dragon_video_transcript_ledger import (
+        TimedTranscriptCue,DragonVideoTranscriptLedger
+    )
+    from skeleton.ai.game_builder.dragon_source_delta_ledger import (
+        DragonSourceDeltaLedger
+    )
+    assert TimedTranscriptCue(0,1200,"Original game evidence").end_ms==1200
+    with pytest.raises(ValueError,match="canonical"):
+        DragonSourceDeltaLedger(None)
+    with pytest.raises(TypeError,match="canonical"):
+        DragonVideoTranscriptLedger(None,review_public_key=b"\x11"*32,
+                                    issuer="external-video-review",
+                                    key_id="external-key-v1")
+
+
+
+def test_mother_dragon_cross_media_remains_review_only():
+    from skeleton.ai.game_builder.dragon_mother_evidence_synergy import (
+        DragonMotherEvidenceSynergy,
+    )
+    with pytest.raises(TypeError,match="canonical"):
+        DragonMotherEvidenceSynergy(None,None)
