@@ -1,0 +1,195 @@
+name: Original Godot Native Dialogue Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_dialogue_godot.py"
+      - "skeleton/ai/game_builder/advanced_dialogue_runtime.py"
+      - "skeleton/ai/game_builder/advanced_godot_export.py"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_dialogue_godot.py"
+      - ".github/workflows/game-builder-advanced-dialogue-native.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-original-dialogue-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  independent-social-simulation:
+    name: Native GDScript original social evidence (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 24
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact-head checkout without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_dialogue_godot.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Install pinned Godot 4.4.1 and export templates
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Exact-head contract and adversarial CLI/Studio exporter checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+          python -m py_compile skeleton/ai/game_builder/advanced_dialogue_godot.py tests/test_game_builder_advanced_dialogue_godot.py
+          python -m unittest tests.test_game_builder_advanced_dialogue_godot -v
+      - name: Generate eight different replay-verified social games
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+          from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session,verify_advanced_session
+          from skeleton.ai.game_builder.advanced_dialogue_godot import render_dialogue_godot_package
+          from skeleton.ai.game_builder.advanced_godot_export import write_advanced_godot_package
+          root=Path(os.environ["RUNNER_TEMP"])/"original-native-dialogue"
+          root.mkdir()
+          consensus=["speak:0","support:0","travel:1","speak:4",
+                     "travel:2","compare:0","claim"]
+          cases=(
+              ("empty",{},[],0),
+              ("consensus",{},consensus,2),
+              ("retired",{},consensus+["retire"],2),
+              ("challenge",{},["speak:0","challenge:0","wait","rest"],3),
+              ("locality",{},["travel:1","speak:1","travel:2","speak:2",
+                              "travel:1","travel:0","speak:3"],5),
+              ("memory",{"memory_turns":2},["speak:0","wait","wait","wait"],7),
+              ("sparse",{"speakers":500,"active_speakers_budget":3},
+                        ["speak:0","support:0"],10),
+              ("nochoices",{"memory_turns":0,"choice_consequences":False},
+                            ["speak:0","inspect"],12),
+          )
+          for name,rules,actions,seed in cases:
+              scene=make_advanced_scene("dialogue",rules,seed=seed)
+              receipt=run_advanced_session("dialogue",rules,actions,seed=seed,scene=scene)
+              assert verify_advanced_session(receipt,rules)
+              if name in ("consensus","retired"):
+                  assert receipt["state"]["checkpoint"]
+              if name=="retired":
+                  assert receipt["state"]["finished"]
+              target=root/name
+              package=render_dialogue_godot_package(receipt,rules,authorized=True)
+              write_advanced_godot_package(package,target,authorized=True)
+              print("NATIVE_DIALOGUE_SOURCE",name,receipt["digest"])
+          PY
+      - name: Execute eight independently simulated GDScript worlds
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import os,sys,subprocess
+          root=Path(os.environ["RUNNER_TEMP"])/"original-native-dialogue"
+          for name in ("empty","consensus","retired","challenge","locality",
+                       "memory","sparse","nochoices"):
+              project=root/name/"godot"
+              for args in (["--headless","--path",str(project),"--import"],
+                           ["--headless","--path",str(project),"--","--verify-dialogue"]):
+                  cmd=["godot",*args] if sys.platform!="win32" else [
+                      str(Path(os.environ["ProgramFiles"])/"Git"/"bin"/"bash.exe"),
+                      "-c",'godot "$@"',"godot",*args]
+                  result=subprocess.run(cmd,capture_output=True,text=True,
+                                        encoding="utf-8",errors="replace",timeout=75)
+                  out=result.stdout+"\n"+result.stderr
+                  print(name,args,result.returncode,out,flush=True)
+                  if "--verify-dialogue" in args:
+                      (root/name/"native-replay.log").write_text(out,encoding="utf-8")
+                      if "NATIVE_ADVANCED_DIALOGUE_OK" not in result.stdout:
+                          raise SystemExit("actual independent Godot social state did not converge: "+name)
+                  if result.returncode:
+                      raise SystemExit("original Godot Dialogue rejected "+name)
+          PY
+      - name: Native game must reject forged consensus, trust and remote impersonation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import os,sys,subprocess,shutil,json
+          root=Path(os.environ["RUNNER_TEMP"])/"original-native-dialogue"
+          start=root/"consensus"/"godot"
+          changes=(
+              ("forged_trust",lambda p:p["expected"]["speakers"][0].__setitem__("trust",99)),
+              ("forged_consensus",lambda p:p["expected"].__setitem__("checkpoint",False)),
+              ("phantom_statement",lambda p:p["expected"]["direct_statements"][0].__setitem__("speaker",7)),
+              ("remote_impersonation",lambda p:p["actions"].__setitem__(0,"speak:4")),
+          )
+          for name,patch in changes:
+              target=root/("negative_"+name)
+              project=target/"godot"
+              shutil.copytree(start,project)
+              file=project/"proof.json"
+              proof=json.loads(file.read_text(encoding="utf-8"))
+              patch(proof)
+              file.write_text(json.dumps(proof,sort_keys=True),encoding="utf-8")
+              args=["--headless","--path",str(project),"--","--verify-dialogue"]
+              cmd=["godot",*args] if sys.platform!="win32" else [
+                  str(Path(os.environ["ProgramFiles"])/"Git"/"bin"/"bash.exe"),
+                  "-c",'godot "$@"',"godot",*args]
+              run=subprocess.run(cmd,capture_output=True,text=True,
+                                 encoding="utf-8",errors="replace",timeout=75)
+              out=run.stdout+"\n"+run.stderr
+              (target/"denied-proof.log").write_text(out,encoding="utf-8")
+              print(name,run.returncode,out,flush=True)
+              if run.returncode==0 or "NATIVE_ADVANCED_DIALOGUE_OK" in out:
+                  raise SystemExit("forged social outcome was accepted: "+name)
+          PY
+      - name: Export and execute real Linux original Dialogue desktop game
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/original-native-dialogue"
+          binary="$root/original-dialogue.x86_64"
+          godot --headless --path "$root/consensus/godot" --export-release Linux "$binary"
+          test -s "$binary"
+          chmod +x "$binary"
+          "$binary" --headless -- --verify-dialogue | tee "$root/linux-native-replay.log"
+          grep -q NATIVE_ADVANCED_DIALOGUE_OK "$root/linux-native-replay.log"
+      - name: Preserve native receipts and unsigned game binary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-native-dialogue-${{ matrix.os }}-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/original-native-dialogue/*/native-replay.log
+            ${{ runner.temp }}/original-native-dialogue/*/denied-proof.log
+            ${{ runner.temp }}/original-native-dialogue/*/release.json
+            ${{ runner.temp }}/original-native-dialogue/original-dialogue.x86_64
+            ${{ runner.temp }}/original-native-dialogue/linux-native-replay.log
