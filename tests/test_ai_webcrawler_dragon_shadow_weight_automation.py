@@ -96,6 +96,13 @@ def scrutiny(label):
     return record, tuple(receipts), adversarial
 
 
+def adversarial_dispatch_for(receipts):
+    return LayerDispatch(
+        AnalysisLayer.ADVERSARIAL_REVIEW,
+        (receipts[8].output_fingerprint,), "adversarial_worker", "1",
+    )
+
+
 @pytest.fixture
 def setup(tmp_path):
     knowledge = ReviewedKnowledgeStore(tmp_path / "reviewed.sqlite")
@@ -139,6 +146,7 @@ def offer(setup, source="alpha", **changes):
     arguments = dict(
         normalized_knowledge_id=record.knowledge_id,
         normalized_records=(record,), adversarial_output=adv,
+        adversarial_dispatch=adversarial_dispatch_for(receipts),
         receipts=receipts, at=T1, idle_since=T0,
         hardware=sample(), hardware_now=1000.0,
         consented=True, authorized=True, privacy_clear=True,
@@ -428,7 +436,8 @@ def test_orchestration_stages_then_activates_only_after_human_ledger_review(setu
     )
     candidate = ReviewedAcquisition(
         "alpha", "note-alpha", "movement", record.knowledge_id,
-        (record,), receipts, adversarial, suite(setup),
+        (record,), receipts, adversarial,
+        adversarial_dispatch_for(receipts), suite(setup),
     )
     first = run_shadow_automation(
         automation, library, plan, (candidate,),
@@ -479,6 +488,7 @@ def test_orchestration_rejects_unscheduled_or_duplicate_reviewed_sources(setup):
     item = ReviewedAcquisition(
         "beta", "note-beta", "movement", record.knowledge_id,
         (record,), receipts, adversarial,
+        adversarial_dispatch_for(receipts),
     )
     options = dict(now=T1, idle_since=T0, hardware=sample(),
                    hardware_now=1000, consented=True,
@@ -620,6 +630,7 @@ def test_unreviewed_ontology_mismatch_cannot_advance_stage(setup):
             normalized_knowledge_id=record.knowledge_id,
             normalized_records=(forged,),
             receipts=receipts, adversarial_output=adversarial,
+            adversarial_dispatch=adversarial_dispatch_for(receipts),
             at=T1, idle_since=T0, hardware=sample(), hardware_now=1000,
             consented=True, authorized=True, privacy_clear=True,
         )
