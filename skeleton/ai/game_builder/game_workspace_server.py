@@ -41,6 +41,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_unified_npc_world import (
+    run_unified_npc_world, verify_unified_npc_world,
+)
 from .advanced_social_quest_fusion import (
     run_social_quest_fusion, verify_social_quest_fusion,
 )
@@ -481,6 +484,23 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":validated,
                                    "original_source_mutated":False})
+        if path=="/api/unified-npc-world":
+            report=run_unified_npc_world(
+                values["actions"],values.get("settings"),
+                scenes=values.get("scenes"),seed=values.get("seed",0))
+            return self._json(200,{
+                "record":report,
+                "independently_verified":verify_unified_npc_world(report),
+                "source_files_mutated":False,
+                "native_unified_engine_executed":False,
+                "core_model_weights_changed":False,
+            })
+        if path=="/api/unified-npc-world-verify":
+            return self._json(200,{
+                "verified":verify_unified_npc_world(values["record"]),
+                "source_files_mutated":False,
+                "core_model_weights_changed":False,
+            })
         if path=="/api/social-quest-fusion":
             result=run_social_quest_fusion(
                 values["commands"],values.get("settings"),
