@@ -161,6 +161,35 @@ class JeevesAllAppCapabilityTests(unittest.TestCase):
                 "reason":"This valid reason should not have extra arguments.",
                 "shell":"rm -rf /"},authorized=True)
 
+    def test_generic_game_director_asset_and_internal_project_source_requires_review(self):
+        original=self.call("studio.source",{"path":"game/readme.md"})["result"]
+        self.assertIn("Original game",original["content"])
+        spec={"path":"cinematics/original_story_camera.md",
+              "content":"# Original chapter camera\nTrack the protagonist's own face and voice.",
+              "expected_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "reason":"Stage an original, consistent chapter camera document for review."}
+        with self.assertRaises(PermissionError):
+            self.call("studio.source.propose",spec)
+        result=self.call("studio.source.propose",spec,authorized=True)["result"]
+        self.assertTrue(result["human_commit_required"])
+        self.assertFalse(result["source_file_compiled"])
+        self.assertFalse(any(x.path==spec["path"] for x in
+                             self.work.files("current",self.project)))
+        with self.assertRaises(PermissionError):
+            self.work.commit(result["proposal_id"],human_approved=False,authorized=True)
+        self.work.commit(result["proposal_id"],human_approved=True,authorized=True)
+        retrieved=self.call("studio.source",{"path":spec["path"]})["result"]
+        self.assertEqual(retrieved["content"],spec["content"])
+        with self.assertRaises(WorkspaceError):
+            self.call("studio.source.propose",spec,authorized=True)
+        for malformed in ("../../private/escape.py","provider_runtime.py",
+                          "notes/my_password.txt","reviews/accepted/a.json",
+                          "story/../../credential.txt"):
+            with self.subTest(path=malformed),self.assertRaises((PermissionError,
+                                        JeevesAppCapabilityError,WorkspaceError)):
+                self.call("studio.source.propose",{
+                    **spec,"path":malformed},authorized=True)
+
     def test_source_scope_denies_private_paths_and_foreign_projects(self):
         with self.assertRaises(PermissionError):
             self.call("studio.source",{"path":"../../etc/passwd"})
