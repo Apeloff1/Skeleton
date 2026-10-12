@@ -12,6 +12,9 @@ import json
 from typing import Mapping, Sequence
 
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_stealth_runtime import (ACTIONS as STEALTH_ACTIONS, StealthActionError,
+                                      start as stealth_start, step as stealth_step,
+                                      apply_scene as apply_stealth_scene)
 from .advanced_city_runtime import (ACTIONS as CITY_ACTIONS, CityActionError,
                                     start as city_start, step as city_step,
                                     apply_scene as apply_city_scene)
@@ -30,7 +33,7 @@ from .advanced_genre_engines import (
 )
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -51,6 +54,7 @@ ACTION_HELP = {
     "factory": FACTORY_ACTIONS,
     "colony": COLONY_ACTIONS,
     "city_builder": CITY_ACTIONS,
+    "stealth": STEALTH_ACTIONS,
     **GENRE_ACTIONS,
 }
 
@@ -656,6 +660,7 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "factory":factory_start,
         "colony":colony_start,
         "city_builder":city_start,
+        "stealth":stealth_start,
         **GENRE_STARTS,
     }
     state=starts[editor](rules,seed)
@@ -695,6 +700,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             apply_colony_scene(state,rules,layout)
         elif editor=="city_builder":
             apply_city_scene(state,rules,layout)
+        elif editor=="stealth":
+            apply_stealth_scene(state,rules,layout)
         else:
             apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
@@ -715,11 +722,12 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "factory":factory_step,
             "colony":colony_step,
             "city_builder":city_step,
+            "stealth":stealth_step,
             **GENRE_STEPS,
         }
         try:
             events=steps[editor](state,rules,action)
-        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError) as exc:
+        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
