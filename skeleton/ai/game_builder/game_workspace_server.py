@@ -25,6 +25,8 @@ from .advanced_gameplay_runtime import (
 )
 from .advanced_level_scenes import make_advanced_scene, scene_path, validate_advanced_scene
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_fighting_rollback import (run_peer_fight,verify_peer_fight,
+    reconcile_peer_prediction,verify_peer_reconciliation)
 from .advanced_rhythm_longrun import (run_long_rhythm,verify_long_rhythm,continue_long_rhythm)
 from .advanced_rhythm_runtime import default_layout as rhythm_default_layout
 from .advanced_rhythm_audio import render_original_beat_wav,original_audio_receipt
@@ -274,6 +276,27 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "requires_approved_system":True,
                 "automatically_committed":False,
             })
+        if path=="/api/fighting-peer-replay":
+            report=run_peer_fight(
+                values.get("settings"),values.get("blue_actions",[]),
+                values.get("red_actions",[]),seed=values.get("seed",0),
+                scene=values.get("scene"))
+            return self._json(200,{"report":report,
+                "independently_verified":verify_peer_fight(
+                    report,values.get("settings")),
+                "source_code_executed":False,"native_hardware_certified":False,
+                "network_transport_certified":False,"game_files_mutated":False})
+        if path=="/api/fighting-rollback":
+            report=reconcile_peer_prediction(
+                values.get("settings"),values.get("blue_actions",[]),
+                values.get("predicted_red",[]),
+                values.get("authoritative_red",[]),seed=values.get("seed",0),
+                scene=values.get("scene"))
+            return self._json(200,{"report":report,
+                "independently_verified":verify_peer_reconciliation(
+                    report,values.get("settings")),
+                "source_code_executed":False,"native_hardware_certified":False,
+                "network_transport_certified":False,"game_files_mutated":False})
         if path=="/api/rhythm-longrun":
             if values.get("prior") is not None:
                 record=continue_long_rhythm(values["prior"],
