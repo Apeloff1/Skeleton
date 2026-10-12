@@ -9,7 +9,7 @@ from __future__ import annotations
 
 ACTIONS=("north","south","east","west","inspect","wait","observe","talk",
          "work","gather","donate","trade","help","accuse","mediate",
-         "checkpoint","retire","rest")+tuple("focus:"+str(i) for i in range(16))
+         "checkpoint","retire","rest")+tuple("focus:"+str(i) for i in range(32))
 DIRS={"north":(0,1),"south":(0,-1),"east":(1,0),"west":(-1,0)}
 PROFESSIONS=("farmer","builder","merchant","scholar","healer","guard")
 SITE={"hall":[4,4],"market":[3,3],"farm":[1,5],
