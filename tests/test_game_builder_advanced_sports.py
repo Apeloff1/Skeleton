@@ -130,6 +130,56 @@ class OriginalSportsRulesTests(unittest.TestCase):
         self.assertEqual(assembly["authored_scene_count"],1)
         self.assertEqual(assembly["advanced_runtime_evidence"][0]["editor"],"sports")
 
+    def test_pass_is_control_transfer_not_ball_carrier_teleport(self):
+        cfg=make_editor_document("sports")["settings"]
+        state=start(cfg,0)
+        initial=list(state["home"])
+        receiver=list(state["teammate"])
+        self.assertNotEqual(initial,receiver)
+        events=step(state,cfg,"pass")
+        self.assertIn("earned_ball_transfer_to_existing_teammate",events)
+        self.assertEqual(state["home"],receiver)
+        self.assertEqual(state["teammate"],initial)
+        self.assertEqual(state["ball"],receiver)
+        self.assertEqual(state["passes"],1)
+        self.assertEqual(state["owner"],"home")
+        single=make_editor_document("sports",{"team_size":1,"substitutions":0})["settings"]
+        with self.assertRaises(SportsActionError):
+            step(start(single,0),single,"pass")
+
+    def test_authored_cover_blocks_real_pass_and_unearned_goal(self):
+        cfg=make_editor_document("sports")["settings"]
+        layout=default_layout(cfg,0)
+        layout["home_spawn"]=[40,1]
+        layout["cover"]=[[42,1]]
+        scene=make_advanced_scene("sports",layout=layout)
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("sports",actions=["pass"],scene=scene)
+        self.assertTrue(verify_advanced_session(
+            run_advanced_session("sports",actions=["advance"],scene=scene)))
+
+    def test_weather_and_press_actually_affect_dynamics(self):
+        config={"target_score":1,"shot_power":4,"opponent_skill":8}
+        cfg=make_editor_document("sports",config)["settings"]
+        clear=default_layout(cfg,0)
+        rain=deepcopy(clear);rain["weather"]="rain"
+        wind=deepcopy(clear);wind["weather"]="wind"
+        clear_scene=make_advanced_scene("sports",config,layout=clear)
+        rain_scene=make_advanced_scene("sports",config,layout=rain)
+        dry=run_advanced_session("sports",config,["sprint"],scene=clear_scene)
+        wet=run_advanced_session("sports",config,["sprint"],scene=rain_scene)
+        self.assertGreater(dry["state"]["home"][0],wet["state"]["home"][0])
+        self.assertTrue(verify_advanced_session(wet,config))
+        for layout in (clear,wind):
+            layout["home_spawn"]=[85,1]
+        calm_scene=make_advanced_scene("sports",config,layout=clear)
+        gust_scene=make_advanced_scene("sports",config,layout=wind)
+        calm=run_advanced_session("sports",config,["shoot"],scene=calm_scene)
+        gust=run_advanced_session("sports",config,["shoot"],scene=gust_scene)
+        self.assertEqual(calm["state"]["home_score"],1)
+        self.assertEqual(gust["state"]["home_score"],0)
+        self.assertTrue(verify_advanced_session(gust,config))
+
     def test_fail_closed_cross_rules_and_impossible_team_rosters(self):
         for params in (
             {"rules":"racket"},
