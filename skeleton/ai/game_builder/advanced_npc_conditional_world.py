@@ -65,7 +65,8 @@ def _predicate(node,counts,depth=0):
     if set(node)=={"not"}:
         return {"not":_predicate(node["not"],counts,depth+1)}
     if set(node)=={"fact","op","value"}:
-        if (node["fact"] not in FACTS or node["op"] not in ("gte","lte","eq") or
+        if (type(node["fact"]) is not str or type(node["op"]) is not str or
+            node["fact"] not in FACTS or node["op"] not in ("gte","lte","eq") or
             type(node["value"]) is not int or not 0<=node["value"]<=4096):
             raise NPCConditionalError("unreviewed or impossible original world fact")
         return dict(node)
