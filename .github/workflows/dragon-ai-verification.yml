@@ -112,7 +112,9 @@ jobs:
             tests/test_dragon_wisdom_operational.py \
             tests/test_dragon_wisdom_integration.py \
             tests/test_dragon_visual_play_integration.py \
-            tests/test_dragon_evidence_timestamp_compatibility.py; do
+            tests/test_dragon_evidence_timestamp_compatibility.py \
+            tests/test_dragon_discovery_admission.py \
+            tests/test_dragon_catalog_expansion.py; do
             python -m pytest -q --noconftest "$test"
           done
       - name: Authenticated Dragon companion snapshots
