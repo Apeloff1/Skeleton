@@ -28,7 +28,8 @@ QUEST_STATES = frozenset({"unknown", "available", "active", "completed", "failed
 METER_TYPES = frozenset({"karma", "reputation", "relationship", "law_heat"})
 GOOD_NEUTRAL_EVIL = frozenset({"good", "neutral", "evil", "mixed"})
 BEAT_ACTIONS = frozenset({"setup", "promise", "cliffhanger", "red_herring",
-                          "foreshadow", "payoff", "resolution", "false_lead_disclosed"})
+                          "foreshadow", "surprise", "payoff", "resolution",
+                          "false_lead_disclosed"})
 CLOSURES = frozenset({"payoff", "resolution", "false_lead_disclosed"})
 MAX_NODES = 2000
 MAX_ENDINGS = 200
@@ -264,6 +265,12 @@ def apply_effects(state: dict, obligations: dict, effects: Sequence[Mapping[str,
                 old.update({"status": "closed", "closed_scene": scene,
                             "closure_role": role, "closure_plot_id": effect["plot_id"]})
             else:
+                if role == "surprise":
+                    if not old or old["status"] != "open" or old["opened_scene"] >= scene:
+                        raise ValueError("Surprise requires a previously authored open clue.")
+                    events.append({"op": op, "id": effect["id"], "role": role,
+                                   "scene": scene, "plot_id": effect["plot_id"]})
+                    continue
                 if old and old["status"] == "closed":
                     raise ValueError("Closed plot thread cannot reopen under the same ID.")
                 if not old:
@@ -365,11 +372,16 @@ def validate_plan(raw: Mapping[str, Any]) -> dict:
             "tone": tone, "epilogue": _text(item.get("epilogue"), "epilogue", 6000, 40),
             "consequences": _text(item.get("consequences"), "lasting consequences", 3000, 20),
             "required_lore": sorted({
-                identifier(x, kind="required lore") for x in item.get("required_lore", [])
+                identifier(x, kind="required lore") for x in (
+                    item.get("required_lore") if isinstance(item.get("required_lore"), list)
+                    and len(item["required_lore"]) <= 500 else
+                    (_ for _ in ()).throw(ValueError("Required ending lore must be a bounded list."))
+                )
             }),
             **conclusions,
         }
     node_map = {}
+    choice_ids: set[str] = set()
     for record in nodes:
         item = _plain(record, "scene node")
         _exact(item, {"id", "scene", "act", "chapter", "kind", "speaker",
@@ -415,9 +427,10 @@ def validate_plan(raw: Mapping[str, Any]) -> dict:
             _exact(op, {"id", "label", "guard", "effects", "next_node", "ending",
                         "dialogue", "intent", "emotional_consequence"}, location="choice")
             oid = identifier(op.get("id"), kind="choice")
-            if oid in selected:
-                raise ValueError("Choice IDs must be distinct in a node.")
+            if oid in selected or oid in choice_ids:
+                raise ValueError("Choice IDs must be globally unique to preserve dialogue-history identity.")
             selected.add(oid)
+            choice_ids.add(oid)
             dest, ending = op.get("next_node"), op.get("ending")
             if bool(dest) == bool(ending):
                 raise ValueError("Choice leads to exactly one next node or ending.")
