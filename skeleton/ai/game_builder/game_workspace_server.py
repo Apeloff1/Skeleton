@@ -24,6 +24,7 @@ from .advanced_gameplay_runtime import (
 )
 from .advanced_level_scenes import make_advanced_scene, scene_path
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_stealth_planner import plan_stealth_route
 from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
@@ -266,6 +267,14 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "requires_approved_system":True,
                 "automatically_committed":False,
             })
+        if path=="/api/stealth-plan":
+            result=plan_stealth_route(
+                values["scene"],values.get("settings"),
+                max_states=values.get("max_states",30000),
+                max_depth=values.get("max_depth",96))
+            return self._json(200,{"plan":result,
+                                  "original_source_mutated":False,
+                                  "live_security_evasion_certified":False})
         if path=="/api/advanced-play":
             result=run_advanced_session(
                 values["editor"], values.get("settings"),
