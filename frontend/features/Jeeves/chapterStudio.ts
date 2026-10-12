@@ -12,9 +12,71 @@ export const CHAPTER_SCENE_HANDOFF_TTL = 60 * 60 * 1000;
 export const PLOT_KINDS = [
   'setup', 'payoff', 'foreshadow', 'reveal', 'decision', 'consequence',
   'promise', 'resolution', 'dialogue', 'motif', 'historical_detail',
-  'visual_identity', 'voice_identity',
+  'visual_identity', 'voice_identity', 'prologue', 'epilogue',
+  'cliffhanger', 'surprise', 'emotional_turn', 'red_herring',
+  'misdirection_reveal', 'dramatic_irony', 'comic_relief',
+  'choice', 'romance', 'betrayal', 'tension_release',
 ] as const;
 export type PlotKind = typeof PLOT_KINDS[number];
+export const SCENE_KINDS = [
+  'prologue', 'story', 'side_story', 'chapter_climax', 'finale', 'epilogue', 'postgame',
+] as const;
+export type SceneKind = typeof SCENE_KINDS[number];
+export const MOMENT_KINDS = [
+  'prologue', 'inciting_incident', 'emotional_turn', 'cliffhanger',
+  'surprise', 'red_herring', 'reveal', 'tension_release', 'comic_relief',
+  'romance', 'betrayal', 'sacrifice', 'loss', 'reconciliation', 'choice',
+  'consequence', 'climax', 'denouement', 'epilogue', 'postgame',
+] as const;
+export const THREAD_ROLES = [
+  'setup', 'foreshadow', 'promise', 'cliffhanger', 'red_herring',
+  'payoff', 'resolution', 'false_lead_disclosed', 'surprise', 'epilogue_callback',
+] as const;
+export type StoryMoment = {
+  kind: typeof MOMENT_KINDS[number]; plot_id: string; intensity: number;
+  objective: string; audience_effect: string;
+};
+export type ThreadBeat = { thread_id: string; role: typeof THREAD_ROLES[number]; plot_id: string };
+export function parseNarrativeBeats(
+  rawMoments: string, rawThreads: string, plotPoints: PlotPoint[], stage: SceneKind,
+) {
+  let moments: any, threads: any;
+  try {
+    moments = JSON.parse(rawMoments);
+    threads = JSON.parse(rawThreads);
+  } catch { throw new Error('Emotional beats and plot threads require valid JSON.'); }
+  if (!SCENE_KINDS.includes(stage) || !Array.isArray(moments) ||
+      !Array.isArray(threads) || moments.length > 40 || threads.length > 100) {
+    throw new Error('Invalid story stage or too many emotional/thread beats.');
+  }
+  const anchors = new Set(plotPoints.map(p => p.id));
+  const checkedMoments: StoryMoment[] = moments.map(m => {
+    if (!m || !MOMENT_KINDS.includes(m.kind) || !anchors.has(m.plot_id) ||
+        !Number.isInteger(m.intensity) || m.intensity < 0 || m.intensity > 100 ||
+        typeof m.objective !== 'string' || m.objective.length < 12 ||
+        m.objective.length > 600 || typeof m.audience_effect !== 'string' ||
+        m.audience_effect.length < 12 || m.audience_effect.length > 600) {
+      throw new Error('Every emotional beat requires a highlight, intensity, objective and audience effect.');
+    }
+    return { kind: m.kind, plot_id: m.plot_id, intensity: m.intensity,
+      objective: m.objective, audience_effect: m.audience_effect };
+  });
+  const checkedThreads: ThreadBeat[] = threads.map(t => {
+    if (!t || !THREAD_ROLES.includes(t.role) || !anchors.has(t.plot_id) ||
+        typeof t.thread_id !== 'string') {
+      throw new Error('Every story thread beat requires a role and highlighted source.');
+    }
+    return { thread_id: slug(t.thread_id, 'Plot thread'),
+      role: t.role, plot_id: t.plot_id };
+  });
+  if (stage === 'epilogue' && !checkedMoments.some(m => m.kind === 'epilogue')) {
+    throw new Error('Epilogue requires a highlighted emotional closing moment.');
+  }
+  if (stage === 'finale' && !checkedMoments.some(m => m.kind === 'climax')) {
+    throw new Error('Finale requires a highlighted climax.');
+  }
+  return { story_moments: checkedMoments, thread_beats: checkedThreads, scene_kind: stage };
+}
 export type PlotPoint = {
   id: string;
   kind: PlotKind;
@@ -37,6 +99,7 @@ export type SceneDraft = {
   scene: number; chapter: number; act: number; branch_id: string;
   revision: number; digest: string; summary: string; text: string;
   status: string; chapter_revision: number; chapter_digest: string;
+  scene_kind?: SceneKind; story_moments?: StoryMoment[]; thread_beats?: ThreadBeat[];
   characters: string[]; thread_keys: string[]; plot_points: PlotPoint[];
   source_message_id: string; proof?: ProofReceipt | null;
 };
