@@ -6,10 +6,13 @@ the production source authority was not configured.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 import re
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+import sqlite3
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from routes.dragon_academy import _principal
 from routes.gameforge_auth import require_role
+from core.dragon_research_session import DragonResearchSessionFactory
 from skeleton.ai.game_builder.dragon_three_hatchling_coordinator import (
     DragonThreeHatchlingCoordinator,
 )
@@ -20,21 +23,31 @@ _SOURCE = re.compile(r"source-[0-9a-f]{64}\Z")
 
 def install_dragon_research_dashboard(app, coordinator):
     """One-time trusted backend composition. No authority in HTTP payload."""
-    if not isinstance(coordinator, DragonThreeHatchlingCoordinator):
-        raise TypeError("canonical three-child research coordinator required")
+    if not isinstance(coordinator, (DragonThreeHatchlingCoordinator,DragonResearchSessionFactory)):
+        raise TypeError("trusted three-child research session authority required")
     if getattr(app.state, "dragon_research_dashboard", None) is not None:
         raise ValueError("Dragon dashboard is already configured")
     app.state.dragon_research_dashboard = coordinator
 
 
-def _runtime(request: Request) -> DragonThreeHatchlingCoordinator:
+@contextmanager
+def _runtime(request: Request):
     runtime = getattr(request.app.state, "dragon_research_dashboard", None)
-    if not isinstance(runtime, DragonThreeHatchlingCoordinator):
+    if isinstance(runtime, DragonThreeHatchlingCoordinator):
+        yield runtime
+    elif isinstance(runtime, DragonResearchSessionFactory):
+        try:
+            with runtime.open() as coordinator:
+                yield coordinator
+        except (sqlite3.DatabaseError, OSError, ValueError, PermissionError):
+            raise HTTPException(
+                status_code=409, detail="Dragon research storage verification failed"
+            ) from None
+    else:
         raise HTTPException(
             status_code=503,
             detail="Dragon research evidence runtime is not configured",
         )
-    return runtime
 
 
 def _identity(value: str, name: str) -> str:
@@ -43,54 +56,79 @@ def _identity(value: str, name: str) -> str:
     return value
 
 
+@router.get("/sources")
+def source_catalog(
+    request: Request,
+    response: Response,
+    limit: int = Query(30, ge=1, le=60),
+    after_source: str | None = Query(None, min_length=71, max_length=71),
+    owner: str = Depends(_principal),
+) -> dict:
+    if after_source is not None:
+        _identity(after_source, "source cursor")
+    response.headers["Cache-Control"] = "private, no-store"
+    with _runtime(request) as coordinator:
+        try:
+            return coordinator.source_catalog(
+                owner, authorized=True, limit=limit, after_source=after_source,
+            )
+        except (ValueError, PermissionError, LookupError):
+            raise HTTPException(
+                status_code=409,
+                detail="Research source index cannot be verified",
+            ) from None
+
+
 @router.get("/status")
 def three_hatchlings_status(
     request: Request,
+    response: Response,
     article: str = Query(..., min_length=71, max_length=71),
     video: str = Query(..., min_length=71, max_length=71),
     updates: str = Query(..., min_length=71, max_length=71),
     owner: str = Depends(_principal),
 ) -> dict:
-    coordinator = _runtime(request)
     ids = (
         _identity(article, "article"), _identity(video, "video"),
         _identity(updates, "updates"),
     )
-    try:
-        return coordinator.status(
-            owner, article_source_id=ids[0],
-            video_source_id=ids[1], update_source_id=ids[2],
-            authorized=True,
-        )
-    except (ValueError, PermissionError, LookupError) as exc:
-        # No source-specific secret data, SQL fragments or hidden policy
-        # details in the public error envelope.
-        raise HTTPException(
-            status_code=409, detail="Research evidence not available for these sources"
-        ) from None
+    response.headers["Cache-Control"] = "private, no-store"
+    with _runtime(request) as coordinator:
+        try:
+            return coordinator.status(
+                owner, article_source_id=ids[0],
+                video_source_id=ids[1], update_source_id=ids[2],
+                authorized=True,
+            )
+        except (ValueError, PermissionError, LookupError):
+            raise HTTPException(
+                status_code=409, detail="Research evidence not available for these sources"
+            ) from None
 
 
 @router.get("/mother-review")
 def mother_three_lane_review(
     request: Request,
+    response: Response,
     article: str = Query(..., min_length=71, max_length=71),
     video: str = Query(..., min_length=71, max_length=71),
     updates: str = Query(..., min_length=71, max_length=71),
     owner: str = Depends(_principal),
     reviewer=Depends(require_role("editor")),
 ) -> dict:
-    coordinator = _runtime(request)
     ids = (
         _identity(article, "article"), _identity(video, "video"),
         _identity(updates, "updates"),
     )
-    try:
-        return coordinator.mother_review(
-            owner, article_source_id=ids[0],
-            video_source_id=ids[1], update_source_id=ids[2],
-            authorized=True,
-        )
-    except (ValueError, PermissionError, LookupError):
-        raise HTTPException(
-            status_code=409, detail="Research evidence not available for these sources"
-        ) from None
+    response.headers["Cache-Control"] = "private, no-store"
+    with _runtime(request) as coordinator:
+        try:
+            return coordinator.mother_review(
+                owner, article_source_id=ids[0],
+                video_source_id=ids[1], update_source_id=ids[2],
+                authorized=True,
+            )
+        except (ValueError, PermissionError, LookupError):
+            raise HTTPException(
+                status_code=409, detail="Research evidence not available for these sources"
+            ) from None

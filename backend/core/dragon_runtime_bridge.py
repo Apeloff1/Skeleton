@@ -89,6 +89,14 @@ def mount_configured_dragon_runtime(app, conversation_authority):
     # choose a database file, reviewer signer or owner. Never synthesize a
     # research coordinator when canonical capture/nest stores are absent.
     research = getattr(app.state, "dragon_research_coordinator", None)
+    # Explicit opt-in only. Use the same canonical knowledge and signed-nest
+    # stores already configured for Dragon Academy. Never create DBs on GET.
+    if research is None:
+        import os
+        if os.environ.get("SKL_DRAGON_RESEARCH_DASHBOARD_ENABLED") == "1":
+            from core.dragon_research_session import DragonResearchSessionFactory
+            research = DragonResearchSessionFactory.from_env()
+            app.state.dragon_research_coordinator = research
     if research is not None:
         from routes.dragon_research import install_dragon_research_dashboard
         existing = getattr(app.state, "dragon_research_dashboard", None)
