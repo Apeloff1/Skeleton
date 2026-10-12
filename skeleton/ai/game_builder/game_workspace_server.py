@@ -194,6 +194,13 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "model_training_or_deployment_running":False,
                 "core_llm_weights_changed":False,
             })
+        if path=="/api/jeeves-app-atlas":
+            from .jeeves_app_runtime import app_atlas
+            family=params.get("family") or None
+            return self._json(200,app_atlas(
+                family=family,offset=int(params.get("offset",0)),
+                limit=int(params.get("limit",80)),
+                query=params.get("query") or None))
         if path=="/api/story-memory-page":
             from .story_memory import character_memory_page
             return self._json(200,character_memory_page(
@@ -230,6 +237,11 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/jeeves-app-action":
+            from .jeeves_app_runtime import dispatch_app_action
+            return self._json(200,dispatch_app_action(
+                studio,values["project"],values["action"],
+                values["args"],authorized=True))
         if path=="/api/jeeves-chapter-chat":
             from .jeeves_chapter_chat import chat_turn
             result=chat_turn(studio,values["project"],values["prompt"],
