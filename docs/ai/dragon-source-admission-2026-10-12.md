@@ -109,3 +109,40 @@ python -m skeleton.ai.game_builder.dragon_almanac_cli mission-scout \
 This is an explainable, deterministic **proposal**. It scores intersections between goal terms and URL paths, observed catalog headings and repository names, then displays host-diverse candidates. It does not claim different hosts are independent originals; it never treats a ROM, BIOS, dump or download link as automatically lawful; it **never** starts the durable policy queue or fetches media. Rights-risk indicators require manual review. `scan_truncated` and unmatched terms disclose when the bounded metadata scan cannot cover the entire source corpus.
 
 Progress denominators are not interchangeable: **5,438** records are raw URL leads toward the **44,050** raw target (12.35%), whereas **736 / 4,405** represents sequential first-pass acquisitions of the original registry. Neither measure demonstrates 5,438 usable or independent sources. Canonical deduplicated totals are computed at ingestion, and all discoveries remain unapproved for training.
+
+## Whole-corpus mission facet index and proof of currentness
+
+The mission scout no longer needs to rely solely on the earliest 2,000 source IDs. An owner-scoped inverted index stores **only** tokens derived from canonical URLs, pinned README headings and repository identities. It is an expendable search projection, not a second knowledge library, a neural model, a shadow-weight store or permission to fetch source data.
+
+Run `mission-index` repeatedly using the returned `next_source` cursor. Each call indexes up to 1,000 source rows, verifies canonical source digests and all bounded supplemental receipts, and atomically replaces stale postings for its page. A subsequent `mission-index` pass is idempotent. Indexing a repository is not approval of its contents.
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli mission-index \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --limit 500
+
+# Supply the exact cursor returned by the preceding call to continue.
+python -m skeleton.ai.game_builder.dragon_almanac_cli mission-index \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --limit 500 --after-source 'source-<last-exact-source-id>'
+
+python -m skeleton.ai.game_builder.dragon_almanac_cli mission-scout \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --query 'original Game Boy homebrew input latency collision' \
+  --platform 'Game Boy' --genre platformer --era 1990s \
+  --indexed --limit 30 --scan-budget 3000
+```
+
+Indexed mission retrieval first weights task-goal tokens at 58%, platform tokens at 22%, genre at 12% and era at 8%, then executes the same source-level metadata and provenance validation and fine-grained score as the original scout. All weights are deterministic, bounded integer retrieval coefficients; **they are not model weights**. Ranking is scoped to catalog discovery signals, cannot establish content quality, and still requires a separate policy/rights decision before any crawl. It does not modify lease order in the sequential worker.
+
+`index_health` separately reports the number of policy-stage source rows, source-digest-current index entries, missing/stale entries and stale policy input digests. A changed source must not bypass a stale `dragon_almanac_jobs.input_digest` fence. When index coverage is incomplete, results mark the scan truncated rather than asserting full coverage.
+
+Use the read-only `mission-audit` command to detect older raw provenance, changed source records and forged token postings without altering the index:
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli mission-audit \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --limit 200
+```
+
+An audit provides `current`, `stale` and a resumable `next_source`, while rejecting unexpected posting contents. Auditing never certifies factual truth, legal rights, source independence or model performance. Repeat audit pages until the cursor is absent; the audit's scope is the materialized postings, not unindexed content.
