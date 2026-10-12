@@ -29,13 +29,13 @@ class OriginalLiveStrategyTests(unittest.TestCase):
     def rules(**changes):
         return {**{"enemy_ai":False,"enemy_waves":False},**changes}
 
-    def test_seventeenth_family_real_72_axis_editor_with_registered_actions(self):
+    def test_seventeenth_family_real_77_axis_editor_with_registered_actions(self):
         self.assertIn("rts",ENGINES)
         self.assertEqual(set(ACTIONS),set(ACTION_HELP["rts"]))
         spec=next(x for x in catalog() if x["id"]=="rts")
         self.assertEqual(spec["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(spec["progression_floor"],"advanced")
-        self.assertEqual(len(spec["fields"]),72)
+        self.assertEqual(len(spec["fields"]),77)
         self.assertGreater(len(ACTIONS),500)
         self.assertEqual(len(set(ACTIONS)),len(ACTIONS))
 
@@ -351,6 +351,78 @@ class OriginalLiveStrategyTests(unittest.TestCase):
         step(state,cfg,"attack:63")
         self.assertEqual(command["hp"],health-13)
         self.assertEqual(state["buildings"][0]["hp"],cfg["friendly_base_health"])
+
+
+    def test_line_of_fire_blocks_wall_and_friendly_body_without_warping_unit(self):
+        from skeleton.ai.game_builder.advanced_rts_runtime import (
+            _actual_line_of_fire,_damage,
+        )
+        cfg=make_editor_document("rts",self.rules(
+            fog_of_war=False,line_of_sight=True,
+        ))["settings"]
+        state=start(cfg,0)
+        ranger=state["units"][1]
+        ranger["kind"]="ranger";ranger["cell"]=10
+        enemy=state["enemies"][0];enemy["cell"]=26
+        self.assertIn(18,state["map"]["obstacles"])
+        self.assertFalse(_actual_line_of_fire(state,10,26))
+        with self.assertRaises(RTSActionError):
+            _damage(state,cfg,ranger,26,[])
+        health=enemy["hp"]
+        step(state,cfg,"select:1")
+        step(state,cfg,"attack:26")
+        self.assertEqual(enemy["hp"],health)
+        self.assertNotEqual(ranger["cell"],26)
+        state["map"]["obstacles"].remove(18)
+        self.assertTrue(_actual_line_of_fire(state,10,26))
+        state["units"][0]["cell"]=18
+        self.assertFalse(_actual_line_of_fire(state,10,26))
+        state["units"][0]["cell"]=1
+        self.assertTrue(_actual_line_of_fire(state,10,26))
+
+    def test_hostile_troops_can_destroy_actual_command_base_with_contact_siege(self):
+        cfg=make_editor_document("rts",self.rules(
+            enemy_ai=True,enemy_patrol=False,enemy_siege_damage=4,
+            enemy_siege_range=1,friendly_base_health=7,
+        ))["settings"]
+        state=start(cfg,0)
+        state["units"][0]["cell"]=9
+        state["enemies"][0]["cell"]=1
+        step(state,cfg,"inspect")
+        self.assertEqual(state["buildings"][0]["hp"],3)
+        self.assertIn("actual_original_opposing_faction_assaulted_blue_command",
+                      state["events"])
+        step(state,cfg,"inspect")
+        self.assertTrue(state["failed"])
+        self.assertEqual(state["reason"],"physical_opposing_command_base_assault")
+        self.assertEqual(state["buildings"][0]["hp"],0)
+        self.assertFalse(state["victory"])
+        with self.assertRaises(RTSActionError):
+            step(state,cfg,"tick")
+
+    def test_real_rain_diminishes_ranged_distance_and_desert_deducts_supplies(self):
+        from skeleton.ai.game_builder.advanced_rts_runtime import _damage
+        rules=self.rules(fog_of_war=False,rain_range_penalty=2)
+        cfg=make_editor_document("rts",rules)["settings"]
+        dry=start(cfg,0);wet=start(cfg,3)
+        for state in (dry,wet):
+            state["units"][1]["kind"]="ranger"
+            state["units"][1]["cell"]=53
+            state["enemies"][0]["cell"]=55
+        self.assertEqual(dry["map"]["environment"],"forest")
+        self.assertEqual(wet["map"]["environment"],"rain")
+        with self.assertRaises(RTSActionError):
+            _damage(wet,cfg,wet["units"][1],55,[])
+        before=dry["enemies"][0]["hp"]
+        _damage(dry,cfg,dry["units"][1],55,[])
+        self.assertLess(dry["enemies"][0]["hp"],before)
+        logistics=self.rules(supply_model="logistics",
+                            desert_logistics_penalty=2)
+        forest=run_advanced_session("rts",logistics,["inspect"],seed=0)
+        desert=run_advanced_session("rts",logistics,["inspect"],seed=1)
+        self.assertEqual(desert["state"]["map"]["environment"],"desert")
+        self.assertEqual(forest["state"]["energy"]-desert["state"]["energy"],2)
+        self.assertTrue(verify_advanced_session(desert,logistics))
 
     def test_original_hybrid_source_and_offline_cli_produce_true_gameplay(self):
         cfg=self.rules()
