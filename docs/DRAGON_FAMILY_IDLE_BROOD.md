@@ -455,3 +455,82 @@ robots/SSRF/terms/rights checks, independent Wiki/holdout evaluators,
 operator stop controls, and a complete passing exact-head release suite.
 No code introduced here trains or mutates AI model weights; sandbox
 `shadow_validated` and signed `weight_handoff` remain distinct stages.
+
+
+## Crash recovery, source-global leases and disputed-source research (2026-10-12 UTC)
+
+**Shipped as branch code, not as a production OS service.** This milestone
+turns the previous on-demand idle coordinator into an auditable crash/restart
+worker and connects the independent Mother Dragon Glean Matrix to the sibling
+research queue. The trust boundary remains host-owned.
+
+### Expired-work reconciliation
+
+`DragonIdleCoordinator.reconcile_expired_leases(owner,authorized=True,
+at=trusted_now,max_recover=100)` examines **only** expired, still-running
+owner-scoped leases. Within a single SQLite write transaction it:
+- invalidates the old token so an orphaned process cannot commit its capture;
+- records a new `recovered` outcome (no XP), with source ID, UTC time,
+  parenthesized note, and append-only hash-chain evidence;
+- imposes bounded retry backoff before any fresh attempt and does not
+  refund already-debited daily quota;
+- limits work to at most 100 leases by default (up to 1,000 by policy).
+
+The host-invoked `run_once` automatically performs a bounded reconciliation
+after confirming an authenticated idle/consent window. It does not reconcile
+or resume during foreground activity. A valid resumed tick is still required
+to fetch *new*, independently approved source bytes.
+
+### Multi-process source fence and consent commit fence
+
+A source cannot hold overlapping active leases for Ember, Flicker and Scout
+even on separate worker processes using the same durable SQLite database.
+The per-role queue, source-global lease check and reservation budget operate
+under one SQLite writer lock; a competing role is deferred rather than
+simultaneously re-crawling a source in another worker.
+
+Immediately before inserting an improved source reading, the trusted host's
+`commit_gate` is executed **inside the same write transaction** as the
+canonical `DragonFamily.digest_idle` source-lease check. The gate rechecks
+the session generation, current scope and revocable `DragonConsentLedger`
+approval. Consent revoked between the last post-fetch idle poll and the
+final write cannot be accepted as hatchling growth.
+
+A lost observer cannot be queried again simply to write a cancellation
+receipt. Interrupted work is recorded at the last successfully authenticated
+host time, not silently converted into successful evidence.
+
+### Research-priority synergy
+
+`DragonGleanMatrix.research_briefs` composes read-only, owner-locked,
+source-reviewed contradiction findings. Only `revisit_conflicting_sources`
+briefs can elevate Scout's priority for an already registered source ID.
+The normal research topic and adjacent-topic filters, original source
+catalog, rights/transport gates, source-global lease and task quota remain
+in force. A Wiki review request is never taken as permission to autonomously
+crawl or promote weights.
+
+Missing Almanakk tables now explicitly fail the Glean Matrix's Wiki gate:
+a missing review stage means **unverified**, never permission or an
+uncaught SQLite missing-table exception. Source review and independent claim
+verification stay distinct from sandbox/holdout and signed weight handoff.
+
+### Regression and integration checklist
+
+```bash
+python -m pytest -q --noconftest \
+  tests/test_ai_webcrawler_dragon_family_idle_coordinator.py \
+  tests/test_ai_webcrawler_dragon_family_idle_host.py \
+  tests/test_ai_webcrawler_dragon_family_glean_matrix.py \
+  tests/test_ai_webcrawler_dragon_family_custody_bridge.py
+cd frontend && yarn test:dragon-companion && yarn typecheck
+```
+
+New cases reject multi-role lease races, stale tokens, unapproved or
+non-inventory review priorities, revocation in the commit window, false
+foreground recovery, audit tampering and missing-Almanakk promotion.
+Passing a focused local or GitHub subset **does not** clear existing
+whole-repository Webcrawler/Dragon/App Assembly failures or install a
+native host. Actual operating system idle probes, cancellable network
+adapters and independently graded shadow evaluators remain prerequisites
+to declaring a functioning production crawler companion.
