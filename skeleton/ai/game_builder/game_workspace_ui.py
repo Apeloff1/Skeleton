@@ -2312,6 +2312,94 @@ function renderAdvancedActions(actions){
     }
   });
   target.append(epochPreset);target.append(analyzeEpochs);target.append(epochOutput);
+  const routeTitle=document.createElement("h4");
+  routeTitle.textContent="Dynamic NPC Route Planner · physically executed player navigation";
+  target.append(routeTitle);
+  const routeKind=document.createElement("select");
+  routeKind.id="original-dynamic-route-kind";
+  routeKind.setAttribute("aria-label","Actual original route target type");
+  for(const [kind,name] of [
+    ["site","Reviewed quest source site"],
+    ["npc","Physically embodied citizen"],
+    ["cell","Exact original map tile"]
+  ]){
+    const option=document.createElement("option");
+    option.value=kind;option.textContent=name;routeKind.append(option);
+  }
+  const routeIndex=document.createElement("input");
+  routeIndex.id="original-dynamic-route-index";
+  routeIndex.setAttribute("aria-label","Original source site, citizen, or map-tile index");
+  routeIndex.inputMode="numeric";
+  routeIndex.value="0";
+  const routeAction=document.createElement("select");
+  routeAction.id="original-dynamic-route-action";
+  routeAction.setAttribute("aria-label","Actually execute a source gameplay action at arrival");
+  const valid={
+    site:["approach","harvest","repair","claim"],
+    npc:["approach","speak","observe","support"],
+    cell:["approach"]
+  };
+  const rebuild=()=>{
+    routeAction.replaceChildren();
+    for(const action of valid[routeKind.value]){
+      const option=document.createElement("option");
+      option.value=action;option.textContent=action;routeAction.append(option);
+    }
+    if(routeKind.value==="site")routeAction.value="harvest";
+  };
+  routeKind.addEventListener("change",rebuild);
+  rebuild();
+  const routeButton=document.createElement("button");
+  routeButton.type="button";
+  routeButton.textContent="Execute and independently verify actual world route";
+  const routeResult=document.createElement("pre");
+  routeResult.id="original-dynamic-route-proof";
+  routeResult.setAttribute("role","status");
+  routeResult.setAttribute("aria-live","polite");
+  routeButton.addEventListener("click",async()=>{
+    try{
+      if(!latestStreamRecord)
+        throw Error("Play and independently verify the original streamed world first");
+      const value=routeIndex.value.trim();
+      if(!/^(0|[1-9][0-9]{0,3})$/.test(value))
+        throw Error("Specify one bounded exact source target index");
+      const objective={
+        kind:routeKind.value,index:Number(value),action:routeAction.value
+      };
+      const outcome=await api("/api/plan-original-npc-route",{
+        record:latestStreamRecord,objective,max_steps:24
+      });
+      if(!outcome.verified||outcome.source_files_mutated||
+         outcome.model_weights_promoted||outcome.native_hardware_certified)
+        throw Error("Original route cannot claim false replay, weight or hardware state");
+      const source=await api("/api/verify-original-npc-route",{
+        record:outcome.record
+      });
+      if(!source.verified)throw Error("Original world route failed independent replay");
+      const plan=outcome.record;
+      routeResult.textContent=JSON.stringify({
+        original_world_digest:plan.original_source_digest,
+        approved_objective:plan.objective,
+        source_turns_really_executed:plan.generated_actions,
+        physical_steps:plan.actual_action_receipts,
+        route_replans:plan.replanning_attempts,
+        blocked_waits:plan.blocked_waits,
+        authentic_destination_reached:plan.arrived_at_source_objective,
+        optional_source_action_performed:plan.performed_optional_real_interaction,
+        real_game_outcome:plan.result_summary,
+        full_replay_world_digest:plan.result_world_digest,
+        global_time_optimality_not_claimed:true,
+        no_source_project_mutation:true,
+        no_model_weight_promotion:true
+      },null,2);
+      status("Player route and every NPC step/source effect independently replayed.");
+    }catch(error){
+      routeResult.textContent="";
+      status("Dynamic NPC Route Planner denied: "+error.message);
+    }
+  });
+  target.append(routeKind);target.append(routeIndex);
+  target.append(routeAction);target.append(routeButton);target.append(routeResult);
   return;
  }
  if(advancedSession?.editor==="economy"){
