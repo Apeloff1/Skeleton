@@ -1542,6 +1542,14 @@ CATALOG = json.loads(r'''[
         "minimum": 1,
         "maximum": 10,
         "options": []
+      },
+      {
+        "key": "reinforcement_interval",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
       }
     ],
     "preview": null
