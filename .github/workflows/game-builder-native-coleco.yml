@@ -70,7 +70,7 @@ jobs:
           python -m pip install --disable-pip-version-check 'pytest>=8.4,<9'
           python -m pytest -q --noconftest skeleton/testing/test_game_builder_coleco_native.py
       - name: Upload authentic new ColecoVision machine-code game
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: skeleton-original-colecovision-z80-homebrew
           path: |

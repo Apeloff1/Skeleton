@@ -92,7 +92,7 @@ jobs:
           print("ACTUAL_CGB_ALL_ORIGINAL_MOVES_VERIFIED",d["emulated_steps"])
           PY
       - name: Upload real GBC game and evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: skeleton-original-rgb555-cgb-cartridge
           path: |
