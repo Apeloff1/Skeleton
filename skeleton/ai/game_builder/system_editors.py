@@ -766,6 +766,398 @@ CATALOG = json.loads(r'''[
           "renewable",
           "unlimited"
         ]
+      },
+      {
+        "key": "settler_count",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "starting_energy",
+        "kind": "int",
+        "default": 20,
+        "minimum": 3,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "starting_health",
+        "kind": "int",
+        "default": 60,
+        "minimum": 5,
+        "maximum": 150,
+        "options": []
+      },
+      {
+        "key": "worker_radius",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 7,
+        "options": []
+      },
+      {
+        "key": "crop_days",
+        "kind": "int",
+        "default": 3,
+        "minimum": 2,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "crop_yield",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "season_length",
+        "kind": "int",
+        "default": 12,
+        "minimum": 2,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "weather_enabled",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "ecology_enabled",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "regrowth_cap",
+        "kind": "int",
+        "default": 50,
+        "minimum": 1,
+        "maximum": 1000,
+        "options": []
+      },
+      {
+        "key": "regrowth_period",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "rain_replenishment",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "fire_enabled",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "fire_damage",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "generator_output",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "generator_emissions",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "starvation_damage",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "morale_decay",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "hunger_gain",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 25,
+        "options": []
+      },
+      {
+        "key": "thirst_gain",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 25,
+        "options": []
+      },
+      {
+        "key": "hazards_enabled",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "hunger_threshold",
+        "kind": "int",
+        "default": 80,
+        "minimum": 10,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "thirst_threshold",
+        "kind": "int",
+        "default": 80,
+        "minimum": 10,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "exposure_damage",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "milestone_houses",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "milestone_population",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "move_energy",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 15,
+        "options": []
+      },
+      {
+        "key": "work_energy",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 15,
+        "options": []
+      },
+      {
+        "key": "harvest_strength",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "water_draw",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "fishing_yield",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 15,
+        "options": []
+      },
+      {
+        "key": "irrigation_cost",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "irrigation_effect",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "taming_cost",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "hunting_yield",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "structure_fee",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "plank_wood",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "cooking_yield",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "rest_energy",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "portal_power",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "travel_food",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "travel_energy",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "house_capacity",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "recruit_fee",
+        "kind": "int",
+        "default": 20,
+        "minimum": 1,
+        "maximum": 200,
+        "options": []
+      },
+      {
+        "key": "trading",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "food_price",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "seed_price",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "ore_price",
+        "kind": "int",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "terraforming",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
       }
     ],
     "preview": null
@@ -2916,7 +3308,7 @@ CATALOG = json.loads(r'''[
   }
 ]''')
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
