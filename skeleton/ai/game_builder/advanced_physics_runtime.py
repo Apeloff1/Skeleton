@@ -130,6 +130,9 @@ def normalize_layout(config, layout):
         })
     if bodies[0]["id"] != "payload":
         raise PhysicsActionError("source must give protected payload first identity")
+    if all(abs(goal[axis]-bodies[0]["position"][axis]) <= config["goal_radius"]
+           for axis in (range(3) if depth > 1 else range(2))):
+        raise PhysicsActionError("goal cannot award victory on spawn without physical movement")
     for i, a in enumerate(bodies):
         for b in bodies[i+1:]:
             if all(abs(a["position"][axis] - b["position"][axis]) <
