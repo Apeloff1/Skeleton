@@ -20,7 +20,7 @@ def commit_video_knowledge(journal:DragonEventJournal,session_id:str,
     for chunk in chunks:
         journal.append(session_id,"acquisition_accepted",chunk.source_url,at=now,
                        payload={"video_chunk_id":chunk.chunk_id,"start_ms":chunk.start_ms,"end_ms":chunk.end_ms,
-                                "modalities":chunk.modalities})
+                                "modalities":list(chunk.modalities)})
         journal.append(session_id,"burn_started",chunk.source_url,at=now,
                        payload={"video_chunk_id":chunk.chunk_id})
         receipt=persist(chunk)
