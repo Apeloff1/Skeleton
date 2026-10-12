@@ -36,3 +36,26 @@ Move from candidate quantity to lawful, reproducible acquisition: deploy the own
 
 Code: `skeleton/ai/game_builder/dragon_discovery_admission.py`.
 Regression: `tests/test_dragon_discovery_admission.py`.
+
+## Next reproducible extraction lane: nine pinned catalogs
+
+The manifest `machine/dragon_pinned_crawl_catalogs_20261012.json` now lists nine **additional, Git-revision-identified catalog candidates**: Game Boy, Nintendo 64, CHIP-8, C++ game creation, console-emulator documentation and case studies. This is nine potential **discovery catalogs**, **not** nine approved crawler sources and **not** yet a verified increment to the 5,369 distinct URLs.
+
+A source operator who has separately established permission to retrieve the catalog text can save each exact commit-pinned `README.md` to `/approved/catalog-cache/<owner>/<repo>/README.md`. The `dragon_catalog_expansion` utility does **not** access the network. It rejects modified content by recomputing the Git blob SHA-1 before extracting source links and header/line lineage. It then deduplicates against the full 4,405-entry baseline and the three existing supplements using the canonical URL parser, emits a fourth unapproved supplement, and checks the cumulative 10× target math before writing the evidence file. SHA-256 of each extracted README is also included to support stronger subsequent custody.
+
+Example, after populating the policy-approved cache with the **exact** pinned text:
+
+```bash
+python -m skeleton.ai.game_builder.dragon_catalog_expansion \
+  --trusted-local-operator \
+  --cache /approved/catalog-cache \
+  --observed-at 2026-10-12T02:26:00Z \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json \
+  --output docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json
+```
+
+Pass the generated fourth supplement along with the first three, in that order, to `dragon_almanac_cli import-supplements` to create the additional **pending policy-stage jobs**. The timestamp above illustrates argument shape; operators must use the actual evidence-backed retrieval timestamp and never silently present an example as an observation.
+
+The new acceptance suites `tests/test_dragon_discovery_admission.py` and `tests/test_dragon_catalog_expansion.py` are wired into the hosted Dragon AI Verification workflow. They test full previous-chain counts, idempotency and tenant isolation, atomic corruption rejection, pinned-blob mismatch and non-promotability of unapproved source metadata. Hosted results must be inspected at exact PR head before release.
