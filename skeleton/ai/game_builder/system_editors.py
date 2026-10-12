@@ -2012,6 +2012,462 @@ CATALOG = json.loads(r'''[
           "population",
           "logistics"
         ]
+      },
+      {
+        "key": "max_enemy_active",
+        "kind": "int",
+        "default": 8,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "starting_wood",
+        "kind": "int",
+        "default": 32,
+        "minimum": 0,
+        "maximum": 10000,
+        "options": []
+      },
+      {
+        "key": "starting_ore",
+        "kind": "int",
+        "default": 24,
+        "minimum": 0,
+        "maximum": 10000,
+        "options": []
+      },
+      {
+        "key": "starting_energy",
+        "kind": "int",
+        "default": 18,
+        "minimum": 0,
+        "maximum": 10000,
+        "options": []
+      },
+      {
+        "key": "friendly_base_health",
+        "kind": "int",
+        "default": 45,
+        "minimum": 1,
+        "maximum": 500,
+        "options": []
+      },
+      {
+        "key": "enemy_base_health",
+        "kind": "int",
+        "default": 30,
+        "minimum": 1,
+        "maximum": 500,
+        "options": []
+      },
+      {
+        "key": "obstacle_count",
+        "kind": "int",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "wood_stock",
+        "kind": "int",
+        "default": 60,
+        "minimum": 1,
+        "maximum": 10000,
+        "options": []
+      },
+      {
+        "key": "ore_stock",
+        "kind": "int",
+        "default": 50,
+        "minimum": 1,
+        "maximum": 10000,
+        "options": []
+      },
+      {
+        "key": "energy_stock",
+        "kind": "int",
+        "default": 40,
+        "minimum": 1,
+        "maximum": 10000,
+        "options": []
+      },
+      {
+        "key": "worker_hp",
+        "kind": "int",
+        "default": 15,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "soldier_hp",
+        "kind": "int",
+        "default": 22,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "ranger_hp",
+        "kind": "int",
+        "default": 16,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "medic_hp",
+        "kind": "int",
+        "default": 17,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "siege_hp",
+        "kind": "int",
+        "default": 28,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "worker_attack",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "soldier_attack",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "ranger_attack",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 40,
+        "options": []
+      },
+      {
+        "key": "siege_attack",
+        "kind": "int",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 80,
+        "options": []
+      },
+      {
+        "key": "enemy_attack",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "ranger_range",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "siege_range",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "vision_radius",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "sight_upgrade",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 3,
+        "options": []
+      },
+      {
+        "key": "base_vision",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "worker_capacity",
+        "kind": "int",
+        "default": 6,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "gather_rate",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "economy_bonus",
+        "kind": "int",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "max_buildings",
+        "kind": "int",
+        "default": 16,
+        "minimum": 2,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "building_health",
+        "kind": "int",
+        "default": 20,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "outpost_supply",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "supply_cap",
+        "kind": "int",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "research_cap",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 10,
+        "options": []
+      },
+      {
+        "key": "research_wood",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "research_ore",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "research_energy",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "weapon_bonus",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "armor_bonus",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "enemy_ai",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "enemy_patrol",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "enemy_aggro",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "capture_ticks",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "hold_ticks",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "generator_cycle",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "energy_production",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "turret_range",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 6,
+        "options": []
+      },
+      {
+        "key": "turret_damage",
+        "kind": "int",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "enemy_waves",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "wave_interval",
+        "kind": "int",
+        "default": 12,
+        "minimum": 2,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "wave_cap",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 50,
+        "options": []
+      },
+      {
+        "key": "scan_energy",
+        "kind": "int",
+        "default": 3,
+        "minimum": 0,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "scan_duration",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 20,
+        "options": []
+      },
+      {
+        "key": "scan_bonus",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 8,
+        "options": []
+      },
+      {
+        "key": "repair_wood",
+        "kind": "int",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "repair_amount",
+        "kind": "int",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 30,
+        "options": []
+      },
+      {
+        "key": "logistics_divisor",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 12,
+        "options": []
+      },
+      {
+        "key": "logistics_damage",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
       }
     ],
     "preview": null
@@ -4060,7 +4516,7 @@ CATALOG = json.loads(r'''[
   }
 ]''')
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
