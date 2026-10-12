@@ -2669,7 +2669,7 @@ function showAdvanced(reply){
  advancedAvailableActions=reply.available_actions;
  const nativeSourceFamilies=new Set(["puzzle","platformer","deck_battler",
   "shooter","tactics","tower_defense","racing","survival","farming",
-  "factory","colony"]);
+  "factory","colony","economy"]);
  $("advanced-godot-export").disabled=!nativeSourceFamilies.has(advancedSession.editor);
  $("advanced-godot-export").title=nativeSourceFamilies.has(advancedSession.editor)?
   "Package original Godot source; native hardware verification is a separate CI gate":
@@ -3829,7 +3829,7 @@ $("advanced-scene-stage").addEventListener("click",async()=>{
 });
 $("advanced-godot-export").addEventListener("click",async()=>{
  try{
-  if(!advancedSession||(!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)&&advancedSession.editor!=="colony"))
+  if(!advancedSession||(!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)&&advancedSession.editor!=="colony"&&advancedSession.editor!=="economy"))
    throw Error("Native Godot export requires a verified advanced gameplay session in one of the supported playable native genres");
   if(!advancedSettings)
    throw Error("Original authored game settings must be available");
