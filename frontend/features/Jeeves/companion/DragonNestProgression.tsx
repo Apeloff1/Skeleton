@@ -39,15 +39,26 @@ function valid(snapshot: DragonNestSnapshot | null | undefined): snapshot is Dra
       !Number.isSafeInteger(snapshot.sources_total) || snapshot.sources_total < 1 ||
       !Number.isSafeInteger(snapshot.sources_consumed) || snapshot.sources_consumed < 0 ||
       snapshot.sources_consumed > snapshot.sources_total ||
+      snapshot.sources_total > 10000 ||
       !/^[0-9a-f]{64}$/.test(snapshot.history_head) ||
       !Number.isFinite(Date.parse(snapshot.last_changed_at)) ||
       !snapshot.last_improvement.startsWith('(') || !snapshot.last_improvement.endsWith(')')) return false;
   const expected = ['article', 'video', 'updates'];
   if (snapshot.children.length !== 0 && snapshot.children.length !== 3) return false;
+  if ((snapshot.stage === 'adult') !== (snapshot.children.length === 3)) return false;
   return snapshot.children.every((c, i) =>
-    c.lane === expected[i] && Number.isSafeInteger(c.level) && c.level >= 0 && c.level <= 20 &&
+    c != null && typeof c === 'object' && c.lane === expected[i] &&
+    Number.isSafeInteger(c.level) && c.level >= 0 && c.level <= 20 &&
     Number.isSafeInteger(c.knowledge_items) && c.knowledge_items >= 0 &&
+    c.knowledge_items <= 8192 &&
     ['egg', 'hatchling', 'juvenile', 'adult'].includes(c.stage));
+}
+
+/** Reject stale, malformed or incomplete API payloads instead of inventing pet progress. */
+export function normalizeDragonNestSnapshot(value: unknown): DragonNestSnapshot | null {
+  if (value === null || typeof value !== 'object') return null;
+  const candidate = value as DragonNestSnapshot;
+  return valid(candidate) ? candidate : null;
 }
 
 /** A display only: tapping or rendering this component never starts research. */
