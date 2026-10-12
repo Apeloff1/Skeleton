@@ -32,6 +32,7 @@ from .advanced_defense_godot import render_defense_godot_package
 from .advanced_racing_godot import render_racing_godot_package
 from .advanced_survival_godot import render_survival_godot_package
 from .advanced_farming_godot import render_farming_godot_package
+from .advanced_factory_godot import render_factory_godot_package
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -139,6 +140,7 @@ def main(argv=None) -> int:
                       else render_racing_godot_package if receipt.get("editor")=="racing"
                       else render_survival_godot_package if receipt.get("editor")=="survival"
                       else render_farming_godot_package if receipt.get("editor")=="farming"
+                      else render_factory_godot_package if receipt.get("editor")=="factory"
                       else render_advanced_godot_package)
             artifact=renderer(receipt,settings,authorized=args.trusted_local_operator)
             destination=write_advanced_godot_package(
