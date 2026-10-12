@@ -1,0 +1,87 @@
+name: Original Social Quest Causal Fusion
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_social_quest_fusion.py"
+      - "skeleton/ai/game_builder/advanced_dialogue_runtime.py"
+      - "skeleton/ai/game_builder/advanced_npc_society_runtime.py"
+      - "skeleton/ai/game_builder/advanced_quest_director_runtime.py"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_social_quest_fusion.py"
+      - ".github/workflows/game-builder-social-quest-fusion.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: original-causal-social-fusion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  original-causal-bridge:
+    name: Three real social game engines and replay (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 16
+    env:
+      PYTHONUTF8: "1"
+      PYTHONPATH: "."
+      EXACT_SOURCE: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Source-locked checkout with no stored credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_social_quest_fusion.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Exact source, syntax and source-bounded manifest validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXACT_SOURCE"
+          python -m py_compile skeleton/ai/game_builder/advanced_social_quest_fusion.py tests/test_game_builder_social_quest_fusion.py skeleton/ai/game_builder/system_editor_cli.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_workspace_ui.py
+      - name: Actually execute three game worlds and adversarial composite proofs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_game_builder_social_quest_fusion -v
+      - name: Independently revalidate bounded original fusion on multiple seeds
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from skeleton.ai.game_builder.advanced_social_quest_fusion import (
+              run_social_quest_fusion, verify_social_quest_fusion,
+          )
+          route=["quest_director:south","quest_director:east",
+                 "quest_director:collect:0","bridge:interview:0"]
+          for seed in (0,1,2,7):
+              report=run_social_quest_fusion(route,seed=seed)
+              assert verify_social_quest_fusion(report)
+              assert report["triple_corroborated_interviews"]==1
+              assert not report["model_weights_promoted"]
+              print("VERIFIED_ACTUAL_THREE_WORLD_INTERVIEW",
+                    seed,report["digest"])
+          PY
+      - name: Preserve fail-closed historical provenance
+        if: always()
+        shell: bash
+        run: |
+          echo "Exact-head tri-engine causal proof completed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Do not merge without independent actual game replay and all parent gates."
