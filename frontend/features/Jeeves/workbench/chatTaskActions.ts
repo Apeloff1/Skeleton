@@ -34,6 +34,8 @@ export type ChatTaskPlan = Readonly<{
   projectId: string;
   projectRevision: number;
   projectTitle: string;
+  conversationId: string;
+  messageId: string;
   steps: readonly ChatTaskDraft[];
 }>;
 
@@ -118,6 +120,8 @@ export function prepareChatTasks(
     projectId: project.id,
     projectRevision: project.revision,
     projectTitle: project.title,
+    conversationId,
+    messageId,
     steps,
   };
 }
@@ -135,10 +139,13 @@ export function checkedTaskCommands(state: Workbench, plan: ChatTaskPlan): Comma
     throw new ChatTaskActionError('Task batch is invalid or exceeds capacity.');
   }
   const sources = new Set<string>();
-  return plan.steps.map((step, index) => {
-    if (step.ordinal !== index + 1 || typeof step.title !== 'string' ||
+  let previousOrdinal = 0;
+  return plan.steps.map(step => {
+    if (!Number.isSafeInteger(step.ordinal) || step.ordinal <= previousOrdinal ||
+        step.ordinal > CHAT_TASK_LIMIT || typeof step.title !== 'string' ||
         !step.title.trim() || step.title.length > LIMITS.title ||
-        typeof step.source !== 'string' || !step.source.startsWith(SOURCE_LABEL) ||
+        typeof step.source !== 'string' ||
+        step.source !== sourceFor(plan.conversationId, plan.messageId, step.ordinal) ||
         sources.has(step.source) || /[\r\n\u0000-\u001f\u007f]/.test(step.title)) {
       throw new ChatTaskActionError('Task proposal has invalid or duplicate fields.');
     }
@@ -146,6 +153,7 @@ export function checkedTaskCommands(state: Workbench, plan: ChatTaskPlan): Comma
       task.description.includes(step.source))) {
       throw new ChatTaskActionError('This chat proposal has already been applied.');
     }
+    previousOrdinal = step.ordinal;
     sources.add(step.source);
     return {
       type: 'task.create' as const,
