@@ -225,7 +225,8 @@ def validate_chapter_history(scenes, *, require_final=False):
     }
 
 
-def chapter_context(bible, contract, scenes, *, chapter=None, max_prior_capsules=12):
+def chapter_context(bible, contract, scenes, *, chapter=None, max_prior_capsules=12,
+                    max_carry_highlights=200):
     """One chapter's raw scene context; prior history only via source-linked capsules.
 
     Invoke after full source and receipt reparse. The model context intentionally
@@ -240,6 +241,7 @@ def chapter_context(bible, contract, scenes, *, chapter=None, max_prior_capsules
         chapter=current
     number(chapter,1,CHAPTERS,"requested chapter")
     number(max_prior_capsules,1,CHAPTERS,"prior chapter recall")
+    number(max_carry_highlights,1,500,"bounded carry-over memory")
     require(chapter <= current and (not scenes or chapter in
             projection["chapter_starts"]),
             "cannot load a nonexistent future chapter")
@@ -251,6 +253,11 @@ def chapter_context(bible, contract, scenes, *, chapter=None, max_prior_capsules
              if data["chapter"]==chapter]
     carry=[{"id":key,**data} for key,data in projection["highlights"].items()
            if data["chapter"]<chapter and not data["closed"]]
+    all_carry_count=len(carry)
+    # Bound model context while retaining every historic marker in the signed
+    # source ledger. A partial carry is explicit, never called complete memory.
+    carry.sort(key=lambda row:(-row["importance"],-row["sequence"],row["id"]))
+    carry=carry[:max_carry_highlights]
     # Model context has an explicit, honest byte budget. Historical facts are
     # fully replayed regardless. No hidden truncation: oversize chapters retain
     # their complete source addresses and require exact-source pagination.
@@ -293,6 +300,9 @@ def chapter_context(bible, contract, scenes, *, chapter=None, max_prior_capsules
         "exact_source_pages_required_if_oversize":not all_in_context,
         "chapter_highlighters":markers,
         "unresolved_prior_highlighters":carry,
+        "all_unresolved_prior_highlighter_count":all_carry_count,
+        "prior_highlighters_full_in_model_context":len(carry)==all_carry_count,
+        "prior_highlighter_index_digest":digest(projection["highlights"]),
         "prior_chapter_endings":prior[-max_prior_capsules:],
         "older_chapters_retrievable_by_bookmark":True,
         "all_previous_chapters_reparsed":True,
