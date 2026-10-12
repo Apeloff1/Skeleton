@@ -24,6 +24,8 @@ from .advanced_gameplay_runtime import (
 )
 from .advanced_level_scenes import make_advanced_scene, scene_path
 from .advanced_puzzle_solver import solve_advanced_puzzle
+from .advanced_roguelike_longrun import (replay_long_roguelike,
+    continue_long_roguelike,verify_long_roguelike)
 from .advanced_world_planner import plan_original_world
 from .advanced_stealth_planner import plan_stealth_route
 from .advanced_godot_export import (
@@ -268,6 +270,19 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "requires_approved_system":True,
                 "automatically_committed":False,
             })
+        if path=="/api/roguelike-marathon":
+            if values.get("prior") is not None:
+                result=continue_long_roguelike(
+                    values["prior"],values.get("actions",[]),values.get("settings"))
+            else:
+                result=replay_long_roguelike(
+                    values.get("settings"),values.get("actions",[]),
+                    seed=values.get("seed",0),scene=values.get("scene"),
+                    checkpoint_interval=values.get("checkpoint_interval",64))
+            return self._json(200,{"record":result,
+                "independently_verified":verify_long_roguelike(
+                    result,values.get("settings")),
+                "game_files_mutated":False,"native_executable_certified":False})
         if path=="/api/world-plan":
             result=plan_original_world(values["scene"],values.get("settings"),
                 max_states=values.get("max_states",50000),
