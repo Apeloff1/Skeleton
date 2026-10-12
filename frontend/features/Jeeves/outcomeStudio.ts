@@ -167,10 +167,10 @@ export function compactPlayerContext(
   plan: PlanCatalog, outcome: StorySimulation | null,
 ): string {
   const characters = plan.characters.slice(0, 14).map(c =>
-    c.id + ': ' + c.backstory.slice(0, 180) + '; goal: ' +
+    c.id + ' (' + c.name + '): ' + c.backstory.slice(0, 180) + '; goal: ' +
     c.goals.slice(0, 120) + '; ending: ' + c.personal_ending.slice(0, 100));
   const places = plan.places.slice(0, 12).map(p =>
-    p.id + ': ' + p.history.slice(0, 150) + '; conflicts: ' +
+    p.id + ' (' + p.name + '): ' + p.history.slice(0, 150) + '; conflicts: ' +
     p.regional_conflicts.slice(0, 150));
   const history = (outcome?.steps || []).slice(-20).map(s =>
     'SCENE ' + s.scene + ': ' + s.choice + ' (' + s.intent + ') receipt ' +
