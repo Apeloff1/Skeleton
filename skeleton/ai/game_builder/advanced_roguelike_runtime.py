@@ -178,12 +178,21 @@ def normalize_layout(config,layout):
         for key in ("ranged","rewarded","is_boss"):
             if type(e[key]) is not bool:
                 raise RoguelikeActionError("enemy boolean state must be typed")
+        if e["is_boss"]!=(e["kind"]=="guardian"):
+            raise RoguelikeActionError("original guardian identity and actual boss type must match")
         if e["hp"]!=e["max_hp"] or e["hp"]<=0 or e["status"]!="active" or (
             e["poison"] or e["stun"] or e["rewarded"]):
             raise RoguelikeActionError("authored enemy must begin as a genuine undefeated foe")
         enemies.append(dict(e))
     _integer(layout["hazard_damage"],0,config["trap_damage"],"trap damage")
     _integer(layout["reserve"],0,config["encounters_per_floor"],"encounter reserve")
+    if sum(e["is_boss"] for e in enemies)>1:
+        raise RoguelikeActionError("multiple finale guardians in one original dungeon are invalid")
+    if config["lockpicks"]==0 and enemies and (
+        enemies[0]["cell"] not in reached):
+        raise RoguelikeActionError("locked physical floor has neither a reachable elite nor a lockpick")
+    if any(e["is_boss"] and e["cell"] not in reached for e in enemies):
+        raise RoguelikeActionError("the actual boss must be reachable on the authored map")
     if config["floors"]==1 and not any(e["is_boss"] for e in enemies):
         raise RoguelikeActionError("single-floor campaigns require an actual original guardian")
     if config["floors"]>1 and any(e["is_boss"] for e in enemies):
