@@ -1,0 +1,79 @@
+# Advanced Game Studio — 128-NPC Fair Physical Streaming
+
+Date: 2026-10-12 (Europe/Oslo). Draft pending exact-head CI.
+Dependency stack: unified NPC world #3686, streaming #3689, timeline
+#3690, fast source forks #3692 and history index #3694.
+
+## Real bounded physical NPC world
+
+The original 21x21 or 35x35 chunked CPU reference world supports up to
+128 persistent distinct original NPCs. Four are source-authored and the
+others are deterministic original residents generated from the source seed,
+each tagged with honest original provenance. No character is presented
+as copied or imported from a commercial title.
+
+The detailed simulation limit is distinct from the population size:
+4–32 actual detailed NPC update slots per tick. Deferred NPCs retain exact
+last physical position and cannot teleport, witness events, cause hidden
+quests or claim unperformed activity. Source-line-of-sight still uses the
+full original expanded map geometry.
+
+## Two deterministic fidelity policies
+
+- nearest: unchanged physically closest priority with stable source ID ties.
+- fair: eligible NPCs gain progressively more priority after each detailed
+  turn they miss. Actors outside the current loaded chunks remain deferred
+  and never receive pretend detailed updates.
+
+Each actor records actual tile steps, detailed turns, deferred turns,
+current and longest deferral streak, and deferred turns during which the
+actor was inside a loaded eligible chunk. The world scheduler records
+detailed updates, deferred turns, physical movements, eligible deferred
+turns and largest historical deferral streak.
+
+For N actors across T ticks, detailed updates plus deferred actor turns
+must equal N multiplied by T. An individual actor cannot move more tiles
+than its actual detailed updates. These are verifiable work counters, not
+inferred performance or GPU hardware benchmarks.
+
+## Practical original game capability
+
+Existing original physical harvesting, firsthand eyewitness events, finite
+resource payments, real speaker trust and earned quest consequences remain
+source-verified. Studio allows 8/16/24/32/64/96/128 persistent residents,
+detailed NPC budgets up to 32 and selection of nearest vs fair policies.
+Every fairness decision is replayable from exact source scene, seed and
+registered game actions, without arbitrary user-provided state injection.
+
+New cross-OS tests execute 128 real NPC identities on both world sizes,
+check uniqueness and occupancy, enforce one-tile physical moves, compare
+actual detailed/deferred work, and reject forged counters, source identities
+and unknown policies. Original timeline bookmarks and branch continuation
+remain source-bound under the new typed options.
+
+## Time-stamped change history
+
+2026-10-12 — Persistent original NPC count increased 32 to 128
+(expanded actually instantiated social world population).
+
+2026-10-12 — Detailed actor budget increased 16 to 32
+(expanded honest high-fidelity simulation options).
+
+2026-10-12 — Implemented deterministic deferral-aware scheduler policy
+(spreads high-detail attention within physically eligible population).
+
+2026-10-12 — Added full actor and aggregate deferred-work accounting
+(prevents fabricated mass simulation and hidden progress claims).
+
+2026-10-12 — Added Studio controls, strict original option validation,
+source-forgery tests and exact-head Ubuntu/Windows CI
+(makes expanded gameplay auditable).
+
+## Limits
+
+Not every resident is fully detailed on every turn. Fairness cannot
+guarantee service for an actor outside eligible chunks and is not a
+starvation-free proof for arbitrary maps. This milestone does not certify
+native Godot execution, million-NPC games, multi-world memory import,
+commercial release, or automatic AI weight improvement. PR stack remains
+draft and unmerged until integration validation.
