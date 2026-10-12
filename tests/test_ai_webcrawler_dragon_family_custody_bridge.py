@@ -114,6 +114,69 @@ def test_trusted_producer_cannot_cross_owner_in_family_or_almanakk():
     db.close()
 
 
+def test_idle_custody_service_uses_real_reviewed_article_and_monitor_captures():
+    from skeleton.ai.webcrawler.dragon_family_idle_integration import (
+        DragonIdleAcquisitionService, AcquiredArticle,
+    )
+    from skeleton.ai.webcrawler.dragon_family import IdleWindow
+    db=sqlite3.connect(":memory:")
+    bridge=DragonFamilyCustodyBridge(db,OWNER)
+    original=document("First independently reviewed level design foundation.")
+    grant(db,sid="web-1",digest=original.content_hash)
+    src,first=bridge.article(snap("web-1"),original)
+    family=bridge.family()
+    family.enroll(OWNER,(src,),authorized=True,now=NOW+11)
+    family.seal_inventory(OWNER,authorized=True,now=NOW+12)
+    family.consume(OWNER,first,authorized=True)
+    updated=document("Improved source with newly reviewed mechanics.",
+                     fetched_at=NOW+710)
+    grant(db,sid="web-1",digest=updated.content_hash)
+    updated_snap=snap("web-1",at=NOW+715,improvement="new collision response details")
+    controller=DragonIdleAcquisitionService(bridge)
+    window=lambda:IdleWindow(NOW+720,NOW+100,0,False,True)
+    result=controller.run_once(
+        authorized=True,idle_state=window,
+        article_capture=lambda task:AcquiredArticle(updated_snap,updated),
+        task_topics=("game_design",))
+    assert result["changed"]==1 and result["failed"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==1
+    # Same capture can never mint second XP from another hatchling, even when
+    # a different callback and a new idle tick provide it.
+    replay=controller.run_once(
+        authorized=True,idle_state=lambda:IdleWindow(NOW+720+7*3600,NOW+100,0,False,True),
+        monitor_capture=lambda task:AcquiredArticle(
+            snap("web-1",at=NOW+720+7*3600-1),updated),
+        task_topics=("game_design",))
+    assert replay["changed"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][2]["discoveries"]==0
+    db.close()
+
+
+def test_idle_custody_service_rejects_wrong_source_capture_without_growth():
+    from skeleton.ai.webcrawler.dragon_family_idle_integration import (
+        DragonIdleAcquisitionService,AcquiredArticle,
+    )
+    from skeleton.ai.webcrawler.dragon_family import IdleWindow
+    db=sqlite3.connect(":memory:")
+    bridge=DragonFamilyCustodyBridge(db,OWNER)
+    original=document("Article-first original validated evidence.")
+    grant(db,sid="web-1",digest=original.content_hash)
+    src,first=bridge.article(snap("web-1"),original)
+    family=bridge.family()
+    family.enroll(OWNER,(src,),authorized=True,now=NOW+11)
+    family.seal_inventory(OWNER,authorized=True,now=NOW+12)
+    family.consume(OWNER,first,authorized=True)
+    controller=DragonIdleAcquisitionService(bridge)
+    result=controller.run_once(authorized=True,
+        idle_state=lambda:IdleWindow(NOW+720,NOW+100,0,False,True),
+        article_capture=lambda task:AcquiredArticle(
+            snap("different-source",at=NOW+719),original),
+        task_topics=("game_design",))
+    assert result["paused"] is True and result["changed"]==0
+    assert family.snapshot(OWNER,authorized=True)["children"][0]["discoveries"]==0
+    db.close()
+
+
 def test_article_tampered_capture_and_untrusted_url_are_refused():
     db = sqlite3.connect(":memory:")
     bridge = DragonFamilyCustodyBridge(db, OWNER)
