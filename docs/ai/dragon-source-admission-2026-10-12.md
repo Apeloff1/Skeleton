@@ -80,3 +80,32 @@ python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-receipts --datab
 ```
 
 `discovery-topics` returns the direct children of an observed heading path, with inherited source counts. `discovery-sources` returns one canonical acquisition identity per URL, its existing policy-stage job state and the total count of unreviewed raw provenance receipts. `discovery-receipts` returns the exact original link, catalog evidence path, observed heading paths, pinned identifiers and receipt digest. Each view validates stored source or evidence digests before presentation and carries explicit `training_authorized: false` and `scope: discovery_metadata_only` fields. Pagination is bounded to 100 rows and all queries require an explicit owner. The CLI is a local operator interface, **not** an HTTP endpoint and **not** a new runtime permission.
+
+
+## Current accepted discovery lineage — 12,777 raw leads
+
+The previously completed **10,551 raw-lead** chain comprised batches 0020–0023 and 0031–0037. An additional 12 SHA-pinned public README catalogs now supply **2,226 non-repeating raw URL leads** in consecutively linked batches **0038–0041**, for **12,777 / 44,050 (29.01%)** of the requested raw discovery target. The accepted chain is precisely fifteen evidence files: 0020, 0021, 0022, 0023, 0031–0041. Batches 0024 and 0030 are orphan/fork evidence and remain excluded, not double-counted.
+
+The new catalogs add specialized source-discovery coverage of Game Boy, N64, Xbox, PICO-8 and TIC-80 development, game networking, AI game research, level design, game production, and programming. Exact repository commit IDs, README blob SHA-1 identities, original link URLs, line numbers and observed heading paths are captured. The staging observation file `docs/ai/evidence/dragon-new-catalog-metadata-20261012-v1.json` retains 2,358 raw line observations from these 12 catalogs; admission deduplicated 105 already-recorded links and 27 repeated observations within this new source set, yielding **2,226 additional distinct raw links**. Each admitted raw URL retains bounded multiple origin references.
+
+An operator can **verify** the pinned evidence chain without network requests or any database source approval:
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-verify \
+  --database /path/to/staging-dragon.sqlite --owner studio \
+  --trusted-local-operator
+```
+
+After independent operator authorization, `import-reconciled` imports the **metadata only**, with one canonical policy-stage job per normalized URL and all distinct raw provenance receipts. It is not a crawling instruction; the separate policy worker must still perform origin-appropriate robots/terms/SSRF/license checks before fetching.
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli import-reconciled \
+  --database /path/to/staging-dragon.sqlite --owner studio \
+  --trusted-local-operator
+```
+
+Both commands use `dragon_discovery_reconciled.py`, now bound to the 12,777-lead, fifteen-file sequence, and refuse missing, reordered, duplicated or authority-promoting input. The documentation above covering 5,369 and 10,551 raw leads describes **historical milestones**, not the current maximum. The full current count remains **raw references**, not independent original sources, approved crawler destinations, verified license permissions or model training material. Source independence, current validity, relevance and rights still require separate evidence-backed assessment.
+
+### Source-diversity caution
+
+Some new collections contain many entries from GitHub, academic preprint hosts and video services. Several links may refer to the same underlying work or to unavailable destinations. Domain count is not independent-evidence count; raw URL growth is not machine knowledge growth. Source-level legal and factual scrutiny remains necessary before any ingestion, distillation or Wiki/HOAG memory promotion.
