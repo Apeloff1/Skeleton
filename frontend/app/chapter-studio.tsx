@@ -429,6 +429,23 @@ export default function ChapterStudioScreen() {
     setNotice('Reviewed evidence recorded: ' + String(response.data.review_receipt).slice(0, 20));
     await readMatrixCoverage();
   };
+  const finalizeMatrixReview = async () => {
+    if (!scene) throw new Error('Select a saved scene first.');
+    const result = await api.post<any>(
+      base() + '/scenes/' + scene.scene +
+      '/matrix-finalize?branch_id=' + encodeURIComponent(branch),
+      {}, { headers: authHeaders(), retries: 0, timeoutMs: 30000 },
+    );
+    if (!result.ok || !result.data?.ok ||
+        result.data.scene_receipt !== scene.digest ||
+        result.data.coverage?.fully_reviewed !== true) {
+      throw new Error('Not all 10,000 evidence cells passed. Final matrix receipt was not issued.');
+    }
+    setMatrixCoverage(result.data.coverage);
+    setNotice('All 100×100 source reviews accepted. Compact scene receipt: ' +
+      String(result.data.matrix_review_receipt).slice(0, 24) +
+      '. This is a review-coverage receipt, not proof of perfect writing.');
+  };
   const verifyProductionManifest = async () => {
     const result = await api.get<any>(
       base() + '/chapters/production-manifest?branch_id=' + encodeURIComponent(branch),
@@ -657,6 +674,7 @@ export default function ChapterStudioScreen() {
             {manifest.coverage.chapter_notes}/100 chapters · {manifest.coverage.acts_with_scenes}/1000 acts
             · {manifest.coverage.scenes_approved}/9999 approved scenes
             · {manifest.coverage.scenes_proofed}/9999 current 100k proofs
+            · {manifest.coverage.scenes_with_approved_100x100_matrix || 0}/9999 complete 100×100 reviews
           </Text>
           <Text style={styles.muted}>
             Missing chapters: {(manifest.missing_chapters || []).slice(0, 20).join(', ') || 'none'}.
@@ -745,6 +763,9 @@ export default function ChapterStudioScreen() {
         <Action label="Check 10,000-cell scrutiny coverage"
           disabled={!scene || busy}
           onPress={() => { void withOperation(readMatrixCoverage); }} />
+        <Action label="Finalize 10,000-cell matrix receipt after complete creator review"
+          disabled={!scene || busy} icon="shield-checkmark-outline"
+          onPress={() => { void withOperation(finalizeMatrixReview); }} />
         {matrixCoverage && <>
           <Text style={matrixCoverage.fully_reviewed ? styles.label : styles.error}>
             {matrixCoverage.cells_passed}/10,000 reviewed and accepted
