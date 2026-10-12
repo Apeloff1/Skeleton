@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 # slug, public documentation entry URL, research axis, direct concepts
-SEEDS = (
+BASE_SEEDS = (
  ("godot", "https://docs.godotengine.org/en/stable/", "engine", "godot editor physics scripting animation"),
  ("unity", "https://docs.unity3d.com/Manual/", "engine", "unity editor physics rendering"),
  ("unreal", "https://dev.epicgames.com/documentation/en-us/unreal-engine/", "engine", "unreal blueprint physics rendering"),
@@ -59,3 +59,8 @@ SEEDS = (
  ("wipo", "https://www.wipo.int/en/web/copyright", "rights", "copyright intellectual-property licensing"),
  ("copyright-office", "https://www.copyright.gov/", "rights", "copyright originality rights law"),
 )
+
+# Stable original identities, then additional candidate-only game studio sources.
+from .dragon_technical_source_cohort_20261012 import ADDITIONAL_SEEDS
+
+SEEDS = BASE_SEEDS + ADDITIONAL_SEEDS

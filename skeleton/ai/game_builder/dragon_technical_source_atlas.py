@@ -31,10 +31,31 @@ _ADJACENT = {
     "music": ("audio", "latency", "accessibility", "sound"),
     "release": ("shipping", "rights", "security", "packaging"),
     "ai": ("evaluation", "agents", "security", "training"),
+    "game": ("engine", "design", "assets", "qa"),
+    "level": ("editor", "tilemap", "narrative", "physics"),
+    "rpg": ("narrative", "quest", "dialogue", "save"),
+    "maze": ("pathfinding", "level", "editor", "physics"),
+    "gameplay": ("physics", "ai", "animation", "qa"),
+    "multiplayer": ("network", "replication", "matchmaking", "security"),
+    "homebrew": ("console", "retro", "portability", "compiler"),
+    "porting": ("runtime", "formats", "shipping", "performance"),
+    "shader": ("graphics", "materials", "rendering", "gpu"),
+    "performance": ("optimization", "profiling", "graphics", "physics"),
+    "animation": ("rigging", "sprites", "assets", "skeletal"),
+    "dialogue": ("narrative", "quest", "localization", "accessibility"),
+    "testing": ("qa", "fuzzing", "profiling", "debugging"),
+    "syntax": ("compiler", "coding", "debugging", "errors"),
+    "license": ("rights", "compliance", "shipping", "assets"),
+    "localization": ("translation", "unicode", "subtitles", "accessibility"),
+    "pipeline": ("production", "assets", "formats", "build"),
+    "console": ("homebrew", "shipping", "portability", "graphics"),
 }
 _DAYS = {"engine":14, "runtime":14, "graphics":30, "audio":60,
     "homebrew":90, "coding":14, "security":30, "ai":14, "research":30,
-    "accessibility":90, "shipping":30, "rights":90}
+    "accessibility":90, "shipping":30, "rights":90,
+    "physics":30, "network":14, "assets":30, "animation":30,
+    "narrative":60, "qa":14, "optimization":14, "localization":60,
+    "formats":60, "production":30}
 _WORD = re.compile(r"[a-z0-9]+")
 _ID = re.compile(r"source-[0-9a-f]{64}\Z")
 _SLUG = re.compile(r"[a-z][a-z0-9-]{1,39}\Z")
@@ -45,7 +66,7 @@ def _curate():
     for slug,raw,family,words in SEEDS:
         url=canonical_source_url(raw)
         topics=tuple(words.split())
-        if (not _SLUG.fullmatch(slug) or slug in slugs or url in urls
+        if (urlsplit(url).scheme != "https" or not _SLUG.fullmatch(slug) or slug in slugs or url in urls
             or family not in _DAYS or not 1<=len(topics)<=16
             or any(not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,39}",word) for word in topics)):
             raise ValueError("invalid curated atlas seed")

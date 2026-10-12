@@ -185,7 +185,7 @@ class DragonNestSourceFeed:
             query=" ".join((*nest.focus_tags,*nest.adjacent_tags))[:300].strip()
             if query:
                 proposal=self.atlas.plan(
-                    owner,query,authorized=True,limit=max(article_limit,len(CATALOG)),
+                    owner,query,authorized=True,limit=max(article_limit,min(len(CATALOG),100)),
                     max_per_host=max_per_host,
                 )
                 for hit in proposal["selected"]:
