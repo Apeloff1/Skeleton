@@ -191,12 +191,15 @@ class DragonFamilyCustodyBridge:
         _digest(content_digest)
         # Resolve review fingerprint from exact previously approved evidence.
         # Arbitrary client-submitted digests are never accepted here.
-        matching = self.db.execute("""SELECT DISTINCT l.review_digest
-            FROM dragon_practice_lessons l JOIN dragon_evidence_passes e
-              ON e.owner=l.owner AND e.claim_id=l.claim_id
-            WHERE l.owner=? AND l.claim_id=? AND l.consent=1
-              AND e.source_id=? AND e.source_revision=?""",
-            (self.owner, snapshot.claim_id, snapshot.source_id, content_digest)).fetchall()
+        try:
+            matching = self.db.execute("""SELECT DISTINCT l.review_digest
+                FROM dragon_practice_lessons l JOIN dragon_evidence_passes e
+                  ON e.owner=l.owner AND e.claim_id=l.claim_id
+                WHERE l.owner=? AND l.claim_id=? AND l.consent=1
+                  AND e.source_id=? AND e.source_revision=?""",
+                (self.owner, snapshot.claim_id, snapshot.source_id, content_digest)).fetchall()
+        except sqlite3.OperationalError:
+            raise PermissionError("canonical reviewed source ledger unavailable") from None
         for (review_digest,) in matching:
             receipt = SourceReceipt(snapshot.source_id, content_digest,
                                     review_digest, snapshot.observed_at,
