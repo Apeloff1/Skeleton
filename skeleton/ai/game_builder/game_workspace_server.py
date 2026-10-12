@@ -300,7 +300,8 @@ class _StudioHandler(BaseHTTPRequestHandler):
         if path=="/api/story-scene-template":
             from .story_workspace import next_story_scene_template
             return self._json(200,next_story_scene_template(
-                studio,values["project"],values["act"],values["scene"]))
+                studio,values["project"],values["act"],values["scene"],
+                chapter=values.get("chapter")))
         if path=="/api/story-brief":
             from .story_workspace import story_workspace_brief
             return self._json(200,story_workspace_brief(
@@ -316,7 +317,7 @@ class _StudioHandler(BaseHTTPRequestHandler):
             source_path=values["path"]
             schema=(BIBLE if source_path=="game/story_bible.json"
                     else CONTRACT if source_path=="game/continuity_contract.json"
-                    else SCENE if source_path.startswith("story/scenes/")
+                    else SCENE if source_path.startswith(("story/scenes/","story/chapters/"))
                     else None)
             if schema is None:
                 raise WorkspaceError("Jeeves signing only permits exact approved story sources")
