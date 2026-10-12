@@ -7,12 +7,15 @@ from collections import Counter
 from .contracts import canonical_json
 from .dragon_almanacs import DragonAlmanacs
 from .dragon_technical_source_atlas import CATALOG, CATALOG_DIGEST, DragonTechnicalSources
+from .dragon_technical_source_captures import DragonSourceCaptures
 from .reviewed_knowledge import ReviewedKnowledgeStore
 
 
 def main():
     parser=argparse.ArgumentParser(description="Policy-stage technical source metadata")
-    parser.add_argument("command",choices=("census","import","plan","history"))
+    parser.add_argument("command",choices=("census","import","plan","history",
+                                                  "capture-history","capture-review",
+                                                  "capture-census"))
     parser.add_argument("--database",required=True)
     parser.add_argument("--owner",required=True)
     parser.add_argument("--trusted-local-operator",action="store_true")
@@ -22,6 +25,7 @@ def main():
     parser.add_argument("--limit",type=int,default=20)
     parser.add_argument("--max-per-host",type=int,default=2)
     parser.add_argument("--direct-only",action="store_true")
+    parser.add_argument("--include-captured-text",action="store_true")
     args=parser.parse_args()
     if not args.trusted_local_operator:
         parser.error("local operator trust required; no HTTP browsing endpoint")
@@ -43,9 +47,44 @@ def main():
             report=atlas.plan(args.owner,args.query,authorized=True,limit=args.limit,
                               max_per_host=args.max_per_host,
                               include_adjacent=not args.direct_only)
-        else:
+        elif args.command=="history":
             if not args.source_id: parser.error("--source-id required")
             report=atlas.history(args.owner,args.source_id,authorized=True)
+        else:
+            captures=DragonSourceCaptures(atlas.a)
+            if args.command=="capture-census":
+                rows=store.db.execute(
+                    "SELECT DISTINCT source FROM dragon_technical_captures_v1 "
+                    "WHERE owner=? ORDER BY source",(args.owner,)
+                ).fetchall()
+                sequences=[captures.history(args.owner,row[0],authorized=True)
+                           for row in rows]
+                report={
+                    "schema":"skeleton.dragon.capture_census.v1",
+                    "owner":args.owner,
+                    "curated_candidates":len(CATALOG),
+                    "observed_sources":len(rows),
+                    "observation_events":sum(len(seq) for seq in sequences),
+                    "new_content_revisions":sum(
+                        event["change"] in ("new","changed")
+                        for seq in sequences for event in seq
+                    ),
+                    "uncorroborated_review_packets":sum(
+                        seq[-1]["change"]!="unchanged" for seq in sequences if seq
+                    ),
+                    "network_requests":0,
+                    "knowledge_approved":False,
+                    "training_authorized":False,
+                }
+            else:
+                if not args.source_id:
+                    parser.error("--source-id required for capture inspection")
+                report=(captures.history(args.owner,args.source_id,authorized=True)
+                        if args.command=="capture-history"
+                        else captures.review_packet(
+                            args.owner,args.source_id,authorized=True,
+                            include_text=args.include_captured_text
+                        ))
         print(canonical_json(report))
 
 
