@@ -540,7 +540,7 @@ def test_full_tenfold_source_milestone_fits_bounded_evidence_partition_budget():
     import math
     more = math.ceil((44_050 - EXPECTED_RAW_TOTAL) / 1_000)
     assert EXPECTED_RAW_TOTAL == 20_860
-    assert len(SOURCE_BATCHES) == 21
+    assert len(SOURCE_BATCHES) == 24
     assert MAX_SUPPLEMENTS >= len(SOURCE_BATCHES) + more
     assert MAX_SUPPLEMENTS <= 128
     assert 1_000 <= MAX_CANDIDATES <= 100_000
