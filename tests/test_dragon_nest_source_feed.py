@@ -81,7 +81,7 @@ def add_video(lib,a,url="https://www.youtube.com/watch?v=abc123"):
     return ResearchLead(source,url,("gameboy",),"video",T1)
 
 
-def update_source(lib):
+def update_source(lib, *, unchanged=False):
     url=next(x["url"] for x in CATALOG if x["slug"]=="pandocs")
     source=sid(url)
     def doc(text,at):
@@ -91,7 +91,8 @@ def update_source(lib):
                           0,7,"supports",940000,"publisher-a",("gameboy",)),))
     first=lib.import_document(doc("Gameboy initial hardware note.",T0),
         expected_parent_digest=None,authorized=True)
-    latest=lib.import_document(doc("Gameboy revised hardware note.",T1),
+    latest=lib.import_document(doc("Gameboy initial hardware note." if unchanged else
+                                   "Gameboy revised hardware note.",T1),
         expected_parent_digest=first.revision_digest,authorized=True)
     return ResearchLead(source,url,("gameboy",),"updates",T2,
                         latest.source_text_digest,T1),latest
@@ -214,3 +215,26 @@ def test_repeat_leads_are_counted_and_bounded(studio):
         preview(broker,video_consent=1)
     with pytest.raises(ValueError,match="article candidate limit"):
         preview(broker,article_limit=0)
+
+
+def test_observation_only_does_not_create_fake_updated_knowledge(studio):
+    lib,_,_,_,broker=studio
+    signal,_=update_source(lib,unchanged=True)
+    result=preview(broker,article_consent=False,update_hints=(signal,))
+    assert result.reviewed_revision_leads==0
+    assert result.rejected_external_leads==1
+    assert result.plan.assignments==()
+
+
+def test_blocked_early_source_does_not_starve_article_limit(studio):
+    lib,_,atlas,_,broker=studio
+    candidates=atlas.plan(OWNER,"gameboy debugging",
+                          authorized=True,limit=55,max_per_host=2)["selected"]
+    assert len(candidates)>=2
+    early=candidates[0]["source_id"]
+    lib.db.execute("UPDATE dragon_almanac_jobs SET state='blocked' "
+                   "WHERE owner=? AND source=?",(OWNER,early))
+    result=preview(broker,article_limit=1,video_consent=False,updates_consent=False)
+    assert result.curated_article_leads==1
+    assert len(result.plan.assignments)==1
+    assert result.plan.assignments[0].source_id!=early

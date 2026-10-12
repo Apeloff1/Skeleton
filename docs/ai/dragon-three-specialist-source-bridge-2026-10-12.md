@@ -36,7 +36,7 @@ preview = feed.preview(
 Workers must separately reacquire authenticated global resource grants, apply canonical DNS/redirect/robots/terms checks, inspect current rights and privacy consent, acquire evidence, and obtain independent Wiki/HOAG approval. No autonomous daemon, network fetch, memory promotion, model training or OS background task is started by this bridge.
 
 ## Validated scope and remaining work
-Eight new integration tests cover articles, video, real changed source revisions, identical/replayed updates, cross-owner and media rejection, blocked policy jobs, idle and consent gating, source corruption, duplicate signals and bounded workloads. The Dragon AI Verification workflow now includes the new test module.
+Ten new integration tests cover articles, video, real changed source revisions, identical/replayed updates, cross-owner and media rejection, blocked policy jobs (including small-plan starvation), unchanged-content revisions, idle and consent gating, source corruption, duplicate signals and bounded workloads. The Dragon AI Verification workflow now includes the new test module.
 
 Run: python -m pytest -q --noconftest tests/test_dragon_technical_source_atlas.py tests/test_dragon_nest_source_feed.py
 

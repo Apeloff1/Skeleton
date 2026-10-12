@@ -185,7 +185,7 @@ class DragonNestSourceFeed:
             query=" ".join((*nest.focus_tags,*nest.adjacent_tags))[:300].strip()
             if query:
                 proposal=self.atlas.plan(
-                    owner,query,authorized=True,limit=article_limit,
+                    owner,query,authorized=True,limit=max(article_limit,len(CATALOG)),
                     max_per_host=max_per_host,
                 )
                 for hit in proposal["selected"]:
@@ -216,6 +216,8 @@ class DragonNestSourceFeed:
                         duplicates+=1
                         continue
                     seen.add(identity);collected.append(lead);articles+=1
+                    if articles >= article_limit:
+                        break
         if video_consent:
             for hint in sorted(video_hints,key=lambda x:(x.source_id,x.url)):
                 if not self._registered(owner,hint):
