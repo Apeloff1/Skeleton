@@ -73,6 +73,7 @@ class MissionSourceScout:
         if not isinstance(almanacs, DragonAlmanacs):
             raise TypeError("canonical DragonAlmanacs required")
         self.db = almanacs.db
+        self._almanacs = almanacs
         # The audit table may be empty when only the pinned baseline has been
         # imported. This scouting lane must not depend on an optional expansion
         # tool being installed or having already imported its supplements.
@@ -85,7 +86,7 @@ class MissionSourceScout:
           ON dragon_almanac_supplement_receipts_v2(owner,normalized_source)""")
 
     def propose(self, owner: str, mission: SourceMission, *, authorized: bool,
-                topic: str | None = None) -> dict:
+                topic: str | None = None, indexed: bool = False) -> dict:
         _auth(owner, authorized)
         if not isinstance(mission, SourceMission):
             raise ValueError("typed mission required")
@@ -95,27 +96,39 @@ class MissionSourceScout:
                     "SELECT 1 FROM dragon_almanac_topics WHERE owner=? AND topic=?",
                     (owner, topic)).fetchone():
                 raise ValueError("unknown owner topic")
-        condition = (
-            "AND EXISTS(SELECT 1 FROM dragon_almanac_members m "
-            "WHERE m.owner=s.owner AND m.source=s.source AND m.topic=?)"
-            if topic is not None else ""
-        )
-        sql = (
-            "SELECT s.source,s.body,s.digest,j.stage,j.state FROM dragon_almanac_sources s "
-            "JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source "
-            "WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked') "
-            + condition + " ORDER BY s.source LIMIT ?"
-        )
-        params = [owner]
-        if topic is not None:
-            params.append(topic)
-        params.append(mission.scan_budget + 1)
-        rows = self.db.execute(sql, params).fetchall()
-        truncated = len(rows) > mission.scan_budget
+        if type(indexed) is not bool:
+            raise ValueError("indexed scouting selector must be boolean")
         goal_tokens = _tokens(mission.goal)
         platform_tokens = _tokens(mission.platform)
         genre_tokens = _tokens(mission.genre)
         era_tokens = _tokens(mission.era)
+        index_health = None
+        if indexed:
+            from .dragon_discovery_facets import DiscoveryFacetIndex
+            rows, index_health = DiscoveryFacetIndex(
+                self._almanacs).matching_rows(
+                    owner, goal_tokens | platform_tokens | genre_tokens | era_tokens,
+                    authorized=True, topic=topic,
+                    limit=mission.scan_budget + 1)
+        else:
+            condition = (
+                "AND EXISTS(SELECT 1 FROM dragon_almanac_members m "
+                "WHERE m.owner=s.owner AND m.source=s.source AND m.topic=?)"
+                if topic is not None else ""
+            )
+            sql = (
+                "SELECT s.source,s.body,s.digest,j.stage,j.state FROM dragon_almanac_sources s "
+                "JOIN dragon_almanac_jobs j ON j.owner=s.owner AND j.source=s.source "
+                "WHERE s.owner=? AND j.stage=0 AND j.state IN ('pending','blocked') "
+                + condition + " ORDER BY s.source LIMIT ?"
+            )
+            params = [owner]
+            if topic is not None:
+                params.append(topic)
+            params.append(mission.scan_budget + 1)
+            rows = self.db.execute(sql, params).fetchall()
+        truncated = len(rows) > mission.scan_budget or (
+            index_health is not None and not index_health["coverage_complete"])
         found_terms = set()
         candidates = []
         for sid, raw, digest, stage, state in rows[:mission.scan_budget]:
@@ -237,4 +250,6 @@ class MissionSourceScout:
             "queue_modified": False,
             "crawler_authorized": False, "training_authorized": False,
             "policy_review_required": True,
+            "indexed_search": indexed,
+            "index_health": index_health,
         }
