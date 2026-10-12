@@ -5744,6 +5744,14 @@ CATALOG = json.loads(r'''[
         "minimum": 0,
         "maximum": 64,
         "options": []
+      },
+      {
+        "key": "testimony_suspicion_tolerance",
+        "kind": "int",
+        "default": 2,
+        "minimum": 0,
+        "maximum": 20,
+        "options": []
       }
     ],
     "preview": null
