@@ -39,6 +39,7 @@ from .advanced_godot_export import (
 )
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_physics_godot import render_physics_godot_package
+from .advanced_physics_handoff import run_physics_handoff, verify_physics_handoff
 from .advanced_deck_godot import render_deck_godot_package
 from .advanced_shooter_godot import render_shooter_godot_package
 from .advanced_tactics_godot import render_tactics_godot_package
@@ -207,6 +208,15 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/physics-handoff":
+            source=run_physics_handoff(values["session"],values.get("settings"),
+                    values.get("actions",["inspect","step:4"]),
+                    values.get("physics_options"))
+            return self._json(200,{
+                "handoff":source,"verified":verify_physics_handoff(source),
+                "origin_game_mutated":False,"weights_promoted":False,
+                "native_parity_verified":False,
+            })
         if path=="/api/advanced-godot-package":
             from base64 import b64encode
             session=values["session"]
