@@ -8,6 +8,7 @@ from skeleton.ai.game_builder.system_editors import (
 from skeleton.ai.game_builder.advanced_level_scenes import (
     make_advanced_scene, validate_advanced_scene, SceneError,
 )
+from skeleton.ai.game_builder.system_editor_assembly import compile_system_assembly
 from skeleton.ai.game_builder.advanced_gameplay_runtime import (
     ENGINES, AdvancedRuntimeError, run_advanced_session,
     verify_advanced_session,
@@ -64,6 +65,16 @@ class EconomyReferenceTests(unittest.TestCase):
         self.assertTrue(retired["state"]["retired"])
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("economy", actions=ROUTE + ["retire", "wait"])
+
+    def test_trade_economy_appears_in_real_hybrid_evidence(self):
+        config=make_editor_document("economy")
+        scene=make_advanced_scene("economy")
+        report=compile_system_assembly(
+            "original-market-game", [config], authorized=True, scenes=[scene])
+        self.assertEqual(report["authored_scene_count"],1)
+        self.assertEqual(report["authored_scene_evidence"][0]["editor"],"economy")
+        self.assertEqual(report["advanced_runtime_evidence"][0]["editor"],"economy")
+        self.assertFalse(report["ready_for_release"])
 
     def test_cash_custody_has_no_external_minting(self):
         start = run_advanced_session("economy")["state"]
