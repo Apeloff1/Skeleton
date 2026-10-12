@@ -31,13 +31,13 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
                 "hazards_enabled":False,"cover_enabled":False,
                 **kwargs}
 
-    def test_nineteenth_family_has_fifty_two_genuine_settings_and_real_actions(self):
+    def test_nineteenth_family_has_fifty_five_genuine_settings_and_real_actions(self):
         self.assertIn("fighting",ENGINES)
         self.assertEqual(set(ACTIONS),set(ACTION_HELP["fighting"]))
         spec=next(x for x in catalog() if x["id"]=="fighting")
         self.assertEqual(spec["runtime_maturity"],"advanced_reference_runtime")
         self.assertEqual(spec["progression_floor"],"advanced")
-        self.assertEqual(len(spec["fields"]),52)
+        self.assertEqual(len(spec["fields"]),55)
         self.assertEqual(len(ACTIONS),len(set(ACTIONS)))
         self.assertGreaterEqual(len(ATTACKS),8)
 
@@ -223,6 +223,52 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
         self.assertEqual(validate_advanced_scene(rebuilt,rules),rebuilt)
 
 
+
+
+    def test_real_combo_window_expires_after_authoritative_clock_advances(self):
+        cfg=make_editor_document("fighting",self.rules(
+            combo_window_frames=24,ai_style="defensive",
+            ai_defense_frequency=0,enemy_health=100,
+            combo_damage_bonus=5,
+        ))["settings"]
+        state=start(cfg,0)
+        state["opponent"]["x"]=2
+        step(state,cfg,"jab")
+        first=state["player"]["damage_done"]
+        self.assertEqual(state["player"]["combo"],1)
+        step(state,cfg,"wait:240")
+        step(state,cfg,"jab")
+        self.assertEqual(state["player"]["combo"],1)
+        self.assertEqual(state["player"]["damage_done"]-first,
+                         4+cfg["attack_bonus"])
+        self.assertIn("original_combo_expired_after_real_frame_window",
+                      state["events"])
+
+    def test_dash_real_energy_and_feint_proximity_are_physical(self):
+        rules=self.rules(stamina_regen=0,dash_stamina_cost=7,
+                         feint_range=2,feint_stamina=4)
+        cfg=make_editor_document("fighting",rules)["settings"]
+        state=start(cfg,0)
+        previous=state["player"]["stamina"]
+        step(state,cfg,"dash")
+        self.assertEqual(state["player"]["x"],3)
+        self.assertEqual(state["player"]["stamina"],previous-
+                         cfg["dash_stamina_cost"]-cfg["move_stamina"])
+        self.assertIn("original_two_cell_dash_paid_extra_finite_stamina",
+                      state["events"])
+        state=start(cfg,0)
+        state["opponent"]["guard_high"]=True
+        step(state,cfg,"feint")
+        self.assertTrue(state["opponent"]["guard_high"])
+        self.assertIn("original_distant_feint_failed_to_change_enemy_guard",
+                      state["events"])
+        state=start(cfg,0)
+        state["opponent"]["x"]=2
+        state["opponent"]["guard_high"]=True
+        step(state,cfg,"feint")
+        self.assertFalse(state["opponent"]["guard_high"])
+        self.assertIn("original_close_range_paid_feint_disrupted_real_guard",
+                      state["events"])
 
     def test_true_zero_object_budgets_and_bounded_starting_meter(self):
         settings=self.rules(hazards_enabled=True,hazard_count=0,
