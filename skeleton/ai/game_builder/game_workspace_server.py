@@ -272,6 +272,16 @@ class _StudioHandler(BaseHTTPRequestHandler):
             from .story_memory import asset_identity_history
             return self._json(200,asset_identity_history(
                 studio,values["project"],values["asset"]))
+        if path=="/api/story-chapter-context":
+            from .story_workspace import load_story_workspace, load_continuity_contract
+            from .story_chapter_context import chapter_context
+            bible,scenes,_=load_story_workspace(studio,values["project"])
+            contract=load_continuity_contract(studio,values["project"])
+            if bible is None or contract is None:
+                raise WorkspaceError("reviewed 100-chapter strict story source required")
+            return self._json(200,chapter_context(
+                bible,contract,scenes,chapter=values.get("chapter"),
+                max_prior_capsules=values.get("max_prior_capsules",12)))
         if path=="/api/story-continuity-template":
             from .story_continuity_assurance import contract_template
             from .story_workspace import load_story_workspace
