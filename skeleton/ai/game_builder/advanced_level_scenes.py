@@ -33,6 +33,10 @@ from .advanced_ecosystem_runtime import (
     default_layout as ecosystem_layout, normalize_layout as validate_ecosystem_layout,
     EcosystemActionError,
 )
+from .advanced_economy_runtime import (
+    default_layout as economy_layout, normalize_layout as validate_economy_layout,
+    EconomyActionError,
+)
 from .advanced_rpg_runtime import (
     default_layout as rpg_layout, normalize_layout as validate_rpg_layout,
     RPGActionError,
@@ -224,6 +228,8 @@ def _default_layout(engine, config, seed):
         return society_layout(config,seed)
     if engine == "ecosystem":
         return ecosystem_layout(config,seed)
+    if engine == "economy":
+        return economy_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -279,6 +285,11 @@ def _normalize_layout(engine, config, layout):
         try:
             return validate_ecosystem_layout(config,layout)
         except EcosystemActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="economy":
+        try:
+            return validate_economy_layout(config,layout)
+        except EconomyActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="fighting":
         try:
