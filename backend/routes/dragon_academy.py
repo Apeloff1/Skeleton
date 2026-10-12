@@ -29,6 +29,7 @@ from skeleton.ai.game_builder.dragon_wisdom_custody import DragonCustodyAnchor
 from skeleton.ai.game_builder.dragon_wisdom_memory import DragonWisdomMemory
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
 from skeleton.ai.webcrawler.dragon_nest_store import DragonNestStore
+from skeleton.ai.webcrawler.dragon_mother_glean_ledger import MotherGleanLedger
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
 from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
@@ -161,6 +162,66 @@ def academy_nest(
             raise HTTPException(status_code=409,
                                 detail="Dragon nest evidence integrity failed") from None
         return {"ok": True, "nest": nest}
+
+
+def _mother_glean_signing_key() -> bytes:
+    raw = os.environ.get("SKL_DRAGON_MOTHER_SIGNING_KEY_HEX", "").strip()
+    try:
+        key = bytes.fromhex(raw)
+    except ValueError:
+        key = b""
+    if len(key) < 32:
+        raise HTTPException(status_code=503,
+                            detail="Dragon mother glean custody not configured")
+    return key
+
+
+@router.get("/mother-glean")
+def academy_mother_glean(
+    response: Response, owner: str = Depends(_principal),
+) -> dict:
+    """Owner-only read of scrutinized subtext. Does not run crawler or award XP.
+
+    The returned questions are explicitly UNCONFIRMED hypotheses. Weight
+    promotion always remains in the separate canonical review pipeline.
+    """
+    response.headers["Cache-Control"] = "private, no-store"
+    key = _mother_glean_signing_key()
+    with _lab() as (lab, _):
+        try:
+            history = MotherGleanLedger(lab.db, signing_key=key).history(
+                owner, authorized=True,
+            )
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=409,
+                                detail="Dragon mother glean integrity unavailable") from None
+        if not history:
+            return {"ok": True, "glean": None}
+        latest = history[-1]
+        questions = tuple(dict.fromkeys(
+            h.question for h in latest.hypotheses
+        ))[:8]
+        synergies = tuple(dict.fromkeys(
+            s.question for s in latest.synergies
+        ))[:6]
+        return {
+            "ok": True,
+            "glean": {
+                "schema": "skeleton.dragon.mother_glean_summary.v1",
+                "observed_at": latest.at,
+                "source_count": len(latest.acquisitions),
+                "search_count": len(latest.probes),
+                "hypothesis_count": len(latest.hypotheses),
+                "synergy_count": len(latest.synergies),
+                "research_gap_count": len(latest.research_gaps),
+                "lenses": sorted({p.lens for p in latest.probes}),
+                "questions": list(questions),
+                "synergy_questions": list(synergies),
+                "last_improvement": latest.improvement,
+                "evidence_digest": latest.digest,
+                "model_promotion_authorized": False,
+            },
+        }
 
 
 @router.get("/wisdom")
