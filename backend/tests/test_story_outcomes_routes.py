@@ -169,3 +169,37 @@ async def test_broken_graph_and_forged_choice_guard_fail_before_persistence(db):
             "game_1", routes.SavePlan(expected_revision=0, plan=broken), user=ACTOR)
     assert error.value.status_code == 422
     assert not db.items
+
+
+
+@pytest.mark.asyncio
+async def test_unwitnessed_matrix_instruction_cannot_claim_a_real_player_history(db):
+    await routes.save_outcome_plan("game_1",
+        routes.SavePlan(expected_revision=0, plan=simple_plan()), user=ACTOR)
+    plan_level = await routes.get_outcome_matrix_instruction(
+        "game_1", branch_id="main",
+        matrix_id="dialogue.choice_clarity.immediate",
+        level=100, ending_id="good", user=ACTOR)
+    assert plan_level["instruction"]["history_witnessed"] is False
+    assert plan_level["instruction"]["player_history_digest"] is None
+    assert "NO PLAYER PATH WITNESS" in plan_level["instruction"]["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_witnessed_matrix_prompt_requires_authentic_successful_ending(db):
+    await routes.save_outcome_plan("game_1",
+        routes.SavePlan(expected_revision=0, plan=simple_plan()), user=ACTOR)
+    body = routes.WitnessedMatrixPromptIn(
+        branch_id="main", matrix_id="dialogue.choice_clarity.immediate",
+        level=100, ending_id="good", choices=["mercy"])
+    witnessed = await routes.get_witnessed_matrix_instruction(
+        "game_1", body, user=ACTOR)
+    assert witnessed["instruction"]["history_witnessed"] is True
+    assert witnessed["instruction"]["player_history_digest"] == witnessed["playthrough_receipt"]
+    assert len(witnessed["playthrough_receipt"]) == 64
+    with pytest.raises(HTTPException) as exc:
+        await routes.get_witnessed_matrix_instruction(
+            "game_1", routes.WitnessedMatrixPromptIn(
+                branch_id="main", matrix_id="dialogue.choice_clarity.immediate",
+                level=100, ending_id="good", choices=["violence"]), user=ACTOR)
+    assert exc.value.status_code == 409
