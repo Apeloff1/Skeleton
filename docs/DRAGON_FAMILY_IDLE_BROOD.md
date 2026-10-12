@@ -534,3 +534,19 @@ whole-repository Webcrawler/Dragon/App Assembly failures or install a
 native host. Actual operating system idle probes, cancellable network
 adapters and independently graded shadow evaluators remain prerequisites
 to declaring a functioning production crawler companion.
+
+
+### Explicit operator opt-out fencing
+
+`DragonIdleHostControl.stop` now revokes the active session generation
+**and** immediately fences the owner's currently running source tokens with
+`DragonIdleCoordinator.fence_owner_leases`. It records a single authenticated
+UTC `(paused: …)` event per fenced source and imposes the transient backoff.
+No active worker can credit its result afterward; the policy-bound native
+network adapter must also cancel its own in-flight requests. Repeating stop
+does not invent new events.
+
+A source-level cooldown now applies to **all** three hatchlings: a source
+just inspected by Ember cannot be immediately re-fetched by Scout merely
+because Scout has a separate role queue. This conserves bandwidth, reduces
+repetitive acquisition, and preserves the game's novelty requirement.
