@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_economy_planner import (
+    plan_original_trade, verify_original_trade_plan,
+)
 from .advanced_ecosystem_planner import (
     plan_original_ecology, verify_original_ecology_plan,
 )
@@ -179,6 +182,17 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    economy=commands.add_parser("plan-economy",
+        help="Prove original market trading through genuine finite production and receipts")
+    economy.add_argument("--scene",required=True)
+    economy.add_argument("--settings")
+    economy.add_argument("--max-actions",type=int,default=100)
+    economy.add_argument("--retire",action="store_true")
+    economy_check=commands.add_parser("verify-economy-plan",
+        help="Independently replay finite-cash economic proof against the source")
+    economy_check.add_argument("--record",required=True)
+    economy_check.add_argument("--scene",required=True)
+    economy_check.add_argument("--settings")
     world_plan=commands.add_parser("plan-original-world",
         help="Search and independently replay a safe original world ability path")
     world_plan.add_argument("--scene",required=True)
@@ -381,6 +395,15 @@ def main(argv=None) -> int:
                 max_actions=args.max_actions,retire=args.retire)
         elif args.operation == "verify-ecology-plan":
             output={"verified":verify_original_ecology_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-economy":
+            output=plan_original_trade(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_actions=args.max_actions,retire=args.retire)
+        elif args.operation == "verify-economy-plan":
+            output={"verified":verify_original_trade_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
         elif args.operation == "plan-original-world":
