@@ -14,7 +14,7 @@ from pathlib import Path
 import sys
 
 from skeleton.repo_intelligence.tree_atlas import (
-    AtlasError, _json, build, query, write_index,
+    AtlasError, _json, build, feature_index, directory_index, query, write_index,
 )
 
 
@@ -59,6 +59,12 @@ def main(argv: list[str] | None = None) -> int:
             raise AtlasError("indexed file identities differ from Git tree")
         if (args.output / "exact_duplicates.jsonl").read_text(encoding="utf-8") != expected_duplicates:
             raise AtlasError("indexed duplicates differ from Git tree")
+        expected_features = "".join(_json(e) for e in feature_index(files))
+        expected_directories = "".join(_json(e) for e in directory_index(files))
+        if (args.output / "features.jsonl").read_text(encoding="utf-8") != expected_features:
+            raise AtlasError("indexed feature groups differ from Git tree")
+        if (args.output / "directories.jsonl").read_text(encoding="utf-8") != expected_directories:
+            raise AtlasError("indexed directory hierarchy differs from Git tree")
         near = json.loads((args.output / "near_duplicates.json").read_text(encoding="utf-8"))
         if not isinstance(near.get("pairs"), list) or near.get("exhaustive") is not False:
             raise AtlasError("invalid near-duplicate disclosure")
