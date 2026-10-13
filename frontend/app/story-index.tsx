@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/utils/apiClient';
 import { authHeaders, checkMe } from '../src/auth/gameforgeAuth';
 import { validProjectId } from '../src/product/worldWorkspace';
+import { STORY_KINDS, prepareStoryEvent, storyIndexPath, type StoryDraft } from '../src/product/storyContinuity';
 import { HANDOFF_KEY } from '../features/Jeeves/workbench/types';
 import { makeStoryRecallHandoff } from '../features/Jeeves/storyContext';
 import { Action, Section, palette, styles } from '../features/Jeeves/workbench/ui';
@@ -45,6 +46,13 @@ export default function StoryIndexScreen() {
   const [notice, setNotice] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [sending, setSending] = React.useState(false);
+  const [recording, setRecording] = React.useState(false);
+  const [storyReceipt, setStoryReceipt] = React.useState('');
+  const [draft, setDraft] = React.useState<StoryDraft>({
+    eventId: '', branchId: 'main', act: '1', scene: '1', beat: '0',
+    kind: 'establish', text: '', characterIds: '', witnessIds: '',
+    speakerId: '', threadKey: '', knowledgeRequired: '', knowledgeGranted: '',
+  });
   const requestId = React.useRef(0);
 
   const load = React.useCallback(async (offset = 0) => {
@@ -58,7 +66,7 @@ export default function StoryIndexScreen() {
     setNotice('');
     try {
       await checkMe();
-      const root = '/api/pipeline/' + encodeURIComponent(game) + '/story-index';
+      const root = storyIndexPath(game);
       const query = '?branch_id=' + encodeURIComponent(branch);
       const list = await api.get<any>(
         root + '/events' + query + '&limit=100&offset=' + offset,
@@ -120,8 +128,7 @@ export default function StoryIndexScreen() {
     try {
       await checkMe();
       const result = await api.get<any>(
-        '/api/pipeline/' + encodeURIComponent(game) +
-        '/story-index/recall/' + encodeURIComponent(characterId) +
+        storyIndexPath(game) + '/recall/' + encodeURIComponent(characterId) +
         '?branch_id=' + encodeURIComponent(branch) + '&max_chars=3500',
         { headers: authHeaders(), timeoutMs: 15000, retries: 0 },
       );
@@ -159,6 +166,46 @@ export default function StoryIndexScreen() {
     } finally { setSending(false); }
   };
 
+
+  const recordStory = async () => {
+    if (recording || busy) return;
+    const game = validProjectId(gameId.trim());
+    if (!game) { setNotice('Choose an existing game before recording.'); return; }
+    let event;
+    try {
+      event = prepareStoryEvent({ ...draft, branchId: branch });
+    } catch (problem) {
+      setNotice(problem instanceof Error ? problem.message : 'Story event is invalid.');
+      return;
+    }
+    setRecording(true);
+    setStoryReceipt('');
+    setNotice('');
+    try {
+      await checkMe();
+      const response = await api.post<{
+        ok: boolean; event: { event_id: string; branch_id: string; record_status: string };
+        replayed: boolean; receipt: string;
+      }>(storyIndexPath(game) + '/events', event, {
+        headers: authHeaders(), timeoutMs: 15000, retries: 0,
+      });
+      const saved = response.data;
+      if (!response.ok || !saved?.ok || !saved.receipt ||
+          saved.event?.event_id !== event.event_id ||
+          saved.event?.branch_id !== branch ||
+          saved.event?.record_status !== 'creator_reviewed_evidence') {
+        throw new Error('The server did not confirm a creator-reviewed receipt.');
+      }
+      setStoryReceipt((saved.replayed ? 'Existing event replayed: ' : 'Event recorded: ') + saved.receipt);
+      setDraft(v => ({ ...v, eventId: '', text: '' }));
+      await load(0);
+    } catch (problem) {
+      setNotice(problem instanceof Error ? problem.message : 'Story event could not be saved.');
+    } finally {
+      setRecording(false);
+    }
+  };
+
   const status = audit === null ? 'Not verified' :
     !audit.complete ? 'Incomplete scan — cannot certify continuity' :
       audit.valid ? 'No contradictions detected in indexed events' :
@@ -192,6 +239,64 @@ export default function StoryIndexScreen() {
         </Section>
         {busy && <ActivityIndicator color={palette.accent} />}
         {!!notice && <Text accessibilityRole="alert" style={styles.muted}>{notice}</Text>}
+
+        <Section title="Record a creator-reviewed story event"
+          subtitle="Append-only, branch-scoped evidence — never automatic model promotion">
+          <Text style={styles.muted}>
+            Record a stable unique event identity. Conflicting repeats fail closed.
+            Saving requires the editor role and an existing canonical game.
+          </Text>
+          <TextInput style={styles.input} accessibilityLabel="Story event ID"
+            value={draft.eventId} placeholder="Unique event ID" autoCapitalize="none"
+            onChangeText={eventId => setDraft(v => ({ ...v, eventId }))} />
+          <View style={styles.wrap}>
+            {STORY_KINDS.map(kind => (
+              <Action key={kind} label={draft.kind === kind ? '✓ ' + kind : kind}
+                onPress={() => setDraft(v => ({ ...v, kind }))} />
+            ))}
+          </View>
+          <TextInput style={styles.input} accessibilityLabel="Act number"
+            value={draft.act} keyboardType="number-pad" placeholder="Act 1–10000"
+            onChangeText={act => setDraft(v => ({ ...v, act }))} />
+          <TextInput style={styles.input} accessibilityLabel="Scene number"
+            value={draft.scene} keyboardType="number-pad" placeholder="Scene 1–100000"
+            onChangeText={scene => setDraft(v => ({ ...v, scene }))} />
+          <TextInput style={styles.input} accessibilityLabel="Beat number"
+            value={draft.beat} keyboardType="number-pad" placeholder="Beat 0–100000"
+            onChangeText={beat => setDraft(v => ({ ...v, beat }))} />
+          <TextInput style={[styles.input, { minHeight: 96 }]} multiline
+            accessibilityLabel="Story event evidence" value={draft.text}
+            placeholder="Precisely what happened in the scene?"
+            onChangeText={text => setDraft(v => ({ ...v, text }))} />
+          <TextInput style={styles.input} accessibilityLabel="Character participants"
+            value={draft.characterIds} autoCapitalize="none"
+            placeholder="Participants (comma-separated character IDs)"
+            onChangeText={characterIds => setDraft(v => ({ ...v, characterIds }))} />
+          <TextInput style={styles.input} accessibilityLabel="Witness character IDs"
+            value={draft.witnessIds} autoCapitalize="none"
+            placeholder="Witnesses (must be participants)"
+            onChangeText={witnessIds => setDraft(v => ({ ...v, witnessIds }))} />
+          <TextInput style={styles.input} accessibilityLabel="Speaker character ID"
+            value={draft.speakerId} autoCapitalize="none" placeholder="Speaker (dialogue)"
+            onChangeText={speakerId => setDraft(v => ({ ...v, speakerId }))} />
+          <TextInput style={styles.input} accessibilityLabel="Plot thread ID"
+            value={draft.threadKey} autoCapitalize="none"
+            placeholder="Thread key (promise/resolution)"
+            onChangeText={threadKey => setDraft(v => ({ ...v, threadKey }))} />
+          <TextInput style={styles.input} accessibilityLabel="Knowledge required IDs"
+            value={draft.knowledgeRequired} autoCapitalize="none"
+            placeholder="Required facts (comma-separated IDs)"
+            onChangeText={knowledgeRequired => setDraft(v => ({ ...v, knowledgeRequired }))} />
+          <TextInput style={styles.input} accessibilityLabel="Knowledge learned IDs"
+            value={draft.knowledgeGranted} autoCapitalize="none"
+            placeholder="Knowledge granted (comma-separated IDs)"
+            onChangeText={knowledgeGranted => setDraft(v => ({ ...v, knowledgeGranted }))} />
+          <Action label="Record creator-reviewed evidence" icon="save-outline"
+            disabled={busy || recording || !draft.eventId.trim() || !draft.text.trim()}
+            onPress={() => { void recordStory(); }} />
+          {recording && <ActivityIndicator color={palette.accent} />}
+          {!!storyReceipt && <Text style={styles.label}>{storyReceipt}</Text>}
+        </Section>
         <Section title="Deterministic continuity audit" subtitle={status}>
           <Text style={styles.muted}>
             Indexed events are creator-reviewed fiction, not automatically verified canon.

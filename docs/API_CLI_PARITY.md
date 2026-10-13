@@ -115,3 +115,19 @@ it even with `include_files=false`. Project `FORGE_MANIFEST.json` writes
 of emitted bytes only. Real Godot boot/playability is still controlled by
 `playtest` and not implied by a matching hash. The JSON/YAML legacy target
 continues to use its separate specification format.
+
+## Security and verification boundary
+
+The HTTP `/gameforge/intake` endpoint is now in-memory only. It rejects
+`project_root`, `out`, and `overwrite` with HTTP 422 instead of letting
+remote clients select server-side filesystem destinations. The local,
+authorized CLI retains project output and overwrite support.
+
+`skeleton.forge.source_manifest` applies the projector's complete Godot
+filename validation even for builds returned only in memory. Unsafe relative
+paths, casefold aliases, Windows-reserved filenames, metadata collisions,
+and missing `project.godot` are rejected at the `emit` stage, before
+Godot verification and before any publication. A failed ten-stage pipeline
+may still contain partial generated source, but does not claim a sealed
+`source_manifest`: that field remains null until the pipeline succeeds.
+This digest is a source identity receipt, not proof of runtime playability.

@@ -155,7 +155,10 @@ class GameForgeRun:
         ]
         run = self.composer.execute("gameforge", stages, initial_context=ctx)
         from skeleton.forge.source_manifest import source_manifest
-        emitted_manifest = source_manifest(run.context.get("files") or {})
+        generated = run.context.get("files") or {}
+        # A failed pipeline may have partial output. Never present its digest
+        # as a sealed, verified source manifest.
+        emitted_manifest = source_manifest(generated) if run.succeeded and generated else None
         payload = {
             "run": run.to_dict(),
             "succeeded": run.succeeded,
@@ -421,7 +424,12 @@ def _stage_jeeves(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.forge.gdscript_check import check_ok
+    from skeleton.forge.source_manifest import source_manifest
+
     files = ctx.get("files") or {}
+    # Validate names in both API/in-memory and disk build modes, before any
+    # expensive engine checks or project publication.
+    source_manifest(files)
     ok, problems = check_ok(files)
     if not ok:
         raise RuntimeError("gdscript check failed: " + "; ".join(problems[:8]))

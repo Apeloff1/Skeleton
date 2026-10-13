@@ -13,10 +13,13 @@ SCHEMA = "skeleton.forge.source_manifest.v1"
 
 
 def source_manifest(files: Mapping[str, str]) -> dict[str, object]:
-    if not isinstance(files, Mapping):
-        raise TypeError("generated source files must be a mapping")
+    # Reuse the exact path validation enforced when projecting to Godot.
+    # Without this, an API-only run could attest paths a real build rejects.
+    from skeleton.forge.projector import _validate
+
+    checked = _validate(files)
     hashes: dict[str, str] = {}
-    for name, body in files.items():
+    for name, body in checked.items():
         if not isinstance(name, str) or not name:
             raise ValueError("generated source name must be a non-empty string")
         if not isinstance(body, str):
