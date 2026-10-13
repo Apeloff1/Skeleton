@@ -1177,6 +1177,75 @@ function drawAdvancedGame(session){
   c.fillText(state.conservation_checkpoint?"Restored · nonterminal biodiversity study":
     "Source habitats · predator-prey dynamics · finite restoration",12,269);
  }
+ if(editor==="dialogue"){
+  c.fillStyle="#e8eef8";
+  c.fillText(state.title+" · original first-hand conversation · turn "+state.tick,13,34);
+  for(let i=0;i<3;i++){
+   const x=18+i*132,y=69;
+   const located=state.position===i;
+   c.fillStyle=located?"#326d6d":"#32475f";
+   c.fillRect(x,y,120,166);
+   c.fillStyle="#f3e2b6";
+   c.fillText(state.locations[i],x+8,y+19);
+   const local=state.speakers.filter(s=>s.location===i);
+   for(let j=0;j<Math.min(5,local.length);j++){
+    const voice=local[j];
+    c.fillStyle=voice.heard?"#a6e8ca":"#cddbec";
+    c.fillText("#"+voice.id+" "+voice.name.slice(0,13),x+8,y+43+j*22);
+    c.fillStyle="#efddad";
+    c.fillText("T"+voice.trust+" · "+voice.patience+" turns",x+8,y+55+j*22);
+   }
+   if(located){c.strokeStyle="#ffcf78";c.lineWidth=3;c.strokeRect(x+1,y+1,118,164);c.lineWidth=1;}
+  }
+  const x=W-187;
+  c.fillStyle="#edeee3";
+  c.fillText("Influence "+state.influence,x,62);
+  c.fillText("Reputation "+state.reputation,x,84);
+  c.fillText("Sources "+state.direct_statements.length,x,106);
+  c.fillText("Corroborated "+state.corroborations.length,x,128);
+  c.fillText("Supported "+state.support_count,x,150);
+  c.fillText("Choices "+state.choices.length,x,172);
+  c.fillText("Detailed "+state.active_speakers,x,194);
+  c.fillStyle="#bee6d6";
+  c.fillText(state.checkpoint?"Social agreement earned · optional epilogue":
+   "Listen to multiple sources; compare evidence at archive",14,269);
+ }
+ if(editor==="economy"){
+  const left=14,top=57,cellW=90,cellH=42;
+  c.fillStyle="#eff6df";
+  c.fillText(state.title+" · turn "+state.tick+" · finite original goods",12,35);
+  for(const market of state.markets){
+   const x=left+(market.id%4)*96,y=top+Math.floor(market.id/4)*49;
+   const located=market.id===state.position;
+   c.fillStyle=located?"#355d53":"#31495d";
+   c.fillRect(x,y,cellW,cellH);
+   c.fillStyle="#f1d8a4";
+   c.fillText(market.id+" "+market.kind,x+5,y+15);
+   const onHand=market.inventory[state.focus]||0;
+   const price=market.prices[state.focus]||0;
+   c.fillStyle="#c8e9e2";
+   c.fillText("Stock "+onHand+" · "+price+" cr",x+5,y+33);
+   if(located){
+    c.strokeStyle="#ffe29c";c.lineWidth=3;
+    c.strokeRect(x+1,y+1,cellW-2,cellH-2);c.lineWidth=1;
+   }
+  }
+  const rx=W-183;
+  const allStock=state.markets.reduce((n,m)=>n+
+   m.inventory.reduce((a,b)=>a+b,0),0);
+  c.fillStyle="#eef6e7";
+  c.fillText("Cash "+state.cash,rx,63);
+  c.fillText("Cargo "+state.cargo.reduce((a,b)=>a+b,0),rx,84);
+  c.fillText("Food & goods "+allStock,rx,105);
+  c.fillText("Factory "+state.manufactured,rx,126);
+  c.fillText("Harvest "+state.harvested,rx,147);
+  c.fillText("Imports "+state.imports_sold,rx,168);
+  c.fillText("Audits "+state.audited.length,rx,189);
+  c.fillText("Households "+state.household_consumed,rx,210);
+  c.fillStyle="#cceab9";
+  c.fillText(state.checkpoint?"Real trade milestone earned · market stays alive":
+   "Physical cargo · market prices · finite deposits",12,269);
+ }
  if(editor==="rpg"){
   const ox=15,oy=64,tile=19;
   const w=advancedSettings.world_width,h=advancedSettings.world_height;
@@ -1431,6 +1500,231 @@ let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="dialogue"){
+  const state=advancedSession.state;
+  const info=document.createElement("p");
+  // Source statements, rather than an assistant's guessed speech, determine
+  // which choices become legal. The backend remains the authority.
+  info.textContent="Speakers "+state.active_speakers+
+   " · station "+state.locations[state.position]+
+   " · direct statements "+state.direct_statements.length+
+   " · verified topics "+state.corroborations.length+
+   " · patience and influence are finite.";
+  target.append(info);
+  const label=document.createElement("label");
+  label.textContent="Local speaker / archived testimony / original social action";
+  const select=document.createElement("select");
+  select.id="original-dialogue-command";
+  select.setAttribute("aria-label","Choose original dialogue action");
+  const recommended=actions.filter(action=>{
+   if(action.startsWith("travel:"))
+    return Math.abs(Number(action.split(":")[1])-state.position)===1;
+   if(action.startsWith("speak:")||action.startsWith("support:")||
+      action.startsWith("challenge:")){
+    const id=Number(action.split(":")[1]);
+    const speaker=state.speakers[id];
+    return speaker&&speaker.location===state.position;
+   }
+   if(action.startsWith("compare:"))return state.position===2;
+   return true;
+  });
+  for(const action of recommended){
+   const option=document.createElement("option");
+   option.value=action;
+   option.textContent=action.replaceAll("_"," ");
+   select.append(option);
+  }
+  label.append(select);target.append(label);
+  const execute=document.createElement("button");
+  execute.type="button";
+  execute.textContent="Perform source-bound social choice";
+  execute.disabled=Boolean(advancedSession.terminal)||!recommended.length;
+  execute.addEventListener("click",()=>advanceAdvanced(select.value));
+  target.append(execute);
+  const hint=document.createElement("small");
+  hint.textContent="First-hand testimony cannot be copied; compare two distinct original sources in the archive. Trust, patience and influence actually change.";
+  target.append(hint);
+  return;
+ }
+ if(advancedSession?.editor==="economy"){
+  const state=advancedSession.state;
+  const label=document.createElement("label");
+  label.textContent="Original trade economy · "+state.active_market_count+
+   " detailed markets · "+state.active_goods.length+" playable products";
+  const select=document.createElement("select");
+  select.id="original-economy-action";
+  for(const action of actions){
+   const option=document.createElement("option");
+   option.value=action;option.textContent=action.replaceAll("_"," ");
+   select.append(option);
+  }
+  label.append(select);target.append(label);
+  const play=document.createElement("button");
+  play.type="button";play.textContent="Perform verified market action";
+  play.disabled=Boolean(advancedSession.terminal);
+  play.addEventListener("click",()=>advanceAdvanced(select.value));
+  target.append(play);
+  const info=document.createElement("small");
+  info.textContent="Market "+state.position+" · "+state.active_goods[state.focus]+
+   " · cash "+state.cash+" · cargo "+state.cargo.reduce((a,b)=>a+b,0)+
+   " · imports sold "+state.imports_sold+
+   (state.checkpoint?" · trade milestone earned; trading continues":"");
+  target.append(info);
+  const retireLabel=document.createElement("label");
+  const retire=document.createElement("input");retire.type="checkbox";
+  retireLabel.append(retire," Retire after earned milestone");
+  target.append(retireLabel);
+  const planBtn=document.createElement("button");planBtn.type="button";
+  planBtn.textContent="AI trade director: prove finite-market cooperation";
+  planBtn.disabled=Boolean(advancedSession.terminal);
+  const proof=document.createElement("pre");
+  proof.setAttribute("role","status");
+  proof.setAttribute("aria-live","polite");
+  planBtn.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="economy"||systemEditor().id!=="economy")
+     throw Error("Source editor changed while preparing trade plan");
+    const scene=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(scene.seed!==advancedSession.seed)
+     throw Error("Trade scene seed changed during source review");
+    const result=await api("/api/economy-plan",{
+     scene,settings:advancedSettings,max_actions:100,retire:retire.checked
+    });
+    const plan=result.plan;
+    proof.textContent=JSON.stringify({
+     status:plan.status,actions:plan.actions,
+     imports_sold:plan.imported_deliveries,
+     manufactured:plan.manufactured_units,audits:plan.verified_audits,
+     ending_cash:plan.final_cash,source_digest:plan.source_digest,
+     independently_replayed:plan.independent_replay_verified,
+     receipt_digest:plan.digest,native_hardware_verified:false
+    },null,2);
+    target.querySelector("#trade-economy-adopt-proof")?.remove();
+    if(plan.status!=="replay_verified_trade"){
+     status("Original economic plan inconclusive; no false trade success awarded.");
+     return;
+    }
+    const adopt=document.createElement("button");
+    adopt.id="trade-economy-adopt-proof";adopt.type="button";
+    adopt.textContent="Explicitly replay verified original trade milestone";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="economy"||systemEditor().id!=="economy"||
+         advancedCommands.length!==0||advancedSession.seed!==scene.seed)
+       throw Error("Trade adoption requires unchanged initial reviewed source");
+      const checked=await api("/api/economy-plan-verify",{
+       record:plan,scene,settings:advancedSettings
+      });
+      if(!checked.verified)throw Error("Source trade proof could not be verified");
+      const played=await api("/api/advanced-play",{
+       editor:"economy",settings:advancedSettings,actions:plan.actions,
+       seed:scene.seed,scene
+      });
+      if(played.session.digest!==plan.replay_digest||
+         !played.session.state.checkpoint||
+         played.session.state.retired!==plan.retired)
+       throw Error("Original replay did not earn verified trade milestone");
+      advancedCommands=plan.actions.slice();
+      advancedScene=scene;
+      showAdvanced(played);
+      status("Independent economic replay adopted by explicit operator choice.");
+     }catch(error){status("Trade milestone adoption refused: "+error.message);}
+    });
+    target.append(adopt);
+    status("Verified original trade plan ready for explicit player adoption.");
+   }catch(error){proof.textContent="";status("Economic director refused: "+error.message);}
+  });
+  target.append(planBtn);target.append(proof);
+  const mirrorBtn=document.createElement("button");
+  mirrorBtn.type="button";
+  mirrorBtn.textContent="Strategy mirror: compare real economic trade-offs";
+  mirrorBtn.disabled=Boolean(advancedSession.terminal);
+  const mirrorView=document.createElement("pre");
+  mirrorView.id="original-economy-mirror-evidence";
+  mirrorView.setAttribute("role","status");
+  mirrorView.setAttribute("aria-live","polite");
+  mirrorBtn.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="economy"||systemEditor().id!=="economy")
+     throw Error("Economy editor selection changed");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("Cannot compare stale authored market world");
+    const result=await api("/api/economy-mirror",{
+     scene:source,settings:advancedSettings,horizon:12,max_scenarios:24
+    });
+    const report=result.report;
+    const proofCheck=await api("/api/economy-mirror-verify",{
+     record:report,scene:source,settings:advancedSettings
+    });
+    if(!proofCheck.verified||report.weights_promoted||
+       !report.comparison_is_simulated_game_only)
+     throw Error("Market comparison failed strict source review");
+    mirrorView.textContent=JSON.stringify({
+     source:report.source_digest,
+     scenarios_attempted:report.scenarios_attempted,
+     scenarios_verified:report.scenarios_verified,
+     infeasible:report.scenarios_infeasible,
+     pareto_frontier:report.pareto_frontier,
+     relative_policy_leader:report.top_relative_policy,
+     evidence:report.evaluated.map(x=>({
+      strategy:x.strategy,relative_score:x.relative_policy_score,
+      households_served:x.metrics.households_served,
+      imports:x.metrics.imported_deliveries,
+      production:x.metrics.manufactured_units,
+      player_cash:x.metrics.player_cash,
+      public_treasury:x.metrics.public_treasury,
+      cargo_supply:x.metrics.market_inventory,
+      verified_session:x.gameplay_session_digest
+     })),
+     source_bound_replay:true,model_weights_promoted:false,
+     hardware_certified:false,mirror_receipt:report.digest
+    },null,2);
+    target.querySelector("#original-economy-mirror-apply")?.remove();
+    target.querySelector("#original-economy-mirror-choice")?.remove();
+    const chooser=document.createElement("select");
+    chooser.id="original-economy-mirror-choice";
+    chooser.setAttribute("aria-label","Select independently simulated market policy");
+    for(const option of report.evaluated){
+     const item=document.createElement("option");
+     item.value=option.strategy;
+     item.textContent=option.strategy+" · relative score "+option.relative_policy_score;
+     chooser.append(item);
+    }
+    target.append(chooser);
+    const apply=document.createElement("button");
+    apply.id="original-economy-mirror-apply";apply.type="button";
+    apply.textContent="Explicitly replay selected market policy from original state";
+    apply.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="economy"||systemEditor().id!=="economy"||
+         advancedCommands.length!==0||advancedSession.seed!==source.seed)
+       throw Error("Counterfactual adoption requires unchanged initial market world");
+      const choice=report.evaluated.find(x=>x.strategy===chooser.value);
+      if(!choice)throw Error("Unknown evidence-backed market policy");
+      const checked=await api("/api/economy-mirror-verify",{
+       record:report,scene:source,settings:advancedSettings
+      });
+      if(!checked.verified)throw Error("Economic policy verification failed");
+      const played=await api("/api/advanced-play",{
+       editor:"economy",settings:advancedSettings,
+       scene:source,seed:source.seed,actions:choice.actions
+      });
+      if(played.session.digest!==choice.gameplay_session_digest)
+       throw Error("Applied real policy diverged from market evidence");
+      advancedCommands=choice.actions.slice();
+      advancedScene=source;
+      showAdvanced(played);
+      status("Selected original market policy replayed after explicit adoption.");
+     }catch(error){status("Market policy adoption rejected: "+error.message);}
+    });
+    target.append(apply);
+    status("Compared actual original economic decisions; no weights promoted.");
+   }catch(error){mirrorView.textContent="";status("Economic mirror refused: "+error.message);}
+  });
+  target.append(mirrorBtn);target.append(mirrorView);
+  return;
+ }
  if(advancedSession?.editor==="npc_society"||
     advancedSession?.editor==="ecosystem"){
   const state=advancedSession.state;
@@ -2542,7 +2836,7 @@ function showAdvanced(reply){
  advancedAvailableActions=reply.available_actions;
  const nativeSourceFamilies=new Set(["puzzle","platformer","deck_battler",
   "shooter","tactics","tower_defense","racing","survival","farming",
-  "factory","colony"]);
+  "factory","colony","economy"]);
  $("advanced-godot-export").disabled=!nativeSourceFamilies.has(advancedSession.editor);
  $("advanced-godot-export").title=nativeSourceFamilies.has(advancedSession.editor)?
   "Package original Godot source; native hardware verification is a separate CI gate":
@@ -3702,7 +3996,7 @@ $("advanced-scene-stage").addEventListener("click",async()=>{
 });
 $("advanced-godot-export").addEventListener("click",async()=>{
  try{
-  if(!advancedSession||(!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)&&advancedSession.editor!=="colony"))
+  if(!advancedSession||(!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)&&advancedSession.editor!=="colony"&&advancedSession.editor!=="economy"))
    throw Error("Native Godot export requires a verified advanced gameplay session in one of the supported playable native genres");
   if(!advancedSettings)
    throw Error("Original authored game settings must be available");

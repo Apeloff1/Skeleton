@@ -38,6 +38,12 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_economy_mirror import (
+    analyze_original_economy, verify_original_economy_mirror,
+)
+from .advanced_economy_planner import (
+    plan_original_trade, verify_original_trade_plan,
+)
 from .advanced_ecosystem_planner import (
     plan_original_ecology, verify_original_ecology_plan,
 )
@@ -57,6 +63,7 @@ from .advanced_survival_godot import render_survival_godot_package
 from .advanced_farming_godot import render_farming_godot_package
 from .advanced_factory_godot import render_factory_godot_package
 from .advanced_colony_godot import render_colony_godot_package
+from .advanced_economy_godot import render_economy_godot_package
 from .advanced_gameplay_save import (
     export_advanced_savegame, import_advanced_savegame, continue_advanced_savegame,
 )
@@ -179,6 +186,28 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    economic_mirror=commands.add_parser("economy-mirror",
+        help="Compare bounded real market scenarios with independently replayed economic outcomes")
+    economic_mirror.add_argument("--scene",required=True)
+    economic_mirror.add_argument("--settings")
+    economic_mirror.add_argument("--horizon",type=int,default=12)
+    economic_mirror.add_argument("--max-scenarios",type=int,default=32)
+    economic_check=commands.add_parser("verify-economy-mirror",
+        help="Independently rerun economic strategy alternatives and source-evidence custody")
+    economic_check.add_argument("--record",required=True)
+    economic_check.add_argument("--scene",required=True)
+    economic_check.add_argument("--settings")
+    economy=commands.add_parser("plan-economy",
+        help="Prove original market trading through genuine finite production and receipts")
+    economy.add_argument("--scene",required=True)
+    economy.add_argument("--settings")
+    economy.add_argument("--max-actions",type=int,default=100)
+    economy.add_argument("--retire",action="store_true")
+    economy_check=commands.add_parser("verify-economy-plan",
+        help="Independently replay finite-cash economic proof against the source")
+    economy_check.add_argument("--record",required=True)
+    economy_check.add_argument("--scene",required=True)
+    economy_check.add_argument("--settings")
     world_plan=commands.add_parser("plan-original-world",
         help="Search and independently replay a safe original world ability path")
     world_plan.add_argument("--scene",required=True)
@@ -383,6 +412,24 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "economy-mirror":
+            output=analyze_original_economy(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                horizon=args.horizon,max_scenarios=args.max_scenarios)
+        elif args.operation == "verify-economy-mirror":
+            output={"verified":verify_original_economy_mirror(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-economy":
+            output=plan_original_trade(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_actions=args.max_actions,retire=args.retire)
+        elif args.operation == "verify-economy-plan":
+            output={"verified":verify_original_trade_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
         elif args.operation == "plan-original-world":
             output=plan_original_world(
                 _load(args.scene),
@@ -467,6 +514,7 @@ def main(argv=None) -> int:
                       else render_farming_godot_package if receipt.get("editor")=="farming"
                       else render_factory_godot_package if receipt.get("editor")=="factory"
                       else render_colony_godot_package if receipt.get("editor")=="colony"
+                      else render_economy_godot_package if receipt.get("editor")=="economy"
                       else render_advanced_godot_package)
             artifact=renderer(receipt,settings,authorized=args.trusted_local_operator)
             destination=write_advanced_godot_package(
