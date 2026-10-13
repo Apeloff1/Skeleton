@@ -1842,6 +1842,8 @@ function showAdvanced(reply){
   "This family has no independently running native Godot source adapter";
  $("advanced-physics-interop").disabled=!["platformer","racing","sandbox"].includes(
   advancedSession.editor)||!advancedSession.scene;
+ $("advanced-npc-observe").disabled=!["platformer","racing","sandbox"].includes(
+   advancedSession.editor)||!advancedSession.scene;
  $("advanced-interop-godot").disabled=!["platformer","racing","sandbox"].includes(
    advancedSession.editor)||!advancedSession.scene;
  $("advanced-linked-step").disabled=!["platformer","racing","sandbox"].includes(
@@ -3184,6 +3186,75 @@ $("advanced-interop-godot").addEventListener("click",async()=>{
    " physical Godot encounter exported. It independently plays Physics only; native genre release requires a separate gate.");
  }catch(error){status("Native original physical encounter export blocked: "+error.message);}
 });
+$("advanced-npc-observe").addEventListener("click",async()=>{
+ try{
+  if(!advancedSession || !advancedSession.scene ||
+      !["platformer","racing","sandbox"].includes(advancedSession.editor))
+   throw Error("Signed original Platformer, Racing or Sandbox scene required");
+  const physicalActions=Array(8).fill("push:east");
+  // The candidate list is evidence produced by independently replayed real
+  // collisions; clients cannot mint a fixture event by selecting an object.
+  const evidence=await api("/api/advanced-physics-interop",{
+   session:advancedSession,settings:advancedSettings,
+   physics_actions:physicalActions
+  });
+  if(!evidence.proof || evidence.proof.source_session_digest!==advancedSession.digest)
+   throw Error("Unauthenticated source evidence");
+  const selector=$("advanced-npc-source");
+  const old=selector.value;
+  selector.replaceChildren();
+  for(const witness of evidence.proof.witnesses){
+   const option=document.createElement("option");
+   option.value=String(witness.source_id);
+   option.textContent=witness.source_type+" #"+witness.source_id+
+    " ("+(witness.layer===2?"passable":"solid")+")";
+   selector.append(option);
+  }
+  if(!selector.options.length)throw Error("No original physics objects exist");
+  if([...selector.options].some(option=>option.value===old))selector.value=old;
+  else {
+   const first=evidence.proof.source_fixture_impacts[0];
+   if(first)selector.value=String(first.source_id);
+  }
+  const sourceId=Number(selector.value);
+  const site=Number($("advanced-npc-site").value);
+  const raw=$("advanced-npc-followups").value.trim();
+  const followups=raw?raw.split(",").map(item=>item.trim()):[];
+  if(followups.length>24 || followups.some(item=>!item))
+   throw Error("A maximum of 24 complete original-world actions is permitted");
+  const world=await api("/api/advanced-scene-template",{
+    editor:"quest_director",seed:advancedSession.seed,
+    scene_id:"npc_physics_world"
+  });
+  const reply=await api("/api/advanced-physics-npc-witness",{
+   session:advancedSession,settings:advancedSettings,
+   world_scene:world.scene,binding:{source_id:sourceId,site_id:site},
+   physics_actions:physicalActions,world_actions:followups
+  });
+  if(!reply.proof || reply.source_project_mutated ||
+     reply.native_certified || reply.automatic_quest_reward_granted_to_original_game ||
+     reply.proof.source_session_digest!==advancedSession.digest ||
+     reply.proof.world_scene_digest!==world.scene.digest)
+   throw Error("Original scene or eyewitness custody did not pass");
+  const report=reply.proof;
+  $("advanced-npc-evidence").textContent=JSON.stringify({
+   object_source:report.binding.source_id,
+   bound_world_site:report.binding.site_id,
+   actual_object_hits:report.actual_bound_impacts,
+   source_collider_receipts:report.source_fixture_impacts,
+   first_hand_witnesses:report.direct_witnesses,
+   actual_incident:report.incident,
+   original_causal_quests:report.physical_origin_quest_ids,
+   followup_timeline:report.world_timeline,
+   npc_memories:report.world_state.npcs.map(n=>({
+    id:n.id,cell:n.cell,eyewitness:n.memories,rumors:n.heard
+   })),
+   original_project_mutated:false,
+   source_replay_digest:report.source_session_digest,
+  },null,2);
+  status("Original physical NPC world independently reconstructed with line-of-sight and causal quest evidence.");
+ }catch(error){status("Physics NPC world action rejected: "+error.message);}
+});
 $("advanced-physics-interop").addEventListener("click",async()=>{
  try{
   if(!advancedSession || !["platformer","racing","sandbox"].includes(advancedSession.editor)
@@ -3302,6 +3373,25 @@ local until typed revalidation and an explicit human-approved file commit.</smal
 <button id="advanced-start" type="button">Start advanced scenario</button>
 <button id="advanced-physics-native" type="button">Prepare native physics demo</button>
 <button id="advanced-physics-interop" type="button">Rehearse authored physical encounters</button>
+<fieldset aria-label="Authored NPC physical witnesses">
+ <legend>NPC-witnessed original physics and quests</legend>
+ <label>Original physical object<select id="advanced-npc-source"></select></label>
+ <label>Author-bound quest site
+  <select id="advanced-npc-site">
+   <option value="0">Site 0 · settlement</option>
+   <option value="1">Site 1 · bridge</option>
+   <option value="2">Site 2 · grove</option>
+   <option value="3">Site 3 · archive</option>
+  </select>
+ </label>
+ <label>NPC world follow-up commands (comma separated; max 24)
+  <input id="advanced-npc-followups" value="" placeholder="wait, south, east, speak:0">
+ </label>
+ <button id="advanced-npc-observe" type="button">
+  Reconstruct physical incident and NPC eyewitness quests
+ </button>
+ <pre id="advanced-npc-evidence" role="status" aria-live="polite"></pre>
+</fieldset>
 <button id="advanced-interop-godot" type="button">Download original physical encounter for Godot 4</button>
 <fieldset aria-label="Opt-in linked physical campaign">
  <legend>Linked physical campaign · real health and durability</legend>
