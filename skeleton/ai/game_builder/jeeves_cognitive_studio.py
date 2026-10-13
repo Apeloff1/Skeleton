@@ -172,6 +172,96 @@ class JeevesCognitiveStudio:
         }
         return {**body, "digest":digest(body)}
 
+    def static_plan(self, *, plan_id, steps, initial_facts,
+                    risk="medium", inject_failure_at=None,
+                    expected_snapshot=None):
+        """Execute installed DAG analyzer and bounded fault-injection simulator.
+
+        This is source-level *simulation*, not real executor dispatch. It
+        cannot grant privileged capabilities, launch jobs or mutate source.
+        """
+        from skeleton.intelligence.plan_verifier import (
+            PlanStep, StaticPlanDefinition, PlanVerificationPolicy,
+            analyze_static_plan, simulate_static_plan,
+        )
+        self._snapshot(expected_snapshot)
+        if (type(plan_id) is not str or not 1 <= len(plan_id) <= 96
+                or type(steps) is not list or not 1 <= len(steps) <= 96
+                or type(initial_facts) is not list
+                or len(initial_facts) > 128):
+            raise JeevesAppwideError("bounded original static plan required")
+        known = frozenset((
+            "source.read", "source.inspect", "game.preview",
+            "forge.preview", "cognition.evaluate", "plan.inspect",
+        ))
+        allowed = frozenset((
+            "step_id", "depends_on", "preconditions", "postconditions",
+            "required_capabilities", "max_tokens", "max_cost_units",
+            "max_wall_time_s", "terminal", "side_effect",
+            "irreversible", "recovery_plan_digest", "rollback_test_digest",
+        ))
+        if any(
+            type(row) is not dict or set(row) - allowed
+            or "step_id" not in row
+            or type(row.get("required_capabilities", [])) not in (tuple,list)
+            or not set(row.get("required_capabilities", [])) <= known
+            for row in steps
+        ):
+            raise JeevesAppwideError("unknown or privileged source plan capability")
+        _bounded_payload({
+            "plan_id":plan_id, "steps":steps, "initial_facts":initial_facts
+        }, 150000)
+        canon_policy = _policy(None)
+        plan=StaticPlanDefinition(
+            plan_id=plan_id, version=1,
+            steps=tuple(PlanStep(**{
+                **row,
+                **{
+                    k:tuple(row[k]) for k in (
+                        "depends_on", "preconditions",
+                        "postconditions", "required_capabilities"
+                    ) if k in row
+                },
+            }) for row in steps),
+            initial_facts=tuple(initial_facts),
+            reasoning_policy_digest=canon_policy.digest,
+            planning_history_digest=digest(steps),
+            risk=_risk(risk),
+        )
+        policy=PlanVerificationPolicy(
+            policy_id="jeeves_readonly_static_plan",
+            version=1,
+            allowed_capabilities=tuple(sorted(known)),
+            max_steps=96,
+            max_total_tokens=80000,
+            max_total_cost_units=200.0,
+            max_total_wall_time_s=300.0,
+            require_terminal_leaves=True,
+            allow_irreversible=False,
+        )
+        analysis=analyze_static_plan(plan,policy)
+        simulation=simulate_static_plan(
+            plan,analysis,
+            available_capabilities=tuple(sorted(known)),
+            injected_failure_step_id=inject_failure_at,
+        )
+        body={
+            "schema":SCHEMA+".static_plan",
+            "inventory_snapshot":self.inv._digest,
+            "canonical_plan_digest":plan.digest,
+            "canonical_policy_digest":policy.digest,
+            "static_analysis":analysis.payload(),
+            "static_analysis_digest":analysis.decision_digest,
+            "fault_injection_simulation":simulation.payload(),
+            "fault_injection_receipt_digest":simulation.decision_digest,
+            "actual_canonical_dag_analyzer_executed":True,
+            "actual_canonical_fault_simulator_executed":True,
+            "source_execution_or_job_dispatch_performed":False,
+            "side_effects_or_privileged_tools_allowed":False,
+            "plan_is_not_independently_product_qualified":True,
+        }
+        return {**body,"digest":digest(body)}
+
     def stopping(self, *, history, risk="medium", policy=None,
                  expected_snapshot=None):
         from skeleton.intelligence.strategy_registry import (
