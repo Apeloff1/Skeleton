@@ -10,10 +10,12 @@ on:
       - "skeleton/ai/game_builder/jeeves_measured_completion.py"
       - "skeleton/ai/game_builder/jeeves_appwide_fabric.py"
       - "scripts/run_app_acceptance_matrix.py"
+      - "scripts/verify_app_acceptance_ci.py"
       - "tests/test_game_builder_jeeves_acceptance_matrix.py"
       - "tests/test_run_app_acceptance_matrix.py"
       - "tests/test_ai_offline_native_functional_boundary.py"
       - "tests/test_ai_shell_approval_contract.py"
+      - "tests/test_game_builder_jeeves_acceptance_run_verifier.py"
       - "skeleton/ai/shell/approval.py"
       - ".github/workflows/jeeves-app-acceptance-matrix.yml"
   workflow_dispatch:
@@ -60,6 +62,7 @@ jobs:
             machine/
             tests/
             scripts/run_app_acceptance_matrix.py
+            scripts/verify_app_acceptance_ci.py
             .github/workflows/
       - name: Compile audited implementation and acceptance reader
         shell: bash
@@ -69,13 +72,16 @@ jobs:
             skeleton/ai/game_builder/jeeves_measured_completion.py \
             scripts/run_app_acceptance_matrix.py \
             tests/test_game_builder_jeeves_acceptance_matrix.py \\
-            tests/test_run_app_acceptance_matrix.py
+            tests/test_run_app_acceptance_matrix.py            tests/test_run_app_acceptance_matrix.py \\
+            tests/test_game_builder_jeeves_acceptance_run_verifier.py \\
+            scripts/verify_app_acceptance_ci.py
       - name: Adversarial candidate-binding validation
         shell: bash
         run: |
           python -m unittest \\
             tests.test_game_builder_jeeves_acceptance_matrix \\
-            tests.test_run_app_acceptance_matrix -v
+            tests.test_run_app_acceptance_matrix -v            tests.test_run_app_acceptance_matrix \\
+            tests.test_game_builder_jeeves_acceptance_run_verifier -v
       - name: Execute actual curated family regression suite
         shell: bash
         run: |
