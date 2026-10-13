@@ -126,7 +126,8 @@ class Jeeves:
                           shadow_pipeline=None, shadow_read_authorize=None,
                           shadow_write_authorize=None, shadow_review_verify=None,
                           shadow_admission_verify=None, shadow_consume_verify=None,
-                          file_atlas=None, file_atlas_read_authorize=None):
+                          file_atlas=None, file_atlas_read_authorize=None,
+                          source_read_authorize=None):
         """Assemble app discovery tools and optionally host-owned creator actions.
 
         By default every tool is READ_ONLY. Editor dispatch is opt-in and only
@@ -175,6 +176,18 @@ class Jeeves:
             register_repository_atlas_tools(
                 registry, atlas=file_atlas, read_authorize=file_atlas_read_authorize,
             )
+            if source_read_authorize is not None:
+                from skeleton.jeeves.source_read_gateway import (
+                    JeevesSourceReadGateway, register_source_read_tool,
+                )
+                register_source_read_tool(
+                    registry,
+                    gateway=JeevesSourceReadGateway(
+                        file_atlas, authorize=source_read_authorize,
+                    ),
+                )
+        elif source_read_authorize is not None:
+            raise ValueError("source read authorization requires a scoped file atlas")
         return registry
 
     def app_capability_catalog(self, *, query: str = "", limit: int = 20, offset: int = 0, root=None):
@@ -325,6 +338,11 @@ class Jeeves:
             token_budget=token_budget, include_tests=include_tests,
             preferred_feature=preferred_feature,
         )
+
+    def source_read_gateway(self, *, atlas, authorize):
+        """Construct a separately host-authorized indexed source-file reader."""
+        from skeleton.jeeves.source_read_gateway import JeevesSourceReadGateway
+        return JeevesSourceReadGateway(atlas, authorize=authorize)
 
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
