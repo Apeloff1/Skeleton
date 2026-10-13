@@ -649,7 +649,7 @@ class TestNativeLLMRuntime(unittest.TestCase):
         runtime = self.runtime()
         sequence = runtime.encode("hello world")
         runtime.tokenizer._digest = "0" * 64
-        forged = TokenSequence("0" * 64, sequence.token_ids, sequence.source_digest)
+        forged = TokenSequence("0" * 64, sequence.token_ids, sequence.source_text_digest)
         with self.assertRaisesRegex(RuntimeContractError, "tokenizer drift during inference"):
             runtime.infer_sequence(forged)
 
