@@ -28,12 +28,12 @@ class TestTokenizerRuntimeErrorEnvelope(unittest.TestCase):
         runtime = NativeLLMRuntime(model())
         with patch.object(runtime.tokenizer, "encode_sequence",
                           side_effect=TokenizerContractError("invalid token")):
-            with self.assertRaisesRegex(RuntimeContractError, "tokenizer encode failed") as ctx:
+            with self.assertRaisesRegex(RuntimeContractError, "native tokenizer encode failed") as ctx:
                 runtime.encode("alpha")
         self.assertIsInstance(ctx.exception.__cause__, TokenizerContractError)
         with patch.object(runtime.tokenizer, "decode_ids",
                           side_effect=TokenizerContractError("invalid token")):
-            with self.assertRaisesRegex(RuntimeContractError, "tokenizer decode failed") as ctx:
+            with self.assertRaisesRegex(RuntimeContractError, "native tokenizer decode failed") as ctx:
                 runtime.decode_ids([0])
         self.assertIsInstance(ctx.exception.__cause__, TokenizerContractError)
 
@@ -49,7 +49,7 @@ class TestTokenizerRuntimeErrorEnvelope(unittest.TestCase):
         checkpoint = runtime.checkpoint()
         with patch.object(runtime.tokenizer, "assert_unchanged",
                           side_effect=TokenizerContractError("drift")):
-            with self.assertRaisesRegex(RuntimeContractError, "tokenizer changed before checkpoint"):
+            with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated before checkpoint"):
                 runtime.checkpoint()
         with patch.object(NativeTokenizer, "assert_checkpoint_matches",
                           side_effect=TokenizerContractError("checkpoint mismatch")):
@@ -61,7 +61,7 @@ class TestTokenizerRuntimeErrorEnvelope(unittest.TestCase):
         sequence = runtime.encode("alpha")
         with patch.object(runtime.tokenizer, "assert_unchanged",
                           side_effect=TokenizerContractError("drift")):
-            with self.assertRaisesRegex(RuntimeContractError, "tokenizer drift during inference"):
+            with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated after admission"):
                 runtime.infer_sequence(sequence)
 
 
