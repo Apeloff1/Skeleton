@@ -85,17 +85,18 @@ jobs:
           python -m py_compile \
             skeleton/ai/game_builder/jeeves_acceptance_matrix.py \
             skeleton/ai/game_builder/jeeves_measured_completion.py \
+            skeleton/ai/game_builder/jeeves_acceptance_run_verifier.py \
             scripts/run_app_acceptance_matrix.py \
-            tests/test_game_builder_jeeves_acceptance_matrix.py \\
-            tests/test_run_app_acceptance_matrix.py            tests/test_run_app_acceptance_matrix.py \\
-            tests/test_game_builder_jeeves_acceptance_run_verifier.py \\
-            scripts/verify_app_acceptance_ci.py
-      - name: Adversarial candidate-binding validation
+            scripts/verify_app_acceptance_ci.py \
+            tests/test_game_builder_jeeves_acceptance_matrix.py \
+            tests/test_run_app_acceptance_matrix.py \
+            tests/test_game_builder_jeeves_acceptance_run_verifier.py
+      - name: Adversarial candidate-binding and CI evidence validation
         shell: bash
         run: |
-          python -m unittest \\
-            tests.test_game_builder_jeeves_acceptance_matrix \\
-            tests.test_run_app_acceptance_matrix -v            tests.test_run_app_acceptance_matrix \\
+          python -m unittest \
+            tests.test_game_builder_jeeves_acceptance_matrix \
+            tests.test_run_app_acceptance_matrix \
             tests.test_game_builder_jeeves_acceptance_run_verifier -v
       - name: Execute actual curated family regression suite
         shell: bash
