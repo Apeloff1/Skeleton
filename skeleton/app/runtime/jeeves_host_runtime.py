@@ -77,6 +77,7 @@ class JeevesApplicationRuntime:
         shadow_review_verify: Callable[..., bool] | None = None,
         shadow_admission_verify: Callable[..., bool] | None = None,
         shadow_consume_verify: Callable[..., bool] | None = None,
+        release_verify_external: Callable[..., bool] | None = None,
     ) -> None:
         if not isinstance(scope, JeevesHostContext):
             raise JeevesHostRuntimeError("authenticated JeevesHostContext required")
@@ -99,6 +100,7 @@ class JeevesApplicationRuntime:
             shadow_review_verify=shadow_review_verify,
             shadow_admission_verify=shadow_admission_verify,
             shadow_consume_verify=shadow_consume_verify,
+            release_verify_external=release_verify_external,
         )
 
     def _require_live(self) -> None:
@@ -183,6 +185,13 @@ class JeevesApplicationRuntime:
                     "task_count": len(ledger.records),
                     "ready_count": len(ledger.ready_names()),
                     "revision_count": revision, "head_digest": head,
+                },
+                "model_release": {
+                    "enabled": self.workbench.model_releases is not None,
+                    "proposals": len(self.workbench.model_releases.list_status(limit=1000))
+                    if self.workbench.model_releases is not None else 0,
+                    "count_capped_at": 1000,
+                    "production_status": "external_model_serving_plane_only",
                 },
                 "runtime_availability": "requires host readiness and execution grants",
                 "weights_loaded_by_jeeves": False,
