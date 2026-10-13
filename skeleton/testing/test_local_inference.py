@@ -467,10 +467,10 @@ async def _wait_for_signal(signal: threading.Event) -> None:
     await asyncio.wait_for(wait(), timeout=2)
 
 
-def _lifecycle_engine(runner) -> LocalInferenceEngine:
+def _lifecycle_engine(runner, *, max_concurrency: int = 1) -> LocalInferenceEngine:
     return LocalInferenceEngine(
         CallableLocalModel(model_id="lifecycle", model_digest="a" * 64, runner=runner),
-        cache_size=0,
+        cache_size=0, max_concurrency=max_concurrency,
     )
 
 
@@ -662,7 +662,9 @@ async def test_cancelled_batch_drains_every_native_worker() -> None:
         finally:
             stopped[index].set()
 
-    engine = _lifecycle_engine(run)
+    # Both native workers must be admitted before cancellation can test
+    # draining *every* worker; the helper's default capacity is one.
+    engine = _lifecycle_engine(run, max_concurrency=2)
     batch = asyncio.create_task(engine.generate_many(tuple(
         LocalInferenceRequest(prompt=str(i)) for i in range(2)
     )))
