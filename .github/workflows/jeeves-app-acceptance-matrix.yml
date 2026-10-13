@@ -53,6 +53,9 @@ jobs:
             skeleton/cortex/
             skeleton/security/
             skeleton/shells/
+            skeleton/automation/
+            skeleton/repo_machine/
+            .machine/
             skeleton/kernel/
             skeleton/jeeves/
             skeleton/forge/
