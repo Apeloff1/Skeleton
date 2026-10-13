@@ -1,6 +1,49 @@
 # Deathmarch execution index — 2026-10-13
 
 
+## DX-96–DX-101 — canonical executable plan scrutiny and accurate failure recovery
+
+This source build pass extends the real policy adapters without claiming
+that simulated actions have been actually dispatched or accepted in CI.
+
+| Milestone | Concrete committed implementation | Canonical module |
+| --- | --- | --- |
+| DX-96 | Execute installed game build plan scoring against actual user vision | \`JeevesCognitiveStudio.build_plan\` → \`PlanVerifier.verify\` |
+| DX-97 | Execute installed DAG static analysis, facts, capability and budget checks | \`JeevesCognitiveStudio.static_plan\` → \`analyze_static_plan\` |
+| DX-98 | Inject an explicit bounded failure and run the original recovery simulator | \`simulate_static_plan\` |
+| DX-99 | Add Game Studio plan scoring, DAG authoring and failure simulation controls | \`game_workspace_ui.py\` |
+| DX-100 | Identify source already written when commit fails during acceptance receipt | \`JeevesProductionReview.commit\` |
+| DX-101 | Reject malformed/privileged plan capabilities and accurately label simulated side effects | \`JeevesCognitiveStudio.static_plan\` |
+
+### Verified vs remaining percentage measurements
+
+Canonical source state **on this branch's reference authorities**:
+- **414 / 421 (98.34%)** masterplan volumes have implementation metadata
+  \`verified\`; **7 / 421 (1.66%) remain** in source implementation state
+  \`hardened\` (VOL-013/014/015/016/017/248/253).
+- **0 / 421 (0%)** volumes are independently enterprise-qualified in
+  canonical enterprise grade (all currently \`designed\`). **100% remaining**.
+- **0 / 9 (0%)** registered AI product capabilities are marked \`complete\`.
+  **100% registry completion remains**.
+- **17 / 17 (100%)** source-declared application construction gaps closed.
+  This does not imply working physical runtime or passing device acceptance.
+
+### Exact-head workflow observation
+
+A **read-only** GitHub workflow observation on the pre-index commit
+\`196a50e40693702ead597e7e7d9bbd8e935e0b6f\` returned only
+the first 25 associated workflow entries: 1 in progress, 1 completed
+with \`skipped\` conclusion, 4 pending, 19 queued. No successful exact-head
+gate was confirmed from that returned page. This index commit is newer,
+so no previous observation qualifies *this* exact head.
+
+**No test suite was initiated or executed by this implementation pass.**
+Product readiness still requires independent exact-head required gate
+success, original game runtime acceptance, platform/device execution,
+model quality checks, enterprise source verification and human promotion.
+An overall completion % is not supportable without inventing a denominator.
+
+
 ## DX-85–DX-95 — measurable verification frontier and real cognition
 
 This workpass establishes explicit progress denominators **without**
