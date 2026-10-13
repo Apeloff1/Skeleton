@@ -904,6 +904,46 @@ $("jeeves-release-download").addEventListener("click",()=>dmGuard(async()=>{
   "Device execution, licensing and commercial release still require signoff.");
 }));
 
+
+/* Actual Python gameplay replay and byte-identical approved game source provenance. */
+$("jeeves-release-replay").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-release-replay-approval").checked)
+  throw Error("Explicitly authorize actual original-game replay execution");
+ const args=await releaseCustodyArgs();
+ if(!releaseVerification||releaseVerificationArgs!==JSON.stringify(args))
+  throw Error("Fresh human-approved source verification is required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.release.replay",
+  params:{...args,expected_verification_digest:releaseVerification},
+  operator_authorized:true,
+ });
+ const proof=receipt.result;
+ $("jeeves-accepted-report").textContent=JSON.stringify(proof,null,2);
+ status(proof.actual_gameplay_steps+" actual reference-gameplay moves executed "+
+  "and "+proof.source_artifacts_regenerated+" approved source members recompiled "+
+  "byte-for-byte. Godot/native binaries not executed.");
+}));
+$("jeeves-release-compare").addEventListener("click",()=>dmGuard(async()=>{
+ if(!model||!model.active||selectedProject!==model.active||
+    selectedTree!=="current"||!jeevesAppSnapshot)
+  throw Error("Select active original project and scan application");
+ const release_ids=$("jeeves-release-compare-ids").value.split(/[,\s]+/)
+  .map(x=>x.trim()).filter(Boolean);
+ if(release_ids.length<2||release_ids.length>6||
+    new Set(release_ids).size!==release_ids.length)
+  throw Error("Choose two to six different approved original release IDs");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.release.compare",
+  params:{project:model.active,release_ids,expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false,
+ });
+ const compare=receipt.result;
+ $("jeeves-release-compare-result").textContent=JSON.stringify(compare,null,2);
+ status(compare.distinct_real_worlds+" truly different authored world sources "+
+  "and "+compare.different_source_members+" distinct changed package members, "+
+  "grounded only in human-approved current Studio source.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -4962,6 +5002,13 @@ then export a portable original source ZIP. Godot binaries are not built.</small
 <label><input id="jeeves-release-download-approval" type="checkbox">
 Authorize original source-only ZIP download</label>
 <button id="jeeves-release-download" type="button">Download approved browser + Godot source archive</button>
+<label><input id="jeeves-release-replay-approval" type="checkbox">
+Approve real replay of the checked, accepted original game source</label>
+<button id="jeeves-release-replay" type="button">Recompile and execute real winning replay</button>
+<label>Compare approved original release IDs (2–6)
+<textarea id="jeeves-release-compare-ids" spellcheck="false" rows="2">demo_01 original_variant_01</textarea></label>
+<button id="jeeves-release-compare" type="button">Compare actually committed original game variants</button>
+<pre id="jeeves-release-compare-result" role="status" aria-live="polite"></pre>
 <pre id="jeeves-accepted-report" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
