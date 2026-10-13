@@ -1,0 +1,144 @@
+{
+  "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
+  "version": "2026-10-13",
+  "parent_scope": "machine/app_completion_scope.json",
+  "stage": "implementation_test",
+  "scope_note": "Curated unit/integration-test candidates; running them does not qualify all features or installed app",
+  "runner_mode": "unittest_module_exact_head",
+  "default_max_seconds": 480,
+  "policies": {
+    "requires_real_test_execution": true,
+    "exact_commit_required": true,
+    "source_test_sha_receipts_required": true,
+    "no_success_inference_from_file_presence": true,
+    "matrix_does_not_verify_end_to_end_user_journey": true,
+    "automated_model_or_source_promotion_forbidden": true,
+    "unmapped_families_remain_unknown": true
+  },
+  "bindings": [
+    {
+      "family_id": "F11",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Jeeves whole-app inventory, auth and source-action boundary",
+      "unittest_modules": [
+        "tests.test_game_builder_jeeves_appwide_fabric"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F12",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Source/graph intelligence custody and stale identity",
+      "unittest_modules": [
+        "tests.test_game_builder_jeeves_evidence_graph",
+        "tests.test_game_builder_jeeves_capability_intelligence"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F13",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Measurable completion UI and product authority",
+      "unittest_modules": [
+        "tests.test_game_builder_jeeves_measured_completion",
+        "tests.test_game_builder_jeeves_completion_census"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F21",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Advanced authored world/engine session invariants",
+      "unittest_modules": [
+        "tests.test_game_builder_advanced_runtime"
+      ],
+      "workflow_hint": "Game Builder Advanced System Engines",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F22",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Observed NPC quest causality and state transfer",
+      "unittest_modules": [
+        "tests.test_game_builder_advanced_quest_director"
+      ],
+      "workflow_hint": "Game Builder Advanced System Engines",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F23",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Story continuity and recoverable branching source",
+      "unittest_modules": [
+        "tests.test_game_builder_story_continuity_assurance"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F24",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Chapter-act-scene canon and story replay",
+      "unittest_modules": [
+        "tests.test_game_builder_story_canon_fabric",
+        "tests.test_game_builder_story_chapter_context"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F25",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Spoiler-safe witnessed chat chapter handoff",
+      "unittest_modules": [
+        "tests.test_game_builder_jeeves_chapter_chat"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F26",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Advanced game editor contract normalization",
+      "unittest_modules": [
+        "tests.test_game_builder_advanced_runtime"
+      ],
+      "workflow_hint": "Game Builder Advanced System Engines",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F27",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Maze, RPG and advanced game execution/replay",
+      "unittest_modules": [
+        "tests.test_game_builder_advanced_runtime"
+      ],
+      "workflow_hint": "Game Builder Advanced System Engines",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F28",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Combat guard, parry, stamina and collision",
+      "unittest_modules": [
+        "tests.test_game_builder_advanced_fighting",
+        "tests.test_game_builder_advanced_ecosystem"
+      ],
+      "workflow_hint": "Game Builder Advanced System Engines",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F34",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Forge graph and appwide runtime permissions",
+      "unittest_modules": [
+        "tests.test_game_builder_jeeves_app_runtime"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false
+    }
+  ]
+}
