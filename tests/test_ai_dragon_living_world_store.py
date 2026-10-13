@@ -34,7 +34,7 @@ def test_real_sqlite_world_save_survives_expired_session_token_and_reissues_vali
         assert receipt["version"]==1
         assert receipt["continues_after_ending"]
         restored=restore(db,world,OWNER,0,now=1_800_000_000+TTL_SECONDS*4)
-        assert restored["state"]["endings_seen"]==["civic_union"]
+        assert restored["state"]["endings_seen"]==("civic_union",)
         assert restored["state"]["era"]==1
         assert restored["history_digest"]==prior.history_digest
         resumed=open_checkpoint(world,restored["new_checkpoint"],OWNER,
@@ -130,6 +130,6 @@ def test_source_history_writes_can_continue_after_world_already_completed():
         assert receipt["version"]==2
         restored=restore(db,world,OWNER,4,now=1_800_000_002)
         assert restored["state"]["era"]==1
-        assert restored["state"]["endings_seen"]==["civic_union"]
+        assert restored["state"]["endings_seen"]==("civic_union",)
         assert restored["state"]["actions_played"]==6
         assert restored["history_digest"]==later.history_digest
