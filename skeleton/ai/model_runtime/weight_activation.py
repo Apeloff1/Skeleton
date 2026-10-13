@@ -13,6 +13,7 @@ from hashlib import sha256
 import os
 from pathlib import Path
 from threading import RLock
+from uuid import uuid4
 from typing import TYPE_CHECKING
 
 from skeleton.ai.training.flgb_training_runtime import digest_json, require_digest
@@ -128,19 +129,25 @@ class NativeWeightDeployment:
             if sha256(target.read_bytes()).hexdigest() != content_digest:
                 raise ShadowWeightError("existing rollback checkpoint has different bytes")
             return content_digest
-        tmp = self._checkpoints / (candidate_digest + f".{os.getpid()}.tmp")
+        tmp = self._checkpoints / (candidate_digest + "." + uuid4().hex + ".tmp")
         try:
             with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as handle:
                 handle.write(raw)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(tmp, target)
-            if os.name == "posix":
-                fd = os.open(self._checkpoints, os.O_RDONLY)
-                try:
-                    os.fsync(fd)
-                finally:
-                    os.close(fd)
+            try:
+                # Never overwrite a previously published rollback checkpoint.
+                os.link(tmp, target)
+            except FileExistsError:
+                if target.is_symlink() or sha256(target.read_bytes()).hexdigest() != content_digest:
+                    raise ShadowWeightError("concurrent rollback checkpoint mismatch")
+            else:
+                if os.name == "posix":
+                    fd = os.open(self._checkpoints, os.O_RDONLY)
+                    try:
+                        os.fsync(fd)
+                    finally:
+                        os.close(fd)
         finally:
             tmp.unlink(missing_ok=True)
         return content_digest
