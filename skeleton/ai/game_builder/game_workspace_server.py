@@ -40,7 +40,7 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
-from .advanced_interleaved_counterfactual import (run_interleaved_counterfactuals,
+from .advanced_interleaved_counterfactual_mirror import (run_interleaved_counterfactuals,
     verify_interleaved_counterfactuals)
 from .advanced_world_counterfactuals import (run_counterfactual_laboratory,
     verify_counterfactual_laboratory,derive_counterfactuals)

@@ -5,7 +5,7 @@ from copy import deepcopy
 import unittest
 
 from tests import test_game_builder_advanced_interleaved_world as sources
-from skeleton.ai.game_builder.advanced_interleaved_counterfactual import (
+from skeleton.ai.game_builder.advanced_interleaved_counterfactual_mirror import (
     MAX_SCENARIOS,OBJECTIVES,CounterfactualWorldError,
     run_interleaved_counterfactuals,verify_interleaved_counterfactuals,
 )
