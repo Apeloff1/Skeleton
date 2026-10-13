@@ -57,6 +57,10 @@ jobs:
             skeleton/jeeves/
             skeleton/forge/
             skeleton/organism/
+            skeleton/app/
+            apps/jeeves/
+            packaging/windows/
+            java-accelerators/
             backend/
             frontend/
             machine/
@@ -64,6 +68,14 @@ jobs:
             scripts/run_app_acceptance_matrix.py
             scripts/verify_app_acceptance_ci.py
             .github/workflows/
+      - name: Pin Python 3.11 toolchain
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+      - name: Check exact tested commit
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Compile audited implementation and acceptance reader
         shell: bash
         run: |
