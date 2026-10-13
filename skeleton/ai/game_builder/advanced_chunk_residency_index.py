@@ -203,6 +203,10 @@ def _query_authenticated(index, query):
         identity = actor["actor_id"]
         if q["actor_id"] is not None and identity != q["actor_id"]:
             continue
+        # The genesis state has not executed a scheduling tick. No actor
+        # can truthfully be classified as served or deferred *this turn*.
+        if q["mode"] != "all" and state["tick"] == 0:
+            continue
         is_detail = identity in selected
         if q["mode"] == "detailed_this_turn" and not is_detail:
             continue
