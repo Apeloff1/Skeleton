@@ -138,7 +138,13 @@ def test_robots_bootstrap_is_self_directed_and_budgeted():
         "https://example.com/robots.txt",
         "https://example.com/",
     ]
+    # One robots bootstrap plus one page: neither transport may double-charge.
     assert e.budget.requests == 2
+    assert e.budget.documents == 1
+    assert e.budget.bytes == (
+        len(pages["https://example.com/robots.txt"][2].encode())
+        + len(pages["https://example.com/"][2].encode())
+    )
 
 
 def test_robots_server_error_fails_closed():
