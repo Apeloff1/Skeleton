@@ -273,6 +273,49 @@ def product_capability_catalog(*, query: str = "", limit: int = 20,
                            limit=limit, offset=offset)
 
 
+
+def plane_capability_catalog(*, query: str = "", limit: int = 20,
+                             offset: int = 0,
+                             root: Path | str | None = None) -> dict[str, Any]:
+    """Show the architecture's runtime planes, owners and incoming consumers.
+
+    Dependency discovery deliberately does not assert that a plane is online
+    or assign Jeeves the right to call it. Operations remain with each owner.
+    """
+    _page(query, limit, offset)
+    home = _root(root)
+    declared = _manifest(home / "machine" / "capability_registry.json").get("capabilities")
+    if not isinstance(declared, list) or len(declared) > MAX_ROWS:
+        raise AppCapabilityBridgeError("runtime plane registry is absent or unbounded")
+    rows: list[dict[str, Any]] = []
+    for record in declared:
+        if not isinstance(record, dict):
+            raise AppCapabilityBridgeError("runtime plane capability must be an object")
+        identity, plane, status = (
+            record.get("id"), record.get("plane"), record.get("status"),
+        )
+        if any(not isinstance(value, str) or not 1 <= len(value) <= 192
+               for value in (identity, plane, status)):
+            raise AppCapabilityBridgeError("invalid runtime plane descriptor")
+        rows.append({
+            "id": identity,
+            "plane": plane,
+            "declared_status": status,
+            "owners": _catalog_strings(record.get("owners", []), field="owners"),
+            "dependency_planes": _catalog_strings(
+                record.get("dependency_planes", []), field="dependency_planes"),
+            "incoming_consumer_planes": _catalog_strings(
+                record.get("incoming_consumer_planes", []),
+                field="incoming_consumer_planes"),
+            "interface_edge_refs": _catalog_strings(
+                record.get("interface_edge_refs", []), field="interface_edge_refs"),
+            "live_availability": "unverified",
+            "authority": "declaration-only; owners remain authoritative",
+        })
+    return _catalog_result(rows, name="runtime-plane-capabilities",
+                           query=query, limit=limit, offset=offset)
+
+
 def interface_catalog(*, query: str = "", limit: int = 20, offset: int = 0,
                       root: Path | str | None = None) -> dict[str, Any]:
     """Find canonical cross-plane contracts without acquiring target-plane rights."""
@@ -375,6 +418,18 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
                 ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
             ),
         ), lambda args, _ctx: product_capability_catalog(
+            query=args.get("query", ""), limit=args.get("limit", 20),
+            offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="app.planes",
+            description="Discover app runtime planes, declared owners, dependencies and consumers; no execution.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("query", "string", required=False, max_length=MAX_QUERY),
+                ArgumentRule("limit", "integer", required=False, minimum=1, maximum=MAX_PAGE),
+                ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
+            ),
+        ), lambda args, _ctx: plane_capability_catalog(
             query=args.get("query", ""), limit=args.get("limit", 20),
             offset=args.get("offset", 0), root=home)),
         (ToolSpec(
