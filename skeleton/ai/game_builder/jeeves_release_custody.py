@@ -252,6 +252,129 @@ class JeevesReleaseCustody:
             expected_snapshot=expected_snapshot)
         return report
 
+    def replay(self, *, project, release_id, expected_verification_digest,
+               expected_snapshot=None, operator_authorized=False):
+        """Rebuild the approved original game and execute its winning trace.
+
+        This is real canonical Python gameplay execution on the inspected
+        original source identity; it is not a repository CI test run nor
+        proof that a Godot binary or browser was executed.
+        """
+        if operator_authorized is not True:
+            raise PermissionError("designer authorization required for actual gameplay replay")
+        if (type(expected_verification_digest) is not str
+                or not SHA.fullmatch(expected_verification_digest)):
+            raise JeevesAppwideError("expected current approved source digest required")
+        verified, source = self._collect(
+            project=project, release_id=release_id,
+            expected_snapshot=expected_snapshot)
+        if verified["digest"] != expected_verification_digest:
+            raise JeevesAppwideError("approved game source changed before replay")
+        from .playable_world import GameBuildIntent
+        from .playable_compiler import compile_original_game
+        from .dual_runtime_export import render_dual_runtime_package
+
+        authored = _json(source["godot/world.json"].decode("utf-8"))
+        settings = authored["intent"]
+        if type(settings) is not dict or settings.get("project_id") != project:
+            raise JeevesAppwideError("approved original game has invalid project intent")
+        reconstructed = GameBuildIntent(**settings)
+        if (reconstructed.levels > 3 or reconstructed.width > 25
+                or reconstructed.height > 25
+                or reconstructed.hazards_per_level > 10):
+            raise JeevesAppwideError("source replay outside reviewed consumer runtime budget")
+        executed = compile_original_game(reconstructed, authorized=True)
+        rebuilt = render_dual_runtime_package(executed, authorized=True)
+        if (executed.world.digest != verified["world_digest"]
+                or executed.proof.digest != verified["proof_digest"]
+                or executed.proof.final_state.status != "won"
+                or rebuilt.manifest["manifest_digest"] !=
+                   verified["package_manifest_digest"]):
+            raise JeevesAppwideError("approved sources diverge from actually recompiled game")
+        if set(rebuilt.files) != set(source):
+            raise JeevesAppwideError("recompiled game package member set differs")
+        inconsistent = [
+            name for name in sorted(source)
+            if rebuilt.files[name] != source[name]
+        ]
+        if inconsistent:
+            raise JeevesAppwideError("accepted source bytes do not match canonical game compiler: "
+                                     + ", ".join(inconsistent[:5]))
+        body = {
+            "schema": SCHEMA + ".replay",
+            "project": project,
+            "release_id": release_id,
+            "source_verification_digest": verified["digest"],
+            "actual_recompiled_world_digest": executed.world.digest,
+            "actual_python_winning_replay_digest": executed.proof.digest,
+            "actual_gameplay_steps": executed.proof.final_state.steps,
+            "final_gameplay_status": executed.proof.final_state.status,
+            "source_artifacts_regenerated": len(rebuilt.files),
+            "every_byte_matches_original_approved_source": True,
+            "original_browser_source_matches": True,
+            "godot_source_matches": True,
+            "gameplay_simulator_actually_executed": True,
+            "godot_binary_actually_executed": False,
+            "browser_executed": False,
+            "native_or_commercial_release_certified": False,
+            "source_files_modified": 0,
+        }
+        return {**body, "digest": digest(body)}
+
+    def compare(self, *, project, release_ids,
+                expected_snapshot=None):
+        """Compare actual accepted game variants rather than enumerating imaginary ones."""
+        self._context(project, expected_snapshot)
+        if (type(release_ids) is not list or
+                not 2 <= len(release_ids) <= 6 or
+                any(type(item) is not str for item in release_ids) or
+                len(release_ids) != len(set(release_ids))):
+            raise JeevesAppwideError("2–6 unique original game release IDs required")
+        accepted = []
+        versions = []
+        for release_id in sorted(release_ids):
+            receipt, source = self._collect(
+                project=project, release_id=release_id,
+                expected_snapshot=expected_snapshot)
+            accepted.append(receipt)
+            versions.append(source)
+        world_counts = {record["world_digest"] for record in accepted}
+        names = sorted(set().union(*(set(source) for source in versions)))
+        changes = []
+        for filename in names:
+            digests = [
+                sha256(source[filename]).hexdigest()
+                if filename in source else None
+                for source in versions
+            ]
+            if len(set(digests)) > 1:
+                changes.append({
+                    "source_member": filename,
+                    "per_release_sha256": dict(zip(sorted(release_ids), digests)),
+                    "content_differs": True,
+                })
+        body = {
+            "schema": SCHEMA + ".comparison",
+            "project": project,
+            "inventory_snapshot": self.inv._digest,
+            "releases": [{
+                "release_id": row["release_id"],
+                "release_verification_digest": row["digest"],
+                "world_digest": row["world_digest"],
+                "proof_digest": row["proof_digest"],
+                "source_files": row["source_file_count"],
+            } for row in accepted],
+            "distinct_real_worlds": len(world_counts),
+            "all_selected_worlds_different": len(world_counts) == len(accepted),
+            "source_member_total": len(names),
+            "different_source_members": len(changes),
+            "changed_members": changes,
+            "each_source_had_a_human_acceptance_receipt": True,
+            "no_untested_platform_equivalence_claim": True,
+            "source_mutated": False,
+        }
+        return {**body, "digest": digest(body)}
+
     def download(self, *, project, release_id, expected_verification_digest,
                  expected_snapshot=None, operator_authorized=False):
         if operator_authorized is not True:
