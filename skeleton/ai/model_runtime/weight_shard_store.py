@@ -30,6 +30,8 @@ class WeightShardStoreError(ModelRuntimeError):
 
 
 def _hash_file(path: Path, *, maximum: int) -> tuple[str, int]:
+    if path.is_symlink() or not path.is_file():
+        raise WeightShardStoreError("stored weight object must be a regular file")
     digest = sha256()
     size = 0
     with path.open("rb") as stream:
@@ -68,6 +70,8 @@ class WeightShardStore:
     @staticmethod
     def _write_once(path: Path, content: bytes) -> None:
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if path.is_symlink():
+            raise WeightShardStoreError("content-addressed path must not be a symlink")
         if path.exists():
             if path.read_bytes() != content:
                 raise WeightShardStoreError("existing content-addressed manifest is inconsistent")
@@ -78,13 +82,14 @@ class WeightShardStore:
                 stream.write(content)
                 stream.flush()
                 os.fsync(stream.fileno())
-            # Concurrent writers can publish identical bytes; no writer may
-            # change the digest-owned contents of an existing object.
-            if path.exists():
-                if path.read_bytes() != content:
+            # Hard-link creation is atomic and never replaces an existing
+            # path. An os.replace race would silently rewrite immutable CAS.
+            try:
+                os.link(tmp, path)
+            except FileExistsError:
+                if path.is_symlink() or path.read_bytes() != content:
                     raise WeightShardStoreError("concurrent manifest content mismatch")
             else:
-                os.replace(tmp, path)
                 if os.name == "posix":
                     directory_fd = os.open(path.parent, os.O_RDONLY)
                     try:
@@ -100,6 +105,8 @@ class WeightShardStore:
             raise WeightShardStoreError("weight shard input must be a regular non-symlink file")
         target = self._object_path(shard.digest)
         target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if target.is_symlink():
+            raise WeightShardStoreError("stored weight object must not be a symlink")
         if target.exists():
             observed, size = _hash_file(target, maximum=shard.bytes)
             if observed != shard.digest or size != shard.bytes:
@@ -124,12 +131,13 @@ class WeightShardStore:
                     raise WeightShardStoreError("weight shard bytes differ from committed digest")
                 writer.flush()
                 os.fsync(writer.fileno())
-            if target.exists():
+            try:
+                os.link(tmp, target)
+            except FileExistsError:
                 observed, stored_size = _hash_file(target, maximum=shard.bytes)
                 if observed != shard.digest or stored_size != shard.bytes:
                     raise WeightShardStoreError("concurrent weight object mismatch")
             else:
-                os.replace(tmp, target)
                 if os.name == "posix":
                     directory_fd = os.open(target.parent, os.O_RDONLY)
                     try:
