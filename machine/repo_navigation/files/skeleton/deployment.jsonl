@@ -1,0 +1,5 @@
+{"p":"skeleton/deployment/__init__.py","g":"d2c1b6d7e43d2bcf2f5cbad315b349e5ad3ba435","b":381,"m":"100644","t":"blob","z":"deployment-compat","f":"skeleton/deployment/__init__.py"}
+{"p":"skeleton/deployment/blue_green.py","g":"cf90c6361f55632f515b9c7ade8212ffc8669410","b":235,"m":"100644","t":"blob","z":"deployment-compat","f":"skeleton/deployment/blue_green.py"}
+{"p":"skeleton/deployment/canary.py","g":"f605113ad7631d348fb70861f0fb3d7d06413e98","b":253,"m":"100644","t":"blob","z":"deployment-compat","f":"skeleton/deployment/canary.py"}
+{"p":"skeleton/deployment/environment_manager.py","g":"ab07edad9537aa462c0f7fe6099201fdf35cd472","b":216,"m":"100644","t":"blob","z":"deployment-compat","f":"skeleton/deployment/environment_manager.py"}
+{"p":"skeleton/deployment/release_notes.py","g":"f9d93c58fc9e2fc00227693c82bd63d4a3ddf7f4","b":262,"m":"100644","t":"blob","z":"deployment-compat","f":"skeleton/deployment/release_notes.py"}

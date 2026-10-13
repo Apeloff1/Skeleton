@@ -1,0 +1,8 @@
+{"p":"skeleton/contexts/__init__.py","g":"e2d4e935c398c0665041341b6675bf925e42d3f8","b":238,"m":"100644","t":"blob","z":"context-compat","f":"skeleton/contexts/__init__.py"}
+{"p":"skeleton/contexts/backlog.py","g":"54df2b61f20f1b89e8f29f48edbb81546c29e013","b":160,"m":"100644","t":"blob","z":"context-compat","f":"skeleton/contexts/backlog.py"}
+{"p":"skeleton/contexts/causal.py","g":"df789aca5c63e2ced7515bd35d53ab3036c8c370","b":158,"m":"100644","t":"blob","z":"context-compat","f":"skeleton/contexts/causal.py"}
+{"p":"skeleton/contexts/cycle.py","g":"7710fb536481b17ad98e03788f3131dc830b5679","b":156,"m":"100644","t":"blob","z":"context-compat","f":"skeleton/contexts/cycle.py"}
+{"p":"skeleton/contexts/oracle.py","g":"67847c0bcc1722a8315f5a1bbc31c3a49063a495","b":158,"m":"100644","t":"blob","z":"context-compat","f":"skeleton/contexts/oracle.py"}
+{"p":"skeleton/contexts/planning.py","g":"c6f6a81f685ba4e494f84dc67d778f76b46262ed","b":162,"m":"100644","t":"blob","z":"context-compat","f":"skeleton/contexts/planning.py"}
+{"p":"skeleton/contexts/syntax.py","g":"78bc75024a7c2723fe49907329a8e3e831e70b9a","b":158,"m":"100644","t":"blob","z":"context-compat","f":"skeleton/contexts/syntax.py"}
+{"p":"skeleton/contexts/workorder.py","g":"27b393369867986b4acafe4601966b514e18ed14","b":164,"m":"100644","t":"blob","z":"context-compat","f":"skeleton/contexts/workorder.py"}
