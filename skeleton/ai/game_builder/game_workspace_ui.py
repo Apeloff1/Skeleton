@@ -532,6 +532,62 @@ $("jeeves-production-stage").addEventListener("click",()=>dmGuard(async()=>{
   "Review exact diffs and commit each proposal explicitly.");
 }));
 
+
+/* Real compiled offline browser + Godot project source review production. */
+let originalReleaseDigest=null,originalReleaseParams=null;
+function releaseIntent(){
+ if(!model||selectedTree!=="current"||!model.active||
+    selectedProject!==model.active)
+  throw Error("Select active writable original Game Studio project");
+ if(!jeevesAppSnapshot)throw Error("Scan app to establish source inventory identity");
+ const release_id=$("jeeves-release-id").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(release_id))
+  throw Error("Release ID must be an original safe identifier");
+ const intent=JSON.parse($("jeeves-release-intent").value);
+ if(!intent||typeof intent!=="object"||Array.isArray(intent))
+  throw Error("Provide bounded original playable game intent");
+ return {project:model.active,release_id,intent,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-release-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if($("jeeves-release-approval").checked!==true)
+  throw Error("Explicit designer approval required to run original compiler");
+ const params=releaseIntent();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.release_plan",
+  params,operator_authorized:true,
+ });
+ const result=receipt.result;
+ originalReleaseDigest=result.digest;
+ originalReleaseParams=JSON.stringify(params);
+ $("jeeves-release-output").textContent=JSON.stringify(result,null,2).slice(0,80000);
+ status(result.source_target_count+" actual browser/Godot game sources compiled; "+
+  "Python winning replay "+result.proof_status+
+  ". Native hardware not certified.");
+}));
+$("jeeves-release-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if($("jeeves-release-approval").checked!==true)
+  throw Error("Human approval is mandatory for source proposal staging");
+ const params=releaseIntent();
+ if(!originalReleaseDigest||originalReleaseParams!==JSON.stringify(params))
+  throw Error("Original game intent changed; compile and review the exact plan again");
+ const reason=$("jeeves-release-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Specific native source review reason required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.release_stage",
+  params:{...params,expected_plan_digest:originalReleaseDigest,reason},
+  operator_authorized:true,
+ });
+ const result=receipt.result;
+ $("jeeves-release-output").textContent=JSON.stringify(result,null,2).slice(0,80000);
+ if(result.proposals.length)
+  $("proposal").textContent=result.proposals[0].proposal_id;
+ originalReleaseDigest=null;
+ status(result.proposal_count+" original runtime sources entered existing "+
+  "human-reviewed proposal custody. No compiled binary has been released.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -4494,6 +4550,29 @@ nothing is secretly accepted or deployed.</small></p>
 Explicitly authorize reviewed original project source proposals</label>
 <button id="jeeves-production-stage" type="button">Stage source proposals in real Studio workspace</button>
 <pre id="jeeves-production-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Original Playable Browser & Godot Source Builder</legend>
+<p><small>Actually compile an original game world, discover a Python-winning
+replay, render offline HTML and Godot source. Stage its real source package
+for per-file designer review. Native binaries are not produced.</small></p>
+<label>Original source-release ID<input id="jeeves-release-id" value="demo_01"></label>
+<label>Bounded game intent JSON
+<textarea id="jeeves-release-intent" spellcheck="false" rows="6">{
+ "title":"Original Adventure",
+ "subtitle":"A new world built with Skeleton Game Studio",
+ "seed":13712,"width":19,"height":15,
+ "levels":2,"collectibles_per_level":3,
+ "hazards_per_level":3,"theme":"forest",
+ "starting_health":4
+}</textarea></label>
+<label><input id="jeeves-release-approval" type="checkbox">
+Explicit designer approval for original-game generation and source staging</label>
+<button id="jeeves-release-plan" type="button">Compile real browser and Godot game source</button>
+<label>Reviewed source-package justification
+<textarea id="jeeves-release-reason" rows="2" spellcheck="false">Review original offline browser gameplay and native Godot 4 project source.</textarea></label>
+<button id="jeeves-release-stage" type="button">Stage real browser + Godot files for review</button>
+<pre id="jeeves-release-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
