@@ -121,16 +121,73 @@ class Jeeves:
     def laws(self) -> tuple[str, ...]:
         return SYSTEM_LAWS
 
-    def app_tool_registry(self, *, root=None):
-        """Expose approved *read-only* app/creator tools to a host tool gate.
+    def app_tool_registry(self, *, root=None,
+                          creator_handlers=None, creator_authorize=None,
+                          shadow_pipeline=None, shadow_read_authorize=None,
+                          shadow_write_authorize=None, shadow_review_verify=None,
+                          shadow_admission_verify=None, shadow_consume_verify=None,
+                          file_atlas=None, file_atlas_read_authorize=None,
+                          source_read_authorize=None):
+        """Assemble app discovery tools and optionally host-owned creator actions.
 
-        The returned registry does not confer any grant or execute actions.
-        Host ToolExecutor / PermitBoundToolExecutor remains authoritative.
+        By default every tool is READ_ONLY. Editor dispatch is opt-in and only
+        registered if the host supplies both operation handlers and its own
+        per-command authorizer. Registration never grants permission: the
+        existing ToolExecutor / PermitBoundToolExecutor must separately approve
+        every HIGH_IMPACT call.
         """
-        from skeleton.jeeves.app_capability_bridge import register_app_tools
+        from skeleton.jeeves.app_capability_bridge import (
+            register_app_tools,
+            register_authorized_creator_tool,
+        )
         from skeleton.jeeves.agent.tools import ToolRegistry
+        if (creator_handlers is None) != (creator_authorize is None):
+            raise ValueError("host creator handlers and authorizer must be supplied together")
         registry = ToolRegistry()
         register_app_tools(registry, root=root)
+        if creator_handlers is not None:
+            register_authorized_creator_tool(
+                registry,
+                handlers=creator_handlers,
+                authorize=creator_authorize,
+            )
+        if (shadow_pipeline is None) != (shadow_read_authorize is None):
+            raise ValueError("shadow owner and read authorizer must be supplied together")
+        if shadow_pipeline is None and shadow_write_authorize is not None:
+            raise ValueError("shadow write authorizer requires an injected owner")
+        if shadow_pipeline is None and any(callback is not None for callback in (
+            shadow_review_verify, shadow_admission_verify, shadow_consume_verify,
+        )):
+            raise ValueError("shadow verifier callbacks require an injected owner")
+        if shadow_pipeline is not None:
+            from skeleton.jeeves.shadow_weight_bridge import register_shadow_weight_tools
+            register_shadow_weight_tools(
+                registry, pipeline=shadow_pipeline,
+                read_authorize=shadow_read_authorize,
+                write_authorize=shadow_write_authorize,
+                review_verify=shadow_review_verify,
+                admission_verify=shadow_admission_verify,
+                consume_verify=shadow_consume_verify,
+            )
+        if (file_atlas is None) != (file_atlas_read_authorize is None):
+            raise ValueError("file atlas and host read authorizer required together")
+        if file_atlas is not None:
+            from skeleton.jeeves.repository_file_atlas import register_repository_atlas_tools
+            register_repository_atlas_tools(
+                registry, atlas=file_atlas, read_authorize=file_atlas_read_authorize,
+            )
+            if source_read_authorize is not None:
+                from skeleton.jeeves.source_read_gateway import (
+                    JeevesSourceReadGateway, register_source_read_tool,
+                )
+                register_source_read_tool(
+                    registry,
+                    gateway=JeevesSourceReadGateway(
+                        file_atlas, authorize=source_read_authorize,
+                    ),
+                )
+        elif source_read_authorize is not None:
+            raise ValueError("source read authorization requires a scoped file atlas")
         return registry
 
     def app_capability_catalog(self, *, query: str = "", limit: int = 20, offset: int = 0, root=None):
@@ -143,10 +200,169 @@ class Jeeves:
         from skeleton.jeeves.app_capability_bridge import capability_concepts
         return capability_concepts(query=query, limit=limit, offset=offset, root=root)
 
+    def app_product_features(self, *, query: str = "", limit: int = 20,
+                             offset: int = 0, root=None):
+        """Look up declared AI features and readiness prerequisites, not grants."""
+        from skeleton.jeeves.app_capability_bridge import product_capability_catalog
+        return product_capability_catalog(
+            query=query, limit=limit, offset=offset, root=root,
+        )
+
+    def app_runtime_planes(self, *, query: str = "", limit: int = 20,
+                           offset: int = 0, root=None):
+        """Discover declared owners, dependencies and consumers across app planes."""
+        from skeleton.jeeves.app_capability_bridge import plane_capability_catalog
+        return plane_capability_catalog(
+            query=query, limit=limit, offset=offset, root=root,
+        )
+
+    def app_interface_catalog(self, *, query: str = "", limit: int = 20,
+                              offset: int = 0, root=None):
+        """Discover owning planes, dependency contracts and failure semantics."""
+        from skeleton.jeeves.app_capability_bridge import interface_catalog
+        return interface_catalog(query=query, limit=limit, offset=offset, root=root)
+
+    def app_dependency_impact(self, plane: str, *, direction: str = "upstream",
+                              max_depth: int = 5, root=None):
+        """Inspect bounded dependency closure without executing cross-plane work."""
+        from skeleton.jeeves.app_capability_bridge import dependency_impact
+        return dependency_impact(
+            plane, direction=direction, max_depth=max_depth, root=root,
+        )
+
     def creator_proposal(self, operation: str, project_id: str, payload):
         """Compile a validated creator proposal, without dispatch authority."""
         from skeleton.jeeves.app_capability_bridge import creator_proposal
         return creator_proposal(operation, project_id, payload)
+
+    def creator_plan(self, project_id: str, steps):
+        """Compile bounded creator workflow proposals without executing them."""
+        from skeleton.jeeves.app_capability_bridge import creator_plan
+        return creator_plan(project_id, steps)
+
+    def creator_runbook(self, compiled_plan, *, executor, persist, restored=None):
+        """Construct a host-permitted executable creator workflow.
+
+        The caller must supply its already-authorized ToolExecutor and durable
+        compare-and-swap storage. This function mints no grants or credentials.
+        """
+        from skeleton.jeeves.ai.creator_runbook_runtime import (
+            CreatorRunbook, CreatorRunbookRunner,
+        )
+        return CreatorRunbookRunner(
+            CreatorRunbook(compiled_plan),
+            executor=executor,
+            persist=persist,
+            restored=restored,
+        )
+
+    def creator_runbook_store(self, path, *, compiled_plan):
+        """Open an explicitly host-selected durable runbook state store."""
+        from skeleton.jeeves.ai.creator_runbook_runtime import CreatorRunbook
+        from skeleton.jeeves.ai.creator_runbook_store import CreatorRunbookStore
+        compiled = CreatorRunbook(compiled_plan)
+        return CreatorRunbookStore(path, plan_sha256=compiled.plan_sha256)
+
+    def shadow_training_release_proposal(self, shadow, manifest, checkpoint,
+                                         candidate, comparison, evaluation,
+                                         promotion, *, expected_head_commit):
+        """Compose a reviewed candidate-only model release proposal.
+
+        No weight is loaded or promoted; the model-serving admission owner must
+        separately verify the exact release, execute the change and retain a
+        validated rollback path.
+        """
+        from skeleton.ai.training.shadow_candidate_gate import prepare_candidate_release
+        return prepare_candidate_release(
+            shadow, manifest, checkpoint, candidate, comparison, evaluation,
+            promotion, expected_head_commit=expected_head_commit,
+        )
+
+    def app_capability_dispatcher(self, *, registry, executor,
+                                  bindings, readiness, authorize, root=None):
+        """Bind declared product features to verified, host-owned tool effects.
+
+        No model-created binding, blanket permission, runtime fallback or
+        implicit readiness is accepted. The host remains the final authority.
+        """
+        from skeleton.jeeves.agent.capability_dispatch import JeevesCapabilityDispatcher
+        return JeevesCapabilityDispatcher(
+            registry=registry,
+            executor=executor,
+            bindings=bindings,
+            readiness=readiness,
+            authorize=authorize,
+            root=root,
+        )
+
+    def orchestration_store(self, path, *, authorize):
+        """Open a host-authorized, durable Supervisor/Secretary/Worker ledger.
+
+        Planning remains non-executing. Authority is checked by the host on
+        every append or state change; evidence can never substitute for a
+        ToolExecutor grant to perform application effects.
+        """
+        from skeleton.jeeves.ai.orchestration_store import DurableOrchestrLedger
+        return DurableOrchestrLedger(path, authorize=authorize)
+
+    def orchestrated_capability_runtime(self, *, ledger, dispatcher, verify_result):
+        """Connect durable delegated plans to host-permitted app capabilities."""
+        from skeleton.jeeves.agent.orchestrated_capability_runtime import (
+            JeevesOrchestratedCapabilityRuntime,
+        )
+        return JeevesOrchestratedCapabilityRuntime(
+            ledger=ledger, dispatcher=dispatcher, verify_result=verify_result,
+        )
+
+    def shadow_learning_handoff(self, proposal, report, **evidence):
+        """Prepare evaluated Jeeves lessons for independent shadow-weight review."""
+        from skeleton.jeeves.agent.shadow_learning_adapter import (
+            prepare_shadow_learning_handoff,
+        )
+        return prepare_shadow_learning_handoff(proposal, report, **evidence)
+
+    def repository_file_atlas(self, *, root, store_path):
+        """Open a host-selected source atlas; refresh is a separate host action."""
+        from skeleton.jeeves.repository_file_atlas import JeevesRepositoryFileAtlas
+        return JeevesRepositoryFileAtlas(root, store_path)
+
+    def app_source_context(self, objective: str, *, atlas,
+                           max_references: int = 32,
+                           token_budget: int = 2048,
+                           include_tests: bool = False,
+                           preferred_feature: str | None = None):
+        """Plan bounded source bookmarks without reading file contents."""
+        from skeleton.jeeves.agent.file_atlas_context import JeevesFileContextPlanner
+        return JeevesFileContextPlanner(atlas).compile(
+            objective, max_references=max_references,
+            token_budget=token_budget, include_tests=include_tests,
+            preferred_feature=preferred_feature,
+        )
+
+    def source_read_gateway(self, *, atlas, authorize):
+        """Construct a separately host-authorized indexed source-file reader."""
+        from skeleton.jeeves.source_read_gateway import JeevesSourceReadGateway
+        return JeevesSourceReadGateway(atlas, authorize=authorize)
+
+    def open_workbench(self, *, root, state_directory, tenant_id, project_id,
+                       principal_id, read_authorize, orchestration_authorize,
+                       **host_adapters):
+        """Attach durable application, editor and shadow systems to this Jeeves.
+
+        Reuses the same tutor/session instance; the host must supply all
+        permissions, verifiers, storage locations and optional live handlers.
+        Workbench lifetime must be closed by the caller.
+        """
+        from skeleton.jeeves.workbench import JeevesWorkbench
+        return JeevesWorkbench(
+            root=root, state_directory=state_directory,
+            tenant_id=tenant_id, project_id=project_id,
+            principal_id=principal_id,
+            read_authorize=read_authorize,
+            orchestration_authorize=orchestration_authorize,
+            core=self,
+            **host_adapters,
+        )
 
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
