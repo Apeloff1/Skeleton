@@ -78,7 +78,20 @@ class ArchiveX:
     @staticmethod
     def _identity(source_url: str, observed_at: float, digest: str) -> str:
         canonical = json.dumps(
-            [source_url, observed_at, digest],
+            [source_url, float(observed_at), digest],
+            separators=(",", ":"), ensure_ascii=True, allow_nan=False,
+        )
+        return sha256(canonical.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _legacy_integer_identity(source_url: str, observed_at: float,
+                                 digest: str) -> str | None:
+        """Verify snapshot IDs created with integer JSON before SQLite REAL storage."""
+        timestamp = float(observed_at)
+        if not timestamp.is_integer():
+            return None
+        canonical = json.dumps(
+            [source_url, int(timestamp), digest],
             separators=(",", ":"), ensure_ascii=True, allow_nan=False,
         )
         return sha256(canonical.encode("utf-8")).hexdigest()
@@ -102,15 +115,22 @@ class ArchiveX:
         source_url = canonical_video_url(source_url)
         digest = sha256(body).hexdigest()
         snapshot_id = self._identity(source_url, observed_at, digest)
+        legacy_id = self._legacy_integer_identity(source_url, observed_at, digest)
         with self.db:
+            existing = self.db.execute("""
+                SELECT snapshot_id FROM archivex_snapshots
+                WHERE owner=? AND snapshot_id IN (?, ?)
+            """, (owner, snapshot_id, legacy_id or snapshot_id)).fetchone()
+            if existing:
+                prior = self.read(owner, existing[0], authorized=True)
+                if prior is None:
+                    raise ValueError("archive record disappeared during capture")
+                return prior[0]
             count = self.db.execute(
                 "SELECT COUNT(*) FROM archivex_snapshots WHERE owner=?",
                 (owner,),
             ).fetchone()[0]
-            existing = self.db.execute("""
-                SELECT 1 FROM archivex_snapshots WHERE owner=? AND snapshot_id=?
-            """, (owner, snapshot_id)).fetchone()
-            if not existing and count >= self.policy.max_snapshots_per_owner:
+            if count >= self.policy.max_snapshots_per_owner:
                 raise ValueError("archive capacity exceeded")
             self.db.execute("""
                 INSERT OR IGNORE INTO archivex_snapshots
@@ -135,8 +155,12 @@ class ArchiveX:
         if row is None:
             return None
         source, observed, digest, length, media, license_note, body = row
+        valid_identity = (
+            self._identity(source, observed, digest) == snapshot_id
+            or self._legacy_integer_identity(source, observed, digest) == snapshot_id
+        )
         if (len(body) != length or sha256(body).hexdigest() != digest or
-                self._identity(source, observed, digest) != snapshot_id):
+                not valid_identity):
             raise ValueError("archive integrity violation")
         return ArchiveXSnapshot(owner, snapshot_id, source, observed,
                                 digest, length, media, license_note), body
