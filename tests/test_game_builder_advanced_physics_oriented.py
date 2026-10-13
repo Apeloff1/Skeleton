@@ -103,8 +103,10 @@ class OriginalOrientedContactTests(unittest.TestCase):
             "physics",policy,("torque:cw",)+("step:4",)*5,scene=scene)
         self.assertGreater(result["state"]["bodies"][0]["orientation"],0)
         self.assertGreater(result["state"]["oriented_contacts"],0)
-        self.assertTrue(any("oriented_dynamic_manifold_resolved" in
-                            item["events"] for item in result["trace"]))
+        self.assertTrue(any(
+            ("oriented_dynamic_manifold_resolved" in item["events"] or
+             "oriented_rotating_swept_dynamic_manifold_resolved" in item["events"])
+            for item in result["trace"]))
         self.assertTrue(verify_advanced_session(result,policy))
 
     def test_oriented_fixture_rotation_is_bound_to_original_source(self):

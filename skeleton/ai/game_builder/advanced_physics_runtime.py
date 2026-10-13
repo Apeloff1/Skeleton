@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from fractions import Fraction
+from .advanced_physics_rotational_sweep import solve_oriented_sweep
+from .advanced_physics_stability import settle, is_sleeping
 from .advanced_physics_oriented import (
     oriented_world, oriented_static, oriented_pairs,
     sat_manifold, box_vertices,
@@ -261,6 +263,10 @@ def start(config, seed):
         "rope_breaks": 0, "max_velocity_seen": 0, "goal_frames": 0,
         "oriented_contacts": 0, "contact_manifolds": [],
         "geometry_mode": config["collision_geometry"],
+        "rotating_swept_contacts": 0, "oriented_sat_evaluations": 0,
+        "broadphase_pairs": 0, "broadphase_fixtures": 0,
+        "broadphase_pruned": 0, "sleeping_bodies": 0,
+        "rest_stabilizations": 0,
         "continuous_pair_contacts": 0, "max_angular_speed_seen": 0,
         "peak_cable_extension": 0,
         "milestones": [], "events": [], "finished": False, "failed": False,
@@ -421,9 +427,14 @@ def _advance(state, config, events):
         state["frame"] += 1
         old_positions = {body["id"]: body["position"][:]
                          for body in state["bodies"]}
+        old_angles = {body["id"]: body["orientation"]
+                      for body in state["bodies"]}
         advance_rotation(state, config)
         for body in state["bodies"]:
             if body["broken"]:
+                continue
+            if (config["collision_geometry"]=="oriented_box" and
+                    is_sleeping(body,state,config)):
                 continue
             pos = body["position"]
             vel = body["velocity"]
@@ -461,6 +472,9 @@ def _advance(state, config, events):
         if (config["continuous_pair_collision"] and
                 config["collision_geometry"]=="aabb"):
             resolve_moving_pairs(state, config, old_positions, events)
+        elif (config["collision_geometry"]=="oriented_box" and
+                config["rotating_sweep_enabled"]):
+            solve_oriented_sweep(state,config,old_positions,old_angles,events)
         for _solver in range(config["solver_iterations"]):
             before = state["contacts"]
             _pair_contacts(state, config, events)
@@ -470,6 +484,8 @@ def _advance(state, config, events):
             if state["contacts"] == before:
                 break
         solve_radial_rope(state, config, events, _world)
+        if config["collision_geometry"]=="oriented_box":
+            settle(state,config,events)
         if (state["magnet"] or state["fan"]) and state["battery"] > 0:
             state["battery"] -= 1
             state["motors_used"] += 1
@@ -513,6 +529,7 @@ def step(state, config, action):
         if state["impulses_left"] == 0 or body["broken"]:
             raise PhysicsActionError("actuator has exhausted its finite impulse budget")
         state["impulses_left"] -= 1
+        body["sleep"]=0
         for axis in range(3):
             body["velocity"][axis] = _clamp(
                 body["velocity"][axis] + config["impulse_strength"]*direction[axis]//body["mass"],
@@ -550,6 +567,7 @@ def step(state, config, action):
         if body["broken"] or not state["impulses_left"]:
             raise PhysicsActionError("no valid finite torque impulse available")
         state["impulses_left"] -= 1
+        body["sleep"]=0
         apply_torque(body, config, clockwise=action=="torque:cw")
         events.append("finite_angular_impulse_applied")
     else:

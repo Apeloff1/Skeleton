@@ -1015,8 +1015,11 @@ function drawAdvancedGame(session){
   for(const fixture of state.fixtures){
    c.fillStyle="#6a777c";
    const p=fixture.position,h=fixture.half_size;
-   c.fillRect(sx+(p[0]-h[0])/100*scale,sy+(p[1]-h[1])/100*scale,
+   c.save();c.translate(sx+p[0]/100*scale,sy+p[1]/100*scale);
+   c.rotate((fixture.orientation||0)*Math.PI/180000);
+   c.fillRect(-h[0]/100*scale,-h[1]/100*scale,
               h[0]/50*scale,h[1]/50*scale);
+   c.restore();
   }
   for(const [i,anchor] of state.anchors.entries()){
    c.fillStyle="#ecce8d";c.fillRect(sx+anchor[0]/100*scale-3,
@@ -1061,7 +1064,7 @@ function drawAdvancedGame(session){
     c.fillText(String(body.position[2]/100),bx-5,by-8);}
   }
   const tx=Math.min(345,sx+scale*(state.width-1)+12);
-  c.font="11px monospace";c.fillStyle="#d6e5e9";
+  c.font="10px monospace";c.fillStyle="#d6e5e9";
   [
    "Contact: "+state.contacts,
    "Battery: "+state.battery,
@@ -1075,8 +1078,13 @@ function drawAdvancedGame(session){
    "Pair CCD: "+state.continuous_pair_contacts,
    "Angular: "+state.max_angular_speed_seen,
    "Cable ext: "+state.peak_cable_extension,
-   "SAT hits: "+state.oriented_contacts
-  ].forEach((line,i)=>c.fillText(line,tx,54+i*20));
+   "SAT hits: "+state.oriented_contacts,
+   "Sweep hits: "+state.rotating_swept_contacts,
+   "Broadphase: "+(state.broadphase_pairs+state.broadphase_fixtures),
+   "Pruned: "+state.broadphase_pruned,
+   "SAT probes: "+state.oriented_sat_evaluations,
+   "Asleep: "+state.sleeping_bodies
+  ].forEach((line,i)=>c.fillText(line,tx,47+i*14));
  }
  if(editor==="flight"){
   const ox=15,trackY=83,trackW=W-188,trackH=154;
@@ -1812,11 +1820,24 @@ function showAdvanced(reply){
  advancedAvailableActions=reply.available_actions;
  const nativeSourceFamilies=new Set(["puzzle","platformer","deck_battler",
   "shooter","tactics","tower_defense","racing","survival","farming",
-  "factory","colony"]);
- $("advanced-godot-export").disabled=!nativeSourceFamilies.has(advancedSession.editor);
- $("advanced-godot-export").title=nativeSourceFamilies.has(advancedSession.editor)?
-  "Package original Godot source; native hardware verification is a separate CI gate":
-  "This original editor has reference gameplay only; an independent native source engine is not implemented";
+  "factory","colony","physics"]);
+ const physicsActions=new Set(["inspect","step","step:4","push:east",
+  "push:west","push:up","push:down","brake","torque:cw","torque:ccw","select:0"]);
+ const authored=advancedSession.scene?.layout;
+ const physicsNativeReady=advancedSession.editor!=="physics" || (
+   advancedSettings?.max_bodies===1 && advancedSettings?.dimension==="2d" &&
+   advancedSettings?.collision_geometry==="aabb" && advancedSettings?.substeps===1 &&
+   advancedSettings?.initial_battery===0 &&
+   authored?.bodies?.length===1 && authored?.fixtures?.length===0 &&
+   authored.water_y>authored.floor_y &&
+   advancedSession.actions.every(action=>physicsActions.has(action)));
+ const nativeReady=nativeSourceFamilies.has(advancedSession.editor)&&physicsNativeReady;
+ $("advanced-godot-export").disabled=!nativeReady;
+ $("advanced-godot-export").title=nativeReady?
+  "Package independent original Godot source; real native replay and hardware review remain separate":
+  advancedSession.editor==="physics"?
+  "Physics Godot export requires an authored one-body 2D AABB scene without fixtures, substeps=1, battery=0 and supported actions":
+  "This family has no independently running native Godot source adapter";
  $("advanced-state").textContent=JSON.stringify({
    session_digest:advancedSession.digest,
    turns:advancedSession.validated_turn_count,
@@ -2972,7 +2993,7 @@ $("advanced-scene-stage").addEventListener("click",async()=>{
 });
 $("advanced-godot-export").addEventListener("click",async()=>{
  try{
-  if(!advancedSession||(!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)&&advancedSession.editor!=="colony"))
+  if(!advancedSession||(!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)&&advancedSession.editor!=="colony"&&advancedSession.editor!=="physics"))
    throw Error("Native Godot export requires a verified advanced gameplay session in one of the supported playable native genres");
   if(!advancedSettings)
    throw Error("Original authored game settings must be available");
@@ -3036,6 +3057,42 @@ $("advanced-load").addEventListener("change",async()=>{
  finally{$("advanced-load").value="";}
 });
 $("advanced-start").addEventListener("click",startAdvanced);
+$("advanced-physics-native").addEventListener("click",async()=>{
+ try{
+  // A local convenience flow; source validation remains entirely on the server.
+  if($("system-kind").value!=="physics"){
+   $("system-kind").value="physics";renderSystemControls();
+  }
+  if(systemEditor()?.id!=="physics")throw Error("Physics editor is not loaded");
+  const preset={dimension:"2d",collision_geometry:"aabb",
+                max_bodies:1,substeps:1,initial_battery:0};
+  for(const [key,value] of Object.entries(preset)){
+   const input=[...$("system-fields").querySelectorAll("[data-system-field]")]
+    .find(node=>node.dataset.systemField===key);
+   if(!input)throw Error("Missing native profile control "+key);
+   if(input.type==="checkbox")input.checked=value;
+   else input.value=String(value);
+  }
+  const settings=systemSettings();
+  const seedRaw=$("advanced-seed").value;
+  if(!/^[0-9]+$/.test(seedRaw))throw Error("Valid integer seed required");
+  const seed=Number(seedRaw);
+  const template=await api("/api/advanced-scene-template",{
+   editor:"physics",settings,seed,scene_id:"native_physics_demo"
+  });
+  const layout=JSON.parse(JSON.stringify(template.scene.layout));
+  layout.fixtures=[];
+  const approved=await api("/api/advanced-scene-template",{
+   editor:"physics",settings,seed,layout,scene_id:"native_physics_demo"
+  });
+  $("advanced-scene-json").value=JSON.stringify(approved.scene,null,2);
+  advancedSession=null;
+  await startAdvanced();
+  if(!advancedSession || advancedSession.scene_digest!==approved.scene.digest)
+   throw Error("Authenticated authored native profile was not replayed");
+  status("Original native physics demo prepared and replayed. Export stays supervised; device validation is separate.");
+ }catch(error){status("Native physics preparation blocked: "+error.message);}
+});
 $("advanced-verify").addEventListener("click",async()=>{
  try{
   if(!advancedSession)throw Error("Start an advanced reference game first");
@@ -3127,6 +3184,7 @@ Other editor families remain authoring-only, not falsely certified engines.</sma
 <p><small>Graphical cell painting: shooter, tactics, puzzle, Colony, City and Stealth. Scene edits stay
 local until typed revalidation and an explicit human-approved file commit.</small></p>
 <button id="advanced-start" type="button">Start advanced scenario</button>
+<button id="advanced-physics-native" type="button">Prepare native physics demo</button>
 <button id="advanced-save" type="button">Download verified savegame</button>
 <button id="advanced-godot-export" type="button">Download playable Godot 4 game project</button>
 <label>Restore portable savegame<input id="advanced-load" type="file" accept=".json,application/json"></label>
