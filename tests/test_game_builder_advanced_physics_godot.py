@@ -24,6 +24,7 @@ from skeleton.ai.game_builder.advanced_godot_export import (
     write_advanced_godot_package,
 )
 from skeleton.ai.game_builder.system_editors import make_editor_document
+from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 
 
 def supported_scene(settings, seed=0, *, win=False):
@@ -103,7 +104,7 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             render_physics_godot_package(session,rules,authorized=False)
         for invalid in [
-            {"gravity":1},{"max_bodies":2},{"dimension":"3d"},
+            {"max_bodies":2},{"dimension":"3d"},
             {"collision_geometry":"oriented_box"},{"substeps":2},
             {"initial_battery":1},
         ]:
@@ -117,8 +118,17 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
         next_scene=make_advanced_scene("physics",rules,layout=extra)
         next_game=run_advanced_session("physics",rules,
                                        ("inspect",),scene=next_scene)
+        self.assertEqual(
+            len(json.loads(render_physics_godot_package(
+                next_game,rules,authorized=True).files["godot/game.json"])
+                ["scene"]["layout"]["fixtures"]),1)
+        rotated=deepcopy(next_scene["layout"])
+        rotated["fixtures"][0]["orientation"]=90000
+        rotated_scene=make_advanced_scene("physics",rules,layout=rotated)
+        rotated_session=run_advanced_session("physics",rules,("inspect",),
+                                             scene=rotated_scene)
         with self.assertRaises(AdvancedGodotExportError):
-            render_physics_godot_package(next_game,rules,authorized=True)
+            render_physics_godot_package(rotated_session,rules,authorized=True)
         for action in ("fan:on","attach:0","select:1","push:front"):
             if action=="select:1" or action=="push:front":
                 continue # Illegal commands are separately covered by core source tests.
@@ -126,6 +136,75 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
             if alternative:
                 with self.assertRaises(AdvancedGodotExportError):
                     render_physics_godot_package(alternative,rules,authorized=True)
+
+    def test_real_swept_source_fixture_blocks_fast_cargo(self):
+        settings=self.profile(gravity=0,air_drag=0,impulse_strength=500,
+                              speed_limit=400,wall_restitution=0)
+        layout=default_layout(make_editor_document("physics",settings)["settings"],4)
+        layout["fixtures"]=[{"position":[430,900,0],
+                             "half_size":[10,100,40],"layer":3}]
+        scene=make_advanced_scene("physics",settings,seed=4,layout=layout)
+        gameplay=run_advanced_session("physics",settings,
+                       ("push:east","push:east"),seed=4,scene=scene)
+        self.assertTrue(verify_advanced_session(gameplay,settings))
+        self.assertGreater(gameplay["state"]["contacts"],0)
+        self.assertLess(gameplay["state"]["bodies"][0]["position"][0],430)
+        self.assertTrue(any("swept_fixture_contact" in
+                            frame["events"] for frame in gameplay["trace"]))
+        pack=render_physics_godot_package(gameplay,settings,authorized=True)
+        self.assertIn("func _fixtures(",pack.files["godot/scripts/main.gd"].decode("utf-8"))
+        self.assertEqual(len(json.loads(pack.files["godot/game.json"])
+                             ["scene"]["layout"]["fixtures"]),1)
+
+    def test_layer_masks_skip_unrelated_original_solid(self):
+        settings=self.profile(gravity=0,air_drag=0,impulse_strength=500,
+                              speed_limit=400,wall_restitution=0)
+        layout=default_layout(make_editor_document("physics",settings)["settings"],1)
+        layout["fixtures"]=[{"position":[430,900,0],
+                             "half_size":[10,100,40],"layer":2}]
+        layout["bodies"][0]["mask"]=1
+        scene=make_advanced_scene("physics",settings,seed=1,layout=layout)
+        result=run_advanced_session("physics",settings,
+                   ("push:east","push:east"),scene=scene,seed=1)
+        self.assertEqual(result["state"]["contacts"],0)
+        self.assertGreater(result["state"]["bodies"][0]["position"][0],430)
+        self.assertTrue(verify_advanced_session(result,settings))
+        pack=render_physics_godot_package(result,settings,authorized=True)
+        self.assertEqual(json.loads(pack.files["godot/game.json"])
+                         ["scene"]["layout"]["bodies"][0]["mask"],1)
+
+    def test_fixture_budget_is_enforced_at_native_export(self):
+        settings=self.profile()
+        layout=default_layout(make_editor_document("physics",settings)["settings"],0)
+        layout["fixtures"]=[]
+        # Nine original fixtures are within the reference source limit of 24,
+        # but outside the native adapter's intentionally bounded budget of 8.
+        for ix in range(9):
+            layout["fixtures"].append({"position":[400+ix*100,200,0],
+             "half_size":[10,10,0],"layer":3})
+        scene=make_advanced_scene("physics",settings,layout=layout)
+        session=run_advanced_session("physics",settings,("inspect",),scene=scene)
+        with self.assertRaises(AdvancedGodotExportError):
+            render_physics_godot_package(session,settings,authorized=True)
+
+    def test_native_gravity_has_real_airborne_acceleration_and_floor_contact(self):
+        settings=self.profile(gravity=8,tick_hz=40,air_drag=0,
+                              wall_restitution=0,floor_friction=0)
+        layout=default_layout(make_editor_document("physics",settings)["settings"],2)
+        layout["fixtures"]=[]
+        layout["bodies"][0]["position"]=[200,500,0]
+        scene=make_advanced_scene("physics",settings,seed=2,layout=layout)
+        actions=("step:4",)*6
+        result=run_advanced_session("physics",settings,actions,seed=2,scene=scene)
+        self.assertTrue(verify_advanced_session(result,settings))
+        self.assertEqual(result["state"]["bodies"][0]["position"][1],960)
+        self.assertGreater(result["state"]["contacts"],0)
+        package=render_physics_godot_package(result,settings,authorized=True)
+        proof=json.loads(package.files["godot/proof.json"])["expected"]
+        self.assertEqual(proof["y"],960)
+        self.assertEqual(proof["frame"],24)
+        self.assertEqual(proof["contacts"],result["state"]["contacts"])
+        self.assertIn("per_frame_g",GODOT_PHYSICS)
 
     def test_bounded_archive_integrity_and_no_implicit_filesystem_write(self):
         rules,scene,session=self.generate()
@@ -164,6 +243,17 @@ class OriginalPhysicsGodotProofTests(unittest.TestCase):
         with self.assertRaises(Exception):
             render_physics_godot_package(
                 session,{**rules,"gravity":1},authorized=True)
+
+    def test_studio_has_actual_signed_native_profile_preparation(self):
+        html=render_workspace_html("B"*32).decode("utf-8")
+        self.assertIn('id="advanced-physics-native"',html)
+        self.assertIn("native_physics_demo",html)
+        self.assertIn('layout.fixtures=[{"position":[430,900,0]',html)
+        self.assertIn("Authenticated authored native profile was not replayed",html)
+        self.assertIn('advancedSettings?.max_bodies===1',html)
+        self.assertIn('advancedSettings?.initial_battery===0',html)
+        self.assertIn('advancedSession.scene_digest!==approved.scene.digest',html)
+        self.assertIn("device validation is separate",html)
 
     def test_independent_script_has_actual_transition_and_exact_proof_comparison(self):
         self.assertIn("func _frame() -> void:",GODOT_PHYSICS)

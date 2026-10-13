@@ -37,6 +37,7 @@ extends Control
 ## NOT engine-builtin RigidBody parity; recreates authorized fixed-point rules.
 const VERIFY_FLAG: String = "--verify-physics"
 const MAX_ACTIONS: int = 128
+const MAX_ORIGINAL_FIXTURES: int = 8
 const ACTIONS: Array = [
     "inspect","step","step:4","push:east","push:west",
     "push:up","push:down","brake","torque:cw","torque:ccw","select:0"
@@ -73,14 +74,18 @@ func _ready() -> void:
         return
     cfg = original["settings"]
     chart = original["scene"]["layout"]
-    if (int(cfg["max_bodies"]) != 1 or int(cfg["gravity"]) != 0
+    if (int(cfg["max_bodies"]) != 1
         or int(cfg["substeps"]) != 1 or str(cfg["dimension"]) != "2d"
         or str(cfg["collision_geometry"]) != "aabb"
         or int(cfg["initial_battery"]) != 0
-        or chart["bodies"].size() != 1 or chart["fixtures"].size() != 0
+        or chart["bodies"].size() != 1 or chart["fixtures"].size() > MAX_ORIGINAL_FIXTURES
         or chart["water_y"] <= chart["floor_y"]):
         _fault("profile forbids unsupported native dynamics")
         return
+    for obstacle in chart["fixtures"]:
+        if int(obstacle["orientation"]) != 0:
+            _fault("native profile refuses rotated fixtures")
+            return
     ready_to_play = true
     get_window().title = "Skeleton Original Physics Lab"
     _reset()
@@ -125,6 +130,14 @@ func _frame() -> void:
     physical["angular_velocity"]=ang
     physical["max_angular_speed_seen"]=maxi(
         int(physical["max_angular_speed_seen"]),absi(ang))
+    # Reference fixed timestep gravity precedes integration and drag.
+    var per_frame_g: int=_floor_div(
+        int(cfg["gravity"])*100+_floor_div(int(cfg["tick_hz"]),2),
+        int(cfg["tick_hz"]))
+    vy=_clamp(vy+per_frame_g,
+              -int(cfg["speed_limit"]),int(cfg["speed_limit"]))
+    var previous_x: int=int(physical["x"])
+    var previous_y: int=int(physical["y"])
     physical["x"]=int(physical["x"])+vx
     physical["y"]=int(physical["y"])+vy
     vx=_floor_div(vx*(100-int(cfg["air_drag"])),100)
@@ -147,6 +160,9 @@ func _frame() -> void:
         physical["contacts"]=int(physical["contacts"])+1
     physical["vx"]=vx
     physical["vy"]=vy
+    _fixtures(previous_x,previous_y)
+    vx=int(physical["vx"])
+    vy=int(physical["vy"])
     var goal: Array=chart["goal"]
     if (absi(int(physical["x"])-int(goal[0]))<=int(cfg["goal_radius"])
         and absi(int(physical["y"])-int(goal[1]))<=int(cfg["goal_radius"])
@@ -159,6 +175,82 @@ func _frame() -> void:
                 physical["milestones"].append("cargo_docked")
     else:
         physical["goal_frames"]=0
+
+
+func _fixtures(previous_x: int, previous_y: int) -> void:
+    # Native mirrors the original source AABB fixture collision sequence.
+    # The authored integer world is small enough for exact float-rational
+    # comparisons; hit coordinates truncate toward zero as in Python.
+    var radius: int=int(chart["bodies"][0]["radius"])
+    var mask: int=int(chart["bodies"][0]["mask"])
+    for fixture in chart["fixtures"]:
+        if (mask & int(fixture["layer"])) == 0:
+            continue
+        var fpos: Array=fixture["position"]
+        var half: Array=fixture["half_size"]
+        var lo: Array=[int(fpos[0])-int(half[0])-radius,
+                       int(fpos[1])-int(half[1])-radius]
+        var hi: Array=[int(fpos[0])+int(half[0])+radius,
+                       int(fpos[1])+int(half[1])+radius]
+        var previous: Array=[previous_x,previous_y]
+        var position: Array=[int(physical["x"]),int(physical["y"])]
+        var velocity: Array=[int(physical["vx"]),int(physical["vy"])]
+        var inside: bool=(lo[0]<previous[0] and previous[0]<hi[0]
+                      and lo[1]<previous[1] and previous[1]<hi[1])
+        if not inside:
+            var entry: float=0.0
+            var leave: float=1.0
+            var hit_axis: int=-1
+            var normal: int=0
+            var possible: bool=true
+            for axis in range(2):
+                var travel: int=position[axis]-previous[axis]
+                if travel==0:
+                    if previous[axis]<lo[axis] or previous[axis]>hi[axis]:
+                        possible=false
+                        break
+                    continue
+                var near: float=float(lo[axis]-previous[axis])/float(travel)
+                var far: float=float(hi[axis]-previous[axis])/float(travel)
+                if near>far:
+                    var temporary: float=near
+                    near=far
+                    far=temporary
+                if near>=entry:
+                    entry=near
+                    hit_axis=axis
+                    normal=-signi(travel)
+                leave=minf(leave,far)
+                if entry>leave:
+                    possible=false
+                    break
+            if (possible and hit_axis>=0 and entry>=0.0
+                and entry<=1.0 and leave>=entry):
+                for axis in range(2):
+                    # int() truncates towards zero to mirror int(Fraction).
+                    position[axis]=previous[axis]+int(
+                        float(position[axis]-previous[axis])*entry)
+                position[hit_axis]+=normal
+                velocity[hit_axis]=_floor_div(
+                    -velocity[hit_axis]*int(cfg["wall_restitution"]),100)
+                physical["contacts"]=int(physical["contacts"])+1
+        var penetration: Array=[
+            radius+int(half[0])-absi(position[0]-int(fpos[0])),
+            radius+int(half[1])-absi(position[1]-int(fpos[1]))
+        ]
+        if penetration[0]>0 and penetration[1]>0:
+            var axis: int=0 if penetration[0]<=penetration[1] else 1
+            var sign: int=signi(position[axis]-int(fpos[axis]))
+            if sign==0:
+                sign=-1 if velocity[axis]>=0 else 1
+            position[axis]+=sign*int(penetration[axis])
+            velocity[axis]=_floor_div(
+                -velocity[axis]*int(cfg["wall_restitution"]),100)
+            physical["contacts"]=int(physical["contacts"])+1
+        physical["x"]=position[0]
+        physical["y"]=position[1]
+        physical["vx"]=velocity[0]
+        physical["vy"]=velocity[1]
 
 
 func _step(action: String) -> bool:
@@ -205,10 +297,10 @@ func _step(action: String) -> bool:
             int(physical["vx"])*(100-int(cfg["brake_strength"])),100)
         physical["vy"]=_floor_div(
             int(physical["vy"])*(100-int(cfg["brake_strength"])),100)
-        # Python uses truncation towards zero for signed angular braking.
-        physical["angular_velocity"]=int(
-            float(int(physical["angular_velocity"])*
-            (100-int(cfg["brake_strength"])))/100.0)
+        # Python gameplay uses signed floor division for source braking.
+        physical["angular_velocity"]=_floor_div(
+            int(physical["angular_velocity"])*
+            (100-int(cfg["brake_strength"])),100)
     physical["tick"]=int(physical["tick"])+1
     var iterations: int=4 if action=="step:4" else 1
     for _i in range(iterations):
@@ -337,12 +429,12 @@ def render_physics_godot_package(session: dict, settings: dict | None = None,
     verify_advanced_session(session,rules)
     if not (
         rules["dimension"]=="2d" and rules["collision_geometry"]=="aabb"
-        and rules["max_bodies"]==1 and rules["gravity"]==0
+        and rules["max_bodies"]==1
         and rules["substeps"]==1 and rules["initial_battery"]==0
     ):
         raise AdvancedGodotExportError(
-            "native parity profile: single-body, 2D AABB, zero gravity, "
-            "zero motor battery and one authored fixed substep required")
+            "native parity profile: single-body, 2D AABB, zero motor battery "
+            "and one authored fixed substep required")
     if any(action not in NATIVE_ACTIONS for action in session["actions"]):
         raise AdvancedGodotExportError("native action unsupported by exact physics profile")
     scene = (validate_advanced_scene(session["scene"],rules)
@@ -352,17 +444,16 @@ def render_physics_godot_package(session: dict, settings: dict | None = None,
         session=run_advanced_session("physics",rules,session["actions"],
                                      seed=session["seed"],scene=scene)
     layout=scene["layout"]
-    if (len(layout["bodies"])!=1 or layout["fixtures"] or
-        layout["water_y"]<=layout["floor_y"] or
-        layout["bodies"][0]["position"][1]!=
-        layout["floor_y"]*100-layout["bodies"][0]["radius"]):
+    if (len(layout["bodies"])!=1 or len(layout["fixtures"])>8 or
+        any(fixture["orientation"]!=0 for fixture in layout["fixtures"]) or
+        layout["water_y"]<=layout["floor_y"]):
         raise AdvancedGodotExportError(
-            "native profile needs one floor-grounded object without fixtures/water")
+            "native profile requires one original body and at most eight axis-aligned source fixtures")
     game={
         "schema":SCHEMA,"editor":"physics","quality_floor":"advanced",
         "settings":rules,"settings_digest":config["digest"],"scene":scene,
         "independent_native_parity_verified":False,
-        "native_profile":"fixedpoint_one_body_2d_laboratory",
+        "native_profile":"fixedpoint_one_body_2d_fixture_laboratory",
     }
     proof={
         "schema":PROOF_SCHEMA,"settings_digest":config["digest"],
@@ -386,8 +477,9 @@ def render_physics_godot_package(session: dict, settings: dict | None = None,
             "Arrows/WASD apply finite impulses, J/K torque, B brakes, Space advances.\n"
             "Godot 4.4.1+ headless source-proof check:\n"
             "godot --headless --path godot -- --verify-physics\n\n"
-            "Only the exact signed one-body 2D zero-gravity AABB profile is "
-            "supported. Other physics modes refuse export; Godot built-in "
+            "Only original 2D fixedpoint one-body AABB with gravity, solid world "
+            "bounds and at most eight original AABB fixtures is supported. Other physics "
+            "modes refuse export; Godot built-in "
             "RigidBody contact equivalence and hardware certification are NOT claimed.\n"
         ).encode("utf-8")
     }
@@ -398,7 +490,7 @@ def render_physics_godot_package(session: dict, settings: dict | None = None,
         "advanced_floor":True,
         "source_session_digest":session["digest"],
         "authored_scene_digest":scene["digest"],
-        "native_parity_profile":"fixedpoint_one_body_2d_laboratory",
+        "native_parity_profile":"fixedpoint_one_body_2d_fixture_laboratory",
         "files":{path:sha256(raw).hexdigest() for path,raw in sorted(files.items())},
         "godot_executed":False,"native_hardware_certified":False,
         "publish_approved":False,

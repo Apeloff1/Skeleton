@@ -4,6 +4,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/ai/game_builder/advanced_physics_godot.py"
+      - "docs/GAME_BUILDER_NATIVE_PHYSICS_LAB.md"
       - "skeleton/ai/game_builder/advanced_physics_runtime.py"
       - "skeleton/ai/game_builder/advanced_godot_export.py"
       - "skeleton/ai/game_builder/game_workspace_server.py"
@@ -87,11 +88,30 @@ jobs:
              ("push:east",),4,True),
             ("open_ended",{"goal_radius":70,"goal_speed":300,"completion_mode":"sandbox"},
              ("push:east","step"),7,True),
+            ("gravity_drop",{"gravity":8,"tick_hz":40,"air_drag":0,
+                              "wall_restitution":0,"floor_friction":0},
+             ("step:4",)*6,2,False),
+            ("fixture_impact",{"gravity":0,"air_drag":0,
+                               "impulse_strength":500,"speed_limit":400,
+                               "wall_restitution":0},
+             ("push:east","push:east"),4,False),
+            ("fixture_ignored_mask",{"gravity":0,"air_drag":0,
+                                     "impulse_strength":500,"speed_limit":400,
+                                     "wall_restitution":0},
+             ("push:east","push:east"),5,False),
           )
           for name,extra,commands,seed,win in cases:
               settings={**common,**extra}
               layout=default_layout(make_editor_document("physics",settings)["settings"],seed)
               layout["fixtures"]=[]
+              if name=="gravity_drop":
+                  layout["bodies"][0]["position"]=[200,500,0]
+              if name in ("fixture_impact","fixture_ignored_mask"):
+                  layout["fixtures"]=[{
+                      "position":[430,900,0],"half_size":[10,100,40],
+                      "layer":2 if name=="fixture_ignored_mask" else 3}]
+                  if name=="fixture_ignored_mask":
+                      layout["bodies"][0]["mask"]=1
               if win:
                   layout["goal"]=[300,960,0]
               scene=make_advanced_scene("physics",settings,seed=seed,layout=layout)
@@ -106,11 +126,48 @@ jobs:
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/native-original-physics"
-          for scenario in movement signed_impulses real_goal open_ended; do
+          for scenario in movement signed_impulses real_goal open_ended gravity_drop fixture_impact fixture_ignored_mask; do
             project="$root/$scenario/godot"
-            godot --headless --path "$project" --import
-            godot --headless --path "$project" -- --verify-physics | tee "$root/$scenario/native.log"
-            grep -q "NATIVE_ADVANCED_PHYSICS_OK" "$root/$scenario/native.log"
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              # The Godot setup action provides a Git Bash launcher, not a
+              # Windows CreateProcess-resolvable .exe named "godot".
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 90s godot --headless --path "$project" --import >"$root/$scenario/import.log" 2>&1
+                timeout 75s godot --headless --path "$project" -- --verify-physics >"$root/$scenario/native.log" 2>&1
+              else
+                godot --headless --path "$project" --import >"$root/$scenario/import.log" 2>&1
+                godot --headless --path "$project" -- --verify-physics >"$root/$scenario/native.log" 2>&1
+              fi
+              cat "$root/$scenario/native.log"
+              grep -q "NATIVE_ADVANCED_PHYSICS_OK" "$root/$scenario/native.log"
+              continue
+            fi
+            python - "$project" "$root/$scenario/native.log" <<'PY'
+          from pathlib import Path
+          import subprocess,sys
+          project,log=sys.argv[1:]
+          combined=[]
+          for label,args,seconds in (
+              ("import",["godot","--headless","--path",project,"--import"],90),
+              ("native replay",["godot","--headless","--path",project,
+                                "--","--verify-physics"],75),
+          ):
+              try:
+                  proc=subprocess.run(args,capture_output=True,text=True,
+                                      errors="replace",timeout=seconds)
+              except subprocess.TimeoutExpired as exc:
+                  print("NATIVE_PHYSICS_TIMEOUT",label,str(exc))
+                  sys.exit(1)
+              chunk=(proc.stdout or "")+"\n"+(proc.stderr or "")
+              combined.append(chunk)
+              if proc.returncode!=0:
+                  print("NATIVE_PHYSICS_ERROR",label,proc.returncode,chunk)
+                  sys.exit(1)
+          Path(log).write_text("\n".join(combined),encoding="utf-8")
+          print(combined[-1])
+          if "NATIVE_ADVANCED_PHYSICS_OK" not in combined[-1]:
+              sys.exit("Independent Godot gameplay proof marker was not printed")
+          PY
           done
       - name: Export actual standalone Linux native game
         if: runner.os == 'Linux'
