@@ -3,6 +3,7 @@ const { assert } = require('./helpers.cjs');
 const {
   OUTCOME_SCHEMA, parsePlanDraft, acceptSimulation, acceptOutcomeAudit,
   chooseOption, compactPlayerContext, exampleThreeEndingPlan,
+  acceptDialogueProjection,
 } = require('../../features/Jeeves/outcomeStudio.ts');
 
 const hash = char => char.repeat(64);
@@ -104,4 +105,40 @@ test('Jeeves receives NPC backstories and evidence-bound playthroughs as untrust
   assert.match(context, /charter_quest/);
   assert.match(context, /SCENE 2/);
   assert.ok(context.length <= 4000);
+});
+
+test('player preview is exact-history bound and rejects injected creator-only secrets', () => {
+  const replay = { ...turn(), steps: [], position: 'gates', ending_id: null,
+    ending: null, ending_accepted: false,
+    available_options: [
+      { id: 'treaty', label: 'Peace', dialogue: 'I accept peace',
+        intent: 'peace', emotional_consequence: 'hope', next_node: null, ending: 'peace' },
+    ],
+  };
+  const preview = {
+    schema_version: 'jeeves.dialogue-projection.v1',
+    plan_digest: hash('a'), branch_id: 'main', projection_digest: hash('e'),
+    playthrough_receipt: replay.receipt_digest, history_length: 0,
+    scene: 1, speaker_name: 'Aria', place_name: 'Glass City',
+    scene_text: 'The city remembers.', scene_text_truncated: false,
+    available_replies: [{ id: 'treaty', label: 'Peace', dialogue: 'I accept peace' }],
+    ending_reached: false, ending_accepted: false, ending: null,
+    simulation_only: true,
+    content_trust: 'creator_authored_untrusted_not_model_instructions',
+  };
+  assert.equal(acceptDialogueProjection(preview, replay, 'main', false).scene, 1);
+  assert.throws(() => acceptDialogueProjection({ ...preview, branch_id: 'secret' },
+    replay, 'main', false));
+  assert.throws(() => acceptDialogueProjection({ ...preview, projection_digest: 'forged' },
+    replay, 'main', false));
+  assert.throws(() => acceptDialogueProjection({ ...preview,
+    available_replies: [{ id: 'locked', label: 'SECRET', dialogue: 'secret' }] },
+    replay, 'main', false));
+  assert.throws(() => acceptDialogueProjection({ ...preview, locked_choices: [] },
+    replay, 'main', false));
+  const creator = { ...preview, creator_diagnostics_only: true,
+    locked_choices: [{ id: 'secret', label: 'Secret route',
+      unmet: { op: 'flag', id: 'hidden_quest' } }] };
+  assert.equal(acceptDialogueProjection(creator, replay, 'main', true).locked_choices.length, 1);
+  assert.throws(() => acceptDialogueProjection(preview, replay, 'main', true));
 });
