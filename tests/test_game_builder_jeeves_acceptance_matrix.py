@@ -72,11 +72,40 @@ class AcceptanceMatrixTests(unittest.TestCase):
         self.assertEqual(report["curated_test_family_count"],1)
         self.assertEqual(len(report["families_without_curated_tests"]),41)
         self.assertEqual(report["unique_test_module_count"],1)
+        self.assertEqual(report["scheduled_test_module_count"],1)
+        self.assertEqual(report["ci_smoke_family_count"],1)
+        self.assertEqual(report["discovery_only_family_count"],0)
         self.assertEqual(report["unique_static_test_case_count"],2)
         self.assertEqual(report["tests_executed_by_this_reader"],0)
         self.assertIsNone(report["exact_head_passed_from_source_scan"])
         self.assertTrue(report["source_coverage_is_not_accepted_test_evidence"])
         self.assertEqual(report,self.audit.overview())
+
+    def test_discovery_only_expands_coverage_without_executing_any_more_modules(self):
+        candidate = deepcopy(self.doc["bindings"][0])
+        candidate["family_id"] = "F14"
+        candidate["execution_tier"] = "discovery_only"
+        self.doc["bindings"].append(candidate)
+        self.refresh()
+        summary = self.audit.overview()
+        self.assertEqual(summary["curated_test_family_count"], 2)
+        self.assertEqual(summary["ci_smoke_family_count"], 1)
+        self.assertEqual(summary["discovery_only_family_count"], 1)
+        self.assertEqual(summary["unique_test_module_count"], 1)
+        self.assertEqual(summary["scheduled_test_module_count"], 1)
+        self.assertEqual(summary["selected_modules"],
+                         ["tests.test_game_builder_sample_acceptance"])
+        discovered = self.audit.page()["families"]
+        self.assertEqual([v["execution_tier"] for v in discovered],
+                         ["ci_smoke", "discovery_only"])
+        self.assertTrue(all(row["independent_execution_verified"] is None
+                            for row in discovered))
+
+    def test_invalid_execution_tier_never_increases_verified_coverage(self):
+        self.doc["bindings"][0]["execution_tier"] = "autopromote"
+        self.refresh()
+        with self.assertRaises(JeevesAppwideError):
+            self.audit.overview()
 
     def test_missing_families_page_and_candidate_distinction(self):
         report=self.audit.overview()
