@@ -178,8 +178,10 @@ export function acceptDialogueProjection(
       typeof x.scene_text_truncated !== 'boolean' ||
       x.ending_reached !== Boolean(replay.ending_id) ||
       x.ending_accepted !== replay.ending_accepted ||
-      x.ending?.id !== (replay.ending_id || undefined) && x.ending !== null ||
+      Boolean(x.ending) !== Boolean(replay.ending_id) ||
+      (x.ending !== null && x.ending.id !== replay.ending_id) ||
       x.available_replies.length !== replay.available_options.length ||
+      new Set(x.available_replies.map(reply => reply.id)).size !== x.available_replies.length ||
       x.available_replies.some(reply =>
         !SLUG.test(reply.id) || typeof reply.dialogue !== 'string' ||
         !replay.available_options.some(option => option.id === reply.id)) ||
