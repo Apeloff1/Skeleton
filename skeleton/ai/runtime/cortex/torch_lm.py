@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import math
 import threading
-from typing import Any, Dict, Iterable, List, Sequence
+from contextlib import contextmanager
+from typing import Any, Callable, Dict, Iterable, List, Sequence
 
 from skeleton.cortex.port import tokens
 
@@ -93,6 +94,23 @@ class TorchAccel:
         with self._state_lock:
             return tuple(self._cached_ids)
 
+    @contextmanager
+    def _inference_lock(self, interrupt: Callable[[], None] | None = None):
+        """Let a queued caller cancel while another request owns resident K/V."""
+        if interrupt is None:
+            with self._state_lock:
+                yield
+            return
+        while True:
+            interrupt()
+            if self._state_lock.acquire(timeout=0.05):
+                break
+        try:
+            interrupt()
+            yield
+        finally:
+            self._state_lock.release()
+
     def reset_decode_cache(self) -> None:
         """Drop all accelerator-local decode history after weight changes."""
         with self._state_lock:
@@ -100,6 +118,8 @@ class TorchAccel:
 
     def _reset_decode_cache_unlocked(self) -> None:
         """Mutate resident cache only while holding the accelerator lock."""
+        occupied = bool(getattr(self, "_cached_ids", ()) or getattr(self, "_cached_keys", ()))
+        self._cache_reset_count = getattr(self, "_cache_reset_count", 0) + int(occupied)
         self._cached_ids: List[int] = []
         self._cached_keys: List[Any] = []
         self._cached_values: List[Any] = []
@@ -310,7 +330,8 @@ class TorchAccel:
             x, (int(self.lm.dim),), weight, layer[prefix + "_b"], eps=1e-5
         )
 
-    def _attention(self, q, k, v, *, heads: int, head_dim: int):
+    def _attention(self, q, k, v, *, heads: int, head_dim: int,
+                   interrupt: Callable[[], None] | None = None):
         """Delegate kernel choice to SDPA: Flash/memory-efficient/math where supported."""
         torch = self.torch
         functional = torch.nn.functional
@@ -328,6 +349,8 @@ class TorchAccel:
             # largest attention mask from T*T to at most chunk*T.
             parts = []
             for start in range(0, length, chunk):
+                if interrupt is not None:
+                    interrupt()
                 stop = min(length, start + chunk)
                 qc = qh[:, :, start:stop, :]
                 kc = kh[:, :, :stop, :]
@@ -359,7 +382,8 @@ class TorchAccel:
         return output.squeeze(0).transpose(0, 1).contiguous().reshape(length, heads * head_dim)
 
     def _forward_ids(
-        self, ids: Sequence[int], *, fill_cache: bool = False, all_positions: bool = False
+        self, ids: Sequence[int], *, fill_cache: bool = False, all_positions: bool = False,
+        interrupt: Callable[[], None] | None = None,
     ):
         torch = self.torch
         lm = self.lm
@@ -374,6 +398,8 @@ class TorchAccel:
         heads = max(1, int(lm.n_heads))
         dh = D // heads
         for blob in self._layers:
+            if interrupt is not None:
+                interrupt()
             Xn = self._normalize(X, blob, "ln1")
             Q, K, V = Xn @ blob["Wq"].T, Xn @ blob["Wk"].T, Xn @ blob["Wv"].T
             Q, K = self._rope(Q), self._rope(K)
@@ -389,7 +415,7 @@ class TorchAccel:
                 )
                 self._cached_keys.append(self._key_buffers[li][:, :, :length, :])
                 self._cached_values.append(self._value_buffers[li][:, :, :length, :])
-            C = self._attention(Q, K, V, heads=heads, head_dim=dh)
+            C = self._attention(Q, K, V, heads=heads, head_dim=dh, interrupt=interrupt)
             X = X + C @ blob["Wo"].T
             if blob.get("W1") is not None:
                 Un = self._normalize(X, blob, "ln2")
@@ -431,7 +457,8 @@ class TorchAccel:
         k = 0.7978845608028654  # sqrt(2/pi)
         return 0.5 * x * (1.0 + torch.tanh(k * (x + 0.044715 * x * x * x)))
 
-    def _cached_step(self, token_id: int) -> "Any":
+    def _cached_step(self, token_id: int, *,
+                     interrupt: Callable[[], None] | None = None) -> "Any":
         """Single-token attention using resident K/V (no repeated prefill).
 
         Keys are rotated exactly once at their original position. For learned
@@ -449,6 +476,8 @@ class TorchAccel:
         heads = lm.n_heads
         hd = lm.dim // heads
         for layer_index, blob in enumerate(self._layers):
+            if interrupt is not None:
+                interrupt()
             xn = self._normalize(x, blob, "ln1")
             q = self._rope((xn @ blob["Wq"].T).unsqueeze(0), position_offset=pos)
             k = self._rope((xn @ blob["Wk"].T).unsqueeze(0), position_offset=pos)
@@ -504,7 +533,8 @@ class TorchAccel:
         return result
 
     def logits_window_with_cache(
-        self, ids: Sequence[int]
+        self, ids: Sequence[int], *, interrupt: Callable[[], None] | None = None,
+        metrics: dict[str, int] | None = None,
     ) -> tuple[List[float], tuple[int, ...]]:
         """Return logits and occupancy from the same atomic cache transition.
 
@@ -512,9 +542,15 @@ class TorchAccel:
         session and can corrupt resource/replay accounting even if logits
         themselves remain correct.
         """
-        with self._state_lock:
+        with self._inference_lock(interrupt):
             try:
-                result = self._logits_window_unlocked(ids)
+                resets_before = self._cache_reset_count
+                if interrupt is not None:
+                    interrupt()
+                result = self._logits_window_unlocked(ids, interrupt=interrupt)
+                if metrics is not None:
+                    metrics["cache_resets"] = self._cache_reset_count - resets_before
+                    metrics["reserved_kv_bytes"] = self.kv_reserved_bytes
                 return result, tuple(self._cached_ids)
             except Exception:
                 # A failed kernel or layer allocation can occur after an
@@ -525,7 +561,8 @@ class TorchAccel:
                 self._reset_decode_cache_unlocked()
                 raise
 
-    def _logits_window_unlocked(self, ids: Sequence[int]) -> List[float]:
+    def _logits_window_unlocked(self, ids: Sequence[int], *,
+                                interrupt: Callable[[], None] | None = None) -> List[float]:
         """Prefill once, then decode with on-device per-layer K/V tensors."""
         self._assert_training_integrity()
         if not self.resident:
@@ -539,7 +576,7 @@ class TorchAccel:
                 # Avoid a second full prefill for the same immutable prompt.
                 return list(self._cached_logits)
             if self._cached_ids == window[:-1]:
-                result = self._cached_step(window[-1])
+                result = self._cached_step(window[-1], interrupt=interrupt)
             elif (
                 self._cached_ids
                 and len(self._cached_ids) < len(window)
@@ -550,7 +587,7 @@ class TorchAccel:
                 # discarding a warm prefix. Longer prompts use fused SDPA
                 # prefill rather than many tiny device launches.
                 for suffix_id in window[len(self._cached_ids):]:
-                    result = self._cached_step(suffix_id)
+                    result = self._cached_step(suffix_id, interrupt=interrupt)
             elif (
                 getattr(lm, "position_mode", "learned_rope") == "rope"
                 and lm.n_layers == 1
@@ -569,19 +606,20 @@ class TorchAccel:
                     self._cached_keys[i] = self._key_buffers[i][:, :, :-1, :]
                     self._cached_values[i] = self._value_buffers[i][:, :, :-1, :]
                 del self._cached_ids[0]
-                result = self._cached_step(window[-1])
+                result = self._cached_step(window[-1], interrupt=interrupt)
             else:
                 # Batched fused causal prefill; one-token loops are only used
                 # for decode. Avoid O(context) Python/GPU launches on prompts.
-                result, _ = self._forward_ids(window, fill_cache=True)
+                result, _ = self._forward_ids(window, fill_cache=True, interrupt=interrupt)
             values = tuple(float(value) for value in result.detach().cpu().tolist())
             self._cached_logits = values
             return list(values)
 
-    def logits(self, ids: Sequence[int]) -> List[float]:
-        with self._state_lock, self.torch.inference_mode():
+    def logits(self, ids: Sequence[int], *,
+               interrupt: Callable[[], None] | None = None) -> List[float]:
+        with self._inference_lock(interrupt), self.torch.inference_mode():
             self._assert_training_integrity()
-            y, _ = self._forward_ids(ids)
+            y, _ = self._forward_ids(ids, interrupt=interrupt)
             return y.detach().cpu().tolist()
 
     def hidden(self, ids: Sequence[int]) -> List[float]:
@@ -694,21 +732,24 @@ class TorchAccel:
 
     def _decode_unlocked(self, prefix: str, n: int = 14, seed: int = 0) -> str:
         """Sample next tokens on the bound device."""
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError("n must be a nonnegative integer")
         torch = self.torch
         lm = self.lm
         if not self.resident:
             self.pin()
         g = torch.Generator(device="cpu")
         g.manual_seed(int(seed) & 0xFFFFFFFF)
-        ids = [lm._id(t) for t in tokens(prefix)] or [lm.unk]
+        ids = lm._ids(prefix)
+        prompt_length = len(ids)
         with torch.no_grad():
-            for _ in range(max(1, n)):
+            for _ in range(n):
                 window = ids[-lm.ctx:]
                 logits = self.logits_window(window)
                 p = torch.softmax(torch.tensor(logits, dtype=torch.float32), dim=-1)
                 nxt = int(torch.multinomial(p, 1, generator=g).item())
                 ids.append(nxt)
-        return " ".join(lm.itos[i] if 0 <= i < len(lm.itos) else UNK for i in ids[:n])
+        return " ".join(lm.itos[i] if 0 <= i < len(lm.itos) else UNK for i in ids[prompt_length:])
 
 
 class TorchTransformer:
@@ -809,20 +850,23 @@ class TorchTransformer:
         return n
 
     def decode(self, prefix: str, *, n: int = 14, seed: int = 0) -> str:
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError("n must be a nonnegative integer")
         torch = self.torch
         self.net.eval()
         g = torch.Generator(device="cpu")
         g.manual_seed(int(seed) & 0xFFFFFFFF)
         ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
+        prompt_length = len(ids)
         with torch.no_grad():
-            for _ in range(max(1, n)):
+            for _ in range(n):
                 window = ids[-self.ctx:]
                 x = torch.tensor([window], dtype=torch.long, device=self.device_obj)
                 logits = self.net(x)[0]
                 p = torch.softmax(logits.float().cpu(), dim=-1)
                 nxt = int(torch.multinomial(p, 1, generator=g).item())
                 ids.append(nxt)
-        return " ".join(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in ids[:n])
+        return " ".join(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in ids[prompt_length:])
 
     def generate(self, prefix: str, n: int = 12, *, seed: int = 0):
         return tuple(self.decode(prefix, n=n, seed=seed).split())
