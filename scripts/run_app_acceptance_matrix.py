@@ -18,7 +18,6 @@ import sys
 from skeleton.ai.game_builder.jeeves_appwide_fabric import AppwideInventory
 from skeleton.ai.game_builder.jeeves_acceptance_matrix import JeevesAcceptanceTestMatrix
 
-MAX_OUTPUT_BYTES = 4096
 MAX_SECONDS_PER_MODULE = 120
 SCHEMA = "skeleton.ai.app_acceptance_run_evidence.v1"
 
@@ -34,12 +33,13 @@ def _commit(repo):
 
 
 def _safe_output(value):
-    # Never return arbitrary unbounded process output in the acceptance
-    # artifact. SHA is evidence of the full in-memory decoded output.
+    # Do not persist stderr/stdout excerpts: tests can echo secrets or
+    # privacy-sensitive fixtures. The digest and byte count are enough to
+    # identify the output in the separately secured CI job log.
     encoded = value.encode("utf-8", errors="replace")
     return {"sha256":sha256(encoded).hexdigest(),
             "total_bytes":len(encoded),
-            "excerpt":encoded[-MAX_OUTPUT_BYTES:].decode("utf-8",errors="replace")}
+            "content_stored_in_artifact":False}
 
 
 def produce(root: Path, output: Path, *, local=False):
