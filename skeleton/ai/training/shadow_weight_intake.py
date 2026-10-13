@@ -322,8 +322,8 @@ class ShadowKnowledgeQueue:
             ).fetchone()
             if row is None or row["revision"] != expected_revision:
                 raise ShadowWeightError("unknown or stale intake candidate")
-            if row["state"] not in {"pending", "quarantined", "training-ready"}:
-                raise ShadowWeightError("leased or trained knowledge is immutable")
+            if row["state"] not in {"pending", "quarantined", "training-ready"} or row["candidate_digest"] is not None:
+                raise ShadowWeightError("leased, reserved or trained knowledge is immutable")
             previous = ShadowKnowledge.from_dict(json.loads(row["payload"]))
             if (
                 previous.knowledge_id != item.knowledge_id
@@ -484,6 +484,44 @@ class ShadowKnowledgeQueue:
             )
             return assessment
 
+    def reserve_candidate(
+        self, lease: ShadowIntakeLease, candidate: CandidateWeights,
+    ) -> str:
+        """Persist one immutable candidate identity before staging other ledgers.
+
+        A crashed worker may re-lease the same observation, but it cannot
+        change the candidate digest after the first reservation. This
+        provides replay safety across the queue/ledger transaction boundary.
+        The lease revision is unchanged: custody identity is a write-once
+        property of the existing fenced lease, not a new knowledge revision.
+        """
+        if not isinstance(candidate, CandidateWeights) or candidate.status != "candidate":
+            raise ShadowWeightError("shadow reservation requires unpromoted weights")
+        if candidate.base_model_digest != lease.knowledge.base_model_digest:
+            raise ShadowWeightError("reserved candidate baseline differs from intake")
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = self._bound_lease(db, lease)
+            existing = row["candidate_digest"]
+            if existing is not None:
+                if existing != candidate.digest:
+                    raise ShadowWeightError("shadow knowledge already reserved for other weights")
+                return existing
+            db.execute(
+                """UPDATE shadow_intake SET candidate_digest=?,updated_at=?
+                   WHERE knowledge_id=?""",
+                (
+                    candidate.digest,
+                    _now().isoformat(timespec="microseconds").replace("+00:00", "Z"),
+                    lease.knowledge.knowledge_id,
+                ),
+            )
+            self._event(
+                db, lease.knowledge.knowledge_id, "reserve-trained-candidate",
+                row["revision"], candidate.digest,
+            )
+            return candidate.digest
+
     def acknowledge(self, lease: ShadowIntakeLease, candidate: CandidateWeights) -> str:
         """Record resulting *candidate* weights, not unreviewed production weights."""
         if not isinstance(candidate, CandidateWeights) or candidate.status != "candidate":
@@ -493,6 +531,8 @@ class ShadowKnowledgeQueue:
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = self._bound_lease(db, lease)
+            if row["candidate_digest"] not in (None, candidate.digest):
+                raise ShadowWeightError("acknowledgement differs from reserved candidate")
             revision = row["revision"] + 1
             db.execute(
                 """UPDATE shadow_intake SET state='trained',candidate_digest=?,
