@@ -501,7 +501,7 @@ class JeevesIdleWorkExecutor:
                     or result.kind is not assignment.kind
                     or result.source_digest != assignment.source_digest
                     or not result.completed or not completed_while_idle
-                    or checkpoint.poll_count < 2
+                    or checkpoint.poll_count < 3  # host handler must cooperate at least once
                     or self._verify(assignment, result, context) is not True):
                 state = IdleExecutionState.IN_DOUBT
             else:
