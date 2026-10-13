@@ -108,6 +108,46 @@ class EvidenceGraphTests(unittest.TestCase):
                 "unavailable_or_restricted_path"], 0)
         self.assertNotIn("machine/.env", json.dumps(result))
 
+    def test_reverse_impact_identifies_volume_and_qualification_journey(self):
+        self.docs["machine/ai_master_plan.json"]["volumes"][0][
+            "implementation_paths"] = ["backend/server.py"]
+        self.docs["machine/ai_master_plan.json"]["volumes"][1][
+            "tests"] = ["backend/server.py"]
+        self.docs["machine/enterprise_ai_superiority.json"][
+            "end_to_end_qualification"] = {
+                "golden_journeys": [{
+                    "id": "ENT-E2E-01", "name": "Source-linked acceptance",
+                    "volume_refs": ["VOL-000"]}]}
+        self.refresh()
+        graph_digest = self.graph.overview()["digest"]
+        impact = self.graph.impact(["backend/server.py"],
+                                   expected_graph_digest=graph_digest)
+        self.assertEqual(impact["targeted_paths"], 1)
+        self.assertEqual({n["id"] for n in impact["sources"][0]["dependent_nodes"]},
+                         {"vol:VOL-000", "vol:VOL-001", "ai_journey:ENT-E2E-01"})
+        self.assertTrue(impact["whole_repo_dependency_graph_not_claimed"])
+        self.assertTrue(impact["no_changes_or_tests_run"])
+        self.assertTrue(impact["sources"][0]["source_content_not_loaded"])
+        self.assertEqual(self.graph.impact(["backend/server.py"]), impact)
+        limited = self.graph.impact(["backend/server.py"], max_results=1)
+        self.assertTrue(limited["sources"][0]["truncated"])
+        self.assertEqual(limited["sources"][0]["dependent_count"], 3)
+
+    def test_reverse_impact_private_unknown_or_stale_refs_fail_closed(self):
+        with self.assertRaises(JeevesAppwideError):
+            self.graph.impact([".env"])
+        with self.assertRaises(JeevesAppwideError):
+            self.graph.impact(["backend/../server.py"])
+        with self.assertRaises(JeevesAppwideError):
+            self.graph.impact(["backend/server.py", "backend/server.py"])
+        with self.assertRaises(JeevesAppwideError):
+            self.graph.impact([True])
+        with self.assertRaises(JeevesAppwideError):
+            self.graph.impact(["backend/server.py"], max_results=True)
+        with self.assertRaises(JeevesAppwideError):
+            self.graph.impact(["backend/server.py"],
+                              expected_graph_digest="0" * 64)
+
     def test_readable_directory_is_not_an_executable_adapter(self):
         self.assertEqual(
             _safe_path("backend", self.inv, {"backend"}), "backend")
