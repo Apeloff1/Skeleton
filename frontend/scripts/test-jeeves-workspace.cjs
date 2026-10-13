@@ -503,3 +503,180 @@ test('transcript export includes context, failure status and honest file omissio
   assert.match(output, /file not included/);
   assert.match(output, /Artifacts are not included/);
 });
+
+
+test('ambiguous delivered reply is recovered from canonical history without second generation', async () => {
+  let submitted;
+  let executions = 0;
+  const store = await controller(
+    async body => {
+      executions++;
+      submitted = body;
+      throw new Error('response lost after server commit');
+    },
+    storage(),
+    async sessionId => ({
+      ok: true, available: true, session_id: sessionId,
+      turns: submitted ? [{
+        session_id: sessionId,
+        client_message_id: submitted.client_message_id,
+        role_user: submitted.message,
+        role_jeeves: 'Committed answer',
+        canonical_assistant_message_id: 'recovered-assistant',
+        status: 'complete', ts: 100,
+      }] : [],
+    }),
+  );
+  store.edit({ draft: 'What was built?' });
+  await store.send();
+  assert.equal(executions, 1);
+  assert.deepEqual(store.active.messages.map(m => m.text), ['What was built?', 'Committed answer']);
+  assert.deepEqual(store.active.messages.map(m => m.status), ['complete', 'complete']);
+  assert.match(store.getSnapshot().notice, /recovered/i);
+});
+
+test('unresolved send is held without erasing the next draft or creating a phantom turn', async () => {
+  let calls = 0;
+  const store = await controller(async () => { calls++; throw new Error('unavailable'); });
+  store.edit({ draft: 'First' });
+  await store.send();
+  assert.equal(store.active.messages.at(-1).status, 'failed');
+  store.edit({ draft: 'Keep this draft' });
+  await store.send();
+  assert.equal(calls, 1);
+  assert.equal(store.active.draft, 'Keep this draft');
+  assert.equal(store.active.messages.length, 1);
+  assert.match(store.getSnapshot().notice, /resolve the interrupted turn/i);
+});
+
+test('retry checks canonical history and never resubmits an already committed answer', async () => {
+  let submitted;
+  let calls = 0;
+  let committed = false;
+  const store = await controller(
+    async body => { calls++; submitted = body; throw new Error('timeout'); },
+    storage(),
+    async sessionId => ({
+      ok: true, available: true, session_id: sessionId,
+      turns: committed ? [{
+        session_id: sessionId,
+        client_message_id: submitted.client_message_id,
+        role_user: submitted.message, role_jeeves: 'Previously committed',
+        status: 'complete', ts: 110,
+      }] : [],
+    }),
+  );
+  store.edit({ draft: 'Do not duplicate' });
+  await store.send();
+  const id = store.active.messages[0].id;
+  assert.equal(store.active.messages[0].status, 'failed');
+  committed = true;
+  await store.retry(id);
+  assert.equal(calls, 1);
+  assert.deepEqual(store.active.messages.map(m => m.status), ['complete', 'complete']);
+  assert.equal(store.active.messages[1].text, 'Previously committed');
+});
+
+test('simultaneous retries are fenced during slow canonical-history reads', async () => {
+  let executions = 0;
+  let reads = 0;
+  const waiting = deferred();
+  const empty = sessionId => ({
+    ok: true, available: true, session_id: sessionId, turns: [],
+  });
+  const store = await controller(
+    async () => {
+      executions++;
+      if (executions === 1) throw new Error('temporary offline');
+      return { reply: 'Finally answered' };
+    },
+    storage(),
+    async sessionId => ++reads === 1 ? empty(sessionId) : waiting.promise,
+  );
+  store.edit({ draft: 'Only one retry' });
+  await store.send();
+  const id = store.active.messages[0].id;
+  const first = store.retry(id);
+  const duplicate = store.retry(id);
+  assert.equal(executions, 1);
+  waiting.resolve(empty(store.active.id));
+  await Promise.all([first, duplicate]);
+  assert.equal(executions, 2);
+  assert.deepEqual(store.active.messages.map(m => m.text), ['Only one retry', 'Finally answered']);
+});
+
+test('cancelled first turn can be reconciled using its original device conversation identity', async () => {
+  const pending = deferred();
+  let submitted;
+  let committed = false;
+  const store = await controller(
+    body => { submitted = body; return pending.promise; },
+    storage(),
+    async sessionId => ({
+      ok: true, available: true, session_id: sessionId,
+      turns: committed ? [{
+        session_id: sessionId, client_message_id: submitted.client_message_id,
+        role_user: submitted.message, role_jeeves: 'Server finished',
+        status: 'complete', ts: 115,
+      }] : [],
+    }),
+  );
+  const sessionId = store.active.id;
+  store.edit({ draft: 'Stop and check' });
+  const first = store.send();
+  store.cancel();
+  assert.equal(store.active.sessionId, null);
+  committed = true;
+  assert.equal(await store.refreshCanonical(), true);
+  assert.equal(store.active.sessionId, sessionId);
+  assert.deepEqual(store.active.messages.map(m => m.text), ['Stop and check', 'Server finished']);
+  pending.resolve({ reply: 'late transport payload', session_id: sessionId });
+  await first;
+  assert.equal(store.active.messages[1].text, 'Server finished');
+});
+
+
+test('retry fails closed if the canonical transcript cannot be checked', async () => {
+  let executions = 0;
+  const store = await controller(
+    async () => { executions++; throw new Error('response may have committed'); },
+    storage(),
+    async () => { throw new Error('authoritative history offline'); },
+  );
+  store.edit({ draft: 'Did you receive this?' });
+  await store.send();
+  assert.equal(store.active.messages[0].status, 'failed');
+  await store.retry(store.active.messages[0].id);
+  assert.equal(executions, 1);
+  assert.equal(store.active.messages.length, 1);
+  assert.match(store.getSnapshot().notice, /retry was not sent/i);
+});
+
+test('manual Retry cannot overtake an in-flight automatic reconciliation', async () => {
+  const history = deferred();
+  let executions = 0;
+  let sent;
+  const store = await controller(
+    async body => { executions++; sent = body; throw new Error('transport timeout'); },
+    storage(),
+    async sessionId => history.promise,
+  );
+  store.edit({ draft: 'Answer before reconnect' });
+  const send = store.send();
+  await tick();
+  const pending = store.active.messages.at(-1);
+  assert.equal(pending.status, 'failed');
+  await store.retry(pending.id);
+  assert.equal(executions, 1);
+  history.resolve({
+    ok: true, available: true, session_id: store.active.id,
+    turns: [{
+      session_id: store.active.id, client_message_id: sent.client_message_id,
+      role_user: sent.message, role_jeeves: 'Recovered while checking',
+      status: 'complete', ts: 125,
+    }],
+  });
+  await send;
+  assert.equal(executions, 1);
+  assert.equal(store.active.messages.at(-1).text, 'Recovered while checking');
+});
