@@ -36,6 +36,19 @@ class AdapterDispatchAuditTests(unittest.TestCase):
         self.assertEqual(report, self.audit.overview())
         self.assertGreaterEqual(report["review_gated_actions"], 1)
 
+    def test_external_effects_are_classified_and_never_auto_authorized(self):
+        external = {name for name, descriptor in OPERATIONS.items()
+                    if descriptor[0] == "external_effect"}
+        self.assertEqual(external, {"studio.production.commit_pages",
+                                    "studio.production.commit_bundle"})
+        self.assertTrue(all(OPERATIONS[name][2] is True for name in external))
+        report = self.audit.overview()
+        self.assertEqual(report["registered_external_effect"], len(external))
+        self.assertEqual(report["runtime_effects_executed"], 0)
+        for name in sorted(external):
+            with self.subTest(action=name), self.assertRaises(PermissionError):
+                JeevesAppwideRuntime(self.inv).invoke(name, {})
+
     def test_ast_recognizes_grouped_if_without_dynamic_execution(self):
         example = (
             "class JeevesAppwideRuntime:\n"
