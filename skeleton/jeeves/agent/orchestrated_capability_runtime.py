@@ -79,6 +79,68 @@ class JeevesOrchestratedCapabilityRuntime:
         ledger, _head, _count = self.ledger.load()
         return ledger.ready_names()
 
+    def reconcile_uncertain(
+        self, task_name: str, intent: CapabilityIntent, *,
+        context: ToolExecutionContext,
+        evidence_digest: str,
+        effect_completed: bool,
+        verify_external: Callable[
+            [CapabilityIntent, str, bool, ToolExecutionContext], bool
+        ],
+        actor: str,
+        authority: Authority,
+        at_ns: int,
+        expected_plan_head: str,
+    ) -> OrchestratedDispatchReceipt:
+        """Close an interrupted RUNNING effect using fresh host-owned proof.
+
+        No ToolExecutor call occurs: reconciliation cannot repeat the effect.
+        A confirmed effect becomes DONE; independently confirmed non-completion
+        stays BLOCKED so the host must design a distinct recovery plan.
+        """
+        if type(effect_completed) is not bool or not callable(verify_external):
+            raise OrchestratedDispatchError("typed outcome and independent owner verifier required")
+        if (not isinstance(evidence_digest, str) or len(evidence_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in evidence_digest)):
+            raise OrchestratedDispatchError("reconciliation requires SHA-256 proof")
+        if not isinstance(intent, CapabilityIntent) or not isinstance(context, ToolExecutionContext):
+            raise OrchestratedDispatchError("reconciliation requires bound intent and host context")
+        if type(at_ns) is not int or at_ns < 0:
+            raise OrchestratedDispatchError("invalid reconciliation timestamp")
+        ledger, active_head, _ = self.ledger.load()
+        task = next((task for task in ledger.records if task.name == task_name), None)
+        if (active_head != expected_plan_head or task is None
+                or task.state is not OrchestrState.RUNNING):
+            raise OrchestratedDispatchError("task is not a current in-flight action")
+        if task.authority is not Authority.WORKER or authority is not Authority.WORKER:
+            raise OrchestratedDispatchError("only worker tasks can reconcile external effects")
+        if (task.payload.get("capability_intent_digest") != intent.digest
+                or intent.run_id != context.run_id
+                or intent.user_id != context.user_id
+                or intent.tenant_id != context.metadata.get("tenant_id")
+                or intent.project_id != context.metadata.get("project_id")):
+            raise OrchestratedDispatchError("reconciliation crosses original intent boundary")
+        if verify_external(intent, evidence_digest, effect_completed, context) is not True:
+            raise OrchestratedDispatchError("external owner did not verify effect outcome")
+        observed = _digest({
+            "intent_digest": intent.digest, "task_name": task_name,
+            "external_evidence": evidence_digest, "completed": effect_completed,
+            "original_task_digest": task.digest,
+        })
+        final_state = OrchestrState.DONE if effect_completed else OrchestrState.BLOCKED
+        _, terminal_head = self.ledger.transition(
+            task_name, final_state,
+            evidence=(observed,), actor=actor, authority=authority,
+            proof_digest=observed, at_ns=at_ns,
+            expected_head=active_head,
+        )
+        return OrchestratedDispatchReceipt(
+            task_name=task_name, request_digest=intent.digest,
+            observation_digest=observed, plan_event_digest=terminal_head,
+            outcome="reconciled_completed" if effect_completed else "reconciled_no_completion",
+            tool_ok=effect_completed,
+        )
+
     def dispatch_one(
         self, task_name: str,
         intent: CapabilityIntent, *,
