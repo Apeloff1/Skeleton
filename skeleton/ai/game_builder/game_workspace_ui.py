@@ -1299,6 +1299,7 @@ $("jeeves-advanced-replay-stage").addEventListener("click",()=>dmGuard(async()=>
  const result=response.result;
  $("jeeves-advanced-replay-output").textContent=JSON.stringify(result,null,2);
  $("jeeves-publish-ids").value=result.proposal_id;
+ $("jeeves-paged-review-id").value=result.proposal_id;
  advancedReplayPlanDigest=null;
  status("Actual verified "+result.editor+" game session staged at "+
   result.source_path+". Human diff review and commit remain required.");
@@ -1363,6 +1364,7 @@ $("jeeves-campaign-stage").addEventListener("click",()=>dmGuard(async()=>{
  const receipt=response.result;
  $("jeeves-campaign-output").textContent=JSON.stringify(receipt,null,2);
  $("jeeves-publish-ids").value=receipt.proposal_id;
+ $("jeeves-paged-review-id").value=receipt.proposal_id;
  jeevesCampaignPlanDigest=null;
  status("Approved-scene multi-ending campaign staged as source. "+
   "Real game journey and both source versions must pass human diff/commit.");
@@ -1493,6 +1495,7 @@ $("jeeves-outcomes-stage").addEventListener("click",()=>dmGuard(async()=>{
  const result=response.result;
  $("jeeves-outcomes-report").textContent=JSON.stringify(result,null,2);
  $("jeeves-publish-ids").value=result.proposal_id;
+ $("jeeves-paged-review-id").value=result.proposal_id;
  campaignOutcomePlan=null;
  status("Source-verified original-game outcomes staged. Human diff review "+
   "and exact commit required before the historical coverage evidence exists.");
@@ -1557,6 +1560,7 @@ $("jeeves-consequence-stage").addEventListener("click",()=>dmGuard(async()=>{
  const result=response.result;
  $("jeeves-consequence-report").textContent=JSON.stringify(result,null,2);
  $("jeeves-publish-ids").value=result.proposal_id;
+ $("jeeves-paged-review-id").value=result.proposal_id;
  consequencePlan=null;
  status("Human-readable source-linked cast, location and causal history "+
   "now staged for independent source diff and commit.");

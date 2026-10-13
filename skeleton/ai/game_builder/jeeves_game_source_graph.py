@@ -19,6 +19,7 @@ SCHEMA="skeleton.ai.game_source_graph.v1"
 MAX_SCAN=1400
 MAX_DEPENDENCIES=9000
 MAX_PAGE=80
+MAX_PAGE_EDGES=1000
 SHA=re.compile(r"[a-f0-9]{64}\Z")
 
 
@@ -222,15 +223,18 @@ class JeevesGameSourceGraph:
             raise JeevesAppwideError("original game source graph changed between pages")
         paged=nodes[offset:offset+limit]
         paths={n["path"] for n in paged}
+        page_edges=[
+            edge for edge in dependencies if edge["source"] in paths
+        ]
         result={
             **indexes,
             "graph_digest":graph_sha,
             "offset":offset,"limit":limit,
             "next_offset":offset+len(paged) if offset+len(paged)<len(nodes) else None,
             "nodes":paged,
-            "dependencies_for_page":[
-                edge for edge in dependencies if edge["source"] in paths
-            ],
+            "page_dependency_total":len(page_edges),
+            "page_dependency_truncated":len(page_edges)>MAX_PAGE_EDGES,
+            "dependencies_for_page":page_edges[:MAX_PAGE_EDGES],
             "graph_source_mutated":False,
         }
         return {**result,"digest":digest(result)}
