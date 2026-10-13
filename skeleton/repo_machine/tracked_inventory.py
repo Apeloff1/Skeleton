@@ -57,7 +57,7 @@ def parse_tree(raw: bytes, *, max_files: int = 250_000) -> list[dict[str, object
             any(part in {"", ".", ".."} for part in path.split("/"))
         ):
             raise TrackedAtlasError("unsafe or noncanonical Git path")
-        if mode not in MODES or (kind == "blob") != (mode != "160000"):
+        if mode not in MODES or kind != ("commit" if mode == "160000" else "blob"):
             raise TrackedAtlasError("unexpected Git object kind or mode")
         if len(object_id) not in (40, 64) or any(c not in "0123456789abcdef" for c in object_id):
             raise TrackedAtlasError("invalid Git object identity")
@@ -105,7 +105,7 @@ def build_artifacts(
         raise TrackedAtlasError("mixed or inconsistent Git object formats")
     groups: dict[str, dict[str, object]] = {}
     families: Counter[str] = Counter()
-    duplicates: dict[tuple[str, str], list[str]] = defaultdict(list)
+    duplicates: dict[str, list[tuple[str, str]]] = defaultdict(list)
     inventory: list[bytes] = []
     total_bytes = 0
     for source in files:
@@ -132,14 +132,23 @@ def build_artifacts(
         zone_families = zone["families"]
         zone_families[family] = zone_families.get(family, 0) + 1
         if source["type"] == "blob":
-            duplicates[(str(source["oid"]), str(source["mode"]))].append(path)
+            duplicates[str(source["oid"])].append((path, str(source["mode"])))
     for zone in groups.values():
         zone["families"] = dict(sorted(zone["families"].items()))
-    repeated = [
-        {"oid": oid, "mode": mode, "paths": sorted(paths), "count": len(paths)}
-        for (oid, mode), paths in duplicates.items() if len(paths) > 1
-    ]
-    repeated.sort(key=lambda row: (-row["count"], row["oid"], row["mode"]))
+    repeated = []
+    for oid, members in duplicates.items():
+        if len(members) < 2:
+            continue
+        modes = sorted({mode for _, mode in members})
+        repeated.append({
+            "oid": oid,
+            "mode": modes[0] if len(modes) == 1 else "mixed",
+            "modes": modes,
+            "paths": sorted(path for path, _ in members),
+            "count": len(members),
+            "review_required": True,
+        })
+    repeated.sort(key=lambda row: (-row["count"], row["oid"]))
     manifest = {
         "schema": SCHEMA,
         "source_commit": commit,
