@@ -74,6 +74,7 @@ jobs:
             backend/gameforge/__init__.py
             backend/gameforge/forges/
             skeleton/forge/
+            skeleton/organism/
             apps/jeeves/
             packaging/windows/
             java-accelerators/
