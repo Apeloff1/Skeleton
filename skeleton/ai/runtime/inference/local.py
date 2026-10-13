@@ -665,13 +665,37 @@ class LocalInferenceEngine:
     ) -> tuple[LocalInferenceResult, ...]:
         if not requests:
             return ()
-        return tuple(await asyncio.gather(*(self.generate(item) for item in requests)))
+        tasks = [asyncio.create_task(self.generate(item)) for item in requests]
+        try:
+            # A failed member must not detach still-running native workers.
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+        except asyncio.CancelledError:
+            for task in tasks:
+                task.cancel()
+            await _drain_inference_tasks(tasks)
+            raise
+        for result in results:
+            if isinstance(result, BaseException):
+                raise result
+        return tuple(results)
+
+
+async def _drain_inference_tasks(tasks: Sequence[asyncio.Task]) -> None:
+    """Keep ownership through repeated cancellation until native cleanup ends."""
+    drained = asyncio.gather(*tasks, return_exceptions=True)
+    while not drained.done():
+        try:
+            await asyncio.shield(drained)
+        except asyncio.CancelledError:
+            continue
+    drained.result()
 
 
 @dataclass(slots=True)
 class _BatchItem:
     request: LocalInferenceRequest
     future: asyncio.Future[LocalInferenceResult]
+    task: asyncio.Task[None] | None = None
 
 
 class LocalInferenceScheduler:
@@ -704,6 +728,8 @@ class LocalInferenceScheduler:
             maxsize=max_batch_size * 32
         )
         self._worker: asyncio.Task[None] | None = None
+        self._admission_lock = asyncio.Lock()
+        self._close_task: asyncio.Task[None] | None = None
         self._closed = False
 
     def _ensure_worker(self) -> None:
@@ -711,13 +737,41 @@ class LocalInferenceScheduler:
             self._worker = asyncio.create_task(self._run())
 
     async def submit(self, request: LocalInferenceRequest) -> LocalInferenceResult:
+        if not isinstance(request, LocalInferenceRequest):
+            raise TypeError("request must be LocalInferenceRequest")
         if self._closed:
             raise RuntimeError("local inference scheduler is closed")
         loop = asyncio.get_running_loop()
         future: asyncio.Future[LocalInferenceResult] = loop.create_future()
-        self._ensure_worker()
-        await self._queue.put(_BatchItem(request=request, future=future))
-        return await future
+        item = _BatchItem(request=request, future=future)
+        try:
+            # A producer waiting for queue space cannot enqueue after the
+            # shutdown sentinel. Close waits for accepted admission to finish.
+            async with self._admission_lock:
+                if self._closed:
+                    raise RuntimeError("local inference scheduler is closed")
+                self._ensure_worker()
+                await self._queue.put(item)
+            return await future
+        except asyncio.CancelledError:
+            future.cancel()
+            if item.task is not None:
+                item.task.cancel()
+                await _drain_inference_tasks([item.task])
+            raise
+
+    async def _execute_item(self, item: _BatchItem) -> None:
+        try:
+            result = await self.engine.generate(item.request)
+        except asyncio.CancelledError:
+            item.future.cancel()
+            raise
+        except Exception as exc:
+            if not item.future.done():
+                item.future.set_exception(exc)
+        else:
+            if not item.future.done():
+                item.future.set_result(result)
 
     async def _run(self) -> None:
         while True:
@@ -742,25 +796,33 @@ class LocalInferenceScheduler:
 
             active = [item for item in batch if not item.future.cancelled()]
             if active:
-                try:
-                    results = await self.engine.generate_many([item.request for item in active])
-                except Exception as exc:
-                    for item in active:
-                        if not item.future.done():
-                            item.future.set_exception(exc)
-                else:
-                    for item, result in zip(active, results):
-                        if not item.future.done():
-                            item.future.set_result(result)
+                for item in active:
+                    item.task = asyncio.create_task(self._execute_item(item))
+                # Each caller owns its result and cancellation. A malformed
+                # request must not fail unrelated requests sharing a batch.
+                await asyncio.gather(
+                    *(item.task for item in active), return_exceptions=True
+                )
             if close_after_batch:
                 return
 
     async def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        if self._worker is not None and not self._worker.done():
-            await self._queue.put(None)
+        if self._close_task is None:
+            self._closed = True
+            self._close_task = asyncio.create_task(self._finish_close())
+        try:
+            await asyncio.shield(self._close_task)
+        except asyncio.CancelledError:
+            # Do not interrupt a saturated queue's sentinel insertion, or
+            # expose completed shutdown while native inference is still live.
+            await _drain_inference_tasks([self._close_task])
+            raise
+
+    async def _finish_close(self) -> None:
+        async with self._admission_lock:
+            if self._worker is not None and not self._worker.done():
+                await self._queue.put(None)
+        if self._worker is not None:
             await self._worker
 
 
