@@ -111,7 +111,7 @@ class OriginalGameObjectiveMatrixTests(unittest.TestCase):
             lambda x:x["candidate_results"][0]["goal_deltas"].update(
                      earned_quest_completions=999),
             lambda x:x["candidate_results"][0].update(
-                     pareto_frontier=True),
+                     pareto_frontier=not x["candidate_results"][0]["pareto_frontier"]),
             lambda x:x.update(automatic_ai_weight_promotion=True),
             lambda x:x.update(head_hash="0"*64),
         )
