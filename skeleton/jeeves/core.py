@@ -193,6 +193,11 @@ class Jeeves:
         from skeleton.jeeves.app_capability_bridge import creator_proposal
         return creator_proposal(operation, project_id, payload)
 
+    def creator_plan(self, project_id: str, steps):
+        """Compile bounded creator workflow proposals without executing them."""
+        from skeleton.jeeves.app_capability_bridge import creator_plan
+        return creator_plan(project_id, steps)
+
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
         if not isinstance(mode, SessionMode):
