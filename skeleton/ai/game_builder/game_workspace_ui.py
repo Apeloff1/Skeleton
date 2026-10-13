@@ -1574,6 +1574,110 @@ $("jeeves-consequence-verify").addEventListener("click",()=>dmGuard(async()=>{
   "or native-game execution asserted.");
 }));
 
+
+/* Full-source human review: each page must be presented and acknowledged. */
+let pagedDiffManifest=null,pagedDiffIndex=0,pagedDiffShown=null;
+let pagedDiffApproved={};
+function pagedDiffArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active original project and scan source inventory");
+ const proposal_id=$("jeeves-paged-review-id").value.trim();
+ if(!/^[a-f0-9]{64}$/.test(proposal_id))
+  throw Error("Exact existing game source proposal SHA-256 required");
+ return {project:model.active,proposal_id,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-paged-manifest").addEventListener("click",()=>dmGuard(async()=>{
+ const args=pagedDiffArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.review_manifest",
+  params:args,operator_authorized:false
+ });
+ pagedDiffManifest=receipt.result;
+ pagedDiffIndex=0;pagedDiffApproved={};pagedDiffShown=null;
+ $("jeeves-paged-review-text").textContent=JSON.stringify({
+  path:pagedDiffManifest.source_path,
+  source_sha256:pagedDiffManifest.new_source_sha256,
+  full_diff_sha256:pagedDiffManifest.full_unified_diff_sha256,
+  full_diff_bytes:pagedDiffManifest.full_unified_diff_utf8_bytes,
+  pages:pagedDiffManifest.page_count,
+  manifest_digest:pagedDiffManifest.digest
+ },null,2);
+ $("jeeves-paged-review-ack").checked=false;
+ status(pagedDiffManifest.page_count+
+  " complete SHA-pinned original source diff pages. "+
+  "Read and separately approve every page before game source publication.");
+}));
+$("jeeves-paged-next").addEventListener("click",()=>dmGuard(async()=>{
+ const args=pagedDiffArgs();
+ if(!pagedDiffManifest||pagedDiffManifest.proposal_id!==args.proposal_id||
+    pagedDiffIndex>=pagedDiffManifest.page_count)
+  throw Error("No current reviewed diff page; load a current proposal manifest");
+ if(pagedDiffIndex>0&&!pagedDiffApproved[pagedDiffIndex-1])
+  throw Error("Confirm the previous source diff page before advancing");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.review_page",
+  params:{...args,index:pagedDiffIndex,
+   expected_review_digest:pagedDiffManifest.digest},
+  operator_authorized:false
+ });
+ const item=receipt.result;
+ const metadata=pagedDiffManifest.page_receipts[pagedDiffIndex];
+ if(item.page_index!==pagedDiffIndex||item.full_utf8_sha256!==metadata.sha256)
+  throw Error("Source diff page SHA receipt differs from current exact manifest");
+ pagedDiffShown=item;
+ $("jeeves-paged-review-text").textContent=item.review_text;
+ $("jeeves-paged-review-ack").checked=false;
+ status("Original source diff page "+(pagedDiffIndex+1)+"/"+
+  pagedDiffManifest.page_count+" · content SHA "+item.full_utf8_sha256+
+  ". Read full source before approving this page.");
+}));
+$("jeeves-paged-accept").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-paged-review-ack").checked)
+  throw Error("Explicitly mark the displayed exact source page human reviewed");
+ if(!pagedDiffManifest||!pagedDiffShown||
+    pagedDiffShown.manifest_digest!==pagedDiffManifest.digest||
+    pagedDiffShown.page_index!==pagedDiffIndex)
+  throw Error("Source page/manifest changed; read from the beginning");
+ pagedDiffApproved[pagedDiffIndex]={
+  index:pagedDiffIndex,sha256:pagedDiffShown.full_utf8_sha256,
+  human_approved:true
+ };
+ pagedDiffIndex++;pagedDiffShown=null;
+ $("jeeves-paged-review-ack").checked=false;
+ $("jeeves-paged-review-text").textContent="Page acknowledged by exact source SHA.\n"+
+  Object.keys(pagedDiffApproved).length+"/"+pagedDiffManifest.page_count+
+  " reviewed. Load the next original diff page.";
+ status(Object.keys(pagedDiffApproved).length+
+  "/"+pagedDiffManifest.page_count+" entire original source diff pages reviewed.");
+}));
+$("jeeves-paged-commit").addEventListener("click",()=>dmGuard(async()=>{
+ const args=pagedDiffArgs();
+ if(!pagedDiffManifest||pagedDiffManifest.proposal_id!==args.proposal_id||
+    Object.keys(pagedDiffApproved).length!==pagedDiffManifest.page_count||
+    !$("jeeves-paged-commit-approval").checked)
+  throw Error("All pages and separate final designer source commit approval required");
+ const reviewed_pages=Object.values(pagedDiffApproved).sort(
+  (a,b)=>a.index-b.index);
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.commit_pages",
+  params:{...args,expected_review_digest:pagedDiffManifest.digest,
+   reviewed_pages},
+  operator_authorized:true
+ });
+ const result=receipt.result;
+ $("jeeves-paged-review-text").textContent=JSON.stringify(result,null,2);
+ pagedDiffManifest=null;pagedDiffShown=null;pagedDiffApproved={};
+ $("jeeves-paged-commit-approval").checked=false;
+ if(result.source_files_committed===1)
+  status("One human-reviewed original source committed with every full diff "+
+   "page SHA acknowledged. Refresh project tree.");
+ else
+  status("Partial source commit condition; reconcile observed files and "+
+   "acceptance custody before any retry.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5902,6 +6006,25 @@ Authorize human-reviewed consequence source proposal</label>
 <button id="jeeves-consequence-stage" type="button">Stage real player consequence matrix as original game source</button>
 <button id="jeeves-consequence-verify" type="button">Reverify signed story and actually played outcomes</button>
 <pre id="jeeves-consequence-report" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Full-Source Paged Human Diff Review</legend>
+<p><small>Review complete large original game-source diffs, even when the
+standard multi-file diff is too large for one response. Every reviewed
+page carries its own content SHA, and all pages must be individually
+acknowledged before the existing canonical GameWorkspace source writer
+can commit the file.</small></p>
+<label>One exact source review proposal SHA-256
+<input id="jeeves-paged-review-id" placeholder="64 lowercase hexadecimal characters"></label>
+<button id="jeeves-paged-manifest" type="button">Create exact full-source page inventory</button>
+<button id="jeeves-paged-next" type="button">Display current full source diff page</button>
+<pre id="jeeves-paged-review-text" role="status" aria-live="polite"></pre>
+<label><input id="jeeves-paged-review-ack" type="checkbox">
+I read the entire displayed source diff page and reviewed its checksum</label>
+<button id="jeeves-paged-accept" type="button">Acknowledge this exact source page</button>
+<label><input id="jeeves-paged-commit-approval" type="checkbox">
+Authorize final commit only after all source diff pages are acknowledged</label>
+<button id="jeeves-paged-commit" type="button">Commit exactly one completely reviewed original source</button>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
