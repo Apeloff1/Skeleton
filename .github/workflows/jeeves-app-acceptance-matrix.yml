@@ -11,6 +11,7 @@ on:
       - "skeleton/ai/game_builder/jeeves_appwide_fabric.py"
       - "scripts/run_app_acceptance_matrix.py"
       - "tests/test_game_builder_jeeves_acceptance_matrix.py"
+      - "tests/test_run_app_acceptance_matrix.py"
       - ".github/workflows/jeeves-app-acceptance-matrix.yml"
   workflow_dispatch:
 
@@ -61,11 +62,14 @@ jobs:
             skeleton/ai/game_builder/jeeves_acceptance_matrix.py \
             skeleton/ai/game_builder/jeeves_measured_completion.py \
             scripts/run_app_acceptance_matrix.py \
-            tests/test_game_builder_jeeves_acceptance_matrix.py
+            tests/test_game_builder_jeeves_acceptance_matrix.py \\
+            tests/test_run_app_acceptance_matrix.py
       - name: Adversarial candidate-binding validation
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_jeeves_acceptance_matrix -v
+          python -m unittest \\
+            tests.test_game_builder_jeeves_acceptance_matrix \\
+            tests.test_run_app_acceptance_matrix -v
       - name: Execute actual curated family regression suite
         shell: bash
         run: |
