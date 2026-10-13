@@ -72,7 +72,7 @@ class HostIdleTelemetry:
     pending_interactive_requests: int
     power_saving: bool
     online: bool
-    signed_observation_digest: str
+    host_observation_digest: str
 
     def __post_init__(self) -> None:
         _ns(self.observed_at_ns, "observed_at_ns")
@@ -88,11 +88,11 @@ class HostIdleTelemetry:
                 raise IdleSchedulerError("host worker/request count is invalid")
         if type(self.power_saving) is not bool or type(self.online) is not bool:
             raise IdleSchedulerError("power and connectivity must be booleans")
-        value = self.signed_observation_digest
+        value = self.host_observation_digest
         if not isinstance(value, str) or len(value) != 64 or any(
             x not in "0123456789abcdef" for x in value
         ):
-            raise IdleSchedulerError("trusted telemetry digest required")
+            raise IdleSchedulerError("host telemetry digest required")
 
     @property
     def quiet_ns(self) -> int:
@@ -292,7 +292,7 @@ class JeevesIdleLearningScheduler:
         return IdleWorkPlan(
             assignments=tuple(selected),
             observed_at_ns=telemetry.observed_at_ns,
-            telemetry_digest=telemetry.signed_observation_digest,
+            telemetry_digest=telemetry.host_observation_digest,
             plan_reason=reason if not selected else "admitted_idle",
             required_host_reauthorization=True,
             available_cost_units=available_cost,
