@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.check_p2_tranche1_activated import P2T1ActivationError, validate
+from scripts.check_p2_tranche1_activated import P2T1ActivationError, _check_task_state, validate
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,7 +55,10 @@ def test_rejects_native_evidence_regression(tmp_path: Path) -> None:
     task = next(x for x in payload["tasks"] if x["task_id"] == "P2-NATIVE-01")
     task["evidence_refs"] = ["github:pr#2332"]
     path.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(Exception, match="lacks an Actions acceptance run"):
+    with pytest.raises(P2T1ActivationError, match="lacks an Actions acceptance run"):
+        _check_task_state("P2-NATIVE-01", task, pr="2332", workflow="P2 Profile-Gated Acceleration", require_matching_head=False)
+    # The canonical validator can reject malformed task evidence first.
+    with pytest.raises(Exception):
         validate(root)
 
 
@@ -82,6 +85,12 @@ def test_pending_unsigned_t1_may_be_activated_without_completion(tmp_path: Path)
         verification_signed=False,
     )
     (root / "machine/ai_p2_task_backlog.json").write_text(json.dumps(backlog), encoding="utf-8")
+    progress_path = root / "machine/ai_p2_execution_map.json"
+    execution = json.loads(progress_path.read_text(encoding="utf-8"))
+    progress = execution["progress"]
+    progress["closed_tasks"].remove("P2-T1-FUNCTIONAL-01")
+    progress["landed_unpromoted_tasks"].append("P2-T1-FUNCTIONAL-01")
+    progress_path.write_text(json.dumps(execution), encoding="utf-8")
     assert validate(root)["status"] == "valid"
 
 
@@ -91,6 +100,8 @@ def test_closed_t1_rejects_missing_required_signoff(tmp_path: Path, field: str) 
     task[field] = False
     (root / "machine/ai_p2_task_backlog.json").write_text(json.dumps(backlog), encoding="utf-8")
     with pytest.raises(P2T1ActivationError, match="signoff is incomplete"):
+        _check_task_state("P2-T1-FUNCTIONAL-01", task, pr="2346", workflow="P2 Functional AI Acceptance")
+    with pytest.raises(Exception):
         validate(root)
 
 
@@ -127,4 +138,6 @@ def test_unpromoted_native_may_not_self_sign(tmp_path: Path) -> None:
                 implementation_signed=False, verification_signed=True)
     (root / "machine/ai_p2_task_backlog.json").write_text(json.dumps(backlog), encoding="utf-8")
     with pytest.raises(P2T1ActivationError, match="may not self-sign"):
+        _check_task_state("P2-NATIVE-01", task, pr="2332", workflow="P2 Profile-Gated Acceleration", require_matching_head=False)
+    with pytest.raises(Exception):
         validate(root)
