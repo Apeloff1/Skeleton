@@ -94,7 +94,8 @@ class GameForgeRun:
                 "dialect": bound.get("dialect"),
             } if bound.get("hit") else None
             resolved_era = bound.get("era")
-            if not era and resolved_era:
+            # A pinned cockpit or explicit blend outranks automatic reference inference.
+            if not era and not (blend or cockpit.blend) and resolved_era:
                 era = str(resolved_era)
             extra = str(bound.get("dialect") or "")
             if extra and extra not in (vision or ""):
