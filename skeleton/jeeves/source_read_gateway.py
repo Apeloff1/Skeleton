@@ -63,7 +63,7 @@ class JeevesSourceReadGateway:
                 or any(part in {"", ".", ".."} for part in path.split("/"))):
             raise JeevesSourceReadError("source path must be canonical relative")
         expected = _sha(expected_index_sha256)
-        meta = self.atlas.search(query="", limit=1, offset=0)
+        meta = self.atlas.metadata()
         if meta["index_sha256"] != expected:
             raise JeevesSourceReadError("source index changed since request planning")
         item = self.atlas.lookup(path)
