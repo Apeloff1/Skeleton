@@ -6,13 +6,15 @@ It complements the canonical docs/architecture/REPOSITORY_ATLAS.md.
 
 ## Minimal-context navigation
 1. Read machine/repo_navigation/manifest.json first for counts, provenance and routing.
-2. Read features.json for groups, primary zones, languages, tests and entrypoints.
-3. Read tree.json for folder hierarchy and file counts.
-4. Open only the relevant files/<group>.jsonl shard, never all files.
+2. Read routes.json to select one small feature route by subsystem.
+3. Read only feature_routes/<subsystem>.json to identify a feature and its file shard.
+4. Read shard_index.json for bounded 256-line ranges and use a line-window read
+   of the selected files/<group>.jsonl shard; never load a huge shard by default.
+5. Read tree.json for folder hierarchy and file counts when placing new modules.
    Fields: p=path, g=Git OID, b=size, m=mode, t=object type, z=zone, f=feature.
-5. Read duplicates.json for identical Git blobs; near_duplicates.json is a
+6. Read duplicates.json for identical Git blobs; near_duplicates.json is a
    heuristic candidate queue, not automatic permission to consolidate.
-6. For symbols/imports/dependency graph/test links, use existing
+7. For symbols/imports/dependency graph/test links, use existing
    skeleton.repo_machine and its repository-machine workflow artifacts.
 
 Ownership, criticality and lifecycle follow .machine/repository.toml,
