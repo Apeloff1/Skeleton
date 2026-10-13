@@ -199,7 +199,7 @@ class ShadowIdleTrainingWorker:
             )
         except Exception:
             try:
-                self.queue.release(session.lease)
+                self.queue.release(session.lease, backoff=True)
             except ShadowWeightError:
                 # Preserve the original training failure, not a stale lease error.
                 pass
