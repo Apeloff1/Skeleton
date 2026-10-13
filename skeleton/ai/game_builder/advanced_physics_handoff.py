@@ -196,6 +196,8 @@ def verify_physics_handoff(evidence:dict)->bool:
     }
     if set(evidence)!=required:
         raise PhysicsHandoffError("physics acquisition cannot contain unreviewed state")
+    if type(evidence["physics_settings"]) is not dict:
+        raise PhysicsHandoffError("reviewed physics settings must be an exact mapping")
     policy={key:value for key,value in evidence["physics_settings"].items()
             if key in OPTIONS}
     actual=run_physics_handoff(evidence["origin_session"],
