@@ -159,6 +159,18 @@ class CompletionCensusTests(unittest.TestCase):
         self.assertEqual(report["construction"]["gap_total"], 2)
         self.assertEqual(report["construction"]["closure_ledger_records"], 1)
 
+    def test_p1_gap_is_tracked_but_not_wrongly_required_in_p0_ledger(self):
+        self.docs["machine/ai_app_construction.json"]["gap_register"].append(
+            {"id": "gap-p1", "priority": "P1", "status": "closed"})
+        self.flush()
+        self.refresh()
+        report = self.census.report()
+        self.assertEqual(report["construction"]["gap_total"], 2)
+        self.assertEqual(report["construction"]["p0_evidence_gap_total"], 1)
+        self.assertEqual(report["construction"]["declared_closed_gaps"], 2)
+        self.assertNotIn("construction_closure_ledger_mismatch",
+                         [d["kind"] for d in report["authority_defects"]])
+
     def test_duplicate_capability_identifier_is_fail_closed(self):
         self.docs["machine/ai_capabilities.json"]["capabilities"].append(
             dict(self.docs["machine/ai_capabilities.json"]["capabilities"][0]))
