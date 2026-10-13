@@ -23,6 +23,7 @@ class CompletionCensusTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.master = {
+            "thematic_parts": [{"title": "AI Runtime"}, {"title": "Game Production"}],
             "volumes": [
                 {"id": 0, "key": "VOL-000", "implementation_status": "verified",
                  "enterprise_grade_state": "designed"},
