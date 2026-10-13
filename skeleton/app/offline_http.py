@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from dataclasses import dataclass, field
 from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import hmac
@@ -20,6 +21,7 @@ import sqlite3
 import stat
 import sys
 import threading
+import time
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -43,6 +45,35 @@ from skeleton.app.offline_grounding import (
 MAX_JSON_BYTES = 16 * 1024 * 1024
 MAX_CHAT_REQUEST_BYTES = 64 * 1024
 MAX_CONNECTIONS = 16
+MAX_TURN_TICKETS = 32
+TERMINAL_TURN_STATES = frozenset({"complete", "failed", "cancelled"})
+
+
+@dataclass(slots=True)
+class _LocalTurn:
+    """Ephemeral execution handle; completed conversation truth stays in SQLite."""
+
+    session_id: str
+    request_id: str
+    request_digest: str
+    state: str = "queued"
+    created_at: float = field(default_factory=time.time)
+    finished_at: float | None = None
+    cancel_requested: bool = False
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    loop: Any = None
+    task: Any = None
+    worker: Any = None
+
+    def public(self) -> dict[str, Any]:
+        return {
+            "session_id": self.session_id, "request_id": self.request_id,
+            "state": self.state, "terminal": self.state in TERMINAL_TURN_STATES,
+            "cancel_requested": self.cancel_requested,
+            "created_at": self.created_at, "finished_at": self.finished_at,
+            "result": self.result, "error": self.error,
+        }
 
 
 class OfflineHTTPError(ValueError):
@@ -88,6 +119,10 @@ class OfflineHTTPApplication:
         self.model_digest = backend.model_digest
         self.tokenizer_digest = _model_tokenizer_digest(backend)
         self._lock = threading.RLock()
+        self._turn_lock = threading.RLock()
+        self._turns: dict[tuple[str, str], _LocalTurn] = {}
+        self._active_session: str | None = None
+        self._closing = False
         self._store = OfflineChatStore(database)
         try:
             self.knowledge = OfflineKnowledgeLibrary(
@@ -98,7 +133,130 @@ class OfflineHTTPApplication:
             raise
 
     def close(self) -> None:
+        with self._turn_lock:
+            self._closing = True
+            workers = []
+            for turn in self._turns.values():
+                if turn.state not in TERMINAL_TURN_STATES:
+                    self._request_cancel(turn)
+                if turn.worker is not None:
+                    workers.append(turn.worker)
+        # Do not close the authority while a cancellation/commit is settling.
+        for worker in workers:
+            if worker is not threading.current_thread():
+                worker.join()
         self._store.close()
+
+    def _request_cancel(self, turn: _LocalTurn) -> None:
+        if turn.state in TERMINAL_TURN_STATES:
+            return
+        turn.cancel_requested = True
+        turn.state = "cancelling"
+        if turn.loop is not None and turn.task is not None:
+            try:
+                turn.loop.call_soon_threadsafe(turn.task.cancel)
+            except RuntimeError:
+                # A closed loop means finalization is already settling.
+                pass
+
+    @staticmethod
+    def _turn_identity(request: dict[str, Any], default_budget: int) -> tuple[str, str]:
+        _fields(request, {"message", "request_id", "max_output_tokens", "grounded"},
+                {"message", "request_id"})
+        message = request["message"]
+        if (not isinstance(message, str) or not message.strip()
+                or len(message.encode("utf-8")) > 4096):
+            raise OfflineHTTPError(400, "message must contain 1–4096 UTF-8 bytes")
+        grounded = request.get("grounded", False)
+        if type(grounded) is not bool:
+            raise OfflineHTTPError(400, "grounded must be a boolean")
+        if grounded and len(message.strip().encode("utf-8")) > 1024:
+            raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
+        rid = _identifier("request id", request["request_id"])
+        digest = _digest_request(message.strip(), GenerationConfig(
+            max_new_tokens=_budget(request, default_budget),
+        ))
+        return rid, grounded_request_digest(digest) if grounded else digest
+
+    def submit_turn(self, session_id: str, body: dict[str, Any]) -> tuple[int, Any]:
+        request = dict(body)
+        retry = request.pop("retry", False)
+        if type(retry) is not bool:
+            raise OfflineHTTPError(400, "retry must be a boolean")
+        rid, digest = self._turn_identity(request, self.default_output_tokens)
+        self._session(session_id)
+        key = (session_id, rid)
+        with self._turn_lock:
+            if self._closing:
+                raise OfflineHTTPError(503, "local application is shutting down")
+            existing = self._turns.get(key)
+            if existing is not None:
+                if existing.request_digest != digest:
+                    raise OfflineHTTPError(409, "request ID belongs to different turn content")
+                if not retry or existing.state not in {"failed", "cancelled"}:
+                    return (200 if existing.state in TERMINAL_TURN_STATES else 202), existing.public()
+            if self._active_session is not None:
+                raise OfflineHTTPError(409, "another local generation is still running")
+            if existing is not None:
+                del self._turns[key]
+            while len(self._turns) >= MAX_TURN_TICKETS:
+                # Admission above guarantees every retained ticket is terminal.
+                self._turns.pop(next(iter(self._turns)))
+            turn = _LocalTurn(session_id, rid, digest)
+            worker = threading.Thread(
+                target=self._run_turn, args=(turn, request),
+                name="skeleton-local-turn", daemon=False,
+            )
+            turn.worker = worker
+            self._turns[key] = turn
+            self._active_session = session_id
+            try:
+                worker.start()
+            except BaseException:
+                del self._turns[key]
+                self._active_session = None
+                raise
+            return 202, turn.public()
+
+    def _run_turn(self, turn: _LocalTurn, request: dict[str, Any]) -> None:
+        try:
+            with self._turn_lock:
+                if turn.cancel_requested:
+                    raise asyncio.CancelledError()
+                turn.state = "running"
+            result = self._perform_turn(turn.session_id, request, turn=turn)
+            with self._turn_lock:
+                # Durable commit wins a late cancellation request.
+                turn.result = result
+                turn.state = "complete"
+        except asyncio.CancelledError:
+            with self._turn_lock:
+                turn.state = "cancelled"
+        except (OfflineHTTPError, OfflineAIError, RuntimeContractError) as exc:
+            with self._turn_lock:
+                turn.state = "failed"
+                turn.error = str(exc)[:400]
+        except Exception:
+            with self._turn_lock:
+                turn.state = "failed"
+                turn.error = "local generation failed; inspect the model and retry"
+        finally:
+            with self._turn_lock:
+                turn.finished_at = time.time()
+                turn.task = None
+                turn.loop = None
+                self._active_session = None
+
+    def turn_status(self, session_id: str, request_id: str, *, cancel: bool = False) -> dict[str, Any]:
+        self._session(session_id)
+        rid = _identifier("request id", request_id)
+        with self._turn_lock:
+            turn = self._turns.get((session_id, rid))
+            if turn is None:
+                raise OfflineHTTPError(404, "turn ticket expired; resubmit the exact original request to recover")
+            if cancel:
+                self._request_cancel(turn)
+            return turn.public()
 
     def authenticate(self, authorization: str | None) -> bool:
         if not isinstance(authorization, str) or not authorization.startswith("Bearer "):
@@ -119,10 +277,10 @@ class OfflineHTTPApplication:
         if hasattr(self.backend, "runtime"):
             limits = self.backend.runtime.limits
             return min(32, limits.max_new_tokens, max(1, limits.max_context // 4))
-        return min(32, max(1, (self.backend.config.context_size or 4096) // 4))
+        return min(512, max(1, (self.backend.config.context_size or 4096) // 4))
 
     def _perform_turn(self, session_id: str,
-                      request: dict[str, Any]) -> dict[str, Any]:
+                      request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded"},
                 {"message", "request_id"})
         grounded = request.get("grounded", False)
@@ -139,7 +297,7 @@ class OfflineHTTPApplication:
         if grounded:
             digest = grounded_request_digest(digest)
         with self._lock:
-            current = self._session(session_id)
+            self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
             if replay is not None:
                 previous = self._store.turn_evidence(
@@ -176,14 +334,22 @@ class OfflineHTTPApplication:
             try:
                 # Runtime adaptation and durability CAS are controlled by
                 # DurableOfflineAISession. A failed turn leaves no partial text.
-                asyncio.run(chat.ask(
-                    text, max_output_tokens=budget, request_id=rid,
-                    evidence_manifest=manifest,
-                ))
+                async def generate():
+                    if turn is not None:
+                        with self._turn_lock:
+                            turn.loop = asyncio.get_running_loop()
+                            turn.task = asyncio.current_task()
+                            if turn.cancel_requested:
+                                raise asyncio.CancelledError()
+                    return await chat.ask(
+                        text, max_output_tokens=budget, request_id=rid,
+                        evidence_manifest=manifest,
+                    )
+                asyncio.run(generate())
             finally:
                 chat.close()
             receipt = self._store.replay(session_id, rid, digest)
-            if receipt is None or receipt.revision != current.revision + 1:
+            if receipt is None:
                 raise RuntimeContractError("local generation receipt was not committed")
             committed_evidence = self._store.turn_evidence(
                 session_id, self.model_digest, self.tokenizer_digest,
@@ -210,6 +376,18 @@ class OfflineHTTPApplication:
         if body is None:
             body = {}
         if path == "/v1/status" and method == "GET":
+            with self._turn_lock:
+                active = next((t for t in self._turns.values()
+                               if t.state not in TERMINAL_TURN_STATES), None)
+                active_turn = None if active is None else {
+                    "session_id": active.session_id, "request_id": active.request_id,
+                    "state": active.state, "cancel_requested": active.cancel_requested,
+                }
+            context_tokens = (self.backend.runtime.limits.max_context
+                              if hasattr(self.backend, "runtime")
+                              else self.backend.config.context_size or 4096)
+            output_tokens = (self.backend.runtime.limits.max_new_tokens
+                             if hasattr(self.backend, "runtime") else 8192)
             return 200, {
                 "local_only": True, "ready": True,
                 "runtime_kind": ("native" if hasattr(self.backend, "runtime")
@@ -218,6 +396,14 @@ class OfflineHTTPApplication:
                 "tokenizer_digest": self.tokenizer_digest,
                 "session_list_limit": 100,
                 "default_output_tokens": self.default_output_tokens,
+                "async_turns": True,
+                "cancellation": True,
+                "max_turn_tickets": MAX_TURN_TICKETS,
+                "active_turn": active_turn,
+                "context_tokens": context_tokens,
+                "max_output_tokens": min(output_tokens, max(1, context_tokens - 1)),
+                "message_bytes": 4096,
+                "grounded_query_bytes": 1024,
             }
         if path == "/v1/knowledge/documents":
             if method == "GET":
@@ -231,10 +417,19 @@ class OfflineHTTPApplication:
             return 200, {"hits": self.knowledge.search(
                 body["query"], limit=body.get("limit", 6)
             )}
-        if path.startswith("/v1/knowledge/documents/") and method == "DELETE":
+        if path.startswith("/v1/knowledge/documents/") and method in {"GET", "DELETE"}:
             document_id = path[len("/v1/knowledge/documents/"):]
+            if method == "GET":
+                return 200, self.knowledge.get_document(document_id)
             self.knowledge.delete(document_id)
             return 200, {"deleted_document_id": document_id}
+        if path == "/v1/sessions/search" and method == "POST":
+            _fields(body, {"query", "cursor", "limit"}, set())
+            return 200, self._store.session_summaries(
+                self.model_digest, self.tokenizer_digest,
+                query=body.get("query", ""), cursor=body.get("cursor"),
+                limit=body.get("limit", 30),
+            )
         if path == "/v1/sessions":
             if method == "GET":
                 return 200, {"sessions": [
@@ -263,6 +458,14 @@ class OfflineHTTPApplication:
             )
             return 201, {"session_id": sid, "revision": self._session(sid).revision}
         components = path.split("/")
+        if len(components) in {6, 7} and components[:3] == ["", "v1", "sessions"]:
+            sid = _identifier("session id", components[3])
+            if components[4] == "turns":
+                if len(components) == 6 and method == "GET":
+                    return 200, self.turn_status(sid, components[5])
+                if len(components) == 7 and components[6] == "cancel" and method == "POST":
+                    _fields(body, set(), set())
+                    return 202, self.turn_status(sid, components[5], cancel=True)
         if (len(components) not in {4, 5} or
                 components[:3] != ["", "v1", "sessions"]):
             raise OfflineHTTPError(404, "unknown local API route")
@@ -270,10 +473,11 @@ class OfflineHTTPApplication:
         tail = components[4] if len(components) == 5 else None
         if tail is None:
             if method == "GET":
-                stored = self._session(sid)
-                evidence = self._store.turn_evidence(
-                    sid, self.model_digest, self.tokenizer_digest,
-                )
+                with self._store.read_snapshot():
+                    stored = self._session(sid)
+                    evidence = self._store.turn_evidence(
+                        sid, self.model_digest, self.tokenizer_digest,
+                    )
                 answers = [
                     message.content for message in stored.transcript.messages
                     if message.role == "assistant"
@@ -290,11 +494,25 @@ class OfflineHTTPApplication:
                     ],
                 }
             if method == "DELETE":
-                self._store.delete(sid, self.model_digest,
-                                   self.tokenizer_digest)
+                with self._turn_lock:
+                    if self._active_session == sid:
+                        raise OfflineHTTPError(409, "cancel the active turn and wait for it to settle before deleting")
+                    self._store.delete(sid, self.model_digest,
+                                       self.tokenizer_digest)
+                    self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
         if tail == "turn" and method == "POST":
-            return 200, self._perform_turn(sid, body)
+            with self._turn_lock:
+                if self._closing or self._active_session is not None:
+                    raise OfflineHTTPError(409, "another local generation is still running")
+                self._active_session = sid
+            try:
+                return 200, self._perform_turn(sid, body)
+            finally:
+                with self._turn_lock:
+                    self._active_session = None
+        if tail == "turns" and method == "POST":
+            return self.submit_turn(sid, body)
         if tail == "fork" and method == "POST":
             _fields(body, {"after_turn"}, set())
             new_sid = self._store.fork(
@@ -426,7 +644,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
             raise OfflineHTTPError(411, "numeric request length required")
         limit = (
             MAX_JSON_BYTES if path == "/v1/sessions/import"
-            else MAX_DOCUMENT_BYTES + 8192 if path == "/v1/knowledge/documents"
+            else MAX_DOCUMENT_BYTES * 6 + 8192 if path == "/v1/knowledge/documents"
             else MAX_CHAT_REQUEST_BYTES
         )
         length = int(declared)
@@ -705,6 +923,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="new private bearer-token file; never overwritten")
     parser.add_argument("--port", type=int, default=0,
                         help="localhost TCP port, default: OS-assigned ephemeral port")
+    parser.add_argument("--open-browser", action="store_true",
+                        help="open the local workspace after binding; token remains in its private file")
     args = parser.parse_args(argv)
     app = None
     token_created = False
@@ -736,7 +956,7 @@ def main(argv: list[str] | None = None) -> int:
                 print("Private bearer token file:", token_path)
                 print("Model digest:", app.model_digest)
                 sys.stdout.flush()
-            else:
+            if args.open_browser or sys.stdout is None:
                 import webbrowser
                 try:
                     webbrowser.open(url)

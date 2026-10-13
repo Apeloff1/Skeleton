@@ -768,5 +768,33 @@
       "machine/ai_closure_evidence.json",
       "docs/AI_APP_CONSTRUCTION_MANUAL.md"
     ]
+  },
+  "offline_application": {
+    "owner": "skeleton/app",
+    "status": "implementation-candidate",
+    "entrypoint": "python -m skeleton.app.offline_http",
+    "http_owner": "skeleton/app/offline_http.py",
+    "ui_owner": "skeleton/app/offline_web.py",
+    "inference_owner": "skeleton/ai/runtime/inference/local.py",
+    "state_authority": "skeleton/ai/model_runtime/offline_chat.py",
+    "knowledge_owner": "skeleton/app/offline_knowledge.py",
+    "network": "authenticated numeric-loopback only; no hosted-provider fallback",
+    "turn_submission": "POST /v1/sessions/{session_id}/turns",
+    "turn_status": "GET /v1/sessions/{session_id}/turns/{request_id}",
+    "turn_cancellation": "POST /v1/sessions/{session_id}/turns/{request_id}/cancel",
+    "turn_authority": "bounded ephemeral execution tickets; SQLite committed-turn receipts remain durable truth",
+    "retry": "same request ID and digest; durable replay before generation; explicit retry after failure or cancellation",
+    "cancellation": "request acknowledgement is non-terminal until model cancellation settles; committed result wins cancellation race",
+    "session_controls": "model-scoped summaries, search, branch, portable backup and Markdown export",
+    "readiness": "implementation only; no test, deployment or quality qualification inferred",
+    "model_preparation": {
+      "entrypoint": "python -m skeleton app prepare-local-model",
+      "owner": "skeleton/ai/runtime/inference/deployment.py",
+      "artifacts": "operator-selected existing llama.cpp executable and GGUF; no download or execution during preparation",
+      "publication": "validated private manifest, create-only; never overwrite existing configuration",
+      "qualification": "manifest admission is not trained-model or runtime qualification"
+    },
+    "session_adapter": "skeleton/app/local_ai.py",
+    "runtime_status_projection": "frontend/features/Jeeves/JeevesRuntimeStatus.tsx reads existing /api/ai/providers and /api/jeeves/free-tier; never selects a provider"
   }
 }

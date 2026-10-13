@@ -50,6 +50,33 @@ Canonical ownership, topology, change lanes, and migration boundaries are mapped
 The complete AI build sequence, provider rules, capability planes, acceptance gates, and open construction gaps are the mandatory manual in [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](docs/AI_APP_CONSTRUCTION_MANUAL.md).
 The whole-system production target—HA topology, tenancy, security, SLOs, disaster recovery, capacity, observability, incident operations, progressive delivery, and enterprise acceptance—is governed by [`docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md`](docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md) and `machine/enterprise_system_architecture.json`.
 
+### Standalone local AI
+
+Use a locally installed trained GGUF model and llama.cpp CLI without Docker or
+hosted-provider credentials. Prepare the pinned configuration once:
+
+```bash
+python -m skeleton app prepare-local-model \
+  --executable /path/to/llama-cli --model /path/to/model.gguf \
+  --output ./local-model.json
+
+# Durable terminal chat:
+python -m skeleton app chat --gguf-deployment ./local-model.json --interactive
+
+# Browser workspace on this computer:
+python -m skeleton app serve-local-ai --gguf-deployment ./local-model.json \
+  --token-file ./local-ai.secret --open-browser
+```
+
+Paste the token from the new private file into the browser workspace. Conversations,
+references, cancellation and retry controls use the local model and SQLite store.
+The desktop **Local AI** window also has **Set up GGUF…**. Native checkpoints remain
+supported. Model preparation pins files; useful responses still require trained
+weights and a compatible installed runtime.
+
+See [offline AI operations](docs/ai/OFFLINE_NATIVE_CHAT.md) for limits, backups,
+API routes, terminal commands and recovery behavior.
+
 ### Windows installer
 
 Windows users can install the assembled application through a normal per-user

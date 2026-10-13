@@ -184,7 +184,12 @@ Use `--local-native-checkpoint` instead of `--local-gguf-deployment` for the nat
 | GET | /v1/status | Exact local model identity and token default |
 | GET, POST | /v1/sessions | List / create persistent conversations |
 | GET, DELETE | /v1/sessions/{id} | Retrieve full history / delete |
-| POST | /v1/sessions/{id}/turn | Native or GGUF inference and durable commit |
+| POST | /v1/sessions/{id}/turn | Compatibility synchronous inference and durable commit |
+| POST | /v1/sessions/{id}/turns | Admit a background generation; returns execution ticket |
+| GET | /v1/sessions/{id}/turns/{request_id} | Read execution state and committed result |
+| POST | /v1/sessions/{id}/turns/{request_id}/cancel | Request cancellation; acknowledgement is not terminal |
+| POST | /v1/sessions/search | Search model-bound summaries with keyset pagination |
+| GET | /v1/knowledge/documents/{id} | Inspect or export verified original source text |
 | POST | /v1/sessions/{id}/fork | Fork at a committed revision |
 | GET | /v1/sessions/{id}/export | Retrieve full integrity-checked backup |
 | POST | /v1/sessions/import | Import into a new conversation ID |
@@ -423,3 +428,124 @@ change `machine/ai_capabilities.json` states or assert that the whole AI app is
 complete. Product completion still requires tested conversation ingress,
 quality qualification, attached-product UI/API, release/installer acceptance,
 and exact-head CI.
+
+
+## Workspace completion implementation — 2026-10-13
+
+This batch is an implementation candidate. No tests were run for this batch, as
+requested by the operator. Build compilation is recorded separately in
+`docs/plan/OFFLINE_AI_WORKSPACE_2026-10-13.md`; it does not establish runtime or
+answer-quality acceptance.
+
+### Prepare and launch an existing local model
+
+```bash
+python -m skeleton app prepare-local-model \
+  --executable /absolute/path/to/llama-cli \
+  --model /absolute/path/to/trained-model.gguf \
+  --output ./local-model.json \
+  --context-size 4096 --gpu-layers 0 --timeout 120
+
+python -m skeleton app chat --gguf-deployment ./local-model.json --interactive
+python -m skeleton app serve-local-ai --gguf-deployment ./local-model.json \
+  --token-file ./new-local-access.secret --open-browser
+```
+
+Preparation accepts existing operator-selected files, hashes both, admits the
+candidate through `LocalModelDeployment.load`, and publishes a new private manifest.
+It does not download weights or execute the runtime. The destination directory must
+exist and support hard links; an existing file is never overwritten. Paths in the
+manifest are absolute. Moving either artifact requires preparing a new manifest.
+Optional `--threads`, `--model-id`, `--gpu-layers`, `--context-size` and `--timeout`
+configure the existing runtime contract. This does not certify hardware suitability
+or model quality. The default uses CPU execution with a 4096-token context.
+
+The desktop **Set up GGUF…** button performs the same file selection and preparation
+in its background model loader. **Load local GGUF…** still opens a prepared manifest.
+The standalone browser `--open-browser` option opens only its numeric-loopback URL;
+the bearer token is never placed in a URL. It remains in the chosen private file,
+which the server removes on normal shutdown if the file was not replaced.
+
+### Background turns and recovery
+
+The browser submits to `/turns` using the original request ID, message, output budget
+and grounding choice. It polls a bounded execution ticket and displays queued,
+running, cancellation requested and terminal states. Each HTTP server instance admits one generation
+at a time across the selected model. Separate processes still use SQLite conflict
+checks; they do not share a global compute reservation. It retains at most 32 tickets in memory;
+terminal entries are evicted for later work. SQLite remains the only durable
+conversation and retry authority. No queue or additional execution database exists.
+
+A normal submission is:
+
+```json
+{"message":"Explain this code","request_id":"stable-request-001","max_output_tokens":512,"grounded":false}
+```
+
+Explicitly retry a failed or cancelled ticket by submitting the identical fields
+with `"retry": true`. Reusing an ID for different input is rejected. A committed
+request is replayed before retrieval or inference, including after server restart
+or ticket eviction. An uncommitted grounded retry retrieves current verified local
+sources; only the evidence supplied to a successfully committed answer becomes its
+immutable source record.
+
+Cancellation requests are acknowledgements. The UI waits for the worker to settle;
+a durable commit wins a late cancellation race. Locking the tab clears credentials,
+drafts and visible content but does not imply cancellation. Reconnect to recover an
+active ticket. On reload, completed history is available from the same model's
+conversation list. Automatic polling backs off on connection errors and pauses after
+eight consecutive failures or ten minutes. **Check status** resumes it; there is no
+automatic new generation. Original retry payloads are kept only in tab memory.
+
+### Conversation and reference controls
+
+- Search saved conversation text and load additional pages; titles derive from the
+  first user message, with the last message shown as a preview.
+- Start a conversation with optional instructions; branch the whole conversation or
+  only through a selected completed assistant turn.
+- Copy messages, copy a full transcript, export Markdown, or export/import a complete
+  canonical JSON backup. Markdown is a readable export, not a restorable backup.
+- Import up to 16 UTF-8 reference files at once, each at most 64 KiB. Search passages,
+  inspect the exact verified original, download it, or remove it from the library.
+- Adjust completion tokens within model limits. GGUF defaults to 512 output tokens,
+  capped to one quarter of the configured context; native checkpoint defaults remain
+  bounded by their smaller runtime limits.
+
+Sources are supplied as untrusted evidence. Citation ID auditing does not establish
+factual accuracy. The desktop now shows the retained source excerpts and that audit
+beside the saved answer. It also supports conversation search, new-conversation
+instructions, text copy/export and the existing restorable JSON backups. Conversation backups preserve committed excerpts even if
+an original library document is later removed; they do not export the whole library.
+
+The browser keeps drafts per conversation in memory only. Switching away from a
+failed turn clears its in-tab retry handle; saved receipts remain in SQLite. Export
+private backups before deleting conversations. There is no automatic cloud sync.
+
+### Terminal controls
+
+The unified `python -m skeleton app chat` command delegates to the same standalone
+chat implementation. Interactive commands:
+
+| Command | Action |
+| --- | --- |
+| `/help`, `/id`, `/history` | Commands, current identity and full saved dialogue |
+| `/list [search]` | List matching conversations across all pages |
+| `/new [instructions]`, `/resume ID` | Start or restore a conversation |
+| `/fork [turn]` | Branch the current conversation at a committed turn |
+| `/tokens N` | Set a model-bounded completion budget |
+| `/ground QUESTION` | Answer with local source evidence |
+| `/retry` | Recover the original interrupted request before new inference |
+| `/references`, `/add FILE`, `/search QUERY` | Inspect, import and search local sources |
+| `/save NEW_FILE.json`, `/import FILE.json` | Private canonical backup and import |
+| `/exit` | Close the terminal session |
+
+Invalid commands and failed turns remain recoverable in the interactive session.
+Ctrl+C during generation interrupts that turn; `/retry` checks its original saved
+receipt. Ctrl+C at the input prompt exits. For one-shot recovery use both `--session`
+and `--request-id`; JSON output identifies the request. Replayed JSON uses the stored
+`output_digest`, without relabeling it as an inference execution receipt.
+
+The main Expo Jeeves workspace separately displays the engine's existing provider
+status and cost-routing availability. This is a read-only status projection; it does
+not change provider configuration, bypass cost policy, or promise that every answer
+is generative. Per-reply model metadata records the actual route.

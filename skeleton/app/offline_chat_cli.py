@@ -8,9 +8,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import os
+import secrets
+import sqlite3
 from pathlib import Path
-import stat
 import sys
 
 from skeleton.ai.model_runtime.offline_chat import (
@@ -21,7 +21,7 @@ from skeleton.app.offline_grounding import (
     audit_answer_citations, grounded_request_digest, prepare_evidence,
 )
 from skeleton.app.offline_knowledge import (
-    OfflineKnowledgeLibrary, MAX_DOCUMENT_BYTES,
+    OfflineKnowledgeLibrary, read_reference_file as _read_reference_file,
 )
 from skeleton.app.local_ai import (
     DurableOfflineAISession,
@@ -32,60 +32,8 @@ from skeleton.app.local_ai import (
 )
 
 
-def _read_reference_file(path: Path) -> str:
-    """Read one bounded local UTF-8 file through a stable regular-file handle.
-
-    Inspect the path both before and after opening, bind the opened file to
-    that identity, and reject any replacement or in-place change during read.
-    O_NOFOLLOW also prevents symlink traversal on supporting operating systems.
-    """
-    try:
-        before = path.lstat()
-        if not stat.S_ISREG(before.st_mode):
-            raise RuntimeContractError(
-                "reference path must be a local regular non-symlink file"
-            )
-        flags = (
-            os.O_RDONLY
-            | getattr(os, "O_BINARY", 0)
-            | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_NOFOLLOW", 0)
-            | getattr(os, "O_NONBLOCK", 0)
-        )
-        fd = os.open(path, flags)
-        with os.fdopen(fd, "rb") as source:
-            opened = os.fstat(source.fileno())
-            if (not stat.S_ISREG(opened.st_mode)
-                    or (opened.st_dev, opened.st_ino) !=
-                    (before.st_dev, before.st_ino)):
-                raise RuntimeContractError("reference changed during file admission")
-            if not 1 <= opened.st_size <= MAX_DOCUMENT_BYTES:
-                raise RuntimeContractError("reference file exceeds the 64 KiB limit")
-            payload = source.read(MAX_DOCUMENT_BYTES + 1)
-            after = os.fstat(source.fileno())
-            current = path.lstat()
-            if (not stat.S_ISREG(current.st_mode)
-                    or (current.st_dev, current.st_ino) !=
-                    (opened.st_dev, opened.st_ino)
-                    or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) !=
-                    (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)):
-                raise RuntimeContractError("reference changed during file admission")
-    except (OSError, ValueError) as exc:
-        if isinstance(exc, RuntimeContractError):
-            raise
-        raise RuntimeContractError("reference path is not a readable regular file") from exc
-    if not 1 <= len(payload) <= MAX_DOCUMENT_BYTES or len(payload) != opened.st_size:
-        raise RuntimeContractError("reference changed or exceeded size budget")
-    try:
-        text = payload.decode("utf-8", errors="strict")
-    except UnicodeError as exc:
-        raise RuntimeContractError("reference must be UTF-8 text") from exc
-    if "\x00" in text:
-        raise RuntimeContractError("binary reference content is prohibited")
-    return text
-
 def _result(answer, session_id: str, *, as_json: bool,
-            evidence: dict | None = None) -> None:
+            evidence: dict | None = None, request_id: str | None = None) -> None:
     if as_json:
         body = {
             "session_id": session_id,
@@ -95,6 +43,8 @@ def _result(answer, session_id: str, *, as_json: bool,
             "input_tokens": answer.input_tokens,
             "output_tokens": answer.output_tokens,
         }
+        if request_id is not None:
+            body["request_id"] = request_id
         if evidence is not None:
             body["evidence"] = evidence
             body["citation_audit"] = audit_answer_citations(answer.text, evidence)
@@ -111,7 +61,7 @@ def _result(answer, session_id: str, *, as_json: bool,
 
 
 def _grounded_turn(chat: DurableOfflineAISession, message: str, *,
-                   max_tokens: int):
+                   max_tokens: int, request_id: str | None = None):
     """Use the same source selection and atomic turn receipt as localhost."""
     if not isinstance(message, str) or not message.strip():
         raise RuntimeContractError("grounded message must not be empty")
@@ -132,46 +82,222 @@ def _grounded_turn(chat: DurableOfflineAISession, message: str, *,
     )
     return asyncio.run(chat.ask(
         message, max_output_tokens=max_tokens, evidence_manifest=manifest,
+        request_id=request_id,
     )), manifest
+
+
+def _emit(event: str, message: str, *, as_json: bool, **data) -> None:
+    if as_json:
+        print(json.dumps({"event": event, "message": message, **data},
+                         sort_keys=True, ensure_ascii=False))
+    else:
+        print(message)
+
+
+def _submit_turn(chat: DurableOfflineAISession, message: str, *,
+                 max_tokens: int, grounded: bool, request_id: str,
+                 as_json: bool) -> None:
+    """Recover an exact committed request before doing any model work."""
+    prompt = message.strip()
+    if not prompt or len(prompt.encode("utf-8")) > 4096:
+        raise RuntimeContractError("message must contain 1–4096 UTF-8 bytes")
+    if grounded and len(prompt.encode("utf-8")) > 1024:
+        raise RuntimeContractError("grounded query exceeds 1024 bytes")
+    digest = _digest_request(prompt, GenerationConfig(max_new_tokens=max_tokens))
+    if grounded:
+        digest = grounded_request_digest(digest)
+    # Read and validate the canonical model-bound history before replay lookup.
+    chat.resume(chat.session_id)
+    replay = chat.store.replay(chat.session_id, request_id, digest)
+    if replay is not None:
+        evidence = chat.store.turn_evidence(
+            chat.session_id, chat.model_digest, chat.tokenizer_digest,
+        )[replay.revision - 1]
+        if as_json:
+            payload = {
+                "session_id": chat.session_id, "request_id": request_id,
+                "model_digest": chat.model_digest, "revision": replay.revision,
+                "text": replay.text, "output_digest": replay.output_digest,
+                "input_tokens": replay.prompt_tokens,
+                "output_tokens": replay.generated_tokens, "replayed": True,
+            }
+            if evidence is not None:
+                payload["evidence"] = evidence
+                payload["citation_audit"] = audit_answer_citations(replay.text, evidence)
+            # Output digest is not mislabeled as an inference execution receipt.
+            print(json.dumps(payload, sort_keys=True, ensure_ascii=False))
+        else:
+            print("Local AI>", replay.text)
+            print("Recovered saved turn", replay.revision, "without new generation.")
+        return
+    if grounded:
+        answer, evidence = _grounded_turn(
+            chat, prompt, max_tokens=max_tokens, request_id=request_id,
+        )
+        _result(answer, chat.session_id, as_json=as_json, evidence=evidence, request_id=request_id)
+    else:
+        answer = asyncio.run(chat.ask(
+            prompt, max_output_tokens=max_tokens, request_id=request_id,
+        ))
+        _result(answer, chat.session_id, as_json=as_json, request_id=request_id)
 
 
 def _run_interactive(chat: DurableOfflineAISession, *, max_tokens: int,
                      as_json: bool) -> None:
-    print("Offline model:", chat.model_digest)
-    print("Session:", chat.session_id)
-    print("Commands: /id  /new  /list  /resume SESSION_ID  /ground QUESTION  /exit")
+    commands = (
+        "/help; /id; /history; /list [search]; /new [instructions]; "
+        "/resume SESSION_ID; /fork [turn]; /tokens N; /ground QUESTION; "
+        "/retry; /references; /add FILE; /search QUERY; /save FILE; "
+        "/import FILE; /exit"
+    )
+    _emit("ready", "Local model " + chat.model_digest + "\nSession: " + chat.session_id
+          + "\nCommands: " + commands, as_json=as_json,
+          session_id=chat.session_id, model_digest=chat.model_digest)
+    pending: tuple[str, str, int, bool, str] | None = None
     while True:
         try:
-            message = input("You> ").strip()
+            message = input("" if as_json else "You> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print()
+            if not as_json:
+                print()
             return
-        if message == "/exit":
-            return
-        if message == "/id":
-            print("Session:", chat.session_id)
-            continue
-        if message == "/new":
-            print("New session:", chat.create_conversation())
-            continue
-        if message == "/list":
-            for session_id, revision in chat.list_conversations():
-                print(f"{session_id}  revision={revision}")
-            continue
-        if message.startswith("/resume "):
-            chat.resume(message[len("/resume "):].strip())
-            print("Restored:", chat.session_id, "turns=", len(chat.history) // 2)
-            continue
         if not message:
             continue
-        if message.startswith("/ground "):
-            answer, evidence = _grounded_turn(
-                chat, message[len("/ground "):].strip(), max_tokens=max_tokens,
-            )
-            _result(answer, chat.session_id, as_json=as_json, evidence=evidence)
-        else:
-            answer = asyncio.run(chat.ask(message, max_output_tokens=max_tokens))
-            _result(answer, chat.session_id, as_json=as_json)
+        command, _, argument = message.partition(" ")
+        argument = argument.strip()
+        try:
+            if command == "/exit":
+                return
+            if command == "/help":
+                _emit("help", commands, as_json=as_json)
+                continue
+            if command == "/id":
+                _emit("session", "Session: " + chat.session_id, as_json=as_json,
+                      session_id=chat.session_id, output_tokens=max_tokens)
+                continue
+            if command == "/history":
+                chat.resume(chat.session_id)
+                if as_json:
+                    print(json.dumps({"session_id": chat.session_id,
+                                      "messages": [{"role": role, "content": content}
+                                                   for role, content in chat.history]},
+                                     ensure_ascii=False))
+                else:
+                    for role, content in chat.history:
+                        print(("You> " if role == "user" else "Local AI> ") + content)
+                continue
+            if command == "/new":
+                if argument:
+                    if len(argument.encode("utf-8")) > 4096:
+                        raise RuntimeContractError("instructions exceed 4096 UTF-8 bytes")
+                    sid = chat.store.create(chat.model_digest, chat.tokenizer_digest,
+                                            system=argument)
+                    chat.resume(sid)
+                else:
+                    chat.create_conversation()
+                pending = None
+                _emit("session", "New session: " + chat.session_id,
+                      as_json=as_json, session_id=chat.session_id)
+                continue
+            if command == "/resume":
+                if not argument:
+                    raise RuntimeContractError("usage: /resume SESSION_ID")
+                chat.resume(argument)
+                pending = None
+                _emit("session", "Restored " + chat.session_id, as_json=as_json,
+                      session_id=chat.session_id, turns=len(chat.history) // 2)
+                continue
+            if command == "/list":
+                cursor = None
+                while True:
+                    page = chat.store.session_summaries(
+                        chat.model_digest, chat.tokenizer_digest,
+                        query=argument, cursor=cursor, limit=100,
+                    )
+                    for item in page["sessions"]:
+                        _emit("conversation", f"{item['session_id']}  {item['revision']} turns  {item['title']}",
+                              as_json=as_json, **item)
+                    cursor = page["next_cursor"]
+                    if cursor is None:
+                        break
+                continue
+            if command == "/fork":
+                after = int(argument) if argument else None
+                sid = chat.fork_conversation(chat.session_id, after_turn=after)
+                chat.resume(sid)
+                pending = None
+                _emit("session", "Branched to " + sid, as_json=as_json, session_id=sid)
+                continue
+            if command == "/tokens":
+                value = int(argument)
+                limit = (chat.backend.runtime.limits.max_new_tokens
+                         if hasattr(chat.backend, "runtime") else 8192)
+                context = (chat.backend.runtime.limits.max_context
+                           if hasattr(chat.backend, "runtime") else chat.backend.config.context_size or 4096)
+                if not 1 <= value <= min(limit, context - 1):
+                    raise RuntimeContractError("token budget exceeds the selected model limits")
+                max_tokens = value
+                _emit("budget", f"Output budget: {value} tokens", as_json=as_json,
+                      max_output_tokens=value)
+                continue
+            if command in {"/references", "/add", "/search"}:
+                knowledge = OfflineKnowledgeLibrary(chat.store, chat.model_digest, chat.tokenizer_digest)
+                if command == "/references":
+                    for item in knowledge.list_documents():
+                        _emit("reference", item["document_id"] + "  " + item["title"],
+                              as_json=as_json, **item)
+                elif command == "/add":
+                    if not argument:
+                        raise RuntimeContractError("usage: /add FILE")
+                    path = Path(argument).expanduser()
+                    item = knowledge.add_text(path.name, _read_reference_file(path))
+                    _emit("reference", "Indexed " + item["title"], as_json=as_json, **item)
+                else:
+                    if not argument:
+                        raise RuntimeContractError("usage: /search QUERY")
+                    hits = knowledge.search(argument, limit=6)
+                    for hit in hits:
+                        _emit("passage", hit["title"] + "\n" + hit["passage"] + "\n" + hit["citation"],
+                              as_json=as_json, **hit)
+                    if not hits:
+                        _emit("search", "No matching local reference passages.", as_json=as_json)
+                continue
+            if command == "/save":
+                if not argument:
+                    raise RuntimeContractError("usage: /save NEW_FILE.json")
+                save_private_bundle(Path(argument).expanduser(), chat.export_conversation(chat.session_id))
+                _emit("export", "Private backup saved to " + argument, as_json=as_json)
+                continue
+            if command == "/import":
+                if not argument:
+                    raise RuntimeContractError("usage: /import FILE.json")
+                sid = chat.import_conversation(load_private_bundle(Path(argument).expanduser()))
+                chat.resume(sid)
+                pending = None
+                _emit("session", "Imported session " + sid, as_json=as_json, session_id=sid)
+                continue
+            if command == "/retry":
+                if pending is None or pending[0] != chat.session_id:
+                    raise RuntimeContractError("no interrupted request exists in this session")
+            else:
+                if command.startswith("/") and command != "/ground":
+                    raise RuntimeContractError("unknown command; use /help")
+                grounded = command == "/ground"
+                prompt = argument if grounded else message
+                if not prompt:
+                    raise RuntimeContractError("usage: /ground QUESTION")
+                pending = (chat.session_id, prompt, max_tokens, grounded, secrets.token_urlsafe(18))
+            sid, prompt, budget, grounded, request_id = pending
+            _emit("submitted", "Request: " + request_id, as_json=as_json,
+                  session_id=sid, request_id=request_id)
+            _submit_turn(chat, prompt, max_tokens=budget, grounded=grounded,
+                         request_id=request_id, as_json=as_json)
+            pending = None
+        except KeyboardInterrupt:
+            _emit("cancelled", "Interrupted. No success is assumed; /retry checks the original receipt first.",
+                  as_json=as_json)
+        except (RuntimeError, ValueError, OSError, sqlite3.Error) as exc:
+            _emit("error", str(exc), as_json=as_json)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -186,6 +312,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--database", type=Path,
                         help="SQLite path; defaults to the Windows GUI's per-model local store")
     parser.add_argument("--session", help="resume a saved conversation ID")
+    parser.add_argument("--request-id", help="stable one-shot request ID; requires --session")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--message", help="complete and commit one local AI turn")
     modes.add_argument("--grounded-message",
@@ -230,6 +357,8 @@ def main(argv: list[str] | None = None) -> int:
                   or args.import_bundle or args.fork_session
                   or args.add_reference or args.list_references
                   or args.search_reference or args.delete_reference)
+    if args.request_id is not None and (not args.session or args.interactive or manage):
+        parser.error("--request-id requires --session with a one-shot message")
     if args.output is not None and args.export_session is None:
         parser.error("--output is valid only with --export-session")
     if args.export_session and args.output is None:
@@ -328,18 +457,15 @@ def main(argv: list[str] | None = None) -> int:
             if args.interactive:
                 _run_interactive(chat, max_tokens=budget, as_json=args.json)
                 return 0
-            if args.grounded_message is not None:
-                answer, evidence = _grounded_turn(
-                    chat, args.grounded_message, max_tokens=budget,
-                )
-                _result(answer, chat.session_id, as_json=args.json, evidence=evidence)
-            else:
-                answer = asyncio.run(
-                    chat.ask(args.message, max_output_tokens=budget)
-                )
-                _result(answer, chat.session_id, as_json=args.json)
+            request_id = args.request_id or secrets.token_urlsafe(18)
+            _submit_turn(
+                chat, args.grounded_message if args.grounded_message is not None else args.message,
+                max_tokens=budget, grounded=args.grounded_message is not None,
+                request_id=request_id, as_json=args.json,
+            )
             if not args.json:
                 print("Session:", chat.session_id)
+                print("Request:", request_id)
             return 0
         finally:
             chat.close()
