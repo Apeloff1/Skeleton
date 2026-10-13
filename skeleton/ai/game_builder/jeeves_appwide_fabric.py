@@ -360,6 +360,8 @@ OPERATIONS = {
     "ai.api.bindings":("read", "selected frontend FastAPI literal route contract comparison",False),
     "ai.milestones":("read", "dependency-ordered application milestone readiness",False),
     "ai.milestones.page":("read", "bounded source-pinned milestone page",False),
+    "ai.milestones.critical":("read", "canonical dependency bottlenecks and longest structural chain",False),
+    "ai.milestones.owners":("read", "page actual canonical task distribution by owner",False),
     "ai.workwaves":("read", "dependency-safe milestone parallelization with owner leases",False),
     "ai.workpack":("read", "source-hashed bounded implementation context for selected milestone IDs",False),
     "ai.code.search":("read", "bounded source-content lookup over inventoried files",False),
@@ -491,6 +493,13 @@ class JeevesAppwideRuntime:
         elif action=="ai.milestones.page":
             from .jeeves_milestone_planner import JeevesMilestonePlanner
             result=JeevesMilestonePlanner(inv).page(**params)
+        elif action in ("ai.milestones.critical", "ai.milestones.owners"):
+            from .jeeves_critical_path import JeevesCriticalPath
+            analysis=JeevesCriticalPath(inv)
+            if action=="ai.milestones.critical":
+                result=analysis.overview(**params)
+            else:
+                result=analysis.ownerload(**params)
         elif action in ("ai.workwaves", "ai.workpack", "ai.change_frontier"):
             from .jeeves_deathmarch_workpacks import JeevesWorkpackDirector
             director=JeevesWorkpackDirector(inv)
