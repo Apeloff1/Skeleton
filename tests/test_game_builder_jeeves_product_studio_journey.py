@@ -210,6 +210,48 @@ class StudioMeasuredUserJourneyTests(unittest.TestCase):
         self.assertEqual(status,400)
         self.assertNotIn("verified",json.dumps(page).lower())
 
+    def test_prompt_to_playable_runtime_save_reload_and_tamper_refusal(self):
+        project=self.root/"integration_workbench/current/original_story_world/project.json"
+        old_hash=sha256(project.read_bytes()).hexdigest()
+        status,plan=self.request("POST","/api/plan",{
+            "project":"original_story_world",
+            "prompt":"Create an original tower defense game with real enemy waves, "
+                     "bounded resources, and an advanced editable system."})
+        self.assertEqual(status,200,str(plan)[:250])
+        self.assertFalse((project.parent/"systems").exists())
+        status,played=self.request("POST","/api/advanced-play",{
+            "editor":"tower_defense",
+            "actions":["build:0","tick:4"],
+            "seed":11,
+        })
+        self.assertEqual(status,200,str(played)[:250])
+        self.assertFalse(played["server_mutated_game_files"])
+        session=played["session"]
+        self.assertEqual(session["editor"],"tower_defense")
+        self.assertEqual(session["validated_turn_count"],2)
+        self.assertTrue(session["trace"])
+        self.assertEqual(self.request("POST","/api/advanced-verify",{
+            "session":session})[0],200)
+        status,save=self.request("POST","/api/advanced-save",{
+            "session":session})
+        self.assertEqual(status,200,str(save)[:250])
+        self.assertFalse(save["source_project_mutated"])
+        status,restored=self.request("POST","/api/advanced-load",{
+            "savegame":save["savegame"]})
+        self.assertEqual(status,200,str(restored)[:250])
+        self.assertEqual(restored["session"]["editor"],"tower_defense")
+        self.assertEqual(restored["session"]["head_digest"],session["head_digest"])
+        self.assertEqual(self.request("POST","/api/advanced-verify",{
+            "session":restored["session"]})[0],200)
+        corrupted=json.loads(json.dumps(session))
+        corrupted["trace"][0]["digest"]="0"*64
+        self.assertEqual(self.request("POST","/api/advanced-verify",{
+            "session":corrupted})[0],400)
+        self.assertEqual(self.request("POST","/api/advanced-save",{
+            "session":corrupted})[0],400)
+        self.assertEqual(sha256(project.read_bytes()).hexdigest(),old_hash)
+        self.assertFalse((project.parent/"systems").exists())
+
     def test_actual_studio_read_requests_do_not_modify_project_source(self):
         project=self.root/"integration_workbench/current/original_story_world/project.json"
         before=sha256(project.read_bytes()).hexdigest()
