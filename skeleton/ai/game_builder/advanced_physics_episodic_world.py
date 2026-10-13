@@ -69,8 +69,9 @@ def run_episodic_physics_world(episodes,quest_scene,quest_settings=None):
             if prior is not None and (
                 len(transcript)<=len(prior) or transcript[:len(prior)]!=prior):
                 raise EpisodicWorldError("original game progress must strictly extend prior source actions")
-            if len(episode["world_actions"])>MAX_ACTIONS_PER_EPISODE:
-                raise EpisodicWorldError("single episode exceeds finite investigation turns")
+            if (type(episode["world_actions"]) not in (list,tuple)
+                or len(episode["world_actions"])>MAX_ACTIONS_PER_EPISODE):
+                raise EpisodicWorldError("episode investigation actions require a bounded array")
             total_actions+=len(episode["world_actions"])
             if total_actions>MAX_TOTAL_WORLD_ACTIONS:
                 raise EpisodicWorldError("total authored investigation commands exceed world budget")
