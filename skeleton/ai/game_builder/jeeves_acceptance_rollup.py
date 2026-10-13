@@ -71,6 +71,10 @@ def combine(*, head, expected_families, unittest_proof, pytest_proof,
              "fixed canonical forty-two family denominator required")
     _validate_proof(unittest_proof, schema=FIRST, head=head)
     _validate_proof(pytest_proof, schema=SECOND, head=head)
+    for source in (unittest_proof, pytest_proof):
+        _require(source.get("reviewed_matrix_sha256") == reviewed_matrix_sha256
+                 and source.get("reviewed_scope_sha256") == reviewed_scope_sha256,
+                 "two independently verified runs disagree with exact reviewed matrix or scope")
     _require(unittest_proof["run_id"] != pytest_proof["run_id"],
              "two execution modes require distinct independently verified runs")
     unittest_ids = unittest_proof.get(
