@@ -7,6 +7,9 @@ on:
       - "machine/app_completion_scope.json"
       - "machine/app_acceptance_test_matrix.json"
       - "machine/app_release_journey_contract.json"
+      - "skeleton/ai/game_builder/jeeves_release_execution_queue.py"
+      - "tests/test_game_builder_jeeves_release_execution_queue.py"
+      - "tests/test_ai_native_session_recovery_journey.py"
       - "skeleton/ai/game_builder/jeeves_acceptance_rollup.py"
       - "skeleton/ai/game_builder/jeeves_enterprise_journey_frontier.py"
       - "tests/test_game_builder_jeeves_enterprise_journey_frontier.py"
@@ -98,12 +101,15 @@ jobs:
             skeleton/ai/game_builder/jeeves_acceptance_matrix.py \
             skeleton/ai/game_builder/jeeves_acceptance_rollup.py \
             skeleton/ai/game_builder/jeeves_enterprise_journey_frontier.py \
+            skeleton/ai/game_builder/jeeves_release_execution_queue.py \
+            tests/test_game_builder_jeeves_release_execution_queue.py \
             tests/test_game_builder_jeeves_enterprise_journey_frontier.py \
             tests/test_game_builder_jeeves_acceptance_rollup.py \
             skeleton/ai/game_builder/jeeves_measured_completion.py \
             skeleton/ai/game_builder/jeeves_acceptance_run_verifier.py \
             scripts/run_app_acceptance_matrix.py \
             scripts/verify_app_acceptance_ci.py \
+            tests/test_ai_native_session_recovery_journey.py \
             tests/test_game_builder_jeeves_acceptance_matrix.py \
             tests/test_game_builder_jeeves_product_studio_journey.py \
             tests/test_run_app_acceptance_matrix.py \
@@ -116,7 +122,8 @@ jobs:
             tests.test_run_app_acceptance_matrix \
             tests.test_game_builder_jeeves_acceptance_run_verifier \
             tests.test_game_builder_jeeves_acceptance_rollup \
-            tests.test_game_builder_jeeves_enterprise_journey_frontier -v
+            tests.test_game_builder_jeeves_enterprise_journey_frontier \
+            tests.test_game_builder_jeeves_release_execution_queue -v
       - name: Execute actual curated family regression suite
         shell: bash
         run: |
