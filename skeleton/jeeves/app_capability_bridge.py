@@ -316,6 +316,91 @@ def plane_capability_catalog(*, query: str = "", limit: int = 20,
                            query=query, limit=limit, offset=offset)
 
 
+
+def dependency_impact(plane: str, *, direction: str = "upstream", max_depth: int = 5,
+                      root: Path | str | None = None) -> dict[str, Any]:
+    """Resolve a bounded owner-aware cross-plane impact graph from the ledger.
+
+    'upstream' traces runtime dependencies; 'downstream' traces consumers.
+    This is architecture planning data, never a permit to change a target.
+    """
+    if not isinstance(plane, str) or not plane or len(plane) > 192:
+        raise AppCapabilityBridgeError("plane must be a bounded identifier")
+    if direction not in ("upstream", "downstream"):
+        raise AppCapabilityBridgeError("direction must be upstream or downstream")
+    if type(max_depth) is not int or not 0 <= max_depth <= 8:
+        raise AppCapabilityBridgeError("max_depth must be an integer in 0..8")
+    home = _root(root)
+    declared = _manifest(home / "machine" / "capability_registry.json").get("capabilities")
+    if not isinstance(declared, list) or len(declared) > MAX_ROWS:
+        raise AppCapabilityBridgeError("canonical runtime plane descriptors unavailable")
+    by_plane: dict[str, dict[str, Any]] = {}
+    for record in declared:
+        if not isinstance(record, dict) or not isinstance(record.get("plane"), str):
+            raise AppCapabilityBridgeError("invalid runtime plane descriptor")
+        name = record["plane"]
+        if name in by_plane:
+            raise AppCapabilityBridgeError("duplicate runtime plane identity")
+        by_plane[name] = record
+    if plane not in by_plane:
+        raise AppCapabilityBridgeError("unknown canonical runtime plane")
+    adjacency: dict[str, set[str]] = {name: set() for name in by_plane}
+    for name, record in by_plane.items():
+        for dependency in _catalog_strings(
+            record.get("dependency_planes", []), field="dependency_planes",
+        ):
+            if dependency not in by_plane:
+                raise AppCapabilityBridgeError("runtime plane has an unresolved dependency")
+            if direction == "upstream":
+                adjacency[name].add(dependency)
+            else:
+                adjacency[dependency].add(name)
+
+    paths: dict[str, tuple[str, ...]] = {plane: (plane,)}
+    frontier = [plane]
+    edges: set[tuple[str, str]] = set()
+    for _ in range(max_depth):
+        following: list[str] = []
+        for current in sorted(frontier):
+            for neighbor in sorted(adjacency[current]):
+                edges.add((current, neighbor))
+                candidate = paths[current] + (neighbor,)
+                if neighbor not in paths:
+                    if len(paths) >= 128:
+                        raise AppCapabilityBridgeError("impact closure exceeds node budget")
+                    paths[neighbor] = candidate
+                    following.append(neighbor)
+        frontier = following
+        if not frontier:
+            break
+    rows = []
+    for name in sorted(paths):
+        descriptor = by_plane[name]
+        rows.append({
+            "plane": name,
+            "depth": len(paths[name]) - 1,
+            "path": list(paths[name]),
+            "owners": _catalog_strings(descriptor.get("owners", []), field="owners"),
+            "declared_status": str(descriptor.get("status", ""))[:80],
+            "live_availability": "unverified",
+        })
+    content = {
+        "schema": SCHEMA,
+        "catalog": "runtime-dependency-impact",
+        "origin_plane": plane,
+        "direction": direction,
+        "max_depth": max_depth,
+        "nodes": rows,
+        "edges": [list(edge) for edge in sorted(edges)],
+        "execution_authority": "none",
+    }
+    content["index_sha256"] = sha256(
+        json.dumps(content, sort_keys=True, separators=(",", ":"),
+                   ensure_ascii=True, allow_nan=False).encode("utf-8")
+    ).hexdigest()
+    return content
+
+
 def interface_catalog(*, query: str = "", limit: int = 20, offset: int = 0,
                       root: Path | str | None = None) -> dict[str, Any]:
     """Find canonical cross-plane contracts without acquiring target-plane rights."""
@@ -432,6 +517,20 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
         ), lambda args, _ctx: plane_capability_catalog(
             query=args.get("query", ""), limit=args.get("limit", 20),
             offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="app.dependency_impact",
+            description="Trace a bounded upstream or downstream app-plane dependency and ownership graph.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("plane", "string", max_length=192),
+                ArgumentRule("direction", "string", required=False,
+                             choices=("upstream", "downstream")),
+                ArgumentRule("max_depth", "integer", required=False,
+                             minimum=0, maximum=8),
+            ),
+        ), lambda args, _ctx: dependency_impact(
+            args["plane"], direction=args.get("direction", "upstream"),
+            max_depth=args.get("max_depth", 5), root=home)),
         (ToolSpec(
             name="app.interfaces",
             description="Read canonical cross-plane dependency, owner and failure contracts; no execution.",
