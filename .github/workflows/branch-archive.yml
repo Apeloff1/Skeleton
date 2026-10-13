@@ -68,41 +68,59 @@ jobs:
           declare -A archive_pr=()
 
           load_open_refs() {
-            local branch
+            local branch heads_file bases_file
+            heads_file="$RUNNER_TEMP/branch-archive-open-heads.txt"
+            bases_file="$RUNNER_TEMP/branch-archive-open-bases.txt"
             open_heads=()
             open_bases=()
+
+            # A process substitution can conceal API failures from set -e.
+            # Resolve each snapshot completely before any cleanup decision.
+            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref' \
+              > "$heads_file"; then
+              echo '::error::Open PR heads unavailable; refusing branch archive mutations.'
+              return 1
+            fi
+            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .base.ref' \
+              > "$bases_file"; then
+              echo '::error::Open PR bases unavailable; refusing branch archive mutations.'
+              return 1
+            fi
 
             while IFS= read -r branch; do
               [[ -n "$branch" ]] || continue
               open_heads["$branch"]=1
-            done < <(
-              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-                --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref'
-            )
-
+            done < "$heads_file"
             while IFS= read -r branch; do
               [[ -n "$branch" && "$branch" != main ]] || continue
               open_bases["$branch"]=1
-            done < <(
-              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-                --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .base.ref'
-            )
+            done < "$bases_file"
           }
 
           load_archive_candidates() {
-            local branch tip pr
+            local branch tip pr candidates_file
+            candidates_file="$RUNNER_TEMP/branch-archive-closed-candidates.tsv"
             archive_pr=()
-            while IFS=$'\t' read -r branch tip pr; do
+
+            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
+              --jq ".[] | select(.merged_at == null and .closed_at != null and .closed_at <= \"$cutoff\" and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha, (.number|tostring)] | @tsv" \
+              > "$candidates_file"; then
+              echo '::error::Closed PR history unavailable; refusing branch archive mutations.'
+              return 1
+            fi
+
+            while IFS=$'\\t' read -r branch tip pr; do
               [[ -n "$branch" && -n "$tip" && -n "$pr" ]] || continue
               archive_pr["${branch}:${tip}"]="$pr"
-            done < <(
-              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
-                --jq ".[] | select(.merged_at == null and .closed_at != null and .closed_at <= \"$cutoff\" and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha, (.number|tostring)] | @tsv"
-            )
+            done < "$candidates_file"
           }
 
-          load_open_refs
-          load_archive_candidates
+          if ! load_open_refs || ! load_archive_candidates; then
+            echo '::error::Branch archive snapshots incomplete; no branches deleted.'
+            exit 1
+          fi
 
           archived=0
           preserved_open=0
@@ -134,7 +152,10 @@ jobs:
             fi
 
             # Revalidate both PR references immediately before mutation.
-            load_open_refs
+            if ! load_open_refs; then
+              echo '::error::Late PR revalidation failed; no further branch deletes.'
+              exit 1
+            fi
             if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
               preserved_open=$((preserved_open + 1))
               continue
