@@ -111,6 +111,12 @@ class GitAtlasTests(unittest.TestCase):
             self.assertEqual(summary["artifact_sha256"], hashes)
             self.assertEqual(len((left / "files.jsonl").read_text().splitlines()), 4)
 
+    def test_padded_git_tree_size_column_is_accepted(self) -> None:
+        # git ls-tree -l pads the object-size column with spaces.
+        with self.fixture() as temp:
+            data = inventory(Path(temp))
+            self.assertEqual(data["summary"]["tracked_entries"], 4)
+
     def test_entry_limit_fails_closed(self) -> None:
         with self.fixture() as temp:
             with patch("skeleton.repo_machine.git_atlas.MAX_ENTRIES", 3):
