@@ -133,6 +133,10 @@ def stage_trained_shadow(
     receipt, batch = build_shadow_training_handoff(
         lease, dataset, manifest, checkpoint, candidate_id=candidate_id,
     )
+    # Reserve the candidate in durable intake *before* staging a second ledger.
+    # After any crash a newly leased worker must reproduce the same candidate;
+    # it cannot replace the reserved weights with another training run.
+    queue.reserve_candidate(lease, batch.candidate)
     snapshot = ledger.stage(batch, expected_revision=expected_shadow_revision)
     queue.acknowledge(lease, batch.candidate)
     return receipt, snapshot
