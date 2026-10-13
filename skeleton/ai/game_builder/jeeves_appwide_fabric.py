@@ -365,6 +365,7 @@ OPERATIONS = {
     "studio.batch_preview":("compute", "bounded approved adapter previews across game/edit/forge planes",False),
     "source.inspect":("read", "UTF-8 source",False),
     "source.propose":("proposal", "exact-file reviewed code edit",True),
+    "source.patchset.preview":("proposal", "source-pinned multi-file exact-hunk refactoring review",True),
     "editor.catalog":("read", "typed original-game editors",False),
     "editor.preview":("compute", "isolated editor simulation",False),
     "editor.template":("compute", "validated editable system template",False),
@@ -502,6 +503,10 @@ class JeevesAppwideRuntime:
                 path=params["path"],expected_sha256=params["expected_sha256"],
                 replacement=params["replacement"],reason=params["reason"],
                 operator_authorized=authorized)
+        elif action=="source.patchset.preview":
+            from .jeeves_source_patchset import preview_source_patchset
+            result=preview_source_patchset(inv, **params,
+                                           operator_authorized=authorized)
         elif action=="editor.catalog":
             from .system_editors import catalog
             result={"editors":catalog(),"read_only":True}
