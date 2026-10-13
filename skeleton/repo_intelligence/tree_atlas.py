@@ -195,15 +195,25 @@ def scan(root: Path) -> tuple[str, str, tuple[Entry, ...]]:
 
 
 def exact_duplicates(entries: Iterable[Entry]) -> list[dict[str, object]]:
-    groups: dict[tuple[str, str], list[str]] = defaultdict(list)
+    groups: dict[tuple[str, str], list[Entry]] = defaultdict(list)
     for e in entries:
         if e.kind == "blob":
-            groups[(e.blob, e.mode if e.mode == "120000" else "file")].append(e.path)
+            groups[(e.blob, e.mode if e.mode == "120000" else "file")].append(e)
     result = []
-    for (blob, _type), paths in sorted(groups.items()):
-        if len(paths) > 1:
-            result.append({"blob": blob, "paths": sorted(paths), "copies": len(paths),
-                           "excess": len(paths) - 1})
+    for (blob, _type), members in sorted(groups.items()):
+        if len(members) < 2:
+            continue
+        paths = sorted(e.path for e in members)
+        history = sum(e.lifecycle == "historical-snapshot" for e in members)
+        classification = ("historical-only" if history == len(members)
+                          else "mixed-historical" if history else "active")
+        # Exactness is about bytes; safe consolidation depends on import
+        # identities, ownership, and the staged-mirror contract.
+        size = members[0].size or 0
+        result.append({"blob": blob, "paths": paths, "copies": len(paths),
+                       "excess": len(paths) - 1, "bytes_per_copy": size,
+                       "excess_bytes": size * (len(paths) - 1),
+                       "classification": classification})
     return sorted(result, key=lambda row: (-int(row["copies"]), str(row["blob"])))
 
 
@@ -312,6 +322,7 @@ def build(root: Path, *, near_limit: int = 0) -> tuple[dict[str, object], tuple[
         "feature_count": len(feature_counts),
         "directory_count": len(directory_index(entries)),
         "exact_duplicate_groups": len(duplicates),
+        "duplicate_classes": dict(sorted(Counter(d["classification"] for d in duplicates).items())),
         "exact_duplicate_excess": sum(int(g["excess"]) for g in duplicates),
         "near_duplicate_exhaustive": False,
         "authorities": [".machine/repository.toml", "machine/ai_file_tree.json"],
