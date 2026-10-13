@@ -1,9 +1,9 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13.v9",
+  "version": "2026-10-13.v10",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
-  "scope_note": "42 source-linked feature families: 17 curated unittest, 20 reviewed pytest, 5 discovery-only; selected suites are narrower than full feature release qualification",
+  "scope_note": "All 42 source-linked families selected for actual target regressions: 17 unittest +25 pytest; independent full family, device, quality and enterprise release acceptance remains open",
   "runner_mode": "unittest_module_exact_head",
   "default_max_seconds": 480,
   "policies": {
@@ -41,12 +41,12 @@
     {
       "family_id": "F03",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Engine API health and kernel interface response subset",
       "unittest_modules": [
         "tests.test_api"
       ],
-      "workflow_hint": "Separate dedicated independent target gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance; exact SHA; source hash and real test case count",
       "product_release_qualified": false
     },
     {
@@ -96,12 +96,12 @@
     {
       "family_id": "F08",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Provider route and failure isolation contract subset",
       "unittest_modules": [
         "tests.test_provider_runtime_boundary"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance; exact SHA; source hash and real test case count",
       "product_release_qualified": false
     },
     {
@@ -118,12 +118,12 @@
     {
       "family_id": "F10",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Model-sourced tool execution independent verifier subset",
       "unittest_modules": [
         "tests.test_tool_runtime_independent_verifier"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance; exact SHA; source hash and real test case count",
       "product_release_qualified": false
     },
     {
@@ -164,12 +164,12 @@
     {
       "family_id": "F14",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Supervisor and delegated agent authority regression subset",
       "unittest_modules": [
         "tests.test_agent_runtime_independent_verifier"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance; exact SHA; source hash and real test case count",
       "product_release_qualified": false
     },
     {
@@ -408,12 +408,12 @@
     {
       "family_id": "F36",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "External tools and connector namespace parity subset",
       "unittest_modules": [
         "tests.test_tools_integrations_namespace_migration"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance; exact SHA; source hash and real test case count",
       "product_release_qualified": false
     },
     {
