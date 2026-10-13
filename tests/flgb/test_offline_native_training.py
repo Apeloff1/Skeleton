@@ -140,6 +140,32 @@ class TestOfflineNativeTraining(unittest.TestCase):
                 with self.assertRaises(OfflineTrainingError):
                     train_local_text(source, Path(directory) / "model.json")
 
+    def test_training_read_rechecks_source_size_after_bounded_read(self) -> None:
+        # Model a concurrent writer expanding the same opened inode after
+        # read(). A pre-read stat and equal bytes alone are insufficient.
+        import os
+        from types import SimpleNamespace
+        from skeleton.app.local_ai_training import _read_corpus
+
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "corpus.txt"
+            source.write_text("hello world\n", encoding="utf-8")
+            real_fstat = os.fstat
+            calls = 0
+
+            def changed_size(fd):
+                nonlocal calls
+                calls += 1
+                original = real_fstat(fd)
+                if calls == 2:
+                    return SimpleNamespace(st_size=original.st_size + 1)
+                return original
+
+            with patch("skeleton.app.local_ai_training.os.fstat", side_effect=changed_size):
+                with self.assertRaisesRegex(OfflineTrainingError, "changed while reading"):
+                    _read_corpus(source)
+            self.assertEqual(calls, 2)
+
     def test_rejects_large_token_count_and_corrupt_encoding(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "notes.txt"
