@@ -125,7 +125,8 @@ class Jeeves:
                           creator_handlers=None, creator_authorize=None,
                           shadow_pipeline=None, shadow_read_authorize=None,
                           shadow_write_authorize=None, shadow_review_verify=None,
-                          shadow_admission_verify=None, shadow_consume_verify=None):
+                          shadow_admission_verify=None, shadow_consume_verify=None,
+                          file_atlas=None, file_atlas_read_authorize=None):
         """Assemble app discovery tools and optionally host-owned creator actions.
 
         By default every tool is READ_ONLY. Editor dispatch is opt-in and only
@@ -166,6 +167,13 @@ class Jeeves:
                 review_verify=shadow_review_verify,
                 admission_verify=shadow_admission_verify,
                 consume_verify=shadow_consume_verify,
+            )
+        if (file_atlas is None) != (file_atlas_read_authorize is None):
+            raise ValueError("file atlas and host read authorizer required together")
+        if file_atlas is not None:
+            from skeleton.jeeves.repository_file_atlas import register_repository_atlas_tools
+            register_repository_atlas_tools(
+                registry, atlas=file_atlas, read_authorize=file_atlas_read_authorize,
             )
         return registry
 
@@ -299,6 +307,11 @@ class Jeeves:
             prepare_shadow_learning_handoff,
         )
         return prepare_shadow_learning_handoff(proposal, report, **evidence)
+
+    def repository_file_atlas(self, *, root, store_path):
+        """Open a host-selected source atlas; refresh is a separate host action."""
+        from skeleton.jeeves.repository_file_atlas import JeevesRepositoryFileAtlas
+        return JeevesRepositoryFileAtlas(root, store_path)
 
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
