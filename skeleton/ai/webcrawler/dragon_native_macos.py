@@ -275,8 +275,18 @@ def publish_macos_game(spec:ProductionRequest,destination:Path,*,
     if authorized is not True:
         raise PermissionError("macOS original game publication requires approval")
     root=Path(destination).expanduser().absolute()
-    if any(path.is_symlink() for path in (root,*root.parents)):
-        raise ValueError("symlinked native macOS game export directory")
+    # macOS owns /var -> /private/var and /tmp -> /private/tmp.
+    # Allow only these exact system aliases; user-created symlinked output
+    # directories and ancestors remain forbidden before any build occurs.
+    for part in (root,*root.parents):
+        if not part.is_symlink():
+            continue
+        system_alias=(
+            sys.platform=="darwin" and part in (Path("/var"),Path("/tmp"))
+            and part.resolve()==Path("/private")/part.name
+        )
+        if not system_alias:
+            raise ValueError("symlinked native macOS game export directory")
     if root.exists() and not root.is_dir():
         raise ValueError("native macOS release path not a directory")
     bundle,receipt=build_native_macos_game(spec,authorized=True)
