@@ -59,7 +59,8 @@ def _source_check(checkpoint, cursor):
 class VerifiedInProcessChunkSnapshot:
     """Integrity-sealed, in-memory-only authority; do not pickle or transport."""
 
-    __slots__ = ("_checkpoint", "_prefix", "_seal", "_cursor", "_bookmark")
+    __slots__ = ("_checkpoint", "_prefix", "_seal", "_cursor", "_bookmark",
+                 "_checkpoint_seal", "_bookmark_seal")
 
     def __init__(self, checkpoint, prefix, cursor, bookmark):
         self._checkpoint = deepcopy(checkpoint)
@@ -67,6 +68,8 @@ class VerifiedInProcessChunkSnapshot:
         self._seal = world_hash(self._prefix)
         self._cursor = cursor
         self._bookmark = deepcopy(bookmark)
+        self._checkpoint_seal = world_hash(self._checkpoint)
+        self._bookmark_seal = world_hash(self._bookmark)
 
     @property
     def cursor(self):
@@ -80,7 +83,9 @@ class VerifiedInProcessChunkSnapshot:
     def _check(self):
         # Protects accidental/unsafe mutation by callers holding a reference
         # to an in-process prepared snapshot; not a cryptographic signature.
-        if world_hash(self._prefix) != self._seal:
+        if (world_hash(self._prefix) != self._seal
+            or world_hash(self._checkpoint) != self._checkpoint_seal
+            or world_hash(self._bookmark) != self._bookmark_seal):
             raise ChunkTimelineError("in-memory original source snapshot changed since verification")
 
     def fork(self, new_actions):
