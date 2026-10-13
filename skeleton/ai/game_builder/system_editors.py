@@ -6221,8 +6221,35 @@ for _entry in CATALOG:
             )
         ])
 
+# An original dialogue editor must have genuinely stateful speaker and
+# interpersonal consequence knobs, not only five authoring-only metadata flags.
+for _entry in CATALOG:
+    if _entry["id"] == "dialogue":
+        _entry["fields"].extend([
+            {"key": key, "kind": "int", "default": default,
+             "minimum": lo, "maximum": hi, "options": []}
+            for key, default, lo, hi in (
+                ("active_speakers_budget", 8, 1, 8),
+                ("speaker_patience", 4, 1, 16),
+                ("starting_trust", 50, 0, 100),
+                ("trust_cap", 100, 10, 100),
+                ("trust_threshold", 60, 1, 100),
+                ("starting_influence", 24, 0, 100),
+                ("starting_reputation", 0, -100, 100),
+                ("support_cost", 5, 1, 20),
+                ("challenge_cost", 4, 1, 20),
+                ("support_trust_gain", 15, 1, 30),
+                ("challenge_trust_loss", 10, 1, 30),
+                ("support_reputation", 2, 1, 10),
+                ("challenge_reputation", 1, 1, 10),
+                ("support_goal", 1, 1, 5),
+                ("rest_influence", 6, 1, 25),
+                ("dialogue_turn_budget", 96, 8, 128),
+            )
+        ])
+
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "economy"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "economy", "dialogue"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),

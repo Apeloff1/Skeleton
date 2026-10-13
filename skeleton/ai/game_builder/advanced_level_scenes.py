@@ -33,6 +33,10 @@ from .advanced_ecosystem_runtime import (
     default_layout as ecosystem_layout, normalize_layout as validate_ecosystem_layout,
     EcosystemActionError,
 )
+from .advanced_dialogue_runtime import (
+    default_layout as dialogue_layout, normalize_layout as validate_dialogue_layout,
+    DialogueActionError,
+)
 from .advanced_economy_runtime import (
     default_layout as economy_layout, normalize_layout as validate_economy_layout,
     EconomyActionError,
@@ -230,6 +234,8 @@ def _default_layout(engine, config, seed):
         return ecosystem_layout(config,seed)
     if engine == "economy":
         return economy_layout(config,seed)
+    if engine == "dialogue":
+        return dialogue_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -290,6 +296,11 @@ def _normalize_layout(engine, config, layout):
         try:
             return validate_economy_layout(config,layout)
         except EconomyActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="dialogue":
+        try:
+            return validate_dialogue_layout(config,layout)
+        except DialogueActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="fighting":
         try:

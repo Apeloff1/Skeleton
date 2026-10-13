@@ -224,7 +224,7 @@ class AdvancedProofTests(unittest.TestCase):
     def test_no_fake_support_for_remaining_authoring_only_systems(self):
         # Maze and RPG now have genuine reference runtimes. Authoring-only
         # systems must remain explicitly unsupported by the game engine.
-        for editor in ("dialogue", "networking", "nonexistent"):
+        for editor in ("cinematics", "networking", "nonexistent"):
             with self.subTest(editor=editor):
                 with self.assertRaises(AdvancedRuntimeError):
                     run_advanced_session(editor)
