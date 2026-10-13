@@ -160,6 +160,24 @@ class CapabilityIntelligenceTests(unittest.TestCase):
             self.intel.contracts([path], expected_sources={
                 path: one["documents"][0]["source_sha256"]})
 
+    def test_all_selected_source_identities_invalidate_receipts_on_same_size_change(self):
+        selection = self.paths("consumer.py", "math_tools.py")
+        before_graph = self.intel.impact(selection, changed=self.base + "math_tools.py")
+        before_dupes = self.intel.duplicates(selection)
+        source = self.root / self.base / "consumer.py"
+        original = source.read_text(encoding="utf-8")
+        edited = original.replace("def run()", "def act()")
+        self.assertEqual(len(edited.encode()), len(original.encode()))
+        source.write_text(edited, encoding="utf-8")
+        after_graph = self.intel.impact(selection, changed=self.base + "math_tools.py")
+        after_dupes = self.intel.duplicates(selection)
+        self.assertEqual(before_graph["selected_edges"], after_graph["selected_edges"])
+        self.assertNotEqual(before_graph["digest"], after_graph["digest"])
+        self.assertNotEqual(before_dupes["digest"], after_dupes["digest"])
+        self.assertNotEqual(
+            before_graph["selected_source_sha256"][self.base + "consumer.py"],
+            after_graph["selected_source_sha256"][self.base + "consumer.py"])
+
     def test_syntax_error_cannot_masquerade_as_export(self):
         page = self.intel.contracts(self.paths("invalid.py"))
         self.assertEqual(page["documents"][0]["status"], "parse_failed")
