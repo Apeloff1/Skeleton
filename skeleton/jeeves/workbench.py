@@ -339,6 +339,61 @@ class JeevesWorkbench:
             self._open_runbooks.append(store)
             return runner
 
+    def propose_idle_shadow_work(
+        self, telemetry, *,
+        host_now_ns: int,
+        active_work_ids: tuple[str, ...] = (),
+        policy=None,
+    ):
+        """Rank outstanding shadow knowledge without consuming idle resources.
+
+        A host MUST recheck real serving pressure, idle duration, and all
+        per-item rights before dispatch. The generated batch is a non-executing
+        proposal. Jeeves cannot start background work by calling this method.
+        """
+        from skeleton.jeeves.ai.idle_learning_scheduler import (
+            HostIdleTelemetry, IdleWorkCandidate, IdleWorkKind,
+            JeevesIdleLearningScheduler,
+        )
+        if not isinstance(telemetry, HostIdleTelemetry):
+            raise JeevesWorkbenchError("trusted host idle telemetry required")
+        with self._lock:
+            self._ensure_open()
+            rows = self.shadow.snapshot()["records"]
+            # Only unapproved evidence can be proposed for additional work.
+            # Already consumed or rejected knowledge may not be queued again.
+            pending = [row for row in rows if row["state"] in (
+                "inbox", "quarantined", "corroborated",
+            )]
+            pending.sort(key=lambda row: (
+                -row["intake"]["relevance_ppm"], row["intake"]["intake_id"],
+            ))
+            candidates = []
+            for record in pending[:8192]:
+                intake = record["intake"]
+                kind = {
+                    "inbox": IdleWorkKind.EVIDENCE_CORROBORATION,
+                    "quarantined": IdleWorkKind.SOURCE_RESEARCH,
+                    "corroborated": IdleWorkKind.CANDIDATE_PREPARATION,
+                }[record["state"]]
+                candidates.append(IdleWorkCandidate(
+                    work_id="shadow-" + intake["intake_id"],
+                    scope_id=intake["target_scope"],
+                    source_digest=self.shadow.get(intake["intake_id"]).intake.digest,
+                    kind=kind,
+                    relevance_ppm=intake["relevance_ppm"],
+                    novelty_ppm=intake["novelty_ppm"],
+                    evidence_confidence_ppm=intake["confidence_ppm"],
+                    created_at_ns=intake["observed_at_ns"],
+                    cost_units=2 if kind is IdleWorkKind.SOURCE_RESEARCH else 1,
+                    requires_network=kind is IdleWorkKind.SOURCE_RESEARCH,
+                    requires_accelerator=False,
+                ))
+            return JeevesIdleLearningScheduler(policy=policy).propose(
+                candidates, telemetry, host_now_ns=host_now_ns,
+                active_work_ids=active_work_ids,
+            )
+
     def source_context(self, objective: str, **kwargs: Any):
         with self._lock:
             self._ensure_open()
