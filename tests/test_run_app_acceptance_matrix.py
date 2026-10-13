@@ -113,6 +113,32 @@ class AcceptanceRunnerTests(unittest.TestCase):
                     runner.produce(self.root,self.output,local=True)
         self.assertFalse(self.output.exists())
 
+    def test_ci_repository_and_workflow_cannot_be_suffix_spoofed(self):
+        known={
+            "CI":"true",
+            "GITHUB_ACTIONS":"true",
+            "EXPECTED_SHA":self.head,
+            "GITHUB_RUN_ID":"12345",
+            "GITHUB_RUN_ATTEMPT":"1",
+            "GITHUB_REPOSITORY":"other/Skeleton",
+            "GITHUB_WORKFLOW":"Jeeves App Acceptance Matrix",
+            "RUNNER_OS":"Linux",
+        }
+        with patch.object(runner,"_commit",return_value=self.head):
+            for corrupt in (
+                {"GITHUB_REPOSITORY":"other/Skeleton"},
+                {"GITHUB_WORKFLOW":"Unreviewed CI Pipeline"},
+                {"RUNNER_OS":"Unknown"},
+                {"GITHUB_RUN_ID":"bad-id"},
+                {"CI":"false"},
+            ):
+                environment={**known,**corrupt}
+                with self.subTest(corrupt=corrupt),patch.dict(
+                    runner.os.environ,environment,clear=True):
+                    with self.assertRaises(RuntimeError):
+                        runner.produce(self.root,self.output,local=False)
+        self.assertFalse(self.output.exists())
+
     def test_output_must_remain_inside_workspace(self):
         elsewhere=Path(self.tmp.name).parent/"external_evidence.json"
         with (patch.dict(runner.os.environ,{"EXPECTED_SHA":self.head}),
