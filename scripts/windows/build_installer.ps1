@@ -144,6 +144,14 @@ $PyInstallerArgs = @(
     "--hidden-import", "skeleton.app.local_ai_training",
     "--hidden-import", "skeleton.app.local_ai_transcript",
     "--hidden-import", "skeleton.app.offline_chat_cli",
+    "--hidden-import", "skeleton.app.offline_cli",
+    "--hidden-import", "skeleton.app.offline_qualification",
+    "--hidden-import", "skeleton.app.offline_snapshot",
+    "--hidden-import", "skeleton.app.offline_library",
+    "--hidden-import", "skeleton.app.offline_workspace",
+    "--hidden-import", "skeleton.app.offline_audit",
+    "--hidden-import", "skeleton.app.offline_readiness",
+    "--hidden-import", "skeleton.app.offline_index_queue",
     "--hidden-import", "skeleton.app.offline_http",
     "--hidden-import", "skeleton.app.offline_knowledge",
     "--hidden-import", "skeleton.app.offline_grounding",
@@ -173,6 +181,29 @@ if (-not (Test-Path -LiteralPath $LauncherExe)) {
     throw "Expected launcher not found: $LauncherExe"
 }
 Copy-Item -LiteralPath $LauncherExe -Destination (Join-Path $PayloadDir "Skeleton.exe") -Force
+
+# The windowed GUI is intentionally separate from the genuine console entry.
+# Reuse the same pinned interpreter and source tree; no extra downloads.
+$ConsoleArgs = @($PyInstallerArgs)
+$WindowFlagIndex = [Array]::IndexOf($ConsoleArgs, "--windowed")
+$ConsoleNameIndex = [Array]::IndexOf($ConsoleArgs, "Skeleton")
+$ConsoleEntryIndex = [Array]::IndexOf($ConsoleArgs, $EntryPoint)
+if ($WindowFlagIndex -lt 0 -or $ConsoleNameIndex -lt 0 -or $ConsoleEntryIndex -lt 0) {
+    throw "Unable to derive canonical offline console build"
+}
+$ConsoleArgs[$WindowFlagIndex] = "--console"
+$ConsoleArgs[$ConsoleNameIndex] = "SkeletonOffline"
+$ConsoleArgs[$ConsoleEntryIndex] = Join-Path $RepoRoot "packaging\windows\offline_cli_entry.py"
+& python @ConsoleArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "PyInstaller offline console build failed"
+}
+$ConsoleExe = Join-Path $LauncherDist "SkeletonOffline.exe"
+if (-not (Test-Path -LiteralPath $ConsoleExe)) {
+    throw "Expected offline console not found: $ConsoleExe"
+}
+Copy-Item -LiteralPath $ConsoleExe -Destination (Join-Path $PayloadDir "SkeletonOffline.exe") -Force
+
 
 $CompilerCandidates = @(
     (Join-Path $env:ProgramFiles "Inno Setup 7\ISCC.exe"),
