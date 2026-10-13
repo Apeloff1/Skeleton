@@ -269,12 +269,40 @@ class ShadowWeightPipeline:
         with self._lock:
             return self._records.get(_id(intake_id, "intake_id"))
 
-    def entries(self, *, state: ShadowState | None = None, limit: int = 100) -> tuple[ShadowRecord, ...]:
+    def entries(
+        self, *, state: ShadowState | None = None,
+        states: tuple[ShadowState, ...] | None = None,
+        offset: int = 0, limit: int = 100,
+    ) -> tuple[ShadowRecord, ...]:
+        """Page eligible candidates by relevance without excluding later records.
+
+        Keep the original single-state filter for existing consumers. A host
+        scheduler may instead request a bounded union of states and paginate
+        the entire priority frontier.
+        """
         if type(limit) is not int or not 1 <= limit <= 1000:
             raise ShadowWeightError("entry page budget exceeded")
+        if type(offset) is not int or not 0 <= offset <= MAX_ENTRIES:
+            raise ShadowWeightError("entry offset exceeds storage capacity")
+        if state is not None and states is not None:
+            raise ShadowWeightError("select state or states, not both")
+        if state is not None and not isinstance(state, ShadowState):
+            raise ShadowWeightError("invalid shadow state filter")
+        if states is not None and (
+            not isinstance(states, tuple) or not 1 <= len(states) <= len(ShadowState)
+            or any(not isinstance(item, ShadowState) for item in states)
+            or len(set(states)) != len(states)
+        ):
+            raise ShadowWeightError("invalid shadow state selection")
+        allowed = frozenset(states) if states is not None else (
+            frozenset((state,)) if state is not None else None
+        )
         with self._lock:
-            records = sorted(self._records.values(), key=lambda r: (-r.intake.relevance_ppm, r.identity))
-            return tuple(r for r in records if state is None or r.state is state)[:limit]
+            records = sorted(self._records.values(),
+                             key=lambda r: (-r.intake.relevance_ppm, r.identity))
+            selected = (r for r in records if allowed is None or r.state in allowed)
+            from itertools import islice
+            return tuple(islice(selected, offset, offset + limit))
 
     def _record(self, record: ShadowRecord, *, operation: str, authority: str,
                 evidence_digest: str, at_ns: int) -> ShadowRecord:
