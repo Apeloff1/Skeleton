@@ -159,15 +159,7 @@ def compile_system_assembly(project_id: str,
         "quest_director": ("inspect",),
         "flight": ("coast",),
         "sailing": ("coast",),
-        "parkour": ("inspect",),
-        "sports": ("inspect",),
-        "maze": ("inspect",),
-        "rpg": ("inspect",),
-        "procedural_world": ("inspect",),
-        "npc_society": ("inspect",),
-        "ecosystem": ("inspect",),
-        "voxel": ("inspect",),
-        "dialogue": ("inspect",),
+        "physics": ("inspect",),
     }
     if set(advanced_smoke) != set(ADVANCED_ENGINE_IDS):
         raise AssemblyError("every playable editor needs an explicit assembly gameplay proof")
@@ -219,15 +211,7 @@ def compile_system_assembly(project_id: str,
             "quest_director":("inspect",),
             "flight":("coast",),
             "sailing":("coast",),
-            "parkour":("inspect",),
-            "sports":("inspect",),
-            "maze":("inspect",),
-            "rpg":("inspect",),
-            "procedural_world":("inspect",),
-            "npc_society":("inspect",),
-            "ecosystem":("inspect",),
-            "voxel":("inspect",),
-            "dialogue":("inspect",),
+            "physics":("inspect",),
         }
         if set(scene_smoke) != set(ADVANCED_ENGINE_IDS):
             raise AssemblyError("every playable editor needs a source-bound scene proof")
