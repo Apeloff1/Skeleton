@@ -38,7 +38,7 @@ MAX_VISIBLE = 120
 MAX_RESULTS = 100
 EMPTY_SHA = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 SHA = re.compile(r"^[a-f0-9]{64}$")
-IDENT = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
+IDENT = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 FILTER = re.compile(r"^[a-zA-Z0-9_.-]{1,100}$")
 PROTECTED = re.compile(
     r"(^|[_.-])(secret|credential|password|api.?key|token|private|vault|"
