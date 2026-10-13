@@ -224,7 +224,7 @@ def _remember(npc,event,config,*,direct):
     return True
 
 
-def _emit(state,config,kind,site,events,*,actor="player"):
+def _emit(state,config,kind,site,events,*,actor="player",physical_source=None):
     if len(state["events_log"])>=config["event_budget"]:
         raise QuestDirectorError("authored finite event memory ledger is full")
     witnesses=[]
@@ -237,8 +237,13 @@ def _emit(state,config,kind,site,events,*,actor="player"):
         "id":state["next_event"],"tick":state["tick"],"kind":kind,
         "site_id":site["id"],"cell":site["cell"],
         "actor":actor,"direct_witnesses":witnesses,
-        "rumored_to":[],"original_source":"physical_player_world_action" if actor=="player" else "physical_npc_world_action",
+        "rumored_to":[],"original_source":(
+            "signed_external_physical_incident" if physical_source is not None else
+            "physical_player_world_action" if actor=="player" else
+            "physical_npc_world_action"),
     }
+    if physical_source is not None:
+        entry["physical_source"]=dict(physical_source)
     state["events_log"].append(entry);state["next_event"]+=1
     for n in state["npcs"]:
         if n["id"] in witnesses:
@@ -636,5 +641,38 @@ def step(state,config,action):
     return events
 
 
+def apply_verified_external_physical_incident(state,config,site_id,source_receipt,
+                                             *,impact_severity=1):
+    """Advance one visible external incident, never crediting the player.
+
+    IMPORTANT: Caller must first *independently* verify the signed physical
+    replay and its single attributable source collider. This is the strict
+    world-side mutation primitive, not an external input verification gateway.
+    """
+    if state["finished"] or state["failed"]:
+        raise QuestDirectorError("terminal quest world cannot accept new physical incidents")
+    _integer(site_id,0,len(state["sites"])-1,"bound physical quest site")
+    _integer(impact_severity,1,3,"bounded physical impact severity")
+    if (type(source_receipt) is not dict or
+        set(source_receipt)!={"interop_digest","source_editor","source_id"} or
+        type(source_receipt["interop_digest"]) is not str or
+        len(source_receipt["interop_digest"])!=64 or
+        any(char not in "0123456789abcdef" for char in source_receipt["interop_digest"]) or
+        source_receipt["source_editor"] not in ("platformer","racing","sandbox") or
+        type(source_receipt["source_id"]) is not int):
+        raise QuestDirectorError("signed external physical witness source identity required")
+    site=_site(state,site_id)
+    if site["integrity"]<=0:
+        raise QuestDirectorError("already destroyed physical world site cannot be harmed again")
+    site["integrity"]=max(0,site["integrity"]-impact_severity)
+    events=[]
+    proof=_emit(state,config,"harm",site,events,actor="external:physics",
+                physical_source=source_receipt)
+    _tick(state,config,events,1)
+    state["turn"]+=1
+    state["events"]=events
+    return proof
+
+
 __all__=["SIDE","CELLS","KINDS","ROLES","EVENTS","ACTIONS","QuestDirectorError",
-         "default_layout","normalize_layout","start","apply_scene","step"]
+         "default_layout","normalize_layout","start","apply_scene","step","apply_verified_external_physical_incident"]
