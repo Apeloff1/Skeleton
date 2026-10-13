@@ -285,7 +285,13 @@ class JeevesCompletionCensus:
                 "domain_count": len(domain_rows),
                 "domains": [d["id"] for d in domain_rows],
                 "workstream_count": len(workstreams),
+                "workstreams": [{"id": w["id"], "name": w.get("name", ""),
+                                 "priority": w.get("priority", "unranked"),
+                                 "depends_on": w.get("depends_on", []),
+                                 "exit": w.get("exit", [])}
+                                for w in workstreams],
                 "required_journey_count": len(journeys),
+                "required_journeys": journeys,
                 "implementation_state": system.get("completion", {})
                                               .get("implementation_state"),
                 "production_qualified": False,
@@ -304,5 +310,95 @@ class JeevesCompletionCensus:
             "read_only": True,
             "model_promotions_performed": False,
             "source_mutations_performed": False,
+        }
+        return {**body, "digest": digest(body)}
+
+    def backlog(self, *, offset=0, limit=20, expected_report_digest=None,
+                expected_snapshot=None):
+        """Explicit evidence-work frontier; DOES NOT perform the tasks.
+
+        Paged plans are bound to the exact eight-authority census receipt.
+        Task order is stable and does not imply permission, CI success, or
+        a task having passed. Immutable human/operator review is still needed.
+        """
+        if type(offset) is not int or not 0 <= offset <= 4096:
+            raise JeevesAppwideError("bounded non-negative work offset required")
+        if type(limit) is not int or not 1 <= limit <= 50:
+            raise JeevesAppwideError("bounded completion task page size required")
+        report = self.report(expected_snapshot=expected_snapshot)
+        if expected_report_digest is not None and expected_report_digest != report["digest"]:
+            raise JeevesAppwideError("stale completion receipt; re-evaluate before planning")
+        tasks = []
+        def add(identifier, kind, priority, owner, acceptance, dependency=None):
+            if type(acceptance) is not list or not acceptance or not all(
+                type(x) is str and 1 <= len(x) <= 500 for x in acceptance
+            ):
+                raise JeevesAppwideError("non-empty bounded task acceptance required")
+            tasks.append({
+                "id": identifier, "kind": kind, "priority": priority,
+                "owner": owner, "evidence_required": acceptance,
+                "dependencies": dependency or [],
+                "implementation_verified": False,
+                "release_qualified": False,
+                "automatic_execution_authorized": False,
+            })
+        for service in report["application"]["services"]:
+            add("APP-SERVICE-" + service["name"], "runtime_service", "P0",
+                service["name"], [
+                    "exact-head installed startup and authenticated route smoke",
+                    "real persistence and recovery under fault injection",
+                    "health/readiness and shutdown evidence on intended platform",
+                ])
+        for item in report["ai_product"]["capabilities"]:
+            add("AI-CAP-" + item["id"], "end_user_ai", "P0",
+                item["owner"], [
+                    "real product route and trained/provider model acceptance",
+                    "independent quality/safety, recovery and permission tests",
+                    "exact-head cross-platform golden journey",
+                ])
+        if not report["plan"]["parse_index_masterplan_git_blob_matches"]:
+            add("AI-INDEX-REVERIFY", "source_identity", "P0", "machine",
+                ["re-parse canonical masterplan source blob",
+                 "independently re-verify signed accountability and evidence",
+                 "record valid traceable signature without retro-signing"])
+        for path in report["application"]["missing_required_paths"][:75]:
+            add("APP-MISSING-" + sha256(path.encode()).hexdigest()[:16],
+                "missing_source", "P0", "app_construction",
+                ["restore or update declared required path after owner review",
+                 "run canonical architecture and app construction checks"])
+        add("AI-ENTERPRISE-421", "enterprise_qualification", "P1",
+            "enterprise_ai", [
+                "all 421 volumes independently enterprise-qualified on exact source",
+                "critical dedicated profiles pass independent comparator evidence",
+                "rollback/canary and end-to-end release acceptance pass"])
+        for work in report["enterprise"]["workstreams"]:
+            add("WORK-" + str(work["id"]), "enterprise_workstream",
+                work["priority"], work["id"],
+                list(work["exit"]) if work["exit"] else
+                ["executable implementation and independent evidence required"],
+                ["WORK-" + str(x) for x in work["depends_on"]])
+        for index, journey in enumerate(report["enterprise"]["required_journeys"], 1):
+            add("JOURNEY-%02d" % index, "enterprise_journey", "P1",
+                "enterprise_system", [
+                    "independent exact-head end-to-end execution of: " + str(journey)[:350],
+                    "tenant and failure-injection proof plus rollback evidence",
+                ])
+        tasks.sort(key=lambda x: ({"P0": 0, "P1": 1, "P2": 2}.get(x["priority"], 3),
+                                  x["id"]))
+        task_ids = [t["id"] for t in tasks]
+        if len(set(task_ids)) != len(task_ids):
+            raise JeevesAppwideError("duplicate work IDs from authoritative plans")
+        page = tasks[offset:offset+limit]
+        body = {
+            "schema": "skeleton.ai.jeeves_deathmarch_frontier.v1",
+            "census_digest": report["digest"],
+            "inventory_snapshot": report["inventory_snapshot"],
+            "total_work_items": len(tasks), "offset": offset, "limit": limit,
+            "next_offset": offset + len(page) if offset + len(page) < len(tasks) else None,
+            "tasks": page,
+            "planned_is_not_committed": True,
+            "unverified_tasks_not_counted_complete": True,
+            "source_edits_performed": False,
+            "operator_approval_required_for_mutations": True,
         }
         return {**body, "digest": digest(body)}
