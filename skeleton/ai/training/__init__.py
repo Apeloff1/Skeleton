@@ -159,6 +159,7 @@ _GOVERNANCE_EXPORTS = {
     "ShadowWeightBatch": ".shadow_weights",
     "ShadowPromotionPermit": ".shadow_weights",
     "authorize_shadow_promotion": ".shadow_weights",
+    "independent_evidence_roots": ".shadow_weights",
     "ShadowWeightLedger": ".shadow_weight_ledger",
     "ShadowWeightSnapshot": ".shadow_weight_ledger",
     "ShadowKnowledge": ".shadow_weight_intake",
