@@ -72,5 +72,50 @@ class TestPreE2EEvidence(unittest.TestCase):
         self.assertIn("ast.parse", text)
         self.assertNotIn("importlib.import_module", text)
 
+
+    def test_aggregate_fail_closed_when_receipts_are_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            artifacts = Path(directory) / "shards"
+            artifacts.mkdir()
+            output = Path(directory) / "aggregate"
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/e2e_merge_evidence.py"),
+                 "--artifacts", str(artifacts), "--output-dir", str(output)],
+                cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=25
+            )
+            self.assertEqual(completed.returncode, 1)
+            receipt = json.loads((output / "aggregate.json").read_text())
+            self.assertFalse(receipt["passed"])
+            self.assertTrue(any(x["kind"] == "missing-shard"
+                                for x in receipt["issues"]))
+
+    def test_aggregate_requires_one_head_and_five_passing_shards(self):
+        with tempfile.TemporaryDirectory() as directory:
+            artifacts = Path(directory) / "shards"
+            artifacts.mkdir()
+            expected = ("stage7-engine", "stage7-cross-service",
+                        "stage7-browser", "frontend-product", "backend-local-ai-chat")
+            for suite in expected:
+                folder = artifacts / ("e2e-" + suite)
+                folder.mkdir()
+                (folder / "report.json").write_text(json.dumps({
+                    "schema": "skeleton.e2e.evidence.v1", "mode": "offline-e2e",
+                    "head_sha": "a" * 40, "run_id": "fixture",
+                    "suites": [{"id": suite, "status": "passed", "duration_seconds": 1}]
+                }))
+                (folder / "issues.json").write_text(json.dumps({
+                    "schema": "skeleton.e2e.issues.v1", "issues": []
+                }))
+            output = Path(directory) / "aggregate"
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/e2e_merge_evidence.py"),
+                 "--artifacts", str(artifacts), "--output-dir", str(output)],
+                cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=25
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            receipt = json.loads((output / "aggregate.json").read_text())
+            self.assertTrue(receipt["passed"])
+            self.assertEqual(receipt["exact_head"], "a" * 40)
+
 if __name__ == "__main__":
     unittest.main()

@@ -188,3 +188,7 @@ data/vault/
 
 # Generated pre-E2E diagnostic evidence stays in runner artifacts.
 /.e2e-evidence/
+
+# Local staging of downloaded E2E artifacts and the consolidated ledger.
+/.e2e-shards/
+/.e2e-aggregate/

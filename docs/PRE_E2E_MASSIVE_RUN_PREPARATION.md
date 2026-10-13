@@ -46,6 +46,11 @@ and a separately defined integration environment.
   risk flags, estimated test counts, issue candidates, and categorized
   coverage. Static flags are candidates, not confirmed defects.
 
+A final aggregator downloads the five independent shard receipts, requires all
+five passes at one exact SHA, and emits aggregate.json and aggregate.md.
+Missing, duplicate, malformed and failed shards become open issues rather
+than disappearing from the status report.
+
 Artifacts upload even when preflight or a shard fails and are retained
 90 days in GitHub Actions. These logs are operational evidence, not
 cryptographically signed release attestations. Never include provider

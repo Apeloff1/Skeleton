@@ -13,7 +13,7 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-PATHS = ("tests", "skeleton/testing", "backend/tests", "frontend/scripts", ".github/workflows")
+PATHS = ("tests", "skeleton/testing", "backend/tests", "frontend/scripts", "frontend/__tests__", ".github/workflows")
 SIGNALS = {
     "network": r"\b(?:requests|httpx|urllib|fetch|axios|aiohttp)\b|https?://localhost",
     "process": r"\b(?:subprocess|Popen|os\.system|spawn|child_process)\b",
@@ -50,8 +50,8 @@ def issue(out, path, kind, severity, detail):
 def examine(path, live, issues):
     file = ROOT / path
     name = file.name
-    if not path.endswith((".py", ".mjs", ".cjs", ".js")) or not (
-        name.startswith("test") or name.endswith((".test.cjs", ".test.mjs", ".test.js"))
+    if not path.endswith((".py", ".mjs", ".cjs", ".js", ".ts", ".tsx")) or not (
+        name.startswith("test") or name.endswith((".test.cjs", ".test.mjs", ".test.js", ".test.ts", ".test.tsx", ".spec.ts"))
     ):
         return None
     try:

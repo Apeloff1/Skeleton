@@ -7,6 +7,7 @@ on:
     paths:
       - "scripts/e2e_evidence.py"
       - "scripts/e2e_advanced_parse.py"
+      - "scripts/e2e_merge_evidence.py"
       - "machine/e2e_suites.json"
       - "tests/test_e2e_evidence_preflight.py"
       - ".github/workflows/pre-e2e-evidence.yml"
@@ -20,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: pre-e2e-${{ github.event.pull_request.number || github.ref }}
@@ -118,5 +120,34 @@ jobs:
         with:
           name: e2e-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .e2e-evidence/
+          if-no-files-found: warn
+          retention-days: 90
+
+  aggregate-e2e:
+    name: Aggregate all offline E2E evidence and open issues
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.run_offline == true }}
+    needs: [preflight, offline-e2e]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact dispatch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Download all shard evidence including failed jobs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: e2e-*
+          path: .e2e-shards
+          merge-multiple: false
+      - name: Build fail-closed cross-shard issue ledger
+        run: python scripts/e2e_merge_evidence.py --artifacts .e2e-shards --output-dir .e2e-aggregate
+      - name: Preserve consolidated results even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .e2e-aggregate/
           if-no-files-found: warn
           retention-days: 90
