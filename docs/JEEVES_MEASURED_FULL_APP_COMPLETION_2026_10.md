@@ -81,3 +81,38 @@ The baseline job asserts schema/denominator integrity and that the independent a
 Do not edit `family_stage_status` manually; there is intentionally no writable stage completion flag. A future **independent-evidence admission gate** must verify CI run identity, run head and workflow, authorized review, immutable artifact hashes, real runtime test criteria, evidence freshness and rollback. Only then can it populate objectively accepted statuses. Until that gate exists and authentic independent evidence is admitted, `full_app_completion_percent` remains `null`.
 
 The contract is intentionally rigorous so the project can run large batches without having the plan, source index or automatic generator falsely report that the application is done.
+
+## DX-36–DX-44 — candidate tests and executable acceptance evidence
+
+The curated product test matrix is now maintained at `machine/app_acceptance_test_matrix.json`; each mapping is to an **existing, readable test module** on the exact branch, not a proposed filename.
+
+| Metric | Count | Interpretation |
+| --- | ---: | --- |
+| Source-linked product feature families | 42/42 (100%) | A family has at least one targeted regression candidate, often narrow; **not** a feature-level pass |
+| Exact-head CI smoke-selected feature families | 14/42 (33.33%) | Their curated tests are executed in the new workflow; stage-specific outcome must be checked |
+| Discovery-only test candidate families | 28/42 (66.67%) | Existing tests identified but **not** scheduled in this smoke run or counted as passed |
+| Independent user-journey/device qualifiers admitted | 0 observed | The source-only tool cannot authenticate or perform independent device acceptance |
+| Full-app functional completion | Unknown | No invented percentage from test-file discovery |
+
+### New executable evidence lane
+
+`.github/workflows/jeeves-app-acceptance-matrix.yml` performs a pinned **exact-PR-head** checkout on **Ubuntu 24.04 and Windows 2022**. It first runs adversarial test-matrix and evidence-runner checks, then `scripts/run_app_acceptance_matrix.py` performs each reviewed smoke module as an actual Python `unittest` subprocess, recording return codes, timeout, started/ended UTC, selected source digests and explicit non-qualification flags in an ephemeral workflow artifact. The script fails the job when any test fails. GitHub checkout and workflow metadata are checked against the exact repository, head and runner OS before execution.
+
+`ai.product.tests` and `ai.product.tests.page` provide **read-only** source-linked mapping and missing-family data in Jeeves. The Studio Deathmarch Deck has controls to show linked families and remaining unmapped candidates.
+
+**Important:** The runner's JSON is an evidence *claim* until an external trusted verifier separately authenticates the GitHub Actions run identity, exact head, artifact custody and required workflow outcomes. The runner deliberately marks `independent_github_run_identity_verified_externally=false` and `full_app_completion_percent=null`. No shell action or model-weight promotion is granted by the artifact.
+
+### Two previously unmapped source families now have real regressions
+
+**F07 Offline native AI:** `tests/test_ai_offline_native_functional_boundary.py` executes a small actual local transformer in pure Python (embedding, attention, token generation), deterministic replay, checkpoint recovery, bounded chat context and fail-closed model-drift recognition. This **does not** prove competitive language quality, local GGUF loading or hardware installation.
+
+**F37 Shell authority:** `tests/test_ai_shell_approval_contract.py` exercises actual lease-scoped shell-plan approval, exact intent/proposal hashes, expiry, principal fencing, concurrent single-use consumption and denial of malformed/NaN input. `skeleton/ai/shell/approval.py` was hardened against non-finite clocks/TTLs, nonhex SHA-256 receipts and boolean capacity. These tests do **not** grant or perform shell command execution.
+
+### Remaining high-priority completion work
+
+1. Verify latest exact-head Windows/Linux smoke CI and inspect its failure logs; no test path is marked successful based on queued jobs.
+2. Convert discovery-only links into reviewed execution tiers selectively after dependency/fixture qualification, never by merely updating the mapping label.
+3. Add trusted GitHub run/artifact attestation admission, and score only independently authenticated targeted execution outcomes.
+4. Attach functional frontend-to-backend, game engine, real-model, user journey, installed-device and rollback evidence to each of the 42 families.
+5. Preserve upstream PR landing order (#3718 → #3729 → #3730 → #3738 → #3747) and do not sign unmerged code as production release.
+
