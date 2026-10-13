@@ -89,7 +89,9 @@ class GameForgeRun:
                 "url": bound.get("url"),
                 "dialect": bound.get("dialect"),
             } if bound.get("hit") else None
-            era = era or str(bound.get("era") or era)
+            resolved_era = bound.get("era")
+            if not era and resolved_era:
+                era = str(resolved_era)
             extra = str(bound.get("dialect") or "")
             if extra and extra not in (vision or ""):
                 vision = f"{vision} {extra}".strip()
@@ -206,7 +208,7 @@ def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
 def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
     blend = ctx.get("blend")
     cockpit: Cockpit = ctx["cockpit"]
-    if not blend and getattr(cockpit, "blend", None):
+    if not blend and not ctx.get("era_hint") and getattr(cockpit, "blend", None):
         blend = cockpit.blend
         ctx["blend"] = blend
     from skeleton.forge.hardware import detect_generation

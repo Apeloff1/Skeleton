@@ -59,3 +59,44 @@ Transport adapters should not invent alternate meanings for these codes. New com
 ## Streaming
 
 Contract version 1.0 records streaming capability in command metadata but does not introduce a shared streaming protocol. Commands are request/response in this version. A later contract version can add event framing without changing the existing result/error envelope.
+
+## Creator CLI: explicit evidence boundary (2026-10-13)
+
+The **creator CLI** `python -m skeleton run` is the ten-stage
+`skeleton.context.pipeline.GameForgeRun` application workflow. It is
+**not yet equivalent** to `skeleton command run` or the HTTP
+`POST /gameforge/run` legacy handler: those currently call
+`state.gameforge.run` and can produce different file manifests.
+Do not claim creator/API parity until [#3613](https://github.com/Apeloff1/Skeleton/issues/3613)
+lands a single canonical execution adapter and fixture-based manifest
+comparison.
+
+Creator CLI now supports questionnaire intake and real headless Godot
+boot verification:
+
+```sh
+python -m skeleton cockpit BIND ERA cozy_wholesome
+python -m skeleton cockpit BIND ARCHETYPE auto
+python -m skeleton cockpit SNAPSHOT --out ./creator-steering.json
+python -m skeleton run "a peaceful village" --answers ./answers.json \
+    --out ./output/village --playtest require --repair-mode apply
+python -m skeleton cockpit RESTORE ./creator-steering.json
+python -m skeleton run "a new village" --era soulslike --playtest auto
+```
+
+`--answers` accepts a UTF-8 JSON object whose keys and values are
+strings, with a 1 MiB size limit. Missing/invalid input fails without
+launching the forge. `--playtest off` is the default; `auto` records
+the Godot boot result when available; `require` makes a missing or
+failed headless boot fatal and reports the failing `emit` stage.
+`--repair-mode` accepts `apply` or `suggest`.
+
+The console persists **operator steering only** in
+`~/.skeleton/cockpit.json` (override with
+`SKELETON_COCKPIT_STATE`). Era, ten tensor axes, era blend, hardware
+generation, and archetype survive separate invocations. `SNAPSHOT
+--out` and `RESTORE` export/import that exact steering schema.
+A command-line `--era` overrides a saved era/era blend. Execution
+ledgers, model traces, transient inference state and credentials are
+**not** persisted by this creator-control file. Writes are atomic and
+private to the local operator account.

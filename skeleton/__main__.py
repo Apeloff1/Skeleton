@@ -5,14 +5,14 @@ Usage:
 
 Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
-    run         Start the skeleton runtime / GameForge vision run
+    run         GameForge build (--answers JSON --playtest off|auto|require --repair-mode apply|suggest)
     forge       Blueprint compilation and materialization
     test        Run test suites
     dev         Developer CLI (scaffold, wizard, health, visualize)
     eras        List GameForge era dialects
     generations List hardware generations
     plan        Jeeves BuildPlan for a vision / era
-    cockpit     Apply one cockpit command
+    cockpit     Durable creator steering (BIND ERA, BIND ARCHETYPE, SNAPSHOT --out, RESTORE)
     walk        Prove spawn→extract on the emitted door graph
                 (--mode thermal, --seed S, --all-eras, --steps, --json)
     doctor      Check forge prerequisites (eras, walk smoke, output dir, Godot)
@@ -369,11 +369,51 @@ def _cmd_plan(rest: List[str]) -> int:
 
 
 def _cmd_cockpit(rest: List[str]) -> int:
-    from skeleton.context.cockpit import Cockpit
-    out = Cockpit().apply(" ".join(rest).strip())
+    """Execute an operator command against durable, bounded creator steering."""
+    from pathlib import Path
+    from skeleton.context.cockpit import Cockpit, CockpitError
+    from skeleton.context.operator_state import (
+        capture_steering, read_steering, restore_cockpit, write_steering,
+    )
+
+    try:
+        saved = read_steering()
+        cockpit = restore_cockpit(saved) if saved else Cockpit()
+        if rest and rest[0].upper() == "RESTORE":
+            if len(rest) != 2:
+                raise ValueError("usage: cockpit RESTORE <snapshot.json>")
+            incoming = read_steering(Path(rest[1]))
+            if incoming is None:
+                raise ValueError("cockpit snapshot does not exist")
+            write_steering(incoming)
+            out = {"ok": True, "verb": "RESTORE",
+                   "result": restore_cockpit(incoming).snapshot()}
+        elif rest and rest[0].upper() == "SNAPSHOT" and len(rest) == 3 and rest[1] == "--out":
+            location = write_steering(
+                capture_steering(cockpit, era_bound=bool(saved and saved["era_bound"])),
+                Path(rest[2]),
+            )
+            out = {"ok": True, "verb": "SNAPSHOT", "path": str(location),
+                   "result": cockpit.snapshot()}
+        elif rest and rest[0].upper() == "SNAPSHOT" and len(rest) != 1:
+            raise ValueError("usage: cockpit SNAPSHOT [--out snapshot.json]")
+        else:
+            out = cockpit.apply(" ".join(rest).strip())
+            verb = out["verb"]
+            if verb in {"BIND", "SET", "LERP", "BLEND", "DETECT"}:
+                era_bound = bool(saved and saved["era_bound"])
+                if verb in {"DETECT", "LERP"} or (
+                    verb == "BIND" and len(rest) > 1 and rest[1].upper() == "ERA"
+                ):
+                    era_bound = True
+                elif verb == "BLEND":
+                    era_bound = False
+                write_steering(capture_steering(cockpit, era_bound=era_bound))
+    except (OSError, ValueError, CockpitError) as exc:
+        print(f"cockpit error: {exc}", file=sys.stderr)
+        return 2
     print(json.dumps(out, indent=2, default=str))
     return 0
-
 
 def _parse_walk_args(rest: List[str]):
     era = "extraction_now"
@@ -407,59 +447,105 @@ def _cmd_doctor(rest: List[str]) -> int:
 
 
 def _parse_run_args(rest: List[str]):
-    vision_parts: List[str] = []
-    era = None
-    out = None
-    overwrite = False
-    as_json = False
-    blend = None
-    t = 0.5
-    generation = None
-    i = 0
-    while i < len(rest):
-        a = rest[i]
-        if a == "--era" and i + 1 < len(rest):
-            era = rest[i + 1]; i += 2
-        elif a == "--out" and i + 1 < len(rest):
-            out = rest[i + 1]; i += 2
-        elif a == "--overwrite":
-            overwrite = True; i += 1
-        elif a == "--json":
-            as_json = True; i += 1
-        elif a == "--blend" and i + 2 < len(rest):
-            blend = (rest[i + 1], rest[i + 2]); i += 3
-        elif a == "--t" and i + 1 < len(rest):
-            t = float(rest[i + 1]); i += 2
-        elif a == "--generation" and i + 1 < len(rest):
-            generation = rest[i + 1]; i += 2
-        else:
-            vision_parts.append(a); i += 1
-    blend_arg = tuple(blend) + (t,) if blend else None
-    return " ".join(vision_parts).strip(), era, out, overwrite, as_json, blend_arg, generation
+    """Parse the creator loop without swallowing misspelled or missing flags."""
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="python -m skeleton run")
+    parser.add_argument("vision", nargs="*", help="game concept in natural language")
+    parser.add_argument("--era", help="override a cockpit-bound era for this run")
+    parser.add_argument("--archetype", help="override a cockpit-bound archetype")
+    parser.add_argument("--out", help="output directory for the Godot project")
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
+    parser.add_argument("--t", type=float, default=0.5)
+    parser.add_argument("--generation")
+    parser.add_argument("--answers", help="UTF-8 JSON file with questionnaire answers")
+    parser.add_argument("--playtest", choices=("off", "auto", "require"), default="off")
+    parser.add_argument("--repair-mode", choices=("apply", "suggest"), default="apply")
+    args = parser.parse_intermixed_args(rest)
+    if not 0 <= args.t <= 1:
+        parser.error("--t must be between 0 and 1")
+    return args
+
+
+def _load_run_answers(path: Optional[str]) -> dict:
+    """Fail closed on bad questionnaire input rather than starting an empty run."""
+    from pathlib import Path
+    if path is None:
+        return {}
+    with Path(path).expanduser().open("rb") as stream:
+        data = stream.read(1024 * 1024 + 1)
+    if len(data) > 1024 * 1024:
+        raise ValueError("--answers JSON exceeds 1 MiB")
+    try:
+        answers = json.loads(data.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"--answers must be valid UTF-8 JSON: {exc}") from exc
+    if not isinstance(answers, dict) or any(
+        not isinstance(key, str) or not isinstance(value, str)
+        for key, value in answers.items()
+    ):
+        raise ValueError("--answers must be a JSON object mapping strings to strings")
+    return answers
 
 
 def _cmd_gameforge_run(rest: List[str]) -> int:
     from skeleton.context.pipeline import GameForgeRun
-    vision, era, out, overwrite, as_json, blend, generation = _parse_run_args(rest)
-    if not vision and era is None and out is None and blend is None:
+    from skeleton.context.operator_state import read_steering, restore_cockpit
+    try:
+        args = _parse_run_args(rest)
+        answers = _load_run_answers(args.answers)
+        saved = read_steering()
+    except SystemExit as exc:
+        return int(exc.code)
+    except (OSError, ValueError) as exc:
+        print(f"run arguments error: {exc}", file=sys.stderr)
+        return 2
+    if not rest:
         from skeleton.genesis import Genesis
         genesis = Genesis(seed=42).boot()
         print("Skeleton runtime booted.")
         print(f"Handles: {list(genesis.handles.keys())}")
         return 0
-    payload = GameForgeRun.live().execute(
-        vision, era=era, answers={}, project_root=out, overwrite=overwrite, target="godot",
-        blend=blend, generation=generation,
+    cockpit = restore_cockpit(saved) if saved else None
+    era = args.era or (
+        saved["tensor"]["era"] if saved and saved["era_bound"] else None
     )
-    if as_json:
-        slim = {k: payload[k] for k in ("succeeded", "era", "mass", "complete", "sim", "project", "forge") if k in payload}
+    blend = (*args.blend, args.t) if args.blend else None
+    payload = GameForgeRun.live(cockpit=cockpit).execute(
+        " ".join(args.vision).strip(),
+        era=era,
+        archetype=args.archetype,
+        answers=answers,
+        project_root=args.out,
+        overwrite=args.overwrite,
+        target="godot",
+        blend=blend,
+        generation=args.generation,
+        playtest=args.playtest,
+        repair_mode=args.repair_mode,
+    )
+    failed = [stage for stage in (payload.get("run") or {}).get("stages", [])
+              if stage.get("status") == "FAILED"]
+    playtest = payload.get("playtest") or {}
+    status = playtest.get("status", "off" if args.playtest == "off" else "not-reached")
+    if args.json:
+        slim = {k: payload[k] for k in (
+            "succeeded", "era", "mass", "complete", "sim", "project", "forge", "playtest"
+        ) if k in payload}
+        slim["failed_stages"] = failed
         print(json.dumps(slim, indent=2, default=str))
     else:
-        print(f"era={payload.get('era')} mass={payload.get('mass')} sim={(payload.get('sim') or {}).get('passed')} files={(payload.get('forge') or {}).get('file_count')}")
+        print(f"era={payload.get('era')} mass={payload.get('mass')} "
+              f"sim={(payload.get('sim') or {}).get('passed')} "
+              f"files={(payload.get('forge') or {}).get('file_count')} playtest={status}")
         if payload.get("project"):
             print("wrote", payload["project"]["root"])
+        for stage in failed:
+            print(f"FAILED stage={stage.get('name')}: "
+                  f"{stage.get('error') or stage.get('gate_failure')}", file=sys.stderr)
     return 0 if payload.get("succeeded") else 1
-
 
 
 def _cmd_creator(rest: List[str]) -> int:
