@@ -1176,6 +1176,34 @@ $("jeeves-verify-next").addEventListener("click",()=>dmGuard(
  }
 ));
 
+
+let jeevesVolumeCursor=0;
+async function verificationVolumePage(reset=false){
+ if(!jeevesVerificationDigest)
+  throw Error("Calculate source-backed verification progress first");
+ if(reset)jeevesVolumeCursor=0;
+ const result=await verificationInvoke("ai.verification.volumes",{
+  expected_progress_digest:jeevesVerificationDigest,
+  offset:jeevesVolumeCursor,limit:40,
+  only_not_implementation_verified:$("jeeves-volume-hardened").checked===true,
+ });
+ jeevesVolumeCursor=result.next_offset;
+ $("jeeves-volume-next").disabled=jeevesVolumeCursor===null;
+ $("jeeves-volume-output").textContent=JSON.stringify(result,null,2);
+ status(result.volumes.length+" actual original masterplan volumes indexed; "+
+  result.filtered_remaining_volumes+" match current filter. "+
+  "Named tests/evaluations are requirements, not executed results.");
+}
+$("jeeves-volume-list").addEventListener("click",()=>dmGuard(
+ async()=>{await verificationVolumePage(true);}
+));
+$("jeeves-volume-next").addEventListener("click",()=>dmGuard(
+ async()=>{
+  if(jeevesVolumeCursor===null)throw Error("End of volume verification index");
+  await verificationVolumePage(false);
+ }
+));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5303,6 +5331,12 @@ from independent product execution. No guessed overall application percentage,
 automatic source signoff, invented successful CI or fictional model training.</small></p>
 <button id="jeeves-verify-percent" type="button">Calculate live source-anchored completion %</button>
 <pre id="jeeves-verify-numbers" role="status" aria-live="polite"></pre>
+
+<label><input id="jeeves-volume-hardened" type="checkbox" checked>
+Show only source volumes NOT marked verified (currently seven)</label>
+<button id="jeeves-volume-list" type="button">Show exact incomplete AI masterplan volumes</button>
+<button id="jeeves-volume-next" type="button" disabled>Next 40 volume acceptance records</button>
+<pre id="jeeves-volume-output" role="status" aria-live="polite"></pre>
 <button id="jeeves-verify-blockers" type="button">List independent verification blockers</button>
 <button id="jeeves-verify-next" type="button" disabled>Next verification blocker page</button>
 <pre id="jeeves-verify-output" role="status" aria-live="polite"></pre>
