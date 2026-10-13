@@ -210,6 +210,7 @@ class ShadowRecord:
     version: int = 0
     review_digest: str | None = None
     training_manifest_digest: str | None = None
+    consumed_candidate_digest: str | None = None
     last_event_digest: str | None = None
 
     @property
@@ -221,6 +222,7 @@ class ShadowRecord:
             "intake": self.intake.to_dict(), "state": self.state.value,
             "version": self.version, "review_digest": self.review_digest,
             "training_manifest_digest": self.training_manifest_digest,
+            "consumed_candidate_digest": self.consumed_candidate_digest,
             "last_event_digest": self.last_event_digest,
         }
 
@@ -391,7 +393,9 @@ class ShadowWeightPipeline:
                 raise ShadowWeightError("unknown or stale shadow intake")
             if prior.state is not ShadowState.TRAINING_ELIGIBLE:
                 raise ShadowWeightError("training was not independently admitted")
-            updated = replace(prior, state=ShadowState.CONSUMED, version=prior.version + 1)
+            updated = replace(prior, state=ShadowState.CONSUMED,
+                              version=prior.version + 1,
+                              consumed_candidate_digest=verified_candidate_digest)
             return self._record(updated, operation="consume", authority=authority,
                                 evidence_digest=verified_candidate_digest, at_ns=at_ns)
 
