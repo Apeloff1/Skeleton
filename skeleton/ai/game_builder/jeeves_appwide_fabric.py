@@ -361,6 +361,8 @@ OPERATIONS = {
     "ai.milestones.page":("read", "bounded source-pinned milestone page",False),
     "ai.workwaves":("read", "dependency-safe milestone parallelization with owner leases",False),
     "ai.workpack":("read", "source-hashed bounded implementation context for selected milestone IDs",False),
+    "ai.code.search":("read", "bounded source-content lookup over inventoried files",False),
+    "ai.code.snippet":("read", "line-paged verified UTF-8 source excerpt",False),
     "ai.change_frontier":("read", "declared downstream change impact from exact repository paths",False),
     "studio.batch_preview":("compute", "bounded approved adapter previews across game/edit/forge planes",False),
     "source.inspect":("read", "UTF-8 source",False),
@@ -493,6 +495,13 @@ class JeevesAppwideRuntime:
                 result=director.workpack(**params)
             else:
                 result=director.change_frontier(**params)
+        elif action in ("ai.code.search", "ai.code.snippet"):
+            from .jeeves_code_navigator import JeevesCodeNavigator
+            navigator=JeevesCodeNavigator(inv)
+            if action=="ai.code.search":
+                result=navigator.search(**params)
+            else:
+                result=navigator.snippet(**params)
         elif action=="studio.batch_preview":
             from .jeeves_batch_workbench import run_batch_preview
             result=run_batch_preview(self, params)
