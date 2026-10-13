@@ -57,9 +57,9 @@ class AcceptanceRunnerTests(unittest.TestCase):
             matrix.return_value.overview.return_value=self.matrix
             execute.side_effect=[
                 CompletedProcess(["python","-m","unittest"],0,
-                                 stdout="PASS",stderr=""),
+                                 stdout="PASS",stderr="Ran 2 tests in 0.002s\\n\\nOK\\n"),
                 CompletedProcess(["python","-m","unittest"],0,
-                                 stdout="",stderr="OK"),
+                                 stdout="",stderr="Ran 3 tests in 0.003s\\n\\nOK\\n"),
             ]
             success=runner.produce(self.root,self.output,local=True)
             self.assertTrue(success)
@@ -69,6 +69,8 @@ class AcceptanceRunnerTests(unittest.TestCase):
         self.assertEqual(evidence["candidate_modules"],2)
         self.assertEqual(evidence["modules_actually_executed"],2)
         self.assertEqual(evidence["modules_reporting_pass"],2)
+        self.assertEqual(evidence["total_unittest_cases_observed"],5)
+        self.assertEqual([x["unittest_cases_observed"] for x in evidence["run_results"]],[2,3])
         self.assertTrue(evidence["selected_regression_suite_reported_success"])
         self.assertFalse(evidence["independent_github_run_identity_verified_externally"])
         self.assertFalse(evidence["release_device_verified"])
@@ -86,7 +88,7 @@ class AcceptanceRunnerTests(unittest.TestCase):
               patch.object(runner.subprocess,"run") as execute):
             matrix.return_value.overview.return_value=self.matrix
             execute.side_effect=[
-                CompletedProcess([],0,stdout="",stderr=""),
+                CompletedProcess([],0,stdout="",stderr="Ran 1 test in 0.001s\\nOK\\n"),
                 CompletedProcess([],1,stdout="",stderr="Traceback"),
             ]
             success=runner.produce(self.root,self.output,local=True)
@@ -97,6 +99,34 @@ class AcceptanceRunnerTests(unittest.TestCase):
         self.assertFalse(receipt["selected_regression_suite_reported_success"])
         self.assertFalse(receipt["run_results"][1]["targeted_tests_passed_in_runner"])
         self.assertNotIn("Traceback",json.dumps(receipt))
+
+    def test_unittest_zero_tests_is_not_accepted_as_working_feature(self):
+        with (patch.dict(runner.os.environ,{"EXPECTED_SHA":self.head}),
+              patch.object(runner,"_commit",return_value=self.head),
+              patch.object(runner,"AppwideInventory"),
+              patch.object(runner,"JeevesAcceptanceTestMatrix") as matrix,
+              patch.object(runner.subprocess,"run") as execute):
+            matrix.return_value.overview.return_value=self.matrix
+            execute.side_effect=[
+                CompletedProcess([],0,stdout="",stderr="Ran 0 tests in 0.000s\\nOK\\n"),
+                CompletedProcess([],0,stdout="",stderr="Ran 1 test in 0.001s\\nOK\\n"),
+            ]
+            self.assertFalse(runner.produce(self.root,self.output,local=True))
+        payload=json.loads(self.output.read_text())
+        self.assertEqual(payload["modules_reporting_pass"],1)
+        self.assertIsNone(payload["run_results"][0]["unittest_cases_observed"])
+        self.assertFalse(payload["selected_regression_suite_reported_success"])
+
+    def test_missing_actual_unittest_test_count_fails_closed(self):
+        self.assertIsNone(runner._observed_unittest_count(""))
+        self.assertIsNone(runner._observed_unittest_count("OK"))
+        self.assertIsNone(runner._observed_unittest_count("Ran 0 tests in 0.001s"))
+        self.assertIsNone(runner._observed_unittest_count(
+            "Ran 2 tests in 0.001s\\nRan 2 tests in 0.001s"))
+        self.assertEqual(runner._observed_unittest_count(
+            "Ran 1 test in 0.001s\\n\\nOK"),1)
+        self.assertEqual(runner._observed_unittest_count(
+            "Ran 50 tests in 0.145s\\n\\nOK"),50)
 
     def test_ci_mode_without_exact_provenance_rejected_before_imports(self):
         with patch.object(runner,"_commit",return_value=self.head):
@@ -147,8 +177,8 @@ class AcceptanceRunnerTests(unittest.TestCase):
               patch.object(runner,"JeevesAcceptanceTestMatrix") as matrix,
               patch.object(runner.subprocess,"run") as execute):
             matrix.return_value.overview.return_value=self.matrix
-            execute.side_effect=[CompletedProcess([],0,"",""),
-                                 CompletedProcess([],0,"","")]
+            execute.side_effect=[CompletedProcess([],0,"","Ran 2 tests in 0.001s\\nOK\\n"),
+                                 CompletedProcess([],0,"","Ran 2 tests in 0.001s\\nOK\\n")]
             with self.assertRaises(RuntimeError):
                 runner.produce(self.root,elsewhere,local=True)
         self.assertFalse(elsewhere.exists())
