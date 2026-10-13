@@ -25,6 +25,11 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
         self.attempt=2
         self.modules=["tests.test_alpha","tests.test_beta"]
         self.expected={
+            "family_denominator":42,
+            "smoke_families":[
+                {"family_id":"F07","modules":[self.modules[0]]},
+                {"family_id":"F37","modules":[self.modules[1]]},
+            ],
             "selected_modules":self.modules,
             "module_source_receipts":[
                 {"path":"tests/test_alpha.py","sha256":"b"*64,
@@ -127,6 +132,10 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
         self.assertTrue(receipt["independent_ci_execution_verified"])
         self.assertEqual(receipt["verified_git_head"],self.commit)
         self.assertEqual(receipt["scheduled_test_modules_independently_confirmed"],2)
+        self.assertEqual(receipt["targeted_regression_subsets_verified_for_families"],["F07","F37"])
+        self.assertEqual(receipt["targeted_family_subset_count"],2)
+        self.assertEqual(receipt["targeted_family_subset_verified_percent"],4.76)
+        self.assertEqual(receipt["complete_family_stage_qualifications_admitted"],0)
         self.assertEqual([x["observed_unittest_cases"] for x in receipt["verified_os"]],[4,4])
         self.assertEqual({i["os"] for i in receipt["verified_os"]},{"Linux","Windows"})
         self.assertIsNone(receipt["full_app_completion_percent"])
@@ -144,6 +153,23 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
         self.evidence["Windows"]=self.stamp(self.evidence["Windows"])
         with self.assertRaises(JeevesAppwideError):
             self.check()
+
+    def test_unreviewed_smoke_families_cannot_inflate_progress(self):
+        prior=deepcopy(self.expected)
+        for row in (
+            {"family_id":"F99","modules":[self.modules[0]]},
+            {"family_id":"F38","modules":["tests.test_unexecuted"]},
+            {"family_id":"F07","modules":[self.modules[1]]},
+        ):
+            self.expected["smoke_families"].append(row)
+            with self.subTest(row=row):
+                with self.assertRaises(JeevesAppwideError):
+                    self.check()
+            self.expected["smoke_families"].pop()
+        self.expected["family_denominator"]=2
+        with self.assertRaises(JeevesAppwideError):
+            self.check()
+        self.expected=prior
 
     def test_run_identity_attacks_fail_closed(self):
         for name,value in (
