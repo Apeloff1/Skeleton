@@ -84,9 +84,11 @@ def test_content_source_bundles_contain_different_real_hardware_tiles():
     gb=publish_codex_source(src,"game_boy",rights_attested=True)
     nes=publish_codex_source(src,"nes",rights_attested=True)
     snes=publish_codex_source(src,"snes",rights_attested=True)
-    with ZipFile(BytesIO(gb.zip_bytes)) as a, (
-         ZipFile(BytesIO(nes.zip_bytes)) as b), (
-         ZipFile(BytesIO(snes.zip_bytes)) as c):
+    with (
+        ZipFile(BytesIO(gb.zip_bytes)) as a,
+        ZipFile(BytesIO(nes.zip_bytes)) as b,
+        ZipFile(BytesIO(snes.zip_bytes)) as c,
+    ):
         asset_gb=a.read("art/original-tiles.bin")
         asset_nes=b.read("art/original-tiles.bin")
         asset_snes=c.read("art/original-tiles.bin")
