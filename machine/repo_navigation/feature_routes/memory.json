@@ -1,0 +1,1 @@
+{"features":[{"file_shards":["memory"],"files":11,"name":"memory","zones":{"project-memory":11}},{"file_shards":["memory"],"files":98,"name":"memory/mongo_backup","zones":{"project-memory":98}}],"schema":"skeleton.repository-navigation.v1"}

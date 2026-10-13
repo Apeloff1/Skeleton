@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 import subprocess
+import json
+import re
+
+import pytest
 
 from skeleton.app.installer import InstallPhase, install_application
 from skeleton.app.preloader import PreloadCheck, PreloadReport
@@ -38,6 +42,8 @@ def test_setup_runtime_creates_complete_secret_backed_environment(tmp_path):
     assert result.changed is True
     assert values["MONGO_INITDB_ROOT_PASSWORD"]
     assert len(values["JWT_SECRET"]) == 64
+    assert len(values["SKL_ENGINE_SERVICE_TOKEN"]) == 64
+    assert values["SKL_ENGINE_SERVICE_TOKEN"] != values["JWT_SECRET"]
     assert values["MONGO_URL"].startswith("mongodb://admin:")
     assert "@mongo:27017/tutolage?authSource=admin" in values["MONGO_URL"]
     assert "@mongo:27017/skeleton?authSource=admin" in values["SKL_MONGO_URI"]
@@ -46,6 +52,7 @@ def test_setup_runtime_creates_complete_secret_backed_environment(tmp_path):
         "MONGO_URL",
         "SKL_MONGO_URI",
         "JWT_SECRET",
+        "SKL_ENGINE_SERVICE_TOKEN",
     }
 
 
@@ -63,6 +70,7 @@ def test_setup_runtime_is_idempotent_and_preserves_existing_secrets(tmp_path):
     assert second_text == first_text
     assert "MONGO_INITDB_ROOT_PASSWORD" in second.preserved_keys
     assert "JWT_SECRET" in second.preserved_keys
+    assert "SKL_ENGINE_SERVICE_TOKEN" in second.preserved_keys
 
 
 def test_setup_runtime_url_encodes_preserved_mongo_credentials(tmp_path):
@@ -94,6 +102,53 @@ def test_setup_receipt_never_contains_secret_values(tmp_path):
     assert values["JWT_SECRET"] not in serialized
     assert values["MONGO_URL"] not in serialized
     assert values["SKL_MONGO_URI"] not in serialized
+    assert values["SKL_ENGINE_SERVICE_TOKEN"] not in serialized
+
+
+@pytest.mark.parametrize("token", ["", "change-me", "short", "x" * 4097])
+def test_setup_repairs_legacy_engine_authentication(tmp_path, token):
+    (tmp_path / ".env").write_text(
+        ENV_TEMPLATE + f"SKL_ENGINE_SERVICE_TOKEN={token}\n", encoding="utf-8"
+    )
+    result = ensure_runtime_environment(tmp_path)
+    values = _read_values(tmp_path / ".env")
+    assert len(values["SKL_ENGINE_SERVICE_TOKEN"]) == 64
+    assert "SKL_ENGINE_SERVICE_TOKEN" in result.configured_keys
+    assert not ensure_runtime_environment(tmp_path).changed
+
+
+def test_setup_repairs_duplicate_assignments_and_rotates_engine_token(tmp_path):
+    (tmp_path / ".env").write_text(
+        ENV_TEMPLATE + "SKL_ENGINE_SERVICE_TOKEN=old\nSKL_ENGINE_SERVICE_TOKEN=\n",
+        encoding="utf-8",
+    )
+    ensure_runtime_environment(tmp_path)
+    before = _read_values(tmp_path / ".env")
+    result = ensure_runtime_environment(tmp_path, rotate_secrets=True)
+    after = _read_values(tmp_path / ".env")
+    assignments = [
+        line.split("=", 1)[1]
+        for line in (tmp_path / ".env").read_text().splitlines()
+        if line.startswith("SKL_ENGINE_SERVICE_TOKEN=")
+    ]
+    assert assignments == [after["SKL_ENGINE_SERVICE_TOKEN"]] * 2
+    assert after["SKL_ENGINE_SERVICE_TOKEN"] != before["SKL_ENGINE_SERVICE_TOKEN"]
+    assert after["SKL_ENGINE_SERVICE_TOKEN"] not in repr(result.to_dict())
+    assert not ensure_runtime_environment(tmp_path).changed
+
+
+def test_setup_covers_every_required_compose_value(tmp_path):
+    """A new Compose requirement cannot silently escape first-run setup."""
+    root = Path(__file__).resolve().parents[2]
+    (tmp_path / ".env.example").write_text(
+        (root / ".env.example").read_text(), encoding="utf-8"
+    )
+    ensure_runtime_environment(tmp_path)
+    values = _read_values(tmp_path / ".env")
+    required = set(re.findall(r"\$\{([A-Z_]+):\?", (root / "docker-compose.yml").read_text()))
+    manifest = json.loads((root / "skeleton/app/manifest.json").read_text())
+    assert required <= set(manifest["runtime"]["required_env"])
+    assert all(values.get(key) for key in required)
 
 
 def test_installer_stops_before_mutation_when_preloader_blocks(tmp_path, monkeypatch):
