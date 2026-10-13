@@ -617,10 +617,21 @@ class JeevesWorkbench:
                     raise JeevesWorkbenchError("proposal policy must equal host execution policy")
             else:
                 current_policy = policy
-            records = [
-                record for record in self.shadow.entries(limit=1000)
-                if record.state.value in ("inbox", "quarantined", "corroborated")
-            ]
+            from skeleton.ai.training.shadow_weight_pipeline import ShadowState
+            eligible = (
+                ShadowState.INBOX,
+                ShadowState.QUARANTINED,
+                ShadowState.CORROBORATED,
+            )
+            records = []
+            while len(records) < 8192:
+                page = self.shadow.entries(
+                    states=eligible, offset=len(records),
+                    limit=min(1000, 8192 - len(records)),
+                )
+                if not page:
+                    break
+                records.extend(page)
             candidates = tuple(self._idle_candidate(record) for record in records)
             return JeevesIdleLearningScheduler(policy=current_policy).propose(
                 candidates, telemetry, host_now_ns=host_now_ns,
