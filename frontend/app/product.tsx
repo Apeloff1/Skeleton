@@ -70,7 +70,7 @@ export default function ProductShellRoute() {
         capability.pillar,
         pillarSearchText(capability.pillar),
         capability.backendSurface ?? '',
-        ...capability.actions.flatMap((action) => [action.title, action.description, action.operation]),
+        ...capability.actions.flatMap((action) => [action.title, action.description, action.operation ?? action.navigationId]),
       ]
         .join(' ')
         .toLowerCase();
