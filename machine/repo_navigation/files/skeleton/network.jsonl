@@ -1,5 +1,5 @@
-{"p":"skeleton/network/__init__.py","g":"85703795266c139f67ea975cfa0b86d72967f84f","b":62,"m":"100644","t":"blob","z":"network-compat","f":"skeleton/network"}
-{"p":"skeleton/network/architecture.py","g":"f51fe7b739db736abf1ba37881207bcbf6c3ecfb","b":1836,"m":"100644","t":"blob","z":"network-compat","f":"skeleton/network"}
-{"p":"skeleton/network/model_placement.py","g":"8822d3e6ed75b22b2ab56b8a570e5f1c9332d88d","b":78,"m":"100644","t":"blob","z":"network-compat","f":"skeleton/network"}
-{"p":"skeleton/network/remote_execution.py","g":"731524d1a70a69b57df6e94f90c71c0bee5cec2e","b":79,"m":"100644","t":"blob","z":"network-compat","f":"skeleton/network"}
-{"p":"skeleton/network/replication.py","g":"2cedb49180013364d0f7d1b02910a3f8151fae45","b":74,"m":"100644","t":"blob","z":"network-compat","f":"skeleton/network"}
+{"b":62,"f":"skeleton/network","g":"85703795266c139f67ea975cfa0b86d72967f84f","m":"100644","p":"skeleton/network/__init__.py","t":"blob","z":"network-compat"}
+{"b":1836,"f":"skeleton/network","g":"f51fe7b739db736abf1ba37881207bcbf6c3ecfb","m":"100644","p":"skeleton/network/architecture.py","t":"blob","z":"network-compat"}
+{"b":78,"f":"skeleton/network","g":"8822d3e6ed75b22b2ab56b8a570e5f1c9332d88d","m":"100644","p":"skeleton/network/model_placement.py","t":"blob","z":"network-compat"}
+{"b":79,"f":"skeleton/network","g":"731524d1a70a69b57df6e94f90c71c0bee5cec2e","m":"100644","p":"skeleton/network/remote_execution.py","t":"blob","z":"network-compat"}
+{"b":74,"f":"skeleton/network","g":"2cedb49180013364d0f7d1b02910a3f8151fae45","m":"100644","p":"skeleton/network/replication.py","t":"blob","z":"network-compat"}
