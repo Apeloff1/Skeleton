@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "check:expo-native-compat": "node ./scripts/check-expo-native-compat.cjs",
     "start": "expo start --port 3000",
     "postinstall": "node ./scripts/patch-node-modules.js",
     "reset-project": "node ./scripts/reset-project.js",
@@ -29,6 +30,7 @@
     "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
     "test:knowledge-experience": "node --test scripts/test-knowledge-experience.mjs",
     "test:world-workbench": "node --test scripts/test-world-workbench.mjs",
+    "test:story-continuity": "node --test scripts/test-story-continuity.mjs",
     "test:design-review": "node --test scripts/test-design-review.mjs"
   },
   "engines": {

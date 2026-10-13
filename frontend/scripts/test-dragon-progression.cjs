@@ -44,6 +44,94 @@ const goodAttempt={
  supported:['movement','platforming'],deferred:[],
 };
 assert.equal(m.normalizeDragonAttempts([goodAttempt,{...goodAttempt,state:'fictional'}]).length,1);
+// The three idle hatchlings use a separately validated, read-only server wire.
+const familyModel=load('dragonFamilyProjection.ts');
+const familyModule={exports:{}};
+vm.runInNewContext(familyModel.code,{module:familyModule,exports:familyModule.exports,
+ Math,Array,Number,Object,Set,Date},{filename:'dragonFamilyProjection.js',timeout:1500});
+const family=familyModule.exports;
+const at='2026-10-12T14:15:00.000Z';
+const egg=(id,name)=>({id,name,specialty:'Verified research',stage:'egg',
+ level:0,discoveries:0,last_grew_at:null,idle_only:true});
+const brood={
+ schema:'skeleton.ai.dragon.family.v1',
+ parent:{stage:'adult',consumed:2,source_total:2,complete:true,laid_at:at},
+ inventory_sealed:true,children:[
+  egg('article','Ember'),egg('video','Flicker'),egg('monitor','Scout')],
+ history:[],pending_source_count:0,
+ knowledge_authority:'canonical human-approved crawler only',
+ update_policy:'idle-only; changed reviewed content',
+};
+assert.ok(family.validateDragonFamily(brood),'reviewed parent must have exactly three eggs');
+const broken=[
+ {...brood,children:brood.children.slice(0,2)},
+ {...brood,parent:{...brood.parent,complete:false}},
+ {...brood,parent:{...brood.parent,source_total:1}},
+ {...brood,inventory_sealed:false},
+ {...brood,children:[{...brood.children[0],level:9},...brood.children.slice(1)]},
+ {...brood,children:[{...brood.children[0],idle_only:false},...brood.children.slice(1)]},
+ {...brood,children:[{...brood.children[0],stage:'dragon'},...brood.children.slice(1)]},
+ {...brood,history:[{sequence:1,at,dragon:'article',action:'hatched',
+  source_id:'one',change:'forged',digest:'short'}]},
+];
+for(const item of broken)assert.equal(family.validateDragonFamily(item),null,
+ 'untrusted client must not create or modify dragon family progression');
+// Mother gleaning is an independently reviewed, read-only extension.
+const glean={
+ schema:'skeleton.ai.dragon.glean.v1',insights:1,
+ stale_observations:0,total_active_observations:2,lenses_used:1,
+ counts:{contested:0,wiki_candidate:1,needs_independent_sources:0},
+ read_only:true,promotion:'Wiki before shadow sandbox; never direct live weights',
+ updated_at:at,
+ cells:[{lens:'game_mechanics',proposition_digest:'b'.repeat(64),
+  status:'wiki_candidate',source_count:2,support_sources:2,challenge_sources:0,
+  support_groups:2,challenge_groups:0,modalities:['article','video'],
+  latest_at:at,exemplar:'Review-backed game loop inference requiring verification',
+  priority:'independent_wiki_review',evidence_fingerprint:'e'.repeat(64)}],
+};
+assert.ok(family.validateDragonFamily({...brood,glean}));
+for(const brokenGlean of [
+ {...glean,read_only:false},
+ {...glean,counts:{...glean.counts,wiki_candidate:3}},
+ {...glean,cells:[{...glean.cells[0],evidence_fingerprint:'fake'}]},
+ {...glean,cells:[{...glean.cells[0],support_groups:1}]},
+ {...glean,cells:[{...glean.cells[0],modalities:['video','unreviewed_media']}]},
+ {...glean,cells:[{...glean.cells[0],status:'contested',challenge_sources:0}]},
+]){
+ assert.equal(family.validateDragonFamily({...brood,glean:brokenGlean}),null,
+  'the UI cannot fabricate confirmed cross-source glean evidence');
+}
+// Consent-bound host state is read-only. A queued tick never equals live idle.
+const host={schema:'skeleton.ai.dragon.idle.host.v1',
+ configured:true,active:true,host_idle_now:null,requires_os_idle_observer:true,
+ daily_attempts:2,daily_by_specialist:{article:1,monitor:1},
+ consent_expires_at:at,next_tick_at:at};
+assert.ok(family.validateDragonFamily({...brood,idle_host:host}));
+for(const badHost of [
+ {...host,host_idle_now:true},
+ {...host,active:true,configured:false},
+ {...host,daily_attempts:5},
+ {...host,requires_os_idle_observer:false},
+ {...host,daily_by_specialist:{article:-1}},
+ {...host,consent_expires_at:'not-a-utc-date'},
+ {...host,daily_by_specialist:{worker:2}},
+]){
+ assert.equal(family.validateDragonFamily({...brood,idle_host:badHost}),null,
+  'browser cannot forge host consent, idle status, quotas or activity');
+}
+const nested=load('DragonFamilyNest.tsx');
+assert.ok(nested.source.includes('idle only')&&nested.source.includes('evolution history'));
+assert.ok(nested.source.includes('validateDragonFamily'));
+assert.ok(nested.source.includes('Mother Dragon · Glean Matrix'));
+assert.ok(nested.source.includes('Idle research permissions'));
+assert.ok(nested.source.includes('Disputed:'));
+assert.ok(nested.source.includes('Superseded or revoked observations:'));
+
+const familyHook=fs.readFileSync(path.join(dir,'useDragonAcademy.ts'),'utf8');
+assert.ok(familyHook.includes('validateDragonFamily(snapshot.family)'));
+assert.ok(familyHook.includes('family,subscription,practiceBusy'));
+assert.ok(!familyHook.includes("'/family/consume'"), 'the frontend cannot forge source consumption');
+
 for(const name of ['DragonQuestBoard.tsx','DragonCompanion.tsx','DragonCompanionPanel.tsx']){
  const result=load(name);
  if(name==='DragonQuestBoard.tsx'){

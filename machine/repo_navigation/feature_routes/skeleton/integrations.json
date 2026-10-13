@@ -1,0 +1,1 @@
+{"features":[{"file_shards":["skeleton/integrations"],"files":4,"name":"skeleton/integrations","zones":{"integrations-compat":4}},{"file_shards":["skeleton/integrations"],"files":16,"name":"skeleton/integrations/adapters","zones":{"integrations-compat":16}}],"schema":"skeleton.repository-navigation.v1"}

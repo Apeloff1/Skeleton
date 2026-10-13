@@ -1,0 +1,157 @@
+name: Jeeves Story Canon Production
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/story_canon_fabric.py"
+      - "skeleton/ai/game_builder/story_workspace.py"
+      - "skeleton/ai/game_builder/story_memory.py"
+      - "skeleton/ai/game_builder/story_continuity_assurance.py"
+      - "skeleton/ai/game_builder/story_chapter_context.py"
+      - "skeleton/ai/game_builder/jeeves_chapter_chat.py"
+      - "skeleton/ai/game_builder/jeeves_app_runtime.py"
+      - "skeleton/ai/game_builder/jeeves_appwide_fabric.py"
+      - "skeleton/ai/game_builder/jeeves_capability_intelligence.py"
+      - "skeleton/ai/game_builder/jeeves_completion_census.py"
+      - "tests/test_game_builder_jeeves_app_runtime.py"
+      - "tests/test_game_builder_jeeves_appwide_fabric.py"
+      - "tests/test_game_builder_jeeves_capability_intelligence.py"
+      - "tests/test_game_builder_jeeves_completion_census.py"
+      - "docs/JEEVES_APP_CAPABILITY_ATLAS.md"
+      - "docs/JEEVES_WHOLE_REPO_INVENTORY_AND_GOVERNED_ACTIONS.md"
+      - "docs/JEEVES_APP_COMPLETION_CENSUS_2026_10.md"
+      - "skeleton/ai/game_builder/story_cinematic_review.py"
+      - "skeleton/ai/game_builder/story_detail_history.py"
+      - "skeleton/ai/game_builder/story_asset_pixels.py"
+      - "tests/test_game_builder_story_asset_pixels.py"
+      - "skeleton/ai/game_builder/jeeves_production_director.py"
+      - "skeleton/ai/game_builder/game_project_workspace.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "skeleton/ai/game_builder/game_prompt_router.py"
+      - "tests/test_game_builder_story_canon_fabric.py"
+      - "tests/test_game_builder_story_workspace.py"
+      - "tests/test_game_builder_jeeves_production.py"
+      - "tests/test_game_builder_story_continuity_assurance.py"
+      - "tests/test_game_builder_story_chapter_context.py"
+      - "tests/test_game_builder_jeeves_chapter_chat.py"
+      - "docs/JEEVES_100_ACT_9999_SCENE_CONSISTENCY_LAW.md"
+      - "docs/JEEVES_100_CHAPTER_1000_ACT_9999_SCENE_STUDIO_STANDARD.md"
+      - ".github/workflows/game-builder-jeeves-story-canon.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: jeeves-story-canon-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  canonical-authoring:
+    name: Canon consistency and supervised production (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact SHA checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            skeleton/ai/forge/universal.py
+            skeleton/ai/forge/__init__.py
+            skeleton/ai/webcrawler/__init__.py
+            skeleton/ai/webcrawler/
+            skeleton/kernel/
+            skeleton/app/manifest.json
+            machine/ai_capabilities.json
+            machine/ai_app_construction.json
+            machine/ai_closure_evidence.json
+            machine/ai_master_plan.json
+            machine/ai_masterplan_parse_index.json
+            machine/enterprise_ai_superiority.json
+            machine/enterprise_system_architecture.json
+            frontend/features/
+            backend/gameforge/__init__.py
+            backend/gameforge/forges/
+            skeleton/forge/
+            skeleton/organism/
+            apps/jeeves/
+            packaging/windows/
+            java-accelerators/
+            tests/__init__.py
+            tests/test_game_builder_story_canon_fabric.py
+            tests/test_game_builder_story_workspace.py
+            tests/test_game_builder_jeeves_production.py
+            tests/test_game_builder_story_continuity_assurance.py
+            tests/test_game_builder_story_chapter_context.py
+            tests/test_game_builder_jeeves_chapter_chat.py
+            tests/test_game_builder_jeeves_app_runtime.py
+            tests/test_game_builder_jeeves_appwide_fabric.py
+            tests/test_game_builder_jeeves_capability_intelligence.py
+            tests/test_game_builder_jeeves_completion_census.py
+            tests/test_game_builder_story_asset_pixels.py
+            tests/test_game_builder_system_editors.py
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+      - name: Verify checked-out commit
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Compile project canon and editor glue
+        shell: bash
+        run: |
+          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/jeeves_app_runtime.py skeleton/ai/game_builder/jeeves_appwide_fabric.py skeleton/ai/game_builder/jeeves_capability_intelligence.py skeleton/ai/game_builder/jeeves_completion_census.py skeleton/ai/game_builder/story_cinematic_review.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
+      - name: Check app-wide Jeeves tools, all system editors, forge graph, Dragon, learning and 9999-scene receipts
+        shell: bash
+        run: |
+          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census -v
+      - name: Reconcile real exact-head masterplan and product AI authority
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.game_builder.jeeves_appwide_fabric import AppwideInventory
+          from skeleton.ai.game_builder.jeeves_completion_census import JeevesCompletionCensus
+          inventory = AppwideInventory(Path.cwd())
+          inventory.scan()
+          report = JeevesCompletionCensus(inventory).report()
+          assert report["plan"]["volume_total"] == 421
+          # Stale signatures are a reported completion blocker, not a
+          # reason to break source reconciliation or forge a fresh signature.
+          fresh = report["plan"]["parse_index_masterplan_git_blob_matches"]
+          stale = any(d["kind"] == "masterplan_parse_index_source_stale"
+                      for d in report["authority_defects"])
+          assert fresh != stale
+          assert not report["readiness"]["release_qualified"]
+          assert report["ai_product"]["capability_total"] == 9
+          assert report["construction"]["plane_total"] == 27
+          assert report["enterprise"]["domain_count"] == 11
+          frontier = JeevesCompletionCensus(inventory).backlog(
+              limit=20, expected_report_digest=report["digest"])
+          assert frontier["total_work_items"] >= 43
+          assert len(frontier["tasks"]) == 20
+          assert frontier["next_offset"] == 20
+          assert frontier["census_digest"] == report["digest"]
+          assert all(not task["automatic_execution_authorized"] and
+                     not task["release_qualified"] for task in frontier["tasks"])
+          assert not report["readiness"]["release_qualified"]
+          print({"source_receipts":len(report["source_receipts"]),
+                 "capabilities":report["ai_product"]["capability_states"],
+                 "volumes":report["plan"]["volume_implementation_states"],
+                 "authority_defects":report["authority_defects"]})
+          PY

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from skeleton.cortex.attn import (
     add,
@@ -128,12 +128,17 @@ class TransformerBlock:
             blk.ln2_g = ones(dim)
         return blk
 
-    def forward(self, X: List[List[float]], n_heads: int):
+    def forward(
+        self, X: List[List[float]], n_heads: int, *, retain_cache: bool = True,
+        interrupt: Callable[[], None] | None = None,
+    ):
         n = len(X)
         Xn: List[List[float]] = []
         hats1: List[List[float]] = []
         invs1: List[float] = []
         for x in X:
+            if interrupt is not None:
+                interrupt()
             y, hat, inv = self._norm(x, self.ln1_g, self.ln1_b)
             Xn.append(y)
             hats1.append(hat)
@@ -141,7 +146,9 @@ class TransformerBlock:
         Q = [apply_rope(matvec(self.Wq, x), t) for t, x in enumerate(Xn)]
         K = [apply_rope(matvec(self.Wk, x), t) for t, x in enumerate(Xn)]
         V = [matvec(self.Wv, x) for x in Xn]
-        C, As = multi_head_attend(Q, K, V, n_heads)
+        C, As = multi_head_attend(
+            Q, K, V, n_heads, retain_weights=retain_cache, interrupt=interrupt,
+        )
         attn = [matvec(self.Wo, c) for c in C]
         U = [add(X[t], attn[t]) for t in range(n)]
         z: List[List[float]] = []
@@ -168,6 +175,10 @@ class TransformerBlock:
                 z = [gelu(p) for p in pre]
             ff = [add(matvec(self.W2, zi), self.b2) for zi in z]
             Y = [add(U[t], ff[t]) for t in range(n)]
+        if not retain_cache:
+            # Inference does not need the quadratic attention probability
+            # matrices or backward activations held across all layers.
+            return Y, {}
         cache = {
             "X": X, "Xn": Xn, "hats1": hats1, "invs1": invs1,
             "Q": Q, "K": K, "V": V, "C": C, "As": As, "attn": attn, "U": U,
@@ -211,6 +222,12 @@ class TransformerBlock:
                 dY[t] = [x * s for x in dY[t]]
         dU = [list(dY[t]) for t in range(n)]
         if self.d_ff and cache.get("z"):
+            # All positions backpropagate through the weights that produced
+            # this forward pass. In-place SGD must not make later positions
+            # differentiate an already-updated projection.
+            W2_forward = _copy_mat(self.W2)
+            W1_forward = _copy_mat(self.W1)
+            Wu_forward = _copy_mat(self.Wu) if self.ffn_kind == "swiglu" else []
             Un = cache["Un"]
             z = cache["z"]
             acc_b2 = zeros(D)
@@ -220,7 +237,7 @@ class TransformerBlock:
                 add_outer(self.W2, dY[t], z[t], -lr)
                 for i in range(D):
                     acc_b2[i] += dY[t][i]
-                d_z = matvec_T(self.W2, dY[t])
+                d_z = matvec_T(W2_forward, dY[t])
                 if self.ffn_kind == "swiglu" and cache.get("gate"):
                     d_gate, d_up = swiglu_bwd(d_z, cache["gate"][t], cache["up"][t])
                     add_outer(self.W1, d_gate, Un[t], -lr)
@@ -228,13 +245,13 @@ class TransformerBlock:
                     for i in range(len(self.b1)):
                         acc_b1[i] += d_gate[i]
                         self.bu[i] -= lr * d_up[i]
-                    d_Un[t] = add(matvec_T(self.W1, d_gate), matvec_T(self.Wu, d_up))
+                    d_Un[t] = add(matvec_T(W1_forward, d_gate), matvec_T(Wu_forward, d_up))
                 else:
                     d_pre = gelu_bwd(d_z, cache["pre"][t])
                     add_outer(self.W1, d_pre, Un[t], -lr)
                     for i in range(len(self.b1)):
                         acc_b1[i] += d_pre[i]
-                    d_Un[t] = matvec_T(self.W1, d_pre)
+                    d_Un[t] = matvec_T(W1_forward, d_pre)
             for i in range(D):
                 self.b2[i] -= lr * acc_b2[i]
             for i in range(len(self.b1)):
@@ -265,12 +282,15 @@ class TransformerBlock:
         dQ = [apply_rope_bwd(dq, t) for t, dq in enumerate(dQ)]
         dK = [apply_rope_bwd(dk, t) for t, dk in enumerate(dK)]
         dXn = [zeros(D) for _ in range(n)]
+        Wq_forward, Wk_forward, Wv_forward = (
+            _copy_mat(self.Wq), _copy_mat(self.Wk), _copy_mat(self.Wv)
+        )
         for t in range(n):
             add_outer(self.Wq, dQ[t], Xn[t], -lr)
             add_outer(self.Wk, dK[t], Xn[t], -lr)
             add_outer(self.Wv, dV[t], Xn[t], -lr)
-            dXn[t] = add(add(matvec_T(self.Wq, dQ[t]), matvec_T(self.Wk, dK[t])),
-                         matvec_T(self.Wv, dV[t]))
+            dXn[t] = add(add(matvec_T(Wq_forward, dQ[t]), matvec_T(Wk_forward, dK[t])),
+                         matvec_T(Wv_forward, dV[t]))
         acc_dg = zeros(D)
         acc_db = zeros(D)
         dX_ln = [zeros(D) for _ in range(n)]
@@ -297,16 +317,19 @@ class TransformerBlock:
         n_heads: int,
         pos: int,
     ) -> List[float]:
-        """One-token decode step. Ks/Vs grow with unroped keys; RoPE at attend time."""
+        """One-token decode step, storing keys already rotated at their position."""
         y, _, _ = self._norm(x, self.ln1_g, self.ln1_b)
         q = matvec(self.Wq, y)
         k = matvec(self.Wk, y)
         v = matvec(self.Wv, y)
-        Ks.append(k)
+        # Store already-rotated keys once: re-rotating every historical key
+        # on each token makes incremental decode needlessly quadratic in RoPE
+        # work. Window shifts reset the cache, preserving absolute parity
+        # with the reference window-relative full-sequence path.
+        Ks.append(apply_rope(k, pos))
         Vs.append(v)
-        K_rope = [apply_rope(kk, t) for t, kk in enumerate(Ks)]
         q_rope = apply_rope(q, pos)
-        c, _ = cached_mha(q_rope, K_rope, Vs, n_heads)
+        c, _ = cached_mha(q_rope, Ks, Vs, n_heads)
         attn = matvec(self.Wo, c)
         u = add(x, attn)
         if self.d_ff:
@@ -329,11 +352,22 @@ class KVCache:
         self.K: List[List[List[float]]] = [[] for _ in range(self.n_layers)]
         self.V: List[List[List[float]]] = [[] for _ in range(self.n_layers)]
         self.tokens: List[int] = []
+        self.next_position = 0
+        self.reset_count = 0
+        self.reserved_bytes = 0
+        self.owner: object | None = None
+        self.revision: tuple[Any, ...] | None = None
+        self.last_logits: List[float] | None = None
 
     def reset(self) -> None:
+        if self.tokens:
+            self.reset_count += 1
         self.K = [[] for _ in range(self.n_layers)]
         self.V = [[] for _ in range(self.n_layers)]
         self.tokens = []
+        self.last_logits = None
+        self.next_position = 0
+        self.reserved_bytes = 0
 
     def primed_for(self, window: Sequence[int]) -> bool:
         """True iff cache holds window[:-1] and can extend by window[-1]."""
@@ -357,6 +391,7 @@ class TinyTransformer:
         d_ff: int = 0,
         norm: str = "ln",
         ffn_kind: str = "gelu",
+        position_mode: str = "learned_rope",
         use_mod: bool = False,
         mod_deep: float = 0.25,
         mod_shallow: float = 0.25,
@@ -379,6 +414,9 @@ class TinyTransformer:
         ff = max(0, int(d_ff))
         self.norm = "rms" if str(norm).lower() == "rms" else "ln"
         self.ffn_kind = "swiglu" if str(ffn_kind).lower() == "swiglu" else "gelu"
+        if position_mode not in {"learned_rope", "rope"}:
+            raise ValueError("position_mode must be learned_rope or rope")
+        self.position_mode = position_mode
         self.layers: List[TransformerBlock] = [
             TransformerBlock(D, ff, rng, s, norm=self.norm, ffn_kind=self.ffn_kind)
             for _ in range(nL)
@@ -482,50 +520,129 @@ class TinyTransformer:
     def _encode(self, ids: Sequence[int]) -> List[List[float]]:
         X: List[List[float]] = []
         for t, idx in enumerate(ids):
-            X.append(add(self.E[idx], self.P[t]))
+            X.append(list(self.E[idx]) if self.position_mode == "rope" else add(self.E[idx], self.P[t]))
         return X
 
-    def to(self, device: str = "cpu") -> "TinyTransformer":
-        """Bind a device. CUDA if torch can see a GPU; else CPU. Never throws.
+    def _sync_accelerator(self) -> None:
+        """Fail closed instead of losing trained weights on CPU fallback."""
+        if self._accel is None:
+            return
+        try:
+            self._accel.sync()
+        except Exception as exc:
+            raise RuntimeError(
+                "accelerator synchronization failed; refusing stale model weights"
+            ) from exc
 
-        When torch exists the weights pin on the bound device (GPU-resident
-        if cuda, otherwise torch-cpu). Python lists catch up on snapshot().
+    def to(
+        self,
+        device: str = "cpu",
+        *,
+        kv_dtype: str = "fp32",
+        max_kv_bytes: int | None = None,
+        prefill_query_chunk: int | None = None,
+        max_grad_norm: float | None = None,
+    ) -> "TinyTransformer":
+        """Bind CPU, CUDA or Metal with optional bounded reduced-precision KV.
+
+        FP16/BF16 are explicitly opt-in storage choices for the Torch KV
+        cache only. Core weights and attention computations remain FP32.
+        Preserve canonical weights across device transitions.
         """
+        if kv_dtype not in {"fp32", "fp16", "bf16"}:
+            raise ValueError("kv_dtype must be fp32, fp16 or bf16")
+        if max_kv_bytes is not None and (
+            isinstance(max_kv_bytes, bool)
+            or not isinstance(max_kv_bytes, int)
+            or max_kv_bytes <= 0
+        ):
+            raise ValueError("max_kv_bytes must be a positive integer or None")
+        if prefill_query_chunk is not None and (
+            isinstance(prefill_query_chunk, bool)
+            or not isinstance(prefill_query_chunk, int)
+            or not 1 <= prefill_query_chunk <= self.ctx
+        ):
+            raise ValueError("prefill_query_chunk must be between 1 and context length")
+        if max_grad_norm is not None and (
+            isinstance(max_grad_norm, bool)
+            or not isinstance(max_grad_norm, (int, float))
+            or not math.isfinite(float(max_grad_norm))
+            or max_grad_norm <= 0
+        ):
+            raise ValueError("max_grad_norm must be a finite positive number")
         from skeleton.cortex.device import resolve
         info = resolve(device)
-        self.requested = str(info.get("requested") or device)
-        self.device = str(info.get("actual") or "cpu")
-        if self._accel is not None:
-            try:
-                self._accel.sync()
-            except Exception:
-                pass
-        self._accel = None
-        self.resident = False
-        pin = bool(info.get("torch")) and self.requested != "cpu"
+        # Synchronization itself is transactional: it must finish before any
+        # device and accelerator ownership state can change.
+        self._sync_accelerator()
+        requested = str(info.get("requested") or device)
+        actual = str(info.get("actual") or "cpu")
+        constrained = (
+            kv_dtype != "fp32" or max_kv_bytes is not None
+            or prefill_query_chunk is not None
+            or max_grad_norm is not None
+        )
+        # A Torch projection without Mixture-of-Depths routing would silently
+        # execute a different model. Keep the exact Python graph instead.
+        if self.use_mod:
+            if constrained:
+                raise RuntimeError(
+                    "Mixture of Depths cannot admit requested Torch execution policy"
+                )
+            self.requested, self.device = requested, "cpu"
+            self._accel, self.resident = None, False
+            return self
+        pin = bool(info.get("torch")) and requested != "cpu"
         if pin:
             try:
                 from skeleton.cortex.torch_lm import TorchAccel
-                self._accel = TorchAccel(self, device=self.device)
-                self._accel.pin()
-                self.device = self._accel.device_name
-                self.resident = True
-            except Exception:
-                self._accel = None
-                self.device = "cpu"
-                self.resident = False
+                candidate = TorchAccel(
+                    self, device=actual, kv_dtype=kv_dtype,
+                    max_kv_bytes=max_kv_bytes,
+                    prefill_query_chunk=prefill_query_chunk,
+                    max_grad_norm=max_grad_norm,
+                )
+                candidate.pin()
+            except Exception as exc:
+                if constrained:
+                    raise RuntimeError(
+                        "explicit Torch execution policy cannot be admitted"
+                    ) from exc
+                # Preserve an existing proven resident accelerator rather
+                # than discarding it when a new device upload fails. A
+                # brand-new model remains a CPU reference model.
+                return self
+            self._accel = candidate
+            self.requested = requested
+            self.device = candidate.device_name
+            self.resident = True
+        else:
+            if constrained:
+                raise RuntimeError(
+                    "explicit Torch execution policy unavailable on selected device"
+                )
+            self.requested, self.device = requested, "cpu"
+            self._accel, self.resident = None, False
         return self
 
-    def _forward(self, ids: Sequence[int]):
+    def _forward(
+        self, ids: Sequence[int], *, retain_cache: bool = True,
+        interrupt: Callable[[], None] | None = None,
+    ):
         H = self._encode(ids)
         caches = []
         mod = self.mod if self.use_mod else None
         for layer in self.layers:
+            if interrupt is not None:
+                interrupt()
             if mod is not None:
                 H, cache = mod.forward_block(layer, H, self.n_heads)
             else:
-                H, cache = layer.forward(H, self.n_heads)
-            caches.append(cache)
+                H, cache = layer.forward(
+                    H, self.n_heads, retain_cache=retain_cache, interrupt=interrupt,
+                )
+            if retain_cache:
+                caches.append(cache)
         return H, caches
 
     def _block(self, ids: Sequence[int]):
@@ -547,42 +664,194 @@ class TinyTransformer:
             H[-1] if H else [],
         )
 
-    def _logits(self, ids: Sequence[int]) -> List[float]:
+    def _logits(self, ids: Sequence[int], *,
+                interrupt: Callable[[], None] | None = None) -> List[float]:
         if self._accel is not None:
+            interruption: list[BaseException] = []
+
+            def poll() -> None:
+                if interrupt is not None:
+                    try:
+                        interrupt()
+                    except BaseException as exc:
+                        interruption.append(exc)
+                        raise
+
             try:
-                return list(self._accel.logits(ids))
-            except Exception:
+                if interrupt is None:
+                    return list(self._accel.logits(ids))
+                return list(self._accel.logits(ids, interrupt=poll))
+            except Exception as exc:
+                if interruption and exc is interruption[-1]:
+                    raise
+                if getattr(self, "_strict_device_request", False):
+                    raise RuntimeError(
+                        "strict accelerator policy forbids silent CPU fallback"
+                    ) from exc
+                if (
+                    self._accel.kv_dtype_name != "fp32"
+                    or self._accel.max_kv_bytes is not None
+                ):
+                    raise RuntimeError(
+                        "explicit Torch KV policy forbids silent CPU fallback"
+                    ) from exc
+                self._sync_accelerator()
                 self._accel = None
                 self.resident = False
-        H, _ = self._forward(ids)
+                self.device = "cpu"
+        H, _ = self._forward(ids, retain_cache=False, interrupt=interrupt)
         y = H[-1] if H else zeros(self.dim)
         return self._unembed(y)
 
-    def _step(self, idx: int, cache: KVCache) -> List[float]:
+    def _step(
+        self, idx: int, cache: KVCache, *, project: bool = True,
+        interrupt: Callable[[], None] | None = None,
+    ) -> List[float]:
         """Extend the cache by one id. RoPE position is window-relative."""
-        t = len(cache.tokens)
+        t = cache.next_position if self.position_mode == "rope" else len(cache.tokens)
         ei = int(idx) if 0 <= int(idx) < self.V else self.unk
-        x = add(self.E[ei], self.P[min(t, self.ctx - 1)])
-        for li, layer in enumerate(self.layers):
-            x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t)
+        x = list(self.E[ei]) if self.position_mode == "rope" else add(self.E[ei], self.P[min(t, self.ctx - 1)])
+        try:
+            for li, layer in enumerate(self.layers):
+                if interrupt is not None:
+                    interrupt()
+                x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t)
+        except BaseException:
+            # A layer can fail after earlier layers appended a token. Such
+            # a partial cache must never be offered to a subsequent decode.
+            cache.reset()
+            raise
         cache.tokens.append(ei)
-        return self._unembed(x)
+        cache.next_position += 1
+        if project:
+            try:
+                logits = self._unembed(x)
+            except BaseException:
+                cache.reset()
+                raise
+            cache.last_logits = list(logits)
+            return logits
+        cache.last_logits = None
+        return x
 
-    def _logits_window(self, ids: Sequence[int], cache: Optional[KVCache] = None) -> List[float]:
+    def _logits_window(
+        self, ids: Sequence[int], cache: Optional[KVCache] = None, *,
+        interrupt: Callable[[], None] | None = None,
+    ) -> List[float]:
+        if interrupt is not None:
+            interrupt()
         window = list(ids[-self.ctx:] or [self.unk])
-        # Incremental steps implement the dense CPU graph only. MoD routing and
-        # accelerated backends must execute their full graph until equivalent
-        # incremental implementations are available.
-        if cache is None or self.use_mod or self._accel is not None:
+        if cache is not None:
+            if cache.n_layers != self.n_layers or cache.ctx > self.ctx:
+                raise ValueError("KV cache architecture does not match transformer")
+            window = list(ids[-cache.ctx:] or [self.unk])
+            revision = (self.steps, self.fitted, self.tied, self.device, self.resident)
+            if cache.owner is not self or cache.revision != revision:
+                cache.reset()
+                cache.owner = self
+                cache.revision = revision
+        if cache is None or self.use_mod:
             if cache is not None:
                 cache.reset()
-            return self._logits(window)
+            return self._logits(window, interrupt=interrupt)
+        if self._accel is not None:
+            # Accelerator owns its own resident KV tensors; never reuse the
+            # reference Python float-list cache with another device.
+            # Clearing this occupancy mirror is not an accelerator cache
+            # rebuild. Count real resets inside the locked device transition.
+            cache.K = [[] for _ in range(cache.n_layers)]
+            cache.V = [[] for _ in range(cache.n_layers)]
+            cache.tokens = []
+            cache.next_position = 0
+            cache.last_logits = None
+            cache.reserved_bytes = 0
+            interruption: list[BaseException] = []
+            metrics: dict[str, int] = {}
+
+            def poll() -> None:
+                if interrupt is not None:
+                    try:
+                        interrupt()
+                    except BaseException as exc:
+                        interruption.append(exc)
+                        raise
+
+            try:
+                # Snapshot logits and cache occupancy in the same locked
+                # accelerator transition; separate reads can cross requests.
+                if interrupt is None:
+                    logits, resident_ids = self._accel.logits_window_with_cache(
+                        window, metrics=metrics,
+                    )
+                else:
+                    logits, resident_ids = self._accel.logits_window_with_cache(
+                        window, interrupt=poll, metrics=metrics,
+                    )
+                cache.tokens.extend(resident_ids)
+                cache.reset_count += metrics.get("cache_resets", 0)
+                cache.reserved_bytes = metrics.get("reserved_kv_bytes", 0)
+                return list(logits)
+            except MemoryError:
+                # An explicit KV allocation ceiling is an admission limit,
+                # not a hint to silently allocate an unbudgeted Python cache.
+                cache.reset()
+                raise
+            except Exception as exc:
+                if interruption and exc is interruption[-1]:
+                    # An operator cancellation is not a failed accelerator
+                    # kernel and must never trigger a CPU retry.
+                    raise
+                if getattr(self, "_strict_device_request", False):
+                    raise RuntimeError(
+                        "strict accelerator policy forbids silent CPU fallback"
+                    ) from exc
+                if (
+                    self._accel.kv_dtype_name != "fp32"
+                    or self._accel.max_kv_bytes is not None
+                ):
+                    cache.reset()
+                    raise RuntimeError(
+                        "explicit Torch KV policy forbids silent CPU fallback"
+                    ) from exc
+                self._sync_accelerator()
+                self._accel = None
+                self.resident = False
+                self.device = "cpu"
+                # Exact reference fallback on unsupported kernels/devices.
+                return self._logits(window, interrupt=interrupt)
+        if cache.tokens == window and cache.last_logits is not None:
+            return list(cache.last_logits)
         if cache.primed_for(window):
-            return self._step(window[-1], cache)
+            return self._step(window[-1], cache, interrupt=interrupt)
+        if (cache.tokens and len(cache.tokens) < len(window)
+                and window[:len(cache.tokens)] == cache.tokens):
+            for idx in window[len(cache.tokens):-1]:
+                self._step(idx, cache, project=False, interrupt=interrupt)
+            return self._step(window[-1], cache, interrupt=interrupt)
+        # In a single-layer pure rotary model, K/V are independent of
+        # preceding tokens: once the cache fills, eviction is sufficient. Learned
+        # absolute position embeddings are NOT shift-equivariant and retain
+        # their conservative re-prime behavior for checkpoint compatibility.
+        if (
+            self.position_mode == "rope"
+            # In deeper models the previous token's K/V depends on evicted
+            # tokens through earlier layers. Reuse would silently change
+            # the full-window reference result; preserve exact parity.
+            and self.n_layers == 1
+            and len(cache.tokens) == min(self.ctx, cache.ctx)
+            and cache.tokens[1:] == window[:-1]
+        ):
+            for keys, values in zip(cache.K, cache.V):
+                del keys[0]
+                del values[0]
+            del cache.tokens[0]
+            return self._step(window[-1], cache, interrupt=interrupt)
         cache.reset()
         for idx in window[:-1]:
-            self._step(idx, cache)
-        return self._step(window[-1], cache)
+            # Prefill needs the residual stream and K/V, not a vocabulary
+            # projection for every prompt token.
+            self._step(idx, cache, project=False, interrupt=interrupt)
+        return self._step(window[-1], cache, interrupt=interrupt)
 
     def hidden(self, prefix: str) -> List[float]:
         """Last-position context after the stacked residual stream."""
@@ -590,21 +859,19 @@ class TinyTransformer:
         return list(seq[-1]) if seq else zeros(self.dim)
 
     def hidden_seq(self, prefix: str) -> List[List[float]]:
-        """Full residual stream. Callosum reads this, not just the last token."""
-        ids = self._ids(prefix)
-        ids = ids[-self.ctx:]
-        if self._accel is not None:
-            try:
-                h = list(self._accel.hidden(ids))
-                H, _ = self._forward(ids)
-                return [list(row) for row in H] if H else [h]
-            except Exception:
-                self._accel = None
-                self.resident = False
+        """Full residual stream for the Callosum, not just the last token.
+
+        The reference graph owns full-sequence introspection. Avoid a redundant
+        GPU forward pass (which yielded only a final state), and explicitly
+        synchronize real SGD mutations before using the Python reference.
+        """
+        ids = self._ids(prefix)[-self.ctx:]
+        self._sync_accelerator()
         H, _ = self._forward(ids)
         return [list(row) for row in H] if H else [zeros(self.dim)]
 
     def weights_last(self, prefix: str) -> List[float]:
+        self._sync_accelerator()
         ids = self._ids(prefix)
         ids = ids[-self.ctx:]
         _H, caches = self._forward(ids)
@@ -624,8 +891,15 @@ class TinyTransformer:
             try:
                 return float(self._accel.sgd(ids, target, lr))
             except Exception:
+                # A partially applied GPU SGD must not be silently replaced
+                # with a second CPU update using stale canonical parameters.
+                self._sync_accelerator()
                 self._accel = None
                 self.resident = False
+                self.device = "cpu"
+                raise RuntimeError(
+                    "accelerated SGD failed; synchronized state requires explicit retry"
+                )
         n = len(ids)
         D = self.dim
         H, caches = self._forward(ids)
@@ -659,7 +933,8 @@ class TinyTransformer:
             dx = dH[t]
             for d in range(D):
                 self.E[idx][d] -= lr * dx[d]
-                self.P[t][d] -= lr * dx[d]
+                if self.position_mode != "rope":
+                    self.P[t][d] -= lr * dx[d]
         self.steps += 1
         return loss
 
@@ -706,12 +981,8 @@ class TinyTransformer:
 
     def decode(self, prefix: str, *, n: int = 14, seed: int = 0) -> str:
         """Next-token decode on the bound device (CPU default, CUDA if harnessed)."""
-        if self._accel is not None:
-            try:
-                return str(self._accel.decode(prefix, n=n, seed=seed))
-            except Exception:
-                self._accel = None
-                self.resident = False
+        # Use the same sampling and fallback policy on every device. The
+        # logits boundary owns accelerator failure and weight synchronization.
         return " ".join(self.generate(prefix, n=n, seed=seed))
 
     def _unembed(self, y: Sequence[float]) -> List[float]:
@@ -778,6 +1049,9 @@ class TinyTransformer:
         top_p: float = 1.0,
         use_cache: bool = True,
     ) -> Tuple[str, ...]:
+        """Return exactly n new tokens, excluding the conditioning prefix."""
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError("n must be a nonnegative integer")
         rng = random.Random(int(seed) & 0xFFFFFFFF)
         if isinstance(prefix, str):
             ids = self._ids(prefix)
@@ -785,23 +1059,21 @@ class TinyTransformer:
             ids = [self._id(str(t)) for t in prefix] or [self.unk]
         out = list(ids)
         cache = KVCache(self.n_layers, self.ctx) if use_cache else None
-        for _ in range(max(1, n)):
+        generated: List[int] = []
+        for _ in range(n):
             window = out[-self.ctx:]
             logits = self._logits_window(window, cache)
             nxt = sample_logits(
                 logits, rng, temperature=temperature, top_k=top_k, top_p=top_p,
             )
             out.append(int(nxt))
-        return tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in out[:n])
+            generated.append(int(nxt))
+        return tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in generated)
 
     def snapshot(self) -> Dict[str, Any]:
-        if self._accel is not None:
-            try:
-                self._accel.sync()
-            except Exception:
-                pass
+        self._sync_accelerator()
         L0 = self.layers[0]
-        return {
+        snapshot = {
             "dim": self.dim,
             "ctx": self.ctx,
             "n_heads": self.n_heads,
@@ -831,6 +1103,18 @@ class TinyTransformer:
             "use_mod": bool(self.use_mod),
             "mod": None if self.mod is None else self.mod.snapshot(),
         }
+        # Keep all legacy learned-position snapshot bytes and digests stable.
+        # A new rotary-only model includes an explicit architecture identity.
+        if self.position_mode == "rope":
+            snapshot["position_mode"] = "rope"
+        special_tokens = {"unk": self.unk}
+        for name in ("pad", "bos", "eos"):
+            value = getattr(self, name, None)
+            if value is not None:
+                special_tokens[name] = value
+        if special_tokens != {"unk": 0}:
+            snapshot["special_tokens"] = special_tokens
+        return snapshot
 
     @classmethod
     def from_snapshot(cls, data: Dict[str, Any]) -> "TinyTransformer":
@@ -846,12 +1130,23 @@ class TinyTransformer:
             d_ff=int((data or {}).get("d_ff") or 0),
             norm=str((data or {}).get("norm") or "ln"),
             ffn_kind=str((data or {}).get("ffn_kind") or "gelu"),
+            position_mode=str((data or {}).get("position_mode") or "learned_rope"),
             use_mod=bool((data or {}).get("use_mod")),
             mod_deep=float(((data or {}).get("mod") or {}).get("router", {}).get("deep_capacity") or 0.25),
             mod_shallow=float(((data or {}).get("mod") or {}).get("router", {}).get("shallow_capacity") or 0.25),
         )
         lm.itos = itos
         lm.stoi = {t: i for i, t in enumerate(itos)}
+        special_tokens = (data or {}).get("special_tokens")
+        if special_tokens is not None:
+            if (not isinstance(special_tokens, dict) or "unk" not in special_tokens
+                    or set(special_tokens) - {"unk", "pad", "bos", "eos"}
+                    or any(type(value) is not int or not 0 <= value < len(itos)
+                           for value in special_tokens.values())
+                    or len(set(special_tokens.values())) != len(special_tokens)):
+                raise ValueError("invalid transformer special token declarations")
+            for name, value in special_tokens.items():
+                setattr(lm, name, value)
         def _m(key: str, cur: List[List[float]]) -> List[List[float]]:
             raw = (data or {}).get(key)
             return [list(map(float, row)) for row in raw] if raw else cur
@@ -888,9 +1183,11 @@ class TinyTransformer:
         lm.fitted = int((data or {}).get("fitted") or 0)
         lm.steps = int((data or {}).get("steps") or 0)
         lm.device = str((data or {}).get("device") or "cpu")
-        if lm.device == "cuda":
+        if lm.device in {"cuda", "mps"}:
+            # Snapshots are portable weights, never proof of a bound accelerator.
+            lm.requested = lm.device
             lm.device = "cpu"
-            lm.requested = "cuda"
+            lm.resident = False
         return lm
 
 

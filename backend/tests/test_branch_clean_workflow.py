@@ -45,7 +45,11 @@ def test_branch_cleanup_never_uses_commit_age_as_creation_age_fallback() -> None
 
     assert unknown_creation_guard < delayed_create_guard < commit_age_lookup
     assert commit_age_lookup < deletion_candidate
-    assert "Missing branch creation history or branch event history always preserves refs." in text
+    # Missing creation history preserves all unmerged branches. A prior
+    # matching, grace-aged merged-PR head is the sole audited exception.
+    assert 'if [[ -z "${merged_pr_head_tips[$merged_key]+x}" ]]; then' in text
+    assert 'printf \'%s %s creation-age-unknown\\n\'' in text
+    assert 'merged_without_create_count=$((merged_without_create_count + 1))' in text
 
 
 def test_branch_cleanup_preserves_delayed_recreation() -> None:

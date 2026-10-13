@@ -97,8 +97,10 @@ def load_machine_config(root: str | Path) -> MachineConfig:
     if not isinstance(default_owner, str) or not default_owner.strip():
         raise ValueError("default_owner must be text")
 
-    prefixes = ignore.get("prefixes", ())
-    suffixes = ignore.get("suffixes", ())
+    # Optional ignore lists are empty arrays when the section is omitted.
+    # Explicit non-array values still fail closed rather than being coerced.
+    prefixes = ignore.get("prefixes", [])
+    suffixes = ignore.get("suffixes", [])
     if not isinstance(prefixes, list) or not isinstance(suffixes, list):
         raise ValueError("ignore lists must be arrays")
 

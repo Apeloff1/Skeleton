@@ -253,13 +253,15 @@ def test_duplicate_claim_verification_is_rejected() -> None:
     second = verification_receipt(
         receipt_id="88888888-8888-4888-8888-888888888888",
     )
-    decision = evaluate(
-        CHAT_VERIFICATION_PROFILES["structural"],
-        first,
-        second,
-    )
-    assert decision.accepted is False
-    assert "duplicate_claim_verification" in decision.reasons
+    with pytest.raises(
+        ChatVerificationAcceptanceError,
+        match="claim identities must be unique",
+    ):
+        evaluate(
+            CHAT_VERIFICATION_PROFILES["structural"],
+            first,
+            second,
+        )
 
 
 def test_empty_receipt_set_fails_closed() -> None:

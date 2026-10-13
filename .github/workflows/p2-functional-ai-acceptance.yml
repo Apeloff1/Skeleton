@@ -96,6 +96,7 @@ jobs:
           skeleton/testing/test_local_model_deployment.py
           skeleton/testing/test_vs001_functional_ai.py
           tests/test_p2_functional_ai_closure.py
+          tests/test_p2_tranche1_activated.py
           tests/test_p2_functional_ai_exact_head.py
           skeleton/testing/test_execution_runtime.py::test_cooperative_provider_cancellation_aborts_inflight_provider
           skeleton/testing/test_execution_runtime.py::test_expired_deadline_fails_before_provider_io

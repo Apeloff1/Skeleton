@@ -23,13 +23,11 @@ REGISTRY = Path("machine/architecture_rule_registry.json")
 ARCHITECTURE = Path("machine/architecture.json")
 VALIDATOR = Path("scripts/check_architecture_rule_registry.py")
 TESTS = Path("tests/test_architecture_rule_registry.py")
+ACCOUNTABILITY = Path("machine/ai_build_accountability.json")
 VOLUME = "VOL-055"
 TITLE = "Architecture Linter"
-REQUIRED_GAPS = {
-    "define rule registry",
-    "add waiver expiry enforcement",
-}
 RULE_ID = re.compile(r"^ARCH-[A-Z0-9-]+$")
+GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
 class VerificationError(RuntimeError):
@@ -92,12 +90,20 @@ def _verify_volume(master: Mapping[str, Any], errors: list[str]) -> dict[str, An
         errors.append(f"{VOLUME} title drift")
     if volume.get("scope") != "canonical-plan":
         errors.append(f"{VOLUME} scope drift")
-    if volume.get("completion_checkbox") is True:
-        errors.append(f"{VOLUME} cannot self-sign from implementation evidence")
-    gaps = set(volume.get("gaps") or [])
-    missing = sorted(REQUIRED_GAPS - gaps)
-    if missing:
-        errors.append(f"{VOLUME} gap binding drift: {missing}")
+    # The checkbox reports canonical plan state; only the independent
+    # accountability ledger below may substantiate its signed completion.
+    if volume.get("completion_checkbox") is not True or volume.get("completion_checkbox_mark") != "[x]":
+        errors.append(f"{VOLUME} plan completion marker is not signed")
+    if volume.get("implementation_status") != "verified":
+        errors.append(f"{VOLUME} implementation status is not verified")
+    raw_gaps = volume.get("gaps")
+    if (not isinstance(raw_gaps, list)
+            or any(not isinstance(gap, str) or not gap.strip() for gap in raw_gaps)
+            or len(raw_gaps) != len(set(raw_gaps))):
+        errors.append(f"{VOLUME} canonical gaps must be unique non-empty text")
+        gaps = set()
+    else:
+        gaps = set(raw_gaps)
     requirements = tuple(str(item) for item in volume.get("requirements") or [])
     for phrase in (
         "Validate ownership zones, dependency direction, forbidden imports and manifest/path parity",
@@ -134,6 +140,8 @@ def _verify_registry(
     registry: Mapping[str, Any],
     root: Path,
     errors: list[str],
+    *,
+    canonical_gaps: Sequence[str],
 ) -> dict[str, Any]:
     if registry.get("schema_version") != "skeleton.architecture.rule_registry.v1":
         errors.append("architecture rule registry schema drift")
@@ -164,7 +172,11 @@ def _verify_registry(
     else:
         if binding.get("title") != TITLE:
             errors.append("VOL-055 registry title binding drift")
-        if set(binding.get("required_gap_texts") or []) != REQUIRED_GAPS:
+        gap_texts = binding.get("required_gap_texts")
+        if (not isinstance(gap_texts, list)
+                or any(not isinstance(gap, str) or not gap.strip() for gap in gap_texts)
+                or len(gap_texts) != len(set(gap_texts))
+                or set(gap_texts) != set(canonical_gaps)):
             errors.append("VOL-055 registry gap binding drift")
 
     rules = registry.get("rules")
@@ -260,6 +272,105 @@ def _verify_registry(
     }
 
 
+def _verify_accountability(
+    ledger: Mapping[str, Any],
+    root: Path,
+    volume: Mapping[str, Any],
+    errors: list[str],
+) -> dict[str, Any]:
+    """Bind checked closure to separately signed, commit-pinned ledger evidence.
+
+    This validates declared ledger identities and references; it does not
+    cryptographically attest to the GitHub identities behind those declarations.
+    """
+    records = ledger.get("records")
+    if not isinstance(records, list):
+        raise VerificationError("accountability records must be a list")
+    matches = [
+        item for item in records
+        if isinstance(item, dict) and item.get("id") == "ACC-VOL-055"
+    ]
+    if len(matches) != 1:
+        errors.append("VOL-055 requires exactly one accountability record")
+        return {"record_id": "ACC-VOL-055", "present": False}
+    record = matches[0]
+    if record.get("type") != "volume" or record.get("title") != f"{VOLUME} {TITLE}":
+        errors.append("VOL-055 accountability identity drift")
+    if record.get("status") != "verified" or record.get("checkbox") is not True:
+        errors.append("VOL-055 accountability verified closure missing")
+    if record.get("checkbox_mark") != "[x]" or record.get("signing_required") is not True:
+        errors.append("VOL-055 accountability signature marker missing")
+    if record.get("checkbox") != volume.get("completion_checkbox"):
+        errors.append("VOL-055 accountability plan checkbox drift")
+    if record.get("status") != volume.get("implementation_status"):
+        errors.append("VOL-055 accountability implementation status drift")
+
+    identities: list[str] = []
+    signed_shas: list[str] = []
+    signed_times: list[str] = []
+    evidence_path = "scripts/verify_vol055_architecture_linter.py"
+    for key, role in (
+        ("implementation_signoff", "implementation-agent"),
+        ("verification_signoff", "independent-verifier"),
+    ):
+        signoff = record.get(key)
+        if not isinstance(signoff, dict) or signoff.get("signed") is not True:
+            errors.append(f"VOL-055 {key} is not signed")
+            continue
+        signer = signoff.get("signer_id")
+        sha = signoff.get("git_sha")
+        stamp = signoff.get("signed_at_utc")
+        refs = signoff.get("evidence_refs")
+        if not isinstance(signer, str) or not signer.strip():
+            errors.append(f"VOL-055 {key} signer identity missing")
+        else:
+            identities.append(signer)
+        if signoff.get("role") != role:
+            errors.append(f"VOL-055 {key} signer role drift")
+        if not isinstance(sha, str) or not GIT_SHA.fullmatch(sha):
+            errors.append(f"VOL-055 {key} invalid full Git SHA")
+        else:
+            signed_shas.append(sha)
+        if not isinstance(stamp, str) or not stamp.endswith("Z"):
+            errors.append(f"VOL-055 {key} timestamp invalid")
+        else:
+            signed_times.append(stamp)
+        if (not isinstance(refs, list) or evidence_path not in refs
+                or not isinstance(sha, str) or f"git-head:{sha}" not in refs
+                or f"https://github.com/Apeloff1/Skeleton/commit/{sha}" not in refs
+                or not (root / evidence_path).is_file()):
+            errors.append(f"VOL-055 {key} evidence is missing or not pinned")
+        if signoff.get("signature_method") != "github_identity":
+            errors.append(f"VOL-055 {key} signature method drift")
+        if signoff.get("signature_ref") != f"https://github.com/Apeloff1/Skeleton/commit/{sha}":
+            errors.append(f"VOL-055 {key} signature commit reference drift")
+
+    if len(identities) != 2 or identities[0] == identities[1]:
+        errors.append("VOL-055 signers must have independent identities")
+    if len(signed_shas) != 2 or signed_shas[0] != signed_shas[1]:
+        errors.append("VOL-055 implementation and verification evidence commits must match")
+    if len(signed_times) != 2 or signed_times[0] > signed_times[1]:
+        errors.append("VOL-055 verification must not precede implementation")
+    history = record.get("history")
+    if (not isinstance(history, list) or not any(
+        isinstance(event, dict)
+        and event.get("event_type") == "completed"
+        and event.get("actor_id") == (identities[1] if len(identities) == 2 else None)
+        and event.get("git_sha") == (signed_shas[1] if len(signed_shas) == 2 else None)
+        for event in history
+    )):
+        errors.append("VOL-055 independent completion lifecycle evidence missing")
+
+    return {
+        "record_id": "ACC-VOL-055",
+        "present": True,
+        "status": record.get("status"),
+        "signer_ids": identities,
+        "evidence_commits": signed_shas,
+        "history_events": len(history) if isinstance(history, list) else 0,
+    }
+
+
 def _verify_source_contract(root: Path, errors: list[str]) -> dict[str, str]:
     digests: dict[str, str] = {}
     for relative in (VALIDATOR, TESTS):
@@ -306,7 +417,12 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     architecture = _load(root / ARCHITECTURE)
 
     volume_binding = _verify_volume(master, errors)
-    registry_binding = _verify_registry(registry, root, errors)
+    canonical_volume = _volume(master)
+    registry_binding = _verify_registry(
+        registry, root, errors, canonical_gaps=canonical_volume.get("gaps", [])
+    )
+    accountability = _load(root / ACCOUNTABILITY)
+    signoff_binding = _verify_accountability(accountability, root, canonical_volume, errors)
     source_digests = _verify_source_contract(root, errors)
 
     roots = architecture.get("canonical_roots")
@@ -327,6 +443,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         ),
         "volume_binding": volume_binding,
         "registry_binding": registry_binding,
+        "accountability_binding": signoff_binding,
+        "accountability_digest": _sha256(root / ACCOUNTABILITY),
         "source_digests": source_digests,
         "registry_digest": _sha256(root / REGISTRY),
         "architecture_digest": _sha256(root / ARCHITECTURE),

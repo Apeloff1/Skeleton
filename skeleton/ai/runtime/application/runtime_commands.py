@@ -357,10 +357,48 @@ def _run_handler(state: Any):
         if gameforge is None:
             raise CommandError("unavailable", "GameForge runtime is not initialized")
         answers = require_mapping(payload, "answers", {}, optional=False)
+        target = require_text(payload, "target", "json", allowed=MATERIALISE_TARGETS)
+        if target == "godot":
+            # A Godot request uses the same ten-stage engine as `skeleton run`.
+            # Keep HTTP/command calls in-memory: a remote caller must never be
+            # able to select a server filesystem destination or overwrite mode.
+            if any(name in payload for name in ("out", "project_root", "overwrite")):
+                raise CommandError("invalid_argument", "godot API generation does not accept filesystem output paths")
+            from skeleton.context.pipeline import GameForgeRun
+            from skeleton.context.questionnaire import validate_answers
+
+            try:
+                valid_answers = validate_answers(answers)
+            except ValueError as exc:
+                raise CommandError("invalid_argument", str(exc)) from exc
+            title = require_text(payload, "title", None, optional=True)
+            vision = require_text(payload, "vision", "") or title or ""
+            if len(vision) > _MAX_VISION_CHARS:
+                raise CommandError("invalid_argument", "vision exceeds 4096 characters")
+            era = require_text(payload, "era", None, optional=True)
+            archetype = require_text(payload, "archetype", None, optional=True)
+            generation = require_text(payload, "generation", None, optional=True)
+            mode = require_text(payload, "playtest", "off", allowed=("off", "auto", "require"))
+            repair = require_bool(payload, "repair", True)
+            repair_mode = require_text(
+                payload, "repair_mode", "apply" if repair else "suggest",
+                allowed=("apply", "suggest"),
+            )
+            report = GameForgeRun().execute(
+                vision, era=era, archetype=archetype, target="godot",
+                answers=valid_answers, generation=generation,
+                playtest=mode, repair_mode=repair_mode,
+            )
+            if not report.get("succeeded"):
+                raise CommandError("unavailable", "ten-stage GameForge generation did not complete")
+            return {"game": report, "status": "generated", "engine": "gameforge_ten_stage"}
+
+        # JSON/YAML game-spec compatibility remains stable. Migrating those
+        # targets to the full pipeline requires an explicit format contract.
         spec = gameforge.run(
             answers,
             title=require_text(payload, "title", None, optional=True),
-            target=require_text(payload, "target", "json", allowed=MATERIALISE_TARGETS),
+            target=target,
             repair=require_bool(payload, "repair", False),
         )
         game = spec.to_dict() if hasattr(spec, "to_dict") else spec

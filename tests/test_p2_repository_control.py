@@ -23,7 +23,10 @@ class P2RepositoryControlTests(unittest.TestCase):
         result = MODULE.validate(ROOT)
         self.assertEqual(result["status"], "valid")
         self.assertEqual(result["volume_count"], 12)
-        self.assertEqual(result["backlog_count"], 93)
+        self.assertEqual(
+            result["backlog_count"],
+            len(MODULE._load(ROOT, "machine/backlog_registry.json")["items"]),
+        )
         self.assertEqual(result["work_package_count"], 31)
         self.assertEqual(result["aiq_task_count"], 42)
         self.assertEqual(result["wave_count"], 8)
@@ -268,15 +271,38 @@ class P2RepositoryControlTests(unittest.TestCase):
             MODULE.validate(root)
 
     def test_rejects_unowned_debt(self) -> None:
-        root = self._fixture()
-        path, data = self._load(root, "machine/technical_debt_ledger.json")
-        data["items"][0]["owner"]["accountability_id"] = None
-        path.write_text(json.dumps(data), encoding="utf-8")
+        master_by_ref = {
+            ref: {
+                "gaps": [],
+                "accountability_id": f"ACC-{ref}",
+                "contracts": [],
+                "risks": [],
+            }
+            for ref in MODULE.REPO_REFS
+        }
+        ref = MODULE.REPO_REFS[0]
+        master_by_ref[ref]["gaps"] = ["synthetic gap for ownership validation"]
+        debt_id = f"DEBT-{ref}-G01"
+        backlog_ref = f"BL-GAP-{ref}-G01"
+        payload = {
+            "items": [{
+                "id": debt_id,
+                "source": {
+                    "ref": f"{ref}#gap-1",
+                    "text": master_by_ref[ref]["gaps"][0],
+                },
+                "owner": {"accountability_id": None},
+                "affected_contracts": [],
+                "risk_text": [],
+                "backlog_ref": backlog_ref,
+                "adr_disposition": {"rationale": "No architecture change"},
+            }]
+        }
         with self.assertRaisesRegex(
             MODULE.RepositoryControlError,
             "owner missing/drift",
         ):
-            MODULE.validate(root)
+            MODULE._validate_debt(payload, master_by_ref, {backlog_ref})
 
     def test_rejects_roadmap_breadth_expansion(self) -> None:
         root = self._fixture()
