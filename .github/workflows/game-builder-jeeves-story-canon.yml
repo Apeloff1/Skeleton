@@ -14,10 +14,12 @@ on:
       - "skeleton/ai/game_builder/jeeves_appwide_fabric.py"
       - "skeleton/ai/game_builder/jeeves_capability_intelligence.py"
       - "skeleton/ai/game_builder/jeeves_completion_census.py"
+      - "skeleton/ai/game_builder/jeeves_evidence_graph.py"
       - "tests/test_game_builder_jeeves_app_runtime.py"
       - "tests/test_game_builder_jeeves_appwide_fabric.py"
       - "tests/test_game_builder_jeeves_capability_intelligence.py"
       - "tests/test_game_builder_jeeves_completion_census.py"
+      - "tests/test_game_builder_jeeves_evidence_graph.py"
       - "docs/JEEVES_APP_CAPABILITY_ATLAS.md"
       - "docs/JEEVES_WHOLE_REPO_INVENTORY_AND_GOVERNED_ACTIONS.md"
       - "docs/JEEVES_APP_COMPLETION_CENSUS_2026_10.md"
@@ -102,6 +104,7 @@ jobs:
             tests/test_game_builder_jeeves_appwide_fabric.py
             tests/test_game_builder_jeeves_capability_intelligence.py
             tests/test_game_builder_jeeves_completion_census.py
+            tests/test_game_builder_jeeves_evidence_graph.py
             tests/test_game_builder_story_asset_pixels.py
             tests/test_game_builder_system_editors.py
       - name: Setup Python
@@ -115,11 +118,11 @@ jobs:
       - name: Compile project canon and editor glue
         shell: bash
         run: |
-          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/jeeves_app_runtime.py skeleton/ai/game_builder/jeeves_appwide_fabric.py skeleton/ai/game_builder/jeeves_capability_intelligence.py skeleton/ai/game_builder/jeeves_completion_census.py skeleton/ai/game_builder/story_cinematic_review.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
+          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/jeeves_app_runtime.py skeleton/ai/game_builder/jeeves_appwide_fabric.py skeleton/ai/game_builder/jeeves_capability_intelligence.py skeleton/ai/game_builder/jeeves_completion_census.py skeleton/ai/game_builder/jeeves_evidence_graph.py skeleton/ai/game_builder/story_cinematic_review.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
       - name: Check app-wide Jeeves tools, all system editors, forge graph, Dragon, learning and 9999-scene receipts
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census -v
+          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census tests.test_game_builder_jeeves_evidence_graph -v
       - name: Reconcile real exact-head masterplan and product AI authority
         shell: bash
         run: |
@@ -147,6 +150,23 @@ jobs:
           assert len(frontier["tasks"]) == 20
           assert frontier["next_offset"] == 20
           assert frontier["census_digest"] == report["digest"]
+          from skeleton.ai.game_builder.jeeves_evidence_graph import JeevesEvidenceGraph
+          graph = JeevesEvidenceGraph(inventory)
+          evidence = graph.overview()
+          assert evidence["kind_counts"]["masterplan_volume"] == 421
+          assert evidence["kind_counts"]["ai_product_capability"] == 9
+          assert evidence["kind_counts"]["architecture_plane"] == 27
+          assert evidence["kind_counts"]["application_service"] == 5
+          assert evidence["kind_counts"]["enterprise_workstream"] == 16
+          assert evidence["kind_counts"]["required_end_to_end_journey"] == 12
+          assert evidence["node_count"] < 30000
+          assert evidence["declarations_are_not_permissions"]
+          assert not evidence["source_presence_is_not_a_running_app"] is False
+          page = graph.neighborhood("cap:assistant.text", depth=1,
+                                    expected_graph_digest=evidence["digest"])
+          assert len(page["nodes"]) >= 2
+          assert all(not edge["runtime_verified"] for edge in page["edges"])
+
           assert all(not task["automatic_execution_authorized"] and
                      not task["release_qualified"] for task in frontier["tasks"])
           assert not report["readiness"]["release_qualified"]
