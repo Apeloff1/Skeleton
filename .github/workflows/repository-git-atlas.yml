@@ -1,0 +1,83 @@
+name: Git repository atlas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "43 2 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: git-atlas-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install canonical machine package
+        run: python -m pip install .
+
+      - name: Verify exhaustive Git atlas regression contracts
+        run: python -m unittest skeleton.testing.test_repo_git_atlas -v
+
+      - name: Generate complete pinned file and exact-duplicate atlas
+        run: |
+          python -m skeleton.repo_machine.git_atlas --root . --output .machine/git-atlas
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import subprocess
+
+          dest = Path(".machine/git-atlas")
+          summary = json.loads((dest / "summary.json").read_text(encoding="utf-8"))
+          actual_commit = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"], text=True
+          ).strip()
+          actual_tree = subprocess.check_output(
+              ["git", "rev-parse", "HEAD^{tree}"], text=True
+          ).strip()
+          if summary["commit"] != actual_commit or summary["tree"] != actual_tree:
+              raise SystemExit("Atlas provenance diverges from checked-out Git revision")
+          if summary["complete"] is not True:
+              raise SystemExit("Git atlas was not exhaustive")
+          rows = (dest / "files.jsonl").read_bytes().splitlines()
+          if len(rows) != summary["tracked_entries"]:
+              raise SystemExit("File inventory count mismatch")
+          if summary["tracked_entries"] != summary["blobs"] + summary["gitlinks"]:
+              raise SystemExit("Unaccounted Git entries")
+          for name, expected in summary["artifact_sha256"].items():
+              if hashlib.sha256((dest / name).read_bytes()).hexdigest() != expected:
+                  raise SystemExit(f"Artifact checksum mismatch: {name}")
+          print("Verified", summary["tracked_entries"], "Git records at", actual_commit)
+          PY
+
+      - name: Publish versioned read-only atlas
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: git-atlas-${{ github.sha }}
+          path: |
+            .machine/git-atlas/files.jsonl
+            .machine/git-atlas/summary.json
+            .machine/git-atlas/exact-duplicates.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 21
+          compression-level: 9
