@@ -385,6 +385,8 @@ OPERATIONS = {
     "studio.production.stage":("proposal", "reviewed original game system or scene source proposals",True),
     "studio.production.release_plan":("compute", "original replay-proven browser and Godot source package",True),
     "studio.production.release_stage":("proposal", "original browser and Godot artifact review staging",True),
+    "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
+    "studio.production.commit_bundle":("external_effect", "explicit human-approved original source commit group",True),
     "studio.tree":("read", "active project files",False),
     "studio.file":("read", "active project source",False),
     "studio.propose":("proposal", "targeted human-reviewed project edit",True),
@@ -548,6 +550,13 @@ class JeevesAppwideRuntime:
                 result=release.plan(**params, operator_authorized=authorized)
             else:
                 result=release.stage(**params, operator_authorized=authorized)
+        elif action in ("studio.production.review_bundle", "studio.production.commit_bundle"):
+            from .jeeves_production_review import JeevesProductionReview
+            review=JeevesProductionReview(inv, ws)
+            if action=="studio.production.review_bundle":
+                result=review.review(**params)
+            else:
+                result=review.commit(**params, operator_authorized=authorized)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
