@@ -49,7 +49,7 @@ HUD_C=r''' /* Original-game status strip: real state and verified par data.
  }
 '''
 def enable_original_native_hud(source:str)->str:
-    if not isinstance(source,str) or source.count(ANCHOR)!=1:
+    if not isinstance(source,str) or source.count(ANCHOR)!=1 or HUD_C in source:
         raise ValueError("SDL2 original game frame renderer changed")
     if "native_puzzle_stars()" not in source or "render_original_game" not in source:
         raise ValueError("HUD requires native original game score and physics")
