@@ -86,6 +86,7 @@ class JeevesWorkbench:
         principal_id: str,
         read_authorize: Callable[..., bool],
         orchestration_authorize: Callable[..., bool],
+        core: Jeeves | None = None,
         source_read_authorize: Callable[..., bool] | None = None,
         shadow_write_authorize: Callable[..., bool] | None = None,
         shadow_review_verify: Callable[..., bool] | None = None,
@@ -120,7 +121,9 @@ class JeevesWorkbench:
         self._scope = _private_directory(base, self.tenant_id, self.project_id)
         self._lock = RLock()
         self._closed = False
-        self._core = Jeeves()
+        if core is not None and not isinstance(core, Jeeves):
+            raise JeevesWorkbenchError("core must be an existing Jeeves instance")
+        self._core = core if core is not None else Jeeves()
         self._read_authorize = read_authorize
         self._orchestration_authorize = orchestration_authorize
         self._source_read_authorize = source_read_authorize
