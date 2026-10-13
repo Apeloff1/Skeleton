@@ -150,6 +150,22 @@ class GitAtlasTests(unittest.TestCase):
             self.assertEqual(summary["case_collision_count"], 1)
             self.assertEqual(len([item for item in entries if item["path"].lower() == "app/case.py"]), 2)
 
+    def test_uncommitted_authority_change_fails_closed(self) -> None:
+        temp, root = self.make_repository()
+        with temp:
+            policy = root / ".machine/repository.toml"
+            policy.write_text(POLICY + "\n# dirty authority\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "differs from pinned Git commit"):
+                build(root)
+
+    def test_symlink_output_fails_closed(self) -> None:
+        temp, root = self.make_repository()
+        with temp:
+            output = root / "unsafe-index"
+            output.symlink_to(root / "machine", target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "symbolic link"):
+                write(root, output)
+
     def test_missing_canonical_authority_fails_closed(self) -> None:
         temp, root = self.make_repository()
         with temp:
