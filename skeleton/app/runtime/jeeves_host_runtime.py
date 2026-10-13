@@ -205,7 +205,10 @@ class JeevesApplicationRuntime:
                 },
                 "idle_learning": {
                     "worker_enabled": self.workbench.idle_executor is not None,
-                    "status": "host-invoked only; interactive requests take priority",
+                    "status": "host-invoked; cooperative worker preemption on live telemetry",
+                    "custody": self.workbench.idle_executor.history_head()
+                    if self.workbench.idle_executor is not None else None,
+                    "auto_replay": False,
                 },
                 "runtime_availability": "requires host readiness and execution grants",
                 "weights_loaded_by_jeeves": False,
