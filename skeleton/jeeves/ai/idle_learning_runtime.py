@@ -364,10 +364,13 @@ class JeevesIdleWorkExecutor:
         )
         return digest
 
-    def history_head(self) -> dict[str, Any]:
-        """Expose bounded, tamper-evident custody metadata, not worker payloads."""
+    def history_head(self, *, verify: bool = False) -> dict[str, Any]:
+        """Expose constant-time custody metadata; optionally replay evidence."""
+        if type(verify) is not bool:
+            raise IdleRuntimeError("history verification selection must be boolean")
         with self._lock:
-            self._verify_history()
+            if verify:
+                self._verify_history()
             head, count = self._db.execute(
                 "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
             ).fetchone()
