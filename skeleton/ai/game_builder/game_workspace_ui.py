@@ -1217,6 +1217,11 @@ async function cognitiveExecute(action,params){
  status("Canonical installed cognition invoked: "+action+
   ". This computes a decision, not a trained-model quality verification.");
 }
+$("jeeves-cognitive-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const plan=JSON.parse($("jeeves-cognitive-plan-json").value);
+ const vision=$("jeeves-cognitive-vision").value.trim();
+ await cognitiveExecute("ai.cognition.build_plan",{plan,vision});
+}));
 $("jeeves-cognitive-uncertainty").addEventListener("click",()=>dmGuard(async()=>{
  const candidates=JSON.parse($("jeeves-uncertainty-candidates").value);
  await cognitiveExecute("ai.cognition.uncertainty",{candidates});
@@ -5380,6 +5385,15 @@ inference. Self-reported confidence is not proven calibrated probability.</small
  {"text":"An original playable maze can be compiled with bounded walls.","confidence":0.81}
 ]</textarea></label>
 <button id="jeeves-cognitive-uncertainty" type="button">Execute installed uncertainty / abstention gate</button>
+<label>Original game build vision (quality verification input)
+<textarea id="jeeves-cognitive-vision" rows="2" spellcheck="false">An original retro fantasy RPG with tactical dungeon encounter exploration.</textarea></label>
+<label>Source-backed game plan fields for canonical planning quality gate
+<textarea id="jeeves-cognitive-plan-json" rows="4" spellcheck="false">{
+ "title":"Original Retro Fantasy RPG",
+ "era":"Retro Fantasy 1990s", "primary_dps":"Tactical melee",
+ "room_bias":"Dungeon encounter exploration"
+}</textarea></label>
+<button id="jeeves-cognitive-plan" type="button">Run installed original game plan verifier</button>
 <label>Reasoning risk level<select id="jeeves-reasoning-risk">
 <option value="low">Low</option>
 <option value="medium" selected>Medium</option>
