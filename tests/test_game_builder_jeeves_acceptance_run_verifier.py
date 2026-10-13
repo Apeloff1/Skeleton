@@ -70,6 +70,7 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
                     "command":["python","-m","unittest",module,"-q"],
                     "started_utc":"2026-10-13T11:00:00+00:00",
                     "ended_utc":"2026-10-13T11:00:01+00:00",
+                    "unittest_cases_observed":2,
                     "return_code":0,"timed_out":False,
                     "subprocess_executed":True,
                     "targeted_tests_passed_in_runner":True,
@@ -96,6 +97,7 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
                 "test_source_receipts":self.expected["module_source_receipts"],
                 "candidate_modules":2,"modules_actually_executed":2,
                 "modules_reporting_pass":2,
+                "total_unittest_cases_observed":4,
                 "selected_regression_suite_reported_success":True,
                 "run_results":result,
                 "full_app_completion_percent":None,
@@ -125,6 +127,7 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
         self.assertTrue(receipt["independent_ci_execution_verified"])
         self.assertEqual(receipt["verified_git_head"],self.commit)
         self.assertEqual(receipt["scheduled_test_modules_independently_confirmed"],2)
+        self.assertEqual([x["observed_unittest_cases"] for x in receipt["verified_os"]],[4,4])
         self.assertEqual({i["os"] for i in receipt["verified_os"]},{"Linux","Windows"})
         self.assertIsNone(receipt["full_app_completion_percent"])
         self.assertFalse(receipt["release_device_qualified"])
@@ -180,6 +183,8 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
         for mutation in (
             lambda x: x.update(modules_reporting_pass=1),
             lambda x: x["run_results"][0].update(return_code=1),
+            lambda x: x["run_results"][0].update(unittest_cases_observed=0),
+            lambda x: x.update(total_unittest_cases_observed=0),
             lambda x: x["run_results"][0].update(subprocess_executed=False),
             lambda x: x["run_results"][1].update(module="tests.test_unreviewed"),
             lambda x: x.update(full_app_completion_percent=100.0),
