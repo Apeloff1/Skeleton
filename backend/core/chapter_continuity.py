@@ -116,7 +116,9 @@ def chapter_context(
     """Evidence-bounded chapter context, newest scene first, with citations."""
     if not 256 <= max_chars <= 12000:
         raise ValueError("Invalid chapter context budget.")
-    expected = int(chapter["chapter"])
+    expected = chapter["chapter"]
+    if type(expected) is not int or not 1 <= expected <= MAX_CHAPTERS:
+        raise ValueError("Chapter context requires an exact chapter in 1..100.")
     ids: set[str] = set()
     parts: list[str] = []
     # NOTE: source notes are untrusted creator-authored fiction, not instructions.
@@ -137,8 +139,8 @@ def chapter_context(
     total = len(scenes)
     sorted_scenes = sorted(scenes, key=lambda x: (x["scene"], x["act"]), reverse=True)
     for scene in sorted_scenes:
-        if scene.get("chapter") != expected:
-            raise ValueError("A foreign chapter was included in context.")
+        if type(scene.get("chapter")) is not int or scene["chapter"] != expected:
+            raise ValueError("A foreign or invalid chapter was included in context.")
         scene_id = str(scene["scene"])
         if scene_id in ids:
             raise ValueError("Duplicate scene in chapter context.")
