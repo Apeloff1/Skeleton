@@ -130,6 +130,8 @@ def _validate_scope(doc):
             clean_roots.append(path)
         ids.add(name)
         result.append({**family, "source_roots": clean_roots})
+    if ids != {f"F{n:02d}" for n in range(1, 43)}:
+        raise JeevesAppwideError("42-family denominator changed; explicit audited scope migration required")
     return sorted(result, key=lambda f: f["id"])
 
 
@@ -329,7 +331,7 @@ class JeevesMeasuredCompletion:
         body = {
             "schema": SCHEMA + ".family_page",
             "measurement_digest": report["digest"],
-            "source_inventory_snapshot": inv._digest if False else self.inv._digest,
+            "source_inventory_snapshot": self.inv._digest,
             "scope_sha256": report["scope_sha256"],
             "offset": offset, "limit": limit,
             "domain": domain, "only_missing": only_missing,
