@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import os
 import sys
 import time
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from core.engine_client import (
     EngineAuthorizationError,
@@ -72,7 +72,7 @@ def _context() -> ContextEnvelope:
         compiler_version="container-boundary-v1",
     )
     return ContextEnvelope(
-        context_id=str(uuid4()),
+        context_id=str(uuid5(NAMESPACE_URL, "skeleton-context:" + digest)),
         operation_id=operation_id,
         execution_id=execution_id,
         turn_id=turn_id,
