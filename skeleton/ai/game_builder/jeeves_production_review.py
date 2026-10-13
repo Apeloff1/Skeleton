@@ -202,8 +202,37 @@ class JeevesProductionReview:
                     record["proposal_id"],
                     human_approved=True, authorized=True)
             except (WorkspaceError, OSError, ValueError) as exc:
+                # The canonical writer stores the source, then acceptance,
+                # then revision. A disk error between those operations can
+                # leave the failing file ALREADY CHANGED, even though
+                # commit() raised. Report the observed source/receipt state
+                # instead of calling it safely "uncommitted".
+                failed_path = record["path"]
+                accepted_path = (
+                    self.ws.root / "reviews" / "accepted" /
+                    (record["proposal_id"] + ".json")
+                )
+                observed_source_sha = None
+                try:
+                    current = self.ws.read("current", project, failed_path)
+                    observed_source_sha = current["version"]["sha256"]
+                except (WorkspaceError, OSError, ValueError):
+                    pass
+                write_state = (
+                    "source_matches_proposal_but_commit_report_failed"
+                    if observed_source_sha == record["proposed_sha256"]
+                    else "old_source_unchanged"
+                    if observed_source_sha == record["previous_sha256"]
+                    else "unknown_source_state"
+                )
                 failure = {
                     "schema": SCHEMA + ".partial",
+                    "failed_proposal": record["proposal_id"],
+                    "failed_source": failed_path,
+                    "failed_source_sha256_observed": observed_source_sha,
+                    "failed_source_write_state": write_state,
+                    "accepted_receipt_present": accepted_path.is_file(),
+                    "manual_reconciliation_needed_before_any_retry": True,
                     "review_digest": report["digest"],
                     "committed_count": len(committed),
                     "committed": committed,
