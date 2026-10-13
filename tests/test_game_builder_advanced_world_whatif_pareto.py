@@ -5,7 +5,7 @@ from copy import deepcopy
 import unittest
 
 from tests import test_game_builder_advanced_interleaved_world as fixtures
-from skeleton.ai.game_builder.advanced_world_whatif_lab import (
+from skeleton.ai.game_builder.advanced_world_whatif_pareto import (
     WorldWhatIfError,AXES,MAX_SCENARIOS,
     run_world_whatif_lab,verify_world_whatif_lab,
 )

@@ -1,62 +1,65 @@
-"""Actual authoring and source replay of original NPC-world what-if timelines."""
+"""Studio has real source-replayed alternative game world review controls."""
 from __future__ import annotations
 
 import inspect
 import unittest
 
-from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 from skeleton.ai.game_builder.game_workspace_server import _StudioHandler
+from skeleton.ai.game_builder.game_workspace_ui import render_workspace_html
 
 
-class OriginalWorldWhatIfStudioTests(unittest.TestCase):
+class OriginalWhatIfStudioTests(unittest.TestCase):
     @staticmethod
     def html():
-        return render_workspace_html("9"*32).decode("utf-8")
+        return render_workspace_html("E"*32).decode("utf-8")
 
-    def test_real_source_baseline_and_alternative_controls_exist(self):
-        script=self.html()
-        for token in (
-            'id="advanced-whatif-baseline"',
-            'id="advanced-whatif-swap"',
-            'id="advanced-whatif-capture"',
+    def test_mirror_panel_exposes_four_real_factual_priorities_and_depth(self):
+        page=self.html()
+        for phrase in (
+            'id="advanced-whatif-objective"',
+            'value="eyewitness_coverage"',
+            'value="community_recovery"',
+            'value="resource_stewardship"',
+            'value="quest_progress"',
+            'id="advanced-whatif-depth"',
             'id="advanced-whatif-run"',
-            'id="advanced-whatif-queue"',
-            'id="advanced-whatif-results"',
-            '$("advanced-whatif-baseline").addEventListener("click"',
-            '$("advanced-whatif-swap").addEventListener("click"',
-            '$("advanced-whatif-capture").addEventListener("click"',
-            '$("advanced-whatif-run").addEventListener("click"',
+            'id="advanced-whatif-select"',
+            'id="advanced-whatif-use"',
+            'id="advanced-whatif-proof"',
         ):
-            self.assertIn(token,script)
+            self.assertIn(phrase,page)
 
-    def test_whatif_retains_same_source_inputs_and_rejects_uncertified_winner(self):
-        script=self.html()
-        for token in (
-            "reviewedWorldWhatIfScenarios.length>=8",
-            "current.forEach((entry,i)=>{entry.at=i;})",
-            "JSON.stringify(x.timeline)===digest",
-            "/api/advanced-world-whatif",
-            "proof.scenarios.length!==reviewedWorldWhatIfScenarios.length",
-            "!proof.same_source_and_action_inputs",
-            "!proof.comparison_has_no_automatic_winner",
-            "proof.automatic_model_training_approved",
-            "proof.native_full_campaign_certified",
-            "strictly_dominant_over_baseline:proof.strict_baseline_dominators",
-            "no_automatic_winner:true",
+    def test_actual_replay_results_are_required_before_selectable_authored_order(self):
+        page=self.html()
+        for phrase in (
+            '"/api/advanced-world-whatif-lab"',
+            'report.source_games_changed',
+            'report.automatic_authoring_committed',
+            'report.source_world_scene_digest!==episodicLastScene.digest',
+            'response.native_hardware_certified',
+            'response.model_weight_promotion_approved',
+            'for(const alternative of report.accepted_scenarios)',
+            'lastWorldWhatIfProof.accepted_scenarios.find(',
+            'if(!selected || !selected.actually_replayed)',
+            '$("advanced-interleave-editor").value=JSON.stringify(selected.timeline,null,2)',
+            'lastInterleavedProof=null',
+            'lastInterleavedTimeline=null',
+            'no_automatic_model_promotion:true',
         ):
-            self.assertIn(token,script)
+            self.assertIn(phrase,page)
 
-    def test_authenticated_server_rebuilds_both_original_worlds(self):
-        source=inspect.getsource(_StudioHandler)
-        for token in (
-            '"/api/advanced-world-whatif"',
-            "run_world_whatif_lab(",
-            "verify_world_whatif_lab(",
-            '"source_games_mutated":False',
-            '"automatic_model_training":False',
+    def test_authentic_server_reruns_entire_adversarial_world_not_client_metrics(self):
+        handler=inspect.getsource(_StudioHandler)
+        for phrase in (
+            '"/api/advanced-world-whatif-lab"',
+            'run_world_whatif(',
+            'verify_world_whatif(',
+            '"original_game_files_mutated":False',
+            '"automatic_scenario_committed":False',
             '"native_hardware_certified":False',
+            '"model_weight_promotion_approved":False',
         ):
-            self.assertIn(token,source)
+            self.assertIn(phrase,handler)
 
 
 if __name__=="__main__":
