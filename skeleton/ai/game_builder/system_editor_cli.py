@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_economy_mirror import (
+    analyze_original_economy, verify_original_economy_mirror,
+)
 from .advanced_economy_planner import (
     plan_original_trade, verify_original_trade_plan,
 )
@@ -183,6 +186,17 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    economic_mirror=commands.add_parser("economy-mirror",
+        help="Compare bounded real market scenarios with independently replayed economic outcomes")
+    economic_mirror.add_argument("--scene",required=True)
+    economic_mirror.add_argument("--settings")
+    economic_mirror.add_argument("--horizon",type=int,default=12)
+    economic_mirror.add_argument("--max-scenarios",type=int,default=32)
+    economic_check=commands.add_parser("verify-economy-mirror",
+        help="Independently rerun economic strategy alternatives and source-evidence custody")
+    economic_check.add_argument("--record",required=True)
+    economic_check.add_argument("--scene",required=True)
+    economic_check.add_argument("--settings")
     economy=commands.add_parser("plan-economy",
         help="Prove original market trading through genuine finite production and receipts")
     economy.add_argument("--scene",required=True)
@@ -396,6 +410,15 @@ def main(argv=None) -> int:
                 max_actions=args.max_actions,retire=args.retire)
         elif args.operation == "verify-ecology-plan":
             output={"verified":verify_original_ecology_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "economy-mirror":
+            output=analyze_original_economy(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                horizon=args.horizon,max_scenarios=args.max_scenarios)
+        elif args.operation == "verify-economy-mirror":
+            output={"verified":verify_original_economy_mirror(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
         elif args.operation == "plan-economy":

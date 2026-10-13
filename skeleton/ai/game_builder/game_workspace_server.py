@@ -41,6 +41,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_economy_mirror import (
+    analyze_original_economy, verify_original_economy_mirror,
+)
 from .advanced_economy_planner import (
     plan_original_trade, verify_original_trade_plan,
 )
@@ -472,6 +475,21 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":validated,
                                    "original_source_mutated":False})
+        if path=="/api/economy-mirror":
+            report=analyze_original_economy(
+                values["scene"],values.get("settings"),
+                horizon=values.get("horizon",12),
+                max_scenarios=values.get("max_scenarios",32))
+            return self._json(200,{"report":report,
+                "source_project_mutated":False,
+                "model_weights_promoted":False,
+                "native_hardware_verified":False})
+        if path=="/api/economy-mirror-verify":
+            verified=verify_original_economy_mirror(
+                values["record"],values["scene"],values.get("settings"))
+            return self._json(200,{"verified":verified,
+                "source_project_mutated":False,
+                "model_weights_promoted":False})
         if path=="/api/economy-plan":
             plan=plan_original_trade(
                 values["scene"],values.get("settings"),
