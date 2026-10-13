@@ -355,6 +355,7 @@ OPERATIONS = {
     "ai.coverage.page":("read", "bounded volume gap inventory",False),
     "ai.verification.progress":("read", "measured static completion vs independent product and enterprise verification",False),
     "ai.verification.backlog":("read", "paged exact-source verification blockers with denominators",False),
+    "ai.verification.volumes":("read", "paged 421 masterplan volume source and evidence gap frontier",False),
     "ai.release.gates":("read", "required exact-head release-gate authority census",False),
     "ai.release.gates.page":("read", "paged static CI gate provenance and missing workflows",False),
     "ai.adapter.audit":("read", "static registered tool-to-dispatch binding coverage",False),
@@ -504,6 +505,9 @@ class JeevesAppwideRuntime:
                 result=verification.overview(**params)
             else:
                 result=verification.backlog(**params)
+        elif action=="ai.verification.volumes":
+            from .jeeves_verification_progress import JeevesVerificationProgress
+            result=JeevesVerificationProgress(inv).volumes(**params)
         elif action=="ai.release.gates":
             from .jeeves_release_gate_inventory import JeevesReleaseGateInventory
             result=JeevesReleaseGateInventory(inv).overview(**params)
