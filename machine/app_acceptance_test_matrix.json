@@ -1,9 +1,9 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13.v5",
+  "version": "2026-10-13.v6",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
-  "scope_note": "42 source-linked families, 17 approved CI smoke families (19 unique unittest modules), 25 discovery-only candidate families; no source link or passing subset proves full installed-app release",
+  "scope_note": "42/42 linked; 17 unittest smoke families; 4 pytest smoke families; 21 discovery-only; each is a targeted regression, not full-feature qualification",
   "runner_mode": "unittest_module_exact_head",
   "default_max_seconds": 480,
   "policies": {
@@ -194,23 +194,23 @@
     {
       "family_id": "F17",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Crawler acquisition admission and source safety subset",
       "unittest_modules": [
         "tests.test_ai_webcrawler_advanced_admission"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance (Ubuntu 24.04 / Windows 2022)",
       "product_release_qualified": false
     },
     {
       "family_id": "F18",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Idle Dragon companion lifecycle and state transitions subset",
       "unittest_modules": [
         "tests.test_ai_webcrawler_dragon_companion_runtime"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance (Ubuntu 24.04 / Windows 2022)",
       "product_release_qualified": false
     },
     {
@@ -320,23 +320,23 @@
     {
       "family_id": "F29",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Native Dragon game compiler target subset, not every console",
       "unittest_modules": [
         "tests.test_ai_webcrawler_dragon_native_compile"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance (Ubuntu 24.04 / Windows 2022)",
       "product_release_qualified": false
     },
     {
       "family_id": "F30",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Legacy Dragon platform portfolio matrix subset",
       "unittest_modules": [
         "tests.test_ai_webcrawler_dragon_platform_matrix"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance (Ubuntu 24.04 / Windows 2022)",
       "product_release_qualified": false
     },
     {
