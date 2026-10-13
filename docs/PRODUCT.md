@@ -52,7 +52,7 @@ python -m skeleton helix
 python -m skeleton recall mem0
 ```
 
-HTTP: `GET /cortex/{product,health,next,ready,caps,lattice,banks,wiki}`  
+HTTP: `GET /cortex/{product,health,next,ready,caps,lattice,banks,wiki}`
 `POST /cortex/{organismer,galaxy,social,seed,contact,pulse,walk}`
 
 Version stamp lives on the product card (`version`).
