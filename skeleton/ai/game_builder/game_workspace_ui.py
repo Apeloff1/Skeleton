@@ -1444,6 +1444,75 @@ $("jeeves-lore-verify").addEventListener("click",()=>dmGuard(async()=>{
   "cast, region and causal history and exact game source versions.");
 }));
 
+
+/* Actual original multi-ending action portfolios and honest observed route coverage. */
+let campaignOutcomePlan=null,campaignOutcomeInputs=null;
+function outcomeInputs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active current original project and scan application sources");
+ const campaign_id=$("jeeves-outcomes-campaign").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(campaign_id))
+  throw Error("Existing reviewed original campaign ID required");
+ const scenarios=JSON.parse($("jeeves-outcomes-scenarios").value);
+ if(!Array.isArray(scenarios)||scenarios.length<2||scenarios.length>12)
+  throw Error("Author 2–12 distinct bounded player-action scenarios");
+ return {project:model.active,campaign_id,scenarios,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-outcomes-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-outcomes-approval").checked)
+  throw Error("Approve real original-game variant execution");
+ const args=outcomeInputs();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.outcomes.plan",params:args,operator_authorized:true
+ });
+ const result=response.result;
+ campaignOutcomePlan=result.digest;campaignOutcomeInputs=JSON.stringify(args);
+ $("jeeves-outcomes-report").textContent=JSON.stringify(result,null,2);
+ status(result.actually_observed_ending_nodes+"/"+result.authored_ending_nodes+
+  " authored ending nodes observed in "+result.real_scenarios_executed+
+  " actual player-action scenarios; "+result.actually_exercised_branch_edges+
+  "/"+result.authored_branch_edges+" branch edges exercised. "+
+  "Unobserved routes are not counted as verified gameplay.");
+}));
+$("jeeves-outcomes-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-outcomes-approval").checked)
+  throw Error("Authorize source staging for real original game outcome evidence");
+ const args=outcomeInputs();
+ if(!campaignOutcomePlan||campaignOutcomeInputs!==JSON.stringify(args))
+  throw Error("Review a fresh source-linked action portfolio before staging");
+ const reason=$("jeeves-outcomes-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Specific source review and game scenario rationale required");
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.outcomes.stage",
+  params:{...args,expected_plan_digest:campaignOutcomePlan,reason},
+  operator_authorized:true
+ });
+ const result=response.result;
+ $("jeeves-outcomes-report").textContent=JSON.stringify(result,null,2);
+ $("jeeves-publish-ids").value=result.proposal_id;
+ campaignOutcomePlan=null;
+ status("Source-verified original-game outcomes staged. Human diff review "+
+  "and exact commit required before the historical coverage evidence exists.");
+}));
+$("jeeves-outcomes-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=outcomeInputs();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.outcomes.verify",
+  params:{project:args.project,campaign_id:args.campaign_id,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false
+ });
+ const verified=response.result;
+ $("jeeves-outcomes-report").textContent=JSON.stringify(verified,null,2);
+ status(verified.real_endings_exercised+"/"+verified.authored_endings+
+  " actual original game endings replayed and verified against "+
+  verified.reference_gameplay_sessions_reexecuted+" real session executions. "+
+  "No claim to unseen player actions.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5728,6 +5797,33 @@ Explicitly approve reviewed game/story narrative source link</label>
 <button id="jeeves-lore-stage" type="button">Stage complete narrative/campaign source links</button>
 <button id="jeeves-lore-verify" type="button">Verify committed narrative source against entire history</button>
 <pre id="jeeves-lore-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Actual Multiple-Ending Game Scenario Coverage</legend>
+<p><small>Compare distinct player action transcripts against actual
+human-committed game campaigns. Reexecute the installed original game
+engines, identify observed ending nodes and branches, and expose missing
+outcomes without inventing unplayed alternative paths.</small></p>
+<label>Existing source-committed original campaign
+<input id="jeeves-outcomes-campaign" value="first_original_campaign"></label>
+<label>Two–twelve distinct bounded original player-action scenario profiles
+<textarea id="jeeves-outcomes-scenarios" rows="12" spellcheck="false">[
+ {"scenario_id":"first_original_choice",
+  "overrides":{"prologue":["explore"]}},
+ {"scenario_id":"another_original_choice",
+  "overrides":{"prologue":["rest"]}}
+]</textarea></label>
+<caption>Replace example action strings with actual installed engine
+actions. Every override must change a source scene's existing actions;
+different submitted profiles do not guarantee different endings.</caption>
+<label><input id="jeeves-outcomes-approval" type="checkbox">
+Authorize actual simulation of supplied original player actions</label>
+<button id="jeeves-outcomes-plan" type="button">Reexecute multiple real game outcomes and measure coverage</button>
+<label>Human source review rationale
+<textarea id="jeeves-outcomes-reason" rows="2" spellcheck="false">Review executable player decisions and the actual observed outcomes across my authored campaign.</textarea></label>
+<button id="jeeves-outcomes-stage" type="button">Stage reproducible game outcome evidence for human review</button>
+<button id="jeeves-outcomes-verify" type="button">Reexecute source-committed outcome portfolio</button>
+<pre id="jeeves-outcomes-report" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
