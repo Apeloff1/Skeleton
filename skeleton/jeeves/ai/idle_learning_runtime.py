@@ -94,6 +94,17 @@ class HostIdleWorkReceipt:
 
 _SCHEMA = """
 PRAGMA journal_mode=WAL;
+CREATE TABLE IF NOT EXISTS jeeves_idle_event (
+    sequence INTEGER PRIMARY KEY,
+    prior_digest TEXT NOT NULL,
+    event_digest TEXT NOT NULL UNIQUE,
+    event_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS jeeves_idle_meta (
+    singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+    head_digest TEXT NOT NULL,
+    event_count INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS jeeves_idle_effect (
     intent_digest TEXT PRIMARY KEY,
     work_id TEXT NOT NULL UNIQUE,
@@ -140,9 +151,169 @@ class JeevesIdleWorkExecutor:
         try:
             self._db.execute("PRAGMA busy_timeout=10000")
             self._db.executescript(_SCHEMA)
+            self._bootstrap_history()
         except BaseException:
             self._db.close()
             raise
+
+    GENESIS = "0" * 64
+
+    def _bootstrap_history(self) -> None:
+        meta = self._db.execute(
+            "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
+        ).fetchone()
+        if meta is None:
+            if self._db.execute(
+                "SELECT COUNT(*) FROM jeeves_idle_effect"
+            ).fetchone()[0] or self._db.execute(
+                "SELECT COUNT(*) FROM jeeves_idle_event"
+            ).fetchone()[0]:
+                raise IdleRuntimeError("idle effects exist without authoritative evidence history")
+            self._db.execute(
+                "INSERT INTO jeeves_idle_meta VALUES (1, ?, 0)", (self.GENESIS,),
+            )
+        self._verify_history()
+
+    def _verify_history(self) -> None:
+        prior = self.GENESIS
+        count = 0
+        materialized: dict[str, dict[str, Any]] = {}
+        for sequence, stored_prior, digest, event_json in self._db.execute(
+            "SELECT sequence,prior_digest,event_digest,event_json "
+            "FROM jeeves_idle_event ORDER BY sequence"
+        ):
+            if count >= 200_000 or sequence != count or stored_prior != prior:
+                raise IdleRuntimeError("idle event history is not sequential")
+            if not isinstance(event_json, str) or len(event_json) > 65536:
+                raise IdleRuntimeError("idle evidence entry exceeds byte budget")
+            try:
+                event = json.loads(event_json)
+            except (TypeError, ValueError) as exc:
+                raise IdleRuntimeError("idle evidence event is malformed") from exc
+            if (not isinstance(event, dict)
+                    or set(event) != {
+                        "schema", "sequence", "prior_digest", "operation",
+                        "at_ns", "effect",
+                    }
+                    or event["schema"] != "jeeves.idle_effect_event.v1"
+                    or event["sequence"] != count
+                    or event["prior_digest"] != prior
+                    or _digest(event) != digest):
+                raise IdleRuntimeError("idle effect journal digest mismatch")
+            if type(event["at_ns"]) is not int or event["at_ns"] < 0:
+                raise IdleRuntimeError("idle event timestamp invalid")
+            effect = event["effect"]
+            expected_keys = {
+                "intent_digest", "work_id", "scope_id", "source_digest",
+                "plan_digest", "state", "receipt_digest", "host_event_digest",
+            }
+            if not isinstance(effect, dict) or set(effect) != expected_keys:
+                raise IdleRuntimeError("idle effect snapshot contract mismatch")
+            intent = _sha(effect["intent_digest"])
+            _sha(effect["source_digest"])
+            _sha(effect["plan_digest"])
+            for key in ("receipt_digest", "host_event_digest"):
+                if effect[key] is not None:
+                    _sha(effect[key])
+            try:
+                state = IdleExecutionState(effect["state"])
+            except (ValueError, TypeError) as exc:
+                raise IdleRuntimeError("invalid idle effect lifecycle state") from exc
+            old = materialized.get(intent)
+            if old is None:
+                if state is not IdleExecutionState.IN_FLIGHT or event["operation"] != "claimed":
+                    raise IdleRuntimeError("idle effect has no claimed genesis")
+            else:
+                if old["state"] == IdleExecutionState.IN_FLIGHT.value:
+                    allowed = {
+                        IdleExecutionState.VERIFIED, IdleExecutionState.IN_DOUBT,
+                        IdleExecutionState.REJECTED,
+                    }
+                elif old["state"] == IdleExecutionState.IN_DOUBT.value:
+                    allowed = {IdleExecutionState.VERIFIED, IdleExecutionState.REJECTED}
+                else:
+                    allowed = set()
+                if state not in allowed:
+                    raise IdleRuntimeError("idle effect history contains invalid transition")
+                if any(old[key] != effect[key] for key in (
+                    "intent_digest", "work_id", "scope_id", "source_digest", "plan_digest",
+                )):
+                    raise IdleRuntimeError("idle work identity changed after claiming")
+            materialized[intent] = effect
+            prior = digest
+            count += 1
+        meta = self._db.execute(
+            "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
+        ).fetchone()
+        if meta != (prior, count):
+            raise IdleRuntimeError("idle effect journal head is inconsistent")
+        rows = self._db.execute(
+            "SELECT intent_digest,work_id,scope_id,source_digest,"
+            "plan_digest,state,receipt_digest,host_event_digest FROM jeeves_idle_effect"
+        ).fetchall()
+        if len(rows) != len(materialized):
+            raise IdleRuntimeError("idle effects diverge from their evidence journal")
+        keys = (
+            "intent_digest", "work_id", "scope_id", "source_digest",
+            "plan_digest", "state", "receipt_digest", "host_event_digest",
+        )
+        for row in rows:
+            item = dict(zip(keys, row))
+            if materialized.get(item["intent_digest"]) != item:
+                raise IdleRuntimeError("idle materialized effect record was modified")
+
+    def _append_event(self, intent: str, operation: str, *, at_ns: int) -> str:
+        if type(at_ns) is not int or at_ns < 0:
+            raise IdleRuntimeError("trusted host timestamp required for journal entry")
+        current = self._db.execute(
+            "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
+        ).fetchone()
+        if current is None or current[1] >= 200_000:
+            raise IdleRuntimeError("idle journal metadata missing or capacity exhausted")
+        head, number = current
+        row = self._db.execute(
+            "SELECT intent_digest,work_id,scope_id,source_digest,"
+            "plan_digest,state,receipt_digest,host_event_digest "
+            "FROM jeeves_idle_effect WHERE intent_digest=?", (intent,),
+        ).fetchone()
+        if row is None:
+            raise IdleRuntimeError("idle journal cannot attest missing effect")
+        keys = (
+            "intent_digest", "work_id", "scope_id", "source_digest",
+            "plan_digest", "state", "receipt_digest", "host_event_digest",
+        )
+        event = {
+            "schema": "jeeves.idle_effect_event.v1",
+            "sequence": number, "prior_digest": head,
+            "operation": operation, "at_ns": at_ns,
+            "effect": dict(zip(keys, row)),
+        }
+        digest = _digest(event)
+        self._db.execute(
+            "INSERT INTO jeeves_idle_event VALUES (?,?,?,?)",
+            (number, head, digest, json.dumps(
+                event, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=True, allow_nan=False,
+            )),
+        )
+        self._db.execute(
+            "UPDATE jeeves_idle_meta SET head_digest=?, event_count=? WHERE singleton=1",
+            (digest, number + 1),
+        )
+        return digest
+
+    def history_head(self) -> dict[str, Any]:
+        """Expose bounded, tamper-evident custody metadata, not worker payloads."""
+        with self._lock:
+            self._verify_history()
+            head, count = self._db.execute(
+                "SELECT head_digest,event_count FROM jeeves_idle_meta WHERE singleton=1"
+            ).fetchone()
+            return {
+                "schema": "jeeves.idle_effect_history.v1",
+                "head_digest": head, "event_count": count,
+                "authority": "host-worker-only",
+            }
 
     @staticmethod
     def _intent(plan: IdleWorkPlan, assignment: IdleWorkAssignment) -> str:
