@@ -46,6 +46,9 @@ on:
       - "tests/test_game_builder_advanced_rts.py"
       - "tests/test_game_builder_advanced_rhythm.py"
       - "tests/test_game_builder_advanced_fighting.py"
+      - "tests/test_game_builder_causal_live_regressions.py"
+      - "skeleton/ai/game_builder/advanced_dialogue_runtime.py"
+      - "tests/test_game_builder_advanced_dialogue.py"
       - "tests/test_game_builder_advanced_quest_director.py"
       - "tests/test_game_builder_advanced_fighting_rollback.py"
       - "tests/test_game_builder_advanced_rhythm_audio.py"
@@ -164,6 +167,8 @@ jobs:
             tests/test_game_builder_advanced_rts.py
             tests/test_game_builder_advanced_rhythm.py
             tests/test_game_builder_advanced_fighting.py
+            tests/test_game_builder_causal_live_regressions.py
+            tests/test_game_builder_advanced_dialogue.py
             tests/test_game_builder_advanced_flight.py
             tests/test_game_builder_advanced_sailing.py
             tests/test_game_builder_advanced_parkour.py
@@ -213,6 +218,16 @@ jobs:
           target.write_text(SCRIPT.replace("__TOKEN__",'"validated-ci-token"'),encoding="utf-8")
           PY
           node --check "$RUNNER_TEMP/original_game_studio_check.js"
+      - name: Verify witnessed quests and scheduled distant ecosystem consumption
+        shell: bash
+        run: |
+          python -m py_compile tests/test_game_builder_causal_live_regressions.py
+          python -m unittest tests.test_game_builder_causal_live_regressions -v
+      - name: Validate thirty-first original playable dialogue and source proof
+        shell: bash
+        run: |
+          python -m py_compile skeleton/ai/game_builder/advanced_dialogue_runtime.py tests/test_game_builder_advanced_dialogue.py
+          python -m unittest tests.test_game_builder_advanced_dialogue -v
       - name: Replay source-backed real economy and adversarial cargo proof
         shell: bash
         run: python -m unittest tests.test_game_builder_advanced_economy tests.test_game_builder_advanced_economy_planner tests.test_game_builder_advanced_economy_mirror

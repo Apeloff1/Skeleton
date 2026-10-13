@@ -99,7 +99,9 @@ class OriginalPeerRollbackTests(unittest.TestCase):
             verify_peer_reconciliation(altered,cfg)
 
     def test_actual_parry_is_order_dependent_and_cannot_be_fabricated(self):
-        cfg=self.rules(starting_stamina=100)
+        # Compare health against the same normalized authoring contract used
+        # by the peer runtime, not a partial settings override dictionary.
+        cfg=make_editor_document("fighting",self.rules(starting_stamina=100))["settings"]
         blue=["approach","approach","inspect","jab"]
         red=["approach","approach","inspect","parry"]
         match=run_peer_fight(cfg,blue,red)

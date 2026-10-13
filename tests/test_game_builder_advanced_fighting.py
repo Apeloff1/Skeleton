@@ -6,7 +6,7 @@ import io,json,unittest
 
 from skeleton.ai.game_builder.advanced_fighting_runtime import (
     ACTIONS,ATTACKS,FightingActionError,default_layout,
-    normalize_layout,start,step,
+    normalize_layout,start,step,_attack,
 )
 from skeleton.ai.game_builder.system_editors import (
     catalog,make_editor_document,
@@ -57,7 +57,7 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
             self.assertFalse(initial["native_hardware_verified"])
 
     def test_spatial_attack_whiffs_without_fabricated_hit_or_free_damage(self):
-        cfg=make_editor_document("fighting",self.rules())["settings"]
+        cfg=make_editor_document("fighting",self.rules(stamina_regen=0))["settings"]
         state=start(cfg,0)
         before=state["opponent"]["hp"]
         step(state,cfg,"jab")
@@ -103,16 +103,32 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
     def test_actual_high_guard_low_guard_and_grapple_are_different(self):
         cfg=make_editor_document("fighting",
              self.rules(rounds_to_win=2))["settings"]
+        # Control the *same* physically executed jab in both trials: the
+        # adaptive AI intentionally selects a sweep against high guard, so
+        # its reaction is not a fixed attack suitable for guard comparison.
         state=start(cfg,0)
         state["opponent"]["x"]=state["player"]["x"]+1
-        step(state,cfg,"guard_high")
-        self.assertGreater(state["player"]["defended"],0)
+        state["player"]["guard_high"]=True
+        defended_events=[]
+        _attack(state,cfg,state["opponent"],state["player"],"jab",defended_events)
+        self.assertEqual(state["player"]["defended"],1)
         self.assertLess(state["player"]["hp"],cfg["player_health"])
+        self.assertIn("legitimate_original_guard_prevented_major_hit",defended_events)
         other=start(cfg,0)
         other["opponent"]["x"]=other["player"]["x"]+1
-        step(other,cfg,"guard_low")
+        other["player"]["guard_low"]=True
+        unguarded_events=[]
+        _attack(other,cfg,other["opponent"],other["player"],"jab",unguarded_events)
         self.assertEqual(other["player"]["defended"],0)
         self.assertLess(other["player"]["hp"],state["player"]["hp"])
+        self.assertIn("actual_original_hitbox_resolved_combat_damage",unguarded_events)
+        # The smart opponent counters a naive high guard with a low sweep.
+        adaptive=start(cfg,0)
+        adaptive["opponent"]["x"]=adaptive["player"]["x"]+1
+        step(adaptive,cfg,"guard_high")
+        self.assertEqual(adaptive["player"]["defended"],0)
+        self.assertIn("actual_original_hitbox_resolved_combat_damage",
+                      adaptive["events"])
         grappler=start(cfg,0)
         grappler["opponent"]["x"]=grappler["player"]["x"]+1
         grappler["opponent"]["guard_high"]=True
@@ -132,7 +148,7 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
             0,cfg["parry_stun_frames"]-cfg["frames_per_turn"]))
         self.assertLessEqual(state["player"]["stamina"],before)
         self.assertFalse(state["player"]["parry"])
-        with self.assertRaises(FightingActionError):
+        with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("fighting",self.rules(
                 starting_stamina=10,parry_stamina=30),["parry"])
 
