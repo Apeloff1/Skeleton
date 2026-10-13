@@ -33,6 +33,16 @@ __all__ += ["ProjectLearningRun", "build_project_learning_manifest"]
 from importlib import import_module as _training_import_module
 
 _GOVERNANCE_EXPORTS = {
+    "ShadowWeightError": ".shadow_weight_pipeline",
+    "ShadowState": ".shadow_weight_pipeline",
+    "SourceAttestation": ".shadow_weight_pipeline",
+    "ShadowWeightIntake": ".shadow_weight_pipeline",
+    "ShadowPolicy": ".shadow_weight_pipeline",
+    "ShadowReview": ".shadow_weight_pipeline",
+    "ShadowRecord": ".shadow_weight_pipeline",
+    "ShadowEvent": ".shadow_weight_pipeline",
+    "ShadowWeightPipeline": ".shadow_weight_pipeline",
+    "DurableShadowWeightPipeline": ".shadow_weight_store",
     "TemporalFact": ".temporal_facts",
     "TemporalSnapshot": ".temporal_facts",
     "snapshot_facts": ".temporal_facts",
