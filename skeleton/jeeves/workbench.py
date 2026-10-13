@@ -94,6 +94,8 @@ class JeevesWorkbench:
         shadow_consume_verify: Callable[..., bool] | None = None,
         creator_handlers: Mapping[str, Callable[..., Any]] | None = None,
         creator_authorize: Callable[..., bool] | None = None,
+        source_edit_authorize: Callable[..., bool] | None = None,
+        source_edit_handler: Callable[..., Any] | None = None,
     ) -> None:
         from skeleton.jeeves.app_capability_bridge import _root
         self.root = _root(root)
@@ -104,6 +106,12 @@ class JeevesWorkbench:
             raise JeevesWorkbenchError("independent host read/orchestration authorizers required")
         if (creator_handlers is None) != (creator_authorize is None):
             raise JeevesWorkbenchError("creator handlers require a paired host authorizer")
+        if (source_edit_authorize is None) != (source_edit_handler is None):
+            raise JeevesWorkbenchError("source edit permissions require a paired host handler")
+        if source_edit_authorize is not None and not callable(source_edit_authorize):
+            raise JeevesWorkbenchError("source edit authorization must be callable")
+        if source_edit_handler is not None and not callable(source_edit_handler):
+            raise JeevesWorkbenchError("source edit handler must be callable")
         if creator_handlers is not None and not isinstance(creator_handlers, Mapping):
             raise JeevesWorkbenchError("creator handlers must be an explicit mapping")
         if shadow_write_authorize is not None and any(
@@ -133,6 +141,8 @@ class JeevesWorkbench:
         self._shadow_consume_verify = shadow_consume_verify
         self._creator_handlers = creator_handlers
         self._creator_authorize = creator_authorize
+        self._source_edit_authorize = source_edit_authorize
+        self._source_edit_handler = source_edit_handler
         self._open_runbooks: list[CreatorRunbookStore] = []
         self.atlas: JeevesRepositoryFileAtlas | None = None
         self.shadow: DurableShadowWeightPipeline | None = None
@@ -237,7 +247,7 @@ class JeevesWorkbench:
     def _build_tools(self) -> ToolRegistry:
         if self.atlas is None or self.shadow is None:
             raise JeevesWorkbenchError("workbench state owners are unavailable")
-        return self._core.app_tool_registry(
+        registry = self._core.app_tool_registry(
             root=self.root,
             file_atlas=self.atlas,
             file_atlas_read_authorize=self._scoped_read,
@@ -254,6 +264,27 @@ class JeevesWorkbench:
             creator_authorize=self._scoped_creator
             if self._creator_authorize is not None else None,
         )
+        if self._source_edit_handler is not None:
+            from skeleton.jeeves.source_edit_gateway import register_source_edit_tools
+            register_source_edit_tools(
+                registry, atlas=self.atlas,
+                authorize=self._scoped_source_edit,
+                edit=self._host_source_edit,
+            )
+        return registry
+
+    def _scoped_source_edit(self, plan: Any, context: Any) -> bool:
+        return (
+            self._context_scoped(context)
+            and plan.project_id == self.project_id
+            and self._source_edit_authorize is not None
+            and self._source_edit_authorize(plan, context) is True
+        )
+
+    def _host_source_edit(self, plan: Any, context: Any):
+        if not self._scoped_source_edit(plan, context):
+            raise JeevesWorkbenchError("host denied source edit scope")
+        return self._source_edit_handler(plan, context)
 
     def refresh_source_atlas(self, *, observed_at_ns: int,
                              hash_contents: bool = False):
