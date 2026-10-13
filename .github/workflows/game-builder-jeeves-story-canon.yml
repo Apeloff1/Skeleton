@@ -13,11 +13,14 @@ on:
       - "skeleton/ai/game_builder/jeeves_app_runtime.py"
       - "skeleton/ai/game_builder/jeeves_appwide_fabric.py"
       - "skeleton/ai/game_builder/jeeves_capability_intelligence.py"
+      - "skeleton/ai/game_builder/jeeves_completion_census.py"
       - "tests/test_game_builder_jeeves_app_runtime.py"
       - "tests/test_game_builder_jeeves_appwide_fabric.py"
       - "tests/test_game_builder_jeeves_capability_intelligence.py"
+      - "tests/test_game_builder_jeeves_completion_census.py"
       - "docs/JEEVES_APP_CAPABILITY_ATLAS.md"
       - "docs/JEEVES_WHOLE_REPO_INVENTORY_AND_GOVERNED_ACTIONS.md"
+      - "docs/JEEVES_APP_COMPLETION_CENSUS_2026_10.md"
       - "skeleton/ai/game_builder/story_cinematic_review.py"
       - "skeleton/ai/game_builder/story_detail_history.py"
       - "skeleton/ai/game_builder/story_asset_pixels.py"
@@ -90,6 +93,7 @@ jobs:
             tests/test_game_builder_jeeves_app_runtime.py
             tests/test_game_builder_jeeves_appwide_fabric.py
             tests/test_game_builder_jeeves_capability_intelligence.py
+            tests/test_game_builder_jeeves_completion_census.py
             tests/test_game_builder_story_asset_pixels.py
             tests/test_game_builder_system_editors.py
       - name: Setup Python
@@ -103,8 +107,8 @@ jobs:
       - name: Compile project canon and editor glue
         shell: bash
         run: |
-          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/jeeves_app_runtime.py skeleton/ai/game_builder/jeeves_appwide_fabric.py skeleton/ai/game_builder/jeeves_capability_intelligence.py skeleton/ai/game_builder/story_cinematic_review.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
+          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/jeeves_app_runtime.py skeleton/ai/game_builder/jeeves_appwide_fabric.py skeleton/ai/game_builder/jeeves_capability_intelligence.py skeleton/ai/game_builder/jeeves_completion_census.py skeleton/ai/game_builder/story_cinematic_review.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
       - name: Check app-wide Jeeves tools, all system editors, forge graph, Dragon, learning and 9999-scene receipts
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence -v
+          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census -v
