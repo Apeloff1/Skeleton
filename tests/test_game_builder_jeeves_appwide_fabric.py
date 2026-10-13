@@ -31,7 +31,7 @@ class AppwideCapabilityTests(unittest.TestCase):
         for directory,name in directories.items():
             folder=root/directory
             folder.mkdir(parents=True)
-            (folder/name).write_text("source test\n",encoding="utf8")
+            (folder/name).write_bytes(b"source test\n")
         (root/"skeleton/ai/game_builder/secret_token.key").write_text(
             "NO TOKEN EXPOSURE",encoding="utf8")
         (root/".env").write_text("PRIVATE_ENV_DATA",encoding="utf8")
@@ -237,6 +237,37 @@ class AppwideCapabilityTests(unittest.TestCase):
         self.assertTrue(proposal["result"]["human_commit_required"])
         with self.assertRaises(JeevesAppwideError):
             runtime.invoke("studio.tree",{"project":"another"})
+
+    def test_appwide_static_intelligence_contracts_and_dependency_context(self):
+        from skeleton.ai.game_builder.jeeves_capability_intelligence import (
+            JeevesStaticIntelligence,
+        )
+        author=self.root/"skeleton/ai/game_builder/scene_editor.py"
+        author.write_text("def render(items):\\n    return list(items)\\n".replace("\\n", "\n"),
+                          encoding="utf-8")
+        caller=self.root/"skeleton/ai/game_builder/consumer.py"
+        caller.write_text(
+            "from skeleton.ai.game_builder.scene_editor import render\n"
+            "def show():\n    return render([1])\n", encoding="utf-8")
+        self.inv.scan()
+        paths=["skeleton/ai/game_builder/scene_editor.py",
+               "skeleton/ai/game_builder/consumer.py"]
+        contracts=self.run.invoke("ai.contracts",{"paths":paths})["result"]
+        self.assertEqual(contracts["inspected_files"],2)
+        self.assertTrue(contracts["static_discovery_not_execution"])
+        self.assertFalse(any(d["callable_by_jeeves"] for d in contracts["documents"]))
+        impact=self.run.invoke("ai.impact",{
+            "paths":paths,"changed":paths[0]})["result"]
+        self.assertEqual(impact["direct_selected_dependents"],[paths[1]])
+        self.assertFalse(impact["graph_complete"])
+        context=self.run.invoke("ai.context",{
+            "paths":paths,"query":"render","budget_chars":1200})["result"]
+        self.assertTrue(context["selected"])
+        self.assertTrue(context["selected"][0]["source_not_included"])
+        self.assertNotIn("return list(items)",str(context))
+        for forbidden in ("../../env", "skeleton/ai/game_builder/secret_token.key"):
+            with self.assertRaises(JeevesAppwideError):
+                self.run.invoke("ai.contracts",{"paths":[forbidden]})
 
 if __name__=="__main__":
     unittest.main()
