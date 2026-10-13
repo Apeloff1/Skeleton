@@ -185,6 +185,10 @@ jobs:
     # concurrency group evicts obsolete validation without running the suite.
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
+    # The suite runs from backend/, but shared product contracts import the
+    # top-level skeleton/ package. Preserve that source root explicitly.
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     defaults:
       run:
         working-directory: backend
