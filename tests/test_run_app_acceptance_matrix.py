@@ -28,6 +28,8 @@ class AcceptanceRunnerTests(unittest.TestCase):
             "curated_test_family_count":2,
             "family_denominator":42,
             "unique_test_module_count":2,
+            "scheduled_test_module_count":2,
+            "discovery_only_family_count":0,
             "selected_modules":["tests.test_alpha","tests.test_beta"],
             "module_source_receipts":[
                 {"path":"tests/test_alpha.py","sha256":"f"*64,
