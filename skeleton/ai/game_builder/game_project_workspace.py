@@ -22,7 +22,7 @@ IDENT=re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
 SEGMENT=re.compile(r"^[A-Za-z0-9_.-]{1,96}$")
 ALLOWED=frozenset({
     ".json",".md",".txt",".py",".gd",".tscn",".cfg",".toml",
-    ".yml",".yaml",".html",".js",".css",".ini",".csv",
+    ".yml",".yaml",".html",".js",".css",".ini",".csv",".godot",
 })
 SOURCE_MAX=256000
 PROJECT_MAX_FILES=12512

@@ -383,6 +383,8 @@ OPERATIONS = {
     "studio.assembly":("compute", "approved system integration audit",False),
     "studio.production.plan":("compute", "actual multi-engine original game production source plan",False),
     "studio.production.stage":("proposal", "reviewed original game system or scene source proposals",True),
+    "studio.production.release_plan":("compute", "original replay-proven browser and Godot source package",True),
+    "studio.production.release_stage":("proposal", "original browser and Godot artifact review staging",True),
     "studio.tree":("read", "active project files",False),
     "studio.file":("read", "active project source",False),
     "studio.propose":("proposal", "targeted human-reviewed project edit",True),
@@ -539,6 +541,13 @@ class JeevesAppwideRuntime:
                 result=director.plan(**params)
             else:
                 result=director.stage(**params, operator_authorized=authorized)
+        elif action in ("studio.production.release_plan", "studio.production.release_stage"):
+            from .jeeves_original_release_wave import JeevesOriginalReleaseWave
+            release=JeevesOriginalReleaseWave(inv, ws)
+            if action=="studio.production.release_plan":
+                result=release.plan(**params, operator_authorized=authorized)
+            else:
+                result=release.stage(**params, operator_authorized=authorized)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
