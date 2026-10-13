@@ -1,6 +1,6 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13.v7",
+  "version": "2026-10-13.v8",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
   "scope_note": "42/42 source/test links: 17 unittest smoke families, 8 pytest smoke families, 17 discovery-only. Executable subset selection not full feature acceptance.",
@@ -134,7 +134,8 @@
         "tests.test_game_builder_jeeves_appwide_fabric"
       ],
       "workflow_hint": "Jeeves Story Canon Production",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F12",
@@ -145,7 +146,8 @@
         "tests.test_game_builder_jeeves_capability_intelligence"
       ],
       "workflow_hint": "Jeeves Story Canon Production",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F13",
@@ -156,7 +158,8 @@
         "tests.test_game_builder_jeeves_completion_census"
       ],
       "workflow_hint": "Jeeves Story Canon Production",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F14",
@@ -243,7 +246,8 @@
         "tests.test_game_builder_advanced_runtime"
       ],
       "workflow_hint": "Game Builder Advanced System Engines",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F22",
@@ -253,7 +257,8 @@
         "tests.test_game_builder_advanced_quest_director"
       ],
       "workflow_hint": "Game Builder Advanced System Engines",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F23",
@@ -263,7 +268,8 @@
         "tests.test_game_builder_story_continuity_assurance"
       ],
       "workflow_hint": "Jeeves Story Canon Production",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F24",
@@ -274,7 +280,8 @@
         "tests.test_game_builder_story_chapter_context"
       ],
       "workflow_hint": "Jeeves Story Canon Production",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F25",
@@ -284,7 +291,8 @@
         "tests.test_game_builder_jeeves_chapter_chat"
       ],
       "workflow_hint": "Jeeves Story Canon Production",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F26",
@@ -294,7 +302,8 @@
         "tests.test_game_builder_advanced_runtime"
       ],
       "workflow_hint": "Game Builder Advanced System Engines",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F27",
@@ -304,7 +313,8 @@
         "tests.test_game_builder_advanced_runtime"
       ],
       "workflow_hint": "Game Builder Advanced System Engines",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F28",
@@ -315,7 +325,8 @@
         "tests.test_game_builder_advanced_ecosystem"
       ],
       "workflow_hint": "Game Builder Advanced System Engines",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F29",
@@ -380,7 +391,8 @@
         "tests.test_game_builder_jeeves_app_runtime"
       ],
       "workflow_hint": "Jeeves Story Canon Production",
-      "product_release_qualified": false
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
     },
     {
       "family_id": "F35",
