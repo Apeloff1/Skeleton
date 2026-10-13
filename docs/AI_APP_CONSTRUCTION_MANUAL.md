@@ -12,6 +12,12 @@ Runtime contract: `skeleton/app/manifest.json`
 
 This document is the mandatory human construction manual for building, assembling, validating, operating, and evolving the complete Skeleton AI application. The machine-readable construction contract is authoritative for automation; this manual explains how to use it.
 
+## AI chat implementation candidate
+
+The authenticated product entrypoint is `/ai-chat` (also available through `/jeeves-chat`). It composes the existing application API, engine, provider, context, Mongo conversation and execution-ledger owners. For explicit local or hosted configuration and startup instructions, use [Configure local AI chat](plan/AI_CHAT_OPERATOR_SETUP.md). The [implementation record](plan/AI_CHAT_IMPLEMENTATION_2026-10-13.md) lists actual chat behavior, source owners and remaining verification work.
+
+This continuation has source/build checks only for chat. It does not establish live provider readiness, production acceptance, masterplan closure or model promotion. The existing bootstrap and authority rules below still apply.
+
 ## Mandatory bootstrap
 
 Before an AI coding agent, human contributor, runtime provider adapter, automation, or integration changes or activates the system, it must load the active contracts in this order:
