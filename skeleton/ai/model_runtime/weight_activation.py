@@ -93,7 +93,7 @@ class NativeWeightDeployment:
         self._ledger = ledger
         self._lock = RLock()
         self._checkpoints = Path(checkpoint_directory)
-        self._checkpoints.mkdir(parents=True, exist_ok=True)
+        self._checkpoints.mkdir(mode=0o700, parents=True, exist_ok=True)
         self._prior_runtimes: dict[str, NativeLLMRuntime] = {}
         self._activation_receipts: dict[str, NativeActivationReceipt] = {}
 
@@ -122,13 +122,15 @@ class NativeWeightDeployment:
         raw = runtime.checkpoint_json().encode("utf-8")
         content_digest = sha256(raw).hexdigest()
         target = self._checkpoints / (candidate_digest + ".rollback.json")
+        if target.is_symlink():
+            raise ShadowWeightError("rollback checkpoint must not be a symlink")
         if target.exists():
             if sha256(target.read_bytes()).hexdigest() != content_digest:
                 raise ShadowWeightError("existing rollback checkpoint has different bytes")
             return content_digest
         tmp = self._checkpoints / (candidate_digest + f".{os.getpid()}.tmp")
         try:
-            with tmp.open("xb") as handle:
+            with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as handle:
                 handle.write(raw)
                 handle.flush()
                 os.fsync(handle.fileno())
