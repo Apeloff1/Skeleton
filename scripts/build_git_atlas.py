@@ -113,6 +113,29 @@ def build(root: Path, revision: str = "HEAD") -> tuple[dict[str, Any], list[dict
         raise ValueError("Git returned an invalid commit identity")
     zones, mappings = load_authorities(root)
     raw = git(root, "ls-tree", "--full-tree", "-r", "-z", "-l", commit)
+    authority_paths = {".machine/repository.toml", "machine/architecture.json", "machine/ai_file_tree.json"}
+    authority_blobs: dict[str, str] = {}
+    for record in raw.split(b"\x00"):
+        if not record:
+            continue
+        metadata, separator, path_bytes = record.partition(b"\t")
+        if separator and path_bytes.decode("utf-8", "surrogateescape") in authority_paths:
+            fields = metadata.decode("ascii").split()
+            if len(fields) != 4 or fields[0] not in ("100644", "100755"):
+                raise ValueError("authoritative metadata is not a regular Git blob")
+            authority_blobs[path_bytes.decode("utf-8", "surrogateescape")] = fields[2]
+    if set(authority_blobs) != authority_paths:
+        raise ValueError("missing canonical authority in the pinned Git commit")
+    for authority in sorted(authority_paths):
+        source = root / authority
+        if source.is_symlink():
+            raise ValueError("canonical authority cannot be a symbolic link")
+        data = source.read_bytes()
+        header = f"blob {len(data)}\x00".encode("ascii")
+        algorithm = hashlib.sha1 if len(commit) == 40 else hashlib.sha256
+        digest = algorithm(header + data).hexdigest()
+        if digest != authority_blobs[authority]:
+            raise ValueError(f"canonical authority differs from pinned Git commit: {authority}")
     files: list[dict[str, Any]] = []
     hashes: dict[str, list[str]] = defaultdict(list)
     feature_stats: dict[str, dict[str, Any]] = {}
@@ -221,6 +244,8 @@ def build(root: Path, revision: str = "HEAD") -> tuple[dict[str, Any], list[dict
 
 def write(root: Path, destination: Path, revision: str = "HEAD") -> dict[str, Any]:
     summary, files, duplicates, navigation = build(root, revision)
+    if destination.is_symlink():
+        raise ValueError("atlas output cannot be a symbolic link")
     destination = destination.resolve()
     if destination == root.resolve() or (root.resolve() / ".git") in destination.parents:
         raise ValueError("cannot overwrite repository root or Git internal data")
@@ -238,7 +263,10 @@ def write(root: Path, destination: Path, revision: str = "HEAD") -> dict[str, An
     }
     outputs["summary.json"] = json_bytes(summary)
     for name, data in outputs.items():
-        (destination / name).write_bytes(data)
+        target = destination / name
+        if target.is_symlink():
+            raise ValueError(f"atlas artifact path is a symbolic link: {name}")
+        target.write_bytes(data)
     return summary
 
 
