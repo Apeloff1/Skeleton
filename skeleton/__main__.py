@@ -527,7 +527,7 @@ def _load_run_answers(source: str, *, file_path: bool = False) -> Dict[str, str]
     except json.JSONDecodeError as exc:
         raise ValueError(f"invalid answers JSON: {exc.msg}") from exc
     if not isinstance(answers, dict):
-        raise ValueError("answers must be a JSON object")
+        raise ValueError("answers must be a JSON object mapping strings to strings")
     return validate_answers(answers)
 
 

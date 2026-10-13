@@ -12,7 +12,7 @@ python -m skeleton run --answers-file ./answers.json \
   --out build/village --playtest require --repair-mode apply
 ```
 
-`--answers @path.json` is equivalent to `--answers-file path.json`.
+`--answers @path.json` and the existing bare `--answers path.json` are equivalent to `--answers-file path.json`.
 Answers are capped at 64 KiB and validated against known questionnaire beat
 IDs/choices; creative brief facets accept strings. Malformed JSON, unknown
 fields/options, and invalid playtest/repair policies fail with exit 2, rather
