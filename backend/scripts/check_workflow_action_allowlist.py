@@ -37,6 +37,9 @@ APPROVED_THIRD_PARTY_ACTIONS = frozenset(
         "anchore/sbom-action",
         "aquasecurity/trivy-action",
         "astral-sh/setup-uv",
+        # Reviewed Chickensoft Godot 4 runner installer. The only authorized
+        # revision is pinned below; every native Godot workflow uses that SHA.
+        "chickensoft-games/setup-godot",
         "codecov/codecov-action",
         "docker/build-push-action",
         "docker/login-action",
@@ -50,6 +53,14 @@ APPROVED_THIRD_PARTY_ACTIONS = frozenset(
     }
 )
 
+
+# This installer downloads an engine and export templates onto CI runners.
+# Review scope is the signed v2.4.1 commit, not arbitrary future releases.
+APPROVED_THIRD_PARTY_ACTION_PINS = {
+    "chickensoft-games/setup-godot": frozenset({
+        "f166999204a4f2722c6fe042fbaa3b3ea0d9c789"
+    }),
+}
 
 def workflow_files() -> list[Path]:
     return sorted([*WORKFLOW_DIR.glob("*.yml"), *WORKFLOW_DIR.glob("*.yaml")])
@@ -78,7 +89,17 @@ def _reference_violation(path_name: str, number: int, reference: str) -> str | N
         )
 
     owner = repository.split("/", 1)[0]
-    if owner in TRUSTED_ACTION_OWNERS or repository in APPROVED_THIRD_PARTY_ACTIONS:
+    if owner in TRUSTED_ACTION_OWNERS:
+        return None
+    if repository in APPROVED_THIRD_PARTY_ACTIONS:
+        authorized_pins = APPROVED_THIRD_PARTY_ACTION_PINS.get(repository)
+        if authorized_pins is not None:
+            revision = reference.rsplit("@", 1)[-1] if "@" in reference else ""
+            if revision not in authorized_pins:
+                return (
+                    f"{path_name}:{number}: third-party action {repository} must use "
+                    "its explicitly reviewed immutable commit SHA"
+                )
         return None
     return (
         f"{path_name}:{number}: third-party action repository is not allowlisted: "
