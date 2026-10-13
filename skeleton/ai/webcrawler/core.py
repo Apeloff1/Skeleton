@@ -518,9 +518,12 @@ class CrawlEngine:
             item.url,
         ) if successful else None
         novel = bool(doc and not self.store.has_content(doc.content_hash))
-        if not hasattr(self.fetcher,"fetch_once"):
-            self.budget.charge_response(len(body), accepted=novel)
-        elif novel:
+        # fetch_with_policy already charged each network response, including
+        # redirect hops, against the request/byte budget. Only a novel,
+        # accepted document remains to be charged here. Counting the same
+        # request a second time for fetchers without fetch_once exhausted
+        # small budgets prematurely and understated crawl availability.
+        if novel:
             self.budget.documents += 1
         if not doc:
             return None
