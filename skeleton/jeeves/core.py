@@ -180,6 +180,14 @@ class Jeeves:
         from skeleton.jeeves.app_capability_bridge import interface_catalog
         return interface_catalog(query=query, limit=limit, offset=offset, root=root)
 
+    def app_dependency_impact(self, plane: str, *, direction: str = "upstream",
+                              max_depth: int = 5, root=None):
+        """Inspect bounded dependency closure without executing cross-plane work."""
+        from skeleton.jeeves.app_capability_bridge import dependency_impact
+        return dependency_impact(
+            plane, direction=direction, max_depth=max_depth, root=root,
+        )
+
     def creator_proposal(self, operation: str, project_id: str, payload):
         """Compile a validated creator proposal, without dispatch authority."""
         from skeleton.jeeves.app_capability_bridge import creator_proposal
