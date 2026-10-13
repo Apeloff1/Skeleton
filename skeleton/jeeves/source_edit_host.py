@@ -170,32 +170,41 @@ class JeevesAtomicSourceEditor:
             raise JeevesSourceEditError("source edit cannot be a no-op")
         full = self._full_path(plan.path)
         with self._lock:
-            previous = self._db.execute(
-                "SELECT state,project_id,path,before_sha256,after_sha256,event_digest "
-                "FROM jeeves_source_edit WHERE plan_digest=?",
-                (plan.digest,),
-            ).fetchone()
-            if previous is not None:
-                raise JeevesSourceEditError(
-                    "source edit was already submitted; use host reconciliation"
+            # Cross-process lease: hold BEGIN IMMEDIATE while checking for
+            # competing pending edits and installing the durable intent.
+            # No filesystem side effect occurs before COMMIT.
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                previous = self._db.execute(
+                    "SELECT 1 FROM jeeves_source_edit WHERE plan_digest=?",
+                    (plan.digest,),
+                ).fetchone()
+                if previous is not None:
+                    raise JeevesSourceEditError(
+                        "source edit was already submitted; reconcile its exact receipt"
+                    )
+                unresolved = self._db.execute(
+                    "SELECT COUNT(*) FROM jeeves_source_edit "
+                    "WHERE path=? AND state='pending'",
+                    (plan.path,),
+                ).fetchone()[0]
+                if unresolved:
+                    raise JeevesSourceEditError("source has an unresolved prior edit")
+                original, source_stat = self._read_exact(full)
+                if sha256(original).hexdigest() != plan.before_sha256:
+                    raise JeevesSourceEditError("source content changed since proposal")
+                updated = self._apply(original, plan)
+                event = self._event(plan, state="pending", at_ns=at_ns)
+                self._db.execute(
+                    "INSERT INTO jeeves_source_edit VALUES (?,?,?,?,?,?,?,?)",
+                    (plan.digest, plan.project_id, plan.path, plan.before_sha256,
+                     plan.after_sha256, "pending", event, at_ns),
                 )
-            unresolved = self._db.execute(
-                "SELECT COUNT(*) FROM jeeves_source_edit "
-                "WHERE path=? AND state='pending'",
-                (plan.path,),
-            ).fetchone()[0]
-            if unresolved:
-                raise JeevesSourceEditError("source has an unresolved prior edit")
-            original, source_stat = self._read_exact(full)
-            if sha256(original).hexdigest() != plan.before_sha256:
-                raise JeevesSourceEditError("source content changed since proposal")
-            updated = self._apply(original, plan)
-            event = self._event(plan, state="pending", at_ns=at_ns)
-            self._db.execute(
-                "INSERT INTO jeeves_source_edit VALUES (?,?,?,?,?,?,?,?)",
-                (plan.digest, plan.project_id, plan.path, plan.before_sha256,
-                 plan.after_sha256, "pending", event, at_ns),
-            )
+                self._db.execute("COMMIT")
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                raise
             temporary: Path | None = None
             try:
                 with NamedTemporaryFile(
