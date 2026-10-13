@@ -161,7 +161,7 @@ def scan(root: Path) -> tuple[str, str, tuple[Entry, ...]]:
             continue
         try:
             meta, name = record.split(b"\t", 1)
-            mode, kind, blob, size = meta.decode("ascii").split(" ")
+            mode, kind, blob, size = meta.decode("ascii").split()
             path = _canonical(name.decode("utf-8"))
         except (ValueError, UnicodeDecodeError) as exc:
             raise AtlasError("malformed Git tree entry") from exc
@@ -358,19 +358,23 @@ def query(index_dir: Path, root: Path, phrase: str, *, budget: int = 3000,
     if manifest.get("commit") != head:
         raise AtlasError("stale index: rebuild at current pinned commit")
     paths: list[tuple[int, dict[str, object]]] = []
+    ledger = sha256()
+    seen = 0
     with (index_dir / "files.jsonl").open(encoding="utf-8") as handle:
         for line in handle:
             row = json.loads(line)
             path = _canonical(row["path"])
+            if not isinstance(row["blob"], str) or not re.fullmatch(r"[0-9a-f]{40,64}", row["blob"]):
+                raise AtlasError("invalid indexed blob identity")
+            ledger.update(f'{row["mode"]} {row["blob"]} {path}\n'.encode("utf-8"))
+            seen += 1
             hay = frozenset(WORD.findall((path + " " + row["feature"] + " " + row["zone"]).casefold()))
             intersection = words & hay
             if intersection:
                 score = len(intersection) * 10 + (5 if words <= hay else 0)
                 paths.append((score, row))
-    if len(paths) != manifest.get("entries"):
-        # Only matching paths are counted here; integrity requires a separate
-        # all-entry count from the JSONL stream, verified below.
-        pass
+    if seen != manifest.get("entries") or ledger.hexdigest() != manifest.get("inventory_digest"):
+        raise AtlasError("index inventory completeness/integrity violation")
     paths.sort(key=lambda item: (-item[0], item[1]["path"]))
     result: list[dict[str, object]] = []
     used = 0
