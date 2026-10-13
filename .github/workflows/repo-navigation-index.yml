@@ -1,0 +1,79 @@
+name: Repository Navigation Index
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['machine/repo_navigation/**']
+  schedule:
+    - cron: '29 4 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: repository-navigation-refresh
+  cancel-in-progress: false
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Test index builder
+        run: python -m unittest discover -s tests -p test_repo_navigation.py -v
+      - name: Refresh full inventory
+        run: python scripts/build_repo_navigation.py --root . --output machine/repo_navigation
+      - name: Validate completeness
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          from scripts.build_repo_navigation import build
+          root = Path.cwd()
+          out = root / 'machine/repo_navigation'
+          expected = build(root)
+          for name, content in expected.items():
+              assert (out / name).read_text(encoding='utf-8') == content, f'index drift: {name}'
+          assert {p.relative_to(out).as_posix() for p in out.rglob('*') if p.is_file()} == set(expected)
+          meta = json.loads(expected['manifest.json'])
+          tracked = [p for p in subprocess.check_output(['git','ls-tree','-r','--name-only','-z','HEAD']).split(b'\0') if p and not p.startswith(b'machine/repo_navigation/')]
+          assert meta['tracked_objects'] == len(tracked)
+          print('Verified tracked inventory:', meta['tracked_objects'])
+          PY
+      - name: Open or refresh reviewable index PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- machine/repo_navigation && [[ -z "$(git ls-files --others --exclude-standard -- machine/repo_navigation)" ]]; then
+            echo 'Index unchanged'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c automation/repo-navigation-index
+          git add -A machine/repo_navigation
+          git commit -m 'chore(index): refresh complete repository navigation inventory'
+          git fetch origin automation/repo-navigation-index || true
+          git push --force-with-lease origin HEAD:refs/heads/automation/repo-navigation-index
+          if ! gh pr view automation/repo-navigation-index --json number >/dev/null 2>&1; then
+            gh pr create --base main --head automation/repo-navigation-index --title 'chore(index): refresh whole-repository navigation atlas' --body 'Non-destructive feature map, exact Git-blob duplicates and heuristic near-content candidates. Review CI before merging.'
+          fi
+      - name: Publish indexed evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: repo-navigation-${{ github.sha }}
+          path: machine/repo_navigation
+          if-no-files-found: error
+          retention-days: 30
