@@ -171,7 +171,12 @@ class OrchestrLedger:
 
     @property
     def digest(self) -> str:
-        return _digest({"records": [record.digest for record in self.records], "v": 1})
+        # A full 512-task ledger exceeds the per-task 32 KiB payload budget.
+        # Bound the aggregate independently while retaining per-record bounds.
+        return canonical_digest(
+            {"records": [record.digest for record in self.records], "v": 1},
+            max_bytes=128 * 1024,
+        )
 
 
 def _validate_graph(records: Sequence[OrchestrRecord]) -> None:
