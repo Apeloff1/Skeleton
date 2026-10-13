@@ -12,6 +12,9 @@ on:
       - "scripts/run_app_acceptance_matrix.py"
       - "tests/test_game_builder_jeeves_acceptance_matrix.py"
       - "tests/test_run_app_acceptance_matrix.py"
+      - "tests/test_ai_offline_native_functional_boundary.py"
+      - "tests/test_ai_shell_approval_contract.py"
+      - "skeleton/ai/shell/approval.py"
       - ".github/workflows/jeeves-app-acceptance-matrix.yml"
   workflow_dispatch:
 
@@ -45,6 +48,9 @@ jobs:
           sparse-checkout: |
             skeleton/__init__.py
             skeleton/ai/
+            skeleton/cortex/
+            skeleton/security/
+            skeleton/shells/
             skeleton/kernel/
             skeleton/jeeves/
             skeleton/forge/
