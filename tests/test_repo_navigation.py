@@ -63,6 +63,12 @@ class NavigationTests(unittest.TestCase):
             nav.write_index(root, out)
             self.assertEqual(first, (out / "manifest.json").read_bytes())
 
+    def test_feature_groups_are_directories_not_files(self):
+        self.assertEqual(nav.feature_of("skeleton/ai/webcrawler/dragon.py"), "skeleton/ai/webcrawler")
+        self.assertEqual(nav.feature_of("skeleton/ai/runtime/policy/control.py"), "skeleton/ai/runtime/policy")
+        self.assertEqual(nav.feature_of("backend/routes/health.py"), "backend/routes")
+        self.assertEqual(nav.feature_of("tests/test_repo_navigation.py"), "tests")
+
     def test_zone_prefix_boundary(self):
         with self.fixture() as temp:
             rules = nav.zones(Path(temp))
