@@ -129,14 +129,20 @@ def validate(root: Path = ROOT, *, as_of: datetime | None = None, execute: bool 
         if binding.get("title") != volume.get("title"):
             raise ArchitectureRuleRegistryError(f"masterplan title drift for {ref}")
         gap_texts = binding.get("required_gap_texts")
-        if not isinstance(gap_texts, list) or not gap_texts:
-            raise ArchitectureRuleRegistryError(f"{ref} required_gap_texts must be non-empty")
+        if (not isinstance(gap_texts, list)
+                or any(not isinstance(gap, str) or not gap.strip() for gap in gap_texts)
+                or len(gap_texts) != len(set(gap_texts))):
+            raise ArchitectureRuleRegistryError(
+                f"{ref} required_gap_texts must contain unique non-empty strings"
+            )
         canonical_gaps = volume.get("gaps", [])
-        for gap in gap_texts:
-            if gap not in canonical_gaps:
-                raise ArchitectureRuleRegistryError(
-                    f"registry no longer matches canonical masterplan gap {ref}: {gap!r}"
-                )
+        # Zero unresolved gaps is a valid signed closure state, not a reason
+        # to invent a gap. Still require exact source equality, including
+        # direction/order, to detect missing or fabricated work.
+        if gap_texts != canonical_gaps:
+            raise ArchitectureRuleRegistryError(
+                f"registry no longer matches canonical masterplan gap list for {ref}"
+            )
     if binding_refs != {"VOL-055", "VOL-116"}:
         raise ArchitectureRuleRegistryError(
             "architecture rule registry must remain bound to VOL-055 and VOL-116"
