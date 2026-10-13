@@ -525,6 +525,7 @@ $("jeeves-production-stage").addEventListener("click",()=>dmGuard(async()=>{
  });
  const staged=response.result;
  $("jeeves-production-output").textContent=JSON.stringify(staged,null,2).slice(0,75000);
+ $("jeeves-publish-ids").value=staged.proposals.map(x=>x.proposal_id).join("\n");
  if(staged.proposals.length)
   $("proposal").textContent=staged.proposals[0].proposal_id;
  jeevesProductionDigest=null;
@@ -581,11 +582,93 @@ $("jeeves-release-stage").addEventListener("click",()=>dmGuard(async()=>{
  });
  const result=receipt.result;
  $("jeeves-release-output").textContent=JSON.stringify(result,null,2).slice(0,80000);
+ $("jeeves-publish-ids").value=result.proposals.map(x=>x.proposal_id).join("\n");
  if(result.proposals.length)
   $("proposal").textContent=result.proposals[0].proposal_id;
  originalReleaseDigest=null;
  status(result.proposal_count+" original runtime sources entered existing "+
   "human-reviewed proposal custody. No compiled binary has been released.");
+}));
+
+
+/* Finite exact-diff proposal review -> individually approved real source commits. */
+let publishedReview=null, publishedProposalIds=null;
+function publicationIds(){
+ if(!model||!model.active||selectedProject!==model.active||
+    selectedTree!=="current")
+  throw Error("Selected active current Studio project required");
+ const ids=$("jeeves-publish-ids").value.split(/[\s,]+/)
+  .map(x=>x.trim()).filter(Boolean);
+ if(!ids.length||ids.length>24||ids.some(id=>!/^[a-f0-9]{64}$/.test(id))||
+    new Set(ids).size!==ids.length)
+  throw Error("Select 1–24 distinct original SHA-256 proposal IDs");
+ return ids.sort();
+}
+function publicationRenderApprovals(reviews){
+ const container=$("jeeves-publish-approvals");
+ container.replaceChildren();
+ for(const item of reviews){
+  const label=document.createElement("label");
+  const input=document.createElement("input");
+  input.type="checkbox";
+  input.dataset.proposalId=item.proposal_id;
+  input.dataset.sha=item.proposed_sha256;
+  const desc=document.createElement("span");
+  desc.textContent="Approve exact source: "+item.path+" · "+item.proposed_sha256;
+  label.append(input,desc);
+  container.append(label);
+ }
+}
+$("jeeves-publish-review").addEventListener("click",()=>dmGuard(async()=>{
+ if(!jeevesAppSnapshot)throw Error("Scan source inventory first");
+ const ids=publicationIds();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.review_bundle",
+  params:{project:model.active,proposal_ids:ids,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false,
+ });
+ const report=receipt.result;
+ publishedReview=report;
+ publishedProposalIds=JSON.stringify(ids);
+ $("jeeves-publish-report").textContent=JSON.stringify(report,null,2).slice(0,190000);
+ publicationRenderApprovals(report.proposals);
+ status(report.proposal_count+" real original source diffs ready for individual review. "+
+  (report.some_diffs_truncated?"Split truncated bundles before acceptance.":
+   "Inspect every source diff, then approve each item explicitly."));
+}));
+$("jeeves-publish-commit").addEventListener("click",()=>dmGuard(async()=>{
+ const ids=publicationIds();
+ if(!publishedReview||JSON.stringify(ids)!==publishedProposalIds)
+  throw Error("Proposal selection changed; review exact source again");
+ if(publishedReview.some_diffs_truncated)
+  throw Error("Unreviewed truncated diffs cannot be batch-committed");
+ const checkboxes=[...$("jeeves-publish-approvals").querySelectorAll("input[type=checkbox]")];
+ if(checkboxes.length!==ids.length||checkboxes.some(input=>!input.checked))
+  throw Error("Approve each exact-source proposal separately after reviewing it");
+ const approvals=checkboxes.map(input=>({
+  proposal_id:input.dataset.proposalId,
+  reviewed_sha256:input.dataset.sha,
+  human_approved:input.checked===true,
+ }));
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.commit_bundle",
+  params:{project:model.active,proposal_ids:ids,
+   expected_review_digest:publishedReview.digest,approvals,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:true,
+ });
+ const outcome=receipt.result;
+ $("jeeves-publish-report").textContent=JSON.stringify(outcome,null,2).slice(0,90000);
+ publishedReview=null;
+ publishedProposalIds=null;
+ $("jeeves-publish-approvals").replaceChildren();
+ if(outcome.partial_failure)
+  status("Partially committed "+outcome.committed_count+
+   " real game files; refresh source and review pending proposals before retry.");
+ else status(outcome.source_count+" reviewed original game sources "+
+  "committed to current Studio project. Release is not automatically certified.");
+ await refresh();
 }));
 
 function storyProject(){
@@ -4573,6 +4656,18 @@ Explicit designer approval for original-game generation and source staging</labe
 <textarea id="jeeves-release-reason" rows="2" spellcheck="false">Review original offline browser gameplay and native Godot 4 project source.</textarea></label>
 <button id="jeeves-release-stage" type="button">Stage real browser + Godot files for review</button>
 <pre id="jeeves-release-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Publish Reviewed Game Sources</legend>
+<p><small>Review actual staged source diffs before committing to the current
+game project. Each proposed file requires a separate explicit SHA-based
+designer approval. Large diff batches must be split, never blindly accepted.</small></p>
+<label>Exact pending proposal IDs (comma, space or newline separated)
+<textarea id="jeeves-publish-ids" rows="3" spellcheck="false"></textarea></label>
+<button id="jeeves-publish-review" type="button">Inspect complete source diffs and custody</button>
+<div id="jeeves-publish-approvals" role="group"></div>
+<button id="jeeves-publish-commit" type="button">Commit individually approved source versions</button>
+<pre id="jeeves-publish-report" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
