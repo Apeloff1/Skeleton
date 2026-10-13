@@ -166,9 +166,9 @@ def enable_native_save(source:str)->str:
     if source.count(header)!=1:
         raise ValueError("original C99 puzzle include insertion point missing")
     windows_headers=(
-        "#ifdef _WIN32\\n"
-        "#ifndef WIN32_LEAN_AND_MEAN\\n#define WIN32_LEAN_AND_MEAN\\n#endif\\n"
-        "#include <windows.h>\\n#endif\\n"
+        "#ifdef _WIN32\n"
+        "#ifndef WIN32_LEAN_AND_MEAN\n#define WIN32_LEAN_AND_MEAN\n#endif\n"
+        "#include <windows.h>\n#endif\n"
     )
     source=source.replace(header,windows_headers+header,1)
     result=source.replace(ENTRY,SOURCE+"\n"+ENTRY,1)
