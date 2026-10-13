@@ -336,6 +336,30 @@ function dmPositive(id,min,max){
   throw Error("Expected a whole number between "+min+" and "+max);
  return number;
 }
+let jeevesReleaseJourneyDigest=null;
+$("jeeves-dm-journeys").addEventListener("click",()=>dmGuard(async()=>{
+ const receipt=await dmInvoke("ai.product.journeys",{});
+ jeevesReleaseJourneyDigest=receipt.digest;
+ const summary=[
+  "Enterprise release journeys: "+receipt.canonical_journey_count,
+  "Independent journey acceptance axes: "+receipt.total_journey_acceptance_axes,
+  "Unverified acceptance axes: "+receipt.unknown_journey_acceptance_axes,
+  "Required terminal release gates: "+receipt.required_terminal_gates,
+  "AI product capabilities requiring real proof: "+receipt.AI_capability_contract_total,
+  "Enterprise workstreams: "+receipt.enterprise_workstreams,
+  "Confirmed installed-app release: NO — no independent evidence has been admitted.",
+ ].join("\n");
+ $("jeeves-dm-output").textContent=summary+"\n\n"+JSON.stringify(receipt,null,2).slice(0,60000);
+ status("Release frontier indexed: declarations and candidate tests are not independent acceptance.");
+}));
+$("jeeves-dm-journey-gaps").addEventListener("click",()=>dmGuard(async()=>{
+ const params={offset:0,limit:6};
+ if(jeevesReleaseJourneyDigest)
+  params.expected_report_digest=jeevesReleaseJourneyDigest;
+ const receipt=await dmInvoke("ai.product.journeys.page",params);
+ $("jeeves-dm-output").textContent=JSON.stringify(receipt,null,2).slice(0,60000);
+ status(receipt.total_matches+" enterprise journeys require independent end-to-end evidence.");
+}));
 let deathmarchMeasurementDigest=null;
 $("jeeves-dm-measure").addEventListener("click",()=>dmGuard(async()=>{
  const result=await dmInvoke("ai.product.measure",{});
@@ -4452,6 +4476,8 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 and reviewed multi-adapter previews. All previews are non-mutating; source edits,
 model promotion and release still require independent approval and evidence.</small></p>
 <button id="jeeves-dm-measure" type="button">Measure full-app acceptance scope</button>
+<button id="jeeves-dm-journeys" type="button">Audit 12 enterprise user journeys</button>
+<button id="jeeves-dm-journey-gaps" type="button">Inspect first 6 release-blocked journeys</button>
 <button id="jeeves-dm-test-matrix" type="button">Measure test-linked feature families</button>
 <button id="jeeves-dm-unmapped-tests" type="button">List unbound feature tests</button>
 <button id="jeeves-dm-missing" type="button">Inspect missing source owners</button>
