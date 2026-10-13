@@ -725,6 +725,65 @@ $("jeeves-prompt-stage").addEventListener("click",()=>dmGuard(async()=>{
   "independent source diff review and explicit human commit.");
 }));
 
+
+/* Bounded genuinely distinct original game variant render portfolios. */
+let originalPortfolioDigest=null,originalPortfolioInputs=null;
+function originalPortfolioArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select original current project and scan source inventory");
+ const base_intent=JSON.parse($("jeeves-release-intent").value);
+ if(!base_intent||typeof base_intent!=="object"||
+    Array.isArray(base_intent))
+  throw Error("Provide the original browser/Godot game intent first");
+ const release_prefix=$("jeeves-variant-prefix").value.trim();
+ const count=dmPositive("jeeves-variant-count",1,4);
+ const seed_step=dmPositive("jeeves-variant-seed-step",1,1000000);
+ const rotate_themes=$("jeeves-variant-themes").checked===true;
+ return {project:model.active,release_prefix,base_intent,
+  count,seed_step,rotate_themes,expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-variants-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-variant-approval").checked)
+  throw Error("Explicit authorization required for original portfolio compilation");
+ const args=originalPortfolioArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.variants_plan",
+  params:args,operator_authorized:true,
+ });
+ const plan=receipt.result;
+ originalPortfolioDigest=plan.digest;
+ originalPortfolioInputs=JSON.stringify(args);
+ $("jeeves-variants-output").textContent=JSON.stringify(plan,null,2).slice(0,120000);
+ status(plan.variant_count+" real original playable games compiled, "+
+  plan.source_file_count+" browser/Godot project sources, and distinct source worlds.");
+}));
+$("jeeves-variants-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-variant-approval").checked)
+  throw Error("Source staging requires explicit operator authorization");
+ const args=originalPortfolioArgs();
+ if(!originalPortfolioDigest||originalPortfolioInputs!==JSON.stringify(args))
+  throw Error("Portfolio intent changed; regenerate exact reviewed plan");
+ const reason=$("jeeves-variant-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Reviewed portfolio source rationale required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.variants_stage",
+  params:{...args,expected_portfolio_digest:originalPortfolioDigest,reason},
+  operator_authorized:true,
+ });
+ const result=receipt.result;
+ $("jeeves-variants-output").textContent=JSON.stringify(result,null,2).slice(0,140000);
+ const variants=result.variants||result.staged_variants||[];
+ const ids=variants.flatMap(v=>v.proposals.map(p=>p.proposal_id));
+ $("jeeves-publish-ids").value=ids.slice(0,24).join("\n");
+ originalPortfolioDigest=null;
+ status(ids.length+" independently reviewable game files staged in "+
+  variants.length+" source variants. Review/commit in batches of 24 or fewer; "+
+  (ids.length>24?(ids.length-24)+" additional proposal IDs remain in the full receipt.":
+   "No game source was automatically committed."));
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -4741,6 +4800,25 @@ designer approval. Large diff batches must be split, never blindly accepted.</sm
 <div id="jeeves-publish-approvals" role="group"></div>
 <button id="jeeves-publish-commit" type="button">Commit individually approved source versions</button>
 <pre id="jeeves-publish-report" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Original Game Variants</legend>
+<p><small>Produce real, distinct original gameplay worlds and offline
+browser/Godot source alternatives using the authored game intent above.
+Maximum four compiled variants per bounded production wave.</small></p>
+<label>Safe output portfolio prefix
+<input id="jeeves-variant-prefix" value="original_variant"></label>
+<label>Compiled game variants (1–4)
+<input id="jeeves-variant-count" type="number" min="1" max="4" value="2"></label>
+<label>Distinct deterministic seed step
+<input id="jeeves-variant-seed-step" type="number" min="1" max="1000000" value="1009"></label>
+<label><input id="jeeves-variant-themes" type="checkbox" checked> Cycle original game artwork palettes</label>
+<label><input id="jeeves-variant-approval" type="checkbox"> Approve compilation and source proposal staging</label>
+<button id="jeeves-variants-plan" type="button">Build genuine playable game alternatives</button>
+<label>Original game portfolio review rationale
+<textarea id="jeeves-variant-reason" rows="2" spellcheck="false">Review actual original source and gameplay alternatives across independent themes and seeds.</textarea></label>
+<button id="jeeves-variants-stage" type="button">Stage independently authored alternatives</button>
+<pre id="jeeves-variants-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
