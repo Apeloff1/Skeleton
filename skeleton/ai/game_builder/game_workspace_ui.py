@@ -944,6 +944,86 @@ $("jeeves-release-compare").addEventListener("click",()=>dmGuard(async()=>{
   "grounded only in human-approved current Studio source.");
 }));
 
+
+/* Original story canon -> signed source -> full-history validator -> real proposal. */
+let sourceStoryPlan=null,sourceStoryInputs=null,sourceStoryPath=null;
+function sourceStoryArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select an active current game and scan application source");
+ const phase=$("jeeves-story-phase").value;
+ const values={project:model.active,phase,expected_snapshot:jeevesAppSnapshot};
+ if(phase==="scene"){
+  values.act=dmPositive("jeeves-story-act",1,1000);
+  values.scene=dmPositive("jeeves-story-scene",1,9999);
+  const chapter=$("jeeves-story-chapter").value.trim();
+  if(chapter!==""){
+   const n=Number(chapter);
+   if(!Number.isInteger(n)||n<1||n>100)throw Error("Chapter 1–100 required");
+   values.chapter=n;
+  }
+ }
+ return values;
+}
+$("jeeves-story-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const args=sourceStoryArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.story.source_plan",params:args,operator_authorized:false,
+ });
+ const result=receipt.result;
+ sourceStoryPlan=result.digest;
+ sourceStoryInputs=JSON.stringify(args);
+ sourceStoryPath=result.path;
+ $("jeeves-story-authored").value=JSON.stringify(result.source_template,null,2);
+ $("jeeves-story-output").textContent=JSON.stringify({
+  path:result.path,
+  existing_source_sha256:result.expected_source_sha256,
+  latest_history_digest:result.historical_index_digest,
+  scenes_already_committed:result.historical_story_scenes,
+  approved_bible_digest:result.approved_bible_digest,
+  full_plan_digest:result.digest,
+  source_requires_original_authored_content:true
+ },null,2);
+ status("Source-pinned "+result.source_phase+" story template ready. "+
+  "Author actual original writing, sign, then submit to canonical review.");
+}));
+$("jeeves-story-sign").addEventListener("click",()=>dmGuard(async()=>{
+ if(!sourceStoryPlan||sourceStoryInputs!==JSON.stringify(sourceStoryArgs()))
+  throw Error("Rebuild exact original story source plan first");
+ const document=JSON.parse($("jeeves-story-authored").value);
+ const raw=$("jeeves-story-observations").value.trim();
+ const observations=raw?JSON.parse(raw):{};
+ const result=await api("/api/story-sign",{
+  project:model.active,path:sourceStoryPath,document,observations});
+ $("jeeves-story-authored").value=JSON.stringify(result.document,null,2);
+ $("jeeves-story-output").textContent=JSON.stringify(result.evidence,null,2);
+ status("Current original story source signed by canonical continuity validators; "+
+  "no proposed or committed source yet.");
+}));
+$("jeeves-story-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-story-approval").checked)
+  throw Error("Designer must explicitly authorize actual story source staging");
+ const args=sourceStoryArgs();
+ if(!sourceStoryPlan||sourceStoryInputs!==JSON.stringify(args))
+  throw Error("Selected story source or history changed; rebuild exact source plan");
+ const authored_document=JSON.parse($("jeeves-story-authored").value);
+ const reason=$("jeeves-story-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Specific original story change reason is required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.story.source_stage",
+  params:{...args,authored_document,
+   expected_plan_digest:sourceStoryPlan,reason},
+  operator_authorized:true,
+ });
+ const result=receipt.result;
+ $("jeeves-story-output").textContent=JSON.stringify(result,null,2);
+ $("jeeves-publish-ids").value=result.proposal_id;
+ sourceStoryPlan=null;
+ status("Signed original story "+result.phase+" now staged as real source "+
+  result.source_path+". Review exact historical continuity and commit explicitly.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5010,6 +5090,34 @@ Approve real replay of the checked, accepted original game source</label>
 <button id="jeeves-release-compare" type="button">Compare actually committed original game variants</button>
 <pre id="jeeves-release-compare-result" role="status" aria-live="polite"></pre>
 <pre id="jeeves-accepted-report" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Canonical 100-Chapter Story Source Production</legend>
+<p><small>Full-source story foundation, immutable continuity contracts
+and strictly sequential authored scenes. The assistant must write original
+content; generated templates are not mistaken for completed chapters.</small></p>
+<label>Story source phase<select id="jeeves-story-phase">
+<option value="bible">Story/world bible (foundation → cast → design)</option>
+<option value="contract">Immutable approved voice/face/region continuity</option>
+<option value="scene">Next original story chapter/act/scene</option>
+</select></label>
+<label>Chapter 1–100 (optional if not using signed chapter canon)
+<input id="jeeves-story-chapter" type="number" min="1" max="100" value="1"></label>
+<label>Act 1–1000<input id="jeeves-story-act" type="number" min="1" max="1000" value="1"></label>
+<label>Next scene 1–9999<input id="jeeves-story-scene" type="number" min="1" max="9999" value="1"></label>
+<button id="jeeves-story-plan" type="button">Load exact source-bound story template</button>
+<label>Fully authored, originally written story source JSON
+<textarea id="jeeves-story-authored" rows="9" spellcheck="false">{}</textarea></label>
+<details><summary>Signed production observation receipts (for continuity-sealed scenes)</summary>
+<label>Externally substantiated voice/face/shot/timeline observations JSON
+<textarea id="jeeves-story-observations" rows="4" spellcheck="false">{}</textarea></label>
+</details>
+<button id="jeeves-story-sign" type="button">Sign and verify original story canon</button>
+<label>Human review reason
+<textarea id="jeeves-story-reason" rows="2" spellcheck="false">Continue the original world narrative with exactly witnessed plot and character continuity.</textarea></label>
+<label><input id="jeeves-story-approval" type="checkbox"> Authorize real signed original story source proposal</label>
+<button id="jeeves-story-stage" type="button">Stage signed canon for exact source review</button>
+<pre id="jeeves-story-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
