@@ -357,6 +357,7 @@ OPERATIONS = {
     "ai.release.gates.page":("read", "paged static CI gate provenance and missing workflows",False),
     "ai.adapter.audit":("read", "static registered tool-to-dispatch binding coverage",False),
     "ai.adapter.audit.page":("read", "bounded missing-dispatch audit records",False),
+    "ai.api.bindings":("read", "selected frontend FastAPI literal route contract comparison",False),
     "ai.milestones":("read", "dependency-ordered application milestone readiness",False),
     "ai.milestones.page":("read", "bounded source-pinned milestone page",False),
     "ai.workwaves":("read", "dependency-safe milestone parallelization with owner leases",False),
@@ -480,6 +481,9 @@ class JeevesAppwideRuntime:
         elif action=="ai.adapter.audit.page":
             from .jeeves_adapter_dispatch_audit import JeevesAdapterDispatchAudit
             result=JeevesAdapterDispatchAudit(inv).page(**params)
+        elif action=="ai.api.bindings":
+            from .jeeves_crossplane_route_scout import JeevesAPIBindingScout
+            result=JeevesAPIBindingScout(inv).inspect(**params)
         elif action=="ai.milestones":
             from .jeeves_milestone_planner import JeevesMilestonePlanner
             result=JeevesMilestonePlanner(inv).overview(**params)
