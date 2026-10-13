@@ -347,6 +347,8 @@ OPERATIONS = {
     "ai.context":("read", "budgeted source-linked metadata context for Jeeves",False),
     "ai.duplicates":("read", "exact and heuristic near-duplicate review candidates",False),
     "ai.completion":("read", "full-app canonical readiness and evidence-gap census",False),
+    "ai.product.measure":("read", "42-family source and independent-acceptance measurements",False),
+    "ai.product.measure.page":("read", "bounded family readiness and missing-evidence census",False),
     "ai.deathmarch":("read", "prioritized evidence-gated cross-app completion backlog",False),
     "ai.graph":("read", "source-pinned cross-plane feature and release evidence graph",False),
     "ai.graph.neighbors":("read", "bounded graph ownership and dependency traversal",False),
@@ -458,6 +460,12 @@ class JeevesAppwideRuntime:
         elif action=="ai.completion":
             from .jeeves_completion_census import JeevesCompletionCensus
             result=JeevesCompletionCensus(inv).report(**params)
+        elif action=="ai.product.measure":
+            from .jeeves_measured_completion import JeevesMeasuredCompletion
+            result=JeevesMeasuredCompletion(inv).overview(**params)
+        elif action=="ai.product.measure.page":
+            from .jeeves_measured_completion import JeevesMeasuredCompletion
+            result=JeevesMeasuredCompletion(inv).page(**params)
         elif action=="ai.deathmarch":
             from .jeeves_completion_census import JeevesCompletionCensus
             result=JeevesCompletionCensus(inv).backlog(**params)
