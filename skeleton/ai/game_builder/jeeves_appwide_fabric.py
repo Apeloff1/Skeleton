@@ -387,6 +387,8 @@ OPERATIONS = {
     "studio.production.release_stage":("proposal", "original browser and Godot artifact review staging",True),
     "studio.production.variants_plan":("compute", "bounded real original game source variants",True),
     "studio.production.variants_stage":("proposal", "stage independently built original game source variants",True),
+    "studio.story.source_plan":("read", "full-story canonical 100-chapter source and continuity context",False),
+    "studio.story.source_stage":("proposal", "signed full-history reviewed story source proposals",True),
     "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
     "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
@@ -599,6 +601,13 @@ class JeevesAppwideRuntime:
                 result=release.replay(**params, operator_authorized=authorized)
             else:
                 result=release.download(**params, operator_authorized=authorized)
+        elif action in ("studio.story.source_plan", "studio.story.source_stage"):
+            from .jeeves_story_production import JeevesStorySourceWave
+            story_author=JeevesStorySourceWave(inv, ws)
+            if action=="studio.story.source_plan":
+                result=story_author.plan(**params)
+            else:
+                result=story_author.stage(**params, operator_authorized=authorized)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
