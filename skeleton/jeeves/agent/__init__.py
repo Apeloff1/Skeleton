@@ -746,6 +746,14 @@ from .world_model import (
     reliability_to_likelihood_ratio,
 )
 
+from .capability_dispatch import (
+    AppDispatchError,
+    HostCapabilityBinding,
+    ReadinessReceipt,
+    CapabilityIntent,
+    JeevesCapabilityDispatcher,
+)
+
 # New application code gets the guarded/generalizing runtime by default. The
 # pre-enforcement runtime remains explicitly available for compatibility and
 # controlled regression comparisons only.
