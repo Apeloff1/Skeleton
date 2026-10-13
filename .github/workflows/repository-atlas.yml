@@ -1,0 +1,44 @@
+name: Repository Atlas Integrity
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  index:
+    name: Full inventory, exact and near duplicates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Repository atlas regression tests
+        run: python -m unittest tests.test_repo_tree_atlas -v
+      - name: Build complete current-commit atlas
+        run: |
+          python -m scripts.build_repository_atlas build \
+            --output "$RUNNER_TEMP/skeleton-repository-atlas" --near-limit 600
+      - name: Independently verify every indexed Git tree entry
+        run: |
+          python -m scripts.build_repository_atlas verify \
+            --output "$RUNNER_TEMP/skeleton-repository-atlas"
+      - name: Exercise bounded Jeeves-style navigation
+        run: |
+          python -m scripts.build_repository_atlas query \
+            --output "$RUNNER_TEMP/skeleton-repository-atlas" \
+            --text "jeeves game engine" --budget 3000 --limit 20
+      - uses: actions/upload-artifact@v4
+        with:
+          name: repository-atlas
+          path: ${{ runner.temp }}/skeleton-repository-atlas/
+          if-no-files-found: error
+          retention-days: 14
