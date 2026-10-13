@@ -1,7 +1,7 @@
 # Native GameForge delivery recovery
 
-**Date:** 2026-10-13  
-**Source:** PR #3593 at `7f9be557bac3a4108dfc683716b15437de30f547`  
+**Date:** 2026-10-13
+**Source:** PR #3593 at `7f9be557bac3a4108dfc683716b15437de30f547`
 **Target:** current `main`, additive files only
 
 The original homebrew editor and port renderer have a native Tk UI, independent

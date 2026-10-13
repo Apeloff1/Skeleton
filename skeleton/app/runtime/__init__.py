@@ -269,3 +269,17 @@ __all__ = [
     "ttl_audit_snapshot",
     "version_audit_snapshot",
 ]
+
+
+# Stateful Jeeves runtime adapters load only on explicit host construction.
+# They are intentionally excluded from normal app import side effects.
+__all__ += ["JeevesApplicationRuntime", "JeevesHostContext", "JeevesHostRuntimeError"]
+
+
+def __getattr__(name: str):
+    if name in {"JeevesApplicationRuntime", "JeevesHostContext", "JeevesHostRuntimeError"}:
+        from . import jeeves_host_runtime as _jeeves_host_runtime
+        value = getattr(_jeeves_host_runtime, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

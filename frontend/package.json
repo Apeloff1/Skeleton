@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "check:expo-native-compat": "node ./scripts/check-expo-native-compat.cjs",
     "start": "expo start --port 3000",
     "postinstall": "node ./scripts/patch-node-modules.js",
     "reset-project": "node ./scripts/reset-project.js",

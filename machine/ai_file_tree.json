@@ -5658,6 +5658,7 @@
         "adapter_training.py",
         "bitemporal_authority.py",
         "candidate_weights.py",
+        "capability_ledger.py",
         "checkpoint_lineage.py",
         "contamination_scan.py",
         "contracts/adapter_training.schema.json",
@@ -5674,15 +5675,27 @@
         "contracts/training_manifest.schema.json",
         "dataset_lineage.py",
         "dataset_rights.py",
+        "datasets/offline_foundations_v1/manifest.json",
+        "datasets/offline_foundations_v1/test.jsonl",
+        "datasets/offline_foundations_v1/train.jsonl",
+        "datasets/offline_foundations_v1/train_corpus.txt",
+        "datasets/offline_foundations_v1/validation.jsonl",
         "deduplication.py",
         "distillation.py",
         "flgb_training_runtime.py",
         "lifecycle_proof.py",
         "mirror_room_evaluation.py",
+        "model_release_journal.py",
+        "offline_foundations.py",
         "project_learning.py",
         "project_learning_run.py",
         "promotion_gate.py",
         "promotion_lifecycle.py",
+        "resource_admission.py",
+        "shadow_candidate_gate.py",
+        "shadow_weight_pipeline.py",
+        "shadow_weight_store.py",
+        "sparse_capability.py",
         "temporal_abstention.py",
         "temporal_admission.py",
         "temporal_benchmark.py",
@@ -6469,7 +6482,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_24_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_33_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7435,7 +7448,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 24
+    "native_ai_owner_count": 33
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8398,6 +8411,105 @@
       "role": "Canonical AI-native deterministic mathematical reference substrate for stable numerics, linear algebra, probability, optimization, and runtime parity evidence; no independent knowledge, model, promotion, or execution authority.",
       "volume_refs": [
         "VOL-012"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-CAPABILITY-LEDGER",
+      "path": "skeleton/ai/training/capability_ledger.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Native training capability accounting and local admission evidence.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-OFFLINE-MANIFEST",
+      "path": "skeleton/ai/training/datasets/offline_foundations_v1/manifest.json",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Versioned offline-foundations dataset manifest and provenance.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-OFFLINE-TEST",
+      "path": "skeleton/ai/training/datasets/offline_foundations_v1/test.jsonl",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Held-out offline-foundations test examples.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-OFFLINE-TRAIN",
+      "path": "skeleton/ai/training/datasets/offline_foundations_v1/train.jsonl",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Offline-foundations training examples.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-OFFLINE-CORPUS",
+      "path": "skeleton/ai/training/datasets/offline_foundations_v1/train_corpus.txt",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Offline-foundations original training corpus.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-OFFLINE-VALIDATION",
+      "path": "skeleton/ai/training/datasets/offline_foundations_v1/validation.jsonl",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Offline-foundations validation examples.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-OFFLINE-RUNTIME",
+      "path": "skeleton/ai/training/offline_foundations.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Native offline foundation training runtime and dataset qualification.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-RESOURCE-ADMISSION",
+      "path": "skeleton/ai/training/resource_admission.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Training resource admission and budget decisions.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-TRAINING-SPARSE-CAPABILITY",
+      "path": "skeleton/ai/training/sparse_capability.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Sparse-model capability qualification and accounting.",
+      "volume_refs": [
+        "VOL-006"
       ]
     }
   ]

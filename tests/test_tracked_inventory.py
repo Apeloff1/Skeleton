@@ -92,6 +92,14 @@ class TrackedGitAtlasTests(unittest.TestCase):
         )
         return result.stdout.strip()
 
+    def test_rejects_explicit_nonarray_ignore_policy(self) -> None:
+        from skeleton.repo_machine.config import load_machine_config
+
+        policy = self.root / ".machine" / "repository.toml"
+        policy.write_text(policy.read_text(encoding="utf-8") + '\n[ignore]\nprefixes = "src/"\n', encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "ignore lists must be arrays"):
+            load_machine_config(self.root)
+
     def test_whole_tree_deterministic_and_exacts(self) -> None:
         artifacts = build_from_git(self.root)
         self.assertEqual(artifacts, build_from_git(self.root))
