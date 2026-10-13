@@ -1,3 +1,23 @@
+## DX-36–DX-48 — real acceptance execution and last family test links (2026-10-13)
+
+| Milestone | Implemented source or real control | Interpretation |
+| --- | --- | --- |
+| DX-36 | `machine/app_acceptance_test_matrix.json` | Fixed exact family/test module registry with 42 family IDs |
+| DX-37 | `jeeves_acceptance_matrix.py` | Source-hashed AST scan of real test cases and 42-family mapping |
+| DX-38 | `ai.product.tests` / `ai.product.tests.page` | Governed Jeeves inspection of candidates and remaining gaps |
+| DX-39 | `scripts/run_app_acceptance_matrix.py` | Actual scoped test subprocesses, bounded timeout and exact Git SHA |
+| DX-40 | `.github/workflows/jeeves-app-acceptance-matrix.yml` | Real Windows/Ubuntu exact-head regression execution; artifacts are not release signoff |
+| DX-41 | `tests/test_run_app_acceptance_matrix.py` | Fail-closed output/run identity, CI spoof, confidential log and runner result checks |
+| DX-42 | `game_workspace_ui.py` | UI exposes static family candidate coverage and missing test bindings |
+| DX-43 | 28 discovery-only regression families | Existing tests indexed but **not executed or marked passed** by the new smoke job |
+| DX-44 | `tests/test_ai_offline_native_functional_boundary.py` | Actual CPU-local transformer inference, replay, checkpoint recovery and drift rejection |
+| DX-45 | `skeleton/ai/shell/approval.py` | Hardens approval digest, lease, monotonic clock and capacity authority |
+| DX-46 | `tests/test_ai_shell_approval_contract.py` | Real single-use concurrency, expiry and impersonation refusal |
+| DX-47 | Matrix 42/42 family candidate coverage | F07 and F37 new tests bring *static linkage* to 100%; 14 CI-smoke families, 28 discovery-only |
+| DX-48 | Matrix evidence run pinned to source/code SHA | 16 CI-smoke test modules; result requires independent GitHub run validation |
+
+**Caution:** Candidate test coverage is not product functionality. The scanner still marks the 168 independent family acceptance stages unknown. The stage2 smoke runner produces a reviewable CI artifact but deliberately leaves independent external attestation, full-app completion, trained-model quality, user journeys and installed-device readiness unset. Monitor **exact #3747 head** only. All required workflow gates must pass before draft release/merge.
+
 ## DX-31–DX-35 — measurable product completion contract (2026-10-13)
 
 - **DX-31.** Freeze the denominator for the 42 application feature families, with explicit owner-path scopes, feature-specific test targets and five-stage proof requirements in `machine/app_completion_scope.json`.
