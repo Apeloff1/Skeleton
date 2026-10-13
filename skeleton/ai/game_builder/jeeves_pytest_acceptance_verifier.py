@@ -190,7 +190,10 @@ def verify_pytest(
         })
     final = {
         "schema": SCHEMA, "repository": REPOSITORY,
-        "verified_git_head": head, "run_id": expected_run_id,
+        "verified_git_head": head,
+        "reviewed_matrix_sha256": expected_matrix["matrix_sha256"],
+        "reviewed_scope_sha256": expected_matrix["scope_sha256"],
+        "run_id": expected_run_id,
         "run_attempt": expected_attempt, "verified_os": by_os,
         "pytest_targeted_families": sorted(family_names),
         "pytest_targeted_family_count": len(family_names),
