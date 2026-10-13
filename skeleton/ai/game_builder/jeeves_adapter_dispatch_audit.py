@@ -69,7 +69,7 @@ class JeevesAdapterDispatchAudit:
         for action, entry in sorted(OPERATIONS.items()):
             if (type(action) is not str or not action or type(entry) is not tuple
                 or len(entry) != 3 or entry[0] not in
-                ("read", "compute", "proposal") or type(entry[1]) is not str
+                ("read", "compute", "proposal", "external_effect") or type(entry[1]) is not str
                 or type(entry[2]) is not bool):
                 raise JeevesAppwideError("invalid reviewed Jeeves operation descriptor")
             contract[action] = {
@@ -98,6 +98,8 @@ class JeevesAdapterDispatchAudit:
                                       for x in contract.values()),
             "registered_proposal": sum(int(x["effect"] == "proposal")
                                        for x in contract.values()),
+            "registered_external_effect": sum(int(x["effect"] == "external_effect")
+                                               for x in contract.values()),
             "review_gated_actions": sum(int(x["operator_gate"])
                                         for x in contract.values()),
             "functional_appwide_coverage_percent": None,
