@@ -178,11 +178,9 @@ def _ecological_turn(state,config):
             state["tick"]%config["outbreak_period"]==0):
             habitat["disease"]=min(100,habitat["disease"]+config["infection_rate"])
         if habitat["protection"]>0:habitat["protection"]-=1
-    # Allocate physically available habitat food to due background cohorts
-    # *before* detailed species on the same turn. Otherwise a dense detailed
-    # population can starve all 420+ aggregate species indefinitely even
-    # while food regrows. Conservation remains exact: only real habitat
-    # stocks can be consumed, and starvation still occurs when depleted.
+    # Reserve finite habitat food for off-screen species before active species
+    # consume the entire shared stock. This is physically conserved, not a
+    # decorative background statistic or an unlimited allocation.
     # More than 80 authored species remain a bounded food-consuming cohort,
     # rather than a decorative untracked count. No one-per-animal allocation.
     if (state["dormant_species"]>0 and

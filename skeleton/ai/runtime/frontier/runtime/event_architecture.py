@@ -18,29 +18,48 @@ from typing import Iterable
 from skeleton.frontier.runtime.operation_stream import StreamContractError
 
 
+MAX_SCHEMA_VERSIONS = 256
+MAX_SCHEMA_UPGRADE_EDGES = 2048
+MAX_EVENT_CONTRACT_DECLARATIONS = 4096
+
+
 class EventCompatibilityError(StreamContractError):
     """Event schema compatibility or retention policy is invalid."""
 
 
 def _version(value: object, field: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise EventCompatibilityError(f"{field} must be a positive integer")
+    if type(value) is not int or not 1 <= value <= 2**31 - 1:
+        raise EventCompatibilityError(f"{field} must be a bounded positive integer")
     return value
 
 
 def _event_type(value: object) -> str:
-    if not isinstance(value, str) or not value or value != value.strip():
+    if (type(value) is not str or not value or value != value.strip() or
+            any(ord(ch) < 32 or ord(ch) == 127 for ch in value)):
         raise EventCompatibilityError("event_type must be canonical non-empty text")
     if len(value) > 128:
         raise EventCompatibilityError("event_type exceeds maximum length")
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise EventCompatibilityError("event_type must be valid UTF-8") from exc
     return value
 
 
 def _versions(values: Iterable[int], field: str) -> tuple[int, ...]:
-    normalized = tuple(sorted({_version(value, field) for value in values}))
-    if not normalized:
+    if isinstance(values, (str, bytes)):
+        raise EventCompatibilityError(f"{field} must be an iterable of versions")
+    unique: set[int] = set()
+    try:
+        for count, value in enumerate(values, start=1):
+            if count > MAX_SCHEMA_VERSIONS:
+                raise EventCompatibilityError(f"{field} exceeds version count limit")
+            unique.add(_version(value, field))
+    except TypeError as exc:
+        raise EventCompatibilityError(f"{field} must be iterable") from exc
+    if not unique:
         raise EventCompatibilityError(f"{field} must not be empty")
-    return normalized
+    return tuple(sorted(unique))
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,18 +83,23 @@ class EventSchemaContract:
             raise EventCompatibilityError("current_version must be writable")
 
         edges: set[tuple[int, int]] = set()
-        for raw in self.upgrade_edges:
-            if not isinstance(raw, tuple) or len(raw) != 2:
-                raise EventCompatibilityError("upgrade_edges must contain version pairs")
-            source = _version(raw[0], "upgrade source")
-            target = _version(raw[1], "upgrade target")
-            if source == target:
-                raise EventCompatibilityError("upgrade edge must change version")
-            if source not in readable or target not in readable:
-                raise EventCompatibilityError("upgrade edge versions must be readable")
-            if target < source:
-                raise EventCompatibilityError("upgrade edges must be monotonic")
-            edges.add((source, target))
+        try:
+            for count, raw in enumerate(self.upgrade_edges, start=1):
+                if count > MAX_SCHEMA_UPGRADE_EDGES:
+                    raise EventCompatibilityError("upgrade_edges exceeds bounded edge limit")
+                if not isinstance(raw, tuple) or len(raw) != 2:
+                    raise EventCompatibilityError("upgrade_edges must contain version pairs")
+                source = _version(raw[0], "upgrade source")
+                target = _version(raw[1], "upgrade target")
+                if source == target:
+                    raise EventCompatibilityError("upgrade edge must change version")
+                if source not in readable or target not in readable:
+                    raise EventCompatibilityError("upgrade edge versions must be readable")
+                if target < source:
+                    raise EventCompatibilityError("upgrade edges must be monotonic")
+                edges.add((source, target))
+        except TypeError as exc:
+            raise EventCompatibilityError("upgrade_edges must be iterable") from exc
 
         object.__setattr__(self, "current_version", current)
         object.__setattr__(self, "readable_versions", readable)
@@ -136,13 +160,20 @@ class EventCompatibilityRegistry:
 
     def __init__(self, contracts: Iterable[EventSchemaContract] = ()) -> None:
         self._contracts: dict[str, EventSchemaContract] = {}
-        for contract in contracts:
-            self.register(contract)
+        try:
+            for count, contract in enumerate(contracts, start=1):
+                if count > MAX_EVENT_CONTRACT_DECLARATIONS:
+                    raise EventCompatibilityError("event contract declaration budget exceeded")
+                self.register(contract)
+        except TypeError as exc:
+            raise EventCompatibilityError("event contract declarations must be iterable") from exc
 
     def register(self, contract: EventSchemaContract) -> None:
         if not isinstance(contract, EventSchemaContract):
             raise EventCompatibilityError("contract must be EventSchemaContract")
         prior = self._contracts.get(contract.event_type)
+        if prior is None and len(self._contracts) >= MAX_EVENT_CONTRACT_DECLARATIONS:
+            raise EventCompatibilityError("event contract registry at capacity")
         if prior is not None and prior != contract:
             raise EventCompatibilityError(
                 f"event_type {contract.event_type!r} already has a different contract"
@@ -258,6 +289,9 @@ class EventRetentionPolicy:
 
 
 __all__ = [
+    "MAX_SCHEMA_VERSIONS",
+    "MAX_SCHEMA_UPGRADE_EDGES",
+    "MAX_EVENT_CONTRACT_DECLARATIONS",
     "EventCompatibilityError",
     "EventCompatibilityRegistry",
     "EventRetentionPolicy",

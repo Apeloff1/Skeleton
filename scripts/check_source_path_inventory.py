@@ -97,6 +97,7 @@ FIRST_PARTY_PREFIXES = (
     "scripts/",
     "tests/",
     "docs/",
+    "design/",  # first-party authored visual identity, not a canonical runtime root
     ".github/",
     ".cursor/",
     "memory/",

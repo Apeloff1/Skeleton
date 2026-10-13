@@ -6,7 +6,7 @@ import io,json,unittest
 
 from skeleton.ai.game_builder.advanced_fighting_runtime import (
     ACTIONS,ATTACKS,FightingActionError,default_layout,
-    normalize_layout,start,step,_attack,
+    normalize_layout,start,step,_hit,
 )
 from skeleton.ai.game_builder.system_editors import (
     catalog,make_editor_document,
@@ -103,32 +103,34 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
     def test_actual_high_guard_low_guard_and_grapple_are_different(self):
         cfg=make_editor_document("fighting",
              self.rules(rounds_to_win=2))["settings"]
-        # Control the *same* physically executed jab in both trials: the
-        # adaptive AI intentionally selects a sweep against high guard, so
-        # its reaction is not a fixed attack suitable for guard comparison.
         state=start(cfg,0)
         state["opponent"]["x"]=state["player"]["x"]+1
-        state["player"]["guard_high"]=True
-        defended_events=[]
-        _attack(state,cfg,state["opponent"],state["player"],"jab",defended_events)
-        self.assertEqual(state["player"]["defended"],1)
+        step(state,cfg,"guard_high")
+        # Tactical AI counters high guard with a low sweep, not a fake block.
+        self.assertEqual(state["player"]["defended"],0)
+        self.assertEqual(state["opponent"]["last_attack"],"sweep")
         self.assertLess(state["player"]["hp"],cfg["player_health"])
-        self.assertIn("legitimate_original_guard_prevented_major_hit",defended_events)
         other=start(cfg,0)
         other["opponent"]["x"]=other["player"]["x"]+1
-        other["player"]["guard_low"]=True
-        unguarded_events=[]
-        _attack(other,cfg,other["opponent"],other["player"],"jab",unguarded_events)
+        step(other,cfg,"guard_low")
+        # The opponent observes low guard and attacks high with a jab.
         self.assertEqual(other["player"]["defended"],0)
-        self.assertLess(other["player"]["hp"],state["player"]["hp"])
-        self.assertIn("actual_original_hitbox_resolved_combat_damage",unguarded_events)
-        # The smart opponent counters a naive high guard with a low sweep.
-        adaptive=start(cfg,0)
-        adaptive["opponent"]["x"]=adaptive["player"]["x"]+1
-        step(adaptive,cfg,"guard_high")
-        self.assertEqual(adaptive["player"]["defended"],0)
-        self.assertIn("actual_original_hitbox_resolved_combat_damage",
-                      adaptive["events"])
+        self.assertEqual(other["opponent"]["last_attack"],"jab")
+        self.assertLess(other["player"]["hp"],cfg["player_health"])
+        # Test the actual contact guard mechanics independently of the
+        # adaptive decision policy. Correct guards pay only finite chip.
+        blocked=start(cfg,0)
+        blocked["opponent"]["x"]=blocked["player"]["x"]+1
+        blocked["player"]["guard_high"]=True
+        _hit(blocked,cfg,blocked["opponent"],blocked["player"],"jab",[])
+        self.assertEqual(blocked["player"]["defended"],1)
+        self.assertEqual(blocked["player"]["hp"],
+                         cfg["player_health"]-max(1,cfg["guard_chip"]))
+        lower=start(cfg,0)
+        lower["opponent"]["x"]=lower["player"]["x"]+1
+        lower["player"]["guard_low"]=True
+        _hit(lower,cfg,lower["opponent"],lower["player"],"sweep",[])
+        self.assertEqual(lower["player"]["defended"],1)
         grappler=start(cfg,0)
         grappler["opponent"]["x"]=grappler["player"]["x"]+1
         grappler["opponent"]["guard_high"]=True

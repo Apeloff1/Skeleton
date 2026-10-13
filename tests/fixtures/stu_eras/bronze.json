@@ -1,0 +1,25 @@
+{
+  "schema": "stu-eras/1",
+  "id": "bronze",
+  "title": "Bronze Age",
+  "order": 1,
+  "start": "gate",
+  "citation": "docs/lineage/era.md",
+  "tags": ["ancient"],
+  "rooms": [
+    {"id": "gate", "name": "City Gate", "kind": "hub", "exits": [
+      {"direction": "north", "target": "forum"},
+      {"direction": "east", "target": "smithy"}
+    ]},
+    {"id": "forum", "name": "Forum", "kind": "chamber", "depth": 1, "exits": [
+      {"direction": "south", "target": "gate"},
+      {"direction": "down", "target": "vault", "locked": true, "key": "bronze_key"}
+    ]},
+    {"id": "smithy", "name": "Smithy", "kind": "safe", "depth": 1, "tags": ["lit"], "exits": [
+      {"direction": "west", "target": "gate"}
+    ]},
+    {"id": "vault", "name": "Sealed Vault", "kind": "boss", "depth": 2, "exits": [
+      {"direction": "up", "target": "forum"}
+    ]}
+  ]
+}

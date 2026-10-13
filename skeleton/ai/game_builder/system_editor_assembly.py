@@ -167,6 +167,7 @@ def compile_system_assembly(project_id: str,
         "npc_society": ("inspect",),
         "ecosystem": ("inspect",),
         "economy": ("inspect",),
+        "voxel": ("inspect",),
         "dialogue": ("inspect",),
     }
     if set(advanced_smoke) != set(ADVANCED_ENGINE_IDS):
@@ -227,6 +228,7 @@ def compile_system_assembly(project_id: str,
             "npc_society":("inspect",),
             "ecosystem":("inspect",),
             "economy":("inspect",),
+            "voxel":("inspect",),
             "dialogue":("inspect",),
         }
         if set(scene_smoke) != set(ADVANCED_ENGINE_IDS):

@@ -37,7 +37,7 @@ class OriginalEcosystemTests(unittest.TestCase):
         self.assertTrue(verify_advanced_session(game,params))
 
     def test_distant_species_consume_finite_food_through_sparse_cohorts(self):
-        # Supply a finite habitat stock that survives the 80 foreground species\n        # through the first cohort tick, so background feeding is observable.\n        settings={"species":500,"predators":100,"cohort_period":2,\n                  "food_capacity":4000}
+        settings={"species":500,"predators":100,"cohort_period":2}
         report=run_advanced_session("ecosystem",settings,["wait"]*2)
         state=report["state"]
         self.assertEqual(len(state["species"]),80)

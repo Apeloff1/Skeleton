@@ -6188,6 +6188,43 @@ for _entry in CATALOG:
             ],
         }[_entry["id"]]
         _entry["fields"].extend(_extension)
+# Source-verified bounded voxel mechanics; no claim of full GPU world streaming.
+for _entry in CATALOG:
+    if _entry["id"] == "voxel":
+        _entry["fields"].extend([
+            {"key":"initial_wood","kind":"int","default":3,"minimum":0,"maximum":60,"options":[]},
+            {"key":"initial_soil","kind":"int","default":4,"minimum":0,"maximum":60,"options":[]},
+            {"key":"initial_stone","kind":"int","default":2,"minimum":0,"maximum":60,"options":[]},
+            {"key":"initial_sand","kind":"int","default":1,"minimum":0,"maximum":60,"options":[]},
+            {"key":"initial_torches","kind":"int","default":1,"minimum":0,"maximum":16,"options":[]},
+            {"key":"max_health","kind":"int","default":20,"minimum":1,"maximum":100,"options":[]},
+            {"key":"max_stamina","kind":"int","default":20,"minimum":1,"maximum":100,"options":[]},
+            {"key":"mining_energy","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
+            {"key":"building_energy","kind":"int","default":1,"minimum":1,"maximum":20,"options":[]},
+            {"key":"day_length","kind":"int","default":12,"minimum":2,"maximum":128,"options":[]},
+            {"key":"darkness_damage","kind":"int","default":1,"minimum":0,"maximum":20,"options":[]},
+            {"key":"fall_damage","kind":"int","default":3,"minimum":0,"maximum":20,"options":[]},
+            {"key":"ore_goal","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
+            {"key":"light_radius","kind":"int","default":4,"minimum":1,"maximum":12,"options":[]},
+            {"key":"sand_gravity","kind":"bool","default":True,"minimum":None,"maximum":None,"options":[]},
+        ])
+# Genuine original dialogue social consequence mechanics.
+for _entry in CATALOG:
+    if _entry["id"] == "dialogue":
+        _entry["fields"].extend([
+            {"key":"starting_trust","kind":"int","default":35,"minimum":0,"maximum":100,"options":[]},
+            {"key":"trust_gain","kind":"int","default":12,"minimum":1,"maximum":40,"options":[]},
+            {"key":"disclosure_threshold","kind":"int","default":45,"minimum":1,"maximum":100,"options":[]},
+            {"key":"social_energy","kind":"int","default":20,"minimum":2,"maximum":100,"options":[]},
+            {"key":"conversation_cost","kind":"int","default":1,"minimum":1,"maximum":20,"options":[]},
+            {"key":"gift_tokens","kind":"int","default":2,"minimum":0,"maximum":20,"options":[]},
+            {"key":"gift_trust","kind":"int","default":20,"minimum":1,"maximum":50,"options":[]},
+            {"key":"memory_capacity","kind":"int","default":16,"minimum":1,"maximum":128,"options":[]},
+            {"key":"min_witnesses","kind":"int","default":2,"minimum":2,"maximum":4,"options":[]},
+            {"key":"report_target","kind":"int","default":1,"minimum":1,"maximum":2,"options":[]},
+            {"key":"challenge_cost","kind":"int","default":15,"minimum":1,"maximum":50,"options":[]},
+            {"key":"rest_gain","kind":"int","default":6,"minimum":1,"maximum":40,"options":[]},
+        ])
 # Source-grounded economic simulation controls: no monetary or stock minting.
 for _entry in CATALOG:
     if _entry["id"] == "economy":
@@ -6221,35 +6258,8 @@ for _entry in CATALOG:
             )
         ])
 
-# An original dialogue editor must have genuinely stateful speaker and
-# interpersonal consequence knobs, not only five authoring-only metadata flags.
-for _entry in CATALOG:
-    if _entry["id"] == "dialogue":
-        _entry["fields"].extend([
-            {"key": key, "kind": "int", "default": default,
-             "minimum": lo, "maximum": hi, "options": []}
-            for key, default, lo, hi in (
-                ("active_speakers_budget", 8, 1, 8),
-                ("speaker_patience", 4, 1, 16),
-                ("starting_trust", 50, 0, 100),
-                ("trust_cap", 100, 10, 100),
-                ("trust_threshold", 60, 1, 100),
-                ("starting_influence", 24, 0, 100),
-                ("starting_reputation", 0, -100, 100),
-                ("support_cost", 5, 1, 20),
-                ("challenge_cost", 4, 1, 20),
-                ("support_trust_gain", 15, 1, 30),
-                ("challenge_trust_loss", 10, 1, 30),
-                ("support_reputation", 2, 1, 10),
-                ("challenge_reputation", 1, 1, 10),
-                ("support_goal", 1, 1, 5),
-                ("rest_influence", 6, 1, 25),
-                ("dialogue_turn_budget", 96, 8, 128),
-            )
-        ])
-
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "economy", "dialogue"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "voxel", "dialogue", "economy"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6357,6 +6367,14 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
             raise SystemEditorError("civic checkpoint must be physically achievable")
         if normalized["memory_records"]==0 and normalized["relationship_factors"]>50:
             raise SystemEditorError("complex witness scoring requires nonzero memory records")
+    if editor_id == "dialogue":
+        if normalized["conversation_cost"] > normalized["social_energy"]:
+            raise SystemEditorError("social cost exceeds energy budget")
+    if editor_id == "voxel":
+        if normalized["mining_energy"] > normalized["max_stamina"]:
+            raise SystemEditorError("voxel miner needs achievable stamina")
+        if normalized["building_energy"] > normalized["max_stamina"]:
+            raise SystemEditorError("voxel builder needs achievable stamina")
     if editor_id == "economy":
         if not normalized["finite_inventory"]:
             raise SystemEditorError("advanced source market requires finite physical stock")

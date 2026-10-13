@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta, timezone
 import hashlib
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from fastapi import FastAPI
 import httpx
@@ -107,7 +107,7 @@ def _context(*, tenant_id: str = "tenant-a") -> ContextEnvelope:
         compiler_version="cross-service-v1",
     )
     return ContextEnvelope(
-        context_id=str(uuid4()),
+        context_id=str(uuid5(NAMESPACE_URL, "skeleton-context:" + digest)),
         operation_id=operation_id,
         execution_id=execution_id,
         turn_id=turn_id,

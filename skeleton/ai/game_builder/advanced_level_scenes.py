@@ -29,13 +29,17 @@ from .advanced_npc_society_runtime import (
     default_layout as society_layout, normalize_layout as validate_society_layout,
     SocietyActionError,
 )
-from .advanced_ecosystem_runtime import (
-    default_layout as ecosystem_layout, normalize_layout as validate_ecosystem_layout,
-    EcosystemActionError,
-)
 from .advanced_dialogue_runtime import (
     default_layout as dialogue_layout, normalize_layout as validate_dialogue_layout,
     DialogueActionError,
+)
+from .advanced_voxel_runtime import (
+    default_layout as voxel_layout, normalize_layout as validate_voxel_layout,
+    VoxelActionError,
+)
+from .advanced_ecosystem_runtime import (
+    default_layout as ecosystem_layout, normalize_layout as validate_ecosystem_layout,
+    EcosystemActionError,
 )
 from .advanced_economy_runtime import (
     default_layout as economy_layout, normalize_layout as validate_economy_layout,
@@ -232,10 +236,12 @@ def _default_layout(engine, config, seed):
         return society_layout(config,seed)
     if engine == "ecosystem":
         return ecosystem_layout(config,seed)
-    if engine == "economy":
-        return economy_layout(config,seed)
+    if engine == "voxel":
+        return voxel_layout(config,seed)
     if engine == "dialogue":
         return dialogue_layout(config,seed)
+    if engine == "economy":
+        return economy_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -291,6 +297,11 @@ def _normalize_layout(engine, config, layout):
         try:
             return validate_ecosystem_layout(config,layout)
         except EcosystemActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="voxel":
+        try:
+            return validate_voxel_layout(config,layout)
+        except VoxelActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="economy":
         try:
