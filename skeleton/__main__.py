@@ -653,7 +653,7 @@ def _cmd_gameforge_run(rest: List[str]) -> int:
         return 2
     if as_json:
         keys = ("succeeded", "era", "mass", "complete", "sim", "project",
-                "forge", "intake", "playtest", "run")
+                "forge", "intake", "playtest", "run", "source_manifest")
         slim = {k: payload[k] for k in keys if k in payload}
         slim["failed_stages"] = [s for s in (payload.get("run") or {}).get("stages", [])
                                  if s.get("status") == "FAILED"]

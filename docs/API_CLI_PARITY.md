@@ -101,3 +101,17 @@ A command-line `--era` overrides a saved era/era blend. Execution
 ledgers, model traces, transient inference state and credentials are
 **not** persisted by this creator-control file. Writes are atomic and
 private to the local operator account.
+
+## Source manifest parity (October 2026)
+
+Every ten-stage Godot build now includes a deterministic
+`source_manifest` object: `schema`, `file_count`, `files` mapping generated
+relative names to SHA-256 content hashes, and `sha256` of the canonical
+JSON-encoded mapping. `python -m skeleton run ... --json` returns this
+receipt without returning every source file; `POST /gameforge/run` returns
+it even with `include_files=false`. Project `FORGE_MANIFEST.json` writes
+`source_sha256` using the same algorithm; the sealed
+`build_report.md` includes that same digest. The receipt proves equality
+of emitted bytes only. Real Godot boot/playability is still controlled by
+`playtest` and not implied by a matching hash. The JSON/YAML legacy target
+continues to use its separate specification format.
