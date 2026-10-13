@@ -2,9 +2,15 @@
 
 > Canonical navigation for architecture, construction, research evidence, and promotion.
 >
-> Updated: 2026-09-22
+> Updated: 2026-10-09
 >
 > Rule: an architecture feature is not complete if it exists only in prose, only in code, or only in a historical round. It must be reachable from this index and represented in the machine architecture index where applicable.
+
+## October 2026 live index bridges
+
+The [AI master navigation index](plan/MASTER_INDEX.md) now links the active chat, crawler, model/training, game-builder, milestone, AI file-tree, and traceability authorities. The machine-readable source-of-truth chain is [canonical masterplan](../machine/ai_master_plan.json) → [accountability ledger](../machine/ai_build_accountability.json) → [source-bound fast parse index](../machine/ai_masterplan_parse_index.json). [Master traceability](../machine/master_traceability.json) is a deterministic projection of the masterplan into sharded requirement, implementation, test, and evidence links. The [ADR index](../machine/adr_index.json) governs cross-cutting decisions.
+
+**Authority boundary:** Those indexes accelerate discovery but do not override implementation ownership, exact-head validation, independent signoff, provider isolation, or release qualification.
 
 ## 1. Authority order
 
