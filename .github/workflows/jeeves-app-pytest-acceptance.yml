@@ -8,8 +8,9 @@ on:
       - "machine/app_acceptance_test_matrix.json"
       - "skeleton/ai/game_builder/jeeves_acceptance_matrix.py"
       - "skeleton/ai/game_builder/jeeves_appwide_fabric.py"
-      - "scripts/run_app_pytest_acceptance.py"
-      - "tests/test_run_app_pytest_acceptance.py"
+      - "scripts/verify_app_acceptance_ci.py"
+      - "skeleton/ai/game_builder/jeeves_pytest_acceptance_verifier.py"
+      - "tests/test_game_builder_jeeves_pytest_acceptance_verifier.py"
       - ".github/workflows/jeeves-app-pytest-acceptance.yml"
   workflow_dispatch:
 
@@ -47,7 +48,7 @@ jobs:
             machine/
             tests/
             scripts/run_app_acceptance_matrix.py
-            scripts/run_app_pytest_acceptance.py
+            scripts/verify_app_acceptance_ci.py
             pyproject.toml
             .github/workflows/jeeves-app-pytest-acceptance.yml
       - name: Setup Python 3.11
@@ -68,11 +69,16 @@ jobs:
           python -m py_compile \
             skeleton/ai/game_builder/jeeves_acceptance_matrix.py \
             scripts/run_app_pytest_acceptance.py \
-            tests/test_run_app_pytest_acceptance.py
+            scripts/verify_app_acceptance_ci.py \
+            skeleton/ai/game_builder/jeeves_pytest_acceptance_verifier.py \
+            tests/test_run_app_pytest_acceptance.py \
+            tests/test_game_builder_jeeves_pytest_acceptance_verifier.py
       - name: Validate pytest custody and zero-test fail-closed behavior
         shell: bash
         run: |
-          python -m unittest tests.test_run_app_pytest_acceptance -v
+          python -m unittest \
+            tests.test_run_app_pytest_acceptance \
+            tests.test_game_builder_jeeves_pytest_acceptance_verifier -v
       - name: Execute actual reviewed pytest family regressions
         shell: bash
         run: |
