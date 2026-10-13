@@ -59,3 +59,27 @@ def test_patchers_fail_closed_on_foreign_rom_templates():
         enrich_nes_asm("anything")
     assert "Tiles:" in gb_assembly()
     assert ".res $2000-" in nes_assembly()
+
+def test_dragon_oam_patch_accepts_compact_assembly_and_rejects_ambiguous_anchors():
+    sprite = (
+        "    xor a\n"
+        "    ld [DRAGON_OAM+2],a\n"
+        "    ld [DRAGON_OAM+3],a"
+    )
+    star = "    ld a, 1\n    ld [DRAGON_OAM+6],a"
+    source = (
+        "Tiles:\n    db $00\nTilesEnd:\n"
+        + sprite + "\n"
+        "PlayerY: ds 1\n"
+        "    ld a, 48\n    ld [PlayerX], a\n"
+        + star + "\n"
+    )
+    rendered = enrich_gb_asm(source)
+    assert "AnimFrame: ds 1" in rendered
+    assert "ld [DRAGON_OAM+2], a" in rendered
+    assert "ld [DRAGON_OAM+6], a" in rendered
+    assert "    ld a, 4\n    ld [DRAGON_OAM+6], a" in rendered
+    with pytest.raises(ValueError, match="sprite update anchor"):
+        enrich_gb_asm(source.replace(sprite, sprite + "\n" + sprite))
+    with pytest.raises(ValueError, match="collectible sprite declaration"):
+        enrich_gb_asm(source.replace(star, star + "\n" + star))
