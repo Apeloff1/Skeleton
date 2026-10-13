@@ -57,3 +57,74 @@ def test_rejects_native_evidence_regression(tmp_path: Path) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(Exception, match="requires at least three evidence refs|missing evidence prefix"):
         validate(root)
+
+
+def _task_fixture(tmp_path: Path, task_id: str) -> tuple[Path, dict, dict]:
+    root = _fixture(tmp_path)
+    path = root / "machine/ai_p2_task_backlog.json"
+    backlog = json.loads(path.read_text(encoding="utf-8"))
+    task = next(x for x in backlog["tasks"] if x["task_id"] == task_id)
+    return root, backlog, task
+
+
+def test_signed_native_and_functional_tasks_have_independent_evidence() -> None:
+    receipt = validate(ROOT)
+    assert receipt["status"] == "valid"
+
+
+def test_pending_unsigned_t1_may_be_activated_without_completion(tmp_path: Path) -> None:
+    root, backlog, task = _task_fixture(tmp_path, "P2-T1-FUNCTIONAL-01")
+    task.update(
+        status="landed_unpromoted",
+        completion_checkbox=False,
+        completion_checkbox_mark="[ ]",
+        implementation_signed=False,
+        verification_signed=False,
+    )
+    (root / "machine/ai_p2_task_backlog.json").write_text(json.dumps(backlog), encoding="utf-8")
+    assert validate(root)["status"] == "valid"
+
+
+@pytest.mark.parametrize("field", ["completion_checkbox", "implementation_signed", "verification_signed"])
+def test_closed_t1_rejects_missing_required_signoff(tmp_path: Path, field: str) -> None:
+    root, backlog, task = _task_fixture(tmp_path, "P2-T1-FUNCTIONAL-01")
+    task[field] = False
+    (root / "machine/ai_p2_task_backlog.json").write_text(json.dumps(backlog), encoding="utf-8")
+    with pytest.raises(P2T1ActivationError, match="signoff is incomplete"):
+        validate(root)
+
+
+def test_closed_native_rejects_missing_merge_evidence(tmp_path: Path) -> None:
+    root, backlog, task = _task_fixture(tmp_path, "P2-NATIVE-01")
+    task["evidence_refs"] = [r for r in task["evidence_refs"] if not r.startswith("git:merge:")]
+    (root / "machine/ai_p2_task_backlog.json").write_text(json.dumps(backlog), encoding="utf-8")
+    with pytest.raises(P2T1ActivationError, match="immutable merge evidence"):
+        validate(root)
+
+
+def test_closed_t1_rejects_mismatched_acceptance_head(tmp_path: Path) -> None:
+    root, backlog, task = _task_fixture(tmp_path, "P2-T1-FUNCTIONAL-01")
+    task["evidence_refs"] = [
+        r.replace("git-head:c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f", "git-head:" + "0" * 40)
+        for r in task["evidence_refs"]
+    ]
+    (root / "machine/ai_p2_task_backlog.json").write_text(json.dumps(backlog), encoding="utf-8")
+    with pytest.raises(P2T1ActivationError, match="workflow head does not match"):
+        validate(root)
+
+
+def test_closed_t1_rejects_missing_action_run(tmp_path: Path) -> None:
+    root, backlog, task = _task_fixture(tmp_path, "P2-T1-FUNCTIONAL-01")
+    task["evidence_refs"] = [r for r in task["evidence_refs"] if not r.startswith("github-actions-run:")]
+    (root / "machine/ai_p2_task_backlog.json").write_text(json.dumps(backlog), encoding="utf-8")
+    with pytest.raises(P2T1ActivationError, match="Actions acceptance run"):
+        validate(root)
+
+
+def test_unpromoted_native_may_not_self_sign(tmp_path: Path) -> None:
+    root, backlog, task = _task_fixture(tmp_path, "P2-NATIVE-01")
+    task.update(status="landed_unpromoted", completion_checkbox=False, completion_checkbox_mark="[ ]",
+                implementation_signed=False, verification_signed=True)
+    (root / "machine/ai_p2_task_backlog.json").write_text(json.dumps(backlog), encoding="utf-8")
+    with pytest.raises(P2T1ActivationError, match="may not self-sign"):
+        validate(root)
