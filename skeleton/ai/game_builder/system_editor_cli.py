@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_social_quest_fusion import (
+    run_social_quest_fusion, verify_social_quest_fusion,
+)
 from .advanced_economy_mirror import (
     analyze_original_economy, verify_original_economy_mirror,
 )
@@ -187,6 +190,15 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    social=commands.add_parser("social-quest-fusion",
+        help="Run real multi-engine Dialogue/NPC/Quest commands with bounded physical evidence")
+    social.add_argument("--commands",required=True)
+    social.add_argument("--settings",help="Per-engine typed JSON rules")
+    social.add_argument("--scenes",help="Three reviewed source scene documents")
+    social.add_argument("--seed",type=int,default=0)
+    social_check=commands.add_parser("verify-social-quest-fusion",
+        help="Re-execute all three source engines and verify original witness links")
+    social_check.add_argument("--record",required=True)
     economic_mirror=commands.add_parser("economy-mirror",
         help="Compare bounded real market scenarios with independently replayed economic outcomes")
     economic_mirror.add_argument("--scene",required=True)
@@ -413,6 +425,15 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "social-quest-fusion":
+            output=run_social_quest_fusion(
+                _load(args.commands),
+                _load(args.settings) if args.settings else None,
+                scenes=_load(args.scenes) if args.scenes else None,
+                seed=args.seed,
+            )
+        elif args.operation == "verify-social-quest-fusion":
+            output={"verified":verify_social_quest_fusion(_load(args.record))}
         elif args.operation == "economy-mirror":
             output=analyze_original_economy(
                 _load(args.scene),

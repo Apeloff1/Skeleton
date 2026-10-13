@@ -1544,6 +1544,65 @@ function renderAdvancedActions(actions){
   const hint=document.createElement("small");
   hint.textContent="First-hand testimony cannot be copied; compare two distinct original sources in the archive. Trust, patience and influence actually change.";
   target.append(hint);
+  const fusionLabel=document.createElement("label");
+  fusionLabel.textContent="Original Story Fusion · physical NPC, Dialogue and Quest world rehearsal";
+  const fusionInput=document.createElement("textarea");
+  fusionInput.id="original-social-fusion-commands";
+  fusionInput.rows=5;
+  fusionInput.setAttribute("aria-label","JSON array of real original social world commands");
+  fusionInput.value=JSON.stringify([
+   "quest_director:south","quest_director:east","quest_director:collect:0",
+   "bridge:interview:0","bridge:pledge:0",
+   "quest_director:help:0","quest_director:help:0",
+   "quest_director:help:0","quest_director:help:0",
+   "quest_director:help:0","quest_director:resolve:0",
+   "dialogue:travel:1","dialogue:speak:4","dialogue:travel:2",
+   "dialogue:compare:0","dialogue:claim","bridge:conclude:0"
+  ],null,1);
+  fusionLabel.append(fusionInput);target.append(fusionLabel);
+  const runFusion=document.createElement("button");
+  runFusion.type="button";
+  runFusion.textContent="Simulate, scrutinize and verify three actual game worlds";
+  const fusionStatus=document.createElement("pre");
+  fusionStatus.id="original-social-fusion-proof";
+  fusionStatus.setAttribute("role","status");
+  fusionStatus.setAttribute("aria-live","polite");
+  runFusion.addEventListener("click",async()=>{
+   try{
+    const commands=JSON.parse(fusionInput.value);
+    if(!Array.isArray(commands)||commands.length>64||
+       !commands.every(a=>typeof a==="string"&&a.length<90))
+     throw Error("Narrative command array must be 64 or fewer bounded real actions");
+    const res=await api("/api/social-quest-fusion",{commands,seed:0});
+    if(!res.independently_verified||res.source_projects_mutated||
+       res.record.model_weights_promoted)
+     throw Error("Original three-engine narrative evidence failed review");
+    const chk=await api("/api/social-quest-fusion-verify",{record:res.record});
+    if(!chk.verified)throw Error("Independent cross-engine replay did not converge");
+    const states=res.record.worlds;
+    fusionStatus.textContent=JSON.stringify({
+     social_story_digest:res.record.digest,
+     original_npc:states.npc_society.state.residents[0],
+     original_npc_social_memory:states.npc_society.state.memories,
+     dialogue_direct_statements:states.dialogue.state.direct_statements,
+     dialogue_trust:states.dialogue.state.speakers[0].trust,
+     original_quest:states.quest_director.state.quests[0]||null,
+     witnessed_interviews:res.record.triple_corroborated_interviews,
+     resource_funded_social_pledges:res.record.financed_social_pledges,
+     earned_story_resolutions:res.record.earned_narrative_resolutions,
+     source_links:res.record.narrative_links,
+     independently_replayed:true,
+     world_coordinates_are_distinct:true,
+     project_mutated:false,
+     core_weights_promoted:false
+    },null,2);
+    status("Three actual original game worlds replayed and compared; no silent mutations.");
+   }catch(error){
+    fusionStatus.textContent="";
+    status("Original Story Fusion rejected: "+error.message);
+   }
+  });
+  target.append(runFusion);target.append(fusionStatus);
   return;
  }
  if(advancedSession?.editor==="economy"){
