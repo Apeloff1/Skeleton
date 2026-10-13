@@ -167,6 +167,9 @@ _GOVERNANCE_EXPORTS = {
     "ShadowIntakeLease": ".shadow_weight_intake",
     "ShadowKnowledgeQueue": ".shadow_weight_intake",
     "assess_shadow_intake": ".shadow_weight_intake",
+    "ShadowTrainingHandoff": ".shadow_training_handoff",
+    "build_shadow_training_handoff": ".shadow_training_handoff",
+    "stage_trained_shadow": ".shadow_training_handoff",
     "require_temporal_compatibility": ".temporal_intervals",
 }
 
