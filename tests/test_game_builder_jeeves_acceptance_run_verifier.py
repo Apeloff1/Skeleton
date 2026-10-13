@@ -213,7 +213,7 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
                 zipout.writestr("app_acceptance_run_evidence.json",
                                 json.dumps(self.evidence["Linux"]))
             source=GitHubEvidenceSource("unit-test-placeholder-token")
-            source._request=lambda path,limit: pathfile if False else path.read_bytes()
+            source._request=lambda _route,limit: path.read_bytes()
             report=source.artifact(987)
             self.assertEqual(report["github_claims"]["os"],"Linux")
 
@@ -221,8 +221,7 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             path=Path(directory)/"artifact.zip"
             source=GitHubEvidenceSource("unit-test-placeholder-token")
-            source._request=lambda path,limit: pathfile if False else path_obj.read_bytes()
-            path_obj=path
+            source._request=lambda _route,limit: path.read_bytes()
             for name in ("../evidence.json", "other.json"):
                 with zipfile.ZipFile(path,"w") as archive:
                     archive.writestr(name,"{}")
