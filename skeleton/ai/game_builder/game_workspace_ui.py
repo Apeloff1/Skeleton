@@ -455,6 +455,22 @@ $("jeeves-code-patchset").addEventListener("click",()=>dmGuard(async()=>{
   " unique exact-hunk replacements; no files committed.");
 }));
 
+
+$("jeeves-code-dependencies").addEventListener("click",()=>dmGuard(async()=>{
+ const paths=$("jeeves-code-roots").value.split("\n")
+  .map(p=>p.trim()).filter(Boolean);
+ if(!paths.length||paths.length>8||new Set(paths).size!==paths.length)
+  throw Error("Select 1–8 distinct tracked source files");
+ const result=await codeCall("ai.code.dependencies",{
+  paths,depth:dmPositive("jeeves-code-depth",0,5),
+  max_nodes:dmPositive("jeeves-code-max-nodes",1,128),
+  max_source_bytes:1000000,
+ });
+ status(result.node_count+" source modules and "+result.edge_count+
+  " declared import edges indexed, with "+Object.keys(result.unresolved_or_bounded).length+
+  " incompleteness categories. No imported code was executed.");
+});
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -4409,6 +4425,14 @@ operator-reviewed multi-file diffs; never executes files or silently writes code
 <label>Source lines per page (max 80)
 <input id="jeeves-code-count" type="number" min="1" max="80" value="24"></label>
 <button id="jeeves-code-snippet" type="button">Read SHA-pinned source lines</button>
+
+<label>Dependency graph source roots (one tracked file per line)
+<textarea id="jeeves-code-roots" rows="2" spellcheck="false">skeleton/ai/game_builder/jeeves_appwide_fabric.py</textarea></label>
+<label>Static import traversal depth (0–5)
+<input id="jeeves-code-depth" type="number" min="0" max="5" value="3"></label>
+<label>Maximum imported modules (1–128)
+<input id="jeeves-code-max-nodes" type="number" min="1" max="128" value="64"></label>
+<button id="jeeves-code-dependencies" type="button">Map source-linked module dependencies</button>
 <details><summary>Operator-reviewed multi-file exact-hunk patchset</summary>
 <p><small>This stages diffs for review only. Each target needs a current exact
 SHA and its own unique, non-overlapping old/new text hunks.</small></p>
