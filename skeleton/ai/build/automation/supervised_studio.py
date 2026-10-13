@@ -41,6 +41,7 @@ from .studio_artifact_custody import ArtifactCustody
 from .studio_promotion import PromotionEvidence, require_promotable
 from .build_integration import integration_commands
 from .build_composition import composition_digest
+from .shift_supervisor.consumer_plan import canonical_queue_drained
 
 
 def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str, Any]], str]:
@@ -57,6 +58,8 @@ def _canonical_items(state_path: Path, max_tasks: int) -> tuple[list[Mapping[str
     if not isinstance(data, Mapping):
         raise ValueError("repository state must be an object")
     supervisor = data.get("_shift_supervisor")
+    if canonical_queue_drained(supervisor, "night"):
+        return [], ""
     if not isinstance(supervisor, Mapping) or supervisor.get("status") != "loaded":
         raise ValueError("canonical shift-supervisor state was not loaded")
     if supervisor.get("team") != "night":
