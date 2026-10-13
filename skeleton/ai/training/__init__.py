@@ -152,6 +152,15 @@ _GOVERNANCE_EXPORTS = {
     "TemporalEditReceipt": ".temporal_editing",
     "validate_temporal_edit": ".temporal_editing",
     "YearInterval": ".temporal_intervals",
+    "ShadowWeightError": ".shadow_weights",
+    "SourceAttestation": ".shadow_weights",
+    "ShadowWeightPolicy": ".shadow_weights",
+    "ShadowAssessment": ".shadow_weights",
+    "ShadowWeightBatch": ".shadow_weights",
+    "ShadowPromotionPermit": ".shadow_weights",
+    "authorize_shadow_promotion": ".shadow_weights",
+    "ShadowWeightLedger": ".shadow_weight_ledger",
+    "ShadowWeightSnapshot": ".shadow_weight_ledger",
     "require_temporal_compatibility": ".temporal_intervals",
 }
 
