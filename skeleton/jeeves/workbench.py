@@ -96,6 +96,7 @@ class JeevesWorkbench:
         creator_authorize: Callable[..., bool] | None = None,
         source_edit_authorize: Callable[..., bool] | None = None,
         source_edit_handler: Callable[..., Any] | None = None,
+        source_edit_allowlist: Sequence[str] | None = None,
     ) -> None:
         from skeleton.jeeves.app_capability_bridge import _root
         self.root = _root(root)
@@ -106,8 +107,10 @@ class JeevesWorkbench:
             raise JeevesWorkbenchError("independent host read/orchestration authorizers required")
         if (creator_handlers is None) != (creator_authorize is None):
             raise JeevesWorkbenchError("creator handlers require a paired host authorizer")
-        if (source_edit_authorize is None) != (source_edit_handler is None):
-            raise JeevesWorkbenchError("source edit permissions require a paired host handler")
+        if source_edit_handler is not None and source_edit_allowlist is not None:
+            raise JeevesWorkbenchError("choose injected editor or opt-in local editor, not both")
+        if (source_edit_authorize is None) != (source_edit_handler is not None or source_edit_allowlist is not None):
+            raise JeevesWorkbenchError("source editing requires a host authorizer and an explicit handler or allowlist")
         if source_edit_authorize is not None and not callable(source_edit_authorize):
             raise JeevesWorkbenchError("source edit authorization must be callable")
         if source_edit_handler is not None and not callable(source_edit_handler):
@@ -143,11 +146,21 @@ class JeevesWorkbench:
         self._creator_authorize = creator_authorize
         self._source_edit_authorize = source_edit_authorize
         self._source_edit_handler = source_edit_handler
+        self._local_source_editor = None
+        self._source_edit_allowlist = source_edit_allowlist
         self._open_runbooks: list[CreatorRunbookStore] = []
         self.atlas: JeevesRepositoryFileAtlas | None = None
         self.shadow: DurableShadowWeightPipeline | None = None
         self.orchestration: DurableOrchestrLedger | None = None
         try:
+            if self._source_edit_allowlist is not None:
+                from skeleton.jeeves.source_edit_host import JeevesAtomicSourceEditor
+                self._local_source_editor = JeevesAtomicSourceEditor(
+                    repo_root=self.root,
+                    journal_path=self._scope / "source_edits.sqlite",
+                    allowed_roots=self._source_edit_allowlist,
+                )
+                self._source_edit_handler = self._local_source_editor
             self.atlas = JeevesRepositoryFileAtlas(
                 self.root, self._scope / "source_atlas.sqlite",
             )
@@ -444,6 +457,7 @@ class JeevesWorkbench:
             for store in getattr(self, "_open_runbooks", ()):
                 store.close()
             for owner in (
+                getattr(self, "_local_source_editor", None),
                 getattr(self, "orchestration", None),
                 getattr(self, "shadow", None),
                 getattr(self, "atlas", None),
