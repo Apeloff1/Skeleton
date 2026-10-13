@@ -75,10 +75,10 @@ def test_allows_local_actions_and_digest_pinned_container_actions(tmp_path: Path
 def test_allows_reviewed_exact_godot_installer_commit(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
-        "name: test\\non: [push]\\npermissions: {contents: read}\\njobs:\\n"
-        "  native:\\n    steps:\\n"
+        "name: test\non: [push]\npermissions: {contents: read}\njobs:\n"
+        "  native:\n    steps:\n"
         "      - uses: chickensoft-games/setup-godot@"
-        "f166999204a4f2722c6fe042fbaa3b3ea0d9c789\\n",
+        "f166999204a4f2722c6fe042fbaa3b3ea0d9c789\n",
     )
     assert findings == []
 
@@ -86,10 +86,10 @@ def test_allows_reviewed_exact_godot_installer_commit(tmp_path: Path) -> None:
 def test_rejects_unreviewed_godot_installer_revision(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
-        "name: test\\non: [push]\\npermissions: {contents: read}\\njobs:\\n"
-        "  native:\\n    steps:\\n"
+        "name: test\non: [push]\npermissions: {contents: read}\njobs:\n"
+        "  native:\n    steps:\n"
         "      - uses: chickensoft-games/setup-godot@"
-        + PIN + "\\n",
+        + PIN + "\n",
     )
     assert any("explicitly reviewed immutable commit SHA" in finding for finding in findings)
 
@@ -97,8 +97,8 @@ def test_rejects_unreviewed_godot_installer_revision(tmp_path: Path) -> None:
 def test_rejects_unpinned_godot_installer_tag(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
-        "name: test\\non: [push]\\npermissions: {contents: read}\\njobs:\\n"
-        "  native:\\n    steps:\\n"
-        "      - uses: chickensoft-games/setup-godot@v2.4.1\\n",
+        "name: test\non: [push]\npermissions: {contents: read}\njobs:\n"
+        "  native:\n    steps:\n"
+        "      - uses: chickensoft-games/setup-godot@v2.4.1\n",
     )
     assert any("explicitly reviewed immutable commit SHA" in finding for finding in findings)
