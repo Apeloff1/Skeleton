@@ -376,6 +376,85 @@ $("jeeves-dm-batch").addEventListener("click",()=>dmGuard(async()=>{
   result.omitted_large_results+" large responses held to digest-only receipts.");
 }));
 
+
+/* Cross-language source navigator and multi-file reviewed patch cockpit. */
+let codeSearchCursor=null;
+let codeSearchIdentity=null;
+async function codeCall(action, params, approve=false){
+ if(!jeevesAppSnapshot)
+  throw Error("Inventory scan required for source-pinned code navigation");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action,params:{...params,expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:approve,
+ });
+ $("jeeves-code-output").textContent=JSON.stringify(receipt.result,null,2).slice(0,115000);
+ return receipt.result;
+}
+function codeArguments(){
+ const query=$("jeeves-code-query").value.trim();
+ const prefix=$("jeeves-code-prefix").value.trim();
+ if(query.length<2||query.length>128)
+  throw Error("Source query must be 2–128 characters");
+ if(prefix.length>256)
+  throw Error("Source prefix too long");
+ return {query,prefix,case_sensitive:$("jeeves-code-case").checked===true};
+}
+async function runCodeSearch(next){
+ const args=codeArguments();
+ const identity=JSON.stringify(args);
+ if(next && codeSearchIdentity!==identity)
+  throw Error("Source search changed: start a fresh cursor");
+ const result=await codeCall("ai.code.search",{
+  ...args,max_files:48,max_matches:20,
+  start_after:next?codeSearchCursor:null,
+ });
+ codeSearchIdentity=identity;
+ codeSearchCursor=result.next_after;
+ $("jeeves-code-next").disabled=!codeSearchCursor;
+ if(result.matches.length){
+  const first=result.matches[0];
+  $("jeeves-code-path").value=first.path;
+  $("jeeves-code-expected").value=first.source_sha256;
+  $("jeeves-code-line").value=first.matches[0].line;
+ }
+ status(result.matched_file_count+" content matches in "+result.files_examined+
+  " inspected files; "+(result.next_after?"more source pages available":"end of selected source page"));
+}
+$("jeeves-code-search").addEventListener("click",()=>dmGuard(async()=>{
+ codeSearchCursor=null;codeSearchIdentity=null;
+ await runCodeSearch(false);
+}));
+$("jeeves-code-next").addEventListener("click",()=>dmGuard(async()=>{
+ if(!codeSearchCursor)throw Error("No additional source page is available");
+ await runCodeSearch(true);
+}));
+$("jeeves-code-snippet").addEventListener("click",()=>dmGuard(async()=>{
+ const path=$("jeeves-code-path").value.trim();
+ const expected=$("jeeves-code-expected").value.trim();
+ const result=await codeCall("ai.code.snippet",{
+  path,start_line:dmPositive("jeeves-code-line",1,50000000),
+  line_count:dmPositive("jeeves-code-count",1,80),
+  ...(expected?{expected_sha256:expected}:{}),
+ });
+ $("jeeves-code-expected").value=result.source_sha256;
+ status("Showing "+result.returned_lines+" source lines with exact SHA-256 custody.");
+}));
+$("jeeves-code-patchset").addEventListener("click",()=>dmGuard(async()=>{
+ if($("jeeves-code-review").checked!==true)
+  throw Error("Multi-file source diff requires explicit proposal approval");
+ const patches=JSON.parse($("jeeves-code-patches").value);
+ if(!Array.isArray(patches)||patches.length<1||patches.length>8)
+  throw Error("Choose 1–8 exact-hunk source targets");
+ const reason=$("jeeves-code-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("A specific proposal reason of 12–1000 characters is required");
+ const result=await codeCall("source.patchset.preview",{
+  patches,reason,
+ },true);
+ status(result.file_count+" source diffs reviewed, "+result.hunk_count+
+  " unique exact-hunk replacements; no files committed.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -4312,6 +4391,41 @@ model promotion and release still require independent approval and evidence.</sm
 ]</textarea></label>
 <button id="jeeves-dm-batch" type="button">Run reviewed non-mutating app previews</button>
 <pre id="jeeves-dm-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
+<p><small>Content-based source search, cursor paging, exact-hash line context and
+operator-reviewed multi-file diffs; never executes files or silently writes code.</small></p>
+<label>Search actual source contents
+<input id="jeeves-code-query" placeholder="class Jeeves, engine capability, import name"></label>
+<label>Repository source prefix (optional)
+<input id="jeeves-code-prefix" placeholder="skeleton/ai/game_builder"></label>
+<label><input id="jeeves-code-case" type="checkbox"> Case-sensitive literal search</label>
+<button id="jeeves-code-search" type="button">Search source contents</button>
+<button id="jeeves-code-next" type="button" disabled>Next indexed page</button>
+<label>Inspect exact source path<input id="jeeves-code-path" placeholder="skeleton/ai/game_builder/module.py"></label>
+<label>Expected source SHA-256 (optional)<input id="jeeves-code-expected" placeholder="64 lowercase hex characters"></label>
+<label>First source line<input id="jeeves-code-line" type="number" min="1" value="1"></label>
+<label>Source lines per page (max 80)
+<input id="jeeves-code-count" type="number" min="1" max="80" value="24"></label>
+<button id="jeeves-code-snippet" type="button">Read SHA-pinned source lines</button>
+<details><summary>Operator-reviewed multi-file exact-hunk patchset</summary>
+<p><small>This stages diffs for review only. Each target needs a current exact
+SHA and its own unique, non-overlapping old/new text hunks.</small></p>
+<label>Explicit change justification
+<textarea id="jeeves-code-reason" rows="2" spellcheck="false">Reviewed cross-module source consistency improvements for Game Studio.</textarea></label>
+<label>Patch list JSON
+<textarea id="jeeves-code-patches" rows="7" spellcheck="false">[
+  {
+    "path": "skeleton/ai/game_builder/module.py",
+    "expected_sha256": "provide-current-source-sha256",
+    "edits": [{"old":"unique original text","new":"replacement text"}]
+  }
+]</textarea></label>
+<label><input id="jeeves-code-review" type="checkbox"> Explicitly approve generation of reviewed source diffs</label>
+<button id="jeeves-code-patchset" type="button">Generate source-pinned multi-file review</button>
+</details>
+<pre id="jeeves-code-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Whole-App Capability Cockpit</legend>
 <p><small>Live inventory of installed app families, forges, game editors, Dragon/crawler workers, model and training planes. Source discovery is not execution authority. Only audited local adapters can act; edits create proposals needing explicit human commit. No arbitrary shell, network, AI weight promotion or provider secrets.</small></p>
