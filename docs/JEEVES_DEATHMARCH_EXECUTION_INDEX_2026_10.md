@@ -1,3 +1,13 @@
+## DX-31–DX-35 — measurable product completion contract (2026-10-13)
+
+- **DX-31.** Freeze the denominator for the 42 application feature families, with explicit owner-path scopes, feature-specific test targets and five-stage proof requirements in `machine/app_completion_scope.json`.
+- **DX-32.** Add `JeevesMeasuredCompletion`: static owner-root coverage, categorized family visibility, 168 independent acceptance obligations, and separate 489-atom volume/capability/service/workstream/journey/gate denominator. Independent proof remains unknown rather than guessed.
+- **DX-33.** Wire `ai.product.measure` and `ai.product.measure.page` into the already authenticated Jeeves appwide controller, with SHA scope lease, digest pagination and strict read-only behavior.
+- **DX-34.** Expose source versus functional readiness explicitly in the existing Studio Deathmarch Production Deck. Fix scoped parameter injection so measuring product completion does not inherit unrelated milestone-plan parameters.
+- **DX-35.** Enforce Windows+Ubuntu exact-head baseline, immutable family cardinality, independent-proof non-promotion, duplicate JSON/private path rejection and adversarial stale source tests.
+
+**Metric distinction:** 0/9 product AI capabilities are registry-labelled complete; 0/421 masterplan volumes are independently enterprise-qualified in the canonical record; 421/421 volumes have plan maturity classifications. **Actual full installed-app completion is unmeasured** until independent end-to-end/device acceptance evidence is admitted. A source-located family is *not* a completed family. Full explanation: `docs/JEEVES_MEASURED_FULL_APP_COMPLETION_2026_10.md`.
+
 # Deathmarch execution index — 2026-10-13
 
 
