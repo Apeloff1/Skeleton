@@ -117,6 +117,18 @@ class JeevesSourceReadGateway:
                         selected.append(raw.decode("utf-8", errors="strict"))
                     except UnicodeError as exc:
                         raise JeevesSourceReadError("indexed source is not UTF-8 text") from exc
+                if item.content_sha256 is not None:
+                    # Hash-anchored atlas snapshots remain meaningful even if a
+                    # source is rewritten with identical size and timestamps.
+                    stream.seek(0)
+                    whole = sha256()
+                    while piece := stream.read(128 * 1024):
+                        whole.update(piece)
+                    if whole.hexdigest() != item.content_sha256:
+                        raise JeevesSourceReadError("source digest diverges from atlas")
+                after = os.fstat(stream.fileno())
+                if after.st_size != info.st_size or after.st_mtime_ns != info.st_mtime_ns:
+                    raise JeevesSourceReadError("source changed during materialization")
         except BaseException:
             raise
         content = "".join(selected)
