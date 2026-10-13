@@ -1,9 +1,9 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13.v8",
+  "version": "2026-10-13.v9",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
-  "scope_note": "42/42 source/test links: 17 unittest smoke families, 8 pytest smoke families, 17 discovery-only. Executable subset selection not full feature acceptance.",
+  "scope_note": "42 source-linked feature families: 17 curated unittest, 20 reviewed pytest, 5 discovery-only; selected suites are narrower than full feature release qualification",
   "runner_mode": "unittest_module_exact_head",
   "default_max_seconds": 480,
   "policies": {
@@ -19,23 +19,23 @@
     {
       "family_id": "F01",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Workspace ownership and taxonomy are checked, not real user navigation",
       "unittest_modules": [
         "tests.test_app_workspace_taxonomy"
       ],
-      "workflow_hint": "Separate dedicated independent target gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
       "family_id": "F02",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "API gateway payload reliability contract subset, not all routes",
       "unittest_modules": [
         "tests.test_api_gateway_payload_reliability"
       ],
-      "workflow_hint": "Separate dedicated independent target gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
@@ -52,34 +52,34 @@
     {
       "family_id": "F04",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Security and governance boundary adversarial subset",
       "unittest_modules": [
         "tests.test_ai_security_governance_gapfill"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
       "family_id": "F05",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Durable memory ordering and store invariants subset",
       "unittest_modules": [
         "tests.test_memory_store_invariants"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
       "family_id": "F06",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Assistant context and prompt conductor subset",
       "unittest_modules": [
         "tests.test_ai_context_conductor"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
@@ -107,12 +107,12 @@
     {
       "family_id": "F09",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Retrieval correctness and source-backed lookup subset",
       "unittest_modules": [
         "tests.test_retrieval"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
@@ -175,23 +175,23 @@
     {
       "family_id": "F15",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Training program policy and validation governance subset",
       "unittest_modules": [
         "tests.test_ai_training_program_governance"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
       "family_id": "F16",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Shadow promotion requires human governance and source custody subset",
       "unittest_modules": [
         "tests.test_ai_dragon_human_promotion_boundary"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
@@ -219,12 +219,12 @@
     {
       "family_id": "F19",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Dragon video frame source cognition and ingestion subset",
       "unittest_modules": [
         "tests.test_ai_dragon_visual_runtime_ingest"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
@@ -397,12 +397,12 @@
     {
       "family_id": "F35",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Experimental multimodal feature candidate subset",
       "unittest_modules": [
         "tests.test_p3t2_multimodal_candidate"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
@@ -463,23 +463,23 @@
     {
       "family_id": "F41",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Game builder incident and interrupted execution resilience subset",
       "unittest_modules": [
         "tests.test_ai_game_builder_resilience"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     },
     {
       "family_id": "F42",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Enterprise architecture/source contract checks, not full deployed journeys",
       "unittest_modules": [
         "tests.test_enterprise_system_architecture"
       ],
-      "workflow_hint": "Separate dedicated independent target gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
       "product_release_qualified": false
     }
   ]
