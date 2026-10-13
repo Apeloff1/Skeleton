@@ -1,0 +1,165 @@
+name: Git Atlas Completeness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/build_git_atlas.py"
+      - "scripts/build_git_atlas_near.py"
+      - "scripts/query_git_atlas.py"
+      - "tests/test_git_atlas.py"
+      - "tests/test_git_atlas_near.py"
+      - ".machine/repository.toml"
+      - "machine/architecture.json"
+      - "machine/ai_file_tree.json"
+      - ".github/workflows/git-atlas.yml"
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: git-atlas-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  git-atlas:
+    name: Exhaustive tracked-file atlas and duplicate audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Verify Git atlas regression tests
+        run: python -m unittest discover -s tests -p 'test_git_atlas*.py' -v
+
+      - name: Build complete exact-head indexes
+        run: >-
+          python scripts/build_git_atlas.py
+          --root .
+          --output .machine/git-atlas
+          --revision "$EXPECTED_SHA"
+
+      - name: Verify complete index provenance and receipts
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          base = Path(".machine/git-atlas")
+          summary = json.loads((base / "summary.json").read_text(encoding="utf-8"))
+          commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          expected = os.environ["EXPECTED_SHA"]
+          if summary["commit"] != commit or commit != expected:
+              raise SystemExit("Git atlas source SHA does not match checked out HEAD")
+          if summary.get("truncated") is not False:
+              raise SystemExit("Git atlas was truncated")
+          if summary.get("tracked_entries", 0) <= 0:
+              raise SystemExit("Git atlas is empty")
+          for filename, receipt in summary["artifacts"].items():
+              content = (base / filename).read_bytes()
+              if len(content) != receipt["size"]:
+                  raise SystemExit(f"size mismatch for {filename}")
+              if hashlib.sha256(content).hexdigest() != receipt["sha256"]:
+                  raise SystemExit(f"digest mismatch for {filename}")
+          with (base / "files.jsonl").open(encoding="utf-8") as stream:
+              actual_count = sum(1 for line in stream if line.strip())
+          if actual_count != summary["tracked_entries"]:
+              raise SystemExit("file inventory is incomplete")
+          print(f"verified {actual_count} tracked entries at {commit}")
+          PY
+
+      - name: Prove bounded source navigation
+        run: |
+          python scripts/query_git_atlas.py \
+            --root . --atlas .machine/git-atlas \
+            --query "jeeves game editor" --budget-bytes 5000 \
+            > .machine/git-atlas/query-smoke.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          response = json.loads(Path(".machine/git-atlas/query-smoke.json").read_text())
+          if not response["hits"]:
+              raise SystemExit("bounded Jeeves navigation returned zero feature hits")
+          if Path(".machine/git-atlas/query-smoke.json").stat().st_size > 5001:
+              raise SystemExit("bounded navigation exceeded byte budget")
+          PY
+
+      - name: Publish atlas as immutable workflow artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: git-atlas-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .machine/git-atlas/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9
+
+  near-duplicate-audit:
+    name: Git-verified near-duplicate candidate audit
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      EXPECTED_SHA: ${{ github.sha }}
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Build complete Git metadata inventory
+        run: >-
+          python scripts/build_git_atlas.py
+          --root . --output .machine/git-atlas --revision "$EXPECTED_SHA"
+
+      - name: Scan Git-verified normalized and near duplicate candidates
+        run: >-
+          python scripts/build_git_atlas_near.py
+          --root . --atlas .machine/git-atlas
+          --output .machine/git-atlas
+          --max-bytes 65536
+
+      - name: Publish review-only similarity evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: git-atlas-near-${{ github.sha }}
+          path: |
+            .machine/git-atlas/near-summary.json
+            .machine/git-atlas/near-candidates.jsonl
+            .machine/git-atlas/normalized-duplicates.jsonl
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9

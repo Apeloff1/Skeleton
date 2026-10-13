@@ -9,7 +9,7 @@ and strips hosted-provider/proxy credentials from the child environment.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import hashlib
 import json
 import math
@@ -247,6 +247,243 @@ class LlamaCppConfig:
                 raise ValueError(f"invalid environment value for {key}")
             normalized_env[key] = value
         object.__setattr__(self, "environment", normalized_env)
+
+
+@dataclass(frozen=True, slots=True)
+class ConsumerHardwareBudget:
+    """Explicit RAM and KV budget for an offline quantized GGUF deployment.
+
+    kv_bytes_per_token MUST be supplied from the specific model/selected KV
+    representation. GGUF file size alone cannot determine attention memory.
+    ram_bytes is the operator's *available* machine/cgroup memory, not a
+    machine-class guess, and GPU offloading remains an independent backend
+    concern. This is conservative admission planning, not an OOM guarantee.
+    """
+
+    ram_bytes: int
+    physical_cpu_cores: int
+    kv_bytes_per_token: int
+    target_context_tokens: int = 4096
+    reserve_bytes: int = 512 * 1024 * 1024
+    runtime_scratch_bytes: int = 512 * 1024 * 1024
+    max_decode_threads: int = 16
+    prefill_batch_tokens: int = 256
+
+    def __post_init__(self) -> None:
+        for name in (
+            "ram_bytes", "physical_cpu_cores", "kv_bytes_per_token",
+            "target_context_tokens", "max_decode_threads", "prefill_batch_tokens",
+        ):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        for name in ("reserve_bytes", "runtime_scratch_bytes"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{name} must be non-negative")
+        if not 128 <= self.target_context_tokens <= 1_048_576:
+            raise ValueError("target_context_tokens outside llama.cpp bounds")
+
+
+@dataclass(frozen=True, slots=True)
+class ConsumerLlamaPlan:
+    """Auditable configuration chosen without claiming to measure performance."""
+
+    configuration: LlamaCppConfig
+    model_bytes: int
+    reserved_ram_bytes: int
+    reserved_kv_bytes: int
+    estimated_total_bytes: int
+    available_ram_bytes: int
+    context_clamped: bool
+
+
+def estimate_gqa_kv_bytes_per_token(
+    *,
+    layers: int,
+    query_heads: int,
+    kv_heads: int,
+    key_head_dim: int,
+    value_head_dim: int,
+    key_bytes_per_element: int = 2,
+    value_bytes_per_element: int = 2,
+) -> int:
+    """Exact logical K/V tensor bytes per token from known model geometry.
+
+    Supports multi-head (kv_heads=query_heads), grouped-query and multi-query
+    attention. It deliberately excludes allocator padding, paging overhead and
+    backend scratch; the consumer RAM planner reserves those separately.
+    It is not correct to infer KV geometry from GGUF file size alone.
+    """
+    fields = {
+        "layers": layers,
+        "query_heads": query_heads,
+        "kv_heads": kv_heads,
+        "key_head_dim": key_head_dim,
+        "value_head_dim": value_head_dim,
+        "key_bytes_per_element": key_bytes_per_element,
+        "value_bytes_per_element": value_bytes_per_element,
+    }
+    for name, value in fields.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0 or value > 65536:
+            raise ValueError(f"{name} must be a bounded positive integer")
+    if kv_heads > query_heads or query_heads % kv_heads:
+        raise ValueError("query head count must be divisible by KV head count")
+    if key_bytes_per_element > 8 or value_bytes_per_element > 8:
+        raise ValueError("KV element width must be <= 8 bytes")
+    return layers * kv_heads * (
+        key_head_dim * key_bytes_per_element
+        + value_head_dim * value_bytes_per_element
+    )
+
+
+def detect_consumer_hardware_budget(
+    *,
+    kv_bytes_per_token: int,
+    target_context_tokens: int = 4096,
+    available_ram_bytes: int | None = None,
+    physical_cpu_cores: int | None = None,
+) -> ConsumerHardwareBudget:
+    """Conservatively probe an offline host; fail rather than invent capacity.
+
+    psutil, when installed, works on Windows, macOS and Linux. On Linux
+    /proc/meminfo and /proc/cpuinfo allow a standard-library-only fallback.
+    Cgroup v2 memory and CPU quotas and process affinity tighten the budget.
+    Optional explicit overrides support constrained and headless deployments.
+    """
+    def positive(value: object, name: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise LlamaCppRuntimeError(f"invalid detected {name}")
+        return value
+
+    memory = available_ram_bytes
+    cores = physical_cpu_cores
+    if memory is None or cores is None:
+        try:
+            import psutil  # type: ignore[import-not-found]  # optional host probe
+        except ImportError:
+            psutil = None
+        if psutil is not None:
+            if memory is None:
+                memory = int(psutil.virtual_memory().available)
+            if cores is None:
+                detected = psutil.cpu_count(logical=False)
+                cores = int(detected) if detected else None
+    if memory is None:
+        try:
+            for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+                if line.startswith("MemAvailable:"):
+                    memory = int(line.split()[1]) * 1024
+                    break
+        except (OSError, ValueError, IndexError):
+            pass
+    if cores is None:
+        try:
+            pairs = set()
+            physical = logical_core = None
+            for line in Path("/proc/cpuinfo").read_text(encoding="ascii").splitlines() + [""]:
+                if not line.strip():
+                    if physical is not None and logical_core is not None:
+                        pairs.add((physical, logical_core))
+                    physical = logical_core = None
+                elif line.startswith("physical id"):
+                    physical = line.split(":", 1)[1].strip()
+                elif line.startswith("core id"):
+                    logical_core = line.split(":", 1)[1].strip()
+            if pairs:
+                cores = len(pairs)
+        except (OSError, ValueError, IndexError):
+            pass
+    if memory is None or cores is None:
+        raise LlamaCppRuntimeError(
+            "cannot determine available RAM and physical cores; provide explicit values"
+        )
+    memory = positive(memory, "available RAM")
+    cores = positive(cores, "physical CPU count")
+
+    # Linux containers may see the entire host's RAM from psutil or /proc.
+    # The effective budget cannot exceed unallocated cgroup allowance.
+    cgroup = Path("/sys/fs/cgroup")
+    try:
+        max_text = (cgroup / "memory.max").read_text(encoding="ascii").strip()
+        if max_text != "max":
+            mem_limit = int(max_text)
+            mem_current = int((cgroup / "memory.current").read_text(encoding="ascii"))
+            if mem_limit <= 0 or mem_current < 0:
+                raise LlamaCppRuntimeError("invalid cgroup memory accounting")
+            memory = min(memory, max(0, mem_limit - mem_current))
+    except (OSError, ValueError):
+        pass
+    # Container CPU quotas can be smaller than visible physical core count.
+    try:
+        if hasattr(os, "sched_getaffinity"):
+            cores = min(cores, len(os.sched_getaffinity(0)))
+    except OSError:
+        pass
+    try:
+        quota_text, period_text = (cgroup / "cpu.max").read_text(encoding="ascii").split()
+        if quota_text != "max":
+            quota, period = int(quota_text), int(period_text)
+            if quota <= 0 or period <= 0:
+                raise LlamaCppRuntimeError("invalid cgroup CPU quota")
+            cores = min(cores, max(1, (quota + period - 1) // period))
+    except (OSError, ValueError):
+        pass
+    return ConsumerHardwareBudget(
+        ram_bytes=positive(memory, "effective available RAM"),
+        physical_cpu_cores=positive(cores, "effective CPU cores"),
+        kv_bytes_per_token=kv_bytes_per_token,
+        target_context_tokens=target_context_tokens,
+    )
+
+
+def plan_consumer_llama_cpp(
+    config: LlamaCppConfig,
+    budget: ConsumerHardwareBudget,
+    *,
+    model_bytes: int,
+) -> ConsumerLlamaPlan:
+    """Choose context, batch and CPU threads before launching llama.cpp.
+
+    Reserves 20% RAM or the explicit floor for the OS, then charges full GGUF
+    bytes, configured scratch headroom and model-specific KV requirements.
+    Does not fabricate a GPU layer split, infer quantization from file size,
+    or promise that a backend will actually fit (other buffers may exist).
+    """
+    if not isinstance(config, LlamaCppConfig):
+        raise TypeError("config must be LlamaCppConfig")
+    if not isinstance(budget, ConsumerHardwareBudget):
+        raise TypeError("budget must be ConsumerHardwareBudget")
+    if isinstance(model_bytes, bool) or not isinstance(model_bytes, int) or model_bytes <= 0:
+        raise ValueError("model_bytes must be positive")
+    reserved = max(budget.reserve_bytes, budget.ram_bytes // 5)
+    fixed = reserved + budget.runtime_scratch_bytes + model_bytes
+    available_for_kv = budget.ram_bytes - fixed
+    minimum_kv = budget.kv_bytes_per_token * 128
+    if available_for_kv < minimum_kv:
+        raise LlamaCppRuntimeError(
+            "GGUF weights, KV cache and runtime headroom exceed consumer RAM budget"
+        )
+    requested = config.context_size or budget.target_context_tokens
+    possible = min(requested, available_for_kv // budget.kv_bytes_per_token)
+    context = (possible // 128) * 128
+    if context < 128:
+        raise LlamaCppRuntimeError("consumer RAM budget cannot support minimum context")
+    threads = min(config.threads or budget.physical_cpu_cores,
+                  budget.physical_cpu_cores, budget.max_decode_threads)
+    batch = min(config.batch_size or budget.prefill_batch_tokens,
+                budget.prefill_batch_tokens, context)
+    chosen = replace(config, context_size=context, threads=threads, batch_size=batch)
+    kv_total = context * budget.kv_bytes_per_token
+    return ConsumerLlamaPlan(
+        configuration=chosen,
+        model_bytes=model_bytes,
+        reserved_ram_bytes=reserved,
+        reserved_kv_bytes=kv_total,
+        estimated_total_bytes=fixed + kv_total,
+        available_ram_bytes=budget.ram_bytes,
+        context_clamped=context < requested,
+    )
 
 
 def _sha256_file(path: Path) -> str:
@@ -776,8 +1013,17 @@ class LlamaCppModel:
 
 def build_llama_cpp_adapter(
     config: LlamaCppConfig, *, cache_size: int = 0, default_seed: int = 0,
+    consumer_budget: ConsumerHardwareBudget | None = None,
 ) -> LocalModelAdapter:
-    """Construct the canonical provider-neutral adapter around a llama.cpp model."""
+    """Build an offline adapter, optionally applying measured consumer limits."""
+    if consumer_budget is not None:
+        try:
+            model_bytes = Path(config.model_path).stat().st_size
+        except OSError as exc:
+            raise LlamaCppRuntimeError("cannot size local GGUF for consumer planning") from exc
+        config = plan_consumer_llama_cpp(
+            config, consumer_budget, model_bytes=model_bytes,
+        ).configuration
     return LocalModelAdapter(
         LocalInferenceEngine(LlamaCppModel(config), cache_size=cache_size),
         default_seed=default_seed,
@@ -790,6 +1036,11 @@ __all__ = [
     "LlamaCppConfig",
     "LlamaCppModel",
     "LlamaCppRuntimeError",
+    "ConsumerHardwareBudget",
+    "ConsumerLlamaPlan",
+    "detect_consumer_hardware_budget",
+    "estimate_gqa_kv_bytes_per_token",
+    "plan_consumer_llama_cpp",
     "build_llama_cpp_adapter",
     "inspect_gguf",
 ]

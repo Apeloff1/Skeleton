@@ -37,8 +37,8 @@ DEF rLY EQU $FF44
 DEF rSCX EQU $FF43
 DEF rBGP EQU $FF47
 DEF rOBP0 EQU $FF48
-DEF OAM EQU $FE00
-DEF VRAM EQU $8000
+DEF DRAGON_OAM EQU $FE00
+DEF DRAGON_VRAM EQU $8000
 SECTION "Entry", ROM0[$100]
     jp Start
     ds $0150 - @,0
@@ -53,7 +53,7 @@ Start:
     xor a
     ldh [rLCDC],a
     ; transfer 4 native 2bpp tiles into VRAM
-    ld hl,VRAM
+    ld hl,DRAGON_VRAM
     ld de,PlatformTiles
     ld b,PlatformTilesEnd-PlatformTiles
 .copyTiles:
@@ -321,7 +321,7 @@ MoveCamera:
 PaintObjects:
     ; OAM writes are made during VBlank.
     ld a,[PlayerScreenY]
-    ld [OAM],a
+    ld [DRAGON_OAM],a
     ld a,[PlayerWorldX]
     ld b,a
     ld a,[CameraScroll]
@@ -329,7 +329,7 @@ PaintObjects:
     ld a,b
     sub c
     add 8
-    ld [OAM+1],a
+    ld [DRAGON_OAM+1],a
     ld hl,AnimationClock
     inc [hl]
     ld a,[hl]
@@ -340,11 +340,11 @@ PaintObjects:
 .normal:
     ld a,2
 .tile:
-    ld [OAM+2],a
+    ld [DRAGON_OAM+2],a
     xor a
-    ld [OAM+3],a
+    ld [DRAGON_OAM+3],a
     ld a,[StarScreenY]
-    ld [OAM+4],a
+    ld [DRAGON_OAM+4],a
     ld a,[StarWorldX]
     ld b,a
     ld a,[CameraScroll]
@@ -352,11 +352,11 @@ PaintObjects:
     ld a,b
     sub c
     add 8
-    ld [OAM+5],a
+    ld [DRAGON_OAM+5],a
     ld a,3
-    ld [OAM+6],a
+    ld [DRAGON_OAM+6],a
     xor a
-    ld [OAM+7],a
+    ld [DRAGON_OAM+7],a
     ret
 CollectStar:
     ld a,[PlayerWorldX]
@@ -392,7 +392,7 @@ CollectStar:
     ld a,$1B
     ldh [rOBP0],a ; audible/visual reward still needs external review
     ret
-GOAL_X EQU __GOAL_X__
+DEF GOAL_X EQU __GOAL_X__
 __PLATFORM_TILES__
 SECTION "Variables", WRAM0
 PlayerWorldX: ds 1
