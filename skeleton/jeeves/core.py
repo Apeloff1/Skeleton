@@ -266,6 +266,16 @@ class Jeeves:
             root=root,
         )
 
+    def orchestration_store(self, path, *, authorize):
+        """Open a host-authorized, durable Supervisor/Secretary/Worker ledger.
+
+        Planning remains non-executing. Authority is checked by the host on
+        every append or state change; evidence can never substitute for a
+        ToolExecutor grant to perform application effects.
+        """
+        from skeleton.jeeves.ai.orchestration_store import DurableOrchestrLedger
+        return DurableOrchestrLedger(path, authorize=authorize)
+
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
         if not isinstance(mode, SessionMode):
