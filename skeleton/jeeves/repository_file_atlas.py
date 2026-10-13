@@ -421,6 +421,19 @@ class JeevesRepositoryFileAtlas:
             "observed_at_ns": record[2], "file_count": record[3],
         }
 
+    def lookup(self, path: str) -> IndexedFile | None:
+        """Resolve only exact source paths previously observed by the host."""
+        if not isinstance(path, str) or not 1 <= len(path) <= 2048:
+            raise RepositoryAtlasError("invalid indexed path identity")
+        with self._lock:
+            self._meta()
+            result = self._db.execute(
+                "SELECT path,owner_root,feature,suffix,bytes,modified_ns,"
+                "content_sha256 FROM jeeves_atlas_files WHERE path=?",
+                (path,),
+            ).fetchone()
+            return IndexedFile(*result) if result is not None else None
+
     def search(self, *, query: str = "", limit: int = 30, offset: int = 0,
                owner_root: str | None = None,
                feature: str | None = None) -> dict[str, Any]:
