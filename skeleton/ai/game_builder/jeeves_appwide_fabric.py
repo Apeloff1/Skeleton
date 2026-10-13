@@ -406,6 +406,9 @@ OPERATIONS = {
     "studio.campaign.plan":("compute", "simulate bounded branching original game campaign across canonical scenes",True),
     "studio.campaign.stage":("proposal", "reviewed SHA-bound authored campaign source and actual route receipt",True),
     "studio.campaign.verify":("read", "replay committed original campaign source and endings",False),
+    "studio.campaign.lore.plan":("read", "bind real character/region/plot story history to a committed game campaign",False),
+    "studio.campaign.lore.stage":("proposal", "stage canonical full-story game campaign links for human review",True),
+    "studio.campaign.lore.verify":("read", "reverify source-committed story/game causal binding",False),
     "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
     "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
@@ -681,6 +684,16 @@ class JeevesAppwideRuntime:
                 result=campaign.stage(**params,operator_authorized=authorized)
             else:
                 result=campaign.verify(**params)
+        elif action in ("studio.campaign.lore.plan","studio.campaign.lore.stage",
+                        "studio.campaign.lore.verify"):
+            from .jeeves_campaign_lore import JeevesCampaignLore
+            lore=JeevesCampaignLore(inv,ws)
+            if action=="studio.campaign.lore.plan":
+                result=lore.plan(**params)
+            elif action=="studio.campaign.lore.stage":
+                result=lore.stage(**params,operator_authorized=authorized)
+            else:
+                result=lore.verify(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":

@@ -318,6 +318,23 @@ class GameWorkspace:
         config=validate_editor_document(_json(_read(config_path)))
         validate_advanced_scene(document,config["settings"])
 
+    def _validate_campaign_lore_source(self, project, relative, document):
+        """Reject uncommitted narrative links and invalid full-history evidence."""
+        from .jeeves_campaign_lore import rebuild_campaign_lore_document
+        if type(document) is not dict:
+            raise WorkspaceError("exact original campaign narrative source required")
+        rebuilt=rebuild_campaign_lore_document(self,project,document)
+        if rebuilt!=document or relative!=(
+                "game/campaigns/"+document["campaign_id"]+"_lore.json"):
+            raise WorkspaceError("campaign original cast/plot/location source changed")
+        return {
+            "schema":document["schema"],
+            "campaign_id":document["campaign_id"],
+            "full_approved_story_history_reverified":True,
+            "gameplay_campaign_sha256":document["campaign_source_sha256"],
+            "source_files_mutated":False,
+        }
+
     def _validate_advanced_campaign_source(self, project, relative, document):
         """Replay actual scene-linked, choice-branching game campaign at commit.
 
@@ -483,7 +500,10 @@ class GameWorkspace:
             if relative.startswith("game/replays/"):
                 self._validate_advanced_replay_source(project,relative,parsed)
             if relative.startswith("game/campaigns/"):
-                self._validate_advanced_campaign_source(project,relative,parsed)
+                if relative.endswith("_lore.json"):
+                    self._validate_campaign_lore_source(project,relative,parsed)
+                else:
+                    self._validate_advanced_campaign_source(project,relative,parsed)
             if (relative in ("game/story_bible.json","game/continuity_contract.json")
                     or relative.startswith(("story/scenes/","story/chapters/"))):
                 from .story_workspace import validate_story_workspace_source
@@ -537,7 +557,10 @@ class GameWorkspace:
             if proposal["path"].startswith("game/replays/"):
                 self._validate_advanced_replay_source(project,proposal["path"],parsed)
             if proposal["path"].startswith("game/campaigns/"):
-                self._validate_advanced_campaign_source(project,proposal["path"],parsed)
+                if proposal["path"].endswith("_lore.json"):
+                    self._validate_campaign_lore_source(project,proposal["path"],parsed)
+                else:
+                    self._validate_advanced_campaign_source(project,proposal["path"],parsed)
             if (proposal["path"] in ("game/story_bible.json",
                                       "game/continuity_contract.json") or
                     proposal["path"].startswith(("story/scenes/","story/chapters/"))):
