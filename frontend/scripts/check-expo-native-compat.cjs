@@ -26,8 +26,8 @@ function lockVersionAllowed(actual, selector) {
   if (typeof actual !== "string") return false;
   if (!selector.startsWith("~")) return actual === selector;
   // The reviewed SDK matrix uses exact versions or tilde patch ranges only.
-  const floor = /^(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(selector.slice(1));
-  const resolved = /^(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(actual);
+  const floor = /^(\d+)\.(\d+)\.(\d+)$/.exec(selector.slice(1));
+  const resolved = /^(\d+)\.(\d+)\.(\d+)$/.exec(actual);
   return Boolean(floor && resolved &&
     Number(resolved[1]) === Number(floor[1]) &&
     Number(resolved[2]) === Number(floor[2]) &&
