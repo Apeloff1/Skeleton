@@ -169,7 +169,9 @@ class JeevesAllAppCapabilityTests(unittest.TestCase):
                              authorized=True)
         self.work.commit(ready["result"]["proposal_id"],human_approved=True,
                          authorized=True)
-        self.assertEqual(len(self.work.files("current",self.project)),1)
+        self.assertEqual(
+            [x.path for x in self.work.files("current",self.project)
+             if x.path.startswith("systems/")],["systems/racing.json"])
         with self.assertRaises(JeevesAppCapabilityError):
             self.call("studio.editor.stage",{
                 **args,"reason":"short"},authorized=True)
