@@ -136,6 +136,31 @@ class Intake:
         return out
 
 
+def validate_answers(answers: Mapping[str, Any]) -> Dict[str, str]:
+    """Fail closed on unknown questionnaire fields, choices and non-text input.
+
+    This validation is shared between the CLI and the godot API/command path.
+    Creative brief facets intentionally accept free text; voted beats use their
+    closed vocabulary so an invalid preference cannot be silently ignored.
+    """
+    if not isinstance(answers, Mapping):
+        raise ValueError("answers must be a JSON object")
+    valid_beats = {beat["id"]: beat["options"] for beat in BEATS}
+    valid_keys = set(valid_beats) | set(BRIEF_FACETS)
+    validated: Dict[str, str] = {}
+    for key, value in answers.items():
+        if not isinstance(key, str) or key not in valid_keys:
+            raise ValueError(f"unknown questionnaire field: {key!r}")
+        if not isinstance(value, str):
+            raise ValueError(f"answer {key!r} must be a string")
+        if key in valid_beats and value not in valid_beats[key]:
+            raise ValueError(f"unknown {key!r} choice {value!r}; choose from {sorted(valid_beats[key])}")
+        if len(value) > 4096:
+            raise ValueError(f"answer {key!r} exceeds 4096 characters")
+        validated[key] = value
+    return validated
+
+
 def intake(answers: Mapping[str, str]) -> Intake:
     """Vote an era from the twelve beats; fall back to the creative brief.
 

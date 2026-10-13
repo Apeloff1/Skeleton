@@ -1,0 +1,6 @@
+{"p":"skeleton/config/__init__.py","g":"957f3eebb193b81ac89fe61aba226c3e14c15d45","b":382,"m":"100644","t":"blob","z":"foundation","f":"skeleton/config"}
+{"p":"skeleton/config/authority.py","g":"cb5d5322bba08d7b27be46116eb5fa25d17386a6","b":27769,"m":"100644","t":"blob","z":"foundation","f":"skeleton/config"}
+{"p":"skeleton/config/settings.py","g":"e41c979fe48aee785b8e6b2639cc9a29333a906d","b":8267,"m":"100644","t":"blob","z":"foundation","f":"skeleton/config"}
+{"p":"skeleton/config/snapshots.py","g":"6a9e1b9671185e8e788d86c831cc19e67679fef1","b":3640,"m":"100644","t":"blob","z":"foundation","f":"skeleton/config"}
+{"p":"skeleton/config/system.py","g":"60bf760d363f9c50e86e239dc026d7185cacdd7b","b":6589,"m":"100644","t":"blob","z":"foundation","f":"skeleton/config"}
+{"p":"skeleton/config/validators.py","g":"0ed9242537e0d9a6b072ed13623836591765de40","b":1657,"m":"100644","t":"blob","z":"foundation","f":"skeleton/config"}

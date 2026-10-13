@@ -1,4 +1,4 @@
-"""Device harness — CPU always, CUDA when torch can see a GPU.
+"""Device harness — CPU always, CUDA or Apple Metal when available.
 
 Never import torch at module load. GameForge CI is stdlib-only.
 probe() is the truth: name, backend, cuda, gpu, capability.
@@ -16,6 +16,7 @@ def probe() -> Dict[str, Any]:
         "backend": "python",
         "torch": False,
         "cuda": False,
+        "mps": False,
         "gpu": None,
         "count": 0,
         "capability": "python",
@@ -46,6 +47,21 @@ def probe() -> Dict[str, Any]:
             info["memory"] = int(torch.cuda.get_device_properties(0).total_memory)
         except Exception:
             info["memory"] = 0
+    if not ok:
+        try:
+            mps = getattr(torch.backends, "mps", None)
+            info["mps"] = bool(mps is not None and mps.is_available())
+        except Exception:
+            info["mps"] = False
+        if info["mps"]:
+            info["name"] = "mps"
+            info["capability"] = "mps"
+            info["gpu"] = "Apple Metal"
+            # This is a recommended working-set limit, not dedicated VRAM.
+            try:
+                info["memory"] = int(torch.mps.recommended_max_memory())
+            except (AttributeError, RuntimeError):
+                info["memory"] = 0
     return info
 
 
@@ -55,6 +71,9 @@ def resolve(device: str = "auto") -> Dict[str, Any]:
     if want in {"gpu", "cuda"}:
         actual = "cuda" if p["cuda"] else "cpu"
         return {**p, "requested": "cuda", "actual": actual, "degraded": actual != "cuda"}
+    if want == "mps":
+        actual = "mps" if p["mps"] else "cpu"
+        return {**p, "requested": "mps", "actual": actual, "degraded": actual != "mps"}
     if want in {"torch", "torch-cpu"}:
         actual = "cpu"
         degraded = not p["torch"]
@@ -87,8 +106,8 @@ def attach_lm(
         vocab=vocab, dim=dim, ctx=ctx, seed=seed,
         n_heads=n_heads, n_layers=n_layers, d_ff=d_ff,
     )
-    if resolved["actual"] == "cuda":
-        lm.to("cuda")
+    if resolved["actual"] in {"cuda", "mps"}:
+        lm.to(resolved["actual"])
     elif (resolved.get("requested") or "auto") == "cpu":
         lm.to("cpu")
     elif resolved.get("torch"):

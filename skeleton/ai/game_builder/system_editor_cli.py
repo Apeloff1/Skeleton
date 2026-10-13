@@ -31,6 +31,19 @@ from .advanced_roguelike_longrun import (replay_long_roguelike,
     verify_long_roguelike,continue_long_roguelike)
 from .advanced_world_planner import plan_original_world
 from .advanced_stealth_planner import plan_stealth_route
+from .advanced_parkour_planner import plan_parkour_route, verify_parkour_plan
+from .advanced_sports_coach import plan_original_sports_match, verify_original_sports_plan
+from .advanced_maze_planner import plan_original_maze, verify_original_maze_plan
+from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg_plan
+from .advanced_npc_society_planner import (
+    plan_original_civic_milestone, verify_original_civic_plan,
+)
+from .advanced_ecosystem_planner import (
+    plan_original_ecology, verify_original_ecology_plan,
+)
+from .advanced_procedural_world_planner import (
+    plan_original_frontier, verify_original_frontier_plan,
+)
 from .advanced_godot_export import (
     render_advanced_godot_package, write_advanced_godot_package,
 )
@@ -84,6 +97,88 @@ def parser() -> argparse.ArgumentParser:
     stealth_plan.add_argument("--settings")
     stealth_plan.add_argument("--max-states",type=int,default=30000)
     stealth_plan.add_argument("--max-depth",type=int,default=96)
+    parkour_plan=commands.add_parser("plan-parkour",
+        help="Search actual original traversal and independently prove any completed route")
+    parkour_plan.add_argument("--scene",required=True)
+    parkour_plan.add_argument("--settings")
+    parkour_plan.add_argument("--max-states",type=int,default=20000)
+    parkour_plan.add_argument("--max-depth",type=int,default=96)
+    parkour_plan.add_argument("--beam-width",type=int,default=64)
+    parkour_verify=commands.add_parser("verify-parkour-plan",
+        help="Re-search a source-verified original course and verify an exact planner receipt")
+    parkour_verify.add_argument("--record",required=True)
+    parkour_verify.add_argument("--scene",required=True)
+    parkour_verify.add_argument("--settings")
+    sports_plan=commands.add_parser("plan-sports",
+        help="Search source-bound original matches and independently prove a real win")
+    sports_plan.add_argument("--scene",required=True)
+    sports_plan.add_argument("--settings")
+    sports_plan.add_argument("--max-states",type=int,default=16000)
+    sports_plan.add_argument("--max-depth",type=int,default=64)
+    sports_plan.add_argument("--beam-width",type=int,default=48)
+    sports_verify=commands.add_parser("verify-sports-plan",
+        help="Re-search and independently verify exact sporting strategy evidence")
+    sports_verify.add_argument("--record",required=True)
+    sports_verify.add_argument("--scene",required=True)
+    sports_verify.add_argument("--settings")
+    maze_plan=commands.add_parser("plan-maze",
+        help="Search original shifting labyrinths and prove any actual earned keyed exit")
+    maze_plan.add_argument("--scene",required=True)
+    maze_plan.add_argument("--settings")
+    maze_plan.add_argument("--max-states",type=int,default=12000)
+    maze_plan.add_argument("--max-depth",type=int,default=96)
+    maze_plan.add_argument("--beam-width",type=int,default=96)
+    maze_verify=commands.add_parser("verify-maze-plan",
+        help="Replay the exact authored maze and independently verify route search")
+    maze_verify.add_argument("--record",required=True)
+    maze_verify.add_argument("--scene",required=True)
+    maze_verify.add_argument("--settings")
+    rpg_director=commands.add_parser("plan-rpg",
+        help="Plan original quest choices and replay-verify a witnessed story")
+    rpg_director.add_argument("--scene",required=True)
+    rpg_director.add_argument("--settings")
+    rpg_director.add_argument("--max-nodes",type=int,default=8000)
+    rpg_director.add_argument("--max-actions",type=int,default=128)
+    rpg_director.add_argument("--social-choice",default="choose:trust",
+        choices=["choose:trust","choose:challenge","choose:trade"])
+    rpg_check=commands.add_parser("verify-rpg-plan",
+        help="Reconstruct a complete real RPG chapter and verify witness receipts")
+    rpg_check.add_argument("--record",required=True)
+    rpg_check.add_argument("--scene",required=True)
+    rpg_check.add_argument("--settings")
+    frontier=commands.add_parser("plan-frontier",
+        help="Prove an original frontier landmark expedition without inventing a game ending")
+    frontier.add_argument("--scene",required=True)
+    frontier.add_argument("--settings")
+    frontier.add_argument("--max-actions",type=int,default=100)
+    frontier.add_argument("--retire",action="store_true")
+    frontier_check=commands.add_parser("verify-frontier-plan",
+        help="Independently replay the original chunked frontier milestone")
+    frontier_check.add_argument("--record",required=True)
+    frontier_check.add_argument("--scene",required=True)
+    frontier_check.add_argument("--settings")
+    civic=commands.add_parser("plan-civic",
+        help="Prove original NPC town witness resolution with finite player actions")
+    civic.add_argument("--scene",required=True)
+    civic.add_argument("--settings")
+    civic.add_argument("--max-actions",type=int,default=100)
+    civic.add_argument("--retire",action="store_true")
+    civic_verify=commands.add_parser("verify-civic-plan",
+        help="Re-run NPC social witnesses and verify exact source-bound evidence")
+    civic_verify.add_argument("--record",required=True)
+    civic_verify.add_argument("--scene",required=True)
+    civic_verify.add_argument("--settings")
+    ecology=commands.add_parser("plan-ecology",
+        help="Prove a living ecosystem conservation checkpoint through real play")
+    ecology.add_argument("--scene",required=True)
+    ecology.add_argument("--settings")
+    ecology.add_argument("--max-actions",type=int,default=100)
+    ecology.add_argument("--retire",action="store_true")
+    ecology_verify=commands.add_parser("verify-ecology-plan",
+        help="Independently replay and re-evaluate a funded conservation plan")
+    ecology_verify.add_argument("--record",required=True)
+    ecology_verify.add_argument("--scene",required=True)
+    ecology_verify.add_argument("--settings")
     world_plan=commands.add_parser("plan-original-world",
         help="Search and independently replay a safe original world ability path")
     world_plan.add_argument("--scene",required=True)
@@ -221,6 +316,73 @@ def main(argv=None) -> int:
                 _load(args.scene),
                 _load(args.settings) if args.settings else None,
                 max_states=args.max_states,max_depth=args.max_depth)
+        elif args.operation == "plan-parkour":
+            output=plan_parkour_route(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_states=args.max_states,max_depth=args.max_depth,
+                beam_width=args.beam_width)
+        elif args.operation == "verify-parkour-plan":
+            output={"verified":verify_parkour_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-sports":
+            output=plan_original_sports_match(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_states=args.max_states,max_depth=args.max_depth,
+                beam_width=args.beam_width)
+        elif args.operation == "verify-sports-plan":
+            output={"verified":verify_original_sports_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-maze":
+            output=plan_original_maze(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_states=args.max_states,max_depth=args.max_depth,
+                beam_width=args.beam_width)
+        elif args.operation == "verify-maze-plan":
+            output={"verified":verify_original_maze_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-rpg":
+            output=plan_original_rpg_chapter(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_nodes=args.max_nodes,max_actions=args.max_actions,
+                social_choice=args.social_choice)
+        elif args.operation == "verify-rpg-plan":
+            output={"verified":verify_original_rpg_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-frontier":
+            output=plan_original_frontier(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_actions=args.max_actions,retire=args.retire)
+        elif args.operation == "verify-frontier-plan":
+            output={"verified":verify_original_frontier_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-civic":
+            output=plan_original_civic_milestone(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_actions=args.max_actions,retire=args.retire)
+        elif args.operation == "verify-civic-plan":
+            output={"verified":verify_original_civic_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-ecology":
+            output=plan_original_ecology(
+                _load(args.scene),
+                _load(args.settings) if args.settings else None,
+                max_actions=args.max_actions,retire=args.retire)
+        elif args.operation == "verify-ecology-plan":
+            output={"verified":verify_original_ecology_plan(
+                _load(args.record),_load(args.scene),
+                _load(args.settings) if args.settings else None)}
         elif args.operation == "plan-original-world":
             output=plan_original_world(
                 _load(args.scene),

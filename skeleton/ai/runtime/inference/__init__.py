@@ -18,12 +18,17 @@ from .deployment import (
 )
 from .llama_cpp import (
     ArtifactIdentity,
+    ConsumerHardwareBudget,
+    ConsumerLlamaPlan,
     GgufHeader,
     LlamaCppConfig,
     LlamaCppModel,
     LlamaCppRuntimeError,
     build_llama_cpp_adapter,
+    detect_consumer_hardware_budget,
+    estimate_gqa_kv_bytes_per_token,
     inspect_gguf,
+    plan_consumer_llama_cpp,
 )
 from .local import (
     CallableLocalModel,
@@ -56,6 +61,11 @@ __all__ = [
     "qualify_local_model_deployment",
     "qualify_local_model_deployment_sync",
     "ArtifactIdentity",
+    "ConsumerHardwareBudget",
+    "ConsumerLlamaPlan",
+    "plan_consumer_llama_cpp",
+    "detect_consumer_hardware_budget",
+    "estimate_gqa_kv_bytes_per_token",
     "GgufHeader",
     "LlamaCppConfig",
     "LlamaCppModel",

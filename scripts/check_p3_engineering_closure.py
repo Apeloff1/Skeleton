@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,json,sys
+import argparse,json,sys,re
 from pathlib import Path
 from typing import Any,Sequence
 
@@ -37,12 +37,30 @@ def validate(root:Path=ROOT)->dict[str,Any]:
     tasks=backlog.get("tasks")
     if not isinstance(tasks,list) or len(tasks)!=6: raise P3EngineeringClosureError("T1 closure requires six task owners")
     if frontier.get("task_ids")!=[t.get("task_id") for t in tasks]: raise P3EngineeringClosureError("closure task identity drift")
+    head = closure.get("evidence_head")
+    if closure["status"] == "closed" and (not isinstance(head, str) or not re.fullmatch(r"[0-9a-f]{40}", head)):
+        raise P3EngineeringClosureError("closed T1 requires a valid exact source head")
     for task in tasks:
         tid=task.get("task_id")
-        if task.get("status")!="landed_unpromoted": raise P3EngineeringClosureError(f"{tid} is not evidence-landed")
-        if task.get("completion_checkbox") is not False or task.get("implementation_signed") is not False or task.get("verification_signed") is not False: raise P3EngineeringClosureError(f"{tid} may not self-complete or self-sign")
-        if not isinstance(task.get("evidence_refs"),list) or len(task.get("evidence_refs"))<6: raise P3EngineeringClosureError(f"{tid} lacks exact-head evidence")
-    expected={"task_count":6,"in_progress_count":0,"ready_count":0,"blocked_count":0,"landed_unpromoted_count":6,"scheduled_volume_count":37,"queued_volume_count":197,"source_volume_count":234}
+        status=task.get("status")
+        refs=task.get("evidence_refs")
+        if not isinstance(refs,list) or len(refs)<6 or not all(isinstance(ref,str) for ref in refs):
+            raise P3EngineeringClosureError(f"{tid} lacks exact-head evidence")
+        if closure["status"] == "closed":
+            if status != "closed": raise P3EngineeringClosureError(f"{tid} is not signed closed")
+            if (task.get("completion_checkbox") is not True or task.get("implementation_signed") is not True
+                or task.get("verification_signed") is not True or task.get("completion_checkbox_mark") != "[x]"):
+                raise P3EngineeringClosureError(f"{tid} closed task has incomplete signoffs")
+            if (f"git-head:{head}" not in refs
+                or f"workflow:P3 Engineering Extension Authority@{head}:success" not in refs
+                or not any(re.fullmatch(r"github-actions-run:[0-9]+", ref) for ref in refs)):
+                raise P3EngineeringClosureError(f"{tid} closed task lacks matching exact-head authority")
+        else:
+            if status!="landed_unpromoted": raise P3EngineeringClosureError(f"{tid} is not evidence-landed")
+            if (task.get("completion_checkbox") is not False or task.get("implementation_signed") is not False
+                or task.get("verification_signed") is not False):
+                raise P3EngineeringClosureError(f"{tid} may not self-complete or self-sign")
+    expected={"task_count":6,"in_progress_count":0,"ready_count":0,"blocked_count":0,"landed_unpromoted_count":0 if closure["status"]=="closed" else 6,"scheduled_volume_count":37,"queued_volume_count":197,"source_volume_count":234}
     if backlog.get("summary")!=expected or ext.get("progress")!=expected: raise P3EngineeringClosureError("T1 terminal progress drift")
     if closure.get("deferred_scope",{}).get("queued_volume_count")!=197: raise P3EngineeringClosureError("T1 closure must preserve 197 deferred volumes")
     if len(closure.get("evidence_refs",[]))<8: raise P3EngineeringClosureError("T1 closure lacks implementation evidence")
@@ -50,7 +68,11 @@ def validate(root:Path=ROOT)->dict[str,Any]:
     if not isinstance(ce,list): raise P3EngineeringClosureError("closure_evidence must be a list")
     if closure.get("status")=="closed":
         if len(ce)<3: raise P3EngineeringClosureError("closed T1 frontier requires exact-head closure evidence")
-        if not any(str(x).startswith("workflow:P3 Engineering Closure@") for x in ce): raise P3EngineeringClosureError("closed T1 frontier requires closure workflow evidence")
+        closure_heads={ref.removeprefix("git-head:") for ref in ce if isinstance(ref,str) and re.fullmatch(r"git-head:[0-9a-f]{40}",ref)}
+        if not closure_heads or not any(f"workflow:P3 Engineering Closure@{c_head}:success" in ce for c_head in closure_heads):
+            raise P3EngineeringClosureError("closed T1 frontier requires matching closure workflow evidence")
+        if not any(isinstance(ref,str) and re.fullmatch(r"github-actions-run:[0-9]+",ref) for ref in ce):
+            raise P3EngineeringClosureError("closed T1 frontier requires an Actions run receipt")
     return {"status":"valid","closure_status":closure["status"],"source_volume_count":234,"scheduled_volume_count":37,"queued_volume_count":197,"landed_task_count":6}
 
 def main(argv:Sequence[str]|None=None)->int:

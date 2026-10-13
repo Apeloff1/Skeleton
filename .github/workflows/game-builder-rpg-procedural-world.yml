@@ -1,0 +1,80 @@
+name: Game Builder RPG and Procedural Worlds
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_rpg_runtime.py"
+      - "skeleton/ai/game_builder/advanced_rpg_planner.py"
+      - "skeleton/ai/game_builder/advanced_procedural_world_planner.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "tests/test_game_builder_advanced_rpg_planner.py"
+      - "tests/test_game_builder_advanced_procedural_world_planner.py"
+      - "skeleton/ai/game_builder/advanced_procedural_world_runtime.py"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/system_editors.py"
+      - "skeleton/ai/game_builder/system_editor_assembly.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_rpg.py"
+      - "tests/test_game_builder_advanced_procedural_world.py"
+      - ".github/workflows/game-builder-rpg-procedural-world.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: game-builder-rpg-world-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  roleplaying-and-chunks:
+    name: Original RPG/World gameplay evidence (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_rpg.py
+            tests/test_game_builder_advanced_rpg_planner.py
+            tests/test_game_builder_advanced_procedural_world_planner.py
+            tests/test_game_builder_advanced_procedural_world.py
+      - name: Prepare Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Verify exact head and source syntax
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python -m py_compile skeleton/ai/game_builder/advanced_rpg_runtime.py skeleton/ai/game_builder/advanced_rpg_planner.py skeleton/ai/game_builder/advanced_procedural_world_planner.py skeleton/ai/game_builder/advanced_procedural_world_runtime.py skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_level_scenes.py skeleton/ai/game_builder/system_editors.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/system_editor_cli.py tests/test_game_builder_advanced_rpg.py tests/test_game_builder_advanced_rpg_planner.py tests/test_game_builder_advanced_procedural_world_planner.py tests/test_game_builder_advanced_procedural_world.py
+      - name: Validate interactive JavaScript authoring controls
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.game_workspace_ui import SCRIPT
+          path=Path(os.environ["RUNNER_TEMP"])/"original_rpg_world_studio.js"
+          path.write_text(SCRIPT.replace("__TOKEN__",'"game-source-custody"'),encoding="utf-8")
+          PY
+          node --check "$RUNNER_TEMP/original_rpg_world_studio.js"
+      - name: Verify witness quests, persistent stories, chunks and storage
+        shell: bash
+        run: python -m unittest tests.test_game_builder_advanced_rpg tests.test_game_builder_advanced_rpg_planner tests.test_game_builder_advanced_procedural_world tests.test_game_builder_advanced_procedural_world_planner -v

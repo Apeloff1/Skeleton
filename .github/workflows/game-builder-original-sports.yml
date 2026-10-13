@@ -1,0 +1,74 @@
+name: Game Builder Original Sports Rules
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_sports_runtime.py"
+      - "skeleton/ai/game_builder/advanced_sports_coach.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "tests/test_game_builder_advanced_sports_coach.py"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/system_editors.py"
+      - "skeleton/ai/game_builder/system_editor_assembly.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_sports.py"
+      - ".github/workflows/game-builder-original-sports.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: original-sports-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  original-sports-replay:
+    name: Rule-specific sports gameplay and tamper resistance (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact source checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_sports.py
+            tests/test_game_builder_advanced_sports_coach.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Verify pinned head and Python gameplay syntax
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python -m py_compile skeleton/ai/game_builder/advanced_sports_runtime.py skeleton/ai/game_builder/advanced_sports_coach.py skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_level_scenes.py skeleton/ai/game_builder/system_editors.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/system_editor_cli.py tests/test_game_builder_advanced_sports.py tests/test_game_builder_advanced_sports_coach.py
+      - name: Check actual Studio JavaScript is parseable
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.game_workspace_ui import SCRIPT
+          file=Path(os.environ["RUNNER_TEMP"])/"original_sports_view.js"
+          file.write_text(SCRIPT.replace("__TOKEN__",'"source-verified-ci"'),encoding="utf-8")
+          PY
+          node --check "$RUNNER_TEMP/original_sports_view.js"
+      - name: Prove real sport-specific game and forged-score resistance
+        shell: bash
+        run: python -m unittest tests.test_game_builder_advanced_sports tests.test_game_builder_advanced_sports_coach -v

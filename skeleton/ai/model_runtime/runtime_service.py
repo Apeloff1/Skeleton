@@ -17,6 +17,7 @@ from typing import Callable
 from .flgb_model_runtime import LocalModelReceipt, LocalModelRequest, ModelIdentity, digest_json
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
 from .runtime_contracts import GenerationConfig, RuntimeContractError, RuntimeEvent
+from .tokenization import TokenizerContractError
 
 
 class NativeServiceError(RuntimeContractError):
@@ -250,6 +251,7 @@ class NativeModelService:
                 events=events,
             )
 
+        stream = None
         try:
             stream = self.runtime.stream(prompt, config)
             for event in stream:
@@ -278,6 +280,13 @@ class NativeModelService:
                 terminal_reason="model_error",
                 events=events,
             )
+        finally:
+            # Every terminal path must close a partially consumed generator,
+            # releasing attention caches and preventing stale model frames.
+            if stream is not None:
+                close = getattr(stream, "close", None)
+                if close is not None:
+                    close()
 
         receipt = LocalModelReceipt(
             operation_id=request.operation_id,

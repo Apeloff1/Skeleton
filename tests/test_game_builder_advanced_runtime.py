@@ -221,11 +221,14 @@ class AdvancedProofTests(unittest.TestCase):
                 with self.assertRaises(AdvancedRuntimeError):
                     verify_advanced_session(bad)
 
-    def test_no_fake_support_for_38_other_systems(self):
-        with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("maze")
-        with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("rpg")
+    def test_authoring_only_families_do_not_claim_fictitious_runtime(self):
+        remaining = {s["id"] for s in catalog()
+                     if s["runtime_maturity"] == "authoring_only"}
+        self.assertEqual(remaining, {s["id"] for s in catalog()} - set(ENGINES))
+        self.assertTrue(remaining)
+        for editor in sorted(remaining):
+            with self.subTest(editor=editor), self.assertRaises(AdvancedRuntimeError):
+                run_advanced_session(editor)
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("nonexistent")
 
