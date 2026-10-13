@@ -10,7 +10,7 @@
       "title": "Connector Framework",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -230,7 +230,7 @@
       "title": "Plugin Ecosystem",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -450,7 +450,7 @@
       "title": "Tool Marketplace Security",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -671,7 +671,7 @@
       "title": "Sandbox Runtime",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -906,7 +906,7 @@
       "title": "Policy Language",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1141,7 +1141,7 @@
       "title": "Policy Simulation",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1362,7 +1362,7 @@
       "title": "Threat Model",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1586,7 +1586,7 @@
       "title": "AI-Specific Threats",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1819,7 +1819,7 @@
       "title": "Security Boundaries",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2043,7 +2043,7 @@
       "title": "Zero-Trust Internal Model",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2276,7 +2276,7 @@
       "title": "Network Architecture",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2496,7 +2496,7 @@
       "title": "Egress Control",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2724,7 +2724,7 @@
       "title": "Secret Security",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2948,7 +2948,7 @@
       "title": "Key Management",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3171,7 +3171,7 @@
       "title": "Tenant Isolation",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3395,7 +3395,7 @@
       "title": "Privacy Engine",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3616,7 +3616,7 @@
       "title": "Data Deletion",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3842,7 +3842,7 @@
       "title": "Software Bill of Materials",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4063,7 +4063,7 @@
       "title": "Model Bill of Materials",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4283,7 +4283,7 @@
       "title": "Service Level Objectives",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4505,7 +4505,7 @@
       "title": "Error Budgets",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4727,7 +4727,7 @@
       "title": "Observability Cardinality Control",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4949,7 +4949,7 @@
       "title": "Trace Model",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5171,7 +5171,7 @@
       "title": "Performance Profiling",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5393,7 +5393,7 @@
       "title": "Latency Budgeting",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5615,7 +5615,7 @@
       "title": "Cost Governor",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5837,7 +5837,7 @@
       "title": "Energy / Compute Efficiency",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -6059,7 +6059,7 @@
       "title": "Chaos Engineering",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -6282,7 +6282,7 @@
       "title": "Recovery Drills",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -6506,7 +6506,7 @@
       "title": "Release Qualification Matrix",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -6730,7 +6730,7 @@
       "title": "Canary Deployment",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -6954,7 +6954,7 @@
       "title": "Feature Flags",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -7178,7 +7178,7 @@
       "title": "Rollback Architecture",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -7402,7 +7402,7 @@
       "title": "Developer Experience",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -7626,7 +7626,7 @@
       "title": "Local Development",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "unverified",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -7856,7 +7856,7 @@
       "title": "Test Fixture Platform",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -8081,7 +8081,7 @@
       "title": "Simulation Mode",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -8309,7 +8309,7 @@
       "title": "Contract Fuzzing",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -8537,7 +8537,7 @@
       "title": "Property-Based Invariant Testing",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -8761,7 +8761,7 @@
       "title": "Formal Verification Candidates",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "implemented",
+      "legacy_implementation_status": "verified",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {

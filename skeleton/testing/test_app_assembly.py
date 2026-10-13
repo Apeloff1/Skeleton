@@ -72,7 +72,20 @@ def test_runtime_preflight_reports_missing_environment_without_mutating_process(
     assert "env:SKL_MONGO_URI" in failures
     assert "env:MONGO_INITDB_ROOT_PASSWORD" in failures
     assert "env:JWT_SECRET" in failures
+    assert "env:SKL_ENGINE_SERVICE_TOKEN" in failures
     assert "runtime:docker" not in failures
+
+
+@pytest.mark.parametrize("token,expected", [
+    ("short", False), ("x" * 31, False), ("x" * 32, True),
+    ("x" * 4096, True), ("x" * 4097, False), (" " + "x" * 32, False),
+])
+def test_runtime_preflight_validates_engine_authentication(monkeypatch, token, expected):
+    monkeypatch.setattr("skeleton.app.assembly._read_dotenv", lambda _path: {})
+    checks = preflight(runtime=True, environ={"SKL_ENGINE_SERVICE_TOKEN": token})
+    check = next(item for item in checks if item.code == "env:SKL_ENGINE_SERVICE_TOKEN")
+    assert check.ok is expected
+    assert token not in check.message
 
 
 def test_up_command_is_deterministic_and_shell_free():
@@ -267,13 +280,12 @@ def test_all_launcher_paths_converge_on_product_shell():
     assert "router.replace('/product')" in launch
     assert "router.replace('/product')" in welcome
     assert "router.replace('/product')" in safe_mode
-    # The cascade uses a localized button; requiring literal English
-    # implementation text would make accessibility/i18n a false failure.
-    # Verify the exact same translation key drives both the visible label
-    # and the accessible control, and that all routes reach the product shell.
     assert "t('launcher.enter_product')" in launch
-    assert "accessibleButtonProps(t('launcher.enter_product'))" in launch
-    assert "onEnter={enterProduct}" in launch
+    assert "t('launcher.open')" in launch
+    en = (root / "frontend/src/i18n/catalogs/en.ts").read_text(encoding="utf-8")
+    nb = (root / "frontend/src/i18n/catalogs/nb.ts").read_text(encoding="utf-8")
+    assert "'launcher.enter_product': 'Enter Product'" in en
+    assert "'launcher.enter_product': 'Gå inn i produktet'" in nb
     assert "Enter Product" in welcome
 
 

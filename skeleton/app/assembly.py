@@ -432,7 +432,10 @@ def preflight(
         )
         values = _runtime_env(root, environ)
         for key in manifest.required_env:
-            ok = _usable_secret(values.get(key, ""))
+            value = values.get(key, "")
+            ok = _usable_secret(value)
+            if key == "SKL_ENGINE_SERVICE_TOKEN":
+                ok = ok and 32 <= len(value) <= 4096 and value == value.strip()
             checks.append(
                 AssemblyCheck(
                     code=f"env:{key}",
@@ -440,7 +443,7 @@ def preflight(
                     message=(
                         f"runtime value configured: {key}"
                         if ok
-                        else f"runtime value missing or placeholder: {key}"
+                        else f"runtime value missing, invalid or placeholder: {key}"
                     ),
                 )
             )

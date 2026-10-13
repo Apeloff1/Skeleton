@@ -70,13 +70,18 @@ def _is_placeholder(value: str) -> bool:
 def _replace_env_value(text: str, key: str, value: str) -> str:
     lines = text.splitlines()
     replacement = f"{key}={value}"
+    found = False
     for index, line in enumerate(lines):
         if line.strip().startswith("#") or "=" not in line:
             continue
         existing_key, _ = line.split("=", 1)
         if existing_key.strip() == key:
             lines[index] = replacement
-            return "\n".join(lines) + "\n"
+            found = True
+    # Compose uses the last assignment. Repair every occurrence so an older
+    # duplicate cannot override a generated credential on the next startup.
+    if found:
+        return "\n".join(lines) + "\n"
     if lines and lines[-1].strip():
         lines.append("")
     lines.append(replacement)
@@ -163,6 +168,22 @@ def ensure_runtime_environment(
         configured.append("JWT_SECRET")
     else:
         preserved.append("JWT_SECRET")
+
+    # The backend and engine must share this value before Compose can start.
+    # Upgrade existing .env files as well as templates predating Stage-5.
+    service_token = values.get("SKL_ENGINE_SERVICE_TOKEN", "")
+    if (
+        rotate_secrets
+        or _is_placeholder(service_token)
+        or not 32 <= len(service_token) <= 4096
+        or service_token != service_token.strip()
+    ):
+        service_token = secrets.token_hex(32)
+        text = _replace_env_value(text, "SKL_ENGINE_SERVICE_TOKEN", service_token)
+        values["SKL_ENGINE_SERVICE_TOKEN"] = service_token
+        configured.append("SKL_ENGINE_SERVICE_TOKEN")
+    else:
+        preserved.append("SKL_ENGINE_SERVICE_TOKEN")
 
     user_uri = quote(username, safe="")
     password_uri = quote(password, safe="")

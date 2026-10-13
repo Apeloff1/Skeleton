@@ -96,6 +96,32 @@ def compile_original_game(
     return CompiledPlayableProject(world, html, proof, None)
 
 
+def compile_authored_game(
+    intent: GameBuildIntent,
+    authored_levels: list[object] | tuple[object, ...],
+    *,
+    human_reviewed: bool,
+    authorized: bool,
+) -> CompiledPlayableProject:
+    """Compile reviewed original editor tiles through the same Python simulation.
+
+    This is a geometry review boundary, not a waiver of rights clearance.
+    Unlike procedural generation, the source digest explicitly records the
+    authored-tiles algorithm to avoid misrepresenting manual maps as random.
+    """
+    if not authorized:
+        raise PermissionError("authored game compilation requires authorization")
+    from .authored_tiles import compile_authored_world
+
+    world = compile_authored_world(
+        intent, authored_levels,
+        human_reviewed=human_reviewed, authorized=True,
+    )
+    proof = demonstrate_solvable(world, authorized=True)
+    html = render_playable_world(world, authorized=True)
+    return CompiledPlayableProject(world, html, proof, None)
+
+
 def compile_game_from_reviewed_research(
     library: ReviewedKnowledgeStore,
     brief: KnowledgeBrief,
@@ -154,6 +180,7 @@ def export_compiled_project(
 
 __all__ = [
     "PlayableCompilationError", "CompiledPlayableProject",
-    "compile_original_game", "compile_game_from_reviewed_research",
+    "compile_original_game", "compile_authored_game",
+    "compile_game_from_reviewed_research",
     "export_compiled_project",
 ]

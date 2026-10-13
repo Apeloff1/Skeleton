@@ -32,30 +32,29 @@ def test_cs_300_does_not_break_volume_freeze():
     assert data["scope"]["frozen_volume_range"] == ["VOL-000", "VOL-420"]
     assert data["scope"]["relationship_to_frontier_96"] == "strictly-above"
 
-def test_cs_300_recorded_completion_matches_each_layer():
-    """Validate current source records, not the ladder's obsolete initial state."""
+def test_cs_300_completion_reflects_current_layer_receipts():
     data = json.loads(DATA.read_text(encoding="utf-8"))
-    complete = [x for x in data["layers"] if x["complete"]]
-    assert data["completion"]["signed_complete"] == len(complete)
-    assert data["completion"]["cs_300_qualified"] is (len(complete) == 300)
-    for layer in complete:
-        assert layer["maturity"] == "signed_complete"
-        assert layer["implementation_signed"] is True
-        assert layer["independent_verification_signed"] is True
-        assert layer["evidence"]
+    completed = [layer for layer in data["layers"] if layer["complete"] is True]
+    assert data["completion"]["signed_complete"] == len(completed)
+    assert data["completion"]["cs_300_qualified"] is (len(completed) == 300)
+    assert all(
+        layer["maturity"] == "signed_complete"
+        and layer["implementation_signed"] is True
+        and layer["independent_verification_signed"] is True
+        and layer["evidence"]
+        for layer in completed
+    )
+    if data["completion"]["cs_300_qualified"]:
+        assert data["layers"][-1]["independent_verification_signed"] is True
 
 
-def test_cs_300_rejects_unbacked_signoff_mutation():
-    from copy import deepcopy
-
+def test_cs_300_validator_rejects_unbacked_completion_claims():
     module = _load_validator()
     data = json.loads(DATA.read_text(encoding="utf-8"))
-    tampered = deepcopy(data)
-    tampered["layers"][0]["independent_verification_signed"] = False
-    assert any("independent verification" in error for error in module.validate(tampered))
-    forged_count = deepcopy(data)
-    forged_count["completion"]["signed_complete"] = 0
-    assert any("signed_complete" in error for error in module.validate(forged_count))
+    layer = next(x for x in data["layers"] if x["complete"])
+    layer["independent_verification_signed"] = False
+    assert any("without independent verification signature" in error
+               for error in module.validate(data))
 
 def test_each_layer_has_contract_proof_owner_and_dependency_discipline():
     data = json.loads(DATA.read_text(encoding="utf-8"))

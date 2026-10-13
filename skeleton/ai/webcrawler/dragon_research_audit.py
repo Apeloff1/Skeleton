@@ -65,6 +65,7 @@ class DragonResearchAudit:
             raise ValueError("invalid audit subject")
         if not isfinite(now) or now < 0:
             raise ValueError("invalid audit time")
+        now = float(now)
         with self.db:
             row = self.db.execute("""
                 SELECT sequence, event_hash FROM dragon_research_audit
@@ -97,8 +98,13 @@ class DragonResearchAudit:
             sequence, action, subject_id, timestamp, stored_previous, digest = row
             if sequence != expected or stored_previous != previous:
                 return False
-            if digest != self._digest(owner, sequence, action, subject_id,
-                                      timestamp, stored_previous):
+            verified = self._digest(owner, sequence, action, subject_id,
+                                     timestamp, stored_previous)==digest
+            if not verified and isinstance(timestamp,(float,int)) and float(timestamp).is_integer():
+                # Historical integer-time receipts persisted as SQLite REAL.
+                verified = self._digest(owner, sequence, action, subject_id,
+                                        int(timestamp), stored_previous)==digest
+            if not verified:
                 return False
             previous = digest
         return True

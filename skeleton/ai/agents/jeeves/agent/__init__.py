@@ -746,6 +746,30 @@ from .world_model import (
     reliability_to_likelihood_ratio,
 )
 
+from .orchestrated_capability_runtime import (
+    OrchestratedDispatchError,
+    OrchestratedDispatchReceipt,
+    JeevesOrchestratedCapabilityRuntime,
+)
+from .shadow_learning_adapter import (
+    ShadowLearningError,
+    ShadowLearningHandoff,
+    prepare_shadow_learning_handoff,
+)
+from .file_atlas_context import (
+    FileContextError,
+    SourceBookmark,
+    SourceContextPlan,
+    JeevesFileContextPlanner,
+)
+from .capability_dispatch import (
+    AppDispatchError,
+    HostCapabilityBinding,
+    ReadinessReceipt,
+    CapabilityIntent,
+    JeevesCapabilityDispatcher,
+)
+
 # New application code gets the guarded/generalizing runtime by default. The
 # pre-enforcement runtime remains explicitly available for compatibility and
 # controlled regression comparisons only.

@@ -93,12 +93,24 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
     local_ai.add_argument("--epochs", type=int, default=None, help="bounded native CPU training passes (1-4)")
 
-    local_ai.add_argument("--prompt", help="headless text request (requires --model)")
-    local_ai.add_argument("--max-output-tokens", type=int, default=None)
-    local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
     local_ai.add_argument("--load-chat", help="restore verified turns from explicit model-bound local transcript")
     local_ai.add_argument("--save-chat", help="atomically export model-bound local transcript after inference")
 
+    local_ai.add_argument("--prompt", help="headless text request (requires --model)")
+    local_ai.add_argument("--max-output-tokens", type=int, default=None)
+    local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
+    prepare = sub.add_parser("prepare-local-model", help="pin an existing local GGUF and llama.cpp executable")
+    prepare.add_argument("--executable", type=Path, required=True, help="local llama.cpp CLI executable")
+    prepare.add_argument("--model", type=Path, required=True, help="local GGUF weights")
+    prepare.add_argument("--output", type=Path, required=True, help="new manifest file; never overwritten")
+    prepare.add_argument("--model-id", help="optional display identifier")
+    prepare.add_argument("--context-size", type=int, default=4096)
+    prepare.add_argument("--threads", type=int)
+    prepare.add_argument("--gpu-layers", type=int, default=0)
+    prepare.add_argument("--timeout", type=float, default=120.0)
+    prepare.add_argument("--json", action="store_true", dest="as_json")
+    sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
+    sub.add_parser("serve-local-ai", add_help=False, help="open the authenticated offline AI workspace (serve-local-ai --help)")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -213,9 +225,42 @@ def _run_compose(
 def run_app_cli(argv: Sequence[str] | None = None) -> int:
     """Run the application assembly CLI and return a process-style exit code."""
 
-    args = _parser().parse_args(list(argv or ()))
+    arguments = list(argv or ())
+    # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "chat":
+        from skeleton.app.offline_chat_cli import main as chat_main
+        return chat_main(arguments[1:])
+    if arguments and arguments[0] == "serve-local-ai":
+        from skeleton.app.offline_http import main as serve_main
+        return serve_main(arguments[1:])
+    args = _parser().parse_args(arguments)
     command = args.command or "status"
 
+    if command == "prepare-local-model":
+        from skeleton.ai.runtime.inference.deployment import create_local_model_deployment
+        try:
+            model = create_local_model_deployment(
+                args.output, executable_path=args.executable, model_path=args.model,
+                model_id=args.model_id, context_size=args.context_size,
+                threads=args.threads, gpu_layers=args.gpu_layers, timeout_seconds=args.timeout,
+            )
+        except (ValueError, OSError, RuntimeError) as exc:
+            if args.as_json:
+                print(json.dumps({"ok": False, "error": str(exc)}))
+            else:
+                print("Local model preparation failed:", str(exc))
+            return 1
+        if args.as_json:
+            print(json.dumps({"ok": True, "manifest": str(model.manifest_path),
+                              "model_sha256": model.model_sha256,
+                              "executable_sha256": model.executable_sha256,
+                              "runtime_executed": False, "model_qualified": False}))
+        else:
+            print("Local model manifest:", model.manifest_path)
+            print("Model SHA-256:", model.model_sha256)
+            print("Files pinned. No model execution or quality qualification was performed.")
+            print("Start chat: python -m skeleton app chat --gguf-deployment <manifest> --interactive")
+        return 0
     if command == "status":
         return _print_status(
             bool(getattr(args, "as_json", False)),

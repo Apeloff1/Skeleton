@@ -29,6 +29,8 @@ export type Message = {
   artifacts?: Artifact[];
   artifactCount?: number;
   attachmentName?: string;
+  /** Exact non-binary submission parameters; never rebuilt from later edits. */
+  retryRequest?: Pick<ChatBody, 'session_id' | 'context' | 'force_all_forms'>;
   error?: string;
 };
 
@@ -139,7 +141,20 @@ function restoreMessage(value: unknown, now: number): Message | null {
     forms: Array.isArray(item.forms) ? item.forms.filter((x): x is string => typeof x === 'string').slice(0, 10) : undefined,
     artifactCount: typeof item.artifactCount === 'number' ? Math.max(0, Math.min(100, item.artifactCount)) : 0,
     attachmentName: text(item.attachmentName, 200) || undefined,
+    retryRequest: restoreRetryRequest(item.retryRequest),
     error: interrupted ? 'Interrupted when the app closed. You can retry this message.' : text(item.error, 400) || undefined,
+  };
+}
+
+function restoreRetryRequest(value: unknown): Message['retryRequest'] {
+  const item = record(value);
+  if (!item || !sessionIdentity(item.session_id)
+      || typeof item.context !== 'string' || item.context.length > MAX_CONTEXT
+      || typeof item.force_all_forms !== 'boolean') return undefined;
+  return {
+    session_id: item.session_id as string,
+    context: item.context,
+    force_all_forms: item.force_all_forms,
   };
 }
 
@@ -197,6 +212,7 @@ export function encodeWorkspace(workspace: Workspace): string {
         status: m.status, tier: m.tier, model: m.model, forms: m.forms,
         artifactCount: m.artifacts?.length || m.artifactCount || 0,
         attachmentName: m.attachmentName, error: m.error,
+        retryRequest: m.status === 'complete' ? undefined : restoreRetryRequest(m.retryRequest),
       })),
     })),
   });
@@ -343,6 +359,7 @@ export function projectCanonicalHistory(
       createdAt: baseTimestamp,
       status: 'complete',
       error: undefined,
+      retryRequest: undefined,
     });
 
     const localAssistant = localById.get(assistantId);

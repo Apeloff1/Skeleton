@@ -22,6 +22,11 @@ from pydantic import BaseModel, Field
 
 from routes.gameforge_auth import get_current_user
 from skeleton.ai.webcrawler.dragon_practice_lab import DragonPracticeLab
+from skeleton.ai.webcrawler.dragon_family_custody_bridge import DragonFamilyCustodyBridge
+from skeleton.ai.webcrawler.dragon_family_glean_matrix import DragonGleanMatrix
+from skeleton.ai.webcrawler.dragon_family_almanakk import DragonAlmanakkLane
+from skeleton.ai.webcrawler.dragon_family_idle_coordinator import read_idle_family_health
+from skeleton.ai.webcrawler.dragon_family_idle_host import read_idle_host_projection
 from skeleton.ai.webcrawler.dragon_practice_cycles import DragonPracticeCycles
 from skeleton.ai.webcrawler.dragon_session_projection import DragonSessionProjection
 from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
@@ -30,6 +35,7 @@ from skeleton.ai.webcrawler.dragon_native_curriculum import (
     DragonNativeCurriculum,curriculum_report,
 )
 from skeleton.ai.webcrawler.dragon_native_targets import target_catalog, practice_matrix, STYLES
+from skeleton.ai.webcrawler.dragon_platform_readiness import coverage_report
 
 router = APIRouter(prefix="/api/dragon-academy", tags=["Dragon Academy"])
 
@@ -96,9 +102,20 @@ def _lab() -> Iterator[tuple[DragonPracticeLab,DragonPracticeCycles]]:
 
 def _snapshot(lab: DragonPracticeLab, cycles: DragonPracticeCycles,
               owner: str) -> dict:
+    # The public route never owns insight-review callbacks. It projects only
+    # canonical reviewed evidence under the authenticated user's owner scope.
+    custody=DragonFamilyCustodyBridge(lab.db,owner)
+    family=custody.family()
     return {
         "ok": True,
         "progress": asdict(lab.progress(owner,authorized=True)),
+        "family": {
+            **family.snapshot(owner,authorized=True,limit=25),
+            "glean": DragonGleanMatrix(family).projection(owner,authorized=True,limit=12),
+            "almanakk": DragonAlmanakkLane(lab.db).projection(owner,authorized=True,limit=15),
+            "idle_work": read_idle_family_health(lab.db,owner,authorized=True),
+            "idle_host": read_idle_host_projection(lab.db,owner,at=time.time(),authorized=True),
+        },
         "attempts": [asdict(a) for a in lab.attempts(owner,authorized=True,limit=50)],
         "native_attempts": [asdict(a) for a in DragonNativePracticeLab(lab.db,lab).list(owner,authorized=True)],
         "subscription": asdict(cycles.status(owner,authorized=True)),
@@ -127,7 +144,7 @@ def crawler_feed(
 def native_targets(owner: str = Depends(_principal)) -> dict:
     # Catalog metadata does not imply working native compilation.
     return {"ok":True,"targets":target_catalog(),"styles":STYLES,
-            "supported_matrix":practice_matrix()}
+            "supported_matrix":practice_matrix(),"coverage":coverage_report()}
 
 def _build_signing_key() -> bytes:
     value=os.environ.get("SKL_DRAGON_BUILD_SIGNING_KEY_HEX","")

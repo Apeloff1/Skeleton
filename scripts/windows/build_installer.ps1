@@ -135,19 +135,28 @@ $PyInstallerArgs = @(
     "--hidden-import", "skeleton.app.preloader",
     "--hidden-import", "skeleton.app.setup_runtime",
     "--hidden-import", "skeleton.app.local_ai",
-    "--hidden-import", "skeleton.app.local_ai_transcript",
-    "--hidden-import", "skeleton.app.local_ai_training",
-    "--hidden-import", "skeleton.app.local_ai_improvement",
+    "--hidden-import", "skeleton.app.local_ai_acceptance",
     "--hidden-import", "skeleton.app.local_ai_benchmark",
-    "--hidden-import", "skeleton.app.local_ai_replay",
     "--hidden-import", "skeleton.app.local_ai_dataset",
     "--hidden-import", "skeleton.app.local_ai_gguf",
-    "--hidden-import", "skeleton.app.local_ai_acceptance",
-    "--hidden-import", "skeleton.ai.runtime.inference.llama_cpp",
+    "--hidden-import", "skeleton.app.local_ai_improvement",
+    "--hidden-import", "skeleton.app.local_ai_replay",
+    "--hidden-import", "skeleton.app.local_ai_training",
+    "--hidden-import", "skeleton.app.local_ai_transcript",
+    "--hidden-import", "skeleton.app.offline_chat_cli",
+    "--hidden-import", "skeleton.app.offline_http",
+    "--hidden-import", "skeleton.app.offline_knowledge",
+    "--hidden-import", "skeleton.app.offline_grounding",
+    "--hidden-import", "skeleton.app.offline_web",
     "--hidden-import", "skeleton.ai.runtime.inference.local",
     "--hidden-import", "skeleton.ai.runtime.inference.native_runtime",
     "--hidden-import", "skeleton.ai.runtime.inference.artifact",
+    "--hidden-import", "skeleton.ai.runtime.inference.deployment",
+    "--hidden-import", "skeleton.ai.runtime.inference.llama_cpp",
     "--hidden-import", "skeleton.ai.model_runtime.native_llm_runtime",
+    "--hidden-import", "skeleton.ai.model_runtime.offline_chat",
+    "--hidden-import", "skeleton.ai.model_runtime.chat_engine",
+    "--hidden-import", "skeleton.ai.model_runtime.chat_protocol",
     "--hidden-import", "skeleton.ai.model_runtime.runtime_checkpoint",
     "--hidden-import", "skeleton.ai.model_runtime.tokenization",
     "--hidden-import", "skeleton.cortex.transformer",
@@ -164,30 +173,6 @@ if (-not (Test-Path -LiteralPath $LauncherExe)) {
     throw "Expected launcher not found: $LauncherExe"
 }
 Copy-Item -LiteralPath $LauncherExe -Destination (Join-Path $PayloadDir "Skeleton.exe") -Force
-
-# A Windows --windowed PyInstaller binary is not a reliable console host:
-# stdin/stdout/stderr may be null, and Start-Process output redirection
-# cannot turn it into a real terminal. Ship a second frozen console entry
-# using precisely the same Python source, dependencies and policy guard.
-# The GUI remains windowed and the CLI keeps true stdout/JSON/error codes.
-Write-Host "==> Building standalone SkeletonCLI.exe with real console streams"
-$ConsoleArgs = @($PyInstallerArgs)
-$WindowFlagIndex = [Array]::IndexOf($ConsoleArgs, "--windowed")
-$LauncherNameIndex = [Array]::IndexOf($ConsoleArgs, "Skeleton")
-if ($WindowFlagIndex -lt 0 -or $LauncherNameIndex -lt 0) {
-    throw "Cannot derive console binary from canonical frozen launcher args"
-}
-$ConsoleArgs[$WindowFlagIndex] = "--console"
-$ConsoleArgs[$LauncherNameIndex] = "SkeletonCLI"
-& python @ConsoleArgs
-if ($LASTEXITCODE -ne 0) {
-    throw "PyInstaller console native AI build failed"
-}
-$ConsoleExe = Join-Path $LauncherDist "SkeletonCLI.exe"
-if (-not (Test-Path -LiteralPath $ConsoleExe)) {
-    throw "Expected native AI console executable not found: $ConsoleExe"
-}
-Copy-Item -LiteralPath $ConsoleExe -Destination (Join-Path $PayloadDir "SkeletonCLI.exe") -Force
 
 $CompilerCandidates = @(
     (Join-Path $env:ProgramFiles "Inno Setup 7\ISCC.exe"),

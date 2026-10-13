@@ -22,9 +22,78 @@ create a second model implementation. The numerical engine remains
 
 ## Authority and completion status
 
+For local backend execution, `LocalInferenceEngine(model, max_concurrency=1,
+max_batch_size=256)` bounds active model calls and direct batches. Concurrency
+can be explicitly raised up to 32; batch size up to 4096. Raising concurrency
+can multiply GGUF process/model memory, so the default remains one. Queued
+calls can cancel before acquiring execution capacity. Failed batches drain
+their siblings before returning an error.
+
+`LocalInferenceScheduler` rejects a full queue rather than allowing blocked
+submissions to outlive shutdown. Cancelling a submitted future cancels that
+item's inference task. `close()` drains admitted work and can be awaited again
+if an earlier shutdown waiter was cancelled. There is no automatic model retry.
+
+Local cache hits retain isolated copies of structured/tool JSON and bind the
+backend's execution profile when available. Cancellation and deadline results
+are not cached. GGUF artifacts are readmitted before a cached answer is reused.
+
 This is implementation evidence only. FLGB-02 stays `implemented-pending-verification`
 until exact-head CI, dependency closure and independent verification succeed. No
 masterplan completion signature is asserted by file existence or by this document.
+
+## Generation and interruption controls
+
+`GenerationConfig` accepts `repetition_penalty`, `presence_penalty`,
+`frequency_penalty`, `penalty_window`, `min_new_tokens`, `suppress_token_ids`,
+`stop_strings` and `include_stop_tokens` in addition to the existing sampler
+options. Non-default settings are included in the configuration digest. The
+penalty window covers recent prompt and generated IDs. Minimum token count
+suppresses terminal token IDs until the minimum has been sampled; text stops
+are considered after that minimum. Text before an earlier matching marker can
+still be shorter than the sampled-token count.
+
+```python
+config = GenerationConfig.from_dict(
+    {
+        "max_new_tokens": 64,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "repetition_penalty": 1.1,
+        "penalty_window": 64,
+        "stop_strings": ["\nuser:"],
+        "include_stop_tokens": False,
+    },
+    limits=runtime.limits,
+    vocab_size=runtime.tokenizer.vocab_size,
+)
+result = runtime.generate(prompt, config)
+```
+
+This example requires an already-admitted trained runtime with a sufficient
+output budget. It does not initialize trained weights or establish answer quality.
+
+Inference, generation, feed, batch and streaming entrypoints accept an optional
+`interrupt` callback. It must
+return normally to continue or raise to abort. Use the stream as a context manager
+to release partial generator state. Cooperative interruption occurs between CPU
+layers/attention rows and Torch layers/configured prefill chunks, including while
+waiting for a shared accelerator. A kernel, snapshot or some tokenization work
+can remain non-interruptible until its current operation finishes.
+
+Token IDs remain raw sampled IDs, including a terminal token. With string stops,
+token-event text is buffered and the completed event contains the final visible
+text; this prevents exposing an incomplete stop marker. Without string stops,
+token-event text remains vocabulary pieces rather than a guaranteed detokenized
+text stream. `GenerationResult.text` is the authoritative displayed answer.
+
+The native adapter recognizes a declared EOS token and excludes its text. Optional
+`unk`/`pad`/`bos`/`eos` declarations are preserved in model snapshots; no EOS token
+is guessed from a token's spelling. Changing the runtime binding while generating
+aborts the request instead of issuing a receipt for mixed model/device execution.
+
+The October 13 inference pass is unverified: no checks or tests were run at the
+operator's request. See `docs/plan/AI_INFERENCE_TRANSFORMER_2026-10-13.md`.
 
 ## Focused validation
 

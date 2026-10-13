@@ -1,0 +1,77 @@
+name: Game Rival Convergence and Originality Observatory
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/game_builder/rival_convergence_observatory.py"
+      - "skeleton/ai/game_builder/rival_public_monitor.py"
+      - "skeleton/ai/game_builder/rival_watch_cli.py"
+      - "skeleton/ai/game_builder/rival_delivery_campaign.py"
+      - "skeleton/ai/game_builder/rival_trajectory.py"
+      - "tests/test_game_builder_rival_convergence.py"
+      - "tests/test_game_builder_rival_campaign_cli.py"
+      - "docs/ai/game_rival_watchlist.json"
+      - "docs/ai/game_rival_convergence_design_2026_10.md"
+      - ".github/workflows/game-rival-observatory.yml"
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: original-rival-observatory-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  original-convergence:
+    name: Exact-head rival intelligence and non-cloning gates (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+      EXACT_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: No-credentials exact-head checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_rival_convergence.py
+            tests/test_game_builder_rival_campaign_cli.py
+            docs/ai/game_rival_watchlist.json
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Verify source identity, compile, adversarial cases
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXACT_SHA"
+          python -m compileall -q skeleton/ai/game_builder
+          python -m unittest tests.test_game_builder_rival_convergence tests.test_game_builder_rival_campaign_cli -v
+      - name: Daily metadata-only public watch
+        if: matrix.os == 'ubuntu-24.04' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        shell: bash
+        run: |
+          python -m skeleton.ai.game_builder.rival_watch_cli poll \
+            --config docs/ai/game_rival_watchlist.json \
+            --allow-network > rival-public-snapshot.json
+      - name: Preserve immutable per-run snapshot
+        if: matrix.os == 'ubuntu-24.04' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rival-metadata-only-${{ github.run_id }}
+          path: rival-public-snapshot.json
+          if-no-files-found: error
+          retention-days: 14
