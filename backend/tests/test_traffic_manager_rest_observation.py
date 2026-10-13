@@ -3,8 +3,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
+import sys
 
 import pytest
+
+# Backend quality executes tests with cwd=backend, while the traffic manager is
+# a root-level package. Locate the trusted repository root explicitly.
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPOSITORY_ROOT))
 
 from skeleton.automation import traffic_manager as manager
 
