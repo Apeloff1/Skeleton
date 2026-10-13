@@ -32,14 +32,18 @@ WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 # publishers must be reviewed repository-by-repository so approving one scanner
 # or build helper cannot silently authorize every action from that publisher.
 TRUSTED_ACTION_OWNERS = frozenset({"actions", "github"})
+
+# Exact-release exception for the signed Chickensoft v2.4.1 Godot installer.
+# Only this fully qualified immutable action ref is accepted. Do not widen
+# APPROVED_THIRD_PARTY_ACTIONS to cover arbitrary revisions or sibling actions.
+APPROVED_EXACT_PINNED_ACTIONS = frozenset({
+    "chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789",
+})
 APPROVED_THIRD_PARTY_ACTIONS = frozenset(
     {
         "anchore/sbom-action",
         "aquasecurity/trivy-action",
         "astral-sh/setup-uv",
-        # Reviewed Chickensoft Godot 4 runner installer. The only authorized
-        # revision is pinned below; every native Godot workflow uses that SHA.
-        "chickensoft-games/setup-godot",
         "codecov/codecov-action",
         "docker/build-push-action",
         "docker/login-action",
@@ -53,14 +57,6 @@ APPROVED_THIRD_PARTY_ACTIONS = frozenset(
     }
 )
 
-
-# This installer downloads an engine and export templates onto CI runners.
-# Review scope is the signed v2.4.1 commit, not arbitrary future releases.
-APPROVED_THIRD_PARTY_ACTION_PINS = {
-    "chickensoft-games/setup-godot": frozenset({
-        "f166999204a4f2722c6fe042fbaa3b3ea0d9c789"
-    }),
-}
 
 def workflow_files() -> list[Path]:
     return sorted([*WORKFLOW_DIR.glob("*.yml"), *WORKFLOW_DIR.glob("*.yaml")])
@@ -88,18 +84,13 @@ def _reference_violation(path_name: str, number: int, reference: str) -> str | N
             f"repository reference: {reference}"
         )
 
-    owner = repository.split("/", 1)[0]
-    if owner in TRUSTED_ACTION_OWNERS:
+    # A reviewed exception must match the entire action ref, not merely the
+    # owner/repo. Tags, different SHAs and nested reusable workflows fail closed.
+    if reference in APPROVED_EXACT_PINNED_ACTIONS:
         return None
-    if repository in APPROVED_THIRD_PARTY_ACTIONS:
-        authorized_pins = APPROVED_THIRD_PARTY_ACTION_PINS.get(repository)
-        if authorized_pins is not None:
-            revision = reference.rsplit("@", 1)[-1] if "@" in reference else ""
-            if revision not in authorized_pins:
-                return (
-                    f"{path_name}:{number}: third-party action {repository} must use "
-                    "its explicitly reviewed immutable commit SHA"
-                )
+
+    owner = repository.split("/", 1)[0]
+    if owner in TRUSTED_ACTION_OWNERS or repository in APPROVED_THIRD_PARTY_ACTIONS:
         return None
     return (
         f"{path_name}:{number}: third-party action repository is not allowlisted: "
