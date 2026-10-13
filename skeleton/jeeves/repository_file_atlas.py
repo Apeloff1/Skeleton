@@ -283,6 +283,117 @@ class JeevesRepositoryFileAtlas:
                 hashed=sum(row.content_sha256 is not None for row in rows),
             )
 
+    def apply_changes(self, changed_paths: list[str], *, observed_at_ns: int,
+                      hash_contents: bool = False) -> AtlasRefresh:
+        """Host-only, event-driven incremental reindex after file-tree changes.
+
+        Paths must be canonical, relative and from a trusted repository event.
+        A deleted file is removed; a changed regular file is re-statted. The
+        index digest is recomputed from metadata, not from a full source walk.
+        """
+        if (not isinstance(changed_paths, list) or not 1 <= len(changed_paths) <= 8192
+                or len(changed_paths) != len(set(changed_paths))):
+            raise RepositoryAtlasError("incremental update needs 1..8192 unique paths")
+        if type(observed_at_ns) is not int or observed_at_ns < 0:
+            raise RepositoryAtlasError("invalid index observation timestamp")
+        if type(hash_contents) is not bool:
+            raise RepositoryAtlasError("hash_contents must be boolean")
+        changed: dict[str, IndexedFile | None] = {}
+        for path in changed_paths:
+            if not isinstance(path, str) or not path or len(path) > 2048:
+                raise RepositoryAtlasError("invalid indexed path")
+            if "\\" in path or path.startswith("/") or any(
+                part in ("", ".", "..") for part in path.split("/")
+            ):
+                raise RepositoryAtlasError("noncanonical source path")
+            full = self.root / path
+            if not full.resolve().is_relative_to(self.root):
+                raise RepositoryAtlasError("event path escapes canonical repository")
+            if any(part in SKIP_DIRS for part in path.split("/")[:-1]) or _skip_file(Path(path).name):
+                changed[path] = None
+                continue
+            # Explicitly reject traversal via symlinks in any parent directory.
+            if any(parent.is_symlink() for parent in (
+                self.root / Path(*Path(path).parts[:i])
+                for i in range(1, len(Path(path).parts))
+            )):
+                changed[path] = None
+                continue
+            if not full.is_file() or full.is_symlink():
+                changed[path] = None
+                continue
+            try:
+                stat = full.stat(follow_symlinks=False)
+                content_sha = self._hash(full, stat.st_size) if hash_contents else None
+            except OSError as exc:
+                raise RepositoryAtlasError("source changed during incremental indexing") from exc
+            changed[path] = IndexedFile(
+                path=path, owner_root=self._owner(path),
+                feature=self._feature(path), suffix=full.suffix.lower(),
+                bytes=stat.st_size, modified_ns=stat.st_mtime_ns,
+                content_sha256=content_sha,
+            )
+        with self._lock:
+            self._meta()
+            previous = {
+                row[0]: tuple(row[1:]) for row in self._db.execute(
+                    "SELECT path,owner_root,feature,suffix,bytes,modified_ns,"
+                    "content_sha256 FROM jeeves_atlas_files"
+                )
+            }
+            additions = removals = modifications = 0
+            for path, item in changed.items():
+                before = previous.get(path)
+                if item is None:
+                    if before is not None:
+                        removals += 1
+                    previous.pop(path, None)
+                    continue
+                after = item.row()[1:]
+                if before is None:
+                    additions += 1
+                elif before != after:
+                    modifications += 1
+                previous[path] = after
+            if len(previous) > MAX_FILES:
+                raise RepositoryAtlasError("indexed file cap exceeded")
+            rebuilt = [IndexedFile(path, *values) for path, values
+                       in sorted(previous.items())]
+            digest = _canonical_sha(rebuilt)
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                for path, item in changed.items():
+                    if item is None:
+                        self._db.execute(
+                            "DELETE FROM jeeves_atlas_files WHERE path=?", (path,),
+                        )
+                    else:
+                        self._db.execute(
+                            "INSERT INTO jeeves_atlas_files VALUES (?,?,?,?,?,?,?) "
+                            "ON CONFLICT(path) DO UPDATE SET "
+                            "owner_root=excluded.owner_root, feature=excluded.feature, "
+                            "suffix=excluded.suffix, bytes=excluded.bytes, "
+                            "modified_ns=excluded.modified_ns, "
+                            "content_sha256=excluded.content_sha256",
+                            item.row(),
+                        )
+                self._db.execute(
+                    "UPDATE jeeves_atlas_meta "
+                    "SET index_sha256=?, observed_at_ns=?, file_count=? WHERE singleton=1",
+                    (digest, observed_at_ns, len(rebuilt)),
+                )
+                self._db.execute("COMMIT")
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                raise
+            return AtlasRefresh(
+                index_sha256=digest, observed_at_ns=observed_at_ns,
+                file_count=len(rebuilt), added=additions, removed=removals,
+                changed=modifications,
+                hashed=sum(row.content_sha256 is not None for row in rebuilt),
+            )
+
     def _meta(self) -> dict[str, Any]:
         record = self._db.execute(
             "SELECT schema,index_sha256,observed_at_ns,file_count "
