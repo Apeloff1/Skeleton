@@ -223,11 +223,33 @@ class DurableShadowWeightPipeline:
         queue._head = prior_head
         return queue
 
+    def _refresh_if_changed(self) -> None:
+        current = self._db.execute(
+            "SELECT head_digest, event_count, schema_version "
+            "FROM shadow_meta WHERE singleton=1"
+        ).fetchone()
+        if current is None:
+            raise ShadowWeightError("shadow journal authority metadata missing")
+        if current != (
+            self._pipeline.head_digest, len(self._pipeline._events), SCHEMA,
+        ):
+            self._pipeline = self._restore()
+
+    @staticmethod
+    def _fork(queue: ShadowWeightPipeline) -> ShadowWeightPipeline:
+        """Copy the append-only state in memory, leaving the active view intact."""
+        draft = ShadowWeightPipeline(policy=queue.policy)
+        draft._records = dict(queue._records)
+        draft._events = list(queue._events)
+        draft._head = queue._head
+        return draft
+
     def _commit(self, transition: Callable[[ShadowWeightPipeline], ShadowRecord]) -> ShadowRecord:
         with self._lock:
-            # Reopen snapshot before every mutation so another writer cannot
-            # silently branch from a stale chain.
-            loaded = self._restore()
+            # Re-validate persisted history only when another writer moved the
+            # head. Otherwise fork the already-verified in-memory state.
+            self._refresh_if_changed()
+            loaded = self._fork(self._pipeline)
             next_record = transition(loaded)
             seq = len(loaded._events) - 1
             event = loaded._events[-1]
@@ -301,14 +323,14 @@ class DurableShadowWeightPipeline:
         ))
 
     def refresh(self) -> dict[str, object]:
-        """Reload authoritative journal after another writer changed its head."""
+        """Refresh from disk only when another writer changed the journal head."""
         with self._lock:
-            self._pipeline = self._restore()
+            self._refresh_if_changed()
             return self._pipeline.snapshot()
 
     def get(self, intake_id: str) -> ShadowRecord | None:
         with self._lock:
-            self._pipeline = self._restore()
+            self._refresh_if_changed()
             return self._pipeline.get(intake_id)
 
     def snapshot(self) -> dict[str, object]:
