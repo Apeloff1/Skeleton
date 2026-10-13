@@ -21,7 +21,7 @@ from typing import Any
 SCHEMA = "skeleton.git-atlas.v1"
 MAX_TREE_BYTES = 256 * 1024 * 1024
 SOURCE_EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".java", ".rs", ".go", ".cpp", ".c", ".h"}
-TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_]{2,}")
+TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9]{1,}")
 HEX_SHA = re.compile(r"[0-9a-f]{40,64}")
 
 
@@ -213,8 +213,8 @@ def build(root: Path, revision: str = "HEAD") -> tuple[dict[str, Any], list[dict
     groups = sorted(feature_stats.values(), key=lambda group: (-group["files"], group["id"]))
     token_lookup: dict[str, list[str]] = defaultdict(list)
     for group in sorted(groups, key=lambda item: item["id"]):
-        tokens = set(TOKEN.findall(group["id"].lower().replace("-", "_")))
-        tokens.update(TOKEN.findall(group["zone"].lower().replace("-", "_")))
+        tokens = set(TOKEN.findall(group["id"].lower().replace("-", "/").replace("_", "/")))
+        tokens.update(TOKEN.findall(group["zone"].lower().replace("-", "/").replace("_", "/")))
         for token in sorted(tokens):
             token_lookup[token].append(group["id"])
     summary = {
