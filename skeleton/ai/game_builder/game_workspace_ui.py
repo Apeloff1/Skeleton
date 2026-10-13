@@ -349,8 +349,8 @@ $("jeeves-dm-measure").addEventListener("click",()=>dmGuard(async()=>{
    result.unknown_independent_acceptance_stages,
   "Release-qualified families verified by this source scan: 0",
   "Full installed-application completion: UNKNOWN — no justified single percentage.",
- ].join("\\n");
- $("jeeves-dm-output").textContent=headline+"\\n\\n"+JSON.stringify(result,null,2).slice(0,60000);
+ ].join("\n");
+ $("jeeves-dm-output").textContent=headline+"\n\n"+JSON.stringify(result,null,2).slice(0,60000);
  status("Product measurement complete. Source presence is not functional completeness.");
 }));
 $("jeeves-dm-missing").addEventListener("click",()=>dmGuard(async()=>{
