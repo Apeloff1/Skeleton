@@ -15,6 +15,7 @@ import {
  type DragonPracticeAttempt,type DragonPracticeProgress,type DragonPracticeSubscription,
  normalizeDragonAttempts,validateDragonProgress,
 } from './dragonProgression';
+import {type DragonFamilyProjection,validateDragonFamily} from './dragonFamilyProjection';
 import {normalizeDragonWisdomSnapshot,type DragonWisdomReview} from './dragonWisdomReview';
 import {normalizeDragonKnowledgeView,type DragonKnowledgeView} from './dragonKnowledgePyramid';
 import {normalizeDragonNestSnapshot,type DragonNestSnapshot} from './DragonNestProgression';
@@ -24,7 +25,7 @@ import {type NativeAttempt,type NativeTarget,type NativeCurriculum,normalizeNati
 import {EMPTY_COMPANION_JOURNAL,reduceDragonJournal,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
 
 type Snapshot={
- ok:boolean;progress:DragonPracticeProgress;attempts:DragonPracticeAttempt[];
+ ok:boolean;progress:DragonPracticeProgress;attempts:DragonPracticeAttempt[];family?:DragonFamilyProjection;
  subscription:DragonPracticeSubscription;native_attempts?:NativeAttempt[];
  curriculum?:NativeCurriculum;wisdom_review?:unknown;
 };
@@ -44,6 +45,7 @@ const subscriptionValid=(v:unknown):v is DragonPracticeSubscription=>{
 export function useDragonAcademy(){
  const [authenticated,setAuthenticated]=useState(false);
  const [progress,setProgress]=useState<DragonPracticeProgress|null>(null);
+ const [family,setFamily]=useState<DragonFamilyProjection|null>(null);
  const [attempts,setAttempts]=useState<DragonPracticeAttempt[]>([]);
  const [nativeAttempts,setNativeAttempts]=useState<NativeAttempt[]>([]);
  const [nativeTargets,setNativeTargets]=useState<NativeTarget[]>([]);
@@ -73,7 +75,7 @@ export function useDragonAcademy(){
    const me=await checkMe();
    if(!alive.current)return;
    if(!me.authenticated||!getAuthToken()){
-    setAuthenticated(false);setProgress(null);setWisdomReview(null);setKnowledgeView(null);setNest(null);setMotherGlean(null);setMotherGlean(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
+    setAuthenticated(false);setProgress(null);setFamily(null);setWisdomReview(null);setKnowledgeView(null);setNest(null);setMotherGlean(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
     setTelemetry(undefined);sessionRef.current=null;journal.current=EMPTY_COMPANION_JOURNAL;
     setError('Sign in through Studio to connect Dragon Academy.');
     return;
@@ -91,7 +93,7 @@ export function useDragonAcademy(){
     'Dragon Academy returned an invalid verified progression snapshot.');
    const wisdom=normalizeDragonWisdomSnapshot(snapshot.wisdom_review,Date.now()/1000);
    setWisdomReview(wisdom?.review??null);setWisdomExpires(wisdom?.expiresAt??0);
-   setProgress(valid);setAttempts(normalizeDragonAttempts(snapshot.attempts));
+   setProgress(valid);setFamily(validateDragonFamily(snapshot.family));setAttempts(normalizeDragonAttempts(snapshot.attempts));
    setNativeAttempts(normalizeNativeAttempts(snapshot.native_attempts));
    // Catalog is read-only. If unavailable, remain safely without platform choices.
    const platforms=await api.get<{ok:boolean;targets:NativeTarget[];styles:string[]}>(
@@ -107,7 +109,7 @@ export function useDragonAcademy(){
     setCurriculum(normalizeNativeCurriculum(course.data));
    setSubscription(snapshot.subscription);setAuthenticated(true);setError('');
   }catch(e){
-   if(alive.current){setAuthenticated(false);setProgress(null);setWisdomReview(null);setKnowledgeView(null);setNest(null);setMotherGlean(null);
+   if(alive.current){setAuthenticated(false);setProgress(null);setFamily(null);setWisdomReview(null);setKnowledgeView(null);setNest(null);setMotherGlean(null);
     setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
     setError(e instanceof Error?e.message:'Could not connect to Dragon Academy.');}
   }
@@ -239,7 +241,7 @@ export function useDragonAcademy(){
     'Unable to perform that practice action.');
    const p=validateDragonProgress(r.data.progress);
    if(!p||!subscriptionValid(r.data.subscription))throw new Error('Invalid practice result.');
-   if(alive.current){setProgress(p);setAttempts(normalizeDragonAttempts(r.data.attempts));
+   if(alive.current){setProgress(p);setFamily(validateDragonFamily(r.data.family));setAttempts(normalizeDragonAttempts(r.data.attempts));
     setNativeAttempts(normalizeNativeAttempts(r.data.native_attempts));
     if(r.data.curriculum)
      setCurriculum(normalizeNativeCurriculum(r.data.curriculum));
@@ -332,7 +334,7 @@ export function useDragonAcademy(){
  },[attempts,authenticated]);
  const closeDemo=useCallback(()=>setDemo(null),[]);
  const view:CompanionAcademyInput={
-  progress,attempts,subscription,practiceBusy:busy,wisdomReview,knowledgeView,nest,motherGlean,
+  progress,attempts,family,subscription,practiceBusy:busy,wisdomReview,knowledgeView,nest,motherGlean,
   nativeAttempts,nativeTargets,nativeStyles,nativeCurriculum:curriculum,
   onDeliveryGenerated:()=>{void load();},
   onGenerateCurriculum:authenticated?generateCurriculum:undefined,
