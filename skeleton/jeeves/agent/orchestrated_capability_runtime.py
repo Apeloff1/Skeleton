@@ -104,10 +104,10 @@ class JeevesOrchestratedCapabilityRuntime:
             raise OrchestratedDispatchError("task must be explicitly READY")
         if task_name not in ledger.ready_names():
             raise OrchestratedDispatchError("task dependencies or delegation prevent dispatch")
-        if task.authority is not authority and authority is Authority.WORKER:
-            raise OrchestratedDispatchError("worker cannot execute a higher-authority task")
-        if authority is Authority.SECRETARY and task.authority is Authority.SUPERVISOR:
-            raise OrchestratedDispatchError("secretary cannot execute supervisor tasks")
+        # Supervisor and Secretary are non-executing plan authorities. Only
+        # a host-authorized WORKER leaf may enter the actual tool plane.
+        if task.authority is not Authority.WORKER or authority is not Authority.WORKER:
+            raise OrchestratedDispatchError("only worker tasks may execute app effects")
         if task.payload.get("capability_intent_digest") != intent.digest:
             raise OrchestratedDispatchError("plan does not bind the exact capability intent")
         if task.payload.get("run_id") != context.run_id:
