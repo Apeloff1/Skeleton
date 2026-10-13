@@ -358,6 +358,8 @@ OPERATIONS = {
     "ai.adapter.audit":("read", "static registered tool-to-dispatch binding coverage",False),
     "ai.adapter.audit.page":("read", "bounded missing-dispatch audit records",False),
     "ai.api.bindings":("read", "selected frontend FastAPI literal route contract comparison",False),
+    "ai.validation.frontier":("read", "changed source to declared test/evaluation qualification plan",False),
+    "ai.validation.frontier.page":("read", "bounded suggested validation evidence page",False),
     "ai.milestones":("read", "dependency-ordered application milestone readiness",False),
     "ai.milestones.page":("read", "bounded source-pinned milestone page",False),
     "ai.milestones.critical":("read", "canonical dependency bottlenecks and longest structural chain",False),
@@ -487,6 +489,12 @@ class JeevesAppwideRuntime:
         elif action=="ai.api.bindings":
             from .jeeves_crossplane_route_scout import JeevesAPIBindingScout
             result=JeevesAPIBindingScout(inv).inspect(**params)
+        elif action=="ai.validation.frontier":
+            from .jeeves_change_validation_frontier import JeevesChangeValidationFrontier
+            result=JeevesChangeValidationFrontier(inv).overview(**params)
+        elif action=="ai.validation.frontier.page":
+            from .jeeves_change_validation_frontier import JeevesChangeValidationFrontier
+            result=JeevesChangeValidationFrontier(inv).page(**params)
         elif action=="ai.milestones":
             from .jeeves_milestone_planner import JeevesMilestonePlanner
             result=JeevesMilestonePlanner(inv).overview(**params)
