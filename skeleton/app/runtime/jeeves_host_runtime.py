@@ -209,6 +209,39 @@ class JeevesApplicationRuntime:
                 "weights_loaded_by_jeeves": False,
             }
 
+    def stage_candidate_model_release(
+        self, proposal, *, context: JeevesHostContext, observed_at_ns: int,
+    ):
+        """Host-only staging of verified, consumed candidate weights.
+
+        This records a proposal, not a model deployment or a promotion permit.
+        """
+        with self._lock:
+            self._require_live()
+            self._context(context, observed_at_ns=observed_at_ns)
+            return self.workbench.stage_model_release(
+                proposal, actor_id=context.principal_id,
+                at_ns=observed_at_ns,
+            )
+
+    def record_external_model_release(
+        self, proposal_digest: str, receipt, *,
+        context: JeevesHostContext,
+        expected_version: int,
+        runtime_admission=None, rollback_proof=None,
+    ):
+        """Bind host-confirmed external model admission or rollback receipts."""
+        with self._lock:
+            self._require_live()
+            self._context(context)
+            if receipt.actor_id != context.principal_id:
+                raise JeevesHostRuntimeError("external model release actor differs from host")
+            return self.workbench.observe_model_release(
+                proposal_digest, receipt, expected_version=expected_version,
+                runtime_admission=runtime_admission,
+                rollback_proof=rollback_proof,
+            )
+
     def propose_idle_shadow_work(
         self, *, context: JeevesHostContext,
         telemetry, host_now_ns: int,
