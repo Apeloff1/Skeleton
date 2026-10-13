@@ -96,7 +96,8 @@ def test_original_graphics_source_is_covered_by_independent_release_replay():
     assert sources["src/graphics.c"]==enable_sdl_original_game_capture(
         enable_original_native_hud(C_GRAPHICS)
     )
-    assert sources["include/dragon_puzzle_pixels.h"]==pixel_header()
+    # Match the original authored seed used by this source release.
+    assert sources["include/dragon_puzzle_pixels.h"]==pixel_header(seed=17)
 
 
 
