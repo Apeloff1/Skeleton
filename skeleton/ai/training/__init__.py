@@ -33,6 +33,11 @@ __all__ += ["ProjectLearningRun", "build_project_learning_manifest"]
 from importlib import import_module as _training_import_module
 
 _GOVERNANCE_EXPORTS = {
+    "ImprovementDirection": ".shadow_candidate_gate",
+    "ImprovementAxis": ".shadow_candidate_gate",
+    "ImprovementMatrix": ".shadow_candidate_gate",
+    "CandidateReleaseProposal": ".shadow_candidate_gate",
+    "prepare_candidate_release": ".shadow_candidate_gate",
     "ShadowWeightError": ".shadow_weight_pipeline",
     "ShadowState": ".shadow_weight_pipeline",
     "SourceAttestation": ".shadow_weight_pipeline",
