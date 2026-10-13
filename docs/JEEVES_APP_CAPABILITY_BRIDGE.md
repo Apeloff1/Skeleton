@@ -28,3 +28,19 @@ that it grants no execution authority.
 
 This is a substantive app-discovery/control-plane integration, **not a claim**
 that every editor or every game engine is already accessible to Jeeves.
+
+## Opt-in editor action execution
+
+Trusted hosts may separately call `register_authorized_creator_tool(registry,
+handlers=..., authorize=...)`. This does **not** occur in
+`Jeeves.app_tool_registry()`; it adds `creator.execute_authorized` only
+when the host provides real creator operation handlers and a callable
+authorization verifier. The verifier receives the normalized B014 command and
+actual `ToolExecutionContext`, and must return literal `True` for the exact
+command/run/user/lease/approval evidence before the handler is called.
+
+The `ToolExecutor` independently requires a `HIGH_IMPACT` `ToolGrant`
+with a bounded per-run call budget. A rejected authorization consumes the
+presented grant attempt. No `authorize` or `handler` value can be supplied
+in model arguments. The tool is neither cached nor idempotently replayed.
+This is a host integration adapter, not an LLM-controlled write credential.

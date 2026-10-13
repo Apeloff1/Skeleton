@@ -197,3 +197,65 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
     for spec, handler in entries:
         registry.register(spec, handler)
     return tuple(spec.name for spec, _ in entries)
+
+
+def register_authorized_creator_tool(
+    registry,
+    *,
+    handlers,
+    authorize,
+) -> str:
+    """Opt in a real B014 editor dispatch under host-owned exact-command policy.
+
+    No handler, auth verifier, or execution grant is ever constructed by
+    Jeeves. The host callback must check tenant, principal, project, scope,
+    lease, decision and canonical command digest. Even after registration a
+    ToolExecutor HIGH_IMPACT grant is still required for the individual run.
+    """
+    from collections.abc import Callable, Mapping
+    from skeleton.forge.creator.command_surface import OPERATIONS
+    from skeleton.jeeves.agent.tools import (
+        ArgumentRule, ToolDenied, ToolRegistry, ToolSpec,
+    )
+    from skeleton.jeeves.agent.types import RiskTier
+
+    if not isinstance(registry, ToolRegistry):
+        raise TypeError("registry must be a host ToolRegistry")
+    if not isinstance(handlers, Mapping) or not handlers:
+        raise TypeError("trusted creator handlers are required")
+    if not callable(authorize):
+        raise TypeError("host authorization callback is required")
+    enabled = tuple(sorted(handlers))
+    if any(name not in OPERATIONS or not callable(handlers[name]) for name in enabled):
+        raise ValueError("creator handlers must be known operations and callable")
+
+    def _perform(arguments, context):
+        from skeleton.forge.creator.command_surface import (
+            build_creator_command, dispatch_creator_command,
+        )
+        command = build_creator_command(
+            arguments["operation"],
+            project_id=arguments["project_id"],
+            payload=arguments["payload"],
+        )
+        if authorize(command, context) is not True:
+            raise ToolDenied("host did not authorize this exact creator command")
+        receipt = dispatch_creator_command(command, handlers=handlers)
+        return receipt.to_dict()
+
+    spec = ToolSpec(
+        name="creator.execute_authorized",
+        description="Host-authorized and tool-granted creator dispatch. Never autonomous.",
+        risk=RiskTier.HIGH_IMPACT,
+        arguments=(
+            ArgumentRule("operation", "string", choices=enabled),
+            ArgumentRule("project_id", "string", max_length=128),
+            ArgumentRule("payload", "object", max_length=512),
+        ),
+        idempotent=False,
+        cache_ttl_seconds=None,
+        timeout_seconds=20.0,
+        produces_evidence=True,
+    )
+    registry.register(spec, _perform)
+    return spec.name

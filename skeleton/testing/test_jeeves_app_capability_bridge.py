@@ -96,3 +96,78 @@ def test_repo_root_is_host_selected_not_a_model_path(tmp_path):
     with pytest.raises(Exception):
         # ToolSpec does not accept unknown parameters such as "root".
         registry.get("app.capabilities").spec.validate_arguments({"root": "/etc"})
+
+
+def test_explicit_host_authorization_and_high_impact_grant_are_both_required():
+    from skeleton.jeeves.app_capability_bridge import register_authorized_creator_tool
+
+    registry = Jeeves().app_tool_registry()
+    called = []
+    approved = set()
+
+    def handler(command):
+        called.append(command.digest)
+        return {"status": "validated", "project": command.project_id}
+
+    def authorize(command, context):
+        return (command.digest, context.user_id, context.run_id) in approved
+
+    register_authorized_creator_tool(registry, handlers={"preview": handler}, authorize=authorize)
+    executor = ToolExecutor(registry)
+    ctx = ToolExecutionContext(run_id="run-002", user_id="user-002", trace_id="trace-002")
+    args = {"operation": "preview", "project_id": "studio",
+            "payload": {"scopes": ["world:start"], "mode": "static"}}
+    grant = ToolGrant(tool_name="creator.execute_authorized",
+                      allowed_risks=(RiskTier.HIGH_IMPACT,), max_calls=1)
+    with pytest.raises(ToolDenied):
+        executor.execute(
+            ToolCall(call_id="attempt-no-grant", name="creator.execute_authorized", arguments=args),
+            ctx, grants=[])
+    assert not called
+    denied = executor.execute(
+        ToolCall(call_id="attempt-unapproved", name="creator.execute_authorized", arguments=args),
+        ctx, grants=[grant])
+    assert denied.ok is False
+    assert not called
+
+    # Approval alone cannot overcome an exhausted exact-run ToolGrant.
+    cmd = creator_proposal("preview", "studio", args["payload"])["command"]
+    approved.add((cmd["digest"], ctx.user_id, ctx.run_id))
+    with pytest.raises(ToolDenied):
+        executor.execute(
+            ToolCall(call_id="attempt-exhausted", name="creator.execute_authorized", arguments=args),
+            ctx, grants=[grant])
+    assert not called
+
+    # Fresh run and host-approved exact command gets a fresh grant.
+    fresh = ToolExecutionContext(run_id="run-003", user_id="user-002", trace_id="trace-003")
+    approved.add((cmd["digest"], fresh.user_id, fresh.run_id))
+    outcome = executor.execute(
+        ToolCall(call_id="attempt-approved", name="creator.execute_authorized", arguments=args),
+        fresh, grants=[grant])
+    assert outcome.ok is True
+    assert called == [cmd["digest"]]
+    assert outcome.payload["command_digest"] == cmd["digest"]
+
+
+def test_authorization_callback_cannot_be_supplied_in_model_arguments():
+    from skeleton.jeeves.app_capability_bridge import register_authorized_creator_tool
+    registry = Jeeves().app_tool_registry()
+    register_authorized_creator_tool(
+        registry, handlers={"preview": lambda command: {}},
+        authorize=lambda command, context: False)
+    spec = registry.get("creator.execute_authorized").spec
+    from skeleton.jeeves.agent.tools import ToolValidationError
+    with pytest.raises(ToolValidationError):
+        spec.validate_arguments({
+            "operation": "preview", "project_id": "game",
+            "payload": {"scopes": ["scene"], "mode": "static"},
+            "authorize": True,
+        })
+
+
+def test_authorized_tool_requires_explicit_host_handlers():
+    from skeleton.jeeves.app_capability_bridge import register_authorized_creator_tool
+    with pytest.raises(TypeError):
+        register_authorized_creator_tool(
+            Jeeves().app_tool_registry(), handlers={}, authorize=lambda *_: True)
