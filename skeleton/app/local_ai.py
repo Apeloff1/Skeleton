@@ -26,6 +26,7 @@ from skeleton.ai.runtime.inference.deployment import LocalModelDeployment
 from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest, LocalInferenceResult, LocalInferenceEngine
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+from skeleton.app.local_ai_transcript import load_transcript, save_transcript
 
 
 MAX_USER_CHARS = 4096
@@ -51,6 +52,26 @@ def load_gguf_deployment(source: str | Path) -> LlamaCppModel:
     return LlamaCppModel(deployment.llama_cpp_config(
         rehash_artifacts_each_run=True,
     ))
+
+
+def inspect_local_model(backend: NativeRuntimeLocalModel) -> dict[str, object]:
+    """Verify native model identity and report limits without generating text."""
+    if not isinstance(backend, NativeRuntimeLocalModel):
+        raise OfflineAIError("native transformer model required")
+    backend.assert_identity()
+    runtime = backend.runtime
+    return {
+        "schema_version": 1, "model_id": backend.model_id,
+        "model_digest": backend.model_digest,
+        "tokenizer_digest": backend.tokenizer_digest,
+        "runtime_digest": backend.runtime_digest,
+        "max_context_tokens": runtime.limits.max_context,
+        "max_output_tokens": runtime.limits.max_new_tokens,
+        "model_bytes": runtime.model_bytes,
+        "provider_credentials_required": False,
+        "network_required": False,
+        "model_quality_certified": False,
+    }
 
 
 LocalDesktopModel = NativeRuntimeLocalModel | LlamaCppModel
@@ -113,6 +134,32 @@ class OfflineAISession:
             return min(32, runtime.limits.max_new_tokens,
                        max(1, runtime.limits.max_context // 4))
         return min(512, max(1, (self.backend.config.context_size or 4096) // 4))
+
+    @property
+    def ui_output_budget(self) -> int:
+        return self.preferred_output_tokens
+
+    def export_transcript(self, path: str | Path) -> str:
+        """Explicit, integrity-bound local export; not the durable chat authority."""
+        if not isinstance(self.backend, NativeRuntimeLocalModel):
+            raise OfflineAIError("native transformer checkpoint required for this transcript format")
+        self.backend.assert_identity()
+        return save_transcript(
+            path, model_digest=self.backend.model_digest,
+            tokenizer_digest=self.backend.tokenizer_digest, history=self.history,
+        )
+
+    def import_transcript(self, path: str | Path) -> int:
+        """Commit only a fully verified transcript from this exact native model."""
+        if not isinstance(self.backend, NativeRuntimeLocalModel):
+            raise OfflineAIError("native transformer checkpoint required for this transcript format")
+        self.backend.assert_identity()
+        restored = load_transcript(
+            path, model_digest=self.backend.model_digest,
+            tokenizer_digest=self.backend.tokenizer_digest,
+        )
+        self.history = restored
+        return len(restored) // 2
 
     def _request(self, prompt: str, max_output_tokens: int) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:

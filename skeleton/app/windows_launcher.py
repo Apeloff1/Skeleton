@@ -501,6 +501,24 @@ class WindowsLauncher:
 
 
 def _headless(args: argparse.Namespace, root: Path) -> int:
+    if args.local_ai_dataset_smoke:
+        from skeleton.app.local_ai_dataset import smoke_offline_native_dataset
+        try:
+            return 0 if smoke_offline_native_dataset() else 1
+        except Exception:
+            return 1
+    if args.local_ai_benchmark_smoke:
+        from skeleton.app.local_ai_benchmark import smoke_offline_native_benchmark
+        try:
+            return 0 if smoke_offline_native_benchmark() else 1
+        except Exception:
+            return 1
+    if args.local_ai_training_smoke:
+        from skeleton.app.local_ai_training import smoke_offline_native_training
+        try:
+            return 0 if smoke_offline_native_training() else 1
+        except Exception:
+            return 1
     if args.local_http_smoke:
         from skeleton.app.offline_http import smoke_offline_http_inference
         try:
@@ -568,6 +586,9 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--open", action="store_true")
     mode.add_argument("--local-ai", action="store_true", help="open Docker-free native AI conversation")
     mode.add_argument("--local-ai-smoke", action="store_true", help="verify bundled native CPU inference without Docker")
+    mode.add_argument("--local-ai-dataset-smoke", action="store_true", help="check local dataset split contracts")
+    mode.add_argument("--local-ai-benchmark-smoke", action="store_true", help="check offline benchmark receipts")
+    mode.add_argument("--local-ai-training-smoke", action="store_true", help="check native CPU training")
     mode.add_argument("--local-http-smoke", action="store_true",
                       help="test installed loopback AI auth, generation, retries, and SQLite recovery")
     mode.add_argument("--local-gguf-smoke", metavar="MANIFEST", type=Path,
