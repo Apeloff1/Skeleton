@@ -437,6 +437,11 @@ class EngineChat:
             or sum(len(item["content"].encode("utf-8")) for item in self._history) > 512 * 1024
         ):
             self._history.pop(0)
+            # Never retain an assistant reply after evicting its user turn.
+            # Byte-based retention can overflow by just one message, unlike
+            # the paired message-count limit, so trim that orphan as well.
+            while self._history and self._history[0]["role"] == "assistant":
+                self._history.pop(0)
         if self._turn_idempotency_key is not None:
             self._completed_explicit_request = request
             self._completed_explicit_response = response
