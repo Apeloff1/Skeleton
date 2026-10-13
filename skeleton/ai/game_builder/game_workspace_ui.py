@@ -1317,6 +1317,71 @@ $("jeeves-advanced-replay-verify").addEventListener("click",()=>dmGuard(async()=
   "reexecuted with exact SHA-bound original scene and system.");
 }));
 
+
+/* Real multi-scene campaign compiler: choices depend on observed game state. */
+let jeevesCampaignPlanDigest=null,jeevesCampaignInput=null;
+function campaignInput(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active original project and scan application inventory");
+ const spec=JSON.parse($("jeeves-campaign-spec").value);
+ if(!spec||typeof spec!=="object"||Array.isArray(spec)||
+    !Array.isArray(spec.nodes)||spec.nodes.length<2||spec.nodes.length>8)
+  throw Error("Author a bounded original campaign with two to eight scenes");
+ return {project:model.active,spec,expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-campaign-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-campaign-approval").checked)
+  throw Error("Approve original story/game scenario reference execution");
+ const args=campaignInput();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.plan",params:args,operator_authorized:true
+ });
+ const plan=response.result;
+ jeevesCampaignPlanDigest=plan.digest;
+ jeevesCampaignInput=JSON.stringify(args);
+ $("jeeves-campaign-output").textContent=JSON.stringify(plan,null,2);
+ status(plan.real_reference_sessions_executed+
+  " actual original game scenes executed; "+plan.actual_route.length+
+  " scene choices followed, ending: "+plan.actual_reached_ending+
+  ". Other player choices still require authored scenes.");
+}));
+$("jeeves-campaign-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-campaign-approval").checked)
+  throw Error("Designer approval needed for source review");
+ const args=campaignInput();
+ if(!jeevesCampaignPlanDigest||jeevesCampaignInput!==JSON.stringify(args))
+  throw Error("Recompile changed original campaign before staging");
+ const reason=$("jeeves-campaign-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Specific reviewed campaign source rationale required");
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.stage",
+  params:{...args,expected_plan_digest:jeevesCampaignPlanDigest,reason},
+  operator_authorized:true
+ });
+ const receipt=response.result;
+ $("jeeves-campaign-output").textContent=JSON.stringify(receipt,null,2);
+ $("jeeves-publish-ids").value=receipt.proposal_id;
+ jeevesCampaignPlanDigest=null;
+ status("Approved-scene multi-ending campaign staged as source. "+
+  "Real game journey and both source versions must pass human diff/commit.");
+}));
+$("jeeves-campaign-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=campaignInput();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.verify",
+  params:{project:args.project,campaign_id:args.spec.campaign_id,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false
+ });
+ const report=response.result;
+ $("jeeves-campaign-output").textContent=JSON.stringify(report,null,2);
+ status(report.actual_reference_sessions_reexecuted+
+  " real original game sessions independently reexecuted from committed "+
+  "campaign source; observed ending: "+report.actual_reached_ending);
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5539,6 +5604,43 @@ Explicitly authorize reference gameplay execution and review proposal</label>
 <button id="jeeves-advanced-replay-stage" type="button">Stage actual game replay as reviewed project source</button>
 <button id="jeeves-advanced-replay-verify" type="button">Reexecute and verify committed session source</button>
 <pre id="jeeves-advanced-replay-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Multi-Ending Original Game Campaign</legend>
+<p><small>Run actual current approved game scenes, connect deterministic
+outcome-dependent paths and require at least two original endings. All
+terminal routes, real game state receipts and original source hashes are
+reviewed again when humans commit the authored campaign.</small></p>
+<label>Authored campaign program JSON — 2–8 previously approved original scenes
+<textarea id="jeeves-campaign-spec" rows="14" spellcheck="false">{
+ "campaign_id":"first_original_campaign",
+ "start":"prologue",
+ "nodes":[
+  {"id":"prologue","editor":"rpg","scene_id":"scene_01",
+   "actions":[],"ending":null},
+  {"id":"redemption","editor":"maze","scene_id":"scene_01",
+   "actions":[],"ending":"good"},
+  {"id":"exile","editor":"rpg","scene_id":"scene_02",
+   "actions":[],"ending":"evil"}
+ ],
+ "edges":[
+  {"source":"prologue","target":"redemption","priority":0,
+   "predicate":"finished","threshold":null},
+  {"source":"prologue","target":"exile","priority":1,
+   "predicate":"always","threshold":null}
+ ]
+}</textarea></label>
+<caption>Referenced scenes and their engine configurations must already exist
+in the current project and have been human committed. Edit the actions
+and original outcomes to reflect the actual game you are authoring.</caption>
+<label><input id="jeeves-campaign-approval" type="checkbox">
+Authorize real multi-scene gameplay compilation and source staging</label>
+<button id="jeeves-campaign-plan" type="button">Compile real branching original-game campaign</button>
+<label>Original authored campaign source review reason
+<textarea id="jeeves-campaign-reason" rows="2" spellcheck="false">Review original linked RPG and maze game scenes with deterministic branching and multiple endings.</textarea></label>
+<button id="jeeves-campaign-stage" type="button">Stage real original campaign for human source approval</button>
+<button id="jeeves-campaign-verify" type="button">Verify committed campaign against current real engines</button>
+<pre id="jeeves-campaign-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
