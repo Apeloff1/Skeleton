@@ -26,6 +26,7 @@ on:
       - "tests/test_game_builder_jeeves_milestone_planner.py"
       - "tests/test_game_builder_jeeves_evidence_coverage.py"
       - "tests/test_game_builder_jeeves_release_gate_inventory.py"
+      - "tests/test_game_builder_jeeves_deathmarch_workpacks.py"
       - "docs/JEEVES_APP_CAPABILITY_ATLAS.md"
       - "docs/JEEVES_WHOLE_REPO_INVENTORY_AND_GOVERNED_ACTIONS.md"
       - "docs/JEEVES_APP_COMPLETION_CENSUS_2026_10.md"
@@ -115,7 +116,8 @@ jobs:
             tests/test_game_builder_jeeves_evidence_graph.py
             tests/test_game_builder_jeeves_milestone_planner.py
             tests/test_game_builder_jeeves_evidence_coverage.py
-            tests/test_game_builder_jeeves_release_gate_inventory.py"
+            tests/test_game_builder_jeeves_release_gate_inventory.py
+            tests/test_game_builder_jeeves_deathmarch_workpacks.py
             tests/test_game_builder_story_asset_pixels.py
             tests/test_game_builder_system_editors.py
       - name: Setup Python
@@ -133,7 +135,7 @@ jobs:
       - name: Check app-wide Jeeves tools, all system editors, forge graph, Dragon, learning and 9999-scene receipts
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census tests.test_game_builder_jeeves_evidence_graph tests.test_game_builder_jeeves_milestone_planner tests.test_game_builder_jeeves_evidence_coverage tests.test_game_builder_jeeves_release_gate_inventory -v
+          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census tests.test_game_builder_jeeves_evidence_graph tests.test_game_builder_jeeves_milestone_planner tests.test_game_builder_jeeves_evidence_coverage tests.test_game_builder_jeeves_release_gate_inventory tests.test_game_builder_jeeves_deathmarch_workpacks -v
       - name: Reconcile real exact-head masterplan and product AI authority
         shell: bash
         run: |
