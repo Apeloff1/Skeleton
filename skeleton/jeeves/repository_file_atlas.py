@@ -421,6 +421,11 @@ class JeevesRepositoryFileAtlas:
             "observed_at_ns": record[2], "file_count": record[3],
         }
 
+    def metadata(self) -> dict[str, Any]:
+        """Return the persisted snapshot identity without scanning source paths."""
+        with self._lock:
+            return self._meta()
+
     def lookup(self, path: str) -> IndexedFile | None:
         """Resolve only exact source paths previously observed by the host."""
         if not isinstance(path, str) or not 1 <= len(path) <= 2048:
