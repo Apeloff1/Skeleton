@@ -756,6 +756,12 @@ from .shadow_learning_adapter import (
     ShadowLearningHandoff,
     prepare_shadow_learning_handoff,
 )
+from .file_atlas_context import (
+    FileContextError,
+    SourceBookmark,
+    SourceContextPlan,
+    JeevesFileContextPlanner,
+)
 from .capability_dispatch import (
     AppDispatchError,
     HostCapabilityBinding,
