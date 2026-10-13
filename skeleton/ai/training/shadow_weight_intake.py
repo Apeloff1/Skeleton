@@ -544,6 +544,78 @@ class ShadowKnowledgeQueue:
                 revision, lease.assessment_digest,
             )
 
+    def backlog(
+        self, *, states: tuple[str, ...] = ("pending", "quarantined", "training-ready"),
+        limit: int = 200,
+    ) -> tuple[dict[str, object], ...]:
+        """Return bounded, deterministic, provenance-safe shadow work metadata."""
+        allowed = {"pending", "quarantined", "training-ready", "leased", "trained"}
+        if (
+            not isinstance(states, tuple) or not states
+            or len(set(states)) != len(states)
+            or any(not isinstance(state, str) or state not in allowed for state in states)
+        ):
+            raise ShadowWeightError("invalid shadow backlog state selection")
+        _count("backlog limit", limit, lower=1, upper=10_000)
+        placeholders = ",".join("?" for _ in states)
+        with self._connect() as db:
+            rows = db.execute(
+                f"""SELECT knowledge_id,state,revision,priority_gain,priority_relevance,
+                           observed_at,attempts,retry_after,candidate_digest,assessment
+                    FROM shadow_intake WHERE state IN ({placeholders})
+                    ORDER BY priority_gain DESC,priority_relevance DESC,
+                             observed_at ASC,knowledge_id ASC LIMIT ?""",
+                (*states, limit),
+            ).fetchall()
+        return tuple({
+            "knowledge_id": row["knowledge_id"],
+            "state": row["state"],
+            "revision": row["revision"],
+            "priority_gain_ppm": row["priority_gain"],
+            "priority_relevance_ppm": row["priority_relevance"],
+            "observed_at": row["observed_at"],
+            "attempts": row["attempts"],
+            "retry_after": row["retry_after"],
+            "candidate_digest": row["candidate_digest"],
+            "reason_codes": tuple(json.loads(row["assessment"])["reason_codes"]),
+        } for row in rows)
+
+    def workload_summary(self) -> dict[str, int]:
+        """Counts for idle schedulers and companion/progress interfaces."""
+        now_text = _now().isoformat(timespec="microseconds").replace("+00:00", "Z")
+        with self._connect() as db:
+            counts = db.execute(
+                "SELECT state,COUNT(*) AS amount FROM shadow_intake GROUP BY state"
+            ).fetchall()
+            delayed = db.execute(
+                """SELECT COUNT(*) FROM shadow_intake
+                   WHERE state='training-ready' AND retry_after>?""",
+                (now_text,),
+            ).fetchone()[0]
+        result = {
+            "pending": 0, "quarantined": 0, "training-ready": 0,
+            "leased": 0, "trained": 0, "retry-delayed": delayed,
+        }
+        for row in counts:
+            result[row["state"]] = row["amount"]
+        return result
+
+    def events(
+        self, *, after_event_id: int = 0, limit: int = 500,
+    ) -> tuple[dict[str, object], ...]:
+        """Replay ordered timestamped intake actions using an event cursor."""
+        if isinstance(after_event_id, bool) or not isinstance(after_event_id, int) or after_event_id < 0:
+            raise ShadowWeightError("invalid shadow intake event cursor")
+        _count("shadow event limit", limit, lower=1, upper=10_000)
+        with self._connect() as db:
+            rows = db.execute(
+                """SELECT event_id,knowledge_id,action,revision,payload_digest,occurred_at
+                   FROM shadow_intake_events WHERE event_id>?
+                   ORDER BY event_id LIMIT ?""",
+                (after_event_id, limit),
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
+
     def status(self, knowledge_id: str) -> dict[str, object]:
         with self._connect() as db:
             row = db.execute(
