@@ -197,6 +197,25 @@ class JeevesApplicationRuntime:
                 "weights_loaded_by_jeeves": False,
             }
 
+    def pending_source_edits(self, *, context: JeevesHostContext,
+                             limit: int = 100):
+        """Host operator view of unresolved local source commits."""
+        with self._lock:
+            self._require_live()
+            self._context(context)
+            return self.workbench.pending_source_edits(limit=limit)
+
+    def reconcile_source_edit(self, plan_digest: str, *,
+                              context: JeevesHostContext,
+                              observed_at_ns: int):
+        """Resolve an interrupted local edit without executing it again."""
+        with self._lock:
+            self._require_live()
+            self._context(context, observed_at_ns=observed_at_ns)
+            return self.workbench.reconcile_source_edit(
+                plan_digest, observed_at_ns=observed_at_ns,
+            )
+
     def refresh_sources(self, *, observed_at_ns: int,
                         hash_contents: bool = False):
         """Host-only rebuild; never exposed as a model-facing tool."""
