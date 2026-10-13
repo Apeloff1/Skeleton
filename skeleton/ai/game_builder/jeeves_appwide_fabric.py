@@ -348,6 +348,8 @@ OPERATIONS = {
     "ai.duplicates":("read", "exact and heuristic near-duplicate review candidates",False),
     "ai.completion":("read", "full-app canonical readiness and evidence-gap census",False),
     "ai.deathmarch":("read", "prioritized evidence-gated cross-app completion backlog",False),
+    "ai.graph":("read", "source-pinned cross-plane feature and release evidence graph",False),
+    "ai.graph.neighbors":("read", "bounded graph ownership and dependency traversal",False),
     "source.inspect":("read", "UTF-8 source",False),
     "source.propose":("proposal", "exact-file reviewed code edit",True),
     "editor.catalog":("read", "typed original-game editors",False),
@@ -435,6 +437,12 @@ class JeevesAppwideRuntime:
         elif action=="ai.deathmarch":
             from .jeeves_completion_census import JeevesCompletionCensus
             result=JeevesCompletionCensus(inv).backlog(**params)
+        elif action=="ai.graph":
+            from .jeeves_evidence_graph import JeevesEvidenceGraph
+            result=JeevesEvidenceGraph(inv).overview(**params)
+        elif action=="ai.graph.neighbors":
+            from .jeeves_evidence_graph import JeevesEvidenceGraph
+            result=JeevesEvidenceGraph(inv).neighborhood(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
