@@ -3345,6 +3345,146 @@ $("advanced-unified-save-import").addEventListener("change",async()=>{
  }catch(error){status("Untrusted mixed original world save rejected: "+error.message);}
  finally{$("advanced-unified-save-import").value="";}
 });
+$("advanced-objective-goals").value=JSON.stringify([
+ "credible_eyewitness_reach",
+ "earned_quest_completions",
+ "original_site_restoration",
+ "finite_material_resilience"
+],null,2);
+$("advanced-objective-run").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastScene || !verifiedSourceEpisodes.length ||
+      !verifiedGenreEvents.length)
+   throw Error("Review a real original physical and multi-genre source campaign first");
+  const goalList=JSON.parse($("advanced-objective-goals").value);
+  if(!Array.isArray(goalList) || goalList.length<1 ||
+     goalList.length>4 || new Set(goalList).size!==goalList.length)
+   throw Error("Choose one to four unique source-measurable original-game objectives");
+  const timeline=JSON.parse($("advanced-interleave-editor").value);
+  const maxCandidates=Number($("advanced-whatif-trial-limit").value);
+  if(!Array.isArray(timeline) || timeline.length<2 || timeline.length>96 ||
+     !Number.isSafeInteger(maxCandidates) ||
+     maxCandidates<1 || maxCandidates>12)
+   throw Error("The signed timeline and finite original experiment budget are required");
+  const result=await api("/api/advanced-interleaved-objectives",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,
+   timeline,world_settings:interleavedWorldSettings,
+   goals:goalList,max_candidates:maxCandidates
+  });
+  const matrix=result.matrix;
+  if(!matrix || result.source_project_files_mutated ||
+     result.objective_ranking_auto_applied ||
+     result.ai_model_promotion_approved ||
+     matrix.original_project_files_changed ||
+     matrix.automatic_game_event_application ||
+     matrix.automatic_ai_weight_promotion ||
+     JSON.stringify(matrix.goals)!==JSON.stringify(goalList) ||
+     matrix.max_candidates!==maxCandidates ||
+     matrix.candidate_count!==matrix.candidate_results.length)
+   throw Error("Actual game objectives were not independently measured and replayed");
+  $("advanced-objective-proof").textContent=JSON.stringify({
+   original_baseline_source:matrix.baseline_campaign_digest,
+   ordered_authored_goals:matrix.goals,
+   real_baseline_stats:matrix.baseline_metrics,
+   source_replayed_cases:matrix.verified_valid_candidates,
+   independently_better_cases:matrix.verified_strict_improvements,
+   actual_story_tradeoffs:matrix.observed_tradeoffs,
+   invalid_trials_excluded:matrix.rejected_source_timelines,
+   measured_alternatives:matrix.candidate_results.map(c=>({
+    index:c.candidate_index,
+    source_replay_valid:c.valid,
+    objective_classification:c.classification,
+    independently_measured_metrics:c.measured_metrics,
+    strict_baseline_deltas:c.goal_deltas,
+    pareto_nondominated:c.pareto_frontier
+   })),
+   suggested_only_if_strictly_better:matrix.suggested_candidate_index,
+   candidate_selection_requires_separate_manual_whatif_review:true,
+   auto_promotion:false,
+   original_source_files_untouched:true
+  },null,2);
+  status("Original NPC game objectives measured against independently re-executed worlds; ranking does not alter game state");
+ }catch(error){status("Source-measured NPC design goals rejected: "+error.message);}
+});
+$("advanced-whatif-run").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastScene || !verifiedSourceEpisodes.length ||
+     !verifiedGenreEvents.length)
+   throw Error("Adversarial world comparisons need real original physics and genre source sessions");
+  const authored=JSON.parse($("advanced-interleave-editor").value);
+  const maxCandidates=Number($("advanced-whatif-trial-limit").value);
+  if(!Array.isArray(authored) || authored.length<2 || authored.length>96 ||
+     !Number.isSafeInteger(maxCandidates) || maxCandidates<1 ||
+     maxCandidates>12)
+   throw Error("Two to 96 source events and one to 12 trials are required");
+  const response=await api("/api/advanced-interleaved-counterfactual",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,
+   timeline:authored,
+   world_settings:interleavedWorldSettings,
+   max_candidates:maxCandidates
+  });
+  const proof=response.analysis;
+  if(!proof || response.original_project_files_mutated ||
+     response.counterfactuals_promoted || response.native_all_engines_certified ||
+     proof.source_game_files_modified ||
+     proof.unearned_world_rewards_applied ||
+     proof.automatic_ai_weight_promotion ||
+     proof.max_candidates!==maxCandidates ||
+     proof.total_trials!==proof.candidates.length)
+   throw Error("Counterfactual original game proof was not source-authorized");
+  lastWhatIfReport=proof;
+  const select=$("advanced-whatif-candidate");
+  select.replaceChildren();
+  for(const candidate of proof.candidates){
+   const option=document.createElement("option");
+   option.value=String(candidate.candidate_index);
+   option.textContent="Trial "+candidate.candidate_index+
+    " · "+(candidate.valid?"Replay passed":"Invalid source order")+
+    " · "+candidate.changed_dimension_count+" changed dimensions";
+   option.disabled=!candidate.valid;
+   select.append(option);
+  }
+  $("advanced-whatif-proof").textContent=JSON.stringify({
+   baseline_game:proof.baseline_campaign_digest,
+   actual_world_tick:proof.baseline_world_tick,
+   independently_replayed:proof.valid_replayed_trials,
+   rejected_invalid_timelines:proof.invalid_trials,
+   materially_different_worlds:proof.causally_changed_trials,
+   actual_verified_differences:proof.candidates.map(x=>({
+    id:x.candidate_index,valid:x.valid,
+    edited_positions:x.swapped_original_positions,
+    actual_world_dimensions_changed:x.changed_dimensions,
+    original_resource_memory_quest_deltas:x.verified_deltas,
+    unique_replay_digest:x.candidate_digest
+   })),
+   source_inputs_untouched:true,
+   automatic_ai_learning_promotion:false
+  },null,2);
+  status("Independent original game world what-if trials completed; invalid source orders never earn advancement");
+ }catch(error){lastWhatIfReport=null;
+  status("Original causal world comparison rejected: "+error.message);}
+});
+$("advanced-whatif-use").addEventListener("click",()=>{
+ try{
+  if(!lastWhatIfReport)throw Error("Run a new independent what-if comparison");
+  const chosen=Number($("advanced-whatif-candidate").value);
+  if(!Number.isSafeInteger(chosen))throw Error("Choose a verified original game scenario");
+  const candidate=lastWhatIfReport.candidates.find(x=>
+   x.candidate_index===chosen && x.valid);
+  if(!candidate || !candidate.candidate_digest)
+   throw Error("Invalid alternative cannot be authored as a real game-world success");
+  $("advanced-interleave-editor").value=JSON.stringify(
+   candidate.authored_timeline,null,2);
+  lastInterleavedProof=null;
+  lastInterleavedTimeline=null;
+  $("advanced-interleave-save-proof").textContent="";
+  status("Authenticated what-if source order copied for review; run the complete original game timeline to approve it");
+ }catch(error){status("Unverified game counterfactual not applied: "+error.message);}
+});
 $("advanced-interleave-save-export").addEventListener("click",async()=>{
  try{
   if(!lastInterleavedProof || !lastInterleavedTimeline || !episodicLastScene)
@@ -3797,6 +3937,7 @@ $("advanced-npc-rule-commit").addEventListener("click",async()=>{
 let verifiedGenreEvents=[];
 let lastUnifiedGenreProof=null;
 let unifiedWorldFollowups=[];
+let lastWhatIfReport=null;
 let lastInterleavedProof=null;
 let lastInterleavedTimeline=null;
 let lastCounterfactualReport=null;
@@ -4463,6 +4604,33 @@ local until typed revalidation and an explicit human-approved file commit.</smal
         Replay authored cross-engine event timeline
        </button>
        <pre id="advanced-interleave-proof" role="status" aria-live="polite"></pre>
+       <fieldset aria-label="Adversarial game world what-if research">
+        <legend>Mirror laboratory · causal NPC game world alternatives</legend>
+        <label>Maximum independently replayed what-if trials
+          <input id="advanced-whatif-trial-limit" type="number"
+           min="1" max="12" step="1" value="8"/>
+        </label>
+        <button id="advanced-whatif-run" type="button">
+          Compare source-verified world event orders
+        </button>
+        <label>Authenticated alternative scenario
+          <select id="advanced-whatif-candidate"></select>
+        </label>
+        <button id="advanced-whatif-use" type="button">
+          Copy verified alternate order to timeline editor
+        </button>
+        <pre id="advanced-whatif-proof" role="status" aria-live="polite"></pre>
+        <fieldset aria-label="Measurable narrative game objectives">
+         <legend>Adversarial NPC game design objective comparison</legend>
+         <label>Ordered review goals (JSON list, maximum four)
+          <textarea id="advanced-objective-goals" rows="5"></textarea>
+         </label>
+         <button id="advanced-objective-run" type="button">
+          Compare verified playable game outcomes, not just event order
+         </button>
+         <pre id="advanced-objective-proof" role="status" aria-live="polite"></pre>
+        </fieldset>
+       </fieldset>
        <fieldset aria-label="Cross-engine adversarial what-if research">
          <legend>Verified alternative world histories</legend>
          <label>Compare actual game-world objective
