@@ -531,6 +531,15 @@ class GameWorkspace:
         if not isinstance(proposal_id,str) or not re.fullmatch(r"[a-f0-9]{64}",proposal_id):
             raise WorkspaceError("content-addressed original edit ID required")
         proposal_path=self.root/"reviews/proposals"/(proposal_id+".json")
+        accepted=self.root/"reviews/accepted"/(proposal_id+".json")
+        # Never change the game source when the acceptance receipt cannot be
+        # exclusively created, including a prior successful commit or a
+        # symlinked/corrupted acceptance path. This is a preflight: it does
+        # not claim a cross-process filesystem transaction.
+        if accepted.exists() or accepted.is_symlink():
+            raise WorkspaceError("proposal already accepted or accepted path occupied")
+        if accepted.parent.is_symlink() or not accepted.parent.is_dir():
+            raise WorkspaceError("canonical acceptance custody is unavailable")
         proposal=_json(_read(proposal_path,300000))
         if canonical_digest(proposal)!=proposal_id:
             raise WorkspaceError("review proposal was changed after signoff")
@@ -578,7 +587,6 @@ class GameWorkspace:
             self._atomic(path,proposal["new_content"])
         else:
             _newfile(path,proposal["new_content"])
-        accepted=self.root/"reviews/accepted"/(proposal_id+".json")
         _newfile(accepted,canonical_json({
             "schema":"skeleton.game_builder.approved_targeted_edit.v1",
             "proposal":proposal_id,"project":project,
