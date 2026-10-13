@@ -62,14 +62,15 @@ Contract version 1.0 records streaming capability in command metadata but does n
 
 ## Creator CLI: explicit evidence boundary (2026-10-13)
 
-The **creator CLI** `python -m skeleton run` is the ten-stage
-`skeleton.context.pipeline.GameForgeRun` application workflow. It is
-**not yet equivalent** to `skeleton command run` or the HTTP
-`POST /gameforge/run` legacy handler: those currently call
-`state.gameforge.run` and can produce different file manifests.
-Do not claim creator/API parity until [#3613](https://github.com/Apeloff1/Skeleton/issues/3613)
-lands a single canonical execution adapter and fixture-based manifest
-comparison.
+The **creator CLI** `python -m skeleton run` uses the ten-stage
+`skeleton.context.pipeline.GameForgeRun` application workflow. The
+shared `run` command and HTTP `POST /gameforge/run` now use the **same
+engine when `target="godot"` is explicitly requested**; those calls do
+not accept remote output paths. The legacy default `target="json"` and
+YAML specification path retain the existing `state.gameforge.run`
+compatibility contract and are **not** yet equivalent to Godot generation.
+Deterministic fixture-based manifest comparison and real Godot boot
+evidence remain required for complete [#3613](https://github.com/Apeloff1/Skeleton/issues/3613) acceptance.
 
 Creator CLI now supports questionnaire intake and real headless Godot
 boot verification:
@@ -85,7 +86,7 @@ python -m skeleton run "a new village" --era soulslike --playtest auto
 ```
 
 `--answers` accepts a UTF-8 JSON object whose keys and values are
-strings, with a 1 MiB size limit. Missing/invalid input fails without
+strings, with a 64 KiB size limit. Missing/invalid input fails without
 launching the forge. `--playtest off` is the default; `auto` records
 the Godot boot result when available; `require` makes a missing or
 failed headless boot fatal and reports the failing `emit` stage.
