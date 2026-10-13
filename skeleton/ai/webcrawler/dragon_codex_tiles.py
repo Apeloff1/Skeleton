@@ -47,7 +47,7 @@ def _bitmap(address:CodexAddress,name:str,colors:int)->tuple[tuple[int,...],...]
         "ground":("substrate_stability","erosion_clock"),
         "rock":("elevation_tectonics","mineral_layers"),
         "water":("ocean_depth","tide_clock"),
-        "highland":("sky_islands","prevailing_wind"),
+        "highland":("verticality","prevailing_wind"),
         "city":("urban_density","reconstruction_rate"),
         "forest":("flora_succession","resource_regrowth"),
         "historic_ruin":("unreliable_history","settlement_decay"),
