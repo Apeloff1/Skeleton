@@ -1,52 +1,59 @@
 # Product surface
 
-Canonical operator commands. This page lists only CLI entry points that are dispatched by `skeleton.__main__.main`. The HTTP organism API is separate from the CLI; a route existing does not make a same-named terminal command available.
+Operator JSON. No dashboard required.
 
-```sh
-# Canonical assembly and runtime inspection
-python -m skeleton app status --json
-python -m skeleton app check --json
-python -m skeleton app status --live
-python -m skeleton status
-python -m skeleton config
-python -m skeleton contracts
-python -m skeleton capabilities
-
-# GameForge creator loop
-python -m skeleton eras
-python -m skeleton generations
+```
+python -m skeleton ready --fix --walk -n 2
+python -m skeleton product
+python -m skeleton health
 python -m skeleton doctor
-python -m skeleton walk --era extraction_now -n 3 --mode thermal --json
-python -m skeleton walk --all-eras -n 2 --json
-python -m skeleton cockpit BIND ERA cozy_wholesome
-python -m skeleton run "an original cozy village" --out ./out/village
-
-# Further dispatched surfaces
-python -m skeleton app plan --json
-python -m skeleton app smoke --json
-python -m skeleton help
+python -m skeleton next
+python -m skeleton wiki 'SELECT * WHERE kind=principle' --limit 24
+python -m skeleton seed
+python -m skeleton caps
+python -m skeleton lattice
+python -m skeleton pulse
+python -m skeleton orch
+python -m skeleton season -n 2
+python -m skeleton scoreboard
+python -m skeleton hot
+python -m skeleton coverage
+python -m skeleton decade
+python -m skeleton bank --reset
+python -m skeleton switch mobile
+python -m skeleton witness
+python -m skeleton gov
+python -m skeleton cage
+python -m skeleton rot
+python -m skeleton fieldcov
+python -m skeleton enact
+python -m skeleton day -n 2
+python -m skeleton week --days 2
+python -m skeleton calendar
+python -m skeleton conductor
+python -m skeleton conductor --run
+python -m skeleton conductor --commit
+python -m skeleton ctx "plan tensor ttk"
+python -m skeleton ctx "plan tensor ttk" --replay
+python -m skeleton ctx "plan tensor ttk" --refine
+python -m skeleton live "plan tensor ttk"
+python -m skeleton observe
+python -m skeleton stacks
+python -m skeleton mix
+python -m skeleton satellites
+python -m skeleton path
+python -m skeleton bound
+python -m skeleton fieldwalk -n 2
+python -m skeleton dump --hot
+python -m skeleton orgwalk -n 3
+python -m skeleton sleep --force
+python -m skeleton forget "old trace"
+python -m skeleton helix
+python -m skeleton recall mem0
 ```
 
-## Legacy organism HTTP API
-
-The `/cortex/*` endpoints remain HTTP interfaces and require their
-normal server/security setup. They are **not** synonyms for root-level
-`python -m skeleton <verb>` commands.
-
-The older operator command catalog advertised commands that were never
-dispatched. Those speculative CLI examples have been removed here rather
-than presenting `Unknown command` as a completed product. Reintroduce
-individual commands only with working dispatch, proper authorization,
-documented failures, and evidence. Track that work in issue #3614.
-
-## Repeated playable walkthrough contract
-
-`walk -n N` and `walk --repeat N` perform 1 to 100 bounded actual
-walkthrough attempts. Multi-run invocations use per-attempt deterministic
-seeds (`walk:000`, `walk:001`, ... or `<seed>:000`, ...). A single
-failure makes the entire command fail. `--all-eras -n N` runs every era
-N times; `--json` includes each attempt and the aggregate result. One
-walk without `-n` retains its prior output and seed behavior.
+HTTP: `GET /cortex/{product,health,next,ready,caps,lattice,banks,wiki}`
+`POST /cortex/{organismer,galaxy,social,seed,contact,pulse,walk}`
 
 Version stamp lives on the product card (`version`).
 
@@ -84,3 +91,41 @@ gitignored. Atom cap is hardware-live, not a fixed 400.
 
 cite-do-not-copy · stored_prose=0 · clipped-G · write-route skip|update|new
 · headroom-below-wall
+
+## Verified CLI routing batch (13 October 2026)
+
+Four advertised operator entrypoints now actually dispatch to their existing
+canonical owners, without synthetic success payloads:
+
+| CLI | Existing owner |
+| --- | --- |
+| `ready --fix --walk -n 2` | `skeleton.organism.ready.ready_card` |
+| `product` | `skeleton.organism.product.product_card` |
+| `health` | `skeleton.organism.health.health_card` |
+| `next` | `skeleton.organism.next.hint` |
+
+All render source-backed JSON cards. Health/ready return exit 1 when the
+underlying card reports `ok=0`; invalid flags or out-of-budget ready walks
+return 2. Other documented product verbs remain to be audited and dispatched;
+**do not interpret this batch as closing all #3614 verb parity**.
+
+## Operator verb contract — October 2026
+
+Every command in the opening code fence now has an explicit CLI route to
+an existing runtime owner. Organism `orgwalk -n` is distinct from the
+existing GameForge `walk --steps`; the previously advertised `walk -n`
+was invalid and is intentionally replaced. `doctor` continues to invoke
+the already-dispatched GameForge doctor.
+
+`dump --hot` inspects the hot-file card;
+`dump --force` explicitly allows a backup rotation. All repeatable
+mutation loops use finite enforced limits; `--help` reports their options.
+
+This resolves operator command routing for the listed verbs, not complete
+app-wide UX, security, gameplay, or deployment acceptance.
+
+The `wiki SELECT` verb now routes directly into
+`skeleton.galaxy.query.run` (canonical Hoag atom query). It returns
+citation/topic handles, not article bodies; `--limit` is enforced in
+`1..128`, and query length is bounded to 4096 characters before organism
+initialization. No dynamic SQL or arbitrary command execution is used.
