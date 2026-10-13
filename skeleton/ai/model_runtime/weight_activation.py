@@ -8,15 +8,16 @@ compare-and-swap active-model pointer and an auditable rollback receipt.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 from threading import RLock
 from uuid import uuid4
 from typing import TYPE_CHECKING
 
-from skeleton.ai.training.flgb_training_runtime import digest_json, require_digest
+from skeleton.ai.training.flgb_training_runtime import digest_json, require_digest, require_id
 from skeleton.ai.training.promotion_lifecycle import RuntimeAdmission, RollbackProof
 from skeleton.ai.training.shadow_weight_ledger import ShadowWeightLedger
 from skeleton.ai.training.shadow_weights import ShadowPromotionPermit, ShadowWeightError
@@ -34,6 +35,15 @@ class NativeActivationReceipt:
     admission_digest: str
     rollback_proof_digest: str
     checkpoint_content_digest: str
+
+    def __post_init__(self) -> None:
+        require_id(self.candidate_id, "candidate_id")
+        for name in (
+            "permit_digest", "prior_model_digest", "admitted_model_digest",
+            "admission_digest", "rollback_proof_digest",
+            "checkpoint_content_digest",
+        ):
+            require_digest(getattr(self, name), name)
 
     @property
     def digest(self) -> str:
@@ -181,6 +191,110 @@ class NativeWeightDeployment:
         if rollback.verifier_id in {permit.mirror_verifier, permit.admission_authority}:
             raise ShadowWeightError("rollback verifier must be independent")
 
+    def _persist_activation_receipt(
+        self, candidate_digest: str, receipt: NativeActivationReceipt,
+    ) -> None:
+        """Crash-durable immutable receipt, still inert until ledger CAS."""
+        require_digest(candidate_digest, "candidate_digest")
+        raw = json.dumps(
+            asdict(receipt), sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")
+        target = self._checkpoints / (candidate_digest + ".activation.json")
+        if target.is_symlink():
+            raise ShadowWeightError("activation receipt path must not be a symlink")
+        if target.exists():
+            if target.read_bytes() != raw:
+                raise ShadowWeightError("existing activation receipt has different custody")
+            return
+        tmp = self._checkpoints / (candidate_digest + "." + uuid4().hex + ".receipt.tmp")
+        try:
+            with os.fdopen(
+                os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb"
+            ) as handle:
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.link(tmp, target)
+            except FileExistsError:
+                if target.is_symlink() or target.read_bytes() != raw:
+                    raise ShadowWeightError("concurrent activation receipt mismatch")
+            else:
+                if os.name == "posix":
+                    fd = os.open(self._checkpoints, os.O_RDONLY)
+                    try:
+                        os.fsync(fd)
+                    finally:
+                        os.close(fd)
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def recover_rollback_custody(
+        self, candidate_id: str,
+    ) -> NativeActivationReceipt:
+        """Recover previous weights after restart from ledger-bound custody.
+
+        Untrusted local receipt files cannot authorize rollback. Recovery is
+        permitted only for the currently active candidate and only when the
+        immutable receipt matches the exact ledger activation event. The
+        checkpoint must reconstruct the previous native tensor state.
+        """
+        from .native_llm_runtime import NativeLLMRuntime
+
+        require_id(candidate_id, "candidate_id")
+        with self._lock:
+            active = self.runtime
+            snapshot = self._ledger.snapshot(candidate_id)
+            permit = snapshot.permit
+            if snapshot.state != "active" or permit is None:
+                raise ShadowWeightError("only active native candidate has rollback custody")
+            receipt_path = self._checkpoints / (
+                permit.candidate_digest + ".activation.json"
+            )
+            checkpoint_path = self._checkpoints / (
+                permit.candidate_digest + ".rollback.json"
+            )
+            if (
+                receipt_path.is_symlink() or not receipt_path.is_file()
+                or checkpoint_path.is_symlink() or not checkpoint_path.is_file()
+            ):
+                raise ShadowWeightError("durable native rollback custody is unavailable")
+            if receipt_path.stat().st_size > 8192:
+                raise ShadowWeightError("native activation receipt exceeds size bound")
+            try:
+                fields = json.loads(receipt_path.read_bytes())
+                if not isinstance(fields, dict):
+                    raise ValueError("receipt must be an object")
+                receipt = NativeActivationReceipt(**fields)
+            except (ValueError, TypeError) as exc:
+                raise ShadowWeightError("malformed durable activation receipt") from exc
+            if (
+                receipt.candidate_id != candidate_id
+                or receipt.permit_digest != permit.digest
+                or receipt.admitted_model_digest != active.model_digest
+                or receipt.prior_model_digest != permit.base_model_digest
+                or receipt.checkpoint_content_digest != permit.rollback_checkpoint_digest
+                or receipt.digest != self._ledger.activation_receipt_digest(candidate_id)
+            ):
+                raise ShadowWeightError("activation receipt is not ledger-authenticated")
+            max_bytes = active.limits.max_checkpoint_bytes
+            if checkpoint_path.stat().st_size > max_bytes:
+                raise ShadowWeightError("recovery checkpoint exceeds native runtime limit")
+            with checkpoint_path.open("rb") as handle:
+                raw = handle.read(max_bytes + 1)
+            if (
+                len(raw) > max_bytes
+                or sha256(raw).hexdigest() != receipt.checkpoint_content_digest
+            ):
+                raise ShadowWeightError("recovery checkpoint content digest mismatch")
+            previous = NativeLLMRuntime.restore_json(raw)
+            if previous.model_digest != receipt.prior_model_digest:
+                raise ShadowWeightError("restored rollback tensor identity mismatch")
+            self._prior_runtimes[candidate_id] = previous
+            self._activation_receipts[candidate_id] = receipt
+            return receipt
+
     def activate(
         self,
         candidate_id: str,
@@ -226,8 +340,9 @@ class NativeWeightDeployment:
                 rollback_proof_digest=rollback.digest,
                 checkpoint_content_digest=checkpoint_digest,
             )
-            # The durable CAS runs first. Publishing a reference is an in-memory
-            # assignment that follows only after the transaction has committed.
+            # Persist rollback custody before ledger CAS. A failed activation
+            # may leave an inert receipt; only the ledger event authorizes it.
+            self._persist_activation_receipt(permit.candidate_digest, receipt)
             self._ledger.commit_activation(
                 candidate_id,
                 permit_digest=permit.digest,
@@ -365,8 +480,14 @@ class NativeWeightDeployment:
             original = self._prior_runtimes.get(candidate_id)
             activation = self._activation_receipts.get(candidate_id)
             snapshot = self._ledger.snapshot(candidate_id)
-            if original is None or activation is None or snapshot.state != "active":
-                raise ShadowWeightError("no resident rollback runtime for active candidate")
+            if snapshot.state != "active":
+                raise ShadowWeightError("only an active candidate can be rolled back")
+            if original is None or activation is None:
+                self.recover_rollback_custody(candidate_id)
+                original = self._prior_runtimes.get(candidate_id)
+                activation = self._activation_receipts.get(candidate_id)
+            if original is None or activation is None:
+                raise ShadowWeightError("no durable rollback custody for active candidate")
             if snapshot.revision != expected_revision:
                 raise ShadowWeightError("stale rollback revision")
             if proof.admission_digest != activation.admission_digest:
