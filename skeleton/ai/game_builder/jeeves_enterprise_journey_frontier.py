@@ -100,7 +100,9 @@ class JeevesEnterpriseJourneyFrontier:
             raise JeevesAppwideError("enterprise journey acceptance policy mismatch")
         families=docs[SCOPE].get("families")
         if (type(families) is not list or len(families)!=42
-            or {f.get("id") for f in families if type(f) is dict}!=FAMILY_IDS):
+            or any(type(f) is not dict or type(f.get("id")) is not str
+                   for f in families)
+            or {f["id"] for f in families}!=FAMILY_IDS):
             raise JeevesAppwideError("fixed 42 product source families changed")
         required=enterprise.get("required_journeys")
         if (type(required) is not list or len(required)!=12 or
@@ -147,9 +149,11 @@ class JeevesEnterpriseJourneyFrontier:
             if (name!=JOURNEY_IDS[n] or name in seen
                 or row.get("canonical_journey")!=required[n]
                 or type(family_ids) is not list or not 2<=len(family_ids)<=8
+                or any(type(v) is not str for v in family_ids)
                 or len(set(family_ids))!=len(family_ids)
                 or not set(family_ids)<=FAMILY_IDS
                 or type(candidate_paths) is not list or not 1<=len(candidate_paths)<=6
+                or any(type(v) is not str for v in candidate_paths)
                 or len(set(candidate_paths))!=len(candidate_paths)
                 or type(target) is not str or not 30<=len(target)<=400
                 or row.get("acceptance_axes")!=list(AXES)
