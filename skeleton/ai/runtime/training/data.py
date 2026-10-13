@@ -305,6 +305,8 @@ class DatasetManifest:
             raise ValueError("dataset permitted_uses must be explicit")
         if "speech_recovery" in uses and uses != ("speech_recovery",):
             raise ValueError("speech_recovery must remain an isolated dataset purpose")
+        if "media_retrieval" in uses and uses != ("media_retrieval",):
+            raise ValueError("media_retrieval must remain an isolated dataset purpose")
         object.__setattr__(self, "permitted_uses", uses)
         parsers = tuple(dict.fromkeys(item.strip() for item in self.parser_versions if item.strip()))
         if not parsers:
@@ -688,6 +690,39 @@ class MaterializedDatasetReceipt:
             "observation_digest": self.observation_digest,
             "quality_report_digest": self.quality_report_digest,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class SourceAuthorityBinding:
+    """Exact registered original source authority for a separately governed copy."""
+
+    content_digest: str
+    envelope_digest: str
+    authority_epoch: int
+    purpose: str
+
+    def __post_init__(self) -> None:
+        for name in ("content_digest", "envelope_digest"):
+            object.__setattr__(self, name, _require_digest(getattr(self, name), field=name))
+        if (
+            isinstance(self.authority_epoch, bool)
+            or not isinstance(self.authority_epoch, int)
+            or self.authority_epoch < 0
+        ):
+            raise ValueError("source authority epoch must be a non-negative integer")
+        object.__setattr__(self, "purpose", _text(self.purpose, field="purpose"))
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "content_digest": self.content_digest,
+            "envelope_digest": self.envelope_digest,
+            "authority_epoch": self.authority_epoch,
+            "purpose": self.purpose,
+        }
+
+    @property
+    def digest(self) -> str:
+        return _sha256(self.as_dict())
 
 
 def _observations(corpora: Mapping[str, tuple[str, ...]]) -> dict[str, object]:
@@ -1131,7 +1166,36 @@ class DatasetRegistry:
             epoch += source_epoch
             if purpose is not None and (source_status != "active" or purpose in revoked):
                 raise PermissionError("source rights revoked or source deleted")
+        if manifest.permitted_uses == ("media_retrieval",):
+            for binding in self._original_source_bindings(manifest):
+                source_epoch, _, _ = self._authority_state("source", binding.content_digest)
+                epoch += source_epoch
+                if purpose is not None:
+                    self.assert_source_binding(binding)
         return epoch
+
+    def _original_source_bindings(self, manifest: DatasetManifest) -> tuple[SourceAuthorityBinding, ...]:
+        dimensions = self._db.execute(
+            "SELECT length(CAST(materialization_json AS BLOB)) FROM materialized_dataset WHERE dataset_digest=?",
+            (manifest.digest,),
+        ).fetchone()
+        if dimensions is None or dimensions[0] > _MAX_IDENTITY_BYTES:
+            raise ValueError("original source materialization binding is missing or exceeds bounds")
+        encoded = self._db.execute(
+            "SELECT materialization_json FROM materialized_dataset WHERE dataset_digest=?", (manifest.digest,)
+        ).fetchone()[0]
+        materialization = json.loads(encoded)
+        if _sha256(materialization) != manifest.materialization_digest:
+            raise ValueError("original source materialization identity drift")
+        values = materialization.get("original_source_bindings")
+        if not isinstance(values, list) or not 1 <= len(values) <= 256:
+            raise ValueError("original source bindings require bounded exact coverage")
+        bindings = tuple(SourceAuthorityBinding(**value) for value in values)
+        if any(binding.purpose != "media_retrieval" for binding in bindings) or len(
+            {binding.content_digest for binding in bindings}
+        ) != len(bindings):
+            raise ValueError("original source bindings contain ambiguous purposes or duplicates")
+        return bindings
 
     def dataset_authority_epoch(self, dataset_digest: str) -> int:
         with self._lock:
@@ -1179,6 +1243,55 @@ class DatasetRegistry:
                 raise PermissionError("source rights revoked or source deleted")
             payload = json.loads(row[0])
             return IngestEnvelope(**{**payload, "rights": tuple(payload["rights"])})
+
+    def source_binding(self, content_digest: str, *, purpose: str) -> SourceAuthorityBinding:
+        """Issue a binding only for current registered, permitted source authority."""
+        digest = _require_digest(content_digest, field="content_digest")
+        use = _text(purpose, field="purpose")
+        with self._lock:
+            envelope = self.source_envelope(digest)
+            if envelope is None:
+                raise ValueError("source binding requires a registered original")
+            epoch, status, revoked = self._authority_state("source", digest)
+            if (
+                not envelope.trusted
+                or envelope.quarantine_reason
+                or status != "active"
+                or use not in envelope.rights
+                or use in revoked
+            ):
+                raise PermissionError("original source is not permitted for requested purpose")
+            return SourceAuthorityBinding(digest, _sha256(envelope.as_dict()), epoch, use)
+
+    def assert_source_binding(self, binding: SourceAuthorityBinding) -> None:
+        if not isinstance(binding, SourceAuthorityBinding):
+            raise TypeError("source binding must be SourceAuthorityBinding")
+        checked = SourceAuthorityBinding(**binding.as_dict())
+        if checked != self.source_binding(checked.content_digest, purpose=checked.purpose):
+            raise PermissionError("original source authority binding changed")
+
+    @contextmanager
+    def source_authority(self, bindings: Sequence[SourceAuthorityBinding]):
+        """Order bounded copy/retrieval publication against source withdrawal."""
+        if (
+            isinstance(bindings, (str, bytes))
+            or not isinstance(bindings, Sequence)
+            or not 1 <= len(bindings) <= 513
+        ):
+            raise ValueError("source authority requires a bounded ordered binding sequence")
+        checked = tuple(bindings)
+        with self._lock:
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                for binding in checked:
+                    self.assert_source_binding(binding)
+                yield
+                for binding in checked:
+                    self.assert_source_binding(binding)
+                self._db.commit()
+            except BaseException:
+                self._db.rollback()
+                raise
 
     def _source_blob(self, digest: str) -> tuple[str, bytes] | None:
         dimensions = self._db.execute(
@@ -1246,6 +1359,11 @@ class DatasetRegistry:
             or str(materialization.get("version")) != manifest.version
         ):
             raise ValueError("stored materialization identity mismatch")
+        if manifest.permitted_uses == ("media_retrieval",):
+            for binding in self._original_source_bindings(manifest):
+                self.assert_source_binding(binding)
+        elif "original_source_bindings" in materialization:
+            raise ValueError("original media bindings cannot grant another dataset purpose")
         sources: dict[str, tuple[str, ...]] = {}
         if set(materialization["sources"]) != set(manifest.source_ingest_digests):
             raise ValueError("materialized source coverage mismatch")
@@ -1402,6 +1520,7 @@ class DatasetRegistry:
         permitted_uses: Sequence[str],
         retention_class: str,
         quality_rules: Sequence[DataQualityRule] | None = None,
+        original_source_bindings: Sequence[SourceAuthorityBinding] = (),
     ) -> MaterializedDatasetReceipt:
         iid = _text(ingestion_id, field="ingestion_id")
         did = _text(dataset_id, field="dataset_id")
@@ -1419,11 +1538,35 @@ class DatasetRegistry:
             not uses
             or classification not in _CLASSIFICATION_RANK
             or set(uses)
-            - {"training", "evaluation", "simulation_training", "simulation_evaluation", "speech_recovery"}
+            - {
+                "training",
+                "evaluation",
+                "simulation_training",
+                "simulation_evaluation",
+                "speech_recovery",
+                "media_retrieval",
+            }
         ):
             raise ValueError("permitted uses and classification must be explicit")
         if "speech_recovery" in uses and uses != ("speech_recovery",):
             raise ValueError("speech_recovery must remain an isolated dataset purpose")
+        if "media_retrieval" in uses and uses != ("media_retrieval",):
+            raise ValueError("media_retrieval must remain an isolated dataset purpose")
+        if (
+            isinstance(original_source_bindings, (str, bytes))
+            or not isinstance(original_source_bindings, Sequence)
+            or len(original_source_bindings) > 256
+        ):
+            raise ValueError("original source bindings require a bounded ordered sequence")
+        originals = tuple(original_source_bindings)
+        if any(not isinstance(binding, SourceAuthorityBinding) for binding in originals):
+            raise TypeError("original source bindings must be SourceAuthorityBinding")
+        if originals and uses != ("media_retrieval",) or uses == ("media_retrieval",) and not originals:
+            raise PermissionError("original media bindings require isolated media_retrieval purpose")
+        if any(binding.purpose != "media_retrieval" for binding in originals) or len(
+            {binding.content_digest for binding in originals}
+        ) != len(originals):
+            raise ValueError("original source bindings contain ambiguous purposes or duplicates")
         if not isinstance(sources, Mapping) or not 1 <= len(sources) <= 64:
             raise ValueError("materialized sources require a bounded split mapping")
         retention = _text(retention_class, field="retention_class")
@@ -1508,11 +1651,16 @@ class DatasetRegistry:
             "quality_rules": [rule.as_dict() for rule in rules],
         }
         request_digest = _sha256(request)
+        if originals:
+            request["original_source_bindings"] = [binding.as_dict() for binding in originals]
+            request_digest = _sha256(request)
         if len(_canonical(request).encode("utf-8")) > _MAX_IDENTITY_BYTES:
             raise ValueError("materialized ingestion identity exceeds byte bounds")
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE")
             try:
+                for binding in originals:
+                    self.assert_source_binding(binding)
                 previous = self.materialized_ingestion(iid)
                 if previous is not None:
                     if previous.request_digest != request_digest:
@@ -1541,6 +1689,8 @@ class DatasetRegistry:
                     "splits": split_rows,
                     "observation_digest": observation_digest,
                 }
+                if originals:
+                    materialization["original_source_bindings"] = [binding.as_dict() for binding in originals]
                 manifest = DatasetManifest(
                     dataset_id=did,
                     version=str(actual_version + 1),
@@ -1757,6 +1907,30 @@ class DatasetRegistry:
                 )
             )
         return tuple(sources)
+
+    def materialized_source(self, content_digest: str, *, purpose: str) -> MaterializedTrainingSource:
+        """Read one current source, preserving filter-before-read retrieval scopes."""
+        digest = _require_digest(content_digest, field="content_digest")
+        with self._lock:
+            self.source_binding(digest, purpose=purpose)
+            stored = self._source_blob(digest)
+            if stored is None:
+                raise ValueError("materialized source bytes unavailable")
+            identity = json.loads(stored[0])
+            envelope = self.source_envelope(digest)
+            if envelope is None or identity.get("envelope") != envelope.as_dict():
+                raise ValueError("materialized source envelope identity drift")
+            source = MaterializedTrainingSource(
+                envelope,
+                bytes(stored[1]),
+                identity["format"],
+                tuple(identity["rights_refs"]),
+                tuple(identity["lineage_refs"]),
+                identity["evidence"],
+            )
+            if source.as_dict() != identity:
+                raise ValueError("materialized source metadata identity drift")
+            return source
 
     @contextmanager
     def training_authority(self, dataset_digest: str, expected_epoch: int):

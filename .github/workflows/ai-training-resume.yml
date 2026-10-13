@@ -42,6 +42,16 @@ on:
       - "machine/ai_multimodal_temporal_execution.json"
       - "machine/ai_engine_local_provider_binding.json"
       - "machine/ai_measured_local_verifier.json"
+      - "machine/ai_local_elastic_training.json"
+      - "machine/ai_local_preference_training.json"
+      - "machine/ai_measured_model_rollout.json"
+      - "machine/ai_multimodal_content_retrieval.json"
+      - "machine/ai_training_observability.json"
+      - "skeleton/testing/test_local_preference_training.py"
+      - "skeleton/testing/test_elastic_training_recovery.py"
+      - "skeleton/testing/test_measured_model_rollout.py"
+      - "skeleton/testing/test_training_observability*.py"
+      - "skeleton/testing/test_training_restore_scope.py"
       - "skeleton/testing/test_measured_local_verifier.py"
       - "skeleton/testing/test_measured_verifier_fences.py"
       - "skeleton/testing/test_measured_verifier_runtime_identity.py"
@@ -99,6 +109,16 @@ on:
       - "machine/ai_multimodal_temporal_execution.json"
       - "machine/ai_engine_local_provider_binding.json"
       - "machine/ai_measured_local_verifier.json"
+      - "machine/ai_local_elastic_training.json"
+      - "machine/ai_local_preference_training.json"
+      - "machine/ai_measured_model_rollout.json"
+      - "machine/ai_multimodal_content_retrieval.json"
+      - "machine/ai_training_observability.json"
+      - "skeleton/testing/test_local_preference_training.py"
+      - "skeleton/testing/test_elastic_training_recovery.py"
+      - "skeleton/testing/test_measured_model_rollout.py"
+      - "skeleton/testing/test_training_observability*.py"
+      - "skeleton/testing/test_training_restore_scope.py"
       - "skeleton/testing/test_measured_local_verifier.py"
       - "skeleton/testing/test_measured_verifier_fences.py"
       - "skeleton/testing/test_measured_verifier_runtime_identity.py"
@@ -192,6 +212,14 @@ jobs:
           skeleton/testing/test_measured_local_verifier.py
           skeleton/testing/test_measured_verifier_fences.py
           skeleton/testing/test_measured_verifier_runtime_identity.py
+          skeleton/testing/test_elastic_training_recovery.py
+          skeleton/testing/test_local_preference_training.py
+          skeleton/testing/test_measured_model_rollout.py
+          skeleton/testing/test_training_observability.py
+          skeleton/testing/test_training_observability_lock_order.py
+          skeleton/testing/test_governed_training_extensions.py
+          skeleton/testing/test_governed_training_state_cli.py
+          skeleton/testing/test_training_restore_scope.py
           skeleton/testing/test_native_neural_lm.py
           skeleton/testing/test_p3_neural_training_resume.py
           skeleton/testing/test_p3_multimodal_training_projection.py

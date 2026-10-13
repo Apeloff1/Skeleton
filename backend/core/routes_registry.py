@@ -308,6 +308,7 @@ KNOWN_ROUTES_WITH_PREFIX: List[RouteEntry] = [
     ("routes.compiler",                     "router", "/api"),
     ("routes.hub",                          "router", "/api"),
     ("routes.ai",                           "router", "/api"),
+    ("routes.chat_attachments",             "router", "/api"),
     ("routes.operation_stream",             "router", "/api"),
     ("routes.ai_pipeline",                  "router", "/api"),
     ("routes.curriculum",                   "router", "/api"),

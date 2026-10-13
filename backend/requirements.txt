@@ -68,3 +68,6 @@ zstandard==0.25.0
 
 # --- Logging ---
 loguru==0.7.3
+
+# Bounded actual PDF text extraction for governed chat attachments.
+pypdf>=6,<7

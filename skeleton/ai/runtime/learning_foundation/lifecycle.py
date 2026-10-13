@@ -37,6 +37,7 @@ def _locked(method):
         with self._lock:
             if self._repository is None or self._transaction_depth:
                 return method(self, *args, **kwargs)
+            self._commit_fences = []
             before = None
             before_version = self._snapshot_version
             before_digest = self._snapshot_digest
@@ -58,6 +59,8 @@ def _locked(method):
                     self._transaction_depth = 1
                     result = method(self, *args, **kwargs)
                     transaction.save(self._snapshot())
+                    for fence in self._commit_fences:
+                        fence(self)
                     self._snapshot_version = transaction.version
                     self._snapshot_digest = transaction.snapshot_digest
                     return result
@@ -69,6 +72,7 @@ def _locked(method):
                 raise
             finally:
                 self._transaction_depth = 0
+                self._commit_fences = []
 
     return guarded
 
@@ -538,6 +542,7 @@ class ModelLifecycleRegistry:
         self._lock = RLock()
         self._repository = None
         self._transaction_depth = 0
+        self._commit_fences = []
         self._snapshot_version = 0
         self._snapshot_digest = None
         self._mboms: dict[str, ModelBillOfMaterials] = {}
@@ -546,6 +551,7 @@ class ModelLifecycleRegistry:
         self._decisions: dict[str, _MigrationBinding] = {}
         self._migrations: dict[str, ModelMigrationReceipt] = {}
         self._rollbacks: dict[str, ModelMigrationRollbackReceipt] = {}
+        self._rollouts: dict[str, dict] = {}
         if path is not None and repository is not None:
             raise ModelLifecycleError("supply path or repository, not both")
         if path is not None or repository is not None:
@@ -580,7 +586,7 @@ class ModelLifecycleRegistry:
                 "receipt": asdict(receipt),
             }
 
-        return {
+        snapshot = {
             "schema_version": 1,
             "budgets": {
                 name: getattr(self, "_" + name)
@@ -596,10 +602,29 @@ class ModelLifecycleRegistry:
             "migrations": [action(receipt) for receipt in self._migrations.values()],
             "rollbacks": [action(receipt) for receipt in self._rollbacks.values()],
         }
+        if self._rollouts:
+            snapshot["schema_version"] = 2
+            snapshot["rollouts"] = [json.loads(_json(self._rollouts[key])) for key in sorted(self._rollouts)]
+        return snapshot
 
     @classmethod
     def _validate_snapshot(cls, snapshot: object) -> ModelLifecycleRegistry:
         """Reconstruct issued authority solely by replaying validated operations."""
+        if (
+            isinstance(snapshot, dict)
+            and type(snapshot.get("schema_version")) is int
+            and snapshot["schema_version"] == 2
+            and "rollouts" in snapshot
+        ):
+            from .rollout import validate_rollouts
+
+            legacy = {key: value for key, value in snapshot.items() if key != "rollouts"}
+            legacy["schema_version"] = 1
+            registry = cls._validate_snapshot(legacy)
+            registry._rollouts = validate_rollouts(registry, snapshot.get("rollouts"))
+            if _json(registry._snapshot()) != _json(snapshot):
+                raise ModelLifecycleError("rollout snapshot does not match validated graph")
+            return registry
         expected_fields = {
             "schema_version",
             "budgets",
@@ -765,6 +790,10 @@ class ModelLifecycleRegistry:
                 for name in ("_max_models", "_max_transitions", "_max_decisions", "_max_parity_cases")
             ):
                 raise ModelLifecycleError("durable lifecycle rebound its immutable budgets")
+        if require_extension:
+            from .rollout import require_rollout_extension
+
+            require_rollout_extension(self._rollouts, restored._rollouts)
         # Keep genuine handles already issued to this registry when the durable
         # record is unchanged. Equivalent caller-created objects remain denied.
         restored._history = [
@@ -802,12 +831,35 @@ class ModelLifecycleRegistry:
             "_decisions",
             "_migrations",
             "_rollbacks",
+            "_rollouts",
             "_max_models",
             "_max_transitions",
             "_max_decisions",
             "_max_parity_cases",
         ):
             setattr(self, name, getattr(restored, name))
+
+    @_locked
+    def _rollout_access(self, operation, *, _token=None, _commit_fence=None):
+        """Private rollout adapter; all state remains inside this registry owner."""
+        from .lifecycle_repository import _canonical
+        from .rollout import _issued_writer
+
+        if not _issued_writer(_token):
+            raise ModelLifecycleError("rollout mutation requires an executing controller capability")
+        before = json.loads(_json(self._snapshot()))
+        try:
+            result = operation(self)
+            snapshot = json.loads(_canonical(self._snapshot()))
+            self._validate_snapshot(snapshot)
+            if _commit_fence is not None:
+                _commit_fence(self)
+                if self._repository is not None:
+                    self._commit_fences.append(_commit_fence)
+            return result
+        except BaseException:
+            self._load_snapshot(before)
+            raise
 
     @_locked
     def decision(self, decision_digest: str) -> ModelMigrationDecision:

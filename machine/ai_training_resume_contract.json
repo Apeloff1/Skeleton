@@ -18,15 +18,47 @@
   },
   "binding": {
     "schema_version": "skeleton.reference_training_binding.v1",
-    "immutable_fields": ["manifest_digest", "dataset_digest", "split_name", "split_digest", "corpus_digest", "document_sequence_digest", "document_count", "token_count", "corpus_bytes", "model_config"],
-    "model_config_fields": ["kind", "model_id", "order", "estimator"],
+    "immutable_fields": [
+      "manifest_digest",
+      "dataset_digest",
+      "split_name",
+      "split_digest",
+      "corpus_digest",
+      "document_sequence_digest",
+      "document_count",
+      "token_count",
+      "corpus_bytes",
+      "model_config"
+    ],
+    "model_config_fields": [
+      "kind",
+      "model_id",
+      "order",
+      "estimator"
+    ],
     "document_sequence_digest": "sha256 of canonical JSON document sequence; preserves document boundaries beyond the registered newline corpus digest"
   },
   "resume_payload": {
     "schema_version": "skeleton.reference_training_resume.v1",
-    "fields": ["schema_version", "binding_digest", "cursor", "usage", "model", "finished"],
-    "cursor_fields": ["document_index", "step", "corpus_bytes"],
-    "usage_fields": ["steps", "documents", "corpus_bytes", "batches"],
+    "fields": [
+      "schema_version",
+      "binding_digest",
+      "cursor",
+      "usage",
+      "model",
+      "finished"
+    ],
+    "cursor_fields": [
+      "document_index",
+      "step",
+      "corpus_bytes"
+    ],
+    "usage_fields": [
+      "steps",
+      "documents",
+      "corpus_bytes",
+      "batches"
+    ],
     "model": "complete ReferenceNGramModel.to_dict() counts; null only at the initial cursor-zero checkpoint",
     "identity": "payload_digest is included in TrainingCheckpoint identity and verified on every payload read",
     "step_semantics": "cumulative estimator token observations using the model tokenizer, including each document EOS; document completion is the replay boundary",
@@ -48,7 +80,27 @@
     "reload completed artifact idempotently without model training or state mutation",
     "fence checkpoint, failure, telemetry and completion against the current lease inside the SQLite write transaction"
   ],
-  "failures": ["payload or binding corruption fails closed", "immutable retry conflict fails before model work", "stale workers cannot terminalize or overwrite replacement work", "budget exhaustion retains the last valid durable checkpoint", "legacy digest-only checkpoints cannot masquerade as resumable model state"],
-  "tests": ["skeleton/testing/test_p3_training_resume.py", "skeleton/testing/test_p3_training_control.py", "skeleton/testing/test_p3_local_training_evaluation.py"],
-  "scope_limitations": ["reference count estimator only", "single local worker only", "no neural optimizer or collective execution", "no automatic production candidate promotion", "no blanket AI masterplan closure"]
+  "failures": [
+    "payload or binding corruption fails closed",
+    "immutable retry conflict fails before model work",
+    "stale workers cannot terminalize or overwrite replacement work",
+    "budget exhaustion retains the last valid durable checkpoint",
+    "legacy digest-only checkpoints cannot masquerade as resumable model state"
+  ],
+  "tests": [
+    "skeleton/testing/test_p3_training_resume.py",
+    "skeleton/testing/test_p3_training_control.py",
+    "skeleton/testing/test_p3_local_training_evaluation.py",
+    "skeleton/testing/test_training_restore_scope.py"
+  ],
+  "scope_limitations": [
+    "reference count estimator only",
+    "single local worker only",
+    "no neural optimizer or collective execution",
+    "no automatic production candidate promotion",
+    "no blanket AI masterplan closure"
+  ],
+  "failure_rules": [
+    "Semantic restore and archive validation enforce the same single-worker world_size=1 / parallelism=single admission as training, even when all descriptor hashes are recomputed"
+  ]
 }

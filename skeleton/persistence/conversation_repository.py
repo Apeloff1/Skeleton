@@ -8,14 +8,16 @@ branch lineage, and transcript reconstruction.
 
 from __future__ import annotations
 
-from dataclasses import replace
-from datetime import datetime, timezone
+import base64
+import binascii
 import json
-from pathlib import Path
 import sqlite3
 import threading
-from typing import Iterable
-from uuid import uuid4
+from collections.abc import Iterable
+from dataclasses import replace
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import UUID, uuid4
 
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
@@ -46,11 +48,53 @@ class ConversationRepositoryCorruption(ConversationRepositoryError):
     """Persisted conversation state violates the canonical contract."""
 
 
+def conversation_search_text(value: str) -> str:
+    """Normalize a bounded literal title query; never interpret query syntax."""
+    if not isinstance(value, str) or len(value) > 200 or "\x00" in value:
+        raise ValueError("conversation search must contain at most 200 characters")
+    return value.strip()
+
+
+def conversation_data_class_rank(value: str) -> int:
+    return ("public", "internal", "confidential", "restricted").index(value)
+
+
+def encode_thread_cursor(updated_at: datetime, thread_id: str) -> str:
+    instant = _utc(updated_at)
+    if str(UUID(thread_id)) != thread_id:
+        raise ValueError("conversation cursor thread identity is invalid")
+    raw = json.dumps(
+        {"version": 1, "updated_at": instant.isoformat(), "thread_id": thread_id},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def decode_thread_cursor(value: str) -> tuple[datetime, str]:
+    if not isinstance(value, str) or not 1 <= len(value) <= 1024:
+        raise ValueError("conversation cursor is invalid")
+    try:
+        raw = base64.b64decode(value + "=" * (-len(value) % 4), altchars=b"-_", validate=True)
+        payload = json.loads(raw)
+        if set(payload) != {"version", "updated_at", "thread_id"} or type(payload["version"]) is not int:
+            raise ValueError("conversation cursor fields are invalid")
+        if payload["version"] != 1:
+            raise ValueError("conversation cursor version is invalid")
+        instant = _utc(datetime.fromisoformat(payload["updated_at"]))
+        thread_id = payload["thread_id"]
+        if encode_thread_cursor(instant, thread_id) != value:
+            raise ValueError("conversation cursor is not canonical")
+        return instant, thread_id
+    except (ValueError, TypeError, KeyError, AttributeError, binascii.Error, UnicodeDecodeError) as exc:
+        raise ValueError("conversation cursor is invalid") from exc
+
+
 def _utc(value: datetime | None = None) -> datetime:
-    instant = datetime.now(timezone.utc) if value is None else value
+    instant = datetime.now(UTC) if value is None else value
     if not isinstance(instant, datetime) or instant.tzinfo is None or instant.utcoffset() is None:
         raise ConversationRepositoryError("timestamps must be timezone-aware")
-    return instant.astimezone(timezone.utc)
+    return instant.astimezone(UTC)
 
 
 def _json_refs(values: Iterable[str]) -> str:
@@ -109,7 +153,7 @@ def _parse_time(raw: object, field: str) -> datetime:
         raise ConversationRepositoryCorruption(f"{field} is invalid") from exc
     if value.tzinfo is None or value.utcoffset() is None:
         raise ConversationRepositoryCorruption(f"{field} must be timezone-aware")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 class SQLiteConversationRepository:
@@ -129,8 +173,7 @@ class SQLiteConversationRepository:
         self._connection.row_factory = sqlite3.Row
         self._lock = threading.RLock()
         with self._lock:
-            self._connection.executescript(
-                """
+            self._connection.executescript("""
                 PRAGMA foreign_keys = ON;
 
                 CREATE TABLE IF NOT EXISTS conversation_thread (
@@ -191,33 +234,22 @@ class SQLiteConversationRepository:
 
                 CREATE INDEX IF NOT EXISTS idx_conversation_message_thread
                 ON conversation_message(namespace, thread_id, sequence);
-                """
-            )
+                """)
             columns = {
                 row["name"]
-                for row in self._connection.execute(
-                    "PRAGMA table_info(conversation_message)"
-                ).fetchall()
+                for row in self._connection.execute("PRAGMA table_info(conversation_message)").fetchall()
             }
             migrations = {
                 "context_id": "context_id TEXT",
                 "context_digest": "context_digest TEXT",
-                "context_source_snapshot_json": (
-                    "context_source_snapshot_json TEXT NOT NULL DEFAULT '[]'"
-                ),
+                "context_source_snapshot_json": ("context_source_snapshot_json TEXT NOT NULL DEFAULT '[]'"),
                 "context_compiler_version": "context_compiler_version TEXT",
-                "provider_receipt_refs_json": (
-                    "provider_receipt_refs_json TEXT NOT NULL DEFAULT '[]'"
-                ),
-                "memory_refs_json": (
-                    "memory_refs_json TEXT NOT NULL DEFAULT '[]'"
-                ),
+                "provider_receipt_refs_json": ("provider_receipt_refs_json TEXT NOT NULL DEFAULT '[]'"),
+                "memory_refs_json": ("memory_refs_json TEXT NOT NULL DEFAULT '[]'"),
             }
             for column, declaration in migrations.items():
                 if column not in columns:
-                    self._connection.execute(
-                        f"ALTER TABLE conversation_message ADD COLUMN {declaration}"
-                    )
+                    self._connection.execute(f"ALTER TABLE conversation_message ADD COLUMN {declaration}")
 
     @staticmethod
     def _thread_from_row(row: sqlite3.Row) -> ConversationThread:
@@ -381,23 +413,85 @@ class SQLiteConversationRepository:
         owner_id: str,
         include_archived: bool = False,
         limit: int = 50,
+        search: str = "",
+        cursor: str | None = None,
     ) -> tuple[ConversationThread, ...]:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
             raise ValueError("limit must be between 1 and 200")
         states = ("active", "archived") if include_archived else ("active",)
         placeholders = ",".join("?" for _ in states)
+        query = conversation_search_text(search)
+        conditions = ["namespace = ?", "tenant_id = ?", "owner_id = ?", f"state IN ({placeholders})"]
+        parameters: list[object] = [self.namespace, tenant_id, owner_id, *states]
+        if query:
+            conditions.append("instr(lower(title), lower(?)) > 0")
+            parameters.append(query)
+        if cursor is not None:
+            instant, thread_id = decode_thread_cursor(cursor)
+            conditions.append("(updated_at < ? OR (updated_at = ? AND thread_id > ?))")
+            parameters.extend([instant.isoformat(), instant.isoformat(), thread_id])
+        parameters.append(limit)
         with self._lock:
             rows = self._connection.execute(
                 f"""
                 SELECT * FROM conversation_thread
-                WHERE namespace = ? AND tenant_id = ? AND owner_id = ?
-                  AND state IN ({placeholders})
+                WHERE {' AND '.join(conditions)}
                 ORDER BY updated_at DESC, thread_id ASC
                 LIMIT ?
                 """,
-                (self.namespace, tenant_id, owner_id, *states, limit),
+                parameters,
             ).fetchall()
         return tuple(self._thread_from_row(row) for row in rows)
+
+    def rename_thread(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        expected_version: int,
+        title: str,
+    ) -> ConversationThread:
+        if type(expected_version) is not int or expected_version < 1:
+            raise ValueError("expected_version must be a positive integer")
+        if not isinstance(title, str):
+            raise TypeError("conversation title must be text")
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._thread_row(thread_id)
+                if row is None:
+                    raise ConversationNotFound(thread_id)
+                thread = self._thread_from_row(row)
+                self._authorize(thread, tenant_id, owner_id)
+                if thread.version != expected_version:
+                    raise ConversationConflict("thread version conflict")
+                if thread.state not in {ConversationThreadState.ACTIVE, ConversationThreadState.ARCHIVED}:
+                    raise ConversationConflict("thread metadata is not writable")
+                candidate = replace(
+                    thread, title=title.strip(), updated_at=_utc(), version=thread.version + 1
+                )
+                updated = self._connection.execute(
+                    """UPDATE conversation_thread SET title=?,updated_at=?,version=?
+                    WHERE namespace=? AND thread_id=? AND tenant_id=? AND owner_id=? AND version=?""",
+                    (
+                        candidate.title,
+                        candidate.updated_at.isoformat(),
+                        candidate.version,
+                        self.namespace,
+                        thread_id,
+                        tenant_id,
+                        owner_id,
+                        expected_version,
+                    ),
+                )
+                if updated.rowcount != 1:
+                    raise ConversationConflict("thread version changed during rename")
+                self._connection.execute("COMMIT")
+                return candidate
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
 
     def _same_message_identity(
         self,
@@ -473,11 +567,15 @@ class SQLiteConversationRepository:
 
                 if thread.version != expected_thread_version:
                     raise ConversationConflict("thread version conflict")
+                if conversation_data_class_rank(message.data_class) < conversation_data_class_rank(
+                    thread.data_class
+                ):
+                    raise ConversationConflict(
+                        "message classification cannot lower the thread classification"
+                    )
                 expected_sequence = thread.message_sequence + 1
                 if message.sequence != expected_sequence:
-                    raise ConversationConflict(
-                        f"message sequence must be exact-next ({expected_sequence})"
-                    )
+                    raise ConversationConflict(f"message sequence must be exact-next ({expected_sequence})")
 
                 if message.parent_message_id is not None:
                     parent_row = self._message_row(message.parent_message_id)
@@ -488,6 +586,14 @@ class SQLiteConversationRepository:
                         raise ConversationConflict("parent message belongs to another thread")
                     if parent.sequence >= message.sequence:
                         raise ConversationConflict("parent message must precede child")
+                    if (
+                        message.author_type is ConversationAuthorType.ASSISTANT
+                        and conversation_data_class_rank(message.data_class)
+                        < conversation_data_class_rank(parent.data_class)
+                    ):
+                        raise ConversationConflict(
+                            "assistant classification cannot lower its causal user classification"
+                        )
 
                 if message.supersedes_message_id is not None:
                     prior_row = self._message_row(message.supersedes_message_id)
@@ -549,9 +655,7 @@ class SQLiteConversationRepository:
                     updated_at=now,
                     version=thread.version + 1,
                     message_sequence=message.sequence,
-                    active_branch_id=(
-                        message.branch_id if activate_branch else thread.active_branch_id
-                    ),
+                    active_branch_id=(message.branch_id if activate_branch else thread.active_branch_id),
                 )
                 updated = self._connection.execute(
                     """
@@ -591,16 +695,17 @@ class SQLiteConversationRepository:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 500:
             raise ValueError("limit must be between 1 and 500")
         thread = self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
-        del thread
+        if thread.state not in {ConversationThreadState.ACTIVE, ConversationThreadState.ARCHIVED}:
+            raise ConversationConflict("conversation content is unavailable")
         with self._lock:
             rows = self._connection.execute(
                 """
                 SELECT * FROM conversation_message
-                WHERE namespace = ? AND thread_id = ? AND sequence > ?
+                WHERE namespace = ? AND thread_id = ? AND sequence > ? AND sequence <= ?
                 ORDER BY sequence ASC
                 LIMIT ?
                 """,
-                (self.namespace, thread_id, after_sequence, limit),
+                (self.namespace, thread_id, after_sequence, thread.message_sequence, limit),
             ).fetchall()
         return tuple(self._message_from_row(row) for row in rows)
 
@@ -611,40 +716,129 @@ class SQLiteConversationRepository:
         tenant_id: str,
         owner_id: str,
     ) -> tuple[ConversationMessage, ...]:
-        thread = self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
-        messages = self.list_messages(
-            thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-            after_sequence=0,
-            limit=500,
-        )
-        by_id = {message.message_id: message for message in messages}
-        branch_messages = [
-            message for message in messages if message.branch_id == thread.active_branch_id
-        ]
-        if branch_messages:
-            tip = branch_messages[-1]
-        elif messages:
-            tip = messages[-1]
-        else:
-            return ()
+        with self._lock:
+            self._connection.execute("BEGIN")
+            try:
+                thread = self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+                messages, cursor, _tip = self._active_lineage_page(thread, limit=10_000)
+                if cursor is not None:
+                    raise ConversationRepositoryCorruption(
+                        "conversation active lineage exceeds the message bound"
+                    )
+                self._connection.execute("COMMIT")
+                return messages
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
 
-        lineage: list[ConversationMessage] = []
+    def _active_lineage_page(
+        self, thread: ConversationThread, *, limit: int, before_message_id: str | None = None
+    ) -> tuple[tuple[ConversationMessage, ...], str | None, ConversationMessage | None]:
+        if thread.state not in {ConversationThreadState.ACTIVE, ConversationThreadState.ARCHIVED}:
+            raise ConversationConflict("conversation content is unavailable")
+        if thread.message_sequence == 0:
+            if before_message_id is not None:
+                raise ConversationNotFound(before_message_id)
+            return (), None, None
+        row = self._connection.execute(
+            """SELECT * FROM conversation_message
+            WHERE namespace=? AND thread_id=? AND branch_id=? AND sequence<=?
+            ORDER BY sequence DESC LIMIT 1""",
+            (self.namespace, thread.thread_id, thread.active_branch_id, thread.message_sequence),
+        ).fetchone()
+        if row is None:
+            raise ConversationRepositoryCorruption("conversation active branch tip is missing")
+        tip = self._message_from_row(row)
+        current = tip
         seen: set[str] = set()
-        current: ConversationMessage | None = tip
-        while current is not None:
-            if current.message_id in seen:
-                raise ConversationRepositoryCorruption("conversation lineage contains a cycle")
+        page: list[ConversationMessage] = []
+        started = before_message_id is None
+        previous_sequence = thread.message_sequence + 1
+        content_bytes = 0
+        for _depth in range(10_000):
+            if (
+                current.thread_id != thread.thread_id
+                or current.message_id in seen
+                or not 0 < current.sequence < previous_sequence
+            ):
+                raise ConversationRepositoryCorruption("conversation parent lineage is invalid")
             seen.add(current.message_id)
-            lineage.append(current)
-            current = (
-                by_id.get(current.parent_message_id)
-                if current.parent_message_id is not None
-                else None
-            )
-        lineage.reverse()
-        return tuple(lineage)
+            previous_sequence = current.sequence
+            started = started or current.message_id == before_message_id
+            if started:
+                content_bytes += len(
+                    json.dumps(current.as_dict(), ensure_ascii=False, allow_nan=False).encode("utf-8")
+                )
+                if content_bytes > 8 * 1024 * 1024:
+                    raise ConversationRepositoryCorruption(
+                        "conversation projection exceeds its content bound"
+                    )
+                page.append(current)
+            if current.parent_message_id is None:
+                if not started:
+                    raise ConversationNotFound(str(before_message_id))
+                return tuple(reversed(page)), None, tip
+            parent_row = self._message_row(current.parent_message_id)
+            if parent_row is None:
+                raise ConversationRepositoryCorruption("conversation parent lineage is incomplete")
+            parent = self._message_from_row(parent_row)
+            if parent.thread_id != thread.thread_id or parent.sequence >= current.sequence:
+                raise ConversationRepositoryCorruption("conversation parent lineage is invalid")
+            if started and len(page) == limit:
+                return tuple(reversed(page)), parent.message_id, tip
+            current = parent
+        raise ConversationRepositoryCorruption("conversation lineage exceeds the recovery bound")
+
+    def conversation_snapshot(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        limit: int = 100,
+        before_message_id: str | None = None,
+        expected_thread_version: int | None = None,
+    ) -> dict[str, object]:
+        if type(limit) is not int or not 1 <= limit <= 500:
+            raise ValueError("snapshot limit must be between 1 and 500")
+        if expected_thread_version is not None and (
+            type(expected_thread_version) is not int or expected_thread_version < 1
+        ):
+            raise ValueError("expected_thread_version must be a positive integer")
+        with self._lock:
+            self._connection.execute("BEGIN")
+            try:
+                thread = self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+                if expected_thread_version is not None and thread.version != expected_thread_version:
+                    raise ConversationConflict(
+                        "thread version conflict; reconstruct the current conversation"
+                    )
+                messages, cursor, tip = self._active_lineage_page(
+                    thread, limit=limit, before_message_id=before_message_id
+                )
+                pending = None
+                if tip is not None and tip.author_type is ConversationAuthorType.USER:
+                    pending = {
+                        "message_id": tip.message_id,
+                        "idempotency_key": tip.idempotency_key,
+                        "sequence": tip.sequence,
+                        "attachment_refs": list(tip.attachment_refs),
+                        "can_retry": thread.writable,
+                    }
+                result = {
+                    "thread": thread.as_dict(),
+                    "messages": [message.as_dict() for message in messages],
+                    "last_sequence": 0 if tip is None else tip.sequence,
+                    "next_before_message_id": cursor,
+                    "pending_turn": pending,
+                    "projection": "active",
+                    "snapshot_version": thread.version,
+                }
+                self._connection.execute("COMMIT")
+                return result
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
 
     def set_state(
         self,
@@ -655,6 +849,8 @@ class SQLiteConversationRepository:
         expected_version: int,
         state: ConversationThreadState,
     ) -> ConversationThread:
+        if type(expected_version) is not int or expected_version < 1:
+            raise ValueError("expected_version must be a positive integer")
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
@@ -666,8 +862,20 @@ class SQLiteConversationRepository:
                 if thread.version != expected_version:
                     raise ConversationConflict("thread version conflict")
                 next_state = ConversationThreadState(state)
-                if thread.state is ConversationThreadState.DELETED:
-                    raise ConversationConflict("deleted thread is terminal")
+                allowed = {
+                    ConversationThreadState.ACTIVE: {
+                        ConversationThreadState.ARCHIVED,
+                        ConversationThreadState.DELETING,
+                    },
+                    ConversationThreadState.ARCHIVED: {
+                        ConversationThreadState.ACTIVE,
+                        ConversationThreadState.DELETING,
+                    },
+                    ConversationThreadState.DELETING: {ConversationThreadState.DELETED},
+                    ConversationThreadState.DELETED: set(),
+                }
+                if next_state not in allowed[thread.state]:
+                    raise ConversationConflict("thread state transition is not allowed")
                 now = _utc()
                 updated_thread = replace(
                     thread,

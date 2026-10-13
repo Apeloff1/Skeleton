@@ -27,7 +27,7 @@ from skeleton.ai.runtime.inference import (
     load_local_model_artifact,
 )
 from skeleton.ai.runtime.training.cli import build_governed_artifact
-from skeleton.ai.runtime.training.control import TrainingRepository
+from skeleton.ai.runtime.training.control import TrainingRepository, _canonical, _digest
 from skeleton.ai.runtime.training.data import DatasetRegistry
 from skeleton.api.engine_authority import (
     DelegatedAuthority,
@@ -83,7 +83,7 @@ def _offline(monkeypatch):
     monkeypatch.setattr(socket, "socket", socket_without_internet)
 
 
-@pytest.fixture(params=("reference", "neural", "data_parallel"))
+@pytest.fixture(params=("reference", "neural", "data_parallel", "elastic", "preference"))
 def governed_artifact(request, tmp_path, monkeypatch):
     algorithm = request.param
     if algorithm != "reference":
@@ -110,6 +110,36 @@ def governed_artifact(request, tmp_path, monkeypatch):
         "max_updates": 16,
         "max_training_bytes": 4096,
     }
+    if algorithm == "elastic":
+        arguments["physical_workers"] = 1
+    if algorithm == "preference":
+        build_governed_artifact(
+            **{
+                **arguments,
+                "algorithm": "neural",
+                "run_id": "engine-preference-parent",
+                "dataset_id": "engine-parent-data",
+                "output_path": tmp_path / "parent.json",
+            }
+        )
+        corpus = _canonical(
+            {
+                "schema_version": "skeleton.preference_pair.v1",
+                "prompt": "a",
+                "chosen": "aaaa",
+                "rejected": "bbbb",
+            }
+        )
+        source = tmp_path / "owned-preference.json"
+        source.write_text(corpus, encoding="utf-8")
+        arguments.update(
+            {
+                "corpus_paths": (source,),
+                "parent_run_id": "engine-preference-parent",
+                "preference_beta": 0.5,
+                "evaluation_suite_digest": _digest({"planned_suite": "engine-preference-quality"}),
+            }
+        )
     receipt = build_governed_artifact(**arguments)
     artifact = load_local_model_artifact(arguments["output_path"])
     assert artifact.model.model_digest == receipt["model_digest"]
@@ -136,9 +166,13 @@ def governed_artifact(request, tmp_path, monkeypatch):
     # Artifact publication can be retried after a process restart without SGD replay.
     arguments["output_path"].unlink()
     update = (
-        "skeleton.ai.runtime.inference.neural.NumpyRecurrentLM.train_document"
-        if algorithm != "reference"
-        else "skeleton.ai.runtime.training.trainer.ReferenceNGramModel.train"
+        "skeleton.ai.runtime.training.preference_trainer.preference_objective_and_gradients"
+        if algorithm == "preference"
+        else (
+            "skeleton.ai.runtime.inference.neural.NumpyRecurrentLM.train_document"
+            if algorithm != "reference"
+            else "skeleton.ai.runtime.training.trainer.ReferenceNGramModel.train"
+        )
     )
     with patch(update, side_effect=AssertionError("committed training was replayed")):
         assert build_governed_artifact(**arguments) == receipt

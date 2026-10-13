@@ -1,0 +1,56 @@
+{
+  "schema_version": "skeleton.ai.chat_attachments.v1",
+  "status": "implementation_candidate",
+  "owner": "backend/core/chat_attachments.py",
+  "http_owner": "backend/routes/chat_attachments.py",
+  "client_owner": "frontend/features/Jeeves/chatFiles.ts",
+  "conversation_owner": "backend/core/conversations.py",
+  "context_owner": "skeleton/context/compiler.py",
+  "media_decoder_owner": "skeleton/ai/runtime/multimodal/intake.py",
+  "media_validation_owner": "skeleton/ai/runtime/multimodal/media_validation.py",
+  "provider_owner": "skeleton/provider_runtime.py",
+  "state": {
+    "database": "existing core_db",
+    "collection": "chat_attachments",
+    "authority": "authenticated tenant/principal and current canonical conversation",
+    "retention": "24 hours with Mongo TTL removal; explicit delete and conversation retirement scrub original/extracted bytes before canonical lifecycle acknowledgement. Historical digest references remain in canonical messages and governance records; removed/expired refs cannot enter new context.",
+    "device_cache": "references and filenames only; attachment bytes never enter workspace persistence"
+  },
+  "interfaces": [
+    "POST /api/ai/attachments",
+    "GET /api/ai/attachments/capabilities",
+    "GET /api/ai/attachments/{attachment_id}",
+    "DELETE /api/ai/attachments/{attachment_id}",
+    "resolve_attachment_context",
+    "retire_conversation_attachments",
+    "uploadChatAttachment"
+  ],
+  "admission": {
+    "rights": "explicit authenticated acknowledgement of permission to use this file in this conversation; no training consent or cross-conversation reuse",
+    "identity": "server-issued UUID ref binds tenant, owner, conversation, effective classification (at least confidential and preserves restricted conversations), exact original sha256, filename, MIME, extractor identity, extracted content sha256 and immutable expiry",
+    "retry": "existing references resolve only the same stored immutable content and current rights; expiry/deletion never reconstructs content. A pending upload can recover after its fenced 60-second worker lease using the same upload ID and exact saved source, without repeating decoding.",
+    "trust": "canonical ContextSegment artifact with untrusted_evidence; uploaded content cannot become system instructions",
+    "limits": {
+      "max_attachment_bytes": 5242880,
+      "max_refs_per_turn": 4,
+      "max_extracted_utf8_bytes": 49152,
+      "max_context_attachment_utf8_bytes": 131072,
+      "max_pdf_pages": 64,
+      "max_active_attachments_per_conversation": 32,
+      "max_owner_attachment_bytes": 52428800,
+      "max_owner_attachment_count": 128,
+      "retention_seconds": 86400
+    },
+    "decoder_execution": "At most two isolated decoders per backend process; 12-second response deadline and bounded terminate/kill cleanup. Complex PDF/media decoding requires OS resource limits (8 CPU seconds and 512 MiB address space). Decoder environment omits service credentials and audit guards reject network connections and external process execution."
+  },
+  "deletion_scope": "Deletion and expiry retire original attachment bytes and block new context admission. Already admitted engine context/execution checkpoints and derived replies retain their existing owner lifecycle; this interface does not claim historical erasure.",
+  "actual_capabilities": {
+    "text": "strict UTF-8 text/plain, markdown, CSV and JSON; no executable evaluation",
+    "pdf": "bounded real text extraction only when pypdf is available, rejects encrypted/image-only documents and excessive pages/content; never fabricates OCR",
+    "images": "verified PNG/JPEG/WebP actual pixels and geometry through existing decoder; context receives measured metadata, no vision/OCR claim",
+    "audio": "verified integer PCM WAV actual samples and measured metadata through existing decoder; no ASR/transcription claim"
+  },
+  "failure_contract": "foreign/missing conversation or attachment 404; invalid/unsupported files 422/415; expired/deleted refs 410; size/count bounds 413; unavailable extractor/storage/governance 503; failed upload never publishes an active ref",
+  "production_model_promotion_authorized": false,
+  "test_execution": "deferred by explicit user steering; implementation and static source review only"
+}

@@ -171,6 +171,45 @@ def _runtime_identity(model) -> str:
             "type": type(value).__module__ + "." + type(value).__qualname__,
         }
 
+    def binding_value(value, dependencies, path, depth=0):
+        if depth > 8:
+            raise MeasuredVerifierError("backend captured configuration exceeds depth bound")
+        if isinstance(value, float) and not math.isfinite(value):
+            return {"type": "float", "value": repr(value)}
+        if isinstance(value, (type, types.FunctionType)):
+            dependencies.append((path, value))
+            return descriptor(value)
+        if callable(value):
+            if not isinstance(
+                value,
+                (
+                    types.BuiltinFunctionType,
+                    types.BuiltinMethodType,
+                    types.MethodDescriptorType,
+                    types.WrapperDescriptorType,
+                ),
+            ):
+                raise MeasuredVerifierError("backend captured callable requires identified Python code")
+            return descriptor(value)
+        if isinstance(value, (tuple, list, set, frozenset)):
+            if len(value) > 256:
+                raise MeasuredVerifierError("backend capture exceeds item bound")
+            items = [
+                binding_value(item, dependencies, path + ":" + str(index), depth + 1)
+                for index, item in enumerate(value)
+            ]
+            if isinstance(value, (set, frozenset)):
+                items.sort(key=canonical)
+            return {"type": type(value).__name__, "items": items}
+        if isinstance(value, dict):
+            if len(value) > 256 or any(not isinstance(key, str) for key in value):
+                raise MeasuredVerifierError("backend captured mapping must have bounded text keys")
+            return {
+                key: binding_value(item, dependencies, path + ":" + key, depth + 1)
+                for key, item in sorted(value.items())
+            }
+        return value
+
     def class_helpers(cls, name, depth):
         implementations[name] = descriptor(cls)
         if id(cls) in seen_classes:
@@ -178,6 +217,14 @@ def _runtime_identity(model) -> str:
         seen_classes.add(id(cls))
         for base in cls.__mro__:
             for symbol, member in sorted(vars(base).items()):
+                if not symbol.startswith("__") and (
+                    member is None or isinstance(member, (str, int, float, bool, tuple, list, dict))
+                ):
+                    configuration(
+                        member,
+                        name + ":configuration:" + base.__module__ + "." + base.__qualname__ + "." + symbol,
+                        depth,
+                    )
                 functions = (
                     (("get", member.fget), ("set", member.fset), ("delete", member.fdel))
                     if isinstance(member, property)
@@ -189,7 +236,8 @@ def _runtime_identity(model) -> str:
                     if isinstance(function, types.FunctionType):
                         identify(
                             function,
-                            "dependency-class:"
+                            name
+                            + ":dependency-class:"
                             + base.__module__
                             + "."
                             + base.__qualname__
@@ -199,6 +247,15 @@ def _runtime_identity(model) -> str:
                             + accessor,
                             depth + 1,
                         )
+
+    def configuration(value, name, depth):
+        dependencies = []
+        implementations[name] = binding_value(value, dependencies, name)
+        for path, dependency in dependencies:
+            if isinstance(dependency, type):
+                class_helpers(dependency, "configuration-class:" + path, depth)
+            else:
+                identify(dependency, "configuration-function:" + path, depth + 1)
 
     def module_binding(module, symbols, depth):
         implementations["module:" + module.__name__] = getattr(module, "__version__", None)
@@ -230,7 +287,7 @@ def _runtime_identity(model) -> str:
                     "type": type(value).__module__ + "." + type(value).__qualname__,
                 }
             elif isinstance(value, (str, int, float, bool, tuple, list, dict)) or value is None:
-                implementations[name] = value
+                configuration(value, name, depth)
 
     def identify(function, name, depth=0):
         nonlocal code_bytes
@@ -245,19 +302,25 @@ def _runtime_identity(model) -> str:
             code_bytes += len(encoded_code)
             if code_bytes > 256 * 1024:
                 raise MeasuredVerifierError("backend implementation code exceeds byte bound")
+        dependencies = []
         captured = [
-            descriptor(cell.cell_contents) if isinstance(cell.cell_contents, type) else cell.cell_contents
-            for cell in (function.__closure__ or ())
+            binding_value(cell.cell_contents, dependencies, "capture:" + str(index))
+            for index, cell in enumerate(function.__closure__ or ())
         ]
         implementations[name] = {
             "code": hashlib.sha256(encoded_code).hexdigest(),
-            "defaults": function.__defaults__,
-            "kwdefaults": function.__kwdefaults__,
+            "defaults": binding_value(function.__defaults__, dependencies, "defaults"),
+            "kwdefaults": binding_value(function.__kwdefaults__, dependencies, "kwdefaults"),
             "captures": captured,
         }
         if id(function) in seen:
             return
         seen.add(id(function))
+        for path, value in dependencies:
+            if isinstance(value, type):
+                class_helpers(value, "captured-class:" + name + ":" + path, depth)
+            else:
+                identify(value, "captured-function:" + name + ":" + path, depth + 1)
         for symbol in code.co_names:
             value = function.__globals__.get(symbol)
             if isinstance(value, types.FunctionType):
@@ -267,6 +330,8 @@ def _runtime_identity(model) -> str:
                     "module": value.__name__
                 }
                 module_binding(value, code.co_names, depth)
+            elif isinstance(value, type):
+                class_helpers(value, "global-class:" + function.__module__ + "." + symbol, depth)
             elif callable(value):
                 implementations["global-binding:" + function.__module__ + "." + symbol] = descriptor(value)
             elif isinstance(value, re.Pattern):
@@ -275,7 +340,7 @@ def _runtime_identity(model) -> str:
                     "flags": value.flags,
                 }
             elif value is not None and isinstance(value, (str, int, float, bool, tuple, list, dict)):
-                implementations["global:" + function.__module__ + "." + symbol] = value
+                configuration(value, "global:" + function.__module__ + "." + symbol, depth)
 
     for cls in type(model).__mro__:
         if cls is object:

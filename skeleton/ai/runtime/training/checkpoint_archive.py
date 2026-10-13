@@ -36,6 +36,8 @@ _SCHEMA_PAIRS = {
     "skeleton.reference_training_resume.v1": "skeleton.reference_training_binding.v1",
     "skeleton.neural_training_resume.v1": "skeleton.neural_training_binding.v1",
     "skeleton.local_parallel_training_resume.v1": "skeleton.local_parallel_training_binding.v1",
+    "skeleton.local_elastic_training_resume.v1": "skeleton.local_elastic_training_binding.v1",
+    "skeleton.preference_training_resume.v1": "skeleton.preference_training_binding.v1",
 }
 
 
@@ -345,6 +347,7 @@ class TrainingCheckpointArchive:
         checkpoint: TrainingCheckpoint,
         payload: dict[str, Any],
         corpus: Sequence[str],
+        runs: TrainingRepository | None = None,
     ) -> None:
         try:
             documents = tuple(corpus)
@@ -371,6 +374,18 @@ class TrainingCheckpointArchive:
                 from .distributed_trainer import LocalDataParallelTrainer
 
                 LocalDataParallelTrainer(datasets, view)._restore(manifest, binding, checkpoint)
+            elif payload["schema_version"] == "skeleton.local_elastic_training_resume.v1":
+                from .elastic_trainer import ElasticLocalTrainer
+
+                ElasticLocalTrainer(datasets, view)._restore(manifest, binding, checkpoint)
+            elif payload["schema_version"] == "skeleton.preference_training_resume.v1":
+                from .preference_trainer import PreferenceLocalTrainer
+
+                if runs is None:
+                    raise ValueError("preference archive validation requires the current parent repository")
+                PreferenceLocalTrainer(datasets, runs, parent_run_id=binding["parent"]["run_id"])._restore(
+                    manifest, binding, checkpoint, documents, payload=payload
+                )
             else:
                 raise ValueError("unsupported archive payload schema")
         except (ValueError, TypeError, KeyError, TrainingStateError) as exc:
@@ -542,7 +557,7 @@ class TrainingCheckpointArchive:
                 }
             ).encode()
             self._decode(data)
-            self._validate_model(datasets, manifest, binding, checkpoint, payload, corpus)
+            self._validate_model(datasets, manifest, binding, checkpoint, payload, corpus, self.runs)
             addressed = self.store.put(
                 tenant_id=self.tenant_id,
                 logical_id=f"training-checkpoint:{checkpoint.digest}",
@@ -585,7 +600,7 @@ class TrainingCheckpointArchive:
         """Recover exact registration inputs from CAS without writing training state."""
         manifest, binding, checkpoint, payload, operator = self._read(receipt)
         with datasets.training_authority(manifest.dataset_digest, binding["dataset_authority_epoch"]):
-            self._validate_model(datasets, manifest, binding, checkpoint, payload, corpus)
+            self._validate_model(datasets, manifest, binding, checkpoint, payload, corpus, self.runs)
             self._validate_operator(operator, manifest, datasets)
         return CheckpointArchiveContents(manifest, binding, checkpoint, payload, operator)
 
@@ -597,7 +612,7 @@ class TrainingCheckpointArchive:
     ) -> TrainingCheckpoint:
         manifest, binding, checkpoint, payload, operator = self._read(receipt)
         with datasets.training_authority(manifest.dataset_digest, binding["dataset_authority_epoch"]):
-            self._validate_model(datasets, manifest, binding, checkpoint, payload, corpus)
+            self._validate_model(datasets, manifest, binding, checkpoint, payload, corpus, self.runs)
             self._validate_operator(operator, manifest, datasets)
             with self.runs._write():
                 if self.runs.manifest(manifest.run_id).as_dict() != manifest.as_dict():

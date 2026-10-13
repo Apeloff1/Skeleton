@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "e97aca55f91fd5cdb4495339b916503398bc7fec",
+      "source_git_object_sha": "b86e31459b7d61b0e0725b7c911d976725ea5fcc",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -119,7 +119,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "43089eae50fa1dedda736c45cdf9ebdba72b49bb",
+      "source_git_object_sha": "dc8772d1df4b05d7a53d80980c8051aef1b68089",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -222,7 +222,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "a64459d2e839324e2211f623c37dc5fc731e4888",
+      "source_git_object_sha": "b9bf6a0395e1b0886fceb05ea4729e82447c390a",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -352,7 +352,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "da517989de22eb15fd912df734ca24c96ed450b5",
+      "source_git_object_sha": "85b593462de761c761829d9dfaf059bb247e07a4",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -6069,7 +6069,7 @@
         "AIFT-REPO-MACHINE"
       ],
       "source_tree_shas": {
-        "AIFT-INTELLIGENCE": "a64459d2e839324e2211f623c37dc5fc731e4888",
+        "AIFT-INTELLIGENCE": "b9bf6a0395e1b0886fceb05ea4729e82447c390a",
         "AIFT-AUTOMATION": "cb61fec5409f6ebc40553bd0ca082ae352e23a18",
         "AIFT-OBSERVABILITY": "d651dee7fed319154d8d242a2f081e500cb813cc",
         "AIFT-SECURITY": "b20021abdf17e1390dae474248b3662c73367e0f",
@@ -6087,8 +6087,8 @@
         "AIFT-ENGINE-API"
       ],
       "source_object_shas": {
-        "AIFT-PROVIDER-RUNTIME": "e97aca55f91fd5cdb4495339b916503398bc7fec",
-        "AIFT-ENGINE-API": "da517989de22eb15fd912df734ca24c96ed450b5"
+        "AIFT-PROVIDER-RUNTIME": "b86e31459b7d61b0e0725b7c911d976725ea5fcc",
+        "AIFT-ENGINE-API": "85b593462de761c761829d9dfaf059bb247e07a4"
       },
       "promotion_authority": false,
       "policy": "Bind the existing canonical provider owner to explicit optional local artifact activation with mandatory architecture receipt, conservative governance, exact bounded local input admission, actual-usage reconciliation and cooperative cancellation. Preserve the provider facades and legacy byte mirror. Bind the existing engine API source tree to cancellation drain with the same governed mirror. These content identities grant no owner cutover, model promotion, closure or implementation/verification signatures."

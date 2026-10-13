@@ -168,6 +168,8 @@ class NeuralLocalTrainer:
         checkpoint: TrainingCheckpoint,
         documents: Sequence[str] | None = None,
     ) -> tuple[NumpyRecurrentLM, dict[str, int], dict[str, int], float, float | None]:
+        if manifest.world_size != 1 or manifest.parallelism != "single":
+            raise TrainingStateError("neural local trainer supports one worker and single parallelism")
         self._authority(binding)
         payload = self.runs.checkpoint_payload(checkpoint)
         try:

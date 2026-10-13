@@ -41,7 +41,9 @@
   "supported_resume_schemas": [
     "skeleton.reference_training_resume.v1",
     "skeleton.neural_training_resume.v1",
-    "skeleton.local_parallel_training_resume.v1"
+    "skeleton.local_parallel_training_resume.v1",
+    "skeleton.local_elastic_training_resume.v1",
+    "skeleton.preference_training_resume.v1"
   ],
   "compatibility": {
     "target": "already registered run with exact manifest and exact execution binding; no automatic dataset registration or identity substitution",
@@ -50,7 +52,8 @@
     "rollback": "reject an archived checkpoint older than the latest durable target checkpoint",
     "fencing": "clear all worker leases, advance epoch beyond current and archived epochs, set recovering, and pin the imported recovery checkpoint",
     "rights": "dataset quality, training rights and exact dataset authority epoch remain mandatory",
-    "registration_inputs": "verify_backup reads complete validated manifest/binding from committed CAS backup without registering or changing training state"
+    "registration_inputs": "verify_backup reads complete validated manifest/binding from committed CAS backup without registering or changing training state",
+    "preference_parent": "Preference import additionally requires the exact parent run/checkpoint restored and completed in the destination TrainingRepository; the frozen reference is validated against that current live parent authority"
   },
   "retention": {
     "policy": "keep newest requested checkpoint count and all pinned active/recovery references; prune only verified backed-up checkpoints",
@@ -79,7 +82,7 @@
     "skeleton/testing/test_governed_checkpoint_recovery.py"
   ],
   "scope_limitations": [
-    "bounded native ngram, single-worker NumPy neural, and fixed 2-4 local process rank checkpoint formats",
+    "bounded native ngram, NumPy neural, fixed/local elastic ranks and actual single-worker preference checkpoint formats",
     "no new runtime owner or service",
     "no CAS garbage collection",
     "no production promotion",

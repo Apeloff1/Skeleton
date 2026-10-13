@@ -8,7 +8,7 @@ import json
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from uuid import NAMESPACE_URL, UUID, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from skeleton.contracts.ai_execution import (
     AgentTurn,
@@ -85,29 +85,21 @@ class ExecutionVerificationDecision:
                 allow_nan=False,
             ).encode("utf-8")
         except (TypeError, ValueError) as exc:
-            raise CognitiveExecutionError(
-                "verification receipt must be deterministic JSON"
-            ) from exc
+            raise CognitiveExecutionError("verification receipt must be deterministic JSON") from exc
         if len(encoded) > 256 * 1024:
             raise CognitiveExecutionError("verification receipt exceeds size limit")
         refs: list[str] = []
         for raw in self.evidence_refs:
             if not isinstance(raw, str) or not raw.strip():
-                raise CognitiveExecutionError(
-                    "verification evidence refs must be non-empty strings"
-                )
+                raise CognitiveExecutionError("verification evidence refs must be non-empty strings")
             value = raw.strip()
             if value not in refs:
                 refs.append(value)
         if self.passed:
             if normalized.get("policy_satisfied") is not True:
-                raise CognitiveExecutionError(
-                    "passed verification requires policy_satisfied=true"
-                )
+                raise CognitiveExecutionError("passed verification requires policy_satisfied=true")
             if normalized.get("outcome") != "passed":
-                raise CognitiveExecutionError(
-                    "passed verification requires outcome=passed"
-                )
+                raise CognitiveExecutionError("passed verification requires outcome=passed")
             if not refs:
                 policy = normalized.get("policy")
                 structural_assistant_proposal = (
@@ -127,19 +119,13 @@ class ExecutionVerificationDecision:
         if disposition not in {"publish", "qualified", "abstain", "block"}:
             raise CognitiveExecutionError("verification disposition is invalid")
         if self.passed and disposition != "publish":
-            raise CognitiveExecutionError(
-                "passed verification requires publish disposition"
-            )
+            raise CognitiveExecutionError("passed verification requires publish disposition")
         if not self.passed and disposition == "publish":
-            raise CognitiveExecutionError(
-                "publish disposition requires passed verification"
-            )
+            raise CognitiveExecutionError("publish disposition requires passed verification")
         final_output = self.final_output
         if final_output is not None:
             if not isinstance(final_output, str) or not final_output.strip():
-                raise CognitiveExecutionError(
-                    "verification final_output must be non-empty text"
-                )
+                raise CognitiveExecutionError("verification final_output must be non-empty text")
             final_output = final_output.strip()
         object.__setattr__(self, "receipt", normalized)
         object.__setattr__(self, "evidence_refs", tuple(refs))
@@ -161,22 +147,16 @@ class ExecutionFinalizationBindings:
         for field_name in ("memory_refs", "artifact_refs"):
             values = getattr(self, field_name)
             if isinstance(values, (str, bytes)):
-                raise CognitiveExecutionError(
-                    f"{field_name} must be an iterable of references"
-                )
+                raise CognitiveExecutionError(f"{field_name} must be an iterable of references")
             normalized: list[str] = []
             for raw in values:
                 if not isinstance(raw, str) or not raw.strip():
-                    raise CognitiveExecutionError(
-                        f"{field_name} must contain non-empty strings"
-                    )
+                    raise CognitiveExecutionError(f"{field_name} must contain non-empty strings")
                 value = raw.strip()
                 if value not in normalized:
                     normalized.append(value)
                 if len(normalized) > 1024:
-                    raise CognitiveExecutionError(
-                        f"{field_name} exceeds maximum reference count"
-                    )
+                    raise CognitiveExecutionError(f"{field_name} exceeds maximum reference count")
             object.__setattr__(self, field_name, tuple(normalized))
 
 
@@ -280,23 +260,17 @@ def _parse_deadline(
         except ValueError as exc:
             raise CognitiveExecutionError("stop_policy.deadline is invalid") from exc
         if parsed.tzinfo is None or parsed.utcoffset() is None:
-            raise CognitiveExecutionError(
-                "stop_policy.deadline must be timezone-aware"
-            )
+            raise CognitiveExecutionError("stop_policy.deadline must be timezone-aware")
         return parsed.astimezone(UTC)
 
     elapsed = request.resource_budget.get("max_elapsed_seconds")
     if elapsed is None:
         return None
     if isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)):
-        raise CognitiveExecutionError(
-            "resource_budget.max_elapsed_seconds must be numeric"
-        )
+        raise CognitiveExecutionError("resource_budget.max_elapsed_seconds must be numeric")
     seconds = float(elapsed)
     if seconds <= 0 or seconds > 86_400:
-        raise CognitiveExecutionError(
-            "resource_budget.max_elapsed_seconds is outside hard bounds"
-        )
+        raise CognitiveExecutionError("resource_budget.max_elapsed_seconds is outside hard bounds")
     return request.created_at + timedelta(seconds=seconds)
 
 
@@ -325,9 +299,7 @@ def _provider_call_from_dict(payload: Mapping[str, object]) -> ProviderToolCall:
         tool_id=str(payload.get("tool_id") or ""),
         arguments=dict(arguments),
         arguments_digest=(
-            str(payload["arguments_digest"])
-            if payload.get("arguments_digest") is not None
-            else None
+            str(payload["arguments_digest"]) if payload.get("arguments_digest") is not None else None
         ),
     )
 
@@ -353,50 +325,42 @@ def _provider_response_binding(
     response,
     turn_id: str,
 ) -> tuple[str, str]:
-    provider=str(response.provider).strip()
+    provider = str(response.provider).strip()
     if not provider:
         raise CognitiveExecutionError("provider response identity is empty")
-    external_id=str(
-        response.response_id
-        or response.request_id
-        or turn_id
-    ).strip()
+    external_id = str(response.response_id or response.request_id or turn_id).strip()
     if not external_id:
         raise CognitiveExecutionError("provider response external identity is empty")
-    payload={
-        "provider":provider,
-        "model":response.model,
-        "request_id":response.request_id,
-        "response_id":response.response_id,
-        "text":response.text,
-        "structured_output":(
-            None
-            if response.structured_output is None
-            else dict(response.structured_output)
+    payload = {
+        "provider": provider,
+        "model": response.model,
+        "request_id": response.request_id,
+        "response_id": response.response_id,
+        "text": response.text,
+        "structured_output": (
+            None if response.structured_output is None else dict(response.structured_output)
         ),
-        "tool_calls":[call.as_dict() for call in response.tool_calls],
-        "finish_reason":response.finish_reason.value,
-        "usage":response.usage.as_dict(),
-        "governance_decision_id":response.governance_decision_id,
-        "admission_decision_id":response.admission_decision_id,
-        "data_class":response.data_class,
-        "context_id":response.context_id,
-        "context_digest":response.context_digest,
-        "context_source_snapshot":list(response.context_source_snapshot),
-        "context_compiler_version":response.context_compiler_version,
+        "tool_calls": [call.as_dict() for call in response.tool_calls],
+        "finish_reason": response.finish_reason.value,
+        "usage": response.usage.as_dict(),
+        "governance_decision_id": response.governance_decision_id,
+        "admission_decision_id": response.admission_decision_id,
+        "data_class": response.data_class,
+        "context_id": response.context_id,
+        "context_digest": response.context_digest,
+        "context_source_snapshot": list(response.context_source_snapshot),
+        "context_compiler_version": response.context_compiler_version,
     }
     try:
-        encoded=json.dumps(
+        encoded = json.dumps(
             payload,
             sort_keys=True,
-            separators=(",",":"),
+            separators=(",", ":"),
             ensure_ascii=False,
             allow_nan=False,
         ).encode("utf-8")
-    except (TypeError,ValueError) as exc:
-        raise CognitiveExecutionError(
-            "provider response is not deterministic JSON"
-        ) from exc
+    except (TypeError, ValueError) as exc:
+        raise CognitiveExecutionError("provider response is not deterministic JSON") from exc
     return (
         f"provider:{provider}:{external_id}",
         hashlib.sha256(encoded).hexdigest(),
@@ -438,17 +402,12 @@ class CognitiveExecutionRuntime:
         self.repository = repository
         self.provider = provider
         self.tool_runtime = tool_runtime
-        self.tool_result_resolver = (
-            tool_result_resolver or self._default_tool_result_resolver
-        )
+        self.tool_result_resolver = tool_result_resolver or self._default_tool_result_resolver
         self.verification_hook = verification_hook
-        if (
-            semantic_verification_adapter is not None
-            and not hasattr(semantic_verification_adapter, "generate")
+        if semantic_verification_adapter is not None and not hasattr(
+            semantic_verification_adapter, "generate"
         ):
-            raise TypeError(
-                "semantic_verification_adapter must implement generate"
-            )
+            raise TypeError("semantic_verification_adapter must implement generate")
         self.semantic_verification_adapter = semantic_verification_adapter
         self.finalization_binding_hook = finalization_binding_hook
         self.storage_meter = storage_meter
@@ -460,42 +419,29 @@ class CognitiveExecutionRuntime:
         response,
         turn_id: str,
     ) -> str:
-        expected_provider=getattr(self.provider,"provider_id",None)
+        expected_provider = getattr(self.provider, "provider_id", None)
         if (
-            isinstance(expected_provider,str)
+            isinstance(expected_provider, str)
             and expected_provider.strip()
-            and response.provider!=expected_provider
+            and response.provider != expected_provider
         ):
-            raise CognitiveExecutionError(
-                "provider response identity does not match bound adapter"
-            )
-        expected_context=payload.get("context_digest")
-        if (
-            response.context_digest is not None
-            and response.context_digest!=expected_context
-        ):
-            raise CognitiveExecutionError(
-                "provider response context digest drift"
-            )
+            raise CognitiveExecutionError("provider response identity does not match bound adapter")
+        expected_context = payload.get("context_digest")
+        if response.context_digest is not None and response.context_digest != expected_context:
+            raise CognitiveExecutionError("provider response context digest drift")
 
-        provider_ref,fingerprint=_provider_response_binding(response,turn_id)
-        raw=payload.get("provider_response_bindings",{})
-        if not isinstance(raw,Mapping):
-            raise CognitiveExecutionError(
-                "provider response binding checkpoint is corrupt"
-            )
-        bindings=dict(raw)
-        prior=bindings.get(provider_ref)
+        provider_ref, fingerprint = _provider_response_binding(response, turn_id)
+        raw = payload.get("provider_response_bindings", {})
+        if not isinstance(raw, Mapping):
+            raise CognitiveExecutionError("provider response binding checkpoint is corrupt")
+        bindings = dict(raw)
+        prior = bindings.get(provider_ref)
         if prior is not None:
-            if prior!=fingerprint:
-                raise CognitiveExecutionError(
-                    "provider response identity reused with different payload"
-                )
-            raise CognitiveExecutionError(
-                "provider response identity replayed"
-            )
-        bindings[provider_ref]=fingerprint
-        payload["provider_response_bindings"]=bindings
+            if prior != fingerprint:
+                raise CognitiveExecutionError("provider response identity reused with different payload")
+            raise CognitiveExecutionError("provider response identity replayed")
+        bindings[provider_ref] = fingerprint
+        payload["provider_response_bindings"] = bindings
         return provider_ref
 
     def _meter_storage(
@@ -568,64 +514,37 @@ class CognitiveExecutionRuntime:
         normalized_history: list[dict[str, str]] = []
         for message in history:
             if not isinstance(message, AIMessage):
-                raise CognitiveExecutionError(
-                    "history must contain AIMessage values"
-                )
+                raise CognitiveExecutionError("history must contain AIMessage values")
             if message.role not in {"user", "assistant"}:
-                raise CognitiveExecutionError(
-                    "history contains unsupported role"
-                )
+                raise CognitiveExecutionError("history contains unsupported role")
             if not isinstance(message.content, str) or not message.content.strip():
-                raise CognitiveExecutionError(
-                    "history contains empty content"
-                )
-            normalized_history.append(
-                {"role": message.role, "content": message.content}
-            )
+                raise CognitiveExecutionError("history contains empty content")
+            normalized_history.append({"role": message.role, "content": message.content})
         if len(normalized_history) > 1024:
-            raise CognitiveExecutionError(
-                "history exceeds maximum turn count"
-            )
+            raise CognitiveExecutionError("history exceeds maximum turn count")
 
         allowed = request.tool_policy.get("allowed_tool_ids", [])
         if not isinstance(allowed, list) or any(
-            not isinstance(item, str) or not item.strip()
-            for item in allowed
+            not isinstance(item, str) or not item.strip() for item in allowed
         ):
-            raise CognitiveExecutionError(
-                "tool_policy.allowed_tool_ids must be a string list"
-            )
+            raise CognitiveExecutionError("tool_policy.allowed_tool_ids must be a string list")
         tenant_id = (
-            request.tool_policy.get("tenant_id")
-            or request.context_policy.get("tenant_id")
-            or "default"
+            request.tool_policy.get("tenant_id") or request.context_policy.get("tenant_id") or "default"
         )
         if not isinstance(tenant_id, str) or not tenant_id.strip():
             raise CognitiveExecutionError("execution tenant_id is invalid")
         tool_data_class = (
-            request.tool_policy.get("data_class")
-            or request.context_policy.get("data_class")
-            or "internal"
+            request.tool_policy.get("data_class") or request.context_policy.get("data_class") or "internal"
         )
         tool_purpose = (
             request.tool_policy.get("purpose")
             or request.context_policy.get("tool_purpose")
             or "tool-execution"
         )
-        if (
-            not isinstance(tool_data_class, str)
-            or not tool_data_class.strip()
-        ):
-            raise CognitiveExecutionError(
-                "tool data classification is invalid"
-            )
-        if (
-            not isinstance(tool_purpose, str)
-            or not tool_purpose.strip()
-        ):
-            raise CognitiveExecutionError(
-                "tool transfer purpose is invalid"
-            )
+        if not isinstance(tool_data_class, str) or not tool_data_class.strip():
+            raise CognitiveExecutionError("tool data classification is invalid")
+        if not isinstance(tool_purpose, str) or not tool_purpose.strip():
+            raise CognitiveExecutionError("tool transfer purpose is invalid")
 
         deadline = _parse_deadline(request)
         return {
@@ -656,9 +575,7 @@ class CognitiveExecutionRuntime:
     def _checkpoint_payload(self, execution_id: str) -> dict[str, object]:
         checkpoint = self.repository.latest_checkpoint(execution_id)
         if checkpoint is None:
-            raise CognitiveExecutionError(
-                "execution has no durable runtime checkpoint"
-            )
+            raise CognitiveExecutionError("execution has no durable runtime checkpoint")
         return dict(checkpoint.payload)
 
     def _checkpoint(
@@ -670,12 +587,7 @@ class CognitiveExecutionRuntime:
     ) -> tuple[AIExecution, str]:
         self._meter_storage(
             "execution-checkpoint",
-            (
-                "checkpoint:"
-                + execution.execution_id
-                + ":"
-                + str(execution.checkpoint_version + 1)
-            ),
+            ("checkpoint:" + execution.execution_id + ":" + str(execution.checkpoint_version + 1)),
             payload,
             now=now,
         )
@@ -837,22 +749,14 @@ class CognitiveExecutionRuntime:
 
             if execution.state is ExecutionState.WAITING_FOR_USER:
                 pending = self._pending_approvals(execution, payload)
-                missing = tuple(
-                    item
-                    for item in pending
-                    if not approval_refs.get(item.call_id)
-                )
+                missing = tuple(item for item in pending if not approval_refs.get(item.call_id))
                 if missing:
                     checkpoint = self.repository.latest_checkpoint(execution_id)
                     return ExecutionRunResult(
                         execution_id=execution_id,
                         state=execution.state,
                         pending_approvals=missing,
-                        checkpoint_ref=(
-                            None
-                            if checkpoint is None
-                            else checkpoint.checkpoint_ref
-                        ),
+                        checkpoint_ref=(None if checkpoint is None else checkpoint.checkpoint_ref),
                     )
                 execution = self._transition(
                     execution,
@@ -921,8 +825,7 @@ class CognitiveExecutionRuntime:
                 )
 
             raise CognitiveExecutionError(
-                "execution is in a state this runtime cannot safely resume: "
-                + execution.state.value
+                "execution is in a state this runtime cannot safely resume: " + execution.state.value
             )
 
     def _advance_to_provider_pending(
@@ -943,8 +846,7 @@ class CognitiveExecutionRuntime:
             }.get(execution.state)
             if target is None:
                 raise CognitiveExecutionError(
-                    "cannot advance execution to provider from "
-                    + execution.state.value
+                    "cannot advance execution to provider from " + execution.state.value
                 )
             execution = self._transition(execution, target, now=now)
         return execution
@@ -967,9 +869,7 @@ class CognitiveExecutionRuntime:
             or not isinstance(tenant_id, str)
             or not tenant_id.strip()
         ):
-            raise CognitiveExecutionError(
-                "tool privacy checkpoint fields are invalid"
-            )
+            raise CognitiveExecutionError("tool privacy checkpoint fields are invalid")
         tools: list[ProviderToolDefinition] = []
         for tool_id in raw:
             manifest = await self.tool_runtime.manifest(str(tool_id))
@@ -991,13 +891,8 @@ class CognitiveExecutionRuntime:
                 continue
             if not governance.permitted:
                 continue
-            if (
-                manifest.effect is not ToolEffect.READ_ONLY
-                and self.tool_runtime.receipt_store is None
-            ):
-                raise CognitiveExecutionError(
-                    "side-effect tools require a durable receipt store"
-                )
+            if manifest.effect is not ToolEffect.READ_ONLY and self.tool_runtime.receipt_store is None:
+                raise CognitiveExecutionError("side-effect tools require a durable receipt store")
             tools.append(
                 ProviderToolDefinition(
                     tool_id=manifest.tool_id,
@@ -1039,9 +934,7 @@ class CognitiveExecutionRuntime:
             isinstance(item, str) and item.strip()
             for item in (prompt, instructions, context_digest, tenant_id)
         ):
-            raise CognitiveExecutionError(
-                "provider checkpoint fields are incomplete"
-            )
+            raise CognitiveExecutionError("provider checkpoint fields are incomplete")
 
         turn_index = execution.latest_turn_index + 1
         turn_id = _stable_uuid(
@@ -1051,9 +944,7 @@ class CognitiveExecutionRuntime:
         tools = await self._provider_tools(payload)
         deadline = self._deadline(payload)
         context_policy = dict(execution.request.context_policy)
-        structured_output_schema_raw = context_policy.get(
-            "structured_output_schema"
-        )
+        structured_output_schema_raw = context_policy.get("structured_output_schema")
         structured_output_schema = None
         if structured_output_schema_raw is not None:
             if not isinstance(structured_output_schema_raw, Mapping):
@@ -1065,9 +956,7 @@ class CognitiveExecutionRuntime:
                     now=now,
                 )
             try:
-                structured_output_schema = validate_json_schema(
-                    structured_output_schema_raw
-                )
+                structured_output_schema = validate_json_schema(structured_output_schema_raw)
             except ToolContractError:
                 return self._finalize_non_success(
                     execution,
@@ -1078,27 +967,17 @@ class CognitiveExecutionRuntime:
                 )
         execution_budget = dict(execution.request.resource_budget)
         provider_budget = ResourceBudget(
-            max_input_tokens=int(
-                execution_budget.get("max_input_tokens", 200_000)
-            ),
-            max_output_tokens=int(
-                execution_budget.get("max_output_tokens", 16_384)
-            ),
-            max_cost_usd=float(
-                execution_budget.get("max_cost_usd", 10.0)
-            ),
+            max_input_tokens=int(execution_budget.get("max_input_tokens", 200_000)),
+            max_output_tokens=int(execution_budget.get("max_output_tokens", 16_384)),
+            max_cost_usd=float(execution_budget.get("max_cost_usd", 10.0)),
             max_wall_seconds=float(
                 execution_budget.get(
                     "max_wall_seconds",
                     execution_budget.get("max_elapsed_seconds", 120.0),
                 )
             ),
-            max_provider_attempts=int(
-                execution_budget.get("max_provider_attempts", 3)
-            ),
-            max_tool_calls=int(
-                execution_budget.get("max_tool_calls", 32)
-            ),
+            max_provider_attempts=int(execution_budget.get("max_provider_attempts", 3)),
+            max_tool_calls=int(execution_budget.get("max_tool_calls", 32)),
             max_artifact_bytes=int(
                 execution_budget.get(
                     "max_artifact_bytes",
@@ -1111,29 +990,65 @@ class CognitiveExecutionRuntime:
                     100 * 1024 * 1024,
                 )
             ),
-            max_concurrency=int(
-                execution_budget.get("max_concurrency", 32)
-            ),
-            max_queue_depth=int(
-                execution_budget.get("max_queue_depth", 1_000)
-            ),
+            max_concurrency=int(execution_budget.get("max_concurrency", 32)),
+            max_queue_depth=int(execution_budget.get("max_queue_depth", 1_000)),
         )
         raw_snapshot = context_policy.get("source_snapshot", [])
         if not isinstance(raw_snapshot, list):
-            raise CognitiveExecutionError(
-                "execution context source snapshot is corrupt"
-            )
+            raise CognitiveExecutionError("execution context source snapshot is corrupt")
         source_snapshot: list[tuple[str, str]] = []
         for item in raw_snapshot:
             if not isinstance(item, list) or len(item) != 2:
-                raise CognitiveExecutionError(
-                    "execution context source snapshot entry is corrupt"
-                )
+                raise CognitiveExecutionError("execution context source snapshot entry is corrupt")
             source_snapshot.append((str(item[0]), str(item[1])))
+
+        delta_count = 0
+        delta_bytes = 0
+        attempt_id = str(uuid4())
+        streaming = context_policy.get("stream_output") is True
+        if streaming:
+            self.repository.append_stream_event(
+                execution.execution_id,
+                f"output-start:{turn_id}:{attempt_id}",
+                "output.started",
+                {"turn_id": turn_id, "attempt_id": attempt_id},
+                provisional=True,
+                expected_version=execution.version,
+            )
+
+        def publish_text(delta: str) -> None:
+            nonlocal delta_count, delta_bytes
+            if not isinstance(delta, str) or not delta:
+                return
+            current_output_execution = self.repository.get(execution.execution_id)
+            if (
+                current_output_execution.cancellation_requested
+                or current_output_execution.terminal
+                or self._deadline_expired(payload, now=now)
+            ):
+                return
+            encoded_bytes = len(delta.encode("utf-8"))
+            if encoded_bytes > 131072 or delta_bytes + encoded_bytes > 4 * 1024 * 1024:
+                raise CognitiveExecutionError("provisional output byte limit exceeded")
+            event_payload = {"delta": delta, "turn_id": turn_id, "attempt_id": attempt_id}
+            key = f"output:{turn_id}:{attempt_id}:{delta_count}"
+            self._meter_storage(f"execution:{execution.execution_id}", key, event_payload, now=now)
+            self.repository.append_stream_event(
+                execution.execution_id,
+                key,
+                "output.delta",
+                event_payload,
+                provisional=True,
+                expected_version=execution.version,
+            )
+            delta_count += 1
+            delta_bytes += encoded_bytes
 
         provider_request = ProviderRequest(
             instructions=instructions,
             prompt=prompt,
+            temperature=context_policy.get("provider_temperature"),
+            on_text_delta=publish_text if streaming else None,
             history=_history_from_payload(payload),
             max_output_tokens=(
                 int(execution.request.resource_budget["max_output_tokens"])
@@ -1168,9 +1083,7 @@ class CognitiveExecutionRuntime:
             execution_id=execution.execution_id,
             turn_id=turn_id,
             context_id=(
-                None
-                if context_policy.get("context_id") is None
-                else str(context_policy["context_id"])
+                None if context_policy.get("context_id") is None else str(context_policy["context_id"])
             ),
             context_digest=str(context_digest),
             context_source_snapshot=tuple(source_snapshot),
@@ -1184,9 +1097,7 @@ class CognitiveExecutionRuntime:
                 if context_policy.get("provider_model") is None
                 else str(context_policy["provider_model"])
             ),
-            estimated_cost_usd=float(
-                context_policy.get("estimated_cost_usd", 0.0)
-            ),
+            estimated_cost_usd=float(context_policy.get("estimated_cost_usd", 0.0)),
             resource_budget=provider_budget,
             structured_output_schema=structured_output_schema,
             tools=tools,
@@ -1213,16 +1124,8 @@ class CognitiveExecutionRuntime:
         if deadline is None and not cooperative_cancellation:
             response = await self.provider.generate(provider_request)
         else:
-            logical_now = (
-                datetime.now(UTC)
-                if now is None
-                else now.astimezone(UTC)
-            )
-            deadline_budget = (
-                None
-                if deadline is None
-                else (deadline - logical_now).total_seconds()
-            )
+            logical_now = datetime.now(UTC) if now is None else now.astimezone(UTC)
+            deadline_budget = None if deadline is None else (deadline - logical_now).total_seconds()
             if deadline_budget is not None and deadline_budget <= 0:
                 return self._finalize_non_success(
                     execution,
@@ -1232,31 +1135,22 @@ class CognitiveExecutionRuntime:
                     now=now,
                 )
 
-            provider_task = asyncio.create_task(
-                self.provider.generate(provider_request)
-            )
+            provider_task = asyncio.create_task(self.provider.generate(provider_request))
             loop = asyncio.get_running_loop()
             started_wait = loop.time()
             try:
                 while True:
                     remaining = None
                     if deadline_budget is not None:
-                        remaining = (
-                            deadline_budget
-                            - (loop.time() - started_wait)
-                        )
+                        remaining = deadline_budget - (loop.time() - started_wait)
                         if remaining <= 0:
                             provider_task.cancel()
                             try:
                                 await provider_task
                             except asyncio.CancelledError:
                                 pass
-                            durable_timeout = self.repository.get(
-                                execution.execution_id
-                            )
-                            timeout_payload = self._checkpoint_payload(
-                                execution.execution_id
-                            )
+                            durable_timeout = self.repository.get(execution.execution_id)
+                            timeout_payload = self._checkpoint_payload(execution.execution_id)
                             return self._finalize_non_success(
                                 durable_timeout,
                                 timeout_payload,
@@ -1265,17 +1159,11 @@ class CognitiveExecutionRuntime:
                                 now=now,
                             )
 
-                    poll_seconds = (
-                        0.05
-                        if cooperative_cancellation
-                        else remaining
-                    )
+                    poll_seconds = 0.05 if cooperative_cancellation else remaining
                     if remaining is not None:
                         poll_seconds = min(
                             remaining,
-                            0.05
-                            if cooperative_cancellation
-                            else remaining,
+                            0.05 if cooperative_cancellation else remaining,
                         )
                     done, _ = await asyncio.wait(
                         {provider_task},
@@ -1286,18 +1174,14 @@ class CognitiveExecutionRuntime:
                         break
 
                     if cooperative_cancellation:
-                        durable_poll = self.repository.get(
-                            execution.execution_id
-                        )
+                        durable_poll = self.repository.get(execution.execution_id)
                         if durable_poll.cancellation_requested:
                             provider_task.cancel()
                             try:
                                 await provider_task
                             except asyncio.CancelledError:
                                 pass
-                            cancel_payload = self._checkpoint_payload(
-                                execution.execution_id
-                            )
+                            cancel_payload = self._checkpoint_payload(execution.execution_id)
                             return self._finalize_non_success(
                                 durable_poll,
                                 cancel_payload,
@@ -1318,21 +1202,14 @@ class CognitiveExecutionRuntime:
         # execution snapshot. Re-read canonical state, account for the provider
         # work that actually happened, and fence the late result before it can
         # become user-visible success.
-        durable_after_provider = self.repository.get(
-            execution.execution_id
-        )
-        if (
-            durable_after_provider.cancellation_requested
-            or self._deadline_expired(payload, now=now)
-        ):
+        durable_after_provider = self.repository.get(execution.execution_id)
+        if durable_after_provider.cancellation_requested or self._deadline_expired(payload, now=now):
             late_provider_ref = self._bind_provider_response(
                 payload,
                 response,
                 turn_id,
             )
-            late_receipts = list(
-                payload.get("provider_receipts", [])
-            )
+            late_receipts = list(payload.get("provider_receipts", []))
             late_receipts.append(late_provider_ref)
             late_usage = list(payload.get("usage_events", []))
             late_usage.append(response.usage.as_dict())
@@ -1348,14 +1225,9 @@ class CognitiveExecutionRuntime:
                         "provider_response_id": response.response_id,
                         "text": response.text,
                         "structured_output": (
-                            None
-                            if response.structured_output is None
-                            else dict(response.structured_output)
+                            None if response.structured_output is None else dict(response.structured_output)
                         ),
-                        "tool_calls": [
-                            call.as_dict()
-                            for call in response.tool_calls
-                        ],
+                        "tool_calls": [call.as_dict() for call in response.tool_calls],
                         "finish_reason": response.finish_reason.value,
                         "usage": response.usage.as_dict(),
                         "late_result_fenced": True,
@@ -1385,7 +1257,9 @@ class CognitiveExecutionRuntime:
 
         execution = durable_after_provider
 
-
+        if streaming and delta_count == 0 and isinstance(response.text, str) and response.text:
+            # Buffered adapters publish their actual complete output once.
+            publish_text(response.text)
         execution = self._transition(
             execution,
             ExecutionState.PROVIDER_COMPLETED,
@@ -1431,13 +1305,9 @@ class CognitiveExecutionRuntime:
                     "provider_response_id": response.response_id,
                     "text": response.text,
                     "structured_output": (
-                        None
-                        if response.structured_output is None
-                        else dict(response.structured_output)
+                        None if response.structured_output is None else dict(response.structured_output)
                     ),
-                    "tool_calls": [
-                        call.as_dict() for call in response.tool_calls
-                    ],
+                    "tool_calls": [call.as_dict() for call in response.tool_calls],
                     "finish_reason": response.finish_reason.value,
                     "usage": response.usage.as_dict(),
                 },
@@ -1528,9 +1398,7 @@ class CognitiveExecutionRuntime:
                         if provider.get("provider_response_id") is None
                         else str(provider["provider_response_id"])
                     ),
-                    usage_delta=(
-                        dict(provider.get("usage") or {})
-                    ),
+                    usage_delta=(dict(provider.get("usage") or {})),
                     checkpoint_ref=checkpoint.checkpoint_ref,
                     status="provider_completed",
                 ),
@@ -1563,11 +1431,7 @@ class CognitiveExecutionRuntime:
         raw_calls = provider.get("tool_calls", [])
         if not isinstance(raw_calls, list):
             raise CognitiveExecutionError("provider tool call checkpoint is corrupt")
-        calls = tuple(
-            _provider_call_from_dict(item)
-            for item in raw_calls
-            if isinstance(item, dict)
-        )
+        calls = tuple(_provider_call_from_dict(item) for item in raw_calls if isinstance(item, dict))
         if len(calls) != len(raw_calls):
             raise CognitiveExecutionError("provider tool call checkpoint is corrupt")
 
@@ -1580,9 +1444,7 @@ class CognitiveExecutionRuntime:
                 now=now,
             )
 
-        structured_schema = execution.request.context_policy.get(
-            "structured_output_schema"
-        )
+        structured_schema = execution.request.context_policy.get("structured_output_schema")
         if structured_schema is not None:
             structured = provider.get("structured_output")
             if not isinstance(structured, dict):
@@ -1658,14 +1520,8 @@ class CognitiveExecutionRuntime:
             maximum=4,
         )
         raw_repairs = payload.get("structured_output_repairs", 0)
-        if (
-            isinstance(raw_repairs, bool)
-            or not isinstance(raw_repairs, int)
-            or raw_repairs < 0
-        ):
-            raise CognitiveExecutionError(
-                "structured_output_repairs checkpoint is corrupt"
-            )
+        if isinstance(raw_repairs, bool) or not isinstance(raw_repairs, int) or raw_repairs < 0:
+            raise CognitiveExecutionError("structured_output_repairs checkpoint is corrupt")
         if raw_repairs >= max_repairs:
             return self._finalize_non_success(
                 execution,
@@ -1675,9 +1531,7 @@ class CognitiveExecutionRuntime:
                 now=now,
             )
 
-        schema = execution.request.context_policy.get(
-            "structured_output_schema"
-        )
+        schema = execution.request.context_policy.get("structured_output_schema")
         if not isinstance(schema, Mapping):
             return self._finalize_non_success(
                 execution,
@@ -1766,11 +1620,7 @@ class CognitiveExecutionRuntime:
 
         signature = _tool_batch_signature(calls)
         last_signature = payload.get("last_tool_batch_signature")
-        repeats = (
-            int(payload.get("repeat_tool_batch_count", 0)) + 1
-            if last_signature == signature
-            else 0
-        )
+        repeats = int(payload.get("repeat_tool_batch_count", 0)) + 1 if last_signature == signature else 0
         max_repeats = _positive_int(
             execution.request.stop_policy,
             "max_repeat_tool_batches",
@@ -1811,9 +1661,7 @@ class CognitiveExecutionRuntime:
                 )
 
         if missing:
-            payload["pending_approval_call_ids"] = [
-                item.call_id for item in missing
-            ]
+            payload["pending_approval_call_ids"] = [item.call_id for item in missing]
             execution = self._transition(
                 execution,
                 ExecutionState.WAITING_FOR_TOOL_AUTHORITY,
@@ -1855,13 +1703,7 @@ class CognitiveExecutionRuntime:
         execution: AIExecution,
         call: ProviderToolCall,
     ) -> str:
-        return (
-            execution.execution_id
-            + ":"
-            + call.call_id
-            + ":"
-            + str(call.arguments_digest)
-        )
+        return execution.execution_id + ":" + call.call_id + ":" + str(call.arguments_digest)
 
     @staticmethod
     def _tool_lineage(
@@ -1871,18 +1713,12 @@ class CognitiveExecutionRuntime:
     ) -> tuple[str, str, str]:
         last_provider = payload.get("last_provider")
         if not isinstance(last_provider, Mapping):
-            raise CognitiveExecutionError(
-                "tool execution is missing provider-turn lineage"
-            )
+            raise CognitiveExecutionError("tool execution is missing provider-turn lineage")
         turn_id = last_provider.get("turn_id")
         if not isinstance(turn_id, str) or not turn_id.strip():
-            raise CognitiveExecutionError(
-                "tool execution is missing provider turn_id"
-            )
+            raise CognitiveExecutionError("tool execution is missing provider turn_id")
         if not isinstance(call.call_id, str) or not call.call_id.strip():
-            raise CognitiveExecutionError(
-                "tool execution is missing provider call_id"
-            )
+            raise CognitiveExecutionError("tool execution is missing provider call_id")
         return execution.execution_id, turn_id.strip(), call.call_id.strip()
 
     def _approval_ref_for_call(
@@ -1912,17 +1748,10 @@ class CognitiveExecutionRuntime:
             requested_at=execution.updated_at,
             approval_ref=None,
             delegated_authority_ref=(
-                "execution:"
-                + execution.execution_id
-                + ":provider-call:"
-                + call.call_id
+                "execution:" + execution.execution_id + ":provider-call:" + call.call_id
             ),
-            data_class=str(
-                payload.get("tool_data_class", "internal")
-            ),
-            transfer_purpose=str(
-                payload.get("tool_purpose", "tool-execution")
-            ),
+            data_class=str(payload.get("tool_data_class", "internal")),
+            transfer_purpose=str(payload.get("tool_purpose", "tool-execution")),
         )
         return approval_ref_for_request(request)
 
@@ -1977,11 +1806,7 @@ class CognitiveExecutionRuntime:
                 error_code="pending_tool_checkpoint_missing",
                 now=now,
             )
-        calls = tuple(
-            _provider_call_from_dict(item)
-            for item in raw_calls
-            if isinstance(item, dict)
-        )
+        calls = tuple(_provider_call_from_dict(item) for item in raw_calls if isinstance(item, dict))
         if len(calls) != len(raw_calls):
             raise CognitiveExecutionError("pending tool checkpoint is corrupt")
 
@@ -1992,18 +1817,10 @@ class CognitiveExecutionRuntime:
             [],
         )
         if not isinstance(verification_rows_raw, list):
-            raise CognitiveExecutionError(
-                "tool verification evidence checkpoint is corrupt"
-            )
-        verification_rows = [
-            dict(item)
-            for item in verification_rows_raw
-            if isinstance(item, Mapping)
-        ]
+            raise CognitiveExecutionError("tool verification evidence checkpoint is corrupt")
+        verification_rows = [dict(item) for item in verification_rows_raw if isinstance(item, Mapping)]
         if len(verification_rows) != len(verification_rows_raw):
-            raise CognitiveExecutionError(
-                "tool verification evidence checkpoint is corrupt"
-            )
+            raise CognitiveExecutionError("tool verification evidence checkpoint is corrupt")
         for call in calls:
             execution_id, turn_id, call_id = self._tool_lineage(
                 execution,
@@ -2026,33 +1843,19 @@ class CognitiveExecutionRuntime:
                     call,
                 ),
                 arguments=dict(call.arguments),
-                requested_at=(
-                    datetime.now(UTC)
-                    if now is None
-                    else now.astimezone(UTC)
-                ),
+                requested_at=(datetime.now(UTC) if now is None else now.astimezone(UTC)),
                 approval_ref=approval_refs.get(call.call_id),
                 delegated_authority_ref=(
-                    "execution:"
-                    + execution.execution_id
-                    + ":provider-call:"
-                    + call.call_id
+                    "execution:" + execution.execution_id + ":provider-call:" + call.call_id
                 ),
-                data_class=str(
-                    payload.get("tool_data_class", "internal")
-                ),
-                transfer_purpose=str(
-                    payload.get("tool_purpose", "tool-execution")
-                ),
+                data_class=str(payload.get("tool_data_class", "internal")),
+                transfer_purpose=str(payload.get("tool_purpose", "tool-execution")),
             )
             receipt = await self.tool_runtime.execute(
                 tool_request,
                 now=now,
             )
-            if (
-                receipt.status is ToolExecutionStatus.DENIED
-                and receipt.error_code == "approval_required"
-            ):
+            if receipt.status is ToolExecutionStatus.DENIED and receipt.error_code == "approval_required":
                 payload["pending_approval_call_ids"] = [call.call_id]
                 execution = self._transition(
                     execution,
@@ -2090,16 +1893,11 @@ class CognitiveExecutionRuntime:
                     execution,
                     payload,
                     status="failed",
-                    error_code=(
-                        receipt.error_code
-                        or "tool_execution_failed"
-                    ),
+                    error_code=(receipt.error_code or "tool_execution_failed"),
                     now=now,
                 )
 
-            resolved = await _await_maybe(
-                self.tool_result_resolver(receipt)
-            )
+            resolved = await _await_maybe(self.tool_result_resolver(receipt))
             if not isinstance(resolved, str) or not resolved.strip():
                 return self._finalize_non_success(
                     execution,
@@ -2109,9 +1907,7 @@ class CognitiveExecutionRuntime:
                     now=now,
                 )
             result_text = resolved.strip()
-            manifest, _postcondition_registered = (
-                await self.tool_runtime.verification_metadata(call.tool_id)
-            )
+            manifest, _postcondition_registered = await self.tool_runtime.verification_metadata(call.tool_id)
             receipt_ids.append(receipt.receipt_id)
             result_rows.append(
                 {
@@ -2122,32 +1918,23 @@ class CognitiveExecutionRuntime:
                     "result": result_text,
                 }
             )
-            if not any(
-                item.get("receipt_id") == receipt.receipt_id
-                for item in verification_rows
-            ):
+            if not any(item.get("receipt_id") == receipt.receipt_id for item in verification_rows):
                 verification_rows.append(
                     {
                         "receipt_id": receipt.receipt_id,
                         "tool_id": call.tool_id,
                         "result_ref": receipt.result_ref,
                         "result": result_text,
-                        "result_digest": hashlib.sha256(
-                            result_text.encode("utf-8")
-                        ).hexdigest(),
+                        "result_digest": hashlib.sha256(result_text.encode("utf-8")).hexdigest(),
                         "effect": manifest.effect.value,
                         "risk_class": manifest.risk_class.value,
-                        "side_effect_class": (
-                            manifest.side_effect_class.value
-                        ),
+                        "side_effect_class": (manifest.side_effect_class.value),
                         "postcondition_observed": receipt.postcondition_verified,
                         "observed_at": receipt.finished_at.isoformat(),
                         "execution_id": receipt.execution_id,
                         "turn_id": receipt.turn_id,
                         "call_id": receipt.call_id,
-                        "governance_decision_ref": (
-                            receipt.governance_decision_ref
-                        ),
+                        "governance_decision_ref": (receipt.governance_decision_ref),
                     }
                 )
 
@@ -2194,10 +1981,7 @@ class CognitiveExecutionRuntime:
                 turn_index=turn_index,
                 phase=ExecutionState.TOOL_COMPLETED,
                 context_digest=str(payload["context_digest"]),
-                tool_receipt_ids=tuple(
-                    row["receipt_id"]
-                    for row in result_rows
-                ),
+                tool_receipt_ids=tuple(row["receipt_id"] for row in result_rows),
                 usage_delta={
                     "tool_calls": len(calls),
                 },
@@ -2249,9 +2033,7 @@ class CognitiveExecutionRuntime:
     ]:
         raw_rows = payload.get("tool_verification_evidence", [])
         if not isinstance(raw_rows, list):
-            raise CognitiveExecutionError(
-                "tool verification evidence checkpoint is corrupt"
-            )
+            raise CognitiveExecutionError("tool verification evidence checkpoint is corrupt")
 
         context_policy = dict(execution.request.context_policy)
         risk = VerificationRisk.LOW
@@ -2260,9 +2042,7 @@ class CognitiveExecutionRuntime:
             try:
                 risk = VerificationRisk(str(raw_risk).strip().lower())
             except ValueError as exc:
-                raise CognitiveExecutionError(
-                    "execution verification_risk is invalid"
-                ) from exc
+                raise CognitiveExecutionError("execution verification_risk is invalid") from exc
 
         evidence: list[EvidenceReference] = []
         evidence_text: dict[str, str] = {}
@@ -2278,20 +2058,14 @@ class CognitiveExecutionRuntime:
 
         for raw in raw_rows:
             if not isinstance(raw, Mapping):
-                raise CognitiveExecutionError(
-                    "tool verification evidence entry is corrupt"
-                )
+                raise CognitiveExecutionError("tool verification evidence entry is corrupt")
             receipt_id = str(raw.get("receipt_id") or "").strip()
             tool_id = str(raw.get("tool_id") or "").strip()
             result_text = raw.get("result")
             result_digest = str(raw.get("result_digest") or "").strip()
             effect = str(raw.get("effect") or "").strip().lower()
-            side_effect = str(
-                raw.get("side_effect_class") or "none"
-            ).strip().lower()
-            raw_tool_risk = str(
-                raw.get("risk_class") or "low"
-            ).strip().lower()
+            side_effect = str(raw.get("side_effect_class") or "none").strip().lower()
+            raw_tool_risk = str(raw.get("risk_class") or "low").strip().lower()
             raw_observed = str(raw.get("observed_at") or "").strip()
 
             if (
@@ -2299,43 +2073,29 @@ class CognitiveExecutionRuntime:
                 or not tool_id
                 or not isinstance(result_text, str)
                 or not result_text
-                or effect not in {
+                or effect
+                not in {
                     "read_only",
                     "reversible",
                     "irreversible",
                 }
             ):
-                raise CognitiveExecutionError(
-                    "tool verification evidence entry is incomplete"
-                )
-            actual_digest = hashlib.sha256(
-                result_text.encode("utf-8")
-            ).hexdigest()
+                raise CognitiveExecutionError("tool verification evidence entry is incomplete")
+            actual_digest = hashlib.sha256(result_text.encode("utf-8")).hexdigest()
             if result_digest != actual_digest:
-                raise CognitiveExecutionError(
-                    "tool verification evidence digest mismatch"
-                )
+                raise CognitiveExecutionError("tool verification evidence digest mismatch")
             try:
                 observed_at = datetime.fromisoformat(raw_observed)
             except ValueError as exc:
-                raise CognitiveExecutionError(
-                    "tool verification evidence time is invalid"
-                ) from exc
-            if (
-                observed_at.tzinfo is None
-                or observed_at.utcoffset() is None
-            ):
-                raise CognitiveExecutionError(
-                    "tool verification evidence time must be timezone-aware"
-                )
+                raise CognitiveExecutionError("tool verification evidence time is invalid") from exc
+            if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+                raise CognitiveExecutionError("tool verification evidence time must be timezone-aware")
             observed_at = observed_at.astimezone(UTC)
 
             try:
                 tool_risk = VerificationRisk(raw_tool_risk)
             except ValueError as exc:
-                raise CognitiveExecutionError(
-                    "tool verification risk class is invalid"
-                ) from exc
+                raise CognitiveExecutionError("tool verification risk class is invalid") from exc
             risk = self._risk_max(risk, tool_risk)
 
             evidence_id = _stable_uuid(
@@ -2393,9 +2153,7 @@ class CognitiveExecutionRuntime:
                             "skeleton-tool-postcondition",
                             execution.execution_id + ":" + receipt_id,
                         ),
-                        operation_id=_tool_operation_uuid(
-                            execution.operation_id
-                        ),
+                        operation_id=_tool_operation_uuid(execution.operation_id),
                         tenant_id=tenant_id,
                         observed_at=observed_at,
                         passed=True,
@@ -2433,9 +2191,7 @@ class CognitiveExecutionRuntime:
         """
         raw_rows = payload.get("tool_verification_evidence", [])
         if not isinstance(raw_rows, list):
-            raise CognitiveExecutionError(
-                "tool verification evidence checkpoint is corrupt"
-            )
+            raise CognitiveExecutionError("tool verification evidence checkpoint is corrupt")
 
         effect_rank = {
             "read_only": 1,
@@ -2449,23 +2205,14 @@ class CognitiveExecutionRuntime:
 
         for raw in raw_rows:
             if not isinstance(raw, Mapping):
-                raise CognitiveExecutionError(
-                    "tool verification evidence entry is corrupt"
-                )
+                raise CognitiveExecutionError("tool verification evidence entry is corrupt")
             effect = str(raw.get("effect") or "").strip().lower()
             if effect not in effect_rank:
-                raise CognitiveExecutionError(
-                    "tool verification evidence effect is invalid"
-                )
-            if (
-                strongest_effect is None
-                or effect_rank[effect] > effect_rank[strongest_effect]
-            ):
+                raise CognitiveExecutionError("tool verification evidence effect is invalid")
+            if strongest_effect is None or effect_rank[effect] > effect_rank[strongest_effect]:
                 strongest_effect = effect
 
-            side_effect = str(
-                raw.get("side_effect_class") or "none"
-            ).strip().lower()
+            side_effect = str(raw.get("side_effect_class") or "none").strip().lower()
             if side_effect != "none":
                 externally_observable = True
 
@@ -2473,9 +2220,7 @@ class CognitiveExecutionRuntime:
                 continue
             receipt_id = str(raw.get("receipt_id") or "").strip()
             if not receipt_id:
-                raise CognitiveExecutionError(
-                    "effect verification evidence is missing receipt identity"
-                )
+                raise CognitiveExecutionError("effect verification evidence is missing receipt identity")
             if raw.get("postcondition_observed") is True:
                 observed.append(receipt_id)
             else:
@@ -2528,9 +2273,7 @@ class CognitiveExecutionRuntime:
                 )
             )
             if not isinstance(decision, ExecutionVerificationDecision):
-                raise CognitiveExecutionError(
-                    "verification_hook must return ExecutionVerificationDecision"
-                )
+                raise CognitiveExecutionError("verification_hook must return ExecutionVerificationDecision")
             return decision
 
         tenant_id = (
@@ -2541,11 +2284,7 @@ class CognitiveExecutionRuntime:
         if not isinstance(tenant_id, str) or not tenant_id.strip():
             raise CognitiveExecutionError("execution tenant_id is invalid")
         tenant_id = tenant_id.strip()
-        instant = (
-            datetime.now(UTC)
-            if now is None
-            else now.astimezone(UTC)
-        )
+        instant = datetime.now(UTC) if now is None else now.astimezone(UTC)
         turns = self.repository.turns(execution.execution_id)
         turn_id = (
             turns[-1].turn_id
@@ -2563,15 +2302,11 @@ class CognitiveExecutionRuntime:
             "evidence_required",
             "assistant_proposal",
         }:
-            raise CognitiveExecutionError(
-                "unsupported execution verification_profile"
-            )
+            raise CognitiveExecutionError("unsupported execution verification_profile")
 
         claim_id = _stable_uuid(
             "skeleton-execution-verification-claim",
-            execution.execution_id
-            + ":"
-            + hashlib.sha256(candidate.encode("utf-8")).hexdigest(),
+            execution.execution_id + ":" + hashlib.sha256(candidate.encode("utf-8")).hexdigest(),
         )
 
         (
@@ -2596,13 +2331,9 @@ class CognitiveExecutionRuntime:
                 [],
             )
             if capability not in {"assistant.chat", "assistant.compat"}:
-                raise CognitiveExecutionError(
-                    "assistant_proposal verification requires assistant capability"
-                )
+                raise CognitiveExecutionError("assistant_proposal verification requires assistant capability")
             if not isinstance(allowed_tool_ids, list) or allowed_tool_ids:
-                raise CognitiveExecutionError(
-                    "assistant_proposal verification requires tool-free execution"
-                )
+                raise CognitiveExecutionError("assistant_proposal verification requires tool-free execution")
             claim_kind = ClaimKind.HYPOTHESIS
             risk = VerificationRisk.LOW
             action_effect = None
@@ -2629,9 +2360,7 @@ class CognitiveExecutionRuntime:
             context_digest=context_digest,
             provenance_refs=tuple(
                 str(item)
-                for item in self._checkpoint_payload(
-                    execution.execution_id
-                ).get("provider_receipts", [])
+                for item in self._checkpoint_payload(execution.execution_id).get("provider_receipts", [])
             ),
             generated_by_model=True,
         )
@@ -2647,14 +2376,8 @@ class CognitiveExecutionRuntime:
         )
 
         semantic = None
-        if (
-            assessment.policy.level >= VerificationLevel.INDEPENDENT
-            or (
-                execution.request.context_policy.get(
-                    "semantic_verification_required"
-                )
-                is True
-            )
+        if assessment.policy.level >= VerificationLevel.INDEPENDENT or (
+            execution.request.context_policy.get("semantic_verification_required") is True
         ):
             adapter = self.semantic_verification_adapter
             if adapter is None:
@@ -2706,18 +2429,10 @@ class CognitiveExecutionRuntime:
                 "externally_observable_action": externally_observable,
                 "policy": {
                     "level": int(assessment.policy.level),
-                    "required_modes": list(
-                        assessment.policy.required_modes
-                    ),
-                    "min_independent_origins": (
-                        assessment.policy.min_independent_origins
-                    ),
-                    "allow_model_only_evidence": (
-                        assessment.policy.allow_model_only_evidence
-                    ),
-                    "require_postcondition": (
-                        assessment.policy.require_postcondition
-                    ),
+                    "required_modes": list(assessment.policy.required_modes),
+                    "min_independent_origins": (assessment.policy.min_independent_origins),
+                    "allow_model_only_evidence": (assessment.policy.allow_model_only_evidence),
+                    "require_postcondition": (assessment.policy.require_postcondition),
                     "reasons": list(assessment.policy.reasons),
                 },
             }
@@ -2753,19 +2468,14 @@ class CognitiveExecutionRuntime:
             }
 
         evidence_refs = tuple(
-            "evidence:" + evidence_id
-            for evidence_id in canonical_receipt.supporting_evidence_ids
+            "evidence:" + evidence_id for evidence_id in canonical_receipt.supporting_evidence_ids
         )
         published = (
             disposition is FinalizationDisposition.PUBLISH
             and assessment.policy_satisfied
             and assessment.outcome is VerificationOutcome.PASSED
         )
-        final_output = (
-            semantic.final_claim.text
-            if semantic is not None
-            else candidate.strip()
-        )
+        final_output = semantic.final_claim.text if semantic is not None else candidate.strip()
         return ExecutionVerificationDecision(
             passed=published,
             receipt=receipt,
@@ -2867,7 +2577,8 @@ class CognitiveExecutionRuntime:
             explicit_block = (
                 semantic_block
                 or claim_kind == ClaimKind.ACTION_OUTCOME.value
-                or risk in {
+                or risk
+                in {
                     VerificationRisk.HIGH.value,
                     VerificationRisk.CRITICAL.value,
                 }
@@ -2876,11 +2587,7 @@ class CognitiveExecutionRuntime:
                 execution,
                 payload,
                 status="failed",
-                error_code=(
-                    "verification_blocked"
-                    if explicit_block
-                    else "verification_failed"
-                ),
+                error_code=("verification_blocked" if explicit_block else "verification_failed"),
                 now=now,
                 verification=verification,
             )
@@ -2898,9 +2605,7 @@ class CognitiveExecutionRuntime:
                 "stream-terminal:"
                 + execution.execution_id
                 + ":qualified:"
-                + hashlib.sha256(
-                    final_output.encode("utf-8")
-                ).hexdigest()[:24]
+                + hashlib.sha256(final_output.encode("utf-8")).hexdigest()[:24]
             )
             result = AIExecutionResult(
                 operation_id=execution.operation_id,
@@ -2910,14 +2615,8 @@ class CognitiveExecutionRuntime:
                 verification=verification_ref,
                 verification_receipt=verification.as_dict(),
                 evidence_refs=verification.evidence_refs,
-                provider_receipts=tuple(
-                    str(item)
-                    for item in payload.get("provider_receipts", [])
-                ),
-                tool_receipts=tuple(
-                    str(item)
-                    for item in payload.get("tool_receipts", [])
-                ),
+                provider_receipts=tuple(str(item) for item in payload.get("provider_receipts", [])),
+                tool_receipts=tuple(str(item) for item in payload.get("tool_receipts", [])),
                 usage={
                     "model_turns": int(payload.get("model_turns", 0)),
                     "tool_calls": int(payload.get("tool_calls", 0)),
@@ -2925,11 +2624,7 @@ class CognitiveExecutionRuntime:
                     "verification_disposition": "qualified",
                 },
                 stream_terminal_event=terminal_event,
-                completed_at=(
-                    datetime.now(UTC)
-                    if now is None
-                    else now.astimezone(UTC)
-                ),
+                completed_at=(datetime.now(UTC) if now is None else now.astimezone(UTC)),
             )
             return self._commit_terminal_result(
                 execution,
@@ -2937,9 +2632,7 @@ class CognitiveExecutionRuntime:
                 now=now,
             )
         if disposition != "publish" or not verification.passed:
-            raise CognitiveExecutionError(
-                "verification disposition/passed invariant violated"
-            )
+            raise CognitiveExecutionError("verification disposition/passed invariant violated")
 
         bindings = await self._finalization_bindings(
             execution,
@@ -2960,14 +2653,8 @@ class CognitiveExecutionRuntime:
             verification=verification_ref,
             verification_receipt=verification.as_dict(),
             evidence_refs=verification.evidence_refs,
-            provider_receipts=tuple(
-                str(item)
-                for item in payload.get("provider_receipts", [])
-            ),
-            tool_receipts=tuple(
-                str(item)
-                for item in payload.get("tool_receipts", [])
-            ),
+            provider_receipts=tuple(str(item) for item in payload.get("provider_receipts", [])),
+            tool_receipts=tuple(str(item) for item in payload.get("tool_receipts", [])),
             memory_refs=bindings.memory_refs,
             artifact_refs=bindings.artifact_refs,
             usage={
@@ -2977,11 +2664,7 @@ class CognitiveExecutionRuntime:
                 "verification_disposition": "publish",
             },
             stream_terminal_event=terminal_event,
-            completed_at=(
-                datetime.now(UTC)
-                if now is None
-                else now.astimezone(UTC)
-            ),
+            completed_at=(datetime.now(UTC) if now is None else now.astimezone(UTC)),
         )
         return self._commit_terminal_result(
             execution,
@@ -2999,36 +2682,17 @@ class CognitiveExecutionRuntime:
         now: datetime | None,
         verification: ExecutionVerificationDecision | None = None,
     ) -> ExecutionRunResult:
-        terminal_event = (
-            "stream-terminal:"
-            + execution.execution_id
-            + ":"
-            + status
-            + ":"
-            + error_code
-        )
+        terminal_event = "stream-terminal:" + execution.execution_id + ":" + status + ":" + error_code
         result = AIExecutionResult(
             operation_id=execution.operation_id,
             execution_id=execution.execution_id,
             status=status,
             final_output=None,
-            verification=(
-                None if verification is None else _verification_ref(verification)
-            ),
-            verification_receipt=(
-                None if verification is None else verification.as_dict()
-            ),
-            evidence_refs=(
-                () if verification is None else verification.evidence_refs
-            ),
-            provider_receipts=tuple(
-                str(item)
-                for item in payload.get("provider_receipts", [])
-            ),
-            tool_receipts=tuple(
-                str(item)
-                for item in payload.get("tool_receipts", [])
-            ),
+            verification=(None if verification is None else _verification_ref(verification)),
+            verification_receipt=(None if verification is None else verification.as_dict()),
+            evidence_refs=(() if verification is None else verification.evidence_refs),
+            provider_receipts=tuple(str(item) for item in payload.get("provider_receipts", [])),
+            tool_receipts=tuple(str(item) for item in payload.get("tool_receipts", [])),
             usage={
                 "model_turns": int(payload.get("model_turns", 0)),
                 "tool_calls": int(payload.get("tool_calls", 0)),
@@ -3036,11 +2700,7 @@ class CognitiveExecutionRuntime:
                 "error_code": error_code,
             },
             stream_terminal_event=terminal_event,
-            completed_at=(
-                datetime.now(UTC)
-                if now is None
-                else now.astimezone(UTC)
-            ),
+            completed_at=(datetime.now(UTC) if now is None else now.astimezone(UTC)),
         )
         return self._commit_terminal_result(
             execution,

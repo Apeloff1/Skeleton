@@ -222,7 +222,10 @@
         "backend/core/ai_provider.py",
         "backend/core/ai_provider_compat.py",
         "skeleton/jeeves/providers.py",
-        "backend/emergentintegrations/llm/chat.py"
+        "backend/emergentintegrations/llm/chat.py",
+        "machine/ai_chat_model_catalog.json",
+        "backend/core/model_catalog.py",
+        "machine/ai_chat_operator_setup.json"
       ],
       "required_interfaces": [
         "ProviderRequest",
@@ -687,7 +690,9 @@
       "evidence": [
         "skeleton/persistence",
         "docker-compose.yml",
-        "backend/services/database.py"
+        "backend/services/database.py",
+        "machine/ai_chat_application.json",
+        "machine/ai_chat_streaming.json"
       ],
       "required_interfaces": [
         "transaction",
@@ -835,7 +840,12 @@
       "evidence": [
         "backend/server.py",
         "backend/routes",
-        "backend/core/product_control_runtime.py"
+        "backend/core/product_control_runtime.py",
+        "machine/ai_chat_application.json",
+        "backend/routes/ai.py",
+        "backend/core/engine_chat.py",
+        "machine/ai_chat_conversation_management.json",
+        "machine/ai_chat_attachments.json"
       ],
       "required_interfaces": [
         "versioned API",
@@ -882,7 +892,9 @@
       "evidence": [
         "skeleton/api/server.py",
         "skeleton/api/routes.py",
-        "skeleton/api/gateway.py"
+        "skeleton/api/gateway.py",
+        "machine/ai_chat_application.json",
+        "machine/ai_chat_streaming.json"
       ],
       "required_interfaces": [
         "/api/v1 versioning",
@@ -944,7 +956,11 @@
       "evidence": [
         "frontend/app/product.tsx",
         "frontend/src/product",
-        "frontend/utils/apiBase.ts"
+        "frontend/utils/apiBase.ts",
+        "machine/ai_chat_product_client.json",
+        "frontend/app/ai-chat.tsx",
+        "frontend/features/Jeeves/ChatWorkspace.tsx",
+        "frontend/src/product/chatController.ts"
       ],
       "required_interfaces": [
         "canonical endpoint resolver",
@@ -1007,7 +1023,10 @@
       ],
       "evidence": [
         "skeleton/agents/messaging.py",
-        "skeleton/api/webhooks.py"
+        "skeleton/api/webhooks.py",
+        "machine/ai_chat_streaming.json",
+        "backend/routes/ai.py",
+        "skeleton/persistence/execution_repository.py"
       ],
       "required_interfaces": [
         "event id",
@@ -5312,7 +5331,12 @@
       "crash-resumable canonical pending turns",
       "serialized pending-turn concurrency and retryable optimistic conflicts"
     ],
-    "remaining_surfaces": []
+    "remaining_surfaces": [],
+    "ai_chat_source_candidate": {
+      "contract": "machine/ai_chat_application.json",
+      "status": "unverified_source_candidate",
+      "verification": "No tests executed during the 2026-10-13 one-hour implementation session; source checks and web build only. Existing completion and closure authorities are unchanged."
+    }
   },
   "tool_runtime_blueprint": {
     "schema_version": 1,
@@ -6678,7 +6702,12 @@
       "phase_4": "backend/core/ai_provider.py becomes remote compatibility client or is retired",
       "invariant": "never remove backend credential before delegation parity is proven; never claim process convergence while backend still requires it"
     },
-    "frontend_rule": "product conversation/assistant actions enter through backend because backend owns product/conversation authority; direct frontend->engine remains limited to explicitly declared engine surfaces such as health or future separately authorized engine-native features"
+    "frontend_rule": "product conversation/assistant actions enter through backend because backend owns product/conversation authority; direct frontend->engine remains limited to explicitly declared engine surfaces such as health or future separately authorized engine-native features",
+    "ai_chat_source_candidate": {
+      "contract": "machine/ai_chat_application.json",
+      "status": "unverified_source_candidate",
+      "verification": "No tests executed during the 2026-10-13 one-hour implementation session; source checks and web build only. Existing completion and closure authorities are unchanged."
+    }
   },
   "realtime_delivery_blueprint": {
     "schema_version": 1,
@@ -6814,7 +6843,12 @@
       "exact-head Streaming Protocol Closure Gate",
       "independent Stage-6 streaming verifier"
     ],
-    "remaining": []
+    "remaining": [],
+    "ai_chat_source_candidate": {
+      "contract": "machine/ai_chat_application.json",
+      "status": "unverified_source_candidate",
+      "verification": "No tests executed during the 2026-10-13 one-hour implementation session; source checks and web build only. Existing completion and closure authorities are unchanged."
+    }
   },
   "golden_journey_blueprint": {
     "schema_version": 1,
@@ -8971,7 +9005,12 @@
       "large-file context bounds",
       "generated artifact lineage",
       "delete/export propagation"
-    ]
+    ],
+    "ai_chat_source_candidate": {
+      "contract": "machine/ai_chat_application.json",
+      "status": "unverified_source_candidate",
+      "verification": "No tests executed during the 2026-10-13 one-hour implementation session; source checks and web build only. Existing completion and closure authorities are unchanged."
+    }
   },
   "model_routing_execution_policy": {
     "schema_version": 1,
@@ -9508,7 +9547,12 @@
       "citation rendering",
       "provisional-to-final reconciliation",
       "accessibility"
-    ]
+    ],
+    "ai_chat_source_candidate": {
+      "contract": "machine/ai_chat_application.json",
+      "status": "unverified_source_candidate",
+      "verification": "No tests executed during the 2026-10-13 one-hour implementation session; source checks and web build only. Existing completion and closure authorities are unchanged."
+    }
   },
   "implementation_handoff": {
     "schema_version": 1,

@@ -562,7 +562,7 @@
       "id": "cognitive-execution-ledger",
       "owner_plane": "orchestration",
       "physical_store": "engine-cognitive-sqlite",
-      "logical_location": "SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite; AIExecutionRequest / AgentTurn / ExecutionCheckpoint / AIExecutionResult",
+      "logical_location": "SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite; AIExecutionRequest / AgentTurn / ExecutionCheckpoint / AIExecutionResult; additive ai_execution_stream_event immutable replay journal",
       "authority": "authoritative",
       "source_of_truth": true,
       "status": "production-bound",
@@ -571,10 +571,10 @@
         "confidential"
       ],
       "transaction_scope": "execution/turn/checkpoint compare-and-set boundary",
-      "consistency": "turn index and checkpoint version are monotonic; only one resumable canonical checkpoint may be current for an execution",
+      "consistency": "turn index and checkpoint version are monotonic; only one resumable canonical checkpoint may be current for an execution; stream events use stable event identities, monotonic sequence, content digests, bounded pages and execution-version fencing",
       "retention": "operation/governance lifecycle controlled",
       "backup_restore": "restore engine_execution.sqlite before engine recovery; repository corruption checks validate request identity, turn/checkpoint contracts and terminal result payloads before resume",
-      "migration": "must preserve operation_id, execution_id, turn_id lineage, checkpoint version and terminal execution state",
+      "migration": "must preserve operation_id, execution_id, turn_id lineage, checkpoint version and terminal execution state; retain immutable event identity/sequence/digest for resumable provisional output",
       "derived_from": [],
       "rebuildable": false,
       "evidence": [
@@ -587,7 +587,8 @@
         "docker-compose.yml",
         "skeleton/testing/test_execution_repository.py",
         "skeleton/testing/test_execution_runtime.py",
-        "skeleton/testing/test_engine_execution_coordinator.py"
+        "skeleton/testing/test_engine_execution_coordinator.py",
+        "machine/ai_chat_streaming.json"
       ]
     },
     {
@@ -720,7 +721,7 @@
         "confidential"
       ],
       "transaction_scope": "atomic thread version/sequence/active-branch commit point with recoverable prepared-message intent",
-      "consistency": "thread tenant/owner/status/version and committed message_sequence are authoritative; prepared messages beyond committed sequence are invisible recovery intents; client caches cannot advance state",
+      "consistency": "thread tenant/owner/status/version and committed message_sequence are authoritative; prepared messages beyond committed sequence are invisible recovery intents; client caches cannot advance state; prepared user messages retain the exact immutable engine command before admission; attachment source rights and export governance are checked by the existing Mongo owner",
       "retention": "governance controlled by thread retention class",
       "backup_restore": "required with backend core application state",
       "migration": "preserve thread_id, tenant/owner identity, status, active branch, version and retention metadata",
@@ -735,7 +736,10 @@
         "backend/core/conversations.py",
         "backend/routes/conversations.py",
         "backend/tests/test_conversations_api.py",
-        "frontend/src/product/conversationClient.ts"
+        "frontend/src/product/conversationClient.ts",
+        "machine/ai_chat_conversation_management.json",
+        "machine/ai_chat_attachments.json",
+        "backend/core/chat_attachments.py"
       ]
     },
     {

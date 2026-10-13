@@ -390,7 +390,18 @@ class NumpyRecurrentLM:
         start = time.perf_counter()
         if cancel.is_set():
             raise LocalInferenceCancelled("native neural generation cancelled")
-        prompt_tokens = (BOS,) + _encode(request.prompt)
+        characters = (
+            len(request.prompt)
+            + len(request.instructions)
+            + sum(len(content) + 16 for _role, content in request.history)
+            + 32
+        )
+        if characters > 1024 * 1024:
+            raise NeuralLMError("native neural context exceeds character intake bound")
+        rendered_input = request.rendered_input
+        if len(rendered_input.encode("utf-8")) > 1024 * 1024:
+            raise NeuralLMError("native neural context exceeds byte intake bound")
+        prompt_tokens = (BOS,) + _encode(rendered_input)
         hidden = self._prime(prompt_tokens, cancel=cancel)
         rng = np.random.default_rng((request.seed ^ int(self.model_digest[:16], 16)) & ((1 << 63) - 1))
         output_tokens: list[int] = []

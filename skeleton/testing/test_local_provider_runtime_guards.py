@@ -171,6 +171,36 @@ async def test_local_policy_denial_occurs_before_inference(tmp_path, monkeypatch
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("mutation", ["transitions", "order", "malformed_transitions"])
+async def test_cached_reference_digest_cannot_hide_actual_weight_mutation(tmp_path, monkeypatch, mutation):
+    adapter = _registry(tmp_path, monkeypatch).require_active()
+    model = adapter.engine.model
+    original_digest = model.model_digest
+    if mutation == "transitions":
+        model._transitions = {context: {"changed": 1} for context in model._transitions}
+    elif mutation == "order":
+        model.order = 1
+    else:
+        model._transitions = None
+    assert model.model_digest == original_digest
+    calls = []
+
+    def forbidden(*_args, **_kwargs):
+        calls.append(True)
+        raise AssertionError("mutated weights cannot reach local inference")
+
+    monkeypatch.setattr(model, "infer", forbidden)
+    with pytest.raises(ProviderUnavailableError, match="artifact identity drift"):
+        await adapter.generate(
+            ProviderRequest(instructions="local only", prompt="alpha", max_output_tokens=3)
+        )
+    with pytest.raises(ProviderUnavailableError, match="artifact identity drift"):
+        adapter.execution_identity()
+    assert adapter.available is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
 async def test_local_dispatch_requires_actual_canonical_architecture_receipt(tmp_path, monkeypatch):
     registry = _registry(tmp_path, monkeypatch)
     adapter = registry.active

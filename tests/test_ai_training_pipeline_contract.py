@@ -43,6 +43,62 @@ def test_actual_pipeline_declares_executable_local_candidate_contracts():
     assert result["api_owner_count"] == len(APIS)
     assert result["production_model_promotion_authorized"] is False
     assert result["local_parallel_training_supported"] is True
+    assert result["local_elastic_recovery_supported"] is True
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "preference_acceptance",
+        "elastic_acceptance",
+        "rollout_acceptance",
+        "content_retrieval_acceptance",
+        "observability_acceptance",
+        "state_operator_acceptance",
+    ],
+)
+def test_next_wave_requires_explicit_assembled_acceptance(candidate, field):
+    _change(candidate, ASSEMBLY, lambda value: value.pop(field))
+    with pytest.raises(TrainingPipelineContractError, match="acceptance"):
+        validate(candidate)
+
+
+@pytest.mark.parametrize("field", ["logical_ranks", "physical_workers"])
+@pytest.mark.parametrize("bounds", [[1, 8], [1.0, 4.0]])
+def test_pipeline_rejects_elastic_allocation_drift(candidate, field, bounds):
+    _change(
+        candidate,
+        "machine/ai_local_elastic_training.json",
+        lambda value: value["limits"].update({field: bounds}),
+    )
+    with pytest.raises(TrainingPipelineContractError, match="topology"):
+        validate(candidate)
+
+
+@pytest.mark.parametrize(
+    "path,field",
+    [
+        ("machine/ai_local_preference_training.json", "world_size"),
+        ("machine/ai_local_preference_training.json", "hidden_size"),
+        ("machine/ai_local_preference_training.json", "epochs"),
+        ("machine/ai_training_observability.json", "max_selected_payload_bytes"),
+        ("machine/ai_governed_training_state_cli.json", "max_receipt_bytes"),
+    ],
+)
+def test_pipeline_rejects_new_scope_bounds_or_type_drift(candidate, path, field):
+    _change(candidate, path, lambda value: value["limits"].update({field: True}))
+    with pytest.raises(TrainingPipelineContractError, match="limit drift"):
+        validate(candidate)
+
+
+def test_pipeline_cannot_convert_elastic_restart_to_live_resize(candidate):
+    _change(
+        candidate,
+        "machine/ai_local_elastic_training.json",
+        lambda value: value.update({"live_membership_resize_supported": True}),
+    )
+    with pytest.raises(TrainingPipelineContractError, match="authority"):
+        validate(candidate)
 
 
 @pytest.mark.parametrize(

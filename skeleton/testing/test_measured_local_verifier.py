@@ -98,6 +98,42 @@ class _VoteTrainer:
         ), {"training_documents": len(corpora[spec.dataset_ids[0]])}
 
 
+class _GlobalLabelHelper:
+    reverse = False
+
+    @staticmethod
+    def decide(votes, answer):
+        counts = votes.get(answer, {"accept": 0, "reject": 1})
+        decision = max(counts, key=lambda label: (counts[label], label))
+        if _GlobalLabelHelper.reverse:
+            decision = "reject" if decision == "accept" else "accept"
+        return decision, counts[decision] / sum(counts.values())
+
+
+def _label_with_global_class(self, answer):
+    return _GlobalLabelHelper.decide(self.votes, answer)
+
+
+_GLOBAL_LABEL_DISPATCH = {"helpers": (_GlobalLabelHelper,)}
+
+
+def _label_with_global_dispatch(self, answer):
+    return _GLOBAL_LABEL_DISPATCH["helpers"][0].decide(self.votes, answer)
+
+
+def _label_with_default_class(self, answer, helper=_GlobalLabelHelper):
+    return helper.decide(self.votes, answer)
+
+
+def _label_with_captured_class():
+    helper = _GlobalLabelHelper
+
+    def label(self, answer):
+        return helper.decide(self.votes, answer)
+
+    return label
+
+
 def _source(registry, name, documents, trainer=None):
     trainer = trainer or ReferenceNGramTrainer()
     registry.register_dataset(
@@ -399,6 +435,45 @@ def test_helper_runtime_mutation_after_qualification_rejected(tmp_path):
         return "accept", 1.0
 
     sources[2].model._label = MethodType(altered, sources[2].model)
+    with pytest.raises(MeasuredVerifierError, match="implementation identity"):
+        runner.qualified_verifier(qualification, sources[2])
+
+
+@pytest.mark.parametrize("binding", ["global", "global_dispatch", "closure", "default"])
+def test_class_helper_mutation_invalidates_qualified_verifier(tmp_path, monkeypatch, binding):
+    label = {
+        "global": _label_with_global_class,
+        "global_dispatch": _label_with_global_dispatch,
+        "closure": _label_with_captured_class(),
+        "default": _label_with_default_class,
+    }[binding]
+    monkeypatch.setattr(_VoteVerifier, "_label", label)
+    _, sources = _sources()
+    runner = MeasuredVerifierRunner(EvaluationLedger(tmp_path / "eval.db"))
+    qualification = _qualify(runner, _evaluate(runner, sources), sources)
+    unchanged_weights = sources[2].model.to_dict()
+    original_runtime = sources[2].payload["runtime_digest"]
+
+    def changed_decision(_votes, _answer):
+        return "reject", 1.0
+
+    monkeypatch.setattr(_GlobalLabelHelper, "decide", staticmethod(changed_decision))
+    assert sources[2].model.to_dict() == unchanged_weights
+    assert sources[2].model._label("right") == ("reject", 1.0)
+    assert sources[2].payload["runtime_digest"] == original_runtime
+    with pytest.raises(MeasuredVerifierError, match="implementation identity"):
+        runner.qualified_verifier(qualification, sources[2])
+
+
+def test_class_helper_configuration_mutation_invalidates_qualified_verifier(tmp_path, monkeypatch):
+    monkeypatch.setattr(_VoteVerifier, "_label", _label_with_global_class)
+    _, sources = _sources()
+    runner = MeasuredVerifierRunner(EvaluationLedger(tmp_path / "eval.db"))
+    qualification = _qualify(runner, _evaluate(runner, sources), sources)
+    unchanged_weights = sources[2].model.to_dict()
+    monkeypatch.setattr(_GlobalLabelHelper, "reverse", True)
+    assert sources[2].model.to_dict() == unchanged_weights
+    assert sources[2].model._label("right")[0] == "reject"
     with pytest.raises(MeasuredVerifierError, match="implementation identity"):
         runner.qualified_verifier(qualification, sources[2])
 

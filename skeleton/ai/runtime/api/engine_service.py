@@ -2,25 +2,28 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
+import math
 import sqlite3
 import threading
-from typing import Any, Mapping
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.api.engine_authority import (
     DelegatedAuthority,
     EngineAuthorityError,
     EngineAuthorityRegistry,
 )
+from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.contracts.ai_execution import (
     AIExecutionRequest,
     ExecutionState,
+    execution_payload_digest,
 )
 from skeleton.contracts.operation import (
     OperationEnvelope,
@@ -39,17 +42,16 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionRuntimeError,
 )
 from skeleton.intelligence.quota import QuotaError
+from skeleton.persistence.execution_repository import (
+    ExecutionRepositoryConflict,
+    SQLiteExecutionRepository,
+)
 from skeleton.provider_contract import ProviderToolDefinition
 from skeleton.skills.tool_contract import ToolExecutionRequest, approval_ref_for_request
 from skeleton.vault.data_governance import DataGovernanceDenied
 from skeleton.vault.data_lifecycle import DeletionPlan, LifecycleError
 from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.vault.lifecycle_adapters import LifecycleExecutor
-from skeleton.persistence.execution_repository import (
-    ExecutionRepositoryConflict,
-    ExecutionRepositoryError,
-    SQLiteExecutionRepository,
-)
 
 
 class EngineServiceError(RuntimeError):
@@ -72,7 +74,7 @@ def _aware(raw: object, field: str) -> datetime:
         raise EngineServiceError(f"{field} is invalid")
     if value.tzinfo is None or value.utcoffset() is None:
         raise EngineServiceError(f"{field} must be timezone-aware")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _json_object(value: object, field: str) -> dict[str, Any]:
@@ -102,9 +104,7 @@ def _json_bytes(value: object) -> bytes:
             allow_nan=False,
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
-        raise EngineServiceError(
-            "engine storage payload must be deterministic JSON"
-        ) from exc
+        raise EngineServiceError("engine storage payload must be deterministic JSON") from exc
 
 
 def _digest(value: Mapping[str, Any]) -> str:
@@ -132,23 +132,12 @@ def _external_storage_operation_id(
     resource_id: str,
     write_id: str,
 ) -> str:
-    material = "\x1f".join(
-        (
-            "skeleton-external-storage",
-            service_principal,
-            tenant_id,
-            capability,
-            resource_id,
-            write_id,
-        )
-    )
+    material = f"skeleton-external-storage\x1f{service_principal}\x1f{tenant_id}\x1f{capability}\x1f{resource_id}\x1f{write_id}"
     return str(uuid5(NAMESPACE_URL, material))
 
 
 def _external_storage_receipt_id(operation_id: str) -> str:
-    return "storage-admission:" + hashlib.sha256(
-        operation_id.encode("utf-8")
-    ).hexdigest()
+    return "storage-admission:" + hashlib.sha256(operation_id.encode("utf-8")).hexdigest()
 
 
 def _execution_admission_operation_id(operation_id: str) -> str:
@@ -185,17 +174,11 @@ def _resource_budget_from_mapping(
         "max_concurrency",
         "max_queue_depth",
     }
-    kwargs = {
-        key: values[key]
-        for key in supported
-        if key in values
-    }
+    kwargs = {key: values[key] for key in supported if key in values}
     try:
         return ResourceBudget(**kwargs)
     except (TypeError, ValueError, AdmissionError) as exc:
-        raise EngineServiceError(
-            "execution resource budget is invalid"
-        ) from exc
+        raise EngineServiceError("execution resource budget is invalid") from exc
 
 
 def _operation_from_dict(payload: Mapping[str, Any]) -> OperationEnvelope:
@@ -227,11 +210,7 @@ def _execution_request_from_dict(payload: Mapping[str, Any]) -> AIExecutionReque
             tool_policy=_json_object(data["tool_policy"], "tool_policy"),
             resource_budget=_json_object(data["resource_budget"], "resource_budget"),
             stop_policy=_json_object(data["stop_policy"], "stop_policy"),
-            checkpoint_ref=(
-                None
-                if data.get("checkpoint_ref") is None
-                else str(data["checkpoint_ref"])
-            ),
+            checkpoint_ref=(None if data.get("checkpoint_ref") is None else str(data["checkpoint_ref"])),
             created_at=_aware(data["created_at"], "execution_request.created_at"),
         )
     except (KeyError, ValueError, TypeError) as exc:
@@ -278,13 +257,8 @@ class EngineContextHandoff:
                 raise EngineServiceError(f"{name} is required")
             object.__setattr__(self, name, value)
         digest = str(self.context_digest).strip()
-        if (
-            len(digest) != 64
-            or any(ch not in "0123456789abcdef" for ch in digest)
-        ):
-            raise EngineServiceError(
-                "compiled context digest must be lowercase sha256"
-            )
+        if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+            raise EngineServiceError("compiled context digest must be lowercase sha256")
         object.__setattr__(self, "context_digest", digest)
         data_class = str(self.data_class).strip().lower()
         if data_class not in {
@@ -297,83 +271,56 @@ class EngineContextHandoff:
         object.__setattr__(self, "data_class", data_class)
         purpose = str(self.purpose).strip()
         if not purpose or len(purpose) > 256:
-            raise EngineServiceError(
-                "compiled context purpose is invalid"
-            )
+            raise EngineServiceError("compiled context purpose is invalid")
         object.__setattr__(self, "purpose", purpose)
         instructions = str(self.instructions)
         prompt = str(self.prompt)
         if not instructions.strip() or not prompt.strip():
-            raise EngineServiceError(
-                "compiled context handoff requires instructions and prompt"
-            )
+            raise EngineServiceError("compiled context handoff requires instructions and prompt")
         if instructions.strip() != instructions or prompt.strip() != prompt:
-            raise EngineServiceError(
-                "compiled context instructions/prompt must be normalized"
-            )
+            raise EngineServiceError("compiled context instructions/prompt must be normalized")
         if len(instructions) > 1_000_000 or len(prompt) > 1_000_000:
             raise EngineServiceError("compiled context handoff is too large")
 
         snapshot: list[tuple[str, str]] = []
         for item in self.source_snapshot:
             if not isinstance(item, tuple) or len(item) != 2:
-                raise EngineServiceError(
-                    "compiled context source_snapshot entries must be pairs"
-                )
+                raise EngineServiceError("compiled context source_snapshot entries must be pairs")
             segment_id = str(item[0]).strip()
             segment_digest = str(item[1]).strip()
             if (
                 not segment_id
                 or len(segment_digest) != 64
-                or any(
-                    ch not in "0123456789abcdef"
-                    for ch in segment_digest
-                )
+                or any(ch not in "0123456789abcdef" for ch in segment_digest)
             ):
-                raise EngineServiceError(
-                    "compiled context source_snapshot entry is invalid"
-                )
+                raise EngineServiceError("compiled context source_snapshot entry is invalid")
             snapshot.append((segment_id, segment_digest))
-        if len(snapshot) != len(set(segment_id for segment_id, _ in snapshot)):
-            raise EngineServiceError(
-                "compiled context source_snapshot contains duplicate segment"
-            )
+        if len(snapshot) != len({segment_id for segment_id, _ in snapshot}):
+            raise EngineServiceError("compiled context source_snapshot contains duplicate segment")
         object.__setattr__(self, "source_snapshot", tuple(snapshot))
 
         history: list[tuple[str, str]] = []
         for item in self.history:
             if not isinstance(item, tuple) or len(item) != 2:
-                raise EngineServiceError(
-                    "compiled context history entries must be pairs"
-                )
+                raise EngineServiceError("compiled context history entries must be pairs")
             role = str(item[0]).strip()
             content = str(item[1])
             if role not in {"user", "assistant"}:
-                raise EngineServiceError(
-                    "compiled context history role is invalid"
-                )
+                raise EngineServiceError("compiled context history role is invalid")
             if not content.strip() or content.strip() != content:
-                raise EngineServiceError(
-                    "compiled context history content is invalid"
-                )
+                raise EngineServiceError("compiled context history content is invalid")
             history.append((role, content))
             if len(history) > 1024:
-                raise EngineServiceError(
-                    "compiled context history exceeds maximum turns"
-                )
+                raise EngineServiceError("compiled context history exceeds maximum turns")
         object.__setattr__(self, "history", tuple(history))
 
         tools: list[ProviderToolDefinition] = []
         seen_tools: set[str] = set()
         for tool in self.tools:
             if not isinstance(tool, ProviderToolDefinition):
-                raise EngineServiceError(
-                    "compiled context tools must be ProviderToolDefinition values"
-                )
+                raise EngineServiceError("compiled context tools must be ProviderToolDefinition values")
             if tool.tool_id in seen_tools:
-                raise EngineServiceError(
-                    "compiled context tools contain duplicate tool id"
-                )
+                raise EngineServiceError("compiled context tools contain duplicate tool id")
             seen_tools.add(tool.tool_id)
             tools.append(tool)
         object.__setattr__(self, "tools", tuple(tools))
@@ -381,9 +328,7 @@ class EngineContextHandoff:
         if self.model is not None:
             model = str(self.model).strip()
             if not model or len(model) > 256:
-                raise EngineServiceError(
-                    "compiled context provider model is invalid"
-                )
+                raise EngineServiceError("compiled context provider model is invalid")
             object.__setattr__(self, "model", model)
         if self.structured_output_schema is not None:
             object.__setattr__(
@@ -396,54 +341,34 @@ class EngineContextHandoff:
             )
         choice = str(self.tool_choice).strip().lower()
         if choice not in {"none", "auto", "required", "specific"}:
-            raise EngineServiceError(
-                "compiled context tool_choice is invalid"
-            )
+            raise EngineServiceError("compiled context tool_choice is invalid")
         object.__setattr__(self, "tool_choice", choice)
         if self.specific_tool_id is not None:
             specific = str(self.specific_tool_id).strip()
             if not specific:
-                raise EngineServiceError(
-                    "compiled context specific_tool_id is invalid"
-                )
+                raise EngineServiceError("compiled context specific_tool_id is invalid")
             object.__setattr__(self, "specific_tool_id", specific)
         if choice == "specific":
             if self.specific_tool_id is None:
-                raise EngineServiceError(
-                    "specific tool choice requires specific_tool_id"
-                )
-            if self.specific_tool_id not in {
-                tool.tool_id for tool in tools
-            }:
-                raise EngineServiceError(
-                    "specific tool choice is not offered"
-                )
+                raise EngineServiceError("specific tool choice requires specific_tool_id")
+            if self.specific_tool_id not in {tool.tool_id for tool in tools}:
+                raise EngineServiceError("specific tool choice is not offered")
         elif self.specific_tool_id is not None:
-            raise EngineServiceError(
-                "specific_tool_id requires tool_choice='specific'"
-            )
+            raise EngineServiceError("specific_tool_id requires tool_choice='specific'")
         try:
             estimated = float(self.estimated_cost_usd)
         except (TypeError, ValueError) as exc:
-            raise EngineServiceError(
-                "compiled context estimated_cost_usd is invalid"
-            ) from exc
-        if estimated < 0 or estimated != estimated:
-            raise EngineServiceError(
-                "compiled context estimated_cost_usd is invalid"
-            )
+            raise EngineServiceError("compiled context estimated_cost_usd is invalid") from exc
+        if estimated < 0 or not math.isfinite(estimated):
+            raise EngineServiceError("compiled context estimated_cost_usd is invalid")
         object.__setattr__(self, "estimated_cost_usd", estimated)
 
         expected = _digest(self._digest_payload())
         if self.handoff_digest is not None and self.handoff_digest != expected:
-            raise EngineServiceError(
-                "compiled context handoff_digest does not match payload"
-            )
+            raise EngineServiceError("compiled context handoff_digest does not match payload")
         object.__setattr__(self, "handoff_digest", expected)
         if self.schema_version != 1:
-            raise EngineServiceError(
-                "unsupported compiled context handoff schema version"
-            )
+            raise EngineServiceError("unsupported compiled context handoff schema version")
 
     def _digest_payload(self) -> dict[str, Any]:
         return {
@@ -454,24 +379,16 @@ class EngineContextHandoff:
             "context_id": self.context_id,
             "context_digest": self.context_digest,
             "compiler_version": self.compiler_version,
-            "source_snapshot": [
-                [segment_id, digest]
-                for segment_id, digest in self.source_snapshot
-            ],
+            "source_snapshot": [[segment_id, digest] for segment_id, digest in self.source_snapshot],
             "data_class": self.data_class,
             "purpose": self.purpose,
             "instructions": self.instructions,
             "prompt": self.prompt,
-            "history": [
-                {"role": role, "content": content}
-                for role, content in self.history
-            ],
+            "history": [{"role": role, "content": content} for role, content in self.history],
             "tools": [tool.as_dict() for tool in self.tools],
             "model": self.model,
             "structured_output_schema": (
-                None
-                if self.structured_output_schema is None
-                else dict(self.structured_output_schema)
+                None if self.structured_output_schema is None else dict(self.structured_output_schema)
             ),
             "tool_choice": self.tool_choice,
             "specific_tool_id": self.specific_tool_id,
@@ -486,7 +403,7 @@ class EngineContextHandoff:
         }
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> "EngineContextHandoff":
+    def from_dict(cls, payload: Mapping[str, Any]) -> EngineContextHandoff:
         data = _json_object(payload, "compiled_context")
         raw_snapshot = data.get("source_snapshot", [])
         raw_history = data.get("history", [])
@@ -496,24 +413,16 @@ class EngineContextHandoff:
             or not isinstance(raw_history, list)
             or not isinstance(raw_tools, list)
         ):
-            raise EngineServiceError(
-                "compiled context arrays are malformed"
-            )
+            raise EngineServiceError("compiled context arrays are malformed")
         snapshot = tuple(
-            (str(item[0]), str(item[1]))
-            for item in raw_snapshot
-            if isinstance(item, list) and len(item) == 2
+            (str(item[0]), str(item[1])) for item in raw_snapshot if isinstance(item, list) and len(item) == 2
         )
         if len(snapshot) != len(raw_snapshot):
-            raise EngineServiceError(
-                "compiled context source_snapshot is malformed"
-            )
+            raise EngineServiceError("compiled context source_snapshot is malformed")
         history: list[tuple[str, str]] = []
         for item in raw_history:
             if not isinstance(item, Mapping):
-                raise EngineServiceError(
-                    "compiled context history is malformed"
-                )
+                raise EngineServiceError("compiled context history is malformed")
             history.append(
                 (
                     str(item.get("role") or ""),
@@ -523,9 +432,7 @@ class EngineContextHandoff:
         tools: list[ProviderToolDefinition] = []
         for item in raw_tools:
             if not isinstance(item, Mapping):
-                raise EngineServiceError(
-                    "compiled context tool definition is malformed"
-                )
+                raise EngineServiceError("compiled context tool definition is malformed")
             tools.append(
                 ProviderToolDefinition(
                     tool_id=str(item.get("tool_id") or ""),
@@ -551,11 +458,7 @@ class EngineContextHandoff:
             prompt=str(data.get("prompt") or ""),
             history=tuple(history),
             tools=tuple(tools),
-            model=(
-                None
-                if data.get("model") is None
-                else str(data["model"])
-            ),
+            model=(None if data.get("model") is None else str(data["model"])),
             structured_output_schema=(
                 None
                 if data.get("structured_output_schema") is None
@@ -566,18 +469,10 @@ class EngineContextHandoff:
             ),
             tool_choice=str(data.get("tool_choice", "auto")),
             specific_tool_id=(
-                None
-                if data.get("specific_tool_id") is None
-                else str(data["specific_tool_id"])
+                None if data.get("specific_tool_id") is None else str(data["specific_tool_id"])
             ),
-            estimated_cost_usd=float(
-                data.get("estimated_cost_usd", 0.0)
-            ),
-            handoff_digest=(
-                None
-                if data.get("handoff_digest") is None
-                else str(data["handoff_digest"])
-            ),
+            estimated_cost_usd=float(data.get("estimated_cost_usd", 0.0)),
+            handoff_digest=(None if data.get("handoff_digest") is None else str(data["handoff_digest"])),
             schema_version=int(data.get("schema_version", 1)),
         )
 
@@ -597,91 +492,47 @@ class EngineExecutionCommand:
         if not isinstance(self.operation, OperationEnvelope):
             raise EngineServiceError("operation must be OperationEnvelope")
         if not isinstance(self.execution_request, AIExecutionRequest):
-            raise EngineServiceError(
-                "execution_request must be AIExecutionRequest"
-            )
+            raise EngineServiceError("execution_request must be AIExecutionRequest")
         if not isinstance(self.delegated_authority, DelegatedAuthority):
-            raise EngineServiceError(
-                "delegated_authority must be DelegatedAuthority"
-            )
+            raise EngineServiceError("delegated_authority must be DelegatedAuthority")
         if not isinstance(self.compiled_context, EngineContextHandoff):
-            raise EngineServiceError(
-                "compiled_context must be EngineContextHandoff"
-            )
+            raise EngineServiceError("compiled_context must be EngineContextHandoff")
         handoff = self.compiled_context
         if handoff.operation_id != self.operation.operation_id:
-            raise EngineServiceError(
-                "compiled context operation_id mismatch"
-            )
+            raise EngineServiceError("compiled context operation_id mismatch")
         if handoff.execution_id != self.execution_request.execution_id:
-            raise EngineServiceError(
-                "compiled context execution_id mismatch"
-            )
+            raise EngineServiceError("compiled context execution_id mismatch")
         if handoff.tenant_id != self.operation.tenant_id:
-            raise EngineServiceError(
-                "compiled context tenant_id mismatch"
-            )
+            raise EngineServiceError("compiled context tenant_id mismatch")
         context_policy = dict(self.execution_request.context_policy)
         if context_policy.get("context_id") != handoff.context_id:
-            raise EngineServiceError(
-                "compiled context id does not match execution policy"
-            )
+            raise EngineServiceError("compiled context id does not match execution policy")
         if context_policy.get("context_digest") != handoff.context_digest:
-            raise EngineServiceError(
-                "compiled context digest does not match execution policy"
-            )
+            raise EngineServiceError("compiled context digest does not match execution policy")
         if context_policy.get("handoff_digest") != handoff.handoff_digest:
-            raise EngineServiceError(
-                "compiled context handoff is not bound to execution identity"
-            )
-        expected_snapshot = [
-            [segment_id, digest]
-            for segment_id, digest in handoff.source_snapshot
-        ]
+            raise EngineServiceError("compiled context handoff is not bound to execution identity")
+        expected_snapshot = [[segment_id, digest] for segment_id, digest in handoff.source_snapshot]
         if context_policy.get("source_snapshot") != expected_snapshot:
-            raise EngineServiceError(
-                "compiled context source snapshot mismatch"
-            )
+            raise EngineServiceError("compiled context source snapshot mismatch")
         allowed_tool_ids = self.execution_request.tool_policy.get(
             "allowed_tool_ids",
             [],
         )
-        if (
-            not isinstance(allowed_tool_ids, list)
-            or any(
-                not isinstance(item, str) or not item.strip()
-                for item in allowed_tool_ids
-            )
+        if not isinstance(allowed_tool_ids, list) or any(
+            not isinstance(item, str) or not item.strip() for item in allowed_tool_ids
         ):
-            raise EngineServiceError(
-                "execution tool policy allowed_tool_ids is malformed"
-            )
-        canonical_allowed = list(
-            dict.fromkeys(item.strip() for item in allowed_tool_ids)
-        )
-        handoff_tool_ids = [
-            tool.tool_id
-            for tool in handoff.tools
-        ]
+            raise EngineServiceError("execution tool policy allowed_tool_ids is malformed")
+        canonical_allowed = list(dict.fromkeys(item.strip() for item in allowed_tool_ids))
+        handoff_tool_ids = [tool.tool_id for tool in handoff.tools]
         if canonical_allowed != handoff_tool_ids:
-            raise EngineServiceError(
-                "compiled context tools do not match execution tool policy"
-            )
-        if (
-            "tool_choice" in context_policy
-            and context_policy.get("tool_choice") != handoff.tool_choice
-        ):
-            raise EngineServiceError(
-                "compiled context tool_choice does not match execution policy"
-            )
+            raise EngineServiceError("compiled context tools do not match execution tool policy")
+        if "tool_choice" in context_policy and context_policy.get("tool_choice") != handoff.tool_choice:
+            raise EngineServiceError("compiled context tool_choice does not match execution policy")
         if (
             "specific_tool_id" in context_policy
-            and context_policy.get("specific_tool_id")
-            != handoff.specific_tool_id
+            and context_policy.get("specific_tool_id") != handoff.specific_tool_id
         ):
-            raise EngineServiceError(
-                "compiled context specific_tool_id does not match execution policy"
-            )
+            raise EngineServiceError("compiled context specific_tool_id does not match execution policy")
         refs: list[str] = []
         for raw in self.context_seed_refs:
             if not isinstance(raw, str) or not raw.strip():
@@ -702,13 +553,9 @@ class EngineExecutionCommand:
         object.__setattr__(self, "resource_budget", budget)
         object.__setattr__(self, "stream_preferences", preferences)
         if budget != dict(self.execution_request.resource_budget):
-            raise EngineServiceError(
-                "command resource_budget must equal execution request budget"
-            )
+            raise EngineServiceError("command resource_budget must equal execution request budget")
         if self.schema_version != 1:
-            raise EngineServiceError(
-                "unsupported engine execution command schema version"
-            )
+            raise EngineServiceError("unsupported engine execution command schema version")
 
     @property
     def command_digest(self) -> str:
@@ -732,12 +579,8 @@ class EngineExecutionCommand:
                 "operation_id": self.operation.operation_id,
                 "operation_identity_digest": self.operation.identity_digest,
                 "execution_id": self.execution_request.execution_id,
-                "execution_identity_digest": (
-                    self.execution_request.identity_digest
-                ),
-                "compiled_context_handoff_digest": (
-                    self.compiled_context.handoff_digest
-                ),
+                "execution_identity_digest": (self.execution_request.identity_digest),
+                "compiled_context_handoff_digest": (self.compiled_context.handoff_digest),
                 "context_seed_refs": list(self.context_seed_refs),
                 "resource_budget": dict(self.resource_budget),
                 "stream_preferences": dict(self.stream_preferences),
@@ -761,7 +604,7 @@ class EngineExecutionCommand:
         }
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> "EngineExecutionCommand":
+    def from_dict(cls, payload: Mapping[str, Any]) -> EngineExecutionCommand:
         data = _json_object(payload, "engine execution command")
         allowed = {
             "schema_version",
@@ -776,8 +619,7 @@ class EngineExecutionCommand:
         extras = set(data) - allowed
         if extras:
             raise EngineServiceError(
-                "engine command contains unsupported fields: "
-                + ", ".join(sorted(extras))
+                "engine command contains unsupported fields: " + ", ".join(sorted(extras))
             )
         for forbidden in (
             "conversation_history",
@@ -786,16 +628,12 @@ class EngineExecutionCommand:
             "transcript",
         ):
             if forbidden in data:
-                raise EngineServiceError(
-                    "engine command cannot carry client transcript authority"
-                )
+                raise EngineServiceError("engine command cannot carry client transcript authority")
         refs = data.get("context_seed_refs", [])
         if not isinstance(refs, list):
             raise EngineServiceError("context_seed_refs must be a list")
         return cls(
-            operation=_operation_from_dict(
-                _json_object(data.get("operation"), "operation")
-            ),
+            operation=_operation_from_dict(_json_object(data.get("operation"), "operation")),
             execution_request=_execution_request_from_dict(
                 _json_object(
                     data.get("execution_request"),
@@ -968,43 +806,28 @@ class EngineToolApproval:
                 raise EngineServiceError(f"{name} exceeds maximum length")
             object.__setattr__(self, name, value)
         digest = str(self.arguments_digest).strip()
-        if (
-            len(digest) != 64
-            or any(ch not in "0123456789abcdef" for ch in digest)
-        ):
-            raise EngineServiceError(
-                "arguments_digest must be lowercase sha256"
-            )
+        if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+            raise EngineServiceError("arguments_digest must be lowercase sha256")
         object.__setattr__(self, "arguments_digest", digest)
         approval_ref = str(self.bound_approval_ref).strip()
         if not approval_ref.startswith("approval:") or len(approval_ref) > 1024:
-            raise EngineServiceError(
-                "bound_approval_ref must be a request-bound approval capability"
-            )
+            raise EngineServiceError("bound_approval_ref must be a request-bound approval capability")
         object.__setattr__(self, "bound_approval_ref", approval_ref)
         issued = _aware(self.issued_at, "approval.issued_at")
         expires = _aware(self.expires_at, "approval.expires_at")
         if expires <= issued:
-            raise EngineServiceError(
-                "approval expires_at must be later than issued_at"
-            )
+            raise EngineServiceError("approval expires_at must be later than issued_at")
         object.__setattr__(self, "issued_at", issued)
         object.__setattr__(self, "expires_at", expires)
         if self.schema_version != 1:
-            raise EngineServiceError(
-                "unsupported engine tool approval schema version"
-            )
+            raise EngineServiceError("unsupported engine tool approval schema version")
 
     @property
     def approval_ref(self) -> str:
         return self.bound_approval_ref
 
     def expired(self, *, now: datetime | None = None) -> bool:
-        instant = (
-            datetime.now(timezone.utc)
-            if now is None
-            else _aware(now, "approval.now")
-        )
+        instant = datetime.now(UTC) if now is None else _aware(now, "approval.now")
         return instant >= self.expires_at
 
     def as_dict(self) -> dict[str, Any]:
@@ -1052,8 +875,7 @@ class SQLiteEngineSubmissionStore:
         self._connection.row_factory = sqlite3.Row
         self._lock = threading.RLock()
         with self._lock:
-            self._connection.executescript(
-                """
+            self._connection.executescript("""
                 CREATE TABLE IF NOT EXISTS engine_submission (
                     namespace TEXT NOT NULL,
                     service_principal TEXT NOT NULL,
@@ -1095,8 +917,7 @@ class SQLiteEngineSubmissionStore:
                 ON engine_tool_approval(
                     namespace, execution_id, call_id, expires_at
                 );
-                """
-            )
+                """)
 
     @staticmethod
     def _ack_from_dict(data: Mapping[str, Any]) -> EngineExecutionAck:
@@ -1144,9 +965,7 @@ class SQLiteEngineSubmissionStore:
                 command_payload = json.loads(row["command_json"])
                 ack_payload = json.loads(row["ack_json"])
             except json.JSONDecodeError as exc:
-                raise EngineServiceError(
-                    "stored engine submission is corrupt"
-                ) from exc
+                raise EngineServiceError("stored engine submission is corrupt") from exc
             return _StoredSubmission(
                 principal=row["service_principal"],
                 command=EngineExecutionCommand.from_dict(command_payload),
@@ -1207,23 +1026,14 @@ class SQLiteEngineSubmissionStore:
                 if row is not None:
                     try:
                         stored_payload = json.loads(row["command_json"])
-                        stored_command = EngineExecutionCommand.from_dict(
-                            stored_payload
-                        )
+                        stored_command = EngineExecutionCommand.from_dict(stored_payload)
                     except (json.JSONDecodeError, EngineServiceError) as exc:
-                        raise EngineServiceError(
-                            "stored engine submission is corrupt"
-                        ) from exc
-                    if (
-                        stored_command.submission_digest
-                        != command.submission_digest
-                    ):
+                        raise EngineServiceError("stored engine submission is corrupt") from exc
+                    if stored_command.submission_digest != command.submission_digest:
                         raise EngineSubmissionConflict(
                             "engine idempotency identity was reused with different command"
                         )
-                    existing = self._ack_from_dict(
-                        json.loads(row["ack_json"])
-                    )
+                    existing = self._ack_from_dict(json.loads(row["ack_json"]))
                     self._connection.execute("COMMIT")
                     return existing
                 self._connection.execute(
@@ -1263,7 +1073,6 @@ class SQLiteEngineSubmissionStore:
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
-
 
     @staticmethod
     def _approval_from_row(row: sqlite3.Row) -> EngineToolApproval:
@@ -1330,16 +1139,12 @@ class SQLiteEngineSubmissionStore:
                         approval.approval_ref,
                     )
                     if stable_existing != stable_candidate:
-                        raise EngineSubmissionConflict(
-                            "approval idempotency identity was reused differently"
-                        )
+                        raise EngineSubmissionConflict("approval idempotency identity was reused differently")
                     if existing.expires_at == approval.expires_at:
                         self._connection.execute("COMMIT")
                         return existing
                     if not existing.expired(now=approval.issued_at):
-                        raise EngineSubmissionConflict(
-                            "active approval cannot be widened or renewed"
-                        )
+                        raise EngineSubmissionConflict("active approval cannot be widened or renewed")
                     if approval.expires_at <= existing.expires_at:
                         raise EngineSubmissionConflict(
                             "renewed approval must extend an expired approval window"
@@ -1389,9 +1194,7 @@ class SQLiteEngineSubmissionStore:
                 return approval
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
-                raise EngineSubmissionConflict(
-                    "engine tool approval identity conflict"
-                ) from exc
+                raise EngineSubmissionConflict("engine tool approval identity conflict") from exc
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
@@ -1403,11 +1206,7 @@ class SQLiteEngineSubmissionStore:
         now: datetime | None = None,
         include_expired: bool = False,
     ) -> tuple[EngineToolApproval, ...]:
-        instant = (
-            datetime.now(timezone.utc)
-            if now is None
-            else _aware(now, "approval.now")
-        )
+        instant = datetime.now(UTC) if now is None else _aware(now, "approval.now")
         with self._lock:
             rows = self._connection.execute(
                 """
@@ -1420,11 +1219,7 @@ class SQLiteEngineSubmissionStore:
         approvals = tuple(self._approval_from_row(row) for row in rows)
         if include_expired:
             return approvals
-        return tuple(
-            approval
-            for approval in approvals
-            if not approval.expired(now=instant)
-        )
+        return tuple(approval for approval in approvals if not approval.expired(now=instant))
 
     def active_approval_refs(
         self,
@@ -1498,37 +1293,22 @@ class EngineExecutionService:
             raise TypeError("submissions must be SQLiteEngineSubmissionStore")
         if not isinstance(authorities, EngineAuthorityRegistry):
             raise TypeError("authorities must be EngineAuthorityRegistry")
-        if (
-            admission_runtime is not None
-            and not isinstance(admission_runtime, AdmissionRuntime)
-        ):
+        if admission_runtime is not None and not isinstance(admission_runtime, AdmissionRuntime):
             raise TypeError("admission_runtime must be AdmissionRuntime")
-        if (
-            governance_registry is not None
-            and not isinstance(governance_registry, GovernanceRegistry)
-        ):
+        if governance_registry is not None and not isinstance(governance_registry, GovernanceRegistry):
             raise TypeError("governance_registry must be GovernanceRegistry")
-        if (
-            governance_lifecycle_executor is not None
-            and not isinstance(
-                governance_lifecycle_executor,
-                LifecycleExecutor,
-            )
+        if governance_lifecycle_executor is not None and not isinstance(
+            governance_lifecycle_executor,
+            LifecycleExecutor,
         ):
-            raise TypeError(
-                "governance_lifecycle_executor must be LifecycleExecutor"
-            )
+            raise TypeError("governance_lifecycle_executor must be LifecycleExecutor")
         self.repository = repository
         self.submissions = submissions
         self.authorities = authorities
         self.admission_runtime = admission_runtime
         self.governance_registry = governance_registry
         self.governance_lifecycle_executor = governance_lifecycle_executor
-        self._usage_meter = (
-            None
-            if admission_runtime is None
-            else ArtifactUsageMeter(admission_runtime)
-        )
+        self._usage_meter = None if admission_runtime is None else ArtifactUsageMeter(admission_runtime)
 
     def meter_execution_storage(
         self,
@@ -1542,14 +1322,8 @@ class EngineExecutionService:
         meter = self._usage_meter
         if meter is None:
             return
-        instant = (
-            datetime.now(timezone.utc)
-            if now is None
-            else _aware(now, "storage.now")
-        )
-        operation_id = _execution_admission_operation_id(
-            command.operation.operation_id
-        )
+        instant = datetime.now(UTC) if now is None else _aware(now, "storage.now")
+        operation_id = _execution_admission_operation_id(command.operation.operation_id)
         meter.meter_storage(
             operation_id,
             str(resource_id),
@@ -1572,9 +1346,7 @@ class EngineExecutionService:
         runtime = self.admission_runtime
         meter = self._usage_meter
         if runtime is None or meter is None:
-            raise EngineServiceError(
-                "engine storage admission runtime is unavailable"
-            )
+            raise EngineServiceError("engine storage admission runtime is unavailable")
 
         principal = _bounded_storage_text(
             verified_service_principal,
@@ -1602,19 +1374,13 @@ class EngineExecutionService:
             or storage_bytes < 1
             or storage_bytes > 1024 * 1024 * 1024
         ):
-            raise EngineServiceError(
-                "storage_bytes must be within [1, 1GiB]"
-            )
+            raise EngineServiceError("storage_bytes must be within [1, 1GiB]")
 
         grant = self.authorities.grant_for(principal)
         if "engine:admission" not in grant.scopes:
-            raise EngineAuthorityError(
-                "engine admission scope denied"
-            )
+            raise EngineAuthorityError("engine admission scope denied")
         if not grant.allows_tenant(tenant):
-            raise EngineAuthorityError(
-                "engine admission tenant denied"
-            )
+            raise EngineAuthorityError("engine admission tenant denied")
 
         operation_id = _external_storage_operation_id(
             principal,
@@ -1623,11 +1389,7 @@ class EngineExecutionService:
             resource_key,
             write_key,
         )
-        instant = (
-            datetime.now(timezone.utc)
-            if now is None
-            else _aware(now, "storage_admission.now")
-        )
+        instant = datetime.now(UTC) if now is None else _aware(now, "storage_admission.now")
 
         completion_reader = getattr(
             runtime.quota_ledger,
@@ -1643,13 +1405,9 @@ class EngineExecutionService:
                 existing = None
             if existing is not None:
                 if existing.actual.storage_bytes != storage_bytes:
-                    raise EngineServiceError(
-                        "external storage admission identity conflict"
-                    )
+                    raise EngineServiceError("external storage admission identity conflict")
                 return EngineStorageAdmissionReceipt(
-                    receipt_id=_external_storage_receipt_id(
-                        operation_id
-                    ),
+                    receipt_id=_external_storage_receipt_id(operation_id),
                     operation_id=operation_id,
                     tenant_id=tenant,
                     capability=capability_key,
@@ -1658,7 +1416,7 @@ class EngineExecutionService:
                     storage_bytes=storage_bytes,
                     admitted_at=datetime.fromtimestamp(
                         existing.completed_at,
-                        timezone.utc,
+                        UTC,
                     ),
                     quota_reservation_id=existing.reservation_id,
                     admission_decision_id=None,
@@ -1700,19 +1458,15 @@ class EngineExecutionService:
             if lease is not None:
                 try:
                     runtime.release(operation_id)
-                except Exception:
+                except Exception:  # noqa: BLE001, S110
                     # Metered durable usage cannot be released. Preserve the
                     # original admission/accounting failure and leave durable
                     # recovery to the replay-safe quota operation identity.
                     pass
-            raise EngineServiceError(
-                "external storage write denied by resource admission"
-            ) from exc
+            raise EngineServiceError("external storage write denied by resource admission") from exc
 
         reservation_id = (
-            None
-            if completion.quota_completion is None
-            else completion.quota_completion.reservation_id
+            None if completion.quota_completion is None else completion.quota_completion.reservation_id
         )
         return EngineStorageAdmissionReceipt(
             receipt_id=_external_storage_receipt_id(operation_id),
@@ -1746,9 +1500,7 @@ class EngineExecutionService:
     ) -> EngineGovernanceWriteReceipt:
         registry = self.governance_registry
         if registry is None:
-            raise EngineServiceError(
-                "engine governance registry is unavailable"
-            )
+            raise EngineServiceError("engine governance registry is unavailable")
 
         principal = _bounded_storage_text(
             verified_service_principal,
@@ -1773,9 +1525,7 @@ class EngineExecutionService:
             or not isinstance(purposes, tuple)
             or not 1 <= len(purposes) <= 32
         ):
-            raise EngineServiceError(
-                "purposes must contain between 1 and 32 values"
-            )
+            raise EngineServiceError("purposes must contain between 1 and 32 values")
         normalized_purposes = tuple(
             _bounded_storage_text(
                 value,
@@ -1791,9 +1541,7 @@ class EngineExecutionService:
                 or not isinstance(deletion_targets, tuple)
                 or not 1 <= len(deletion_targets) <= 32
             ):
-                raise EngineServiceError(
-                    "deletion_targets must contain between 1 and 32 values"
-                )
+                raise EngineServiceError("deletion_targets must contain between 1 and 32 values")
             normalized_targets = tuple(
                 _bounded_storage_text(
                     value,
@@ -1805,13 +1553,9 @@ class EngineExecutionService:
 
         grant = self.authorities.grant_for(principal)
         if "engine:governance" not in grant.scopes:
-            raise EngineAuthorityError(
-                "engine governance scope denied"
-            )
+            raise EngineAuthorityError("engine governance scope denied")
         if not grant.allows_tenant(tenant):
-            raise EngineAuthorityError(
-                "engine governance tenant denied"
-            )
+            raise EngineAuthorityError("engine governance tenant denied")
 
         kwargs = {
             "record_id": _bounded_storage_text(
@@ -1849,13 +1593,9 @@ class EngineExecutionService:
                 )
             inventory = registry.lifecycle.get(record.record_id)
         except (DataGovernanceDenied, LifecycleError) as exc:
-            raise EngineServiceError(
-                "external governance write rejected"
-            ) from exc
+            raise EngineServiceError("external governance write rejected") from exc
         if inventory["tenant_id"] != tenant:
-            raise EngineServiceError(
-                "governance write tenant reconciliation failed"
-            )
+            raise EngineServiceError("governance write tenant reconciliation failed")
         return EngineGovernanceWriteReceipt(
             mode=mode_key,
             record=inventory,
@@ -1874,13 +1614,9 @@ class EngineExecutionService:
         tenant = _bounded_storage_text(tenant_id, "tenant_id")
         grant = self.authorities.grant_for(principal)
         if "engine:governance" not in grant.scopes:
-            raise EngineAuthorityError(
-                "engine governance scope denied"
-            )
+            raise EngineAuthorityError("engine governance scope denied")
         if not grant.allows_tenant(tenant):
-            raise EngineAuthorityError(
-                "engine governance tenant denied"
-            )
+            raise EngineAuthorityError("engine governance tenant denied")
         return principal, tenant
 
     def request_external_governance_deletion(
@@ -1894,9 +1630,7 @@ class EngineExecutionService:
     ) -> dict[str, Any]:
         registry = self.governance_registry
         if registry is None:
-            raise EngineServiceError(
-                "engine governance registry is unavailable"
-            )
+            raise EngineServiceError("engine governance registry is unavailable")
         _principal, tenant = self._authorize_external_governance(
             verified_service_principal=verified_service_principal,
             tenant_id=tenant_id,
@@ -1916,9 +1650,7 @@ class EngineExecutionService:
                 )
             )
             if not normalized_ids:
-                raise EngineServiceError(
-                    "record_ids must not be empty when supplied"
-                )
+                raise EngineServiceError("record_ids must not be empty when supplied")
             if len(normalized_ids) > 10_000:
                 raise EngineServiceError("too many governance record_ids")
         reason_key = _bounded_storage_text(
@@ -1926,11 +1658,7 @@ class EngineExecutionService:
             "reason",
             maximum=512,
         )
-        timestamp = (
-            None
-            if now is None
-            else _aware(now, "governance_deletion.now").timestamp()
-        )
+        timestamp = None if now is None else _aware(now, "governance_deletion.now").timestamp()
         try:
             plan = registry.request_deletion(
                 tenant,
@@ -1939,9 +1667,7 @@ class EngineExecutionService:
                 now=timestamp,
             )
         except LifecycleError as exc:
-            raise EngineServiceError(
-                "external governance deletion plan rejected"
-            ) from exc
+            raise EngineServiceError("external governance deletion plan rejected") from exc
         return {
             "schema_version": 1,
             "plan_id": plan.plan_id,
@@ -1971,9 +1697,7 @@ class EngineExecutionService:
 
         registry = self.governance_registry
         if registry is None:
-            raise EngineServiceError(
-                "engine governance registry is unavailable"
-            )
+            raise EngineServiceError("engine governance registry is unavailable")
         _principal, tenant = self._authorize_external_governance(
             verified_service_principal=verified_service_principal,
             tenant_id=tenant_id,
@@ -1992,9 +1716,7 @@ class EngineExecutionService:
                 now=timestamp,
             )
         except LifecycleError as exc:
-            raise EngineServiceError(
-                "external governance retention plan rejected"
-            ) from exc
+            raise EngineServiceError("external governance retention plan rejected") from exc
 
         if plan is None:
             return {
@@ -2036,9 +1758,7 @@ class EngineExecutionService:
         registry = self.governance_registry
         executor = self.governance_lifecycle_executor
         if registry is None or executor is None:
-            raise EngineServiceError(
-                "engine governance lifecycle execution is unavailable"
-            )
+            raise EngineServiceError("engine governance lifecycle execution is unavailable")
         _principal, tenant = self._authorize_external_governance(
             verified_service_principal=verified_service_principal,
             tenant_id=tenant_id,
@@ -2054,15 +1774,9 @@ class EngineExecutionService:
                 tenant_id=tenant,
             )
         except (LifecycleError, DataGovernanceDenied) as exc:
-            raise EngineServiceError(
-                "external governance deletion plan is unavailable"
-            ) from exc
+            raise EngineServiceError("external governance deletion plan is unavailable") from exc
 
-        engine_actions = tuple(
-            action
-            for action in pending.actions
-            if action.target != "conversation"
-        )
+        engine_actions = tuple(action for action in pending.actions if action.target != "conversation")
         if not engine_actions:
             return {
                 "schema_version": 1,
@@ -2093,20 +1807,13 @@ class EngineExecutionService:
                 now=timestamp,
             )
         except Exception as exc:
-            raise EngineServiceError(
-                "engine governance target execution failed"
-            ) from exc
+            raise EngineServiceError("engine governance target execution failed") from exc
         return {
             "schema_version": 1,
             "plan_id": result.plan_id,
             "tenant_id": pending.tenant_id,
-            "executed_targets": sorted(
-                {action.target for action in engine_actions}
-            ),
-            "receipts": [
-                receipt.as_dict()
-                for receipt in result.receipts
-            ],
+            "executed_targets": sorted({action.target for action in engine_actions}),
+            "receipts": [receipt.as_dict() for receipt in result.receipts],
         }
 
     def acknowledge_external_governance_deletion(
@@ -2121,9 +1828,7 @@ class EngineExecutionService:
     ) -> dict[str, Any]:
         registry = self.governance_registry
         if registry is None:
-            raise EngineServiceError(
-                "engine governance registry is unavailable"
-            )
+            raise EngineServiceError("engine governance registry is unavailable")
         _principal, tenant = self._authorize_external_governance(
             verified_service_principal=verified_service_principal,
             tenant_id=tenant_id,
@@ -2136,18 +1841,10 @@ class EngineExecutionService:
         try:
             inventory = registry.lifecycle.get(record_key)
         except LifecycleError as exc:
-            raise EngineServiceError(
-                "governance deletion record is unavailable"
-            ) from exc
+            raise EngineServiceError("governance deletion record is unavailable") from exc
         if inventory.get("tenant_id") != tenant:
-            raise EngineAuthorityError(
-                "engine governance tenant denied"
-            )
-        timestamp = (
-            None
-            if now is None
-            else _aware(now, "governance_ack.now").timestamp()
-        )
+            raise EngineAuthorityError("engine governance tenant denied")
+        timestamp = None if now is None else _aware(now, "governance_ack.now").timestamp()
         try:
             receipt = registry.acknowledge_deletion(
                 _bounded_storage_text(
@@ -2164,9 +1861,7 @@ class EngineExecutionService:
                 now=timestamp,
             )
         except LifecycleError as exc:
-            raise EngineServiceError(
-                "governance deletion acknowledgement rejected"
-            ) from exc
+            raise EngineServiceError("governance deletion acknowledgement rejected") from exc
         return {
             "schema_version": 1,
             "receipt_id": receipt.receipt_id,
@@ -2185,9 +1880,7 @@ class EngineExecutionService:
     ) -> dict[str, Any]:
         registry = self.governance_registry
         if registry is None:
-            raise EngineServiceError(
-                "engine governance registry is unavailable"
-            )
+            raise EngineServiceError("engine governance registry is unavailable")
         _principal, tenant = self._authorize_external_governance(
             verified_service_principal=verified_service_principal,
             tenant_id=tenant_id,
@@ -2205,14 +1898,10 @@ class EngineExecutionService:
         command: EngineExecutionCommand,
     ) -> AdmissionRequest:
         return AdmissionRequest(
-            operation_id=_execution_admission_operation_id(
-                command.operation.operation_id
-            ),
+            operation_id=_execution_admission_operation_id(command.operation.operation_id),
             tenant_id=command.operation.tenant_id,
             capability="engine-execution",
-            budget=_resource_budget_from_mapping(
-                command.resource_budget
-            ),
+            budget=_resource_budget_from_mapping(command.resource_budget),
             estimate=UsageEstimate(),
         )
 
@@ -2225,20 +1914,14 @@ class EngineExecutionService:
         runtime = self.admission_runtime
         if runtime is None:
             return None
-        instant = (
-            datetime.now(timezone.utc)
-            if now is None
-            else _aware(now, "admission.now")
-        )
+        instant = datetime.now(UTC) if now is None else _aware(now, "admission.now")
         try:
             return runtime.admit(
                 self._execution_admission_request(command),
                 now_wall=instant.timestamp(),
             )
         except (AdmissionError, AdmissionRuntimeError) as exc:
-            raise EngineServiceError(
-                "engine execution denied by resource admission"
-            ) from exc
+            raise EngineServiceError("engine execution denied by resource admission") from exc
 
     def complete_execution_admission(
         self,
@@ -2249,23 +1932,15 @@ class EngineExecutionService:
         runtime = self.admission_runtime
         if runtime is None:
             return None
-        stored = self.submissions.get_by_execution_id(
-            str(execution_id)
-        )
+        stored = self.submissions.get_by_execution_id(str(execution_id))
         if stored is None:
-            raise EngineServiceError(
-                "engine execution submission is unavailable"
-            )
+            raise EngineServiceError("engine execution submission is unavailable")
         lease = self.ensure_execution_admission(
             stored.command,
             now=now,
         )
         assert lease is not None
-        instant = (
-            datetime.now(timezone.utc)
-            if now is None
-            else _aware(now, "admission.now")
-        )
+        instant = datetime.now(UTC) if now is None else _aware(now, "admission.now")
         try:
             return runtime.complete(
                 lease.operation_id,
@@ -2273,9 +1948,7 @@ class EngineExecutionService:
                 now_wall=instant.timestamp(),
             )
         except AdmissionRuntimeError as exc:
-            raise EngineServiceError(
-                "engine execution admission completion failed"
-            ) from exc
+            raise EngineServiceError("engine execution admission completion failed") from exc
 
     def release_execution_admission(
         self,
@@ -2284,9 +1957,7 @@ class EngineExecutionService:
         runtime = self.admission_runtime
         if runtime is None:
             return
-        operation_id = _execution_admission_operation_id(
-            command.operation.operation_id
-        )
+        operation_id = _execution_admission_operation_id(command.operation.operation_id)
         try:
             runtime.release(operation_id)
         except AdmissionRuntimeError:
@@ -2318,11 +1989,7 @@ class EngineExecutionService:
         tenant_id: str | None = None,
         now: datetime | None = None,
     ) -> EngineExecutionAck:
-        instant = (
-            datetime.now(timezone.utc)
-            if now is None
-            else now.astimezone(timezone.utc)
-        )
+        instant = datetime.now(UTC) if now is None else now.astimezone(UTC)
         self._validate(
             command,
             verified_service_principal=verified_service_principal,
@@ -2330,13 +1997,9 @@ class EngineExecutionService:
             now=instant,
         )
         if actor_id is not None and str(actor_id).strip() != command.operation.actor_id:
-            raise EngineAuthorityError(
-                "submitted actor does not match delegated operation actor"
-            )
+            raise EngineAuthorityError("submitted actor does not match delegated operation actor")
         if tenant_id is not None and str(tenant_id).strip() != command.operation.tenant_id:
-            raise EngineAuthorityError(
-                "submitted tenant does not match delegated operation tenant"
-            )
+            raise EngineAuthorityError("submitted tenant does not match delegated operation tenant")
         existing = self.submissions.get(
             service_principal=verified_service_principal,
             tenant_id=command.operation.tenant_id,
@@ -2344,10 +2007,7 @@ class EngineExecutionService:
             idempotency_key=command.operation.idempotency_key,
         )
         if existing is not None:
-            if (
-                existing.command.submission_digest
-                != command.submission_digest
-            ):
+            if existing.command.submission_digest != command.submission_digest:
                 raise EngineSubmissionConflict(
                     "engine idempotency identity was reused with different command"
                 )
@@ -2391,15 +2051,8 @@ class EngineExecutionService:
             state=_operation_state(execution.state).value,
             accepted_at=instant,
             idempotency_digest=idempotency_digest,
-            status_ref=(
-                "/api/v1/engine/executions/"
-                + execution.execution_id
-            ),
-            events_ref=(
-                "/api/v1/engine/executions/"
-                + execution.execution_id
-                + "/events"
-            ),
+            status_ref=("/api/v1/engine/executions/" + execution.execution_id),
+            events_ref=("/api/v1/engine/executions/" + execution.execution_id + "/events"),
             trace_id=command.operation.trace_id,
         )
         self.meter_execution_storage(
@@ -2435,9 +2088,7 @@ class EngineExecutionService:
         if stored is None:
             raise EngineServiceError("unknown engine execution")
         if stored.principal != verified_service_principal:
-            raise EngineServiceError(
-                "engine execution belongs to a different service principal"
-            )
+            raise EngineServiceError("engine execution belongs to a different service principal")
         grant = self.authorities.grant_for(verified_service_principal)
         if scope not in grant.scopes:
             raise EngineServiceError("engine service grant is missing required scope")
@@ -2471,36 +2122,20 @@ class EngineExecutionService:
             now=now,
         )
         operation = stored.command.operation
-        if (
-            str(actor_id).strip() != operation.actor_id
-            or str(tenant_id).strip() != operation.tenant_id
-        ):
-            raise EngineServiceError(
-                "engine execution belongs to a different actor or tenant"
-            )
+        if str(actor_id).strip() != operation.actor_id or str(tenant_id).strip() != operation.tenant_id:
+            raise EngineServiceError("engine execution belongs to a different actor or tenant")
         execution = self.repository.get(execution_id)
         if execution.state is not ExecutionState.WAITING_FOR_USER:
             return ()
         checkpoint = self.repository.latest_checkpoint(execution_id)
         if checkpoint is None:
-            raise EngineServiceError(
-                "waiting execution has no durable approval checkpoint"
-            )
+            raise EngineServiceError("waiting execution has no durable approval checkpoint")
         payload = checkpoint.payload
         pending_ids = payload.get("pending_approval_call_ids", [])
         calls = payload.get("pending_tool_calls", [])
-        if (
-            not isinstance(pending_ids, list)
-            or not isinstance(calls, list)
-        ):
-            raise EngineServiceError(
-                "durable approval checkpoint is malformed"
-            )
-        wanted = {
-            str(item)
-            for item in pending_ids
-            if isinstance(item, str) and item.strip()
-        }
+        if not isinstance(pending_ids, list) or not isinstance(calls, list):
+            raise EngineServiceError("durable approval checkpoint is malformed")
+        wanted = {str(item) for item in pending_ids if isinstance(item, str) and item.strip()}
         tool_data_class = payload.get(
             "tool_data_class",
             "internal",
@@ -2515,29 +2150,21 @@ class EngineExecutionService:
             or not isinstance(tool_purpose, str)
             or not tool_purpose.strip()
         ):
-            raise EngineServiceError(
-                "durable approval checkpoint privacy context is malformed"
-            )
+            raise EngineServiceError("durable approval checkpoint privacy context is malformed")
         tool_data_class = tool_data_class.strip().lower()
         tool_purpose = tool_purpose.strip().lower()
         last_provider = payload.get("last_provider")
         turn_id: str | None = None
         if last_provider is not None:
             if not isinstance(last_provider, Mapping):
-                raise EngineServiceError(
-                    "durable approval checkpoint provider lineage is malformed"
-                )
+                raise EngineServiceError("durable approval checkpoint provider lineage is malformed")
             turn_id = str(last_provider.get("turn_id") or "").strip()
             if not turn_id:
-                raise EngineServiceError(
-                    "durable approval checkpoint is missing provider turn_id"
-                )
+                raise EngineServiceError("durable approval checkpoint is missing provider turn_id")
         rows: list[dict[str, str]] = []
         for raw in calls:
             if not isinstance(raw, Mapping):
-                raise EngineServiceError(
-                    "durable pending tool call is malformed"
-                )
+                raise EngineServiceError("durable pending tool call is malformed")
             call_id = str(raw.get("call_id") or "").strip()
             if call_id not in wanted:
                 continue
@@ -2549,17 +2176,11 @@ class EngineExecutionService:
                 or len(digest) != 64
                 or any(ch not in "0123456789abcdef" for ch in digest)
             ):
-                raise EngineServiceError(
-                    "durable pending tool call identity is malformed"
-                )
+                raise EngineServiceError("durable pending tool call identity is malformed")
             arguments = raw.get("arguments")
             if not isinstance(arguments, Mapping):
-                raise EngineServiceError(
-                    "durable pending tool call arguments are malformed"
-                )
-            idempotency_key = (
-                execution_id + ":" + call_id + ":" + digest
-            )
+                raise EngineServiceError("durable pending tool call arguments are malformed")
+            idempotency_key = execution_id + ":" + call_id + ":" + digest
             try:
                 operation_id = str(UUID(operation.operation_id))
             except (ValueError, AttributeError):
@@ -2582,10 +2203,7 @@ class EngineExecutionService:
                 request_id=str(
                     uuid5(
                         NAMESPACE_URL,
-                        "skeleton-tool-request:"
-                        + execution_id
-                        + ":"
-                        + call_id,
+                        "skeleton-tool-request:" + execution_id + ":" + call_id,
                     )
                 ),
                 operation_id=operation_id,
@@ -2595,12 +2213,7 @@ class EngineExecutionService:
                 arguments=dict(arguments),
                 requested_at=execution.updated_at,
                 approval_ref=None,
-                delegated_authority_ref=(
-                    "execution:"
-                    + execution_id
-                    + ":provider-call:"
-                    + call_id
-                ),
+                delegated_authority_ref=("execution:" + execution_id + ":provider-call:" + call_id),
                 data_class=tool_data_class,
                 transfer_purpose=tool_purpose,
                 **lineage,
@@ -2615,9 +2228,7 @@ class EngineExecutionService:
                 }
             )
         if len(rows) != len(wanted):
-            raise EngineServiceError(
-                "durable approval checkpoint is incomplete"
-            )
+            raise EngineServiceError("durable approval checkpoint is incomplete")
         return tuple(rows)
 
     def approve_tool_call(
@@ -2642,30 +2253,17 @@ class EngineExecutionService:
             require_live_delegation=True,
         )
         operation = stored.command.operation
-        if (
-            str(actor_id).strip() != operation.actor_id
-            or str(tenant_id).strip() != operation.tenant_id
-        ):
-            raise EngineServiceError(
-                "engine execution belongs to a different actor or tenant"
-            )
-        instant = (
-            datetime.now(timezone.utc)
-            if now is None
-            else _aware(now, "approval.now")
-        )
+        if str(actor_id).strip() != operation.actor_id or str(tenant_id).strip() != operation.tenant_id:
+            raise EngineServiceError("engine execution belongs to a different actor or tenant")
+        instant = datetime.now(UTC) if now is None else _aware(now, "approval.now")
         expiry = _aware(expires_at, "approval.expires_at")
         if expiry <= instant:
-            raise EngineServiceError(
-                "tool approval is already expired"
-            )
+            raise EngineServiceError("tool approval is already expired")
         delegation_expiry = stored.command.delegated_authority.expires_at
         operation_deadline = stored.command.operation.deadline
         authority_ceiling = min(delegation_expiry, operation_deadline)
         if expiry > authority_ceiling:
-            raise EngineServiceError(
-                "tool approval expiry exceeds delegated authority window"
-            )
+            raise EngineServiceError("tool approval expiry exceeds delegated authority window")
         pending = {
             row["call_id"]: row
             for row in self.pending_tool_approvals(
@@ -2679,36 +2277,20 @@ class EngineExecutionService:
         call_key = str(call_id).strip()
         expected = pending.get(call_key)
         if expected is None:
-            raise EngineServiceError(
-                "tool call is not awaiting approval"
-            )
+            raise EngineServiceError("tool call is not awaiting approval")
         tool_key = str(tool_id).strip()
         digest = str(arguments_digest).strip()
-        if (
-            expected["tool_id"] != tool_key
-            or expected["arguments_digest"] != digest
-        ):
-            raise EngineServiceError(
-                "tool approval does not match pending call identity"
-            )
+        if expected["tool_id"] != tool_key or expected["arguments_digest"] != digest:
+            raise EngineServiceError("tool approval does not match pending call identity")
         idem = str(idempotency_key).strip()
         if not idem or len(idem) > 1024:
-            raise EngineServiceError(
-                "approval idempotency_key is invalid"
-            )
+            raise EngineServiceError("approval idempotency_key is invalid")
         if idem != expected["idempotency_key"]:
-            raise EngineServiceError(
-                "approval idempotency_key does not match pending call"
-            )
+            raise EngineServiceError("approval idempotency_key does not match pending call")
         approval_id = str(
             uuid5(
                 NAMESPACE_URL,
-                "skeleton-engine-tool-approval:"
-                + execution_id
-                + ":"
-                + call_key
-                + ":"
-                + idem,
+                "skeleton-engine-tool-approval:" + execution_id + ":" + call_key + ":" + idem,
             )
         )
         approval = EngineToolApproval(
@@ -2732,11 +2314,7 @@ class EngineExecutionService:
         *,
         now: datetime | None = None,
     ) -> dict[str, str]:
-        instant = (
-            datetime.now(timezone.utc)
-            if now is None
-            else _aware(now, "approval.now")
-        )
+        instant = datetime.now(UTC) if now is None else _aware(now, "approval.now")
         stored = self.submissions.get_by_execution_id(execution_id)
         if stored is None:
             return {}
@@ -2766,13 +2344,9 @@ class EngineExecutionService:
         )
         operation = stored.command.operation
         if actor_id is not None and str(actor_id).strip() != operation.actor_id:
-            raise EngineServiceError(
-                "engine execution belongs to a different actor or tenant"
-            )
+            raise EngineServiceError("engine execution belongs to a different actor or tenant")
         if tenant_id is not None and str(tenant_id).strip() != operation.tenant_id:
-            raise EngineServiceError(
-                "engine execution belongs to a different actor or tenant"
-            )
+            raise EngineServiceError("engine execution belongs to a different actor or tenant")
         execution = self.repository.get(execution_id)
         result = self.repository.result(execution_id)
         failure_code = None
@@ -2786,11 +2360,7 @@ class EngineExecutionService:
             operation_state=_operation_state(execution.state).value,
             execution_state=execution.state.value,
             latest_checkpoint_version=execution.checkpoint_version,
-            result_ref=(
-                None
-                if result is None
-                else "execution-result:" + execution.execution_id
-            ),
+            result_ref=(None if result is None else "execution-result:" + execution.execution_id),
             failure_code=failure_code,
             updated_at=execution.updated_at,
             cancellation_requested=execution.cancellation_requested,
@@ -2814,13 +2384,9 @@ class EngineExecutionService:
         )
         operation = stored.command.operation
         if actor_id is not None and str(actor_id).strip() != operation.actor_id:
-            raise EngineServiceError(
-                "engine execution belongs to a different actor or tenant"
-            )
+            raise EngineServiceError("engine execution belongs to a different actor or tenant")
         if tenant_id is not None and str(tenant_id).strip() != operation.tenant_id:
-            raise EngineServiceError(
-                "engine execution belongs to a different actor or tenant"
-            )
+            raise EngineServiceError("engine execution belongs to a different actor or tenant")
         current = self.repository.get(execution_id)
         if not current.terminal and not current.cancellation_requested:
             self.repository.request_cancel(
@@ -2843,6 +2409,8 @@ class EngineExecutionService:
         verified_service_principal: str,
         actor_id: str | None = None,
         tenant_id: str | None = None,
+        after_sequence: int | None = None,
+        limit: int = 256,
         now: datetime | None = None,
     ) -> dict[str, Any]:
         stored = self._stored_for_access(
@@ -2853,14 +2421,60 @@ class EngineExecutionService:
         )
         operation = stored.command.operation
         if actor_id is not None and str(actor_id).strip() != operation.actor_id:
-            raise EngineServiceError(
-                "engine execution belongs to a different actor or tenant"
-            )
+            raise EngineServiceError("engine execution belongs to a different actor or tenant")
         if tenant_id is not None and str(tenant_id).strip() != operation.tenant_id:
-            raise EngineServiceError(
-                "engine execution belongs to a different actor or tenant"
-            )
+            raise EngineServiceError("engine execution belongs to a different actor or tenant")
         execution = self.repository.get(execution_id)
+        if after_sequence is not None:
+            for _ in range(3):
+                execution = self.repository.get(execution_id)
+                try:
+                    self.repository.append_stream_event(
+                        execution_id,
+                        f"state:{execution.version}",
+                        "execution.state",
+                        {
+                            "state": execution.state.value,
+                            "version": execution.version,
+                            "cancellation_requested": execution.cancellation_requested,
+                        },
+                        expected_version=execution.version,
+                    )
+                    break
+                except ExecutionRepositoryConflict:
+                    continue
+            for turn in self.repository.turns(execution_id):
+                self.repository.append_stream_event(
+                    execution_id,
+                    "turn:" + turn.turn_id,
+                    "execution.turn",
+                    {
+                        "turn_id": turn.turn_id,
+                        "turn_index": turn.turn_index,
+                        "execution_id": turn.execution_id,
+                        "operation_id": turn.operation_id,
+                        "phase": turn.phase.value,
+                        "status": turn.status,
+                        "turn_digest": execution_payload_digest(turn.as_dict()),
+                    },
+                )
+            result = self.repository.result(execution_id)
+            if result is not None:
+                self.repository.append_stream_event(
+                    execution_id,
+                    "result:" + execution_id,
+                    "execution.result",
+                    {
+                        "result": {
+                            "execution_id": execution_id,
+                            "operation_id": result.operation_id,
+                            "status": result.status,
+                            "result_digest": execution_payload_digest(result.as_dict()),
+                            "authoritative_result_ref": "execution-result:" + execution_id,
+                        }
+                    },
+                )
+            return self.repository.stream_events(execution_id, after_sequence=after_sequence, limit=limit)
         turns = self.repository.turns(execution_id)
         checkpoint = self.repository.latest_checkpoint(execution_id)
         result = self.repository.result(execution_id)

@@ -903,6 +903,8 @@ def execution_events(
     request: Request,
     actor_id: str = Query(..., min_length=1, max_length=512),
     tenant_id: str = Query(..., min_length=1, max_length=512),
+    after_sequence: int | None = Query(None, ge=0, le=2**63 - 1),
+    limit: int = Query(256, ge=1, le=1024),
     service: EngineExecutionService = Depends(_engine_service),
     service_token: str = Depends(_engine_service_token),
 ) -> dict[str, Any]:
@@ -913,6 +915,8 @@ def execution_events(
             verified_service_principal=principal,
             actor_id=actor_id,
             tenant_id=tenant_id,
+            after_sequence=after_sequence,
+            limit=limit,
         )
     except Exception as exc:
         _raise_engine_error(exc)

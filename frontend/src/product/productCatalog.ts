@@ -65,13 +65,13 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
   },
   {
     id: 'jeeves',
-    title: 'Jeeves',
-    description: 'Plan, reason, teach and coordinate build work through one assistant.',
+    title: 'AI chat',
+    description: 'Chat with configured models, continue conversations and work with your files.',
     pillar: 'learn',
-    href: capabilityHref('jeeves'),
-    backendSurface: '/api/jeeves',
+    href: '/ai-chat',
+    backendSurface: '/api/ai',
     actions: [
-      { id: 'reason', title: 'Reason', description: 'Work through a complex product or engineering problem.', operation: 'jeeves.reason' },
+      { id: 'reason', title: 'Open chat', description: 'Continue a conversation or start a new one.', operation: 'jeeves.reason', href: '/ai-chat' },
       { id: 'plan', title: 'Plan', description: 'Turn a goal into coordinated executable work.', operation: 'jeeves.plan' },
       { id: 'review', title: 'Review agents', description: 'Inspect delegated work and agent outcomes.', operation: 'agents.review', legacyHref: '/agent-review' },
     ],

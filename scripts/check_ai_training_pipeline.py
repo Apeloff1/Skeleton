@@ -104,15 +104,77 @@ CONTRACTS = {
         "skeleton/ai/runtime/training/evaluation.py:EvaluationLedger",
         "tests",
     ),
+    "machine/ai_local_elastic_training.json": (
+        "skeleton.ai.local_elastic_training.v1",
+        "canonical_owner",
+        "skeleton/ai/runtime/training/elastic_trainer.py",
+        "tests",
+    ),
+    "machine/ai_local_preference_training.json": (
+        "skeleton.ai.local_preference_training.v1",
+        "canonical_owner",
+        "skeleton/ai/runtime/training/control.py:TrainingRepository",
+        "tests",
+    ),
+    "machine/ai_measured_model_rollout.json": (
+        "skeleton.ai.measured_model_rollout.v1",
+        "canonical_owner",
+        "skeleton/ai/runtime/learning_foundation/lifecycle.py:ModelLifecycleRegistry",
+        "tests",
+    ),
+    "machine/ai_multimodal_content_retrieval.json": (
+        "skeleton.ai.multimodal_content_retrieval.v1",
+        "owner",
+        "skeleton/ai/runtime/learning_foundation/content_retrieval.py",
+        "verification",
+    ),
+    "machine/ai_training_observability.json": (
+        "skeleton.ai.training_observability.v1",
+        "owner",
+        "skeleton/ai/runtime/training/observability.py",
+        "tests",
+    ),
+    "machine/ai_governed_training_state_cli.json": (
+        "skeleton.ai.governed_training_state_cli.v1",
+        "canonical_owner",
+        "skeleton/ai/runtime/training/state_cli.py",
+        "tests",
+    ),
 }
 APIS = {
+    "skeleton/ai/runtime/training/elastic_trainer.py": {
+        "ElasticLocalTrainer": ("train", "_validate_binding", "_validate_barrier"),
+    },
+    "skeleton/ai/runtime/training/preference_trainer.py": {
+        "PreferencePair": ("from_document",),
+        "PreferenceLocalTrainer": ("train", "load_artifact", "_restore"),
+    },
+    "skeleton/ai/runtime/learning_foundation/rollout.py": {
+        "MeasuredModelRollout": ("run", "receipt", "stage", "cutover", "rollback", "request_result"),
+    },
+    "skeleton/ai/runtime/learning_foundation/content_retrieval.py": {
+        "ContentSignalIndex": ("add", "search", "checkpoint", "restore"),
+    },
+    "skeleton/ai/runtime/training/observability.py": {
+        "TrainingObserver": ("snapshot",),
+        "TrainingObservationReport": ("as_dict",),
+    },
+    "skeleton/ai/runtime/training/state_cli.py": {
+        None: (
+            "inspect_training_state",
+            "archive_training_state",
+            "recover_training_state",
+            "retain_training_state",
+            "main",
+        ),
+    },
     "skeleton/api/engine_routes.py": {None: ("provider_inventory", "execution_handoff")},
     "skeleton/provider_runtime.py": {
         "LocalArtifactProviderAdapter": ("generate", "available", "execution_identity")
     },
     "skeleton/api/engine_runtime.py": {"EngineExecutionCoordinator": ("recover",)},
     "skeleton/ai/runtime/training/distributed_trainer.py": {
-        "LocalDataParallelTrainer": ("train", "load_artifact")
+        "LocalDataParallelTrainer": ("train", "load_artifact", "_restore")
     },
     "skeleton/ai/runtime/training/checkpoint_archive.py": {
         "TrainingCheckpointArchive": ("backup", "verify_backup", "restore", "pin", "unpin", "retain")
@@ -146,6 +208,9 @@ APIS = {
             "assert_dataset_authority",
             "training_authority",
             "source_envelope",
+            "source_binding",
+            "assert_source_binding",
+            "source_authority",
             "latest_materialized_version",
         )
     },
@@ -200,6 +265,9 @@ FORBIDDEN_AUTHORITIES = {
     "new_provider_transport",
     "new_runtime_root",
     "production_promotion",
+    "production_promotion_authorized",
+    "production_routing_authorized",
+    "live_membership_resize_supported",
     "masterplan_signoff",
 }
 
@@ -277,6 +345,8 @@ def validate(root: Path = ROOT, *, head: str | None = None) -> dict:
     _authority(assembly, ASSEMBLY)
     if assembly.get("local_parallel_training_supported") is not True:
         raise TrainingPipelineContractError("local parallel capability declaration drift")
+    if assembly.get("local_elastic_recovery_supported") is not True:
+        raise TrainingPipelineContractError("local elastic capability declaration drift")
     construction = _read(root, "machine/ai_app_construction.json")
     providers = construction.get("runtime_model_providers")
     if not isinstance(providers, list):
@@ -309,7 +379,26 @@ def validate(root: Path = ROOT, *, head: str | None = None) -> dict:
         assembly.get("engine_acceptance"),
         assembly.get("archive_acceptance"),
         assembly.get("verification_acceptance"),
+        *(
+            assembly.get(field)
+            for field in (
+                "preference_acceptance",
+                "elastic_acceptance",
+                "rollout_acceptance",
+                "observability_acceptance",
+                "state_operator_acceptance",
+            )
+        ),
     )
+    deferred = assembly.get("deferred_acceptance", {})
+    content_acceptance = assembly.get("content_retrieval_acceptance")
+    if "content_retrieval_acceptance" not in assembly:
+        raise TrainingPipelineContractError("missing required executable acceptance declaration")
+    if content_acceptance is None:
+        if not isinstance(deferred, dict) or set(deferred) != {"content_retrieval_acceptance"} or not isinstance(deferred["content_retrieval_acceptance"], str) or not deferred["content_retrieval_acceptance"].strip():
+            raise TrainingPipelineContractError("unverified extension needs explicit deferred acceptance")
+    else:
+        acceptance += (content_acceptance,)
     if any(not isinstance(path, str) or not path for path in acceptance):
         raise TrainingPipelineContractError("missing required executable acceptance path")
     tests = set(acceptance)
@@ -350,6 +439,41 @@ def validate(root: Path = ROOT, *, head: str | None = None) -> dict:
             or value.get("credentials") != []
         ):
             raise TrainingPipelineContractError("local provider contract gains external authority")
+        if path == "machine/ai_local_elastic_training.json":
+            limits = value.get("limits", {})
+            if (
+                not isinstance(limits, dict)
+                or value.get("local_elastic_recovery_supported") is not True
+                or any(
+                    limits.get(field) != bounds
+                    or not isinstance(limits.get(field), list)
+                    or any(type(item) is not int for item in limits.get(field, []))
+                    for field, bounds in (("logical_ranks", [2, 4]), ("physical_workers", [1, 4]))
+                )
+            ):
+                raise TrainingPipelineContractError("elastic topology or scope drift")
+        bounded_limits = {
+            "machine/ai_local_preference_training.json": {
+                "world_size": 1,
+                "hidden_size": 64,
+                "epochs": 128,
+                "preference_pairs": 1024,
+                "checkpoint_payload_bytes": 16777216,
+            },
+            "machine/ai_training_observability.json": {
+                "max_points": 4096,
+                "max_selected_payload_bytes": 67108864,
+            },
+            "machine/ai_governed_training_state_cli.json": {
+                "max_receipt_bytes": 65536,
+                "max_retained_count": 1024,
+            },
+        }
+        for field, expected in bounded_limits.get(path, {}).items():
+            limits = value.get("limits")
+            actual = limits.get(field) if isinstance(limits, dict) else None
+            if type(actual) is not int or actual != expected:
+                raise TrainingPipelineContractError("execution limit drift: " + path + ": " + field)
         declared = value.get(test_field)
         if (
             not isinstance(declared, list)
@@ -404,7 +528,9 @@ def validate(root: Path = ROOT, *, head: str | None = None) -> dict:
         "production_model_promotion_authorized": False,
         "masterplan_completion_authorized": False,
         "local_parallel_training_supported": True,
+        "local_elastic_recovery_supported": True,
         "reported_head": head,
+        "deferred_acceptance": sorted(deferred),
     }
 
 

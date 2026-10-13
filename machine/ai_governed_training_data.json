@@ -29,8 +29,10 @@
       "evidence"
     ],
     "formats": ["utf8_text", "json_documents", "multimodal_projection"],
-    "permitted_uses": ["training", "evaluation", "simulation_training", "simulation_evaluation", "speech_recovery"],
+    "permitted_uses": ["training", "evaluation", "simulation_training", "simulation_evaluation", "speech_recovery", "media_retrieval"],
     "speech_recovery": "An explicitly consented, isolated single-purpose snapshot of observed speech bytes and provenance may use the existing SQLite authority. speech_recovery cannot mix with training/evaluation uses, enter training admission or normal multimodal projection export, or claim authority over an unregistered external source. Snapshot rights withdrawal and deletion block further snapshot recovery.",
+    "media_retrieval": "An isolated snapshot of verified media source copies and measured signal features requires immutable original SourceAuthorityBindings, checks current original rights/epochs during commit and every materialized read, and cannot acquire training/evaluation or speech privileges.",
+    "original_source_bindings": "Optional bounded ordered tuple of SourceAuthorityBinding(content_digest,envelope_digest,authority_epoch,purpose), required only for media_retrieval snapshots. Existing original source registration is a distinct acquisition; copied source snapshots cannot resurrect revoked/deleted originals or silently replace their epoch.",
     "identity": "SHA256 of original immutable bytes; exact ordered document sequence additionally binds SHA256 of canonical UTF-8 JSON string array",
     "legacy_split_identity": "SHA256 of newline-joined documents is retained for declared legacy trainer compatibility and cannot substitute for materialized document-sequence identity",
     "receipt": "MaterializedDatasetReceipt",
@@ -67,6 +69,12 @@
     "legacy": "register_ingest/register_dataset remain explicit digest-only compatibility APIs; training_corpus refuses to invent bytes for those datasets",
     "fencing": "Monotonic durable dataset/source epochs fence rights revocation, deletion and changed quality admission during native and neural training",
     "deletion": "Canonical local training content is removed or access-blocked and affected inputs cannot be exported or reused for new/restarted training"
+  },
+  "source_binding_authority": {
+    "apis": ["DatasetRegistry.source_binding", "DatasetRegistry.assert_source_binding", "DatasetRegistry.source_authority", "DatasetRegistry.materialized_source"],
+    "receipt": "Immutable SourceAuthorityBinding pins registered original content, exact ingest envelope SHA256, nonnegative integer lifecycle epoch and an explicitly permitted purpose.",
+    "validation": "Missing, deleted, quarantined, revoked, mismatched-envelope or changed-epoch originals fail closed; a constructed binding supplies no admission authority. A bounded individual materialized_source accessor checks current source rights and exact persisted raw/metadata evidence without reading out-of-scope sibling sources.",
+    "guard": "Canonical SQLite BEGIN IMMEDIATE plus registry lock orders publication against concurrent withdrawal; pre/post binding checks and rollback preserve authority without a new storage owner."
   },
   "rollback": "Disable new materialized ingestion and retain immutable legacy manifests and authoritative receipts; never restore revoked rights or silently regenerate deleted source content",
   "executable_tests": ["skeleton/testing/test_governed_training_data.py"],

@@ -230,3 +230,154 @@ parent, preserving rights, lineage and simulation identity. Lexical scores fuse
 the best evidence per modality with fixed weights; rights, simulation and time
 filters run before ranking. Repeated frames cannot inflate a modality's score.
 Video container timing and extraction lineage remain explicit declarations.
+
+
+## Elastic restart and preference optimization
+
+`--algorithm elastic --world-size 4 --physical-workers 2` retains four logical
+ranks and their exact synchronous averaging order while allocating two real local
+processes. Restart the same admitted run with `--physical-workers 1` or `4` after
+a failure to change placement without changing the consumed cursor, effective
+batch or learned numerical trajectory. Physical count is execution-only;
+logical ranks, collective timeout, optimizer, code, source and maximum allocation
+remain immutable. A completed retry returns the recorded final roster and does
+not spawn new workers. This is local restart elasticity; live and remote resizing
+remain outside this adapter.
+
+Preference optimization uses a completed governed **single-worker neural parent**
+in the same state directory. Preserve its seed and hidden size. Each licensed
+source file is one canonical preference document; create it without a trailing
+newline using the public type:
+
+```python
+from pathlib import Path
+from skeleton.ai.runtime.training import PreferencePair
+
+Path("owned-preference.json").write_text(
+    PreferencePair(prompt="Answer: ", chosen="yes", rejected="no").document,
+    encoding="utf-8",
+)
+```
+
+```bash
+skeleton-train-governed-model owned-preference.json \
+  --algorithm preference --parent-run-id governed-parent \
+  --state-directory ./training-state --output ./preference-model.json \
+  --run-id preference-candidate --dataset-id licensed-preferences \
+  --rights-ref license:operator-owned --hidden-size 24 --seed 0 \
+  --epochs 8 --preference-beta 0.1 \
+  --evaluation-suite-digest <explicit-planned-suite-sha256>
+```
+
+The supplied suite digest is planned evaluation identity, not evaluation evidence.
+Actual DPO computes chosen/rejected conditional likelihoods and recurrent
+back-propagation against frozen parent weights, including prompt conditioning.
+The receipt exposes measured objective and preference margins, full parent and
+experiment lineage, and committed work. Source and parent withdrawal fence both
+training and artifact publication. Checkpoints restore only their declared
+single-worker scope even if an attacker recomputes descriptor digests.
+
+Cumulative training counters include optimization and initial/final diagnostics.
+Bounded numerical validation during reload, report and retry also performs work;
+that read-only work is not added to committed training counters. Counters do not
+establish total lifetime CPU usage or throughput.
+
+## Training state operator
+
+The `skeleton-governed-training-state` command exposes existing state authorities:
+
+```bash
+skeleton-governed-training-state inspect \
+  --state-directory ./training-state --run-id governed-parent
+
+skeleton-governed-training-state archive \
+  --state-directory ./training-state --run-id governed-parent \
+  --cas-path ./checkpoint-cas.sqlite3 --tenant-id operator \
+  --trust-context licensed-training --receipt-output ./parent-backup.json
+
+skeleton-governed-training-state recover \
+  --state-directory ./training-state --dataset-digest <retained-dataset-sha256> \
+  --cas-path ./checkpoint-cas.sqlite3 --tenant-id operator \
+  --trust-context licensed-training --receipt-path ./parent-backup.json
+
+skeleton-governed-training-state retain \
+  --state-directory ./training-state --run-id governed-parent \
+  --cas-path ./checkpoint-cas.sqlite3 --tenant-id operator \
+  --trust-context licensed-training --keep-newest 2
+```
+
+Recovery requires the retained DatasetRegistry and an independently preserved
+CAS plus receipt. The archive command prints the exact dataset and checkpoint
+identities. After training database loss, recover into a fresh training database
+then replay the original training command to reload/publish completed weights.
+For preference candidates, archive both parent and candidate; recover and
+terminalize the exact parent first, then recover the preference checkpoint.
+A missing or changed parent never becomes valid merely because its weights are
+embedded in a preference payload.
+
+Inspection reports committed cursor, budgets, loss, source admission, current
+worker epoch and recovery/stall signals. Cross-entropy and DPO loss remain
+separate metrics. Actual elapsed training intervals, throughput, heartbeat and
+lease expiry are unavailable in these checkpoint formats and are reported as
+such. Stall alerts suggest operator investigation; they do not authorize
+automatic recovery or prove a process died. Inspection preserves lock ordering
+with concurrent checkpoint writers and emits no corpus text or weights.
+Retention prunes only eligible backed-up database checkpoints, preserving latest
+and pinned recovery references; CAS blobs remain retained.
+
+
+## Measured candidate rollout and content retrieval
+
+`MeasuredModelRollout` uses the existing `ModelLifecycleRegistry` snapshot and
+issued `EvaluationModelSource` handles. Construct exact source MBOMs with
+`mbom_for_source(source, license_refs=..., rights_refs=...)`, register the local
+candidate and validated baseline, and retain the existing lifecycle transition
+requirements. A pinned `RolloutPlan` selects the suite, assignment salt, seed,
+canary basis points and tariffs. Run shadow first, then canary:
+
+```python
+from skeleton.ai.runtime.learning_foundation import MeasuredModelRollout, RolloutPlan
+
+controller = MeasuredModelRollout(lifecycle_registry)
+plan = RolloutPlan("local-rollout", heldout_suite, assignment_salt="declared-salt")
+shadow = await controller.run(plan, candidate=candidate, baseline=baseline, verifier=verifier)
+canary = await controller.run(
+    plan, candidate=candidate, baseline=baseline, verifier=verifier, phase="canary"
+)
+stage = controller.stage(canary, candidate=candidate, baseline=baseline, verifier=verifier)
+# stage.status and stage.reasons expose the measured candidate gate result.
+```
+
+Assignments persist before inference; paired actual outputs, independent
+verifier decisions, tokens, monotonic elapsed time and integer tariff cost units
+commit per drained case. Completed cases survive restart. Staging uses measured
+phase evidence and exact current source/MBOM/lifecycle identities. Its quality,
+latency, cost and token thresholds are acceptance gates per completed phase,
+not hard cumulative runtime budgets or hosted billing. `cutover` and `rollback`
+use existing candidate migration receipts and atomic lifecycle history;
+`production_routing_authorized` stays false. SQLite snapshot v2 validates
+the complete additive rollout graph; unused registries keep legacy v1 output.
+
+`ContentSignalIndex` derives fixed measured visual and PCM feature vectors from
+verified corpus records, without using extracted text labels to determine
+similarity. Image signals include color, spatial grids and luminance gradients;
+audio signals include temporal amplitude/zero crossings and bounded FFT bands.
+These handcrafted signals support content similarity, not semantic embeddings,
+OCR or ASR. Public `ContentFeatureReceipt` and `ContentSimilarityHit` identities
+retain decoded/source/rights/lineage evidence, and the hit's `as_scored_result()`
+adapts to the existing retrieval fusion owner.
+
+Declare a rights policy permitting `media_retrieval`, add exact verified record
+IDs, and search an explicit candidate scope. Self/asset, rights, simulation,
+modality and optional time-window filters apply before decoding and ranking.
+`checkpoint(checkpoint_id=...)` persists an isolated `media_retrieval` dataset;
+`restore(corpus, registry, dataset_digest)` rechecks actual bytes, feature/config
+identity and the original source's authority before publishing recovered state.
+Deleting or withdrawing original media blocks every retained copied snapshot.
+The current snapshot version is rechecked inside the source authority guard.
+
+Inspection defaults to 128 selected points. Use `inspect --max-points 16` to
+reduce a large checkpoint window; selected payload bytes remain bounded, and
+reports explicitly identify incomplete history. Preference inspection performs
+bounded objective validation for each selected checkpoint, so window size also
+affects compute and lock duration.

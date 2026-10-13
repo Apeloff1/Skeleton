@@ -156,57 +156,60 @@ def _message_bytes(message: Mapping[str, Any]) -> bytes:
     return raw
 
 
+def _rank_update(rank: int, job: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply one logical document update from its explicitly pinned snapshot."""
+    if (
+        set(job)
+        != {
+            "kind",
+            "worker_epoch",
+            "barrier_index",
+            "input_model_digest",
+            "model",
+            "document",
+            "document_index",
+            "learning_rate",
+            "gradient_clip",
+        }
+        or job["kind"] != "train"
+    ):
+        raise ValueError("invalid local training job")
+    model = NumpyRecurrentLM.from_dict(job["model"])
+    if model.model_digest != job["input_model_digest"]:
+        raise ValueError("local rank pinned weights mismatch")
+    document = job["document"]
+    targets = 0
+    training_bytes = 0
+    if document is not None:
+        training_bytes = len(document.encode("utf-8"))
+        if not 1 <= training_bytes <= 4096:
+            raise ValueError("local rank document byte bound")
+        targets = model.train_document(
+            document, learning_rate=job["learning_rate"], gradient_clip=job["gradient_clip"]
+        )
+    receipt = {
+        "rank": rank,
+        "worker_pid": os.getpid(),
+        "worker_epoch": job["worker_epoch"],
+        "barrier_index": job["barrier_index"],
+        "input_model_digest": job["input_model_digest"],
+        "document_index": job["document_index"],
+        "document_digest": None if document is None else _digest(document),
+        "targets": targets,
+        "training_bytes": training_bytes,
+        "updated_model_digest": model.model_digest,
+        "status": "idle" if document is None else "updated",
+    }
+    return {"kind": "result", "receipt": receipt, "model": model.to_dict()}
+
+
 def _rank_worker(rank: int, connection: Connection) -> None:
     """Pure numerical rank: no dataset store, lease, checkpoint or network owner."""
     try:
         connection.send_bytes(_message_bytes({"kind": "ready", "rank": rank, "worker_pid": os.getpid()}))
         while True:
             job = _decode_message(connection.recv_bytes(_MAX_MESSAGE_BYTES))
-            if (
-                set(job)
-                != {
-                    "kind",
-                    "worker_epoch",
-                    "barrier_index",
-                    "input_model_digest",
-                    "model",
-                    "document",
-                    "document_index",
-                    "learning_rate",
-                    "gradient_clip",
-                }
-                or job["kind"] != "train"
-            ):
-                raise ValueError("invalid local training job")
-            model = NumpyRecurrentLM.from_dict(job["model"])
-            if model.model_digest != job["input_model_digest"]:
-                raise ValueError("local rank pinned weights mismatch")
-            document = job["document"]
-            targets = 0
-            training_bytes = 0
-            if document is not None:
-                training_bytes = len(document.encode("utf-8"))
-                if not 1 <= training_bytes <= 4096:
-                    raise ValueError("local rank document byte bound")
-                targets = model.train_document(
-                    document, learning_rate=job["learning_rate"], gradient_clip=job["gradient_clip"]
-                )
-            receipt = {
-                "rank": rank,
-                "worker_pid": os.getpid(),
-                "worker_epoch": job["worker_epoch"],
-                "barrier_index": job["barrier_index"],
-                "input_model_digest": job["input_model_digest"],
-                "document_index": job["document_index"],
-                "document_digest": None if document is None else _digest(document),
-                "targets": targets,
-                "training_bytes": training_bytes,
-                "updated_model_digest": model.model_digest,
-                "status": "idle" if document is None else "updated",
-            }
-            connection.send_bytes(
-                _message_bytes({"kind": "result", "receipt": receipt, "model": model.to_dict()})
-            )
+            connection.send_bytes(_message_bytes(_rank_update(rank, job)))
     except EOFError:
         pass
     except Exception as exc:  # noqa: BLE001 - Report any numerical worker failure before exit.
@@ -223,6 +226,8 @@ def _rank_worker(rank: int, connection: Connection) -> None:
 class _RankPool:
     """Bound each IPC operation without losing cleanup on a partial pipe write."""
 
+    _worker_target = staticmethod(_rank_worker)
+
     def __init__(self, world_size: int, timeout: float) -> None:
         self.world_size = world_size
         self.timeout = timeout
@@ -238,7 +243,7 @@ class _RankPool:
             for rank in range(self.world_size):
                 parent, child = context.Pipe(duplex=True)
                 process = context.Process(
-                    target=_rank_worker,
+                    target=self._worker_target,
                     args=(rank, child),
                     name=f"skeleton-training-rank-{rank}",
                     daemon=True,
@@ -357,6 +362,29 @@ class LocalDataParallelArtifact(NeuralTrainingArtifact):
 class LocalDataParallelTrainer(NeuralLocalTrainer):
     """Use fixed local ranks and commit only complete synchronous barriers."""
 
+    _binding_schema = _BINDING_SCHEMA
+    _payload_schema = _PAYLOAD_SCHEMA
+    _strategy = _STRATEGY
+    _config_fields = _CONFIG_FIELDS
+    _operator_algorithms = frozenset(("data_parallel", _ALGORITHM))
+    _receipt_schema = "skeleton.local_parallel_training_receipt.v1"
+
+    def _training_config(self, manifest: TrainingRunManifest, config: dict[str, Any]) -> dict[str, Any]:
+        return config
+
+    def _pool(self, manifest: TrainingRunManifest) -> _RankPool:
+        return _RankPool(manifest.world_size, float(manifest.collective_timeout_seconds))
+
+    def _barrier_metadata(
+        self,
+        pool: _RankPool,
+        binding: Mapping[str, Any],
+        lease: WorkerLease,
+        cursor: Mapping[str, int],
+        barrier: dict[str, Any],
+    ) -> dict[str, Any]:
+        return barrier
+
     @staticmethod
     def _optimizer(config: Mapping[str, Any]) -> dict[str, Any]:
         return {
@@ -388,19 +416,19 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
             if limit is not None and actual > limit:
                 raise TrainingStateError(f"local parallel training budget exceeded: {name}")
 
-    @staticmethod
-    def _validate_binding(manifest: TrainingRunManifest, binding: Mapping[str, Any]) -> None:
-        if set(binding) != _BINDING_FIELDS or binding["schema_version"] != _BINDING_SCHEMA:
+    @classmethod
+    def _validate_binding(cls, manifest: TrainingRunManifest, binding: Mapping[str, Any]) -> None:
+        if set(binding) != _BINDING_FIELDS or binding["schema_version"] != cls._binding_schema:
             raise ValueError("invalid local parallel binding fields")
         config = binding["training_config"]
-        if not isinstance(config, dict) or set(config) != _CONFIG_FIELDS:
+        if not isinstance(config, dict) or set(config) != cls._config_fields:
             raise ValueError("invalid local parallel config fields")
         if (
             binding["manifest_digest"] != manifest.digest
             or binding["dataset_digest"] != manifest.dataset_digest
             or binding["initial_model_digest"] != manifest.base_model_digest
             or config["algorithm"] != _ALGORITHM
-            or config["strategy"] != _STRATEGY
+            or config["strategy"] != cls._strategy
             or config["aggregation"] != _AGGREGATION
             or config["runtime"] != _runtime()
             or config["world_size"] != manifest.world_size
@@ -433,7 +461,7 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
             raise ValueError("invalid local parallel seed or authority epoch")
         for name, value in manifest.hyperparameters.items():
             if name == "algorithm":
-                if value not in {"data_parallel", _ALGORITHM}:
+                if value not in cls._operator_algorithms:
                     raise ValueError("local parallel manifest algorithm mismatch")
             elif name in config and value != config[name]:
                 raise ValueError("local parallel manifest hyperparameter mismatch")
@@ -485,6 +513,7 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
         input_digest: str | None,
         output_digest: str,
         pids: Sequence[int] | None = None,
+        require_distinct_processes: bool = True,
     ) -> None:
         world_size = binding["training_config"]["world_size"]
         if not isinstance(barrier, dict) or set(barrier) != _BARRIER_FIELDS:
@@ -544,7 +573,7 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
             updated_digest = _require_digest(receipt["updated_model_digest"], field="rank updated weights")
             if not active and updated_digest != snapshot:
                 raise ValueError("idle local rank changed weights")
-        if len(set(actual_pids)) != world_size:
+        if require_distinct_processes and len(set(actual_pids)) != world_size:
             raise ValueError("duplicate local worker process identity")
 
     def _barrier(
@@ -607,6 +636,7 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
             "worker_epoch": lease.epoch,
             "ranks": [result["receipt"] for result in results],
         }
+        barrier = self._barrier_metadata(pool, binding, lease, cursor, barrier)
         try:
             self._validate_barrier(
                 binding,
@@ -652,7 +682,7 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
         with self.datasets.training_authority(binding["dataset_digest"], binding["dataset_authority_epoch"]):
             optimizer = self._optimizer(binding["training_config"])
             payload = {
-                "schema_version": _PAYLOAD_SCHEMA,
+                "schema_version": self._payload_schema,
                 "binding_digest": _digest(binding),
                 "cursor": cursor,
                 "usage": usage,
@@ -705,16 +735,16 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
                     "finished",
                     "barrier",
                 }
-                or payload["schema_version"] != _PAYLOAD_SCHEMA
+                or payload["schema_version"] != self._payload_schema
             ):
                 raise ValueError("unsupported local parallel resume schema")
             config = binding["training_config"]
             if (
-                binding["schema_version"] != _BINDING_SCHEMA
+                binding["schema_version"] != self._binding_schema
                 or binding["manifest_digest"] != manifest.digest
                 or binding["initial_model_digest"] != manifest.base_model_digest
                 or config["algorithm"] != _ALGORITHM
-                or config["strategy"] != _STRATEGY
+                or config["strategy"] != self._strategy
                 or config["aggregation"] != _AGGREGATION
                 or config["world_size"] != manifest.world_size
                 or config["runtime"] != _runtime()
@@ -816,8 +846,9 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
             barrier,
         )
 
-    @staticmethod
+    @classmethod
     def _artifact(
+        cls,
         manifest: TrainingRunManifest,
         binding: Mapping[str, Any],
         checkpoint: TrainingCheckpoint,
@@ -833,7 +864,7 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
         fields = asdict(base)
         fields["training_receipt_digest"] = _digest(
             {
-                "schema_version": "skeleton.local_parallel_training_receipt.v1",
+                "schema_version": cls._receipt_schema,
                 "binding_digest": _digest(binding),
                 "checkpoint_digest": checkpoint.digest,
                 "model_digest": model.model_digest,
@@ -848,7 +879,7 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
             world_size=binding["training_config"]["world_size"],
             barrier_count=usage["barriers"],
             barrier_receipt_digest=_digest(barrier),
-            strategy=_STRATEGY,
+            strategy=cls._strategy,
         )
 
     def load_artifact(self, run_id: str) -> tuple[NumpyRecurrentLM, LocalDataParallelArtifact]:
@@ -902,10 +933,11 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
             "gradient_clip": float(gradient_clip),
             "world_size": manifest.world_size,
             "collective_timeout_seconds": float(manifest.collective_timeout_seconds),
-            "strategy": _STRATEGY,
+            "strategy": self._strategy,
             "aggregation": _AGGREGATION,
             "runtime": _runtime(),
         }
+        config = self._training_config(manifest, config)
         for name in (
             "hidden_size",
             "epochs",
@@ -930,7 +962,7 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
         if max(sizes) > 4096 or corpus_bytes > 1024 * 1024:
             raise TrainingStateError("local parallel document/corpus byte bound exceeded")
         binding = {
-            "schema_version": _BINDING_SCHEMA,
+            "schema_version": self._binding_schema,
             "manifest_digest": manifest.digest,
             "dataset_digest": manifest.dataset_digest,
             "dataset_authority_epoch": self.datasets.dataset_authority_epoch(manifest.dataset_digest),
@@ -988,7 +1020,7 @@ class LocalDataParallelTrainer(NeuralLocalTrainer):
                     manifest, binding, lease, model, cursor, usage, initial_loss, None, None, instant
                 )
             if cursor["epoch"] < epochs:
-                with _RankPool(manifest.world_size, float(manifest.collective_timeout_seconds)) as pool:
+                with self._pool(manifest) as pool:
                     while cursor["epoch"] < epochs:
                         self.runs.assert_worker_current(lease)
                         self._authority(binding)

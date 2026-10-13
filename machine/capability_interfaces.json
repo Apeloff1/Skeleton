@@ -2749,7 +2749,11 @@
         "message ordering/idempotency tests",
         "edit/regenerate lineage tests"
       ],
-      "status": "present"
+      "status": "present",
+      "ai_chat_source_candidate": {
+        "contract": "machine/ai_chat_product_client.json",
+        "status": "unverified_source_candidate"
+      }
     },
     {
       "id": "runtime_dependency:product-experience->engine-api",

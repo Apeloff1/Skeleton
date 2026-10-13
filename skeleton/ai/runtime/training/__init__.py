@@ -10,6 +10,7 @@ from .data import (
     LineageReceipt,
     MaterializedDatasetReceipt,
     MaterializedTrainingSource,
+    SourceAuthorityBinding,
     SyntheticDataReceipt,
 )
 
@@ -23,6 +24,7 @@ __all__ = [
     "LineageReceipt",
     "MaterializedDatasetReceipt",
     "MaterializedTrainingSource",
+    "SourceAuthorityBinding",
     "SyntheticDataReceipt",
 ]
 
@@ -108,6 +110,8 @@ __all__ += [
     "CheckpointArchiveContents",
     "CheckpointArchiveError",
     "CheckpointArchiveReceipt",
+    "ElasticLocalTrainer",
+    "ElasticTrainingArtifact",
     "EvaluationModelSource",
     "ExecutedCurriculumReceipt",
     "ExecutedEpisodeReceipt",
@@ -127,12 +131,29 @@ __all__ += [
     "PostTrainingExecutionSpec",
     "PostTrainingQualificationReceipt",
     "PostTrainingRunner",
+    "PreferenceLocalTrainer",
+    "PreferencePair",
+    "PreferenceTrainingArtifact",
     "TrainingCheckpointArchive",
+    "TrainingObservationError",
+    "TrainingObservationReport",
+    "TrainingObserver",
     "VerifierGatePolicy",
 ]
 
 
 def __getattr__(name: str):
+    for module_name, names in (
+        ("elastic_trainer", {"ElasticLocalTrainer", "ElasticTrainingArtifact"}),
+        ("preference_trainer", {"PreferenceLocalTrainer", "PreferencePair", "PreferenceTrainingArtifact"}),
+        ("observability", {"TrainingObserver", "TrainingObservationReport", "TrainingObservationError"}),
+    ):
+        if name in names:
+            import importlib
+
+            value = getattr(importlib.import_module("." + module_name, __name__), name)
+            globals()[name] = value
+            return value
     if name in {
         "TrainingCheckpointArchive",
         "CheckpointArchiveReceipt",

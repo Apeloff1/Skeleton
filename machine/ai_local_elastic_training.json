@@ -1,0 +1,184 @@
+{
+  "schema_version": "skeleton.ai.local_elastic_training.v1",
+  "status": "implemented_unpromoted",
+  "claim_scope": "bounded_local_elastic_restart_with_fixed_logical_rank_numerics",
+  "canonical_owner": "skeleton/ai/runtime/training/elastic_trainer.py",
+  "local_elastic_recovery_supported": true,
+  "live_membership_resize_supported": false,
+  "remote_cluster_training_supported": false,
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "masterplan_refs": [
+    "VOL-146",
+    "REQ:VOL-146:001",
+    "REQ:VOL-146:002",
+    "G051",
+    "G093",
+    "G094",
+    "G095"
+  ],
+  "canonical_owners": {
+    "trainer": "skeleton/ai/runtime/training/elastic_trainer.py",
+    "parallel_trainer": "skeleton/ai/runtime/training/distributed_trainer.py",
+    "control": "skeleton/ai/runtime/training/control.py",
+    "model": "skeleton/ai/runtime/inference/neural.py",
+    "data": "skeleton/ai/runtime/training/data.py",
+    "archive": "skeleton/ai/runtime/training/checkpoint_archive.py"
+  },
+  "algorithm": {
+    "numerical_algorithm": "numpy-recurrent-byte-synchronous-mean-sgd-v1",
+    "operator_algorithm": "elastic",
+    "logical_world_size": "manifest.world_size fixes 2-4 logical ranks and the exact document partition; it is never changed during recovery",
+    "physical_workers": "each execution attempt selects 1-4 actual spawned local processes, independently of logical rank count, within immutable max_processes admission",
+    "mapping": "logical rank r is assigned to physical worker slot r modulo physical_workers; each slot executes its logical jobs in rank order from identical pinned barrier weights",
+    "aggregation": "parent validates every logical rank result and reduces active logical rank updated float64 parameters in ascending logical rank order, independent of physical placement; idle logical ranks do not dilute the mean",
+    "optimizer": "existing per-document globally clipped plain SGD; optimizer semantics, logical batch width and ordering remain fixed during physical resize",
+    "randomness": "manifest seed initializes parameters once; SGD has no stochastic draws, shuffling or dropout; resizing creates no RNG streams",
+    "equivalence": "bit-identical weights and consumed logical document/target positions across fixed-process and resized executions of the same logical-rank averaging algorithm"
+  },
+  "persistence": {
+    "authority": "existing TrainingRepository SQLite database",
+    "binding_table": "training_execution_binding",
+    "payload_table": "training_checkpoint_payload",
+    "boundary": "same full barrier checkpoint transaction; elastic membership receipt, complete logical rank receipts, full averaged weights, optimizer settings, epoch/document cursor and cumulative usage commit together under the current parent worker fence and dataset authority guard",
+    "membership_lineage": "each committed barrier records the physical roster, logical assignment, current recovery epoch, preceding membership digest/epoch/count, consumed source position and cumulative resize count",
+    "archive": "explicit elastic schema validation reuses the same bounded CAS archive and fenced restore authority; physical resizing does not change immutable binding or restored learned parameters",
+    "rollback": "failed or interrupted attempts preserve the previous committed barrier; all current physical workers and IPC helpers are stopped and joined before the attempt returns"
+  },
+  "binding": {
+    "schema_version": "skeleton.local_elastic_training_binding.v1",
+    "fields": [
+      "corpus_bytes",
+      "corpus_digest",
+      "dataset_authority_epoch",
+      "dataset_digest",
+      "document_bytes",
+      "document_count",
+      "document_digests",
+      "document_sequence_digest",
+      "document_sizes",
+      "initial_model_digest",
+      "manifest_digest",
+      "schema_version",
+      "split_digest",
+      "split_name",
+      "targets_per_epoch",
+      "training_config"
+    ],
+    "training_config_fields": [
+      "algorithm",
+      "model_id",
+      "hidden_size",
+      "seed",
+      "dtype",
+      "epochs",
+      "learning_rate",
+      "gradient_clip",
+      "world_size",
+      "collective_timeout_seconds",
+      "strategy",
+      "aggregation",
+      "runtime",
+      "max_physical_workers"
+    ],
+    "strategy": "local_elastic_spawned_processes",
+    "max_physical_workers": "integer floor of immutable manifest max_processes, capped at four; defaults to four when max_processes is absent",
+    "execution_only": [
+      "physical_workers"
+    ]
+  },
+  "resume_payload": {
+    "schema_version": "skeleton.local_elastic_training_resume.v1",
+    "fields": [
+      "schema_version",
+      "binding_digest",
+      "cursor",
+      "usage",
+      "optimizer",
+      "model",
+      "initial_loss",
+      "final_loss",
+      "finished",
+      "barrier"
+    ],
+    "cursor_fields": [
+      "epoch",
+      "document_index",
+      "update_count",
+      "step",
+      "barrier_count"
+    ],
+    "usage_fields": [
+      "steps",
+      "documents",
+      "training_bytes",
+      "epochs",
+      "barriers"
+    ],
+    "barrier_extension": "membership",
+    "membership_fields": [
+      "schema_version",
+      "worker_epoch",
+      "logical_ranks",
+      "physical_workers",
+      "worker_pids",
+      "rank_to_worker",
+      "previous_membership_digest",
+      "previous_worker_epoch",
+      "previous_physical_workers",
+      "previous_worker_pids",
+      "previous_resize_count",
+      "resize_count",
+      "barrier_index",
+      "consumed_documents_before",
+      "consumed_targets_before"
+    ],
+    "membership_schema": "skeleton.local_elastic_membership.v1",
+    "rank_receipts": "existing complete logical rank receipt fields; logical ranks assigned to the same physical slot share its actual PID, while the physical roster must contain distinct PIDs",
+    "budgets": "existing cumulative logical target/document/byte/epoch/barrier limits never reset on recovery; max_processes bounds actual concurrent physical workers and is immutable across resizing"
+  },
+  "recovery": [
+    "validate exact dataset, code/config, runtime, initialized base identity and cumulative budgets before worker allocation",
+    "advance the existing parent worker epoch before restoring the authoritative committed checkpoint of a failed/running attempt",
+    "select a new physical count only at a restart boundary; preserve immutable logical ranks, full optimizer configuration and consumed data cursor",
+    "replay only the first uncommitted logical barrier after failure; no committed logical document update is repeated",
+    "physical roster changes require a newer recovery epoch and produce explicit membership lineage in the next committed barrier",
+    "completed reload and retry return the recorded membership artifact without spawning workers or rewriting receipts from the latest requested physical count"
+  ],
+  "failure_drills": [
+    "actual physical process death",
+    "stopped physical process collective timeout",
+    "scale-down and scale-up restart campaign",
+    "stale parent and stale logical rank receipt rejection",
+    "revocation after logical updates before checkpoint",
+    "physical and cumulative budget denial before allocation",
+    "malformed roster/mapping/PID/lineage receipt rejection",
+    "checkpoint tamper and conflicting logical-rank/config retry",
+    "CAS backup/reimport followed by changed physical count"
+  ],
+  "tests": [
+    "skeleton/testing/test_elastic_training_recovery.py",
+    "skeleton/testing/test_p3_local_data_parallel_training.py"
+  ],
+  "limits": {
+    "logical_ranks": [
+      2,
+      4
+    ],
+    "physical_workers": [
+      1,
+      4
+    ],
+    "max_worker_message_bytes": 16777216,
+    "max_checkpoint_payload_bytes": 16777216,
+    "max_collective_timeout_seconds": 120,
+    "numerical_limits": "unchanged native neural hidden-size, document, corpus, epoch and cumulative target limits"
+  },
+  "scope_limitations": [
+    "one machine; physical process restart elasticity only",
+    "fixed logical rank and effective batch semantics",
+    "no live resizing, remote coordinator, GPU collectives, topology optimization or optimizer rescaling",
+    "no model quality, production promotion or masterplan signoff claim",
+    "membership lineage is issued by the trusted existing SQLite writer; retained receipts bind preceding membership digests without attesting a rewritten full history after pruning"
+  ]
+}

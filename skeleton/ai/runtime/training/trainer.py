@@ -128,6 +128,10 @@ class ReferenceLocalTrainer:
         checkpoint: TrainingCheckpoint,
         corpus: Sequence[str] | None = None,
     ) -> tuple[ReferenceNGramModel | None, dict[str, int]]:
+        if manifest.world_size != 1 or manifest.parallelism != "single":
+            raise TrainingStateError(
+                "reference local trainer only supports world_size=1 and parallelism=single"
+            )
         payload = self.runs.checkpoint_payload(checkpoint)
         try:
             if set(payload) != {"schema_version", "binding_digest", "cursor", "usage", "model", "finished"}:

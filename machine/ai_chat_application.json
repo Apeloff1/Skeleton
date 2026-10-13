@@ -1,0 +1,29 @@
+{
+  "schema_version": "skeleton.ai.chat_application.v1",
+  "status": "implementation_candidate",
+  "scope": "Actual authenticated chat composition using existing application, context, provider, conversation and product owners",
+  "owners": {
+    "application": "backend/routes/ai.py",
+    "engine_client": "backend/core/engine_client.py",
+    "conversation": "skeleton/persistence/conversation_repository.py",
+    "provider": "skeleton/provider_runtime.py",
+    "execution": "skeleton/persistence/execution_repository.py",
+    "orchestration": "skeleton/api/engine_runtime.py",
+    "product": "frontend/features/Jeeves/ChatWorkspace.tsx"
+  },
+  "interfaces": {
+    "model_selection": "Optional exact registered provider/model selection is bound into the admitted execution context policy before dispatch; arbitrary models, credential transports and silent fallback on explicit selection reject",
+    "generation": "Optional validated temperature is provider-neutral configuration; token output limits remain in admitted resource budgets",
+    "stream": "Actual provider text deltas publish bounded provisional events through the existing execution repository; canonical assistant messages are committed only from the final governed result",
+    "replay": "Additive execution event journal preserves immutable sequence, digest and stable event identity; after_sequence acknowledges the last accepted event and durable reads survive process restart",
+    "conversation": "Authorized server-owned threads, active lineage, revisions, search/archive/delete, pending turns and terminal assistant receipts reconstruct product state; local drafts are rebuildable cache only",
+    "attachments": "Explicit rights and current conversation scope admit bounded actual extracted file evidence as untrusted context through existing owners",
+    "readiness": "Catalog projects configured declared provider availability and safe diagnostics; unavailable local artifacts never produce fabricated models or hosted fallback"
+  },
+  "bounds": {"max_event_bytes": 262144, "max_events_per_execution": 65536, "max_event_bytes_per_execution": 33554432, "max_event_page": 1024},
+  "failure": "Invalid selection, stale execution identity, event gaps/corruption, withdrawn conversation/attachments, deadline/cancellation and unavailable providers fail explicitly; provisional text never becomes verified evidence by being rendered",
+  "rollback": "Disable new chat surfaces while preserving existing conversation/execution state and event journal; do not erase history or enable direct backend provider calls",
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "verification": "User-directed implementation session: no automated tests written or run after 2026-10-13 14:21:37 UTC"
+}

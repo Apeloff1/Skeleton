@@ -230,6 +230,8 @@ class ProviderRequest:
     tool_choice: str = "auto"
     specific_tool_id: str | None = None
     deadline: datetime | None = None
+    temperature: float | None = None
+    on_text_delta: Callable[[str], Any] | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -539,6 +541,16 @@ class FailoverProviderAdapter(ProviderAdapter):
                 self._telemetry.primary_attempts += 1
             else:
                 self._telemetry.failover_attempts += 1
+            observed_output = False
+            if routed.on_text_delta is not None:
+                receiver = routed.on_text_delta
+
+                def guarded_delta(text, receiver=receiver):
+                    nonlocal observed_output
+                    observed_output = True
+                    return receiver(text)
+
+                routed = replace(routed, on_text_delta=guarded_delta)
             try:
                 response = await adapter.generate(routed)
             except ProviderPolicyError:
@@ -552,11 +564,19 @@ class FailoverProviderAdapter(ProviderAdapter):
             except ProviderUnavailableError as exc:
                 self._telemetry.provider_failures += 1
                 self._telemetry.last_failure_kind = "unavailable"
+                if observed_output:
+                    raise ProviderInvocationError(
+                        "provider failed after provisional output; retry requires a new execution attempt"
+                    ) from exc
                 last_error = exc
                 continue
             except ProviderInvocationError as exc:
                 self._telemetry.provider_failures += 1
                 self._telemetry.last_failure_kind = "invocation"
+                if observed_output:
+                    raise ProviderInvocationError(
+                        "provider failed after provisional output; retry requires a new execution attempt"
+                    ) from exc
                 last_error = exc
                 continue
             if index == 0:
@@ -1198,6 +1218,15 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
         if not isinstance(message.content, str) or not message.content.strip():
             raise ProviderProtocolViolationError("model provider history contains empty content")
 
+    if request.temperature is not None and (
+        isinstance(request.temperature, bool)
+        or not isinstance(request.temperature, (int, float))
+        or not math.isfinite(request.temperature)
+        or not 0 <= request.temperature <= 2
+    ):
+        raise ProviderProtocolViolationError("temperature must be finite and in [0, 2]")
+    if request.on_text_delta is not None and not callable(request.on_text_delta):
+        raise ProviderProtocolViolationError("provider delta receiver must be callable")
     max_output_tokens = request.max_output_tokens
     if max_output_tokens is not None and (
         isinstance(max_output_tokens, bool)
@@ -1976,6 +2005,12 @@ class OpenAIProviderAdapter(ProviderAdapter):
             }
             if request.max_output_tokens is not None:
                 kwargs["max_output_tokens"] = request.max_output_tokens
+            if request.temperature is not None:
+                if model.lower().startswith(("gpt-5", "o1", "o3", "o4")):
+                    raise ProviderProtocolViolationError(
+                        "selected model does not support temperature overrides"
+                    )
+                kwargs["temperature"] = float(request.temperature)
             if tools:
                 kwargs["tools"] = [tool.as_openai_tool() for tool in tools]
                 kwargs["tool_choice"] = _provider_tool_choice_payload(
@@ -1992,10 +2027,48 @@ class OpenAIProviderAdapter(ProviderAdapter):
             )
             try:
                 dispatched = True
-                response = await asyncio.wait_for(
-                    client.responses.create(**kwargs),
-                    timeout=timeout_seconds,
-                )
+
+                async def invoke_response():
+                    if request.on_text_delta is None:
+                        return await client.responses.create(**kwargs)
+                    stream = await client.responses.create(**kwargs, stream=True)
+                    completed = None
+                    streamed_bytes = 0
+                    try:
+                        async for event in stream:
+                            kind = str(_provider_field(event, "type", ""))
+                            if kind == "response.output_text.delta":
+                                delta = _provider_field(event, "delta", None)
+                                if not isinstance(delta, str) or len(delta.encode("utf-8")) > 131072:
+                                    raise ProviderProtocolViolationError(
+                                        "provider stream delta exceeds bounds"
+                                    )
+                                streamed_bytes += len(delta.encode("utf-8"))
+                                if streamed_bytes > _MAX_PROVIDER_RESPONSE_BYTES:
+                                    raise ProviderProtocolViolationError(
+                                        "provider stream output exceeds bounds"
+                                    )
+                                if delta:
+                                    observed = request.on_text_delta(delta)
+                                    if inspect.isawaitable(observed):
+                                        await observed
+                            elif kind in {"response.completed", "response.incomplete", "response.failed"}:
+                                completed = _provider_field(event, "response", None)
+                            elif kind == "error":
+                                raise ProviderInvocationError("model provider stream failed")
+                    finally:
+                        close = getattr(stream, "close", None)
+                        if callable(close):
+                            closed = close()
+                            if inspect.isawaitable(closed):
+                                await closed
+                    if completed is None:
+                        raise ProviderProtocolViolationError(
+                            "provider stream ended without an accountable result"
+                        )
+                    return completed
+
+                response = await asyncio.wait_for(invoke_response(), timeout=timeout_seconds)
             except TimeoutError as exc:
                 raise ProviderInvocationError("model provider deadline exceeded") from exc
             except ProviderError:
@@ -2867,6 +2940,23 @@ class LocalArtifactProviderAdapter(ProviderAdapter):
             or self.engine.model.model_digest != self._artifact["model_digest"]
         ):
             raise ProviderUnavailableError("activated local model artifact identity drift")
+        if self._artifact["schema"] == "reference_ngram":
+            from skeleton.ai.runtime.inference.local import ReferenceNGramModel
+
+            try:
+                model = self.engine.model
+                if type(model) is not ReferenceNGramModel:
+                    raise ValueError("reference artifact requires its canonical model implementation")
+                # ReferenceNGramModel caches its digest at construction. Read
+                # the actual learned table and order before authorizing use.
+                weights = ReferenceNGramModel.to_dict(model, include_digest=False)
+                encoded = json.dumps(
+                    weights, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+                ).encode("utf-8")
+                if hashlib.sha256(encoded).hexdigest() != self._artifact["model_digest"]:
+                    raise ValueError("reference learned content changed")
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise ProviderUnavailableError("activated local model artifact identity drift") from exc
 
     def execution_identity(self) -> dict[str, Any]:
         """Project validated artifact content identity for durable execution pins."""
@@ -2875,6 +2965,27 @@ class LocalArtifactProviderAdapter(ProviderAdapter):
         self._assert_model_identity()
         fields = ("schema", "model_id", "model_digest", "artifact_sha256", "artifact_bytes", "reference")
         try:
+            import platform
+            from pathlib import Path
+
+            inference_root = Path(__file__).resolve().parent
+            if inference_root.name != "skeleton":
+                inference_root = inference_root.parents[1]
+            sources = (
+                inference_root / "provider_runtime.py",
+                inference_root / "ai" / "runtime" / "inference" / "local.py",
+                inference_root / "ai" / "runtime" / "inference" / "neural.py",
+            )
+            code_binding = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}
+            runtime_binding = {
+                "python": platform.python_version(),
+                "platform": platform.system(),
+                "machine": platform.machine(),
+            }
+            if self._artifact["schema"] == "skeleton.numpy_recurrent_lm.v1":
+                import numpy
+
+                runtime_binding["numpy"] = numpy.__version__
             default_seed = self._local_adapter.default_seed
             if type(default_seed) is not int or not 0 <= default_seed <= (1 << 63) - 1:
                 raise ValueError("invalid local inference seed")
@@ -2893,14 +3004,18 @@ class LocalArtifactProviderAdapter(ProviderAdapter):
                 or artifact["reference"] != "local-model-artifact:" + artifact["artifact_sha256"]
             ):
                 raise ValueError("invalid artifact descriptor")
-        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        except (AttributeError, KeyError, TypeError, ValueError, OSError) as exc:
             raise ProviderUnavailableError("local model artifact execution identity is invalid") from exc
         return {
             "schema_version": "skeleton.local_provider_execution_identity.v1",
             "provider_id": self.provider_id,
             "model_id": self.model,
             "artifact": artifact,
-            "inference": {"default_seed": default_seed},
+            "inference": {
+                "default_seed": default_seed,
+                "code_digest": hashlib.sha256(json.dumps(code_binding, sort_keys=True).encode()).hexdigest(),
+                "runtime": runtime_binding,
+            },
         }
 
     @property
@@ -2932,8 +3047,6 @@ class LocalArtifactProviderAdapter(ProviderAdapter):
         )
         if characters > 1024 * 1024:
             raise ProviderPolicyError("local model input exceeds bounded context intake")
-        if self._artifact["schema"] == "skeleton.numpy_recurrent_lm.v1":
-            return len(request.prompt.encode("utf-8")) + 1
         from skeleton.ai.runtime.inference.local import _TOKEN, LocalInferenceRequest
 
         rendered = LocalInferenceRequest(
@@ -2941,6 +3054,11 @@ class LocalArtifactProviderAdapter(ProviderAdapter):
             instructions=request.instructions,
             history=tuple((item.role, item.content) for item in request.history),
         ).rendered_input
+        if self._artifact["schema"] == "skeleton.numpy_recurrent_lm.v1":
+            byte_count = len(rendered.encode("utf-8"))
+            if byte_count > 1024 * 1024:
+                raise ProviderPolicyError("local neural model input exceeds byte intake bound")
+            return byte_count + 1
         return sum(1 for _ in _TOKEN.finditer(rendered))
 
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
@@ -3061,6 +3179,49 @@ def _local_env_integer(name: str, default: int, maximum: int) -> int:
     return value
 
 
+class _UnavailableLocalProviderAdapter(ProviderAdapter):
+    """Keep local activation diagnostics readable without granting dispatch."""
+
+    provider_id = "local"
+    model = None
+
+    def __init__(self, code: str) -> None:
+        self.readiness_code = code
+
+    @property
+    def available(self) -> bool:
+        return False
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "id": self.provider_id,
+            "model": None,
+            "available": False,
+            "configured": False,
+            "execution_mode": "local",
+            "network_policy": "none",
+            "readiness_code": self.readiness_code,
+        }
+
+    async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        del request
+        raise ProviderUnavailableError("local provider activation is unavailable")
+
+
+def _local_readiness_code(error: ProviderUnavailableError) -> str:
+    # Match only messages issued by this owner; never project raw exceptions.
+    message = str(error)
+    if message.startswith("AI_LOCAL_MODEL_PATH is required"):
+        return "local_model_not_configured"
+    if message.startswith("local model artifact failed activation"):
+        return "local_artifact_invalid"
+    if message.startswith("local mode forbids a secondary"):
+        return "local_external_fallback_denied"
+    if message.startswith("local mode forbids an external semantic verifier"):
+        return "local_external_verifier_denied"
+    return "local_configuration_invalid"
+
+
 class ProviderRegistry:
     """Configuration-driven provider selector with mandatory architecture read."""
 
@@ -3097,49 +3258,18 @@ class ProviderRegistry:
         cls,
         *,
         admission_runtime: AdmissionRuntime | None = None,
+        retain_unavailable: bool = False,
     ) -> ProviderRegistry:
+        if type(retain_unavailable) is not bool:
+            raise TypeError("retain_unavailable must be boolean")
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
         if active == "local":
-            if any(
-                os.getenv(name, "").strip()
-                for name in ("AI_SECONDARY_API_KEY", "AI_SECONDARY_BASE_URL", "AI_SECONDARY_MODEL")
-            ):
-                raise ProviderUnavailableError("local mode forbids a secondary external provider")
-            if os.getenv("AI_VERIFICATION_MODEL", "").strip():
-                raise ProviderUnavailableError("local mode forbids an external semantic verifier")
-            path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
-            if not path:
-                raise ProviderUnavailableError("AI_LOCAL_MODEL_PATH is required for local activation")
-            cache_size = _local_env_integer("AI_LOCAL_MODEL_CACHE_SIZE", 128, 4096)
-            seed = _local_env_integer("AI_LOCAL_MODEL_SEED", 0, (1 << 63) - 1)
             try:
-                timeout = float(os.getenv("AI_TIMEOUT_SECONDS", "45"))
-            except ValueError as exc:
-                raise ProviderUnavailableError("local AI_TIMEOUT_SECONDS must be numeric") from exc
-            if not math.isfinite(timeout) or not 1 <= timeout <= 3600:
-                raise ProviderUnavailableError("local AI_TIMEOUT_SECONDS exceeds execution bounds")
-            from skeleton.ai.runtime.inference.artifact import (
-                LocalModelArtifactError,
-                load_local_model_artifact,
-            )
-            from skeleton.ai.runtime.inference.local import (
-                LocalInferenceEngine,
-                LocalModelAdapter,
-            )
-
-            try:
-                loaded = load_local_model_artifact(path)
-            except LocalModelArtifactError as exc:
-                raise ProviderUnavailableError("local model artifact failed activation") from exc
-            local = LocalArtifactProviderAdapter(
-                LocalModelAdapter(
-                    LocalInferenceEngine(loaded.model, cache_size=cache_size), default_seed=seed
-                ),
-                artifact=loaded.receipt.as_dict(),
-                timeout_seconds=timeout,
-                admission_runtime=admission_runtime,
-            )
-            return cls((local,), active=active)
+                return cls._local_from_env(admission_runtime=admission_runtime)
+            except ProviderUnavailableError as exc:
+                if not retain_unavailable:
+                    raise
+                return cls((_UnavailableLocalProviderAdapter(_local_readiness_code(exc)),), active="local")
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
         adapter = OpenAIProviderAdapter(
@@ -3203,6 +3333,47 @@ class ProviderRegistry:
             fallback_ids=fallback_ids,
         )
 
+    @classmethod
+    def _local_from_env(cls, *, admission_runtime: AdmissionRuntime | None = None) -> ProviderRegistry:
+        if any(
+            os.getenv(name, "").strip()
+            for name in ("AI_SECONDARY_API_KEY", "AI_SECONDARY_BASE_URL", "AI_SECONDARY_MODEL")
+        ):
+            raise ProviderUnavailableError("local mode forbids a secondary external provider")
+        if os.getenv("AI_VERIFICATION_MODEL", "").strip():
+            raise ProviderUnavailableError("local mode forbids an external semantic verifier")
+        path = os.getenv("AI_LOCAL_MODEL_PATH", "").strip()
+        if not path:
+            raise ProviderUnavailableError("AI_LOCAL_MODEL_PATH is required for local activation")
+        cache_size = _local_env_integer("AI_LOCAL_MODEL_CACHE_SIZE", 128, 4096)
+        seed = _local_env_integer("AI_LOCAL_MODEL_SEED", 0, (1 << 63) - 1)
+        try:
+            timeout = float(os.getenv("AI_TIMEOUT_SECONDS", "45"))
+        except ValueError as exc:
+            raise ProviderUnavailableError("local AI_TIMEOUT_SECONDS must be numeric") from exc
+        if not math.isfinite(timeout) or not 1 <= timeout <= 3600:
+            raise ProviderUnavailableError("local AI_TIMEOUT_SECONDS exceeds execution bounds")
+        from skeleton.ai.runtime.inference.artifact import (
+            LocalModelArtifactError,
+            load_local_model_artifact,
+        )
+        from skeleton.ai.runtime.inference.local import (
+            LocalInferenceEngine,
+            LocalModelAdapter,
+        )
+
+        try:
+            loaded = load_local_model_artifact(path)
+        except LocalModelArtifactError as exc:
+            raise ProviderUnavailableError("local model artifact failed activation") from exc
+        local = LocalArtifactProviderAdapter(
+            LocalModelAdapter(LocalInferenceEngine(loaded.model, cache_size=cache_size), default_seed=seed),
+            artifact=loaded.receipt.as_dict(),
+            timeout_seconds=timeout,
+            admission_runtime=admission_runtime,
+        )
+        return cls((local,), active="local")
+
     @property
     def active(self) -> ProviderAdapter | None:
         return self._adapters.get(self.active_id)
@@ -3259,6 +3430,20 @@ class ProviderRegistry:
 
         if not adapter.available:
             raise ProviderUnavailableError(f"AI provider is not configured: {self.active_id}")
+        return adapter
+
+    def require_selection(self, provider_id: str, model_id: str) -> ProviderAdapter:
+        """Resolve one declared pair, with no implicit fallback or model substitution."""
+        if not isinstance(provider_id, str) or provider_id != provider_id.strip():
+            raise ProviderUnavailableError("provider selection must be normalized")
+        if not isinstance(model_id, str) or model_id != model_id.strip() or not model_id:
+            raise ProviderUnavailableError("model selection must be normalized")
+        adapter = self._adapters.get(provider_id)
+        if adapter is None or getattr(adapter, "model", None) != model_id:
+            raise ProviderUnavailableError("selected provider/model pair is not declared")
+        self._architecture_receipt(provider_id)
+        if not adapter.available:
+            raise ProviderUnavailableError("selected provider/model pair is unavailable")
         return adapter
 
     def redundancy_status(self) -> dict[str, Any]:
@@ -3331,6 +3516,55 @@ class ProviderRegistry:
                 status["architecture_acknowledged"] = True
                 status["architecture_tag"] = receipt.architecture_tag
                 status["construction_version"] = receipt.construction_version
+            local = provider_id == "local"
+            status["credential_free"] = local
+            status["execution_mode"] = "local" if local else "hosted"
+            status["configured"] = (
+                not isinstance(adapter, _UnavailableLocalProviderAdapter)
+                if local
+                else bool(getattr(adapter, "api_key", None) or getattr(adapter, "_client", None) is not None)
+            )
+            status["context_window"] = 16_384 if local else 128_000
+            status["max_output_tokens"] = 8_192 if local else 16_384
+            status["default_output_tokens"] = 256 if local else 4_096
+            status["limits_source"] = "engine_chat_policy"
+            model_id = getattr(adapter, "model", None)
+            status["supports_temperature"] = (
+                provider_id == "openai"
+                and isinstance(model_id, str)
+                and (model_id in ("gpt-4o", "gpt-4.1") or model_id.startswith(("gpt-4o-", "gpt-4.1-")))
+            )
+            artifact = status.get("artifact")
+            status["tokenizer"] = (
+                "utf8_bytes"
+                if (
+                    local
+                    and isinstance(artifact, Mapping)
+                    and artifact.get("schema") == "skeleton.numpy_recurrent_lm.v1"
+                )
+                else "reference_tokens" if local else "approximate_text"
+            )
+            status["capabilities"] = ["text-generation"]
+            if provider_id == "openai":
+                status["capabilities"] += [
+                    "image-generation",
+                    "image-variation",
+                    "image-editing",
+                    "speech-synthesis",
+                ]
+            if not status["architecture_acknowledged"]:
+                status["readiness_code"] = "provider_architecture_unacknowledged"
+            elif status["available"]:
+                status["readiness_code"] = "ready"
+            elif "readiness_code" not in status:
+                if local:
+                    status["readiness_code"] = "local_model_unavailable"
+                elif not getattr(adapter, "api_key", None) and getattr(adapter, "_client", None) is None:
+                    status["readiness_code"] = "provider_credentials_missing"
+                elif getattr(adapter, "_sdk_import_error", None) is not None:
+                    status["readiness_code"] = "provider_sdk_unavailable"
+                else:
+                    status["readiness_code"] = "provider_configuration_unavailable"
             statuses.append(status)
         return statuses
 

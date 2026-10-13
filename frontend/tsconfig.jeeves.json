@@ -10,6 +10,12 @@
     "features/Jeeves/workbench/**/*.tsx",
     "app/jeeves-workbench.tsx",
     "app/jeeves-chat.tsx",
+    "app/ai-chat.tsx",
+    "src/product/aiChatClient.ts",
+    "src/product/chatController.ts",
+    "src/product/useChatController.ts",
+    "features/Jeeves/ChatExport.ts",
+    "features/Jeeves/ChatAttachments.tsx",
     "expo-env.d.ts"
   ]
 }

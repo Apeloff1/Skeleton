@@ -105,10 +105,14 @@ def _code_digest(algorithm: str) -> str:
     root = Path(__file__).parent
     paths = [root / name for name in ("cli.py", "control.py", "data.py", "trainer.py")]
     paths.append(root.parent / "inference" / "local.py")
-    if algorithm in {"neural", "data_parallel"}:
+    if algorithm in {"neural", "data_parallel", "elastic", "preference"}:
         paths += [root / "neural_trainer.py", root.parent / "inference" / "neural.py"]
-    if algorithm == "data_parallel":
+    if algorithm in {"data_parallel", "elastic"}:
         paths.append(root / "distributed_trainer.py")
+    if algorithm == "elastic":
+        paths.append(root / "elastic_trainer.py")
+    if algorithm == "preference":
+        paths += [root / "preference_trainer.py", root / "post_training.py"]
     return _digest(
         {str(path.relative_to(root.parent)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
     )
@@ -182,12 +186,17 @@ def build_governed_artifact(
     max_training_bytes: int = 64 * 1024 * 1024,
     world_size: int | None = None,
     collective_timeout_seconds: float | None = None,
+    physical_workers: int | None = None,
+    parent_run_id: str | None = None,
+    preference_beta: float | None = None,
+    evaluation_suite_digest: str | None = None,
 ) -> dict[str, object]:
     """Materialize licensed files, resume training, and atomically export weights."""
-    if algorithm not in {"reference", "neural", "data_parallel"}:
-        raise GovernedTrainingBuildError("algorithm must be reference, neural or data_parallel")
-    neural = algorithm in {"neural", "data_parallel"}
-    if algorithm == "data_parallel":
+    if algorithm not in {"reference", "neural", "data_parallel", "elastic", "preference"}:
+        raise GovernedTrainingBuildError("unsupported governed training algorithm")
+    neural = algorithm != "reference"
+    parallel = algorithm in {"data_parallel", "elastic"}
+    if parallel:
         world_size = 2 if world_size is None else world_size
         collective_timeout_seconds = (
             60.0 if collective_timeout_seconds is None else collective_timeout_seconds
@@ -202,7 +211,36 @@ def build_governed_artifact(
         ):
             raise GovernedTrainingBuildError("collective timeout must be finite and within 120 seconds")
     elif world_size is not None or collective_timeout_seconds is not None:
-        raise GovernedTrainingBuildError("parallel process configuration requires data_parallel")
+        raise GovernedTrainingBuildError("parallel process configuration requires data_parallel or elastic")
+    if algorithm == "elastic":
+        if physical_workers is not None and (
+            type(physical_workers) is not int or not 1 <= physical_workers <= 4
+        ):
+            raise GovernedTrainingBuildError("elastic physical_workers must be between 1 and 4")
+    elif physical_workers is not None:
+        raise GovernedTrainingBuildError("physical_workers requires elastic training")
+    if algorithm == "preference":
+        if not isinstance(parent_run_id, str) or not parent_run_id.strip() or parent_run_id == run_id:
+            raise GovernedTrainingBuildError("preference training requires a distinct parent_run_id")
+        preference_beta = 0.1 if preference_beta is None else preference_beta
+        if (
+            type(preference_beta) not in {int, float}
+            or not math.isfinite(preference_beta)
+            or not 0 < preference_beta <= 10
+        ):
+            raise GovernedTrainingBuildError("preference beta must be finite and in (0, 10]")
+        if (
+            not isinstance(evaluation_suite_digest, str)
+            or len(evaluation_suite_digest) != 64
+            or any(c not in "0123456789abcdef" for c in evaluation_suite_digest)
+        ):
+            raise GovernedTrainingBuildError(
+                "preference training requires an explicit planned evaluation suite digest"
+            )
+        if type(epochs) is not int or not 1 <= epochs <= 128:
+            raise GovernedTrainingBuildError("preference epochs must be in [1, 128]")
+    elif any(value is not None for value in (parent_run_id, preference_beta, evaluation_suite_digest)):
+        raise GovernedTrainingBuildError("preference configuration requires preference training")
     if any(not isinstance(value, str) or not value.strip() for value in (run_id, dataset_id, classification)):
         raise GovernedTrainingBuildError("run, dataset and classification identities must be non-empty")
     if classification not in {"public", "internal", "confidential", "restricted"}:
@@ -243,12 +281,30 @@ def build_governed_artifact(
     if neural and seed < 0:
         raise GovernedTrainingBuildError("neural initialization seed must be non-negative")
     sources = _read_sources(corpus_paths, neural=neural)
-    if neural and (
-        sum(len(payload) + 1 for _, payload in sources) * epochs > min(max_steps, 16_777_216)
-        or len(sources) * epochs > min(max_updates, 65_536)
-        or sum(len(payload) for _, payload in sources) * epochs > max_training_bytes
+    if (
+        neural
+        and algorithm != "preference"
+        and (
+            sum(len(payload) + 1 for _, payload in sources) * epochs > min(max_steps, 16_777_216)
+            or len(sources) * epochs > min(max_updates, 65_536)
+            or sum(len(payload) for _, payload in sources) * epochs > max_training_bytes
+        )
     ):
         raise GovernedTrainingBuildError("neural corpus/configuration exceeds cumulative execution budget")
+    if algorithm == "preference":
+        from .preference_trainer import PreferenceLocalTrainer, PreferencePair
+
+        pairs = tuple(PreferencePair.from_document(payload.decode("utf-8")) for _, payload in sources)
+        targets, byte_costs = PreferenceLocalTrainer._costs(pairs)
+        if (
+            len(pairs) > 1024
+            or sum(targets) * (epochs + 2) > min(max_steps, 16_777_216)
+            or len(pairs) * epochs > min(max_updates, 65_536)
+            or sum(byte_costs) * (epochs + 2) > max_training_bytes
+        ):
+            raise GovernedTrainingBuildError(
+                "preference corpus/configuration exceeds cumulative execution budget"
+            )
     if algorithm == "reference" and (
         sum(_step_count(payload.decode("utf-8")) for _, payload in sources) > max_steps
         or len(sources) > max_updates
@@ -295,10 +351,14 @@ def build_governed_artifact(
         from .neural_trainer import NeuralLocalTrainer
 
         environment["numpy"] = numpy.__version__
-    if algorithm == "data_parallel":
+    if parallel:
         from .distributed_trainer import LocalDataParallelTrainer
 
-        environment["worker_strategy"] = "local_spawned_processes"
+        environment["worker_strategy"] = (
+            "local_spawned_processes" if algorithm == "data_parallel" else "local_elastic_spawned_processes"
+        )
+    if algorithm == "elastic":
+        from .elastic_trainer import ElasticLocalTrainer
     budget = {"max_steps": max_steps, "max_documents": max_updates, "max_training_bytes": max_training_bytes}
     if algorithm == "reference":
         budget["max_corpus_bytes"] = max_training_bytes
@@ -310,11 +370,11 @@ def build_governed_artifact(
         "gradient_clip": float(gradient_clip),
         "order": order,
     }
-    if algorithm == "data_parallel":
+    if parallel:
         parameters.update(
             {"world_size": world_size, "collective_timeout_seconds": float(collective_timeout_seconds)}
         )
-        budget["max_processes"] = world_size
+        budget["max_processes"] = world_size if algorithm == "data_parallel" else 4
         budget["max_barriers"] = ((len(sources) + world_size - 1) // world_size) * epochs
     code_digest, environment_digest = _code_digest(algorithm), _digest(environment)
     request = {
@@ -336,11 +396,30 @@ def build_governed_artifact(
     datasets = DatasetRegistry(dataset_path)
     runs = None
     try:
+        parent = None
+        if algorithm == "preference":
+            runs = TrainingRepository(run_path)
+            parent, parent_artifact = NeuralLocalTrainer(datasets, runs).load_artifact(parent_run_id)
+            if parent.config.hidden_size != hidden_size or parent.config.seed != seed:
+                raise GovernedTrainingBuildError(
+                    "preference hidden_size and seed must match the neural parent"
+                )
+            parameters.update(
+                {
+                    "parent_run_id": parent_run_id,
+                    "parent_checkpoint_digest": parent_artifact.checkpoint_digest,
+                    "parent_model_digest": parent.model_digest,
+                    "beta": float(preference_beta),
+                    "evaluation_suite_digest": evaluation_suite_digest,
+                }
+            )
+            request["parameters"] = parameters
         acquired_text, expected_version = _admit_request(
             run_path, run_id, request, expected_version=datasets.latest_materialized_version(dataset_id)
         )
         acquired_at = datetime.fromisoformat(acquired_text)
-        runs = TrainingRepository(run_path)
+        if runs is None:
+            runs = TrainingRepository(run_path)
         materialized_sources = []
         for path, payload in sources:
             envelope = IngestEnvelope.from_bytes(
@@ -390,13 +469,25 @@ def build_governed_artifact(
         )
         corpus = datasets.training_corpus(materialized.dataset_digest)
         if neural:
-            base_digest = NeuralLocalTrainer.initialize_model(
-                run_id, hidden_size=hidden_size, seed=seed
-            ).model_digest
+            base_digest = (
+                parent.model_digest
+                if parent is not None
+                else NeuralLocalTrainer.initialize_model(
+                    run_id, hidden_size=hidden_size, seed=seed
+                ).model_digest
+            )
             trainer = (
-                LocalDataParallelTrainer(datasets, runs)
-                if algorithm == "data_parallel"
-                else NeuralLocalTrainer(datasets, runs)
+                PreferenceLocalTrainer(datasets, runs, parent_run_id=parent_run_id)
+                if algorithm == "preference"
+                else (
+                    ElasticLocalTrainer(datasets, runs)
+                    if algorithm == "elastic"
+                    else (
+                        LocalDataParallelTrainer(datasets, runs)
+                        if algorithm == "data_parallel"
+                        else NeuralLocalTrainer(datasets, runs)
+                    )
+                )
             )
         else:
             base_digest = _digest({"kind": "untrained_reference_ngram", "order": order})
@@ -410,13 +501,38 @@ def build_governed_artifact(
             hyperparameters=parameters,
             seed=seed,
             resource_budget=budget,
-            world_size=world_size if algorithm == "data_parallel" else 1,
-            parallelism="data_parallel" if algorithm == "data_parallel" else "single",
-            collective_timeout_seconds=(
-                float(collective_timeout_seconds) if algorithm == "data_parallel" else 60.0
-            ),
+            world_size=world_size if parallel else 1,
+            parallelism="data_parallel" if parallel else "single",
+            collective_timeout_seconds=(float(collective_timeout_seconds) if parallel else 60.0),
         )
-        if neural:
+        if algorithm == "preference":
+            from .post_training import PostTrainingExperiment
+
+            experiment = PostTrainingExperiment(
+                experiment_id="preference:" + run_id,
+                base_candidate_digest=base_digest,
+                dataset_digest=materialized.dataset_digest,
+                objective="dpo",
+                algorithm="numpy-recurrent-byte-dpo-v1",
+                configuration={
+                    "epochs": epochs,
+                    "beta": float(preference_beta),
+                    "learning_rate": float(learning_rate),
+                    "gradient_clip": float(gradient_clip),
+                },
+                evaluation_suite_digest=evaluation_suite_digest,
+            )
+            model, training = trainer.train(
+                manifest,
+                corpus,
+                experiment=experiment,
+                epochs=epochs,
+                beta=preference_beta,
+                learning_rate=learning_rate,
+                gradient_clip=gradient_clip,
+            )
+        elif neural:
+            execution = {"physical_workers": physical_workers} if algorithm == "elastic" else {}
             model, training = trainer.train(
                 manifest,
                 corpus,
@@ -424,6 +540,7 @@ def build_governed_artifact(
                 epochs=epochs,
                 learning_rate=learning_rate,
                 gradient_clip=gradient_clip,
+                **execution,
             )
         else:
             model, training = trainer.train(manifest, corpus, order=order, checkpoint_every_documents=1)
@@ -431,6 +548,8 @@ def build_governed_artifact(
         if binding is None or "dataset_authority_epoch" not in binding:
             raise GovernedTrainingBuildError("training artifact lacks durable dataset authority binding")
         with datasets.training_authority(materialized.dataset_digest, binding["dataset_authority_epoch"]):
+            if algorithm == "preference":
+                trainer._authority(binding)
             artifact = write_local_model_artifact(model, output)
         receipt = {
             "schema_version": "skeleton.governed_local_model_build.v1",
@@ -456,8 +575,27 @@ def build_governed_artifact(
                     "update_count": training.update_count,
                 }
             )
-        if algorithm == "data_parallel":
+        if parallel:
             receipt.update({"world_size": world_size, "barrier_count": training.barrier_count})
+        if algorithm == "elastic":
+            receipt.update(
+                {
+                    "physical_workers": training.physical_workers,
+                    "membership_change_count": training.membership_change_count,
+                    "membership_receipt_digest": training.membership_receipt_digest,
+                }
+            )
+        if algorithm == "preference":
+            receipt.update(
+                {
+                    "parent_run_id": training.parent_run_id,
+                    "reference_model_digest": training.reference_model_digest,
+                    "initial_margin": training.initial_margin,
+                    "final_margin": training.final_margin,
+                    "experiment_digest": training.experiment_digest,
+                    "evaluation_suite_digest": training.evaluation_suite_digest,
+                }
+            )
         receipt["receipt_digest"] = _digest(receipt)
         return receipt
     finally:
@@ -475,7 +613,17 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--dataset-id", required=True)
     parser.add_argument("--rights-ref", required=True, action="append", dest="rights_refs")
     parser.add_argument("--classification", default="internal")
-    parser.add_argument("--algorithm", choices=("reference", "neural", "data_parallel"), default="neural")
+    parser.add_argument(
+        "--algorithm",
+        choices=("reference", "neural", "data_parallel", "elastic", "preference"),
+        default="neural",
+    )
+    parser.add_argument("--physical-workers", type=int)
+    parser.add_argument("--parent-run-id")
+    parser.add_argument("--preference-beta", type=float)
+    parser.add_argument(
+        "--evaluation-suite-digest", help="Declared planned suite identity for preference candidates"
+    )
     parser.add_argument("--world-size", type=int)
     parser.add_argument("--collective-timeout-seconds", type=float)
     parser.add_argument("--hidden-size", type=int, default=24)

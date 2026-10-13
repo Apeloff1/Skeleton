@@ -48,8 +48,10 @@
       "issued-decisions-bind-exact-evaluation-mbom-and-lifecycle-prefix",
       "state-map-equals-replayed-history",
       "rollback-reservations-fit-history-budget",
-      "no-orphaned-evidence-or-receipts"
-    ]
+      "no-orphaned-evidence-or-receipts",
+      "v2-rollout-complete-input-result-metric-stage-and-lifecycle-action-graph"
+    ],
+    "v2_extension": "machine/ai_measured_model_rollout.json: bounded rollout plans, request assignments, actual observations, stages and lifecycle-linked cutover/rollback; v1 unchanged when extension unused"
   },
   "bounds": {
     "max_snapshot_bytes": 16777216,
@@ -62,8 +64,13 @@
     "max_text_characters": 1024
   },
   "migration": {
-    "supported_database_versions": [1],
-    "supported_snapshot_versions": [1],
+    "supported_database_versions": [
+      1
+    ],
+    "supported_snapshot_versions": [
+      1,
+      2
+    ],
     "empty_database_initialization": "atomic-schema-and-initial-empty-snapshot",
     "unknown_or_newer_version": "reject-without-upgrade-or-state-rewrite",
     "existing_unrelated_database": "reject-without-taking-ownership",

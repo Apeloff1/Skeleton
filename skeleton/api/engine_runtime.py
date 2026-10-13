@@ -76,7 +76,7 @@ class EngineExecutionCoordinator:
         if not isinstance(service, EngineExecutionService):
             raise TypeError("service must be EngineExecutionService")
         self.service = service
-        self.provider_registry = provider_registry or ProviderRegistry.from_env()
+        self.provider_registry = provider_registry or ProviderRegistry.from_env(retain_unavailable=True)
         self.tool_runtime = tool_runtime or AsyncToolRuntime()
         self.verification_hook = verification_hook
         self.finalization_binding_hook = finalization_binding_hook
@@ -203,7 +203,15 @@ class EngineExecutionCoordinator:
             )
             return
         try:
-            provider = self.provider_registry.require_active()
+            selection = command.execution_request.context_policy.get("provider_selection")
+            if selection is None:
+                provider = self.provider_registry.require_active()
+            elif isinstance(selection, dict) and set(selection) == {"provider_id", "model_id"}:
+                provider = self.provider_registry.require_selection(
+                    selection["provider_id"], selection["model_id"]
+                )
+            else:
+                raise ProviderUnavailableError("invalid declared provider selection")
         except ProviderUnavailableError:
             await self._finalize_failure(
                 execution_id,

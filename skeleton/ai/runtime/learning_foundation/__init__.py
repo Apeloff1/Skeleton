@@ -65,6 +65,9 @@ from .training import (
 
 __all__ = [
     "ContentAddressedStore",
+    "ContentFeatureReceipt",
+    "ContentSignalIndex",
+    "ContentSimilarityHit",
     "CurriculumDecision",
     "CurriculumStage",
     "DataConflictError",
@@ -83,6 +86,9 @@ __all__ = [
     "LifecycleTransitionReceipt",
     "LiveSpeechExecution",
     "LocalTrainingControlPlane",
+    "LocalUsageTariff",
+    "MeasuredModelRollout",
+    "MeasuredRolloutError",
     "MetricGate",
     "MigrationParityCase",
     "ModelBillOfMaterials",
@@ -103,6 +109,11 @@ __all__ = [
     "RecoveryReceipt",
     "ReinforcementEnvironment",
     "RetrievalHit",
+    "RolloutActionReceipt",
+    "RolloutGatePolicy",
+    "RolloutMeasurementReceipt",
+    "RolloutPlan",
+    "RolloutStageReceipt",
     "SQLiteModelLifecycleRepository",
     "SpeechChunkReceipt",
     "SpeechExecutionReceipt",
@@ -126,6 +137,27 @@ __all__ = [
 
 
 def __getattr__(name: str):
+    if name in {"ContentSignalIndex", "ContentFeatureReceipt", "ContentSimilarityHit"}:
+        from . import content_retrieval
+
+        value = getattr(content_retrieval, name)
+        globals()[name] = value
+        return value
+    if name in {
+        "MeasuredModelRollout",
+        "MeasuredRolloutError",
+        "RolloutPlan",
+        "RolloutGatePolicy",
+        "RolloutMeasurementReceipt",
+        "RolloutStageReceipt",
+        "RolloutActionReceipt",
+        "LocalUsageTariff",
+    }:
+        from . import rollout
+
+        value = getattr(rollout, name)
+        globals()[name] = value
+        return value
     if name in {
         "LiveSpeechExecution",
         "SpeechFrameEvidence",
