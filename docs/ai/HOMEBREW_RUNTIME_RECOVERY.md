@@ -1,8 +1,8 @@
 # Source-pinned original homebrew/runtime recovery
 
-**Reconciliation date:** 2026-10-13  
-**Baseline:** current `main`, not the historical branch tree  
-**Custody:** `Apeloff1/Skeleton` PR #3593 at `7f9be557bac3a4108dfc683716b15437de30f547`  
+**Reconciliation date:** 2026-10-13\
+**Baseline:** current `main`, not the historical branch tree\
+**Custody:** `Apeloff1/Skeleton` PR #3593 at `7f9be557bac3a4108dfc683716b15437de30f547`\
 **Recovery branch:** `feat/original-homebrew-core-recover-20261013`
 
 ## Exact scope

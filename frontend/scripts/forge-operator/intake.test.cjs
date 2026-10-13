@@ -119,4 +119,3 @@ test('operatorTabs includes intake after beats', () => {
   assert.equal(T.parseOperatorTab('intake'), 'intake');
   assert.equal(T.parseOperatorTab('INTAKE'), 'intake');
 });
-

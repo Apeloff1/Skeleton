@@ -344,4 +344,3 @@ def highlight_source(bible, contract, scenes, highlight):
         "original_source_reparsed":True,
     }
     return {**body,"digest":digest(body)}
-

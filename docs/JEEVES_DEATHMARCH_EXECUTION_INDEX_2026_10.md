@@ -1,6 +1,6 @@
 # Deathmarch execution index — 2026-10-13
 
-**Active integration PR:** #3730, stacked on #3729 and #3718.  
+**Active integration PR:** #3730, stacked on #3729 and #3718.\
 **Truth rule:** An unmerged branch and a partially passing CI workflow are not a released application. This file tracks durable implementation changes, exact failures, and the next bounded actions. Update it when CI changes.
 
 ## Implemented this workpass (real commits, not claimed release qualification)

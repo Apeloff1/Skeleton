@@ -1,7 +1,7 @@
 # Original Physics Studio — Advanced Executable Reference
 
-**Authored:** 2026-10-12 (Europe/Oslo)  
-**Change chain:** `feat/game-builder-advanced-physics-world-20261012` stacked on Game Builder PR #3642.  
+**Authored:** 2026-10-12 (Europe/Oslo)\
+**Change chain:** `feat/game-builder-advanced-physics-world-20261012` stacked on Game Builder PR #3642.\
 **Purpose:** Advance an existing authoring-only physics editor into real, deterministic gameplay without a second game-state authority or copyrighted source assets.
 
 ## Delivered runtime

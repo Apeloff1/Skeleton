@@ -183,7 +183,7 @@ def edit_genome(index:str,changes:dict[str,int])->WorldGenomeAddress:
     return unrank_genome_address(
         str(original.base_design_index*GENOME_VARIATIONS+
             genome_code(Genome(tuple(updated)))))
-    
+
 
 def genome_world(address:WorldGenomeAddress)->tuple[LivingWorld,Genome]:
     if not isinstance(address,WorldGenomeAddress) or address.schema!=SCHEMA:

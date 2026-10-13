@@ -295,7 +295,7 @@ def structurally_qualified_capacity()->dict:
                 if not ways:continue
                 following[old_domains][old_active]+=ways
                 for count in range(1,size+1):
-                    following[min(3,old_domains+1)][min(4,old_active+count)]+=( 
+                    following[min(3,old_domains+1)][min(4,old_active+count)]+=(
                         ways*comb(size,count)
                     )
         dp=following
