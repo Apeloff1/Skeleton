@@ -3345,6 +3345,81 @@ $("advanced-unified-save-import").addEventListener("change",async()=>{
  }catch(error){status("Untrusted mixed original world save rejected: "+error.message);}
  finally{$("advanced-unified-save-import").value="";}
 });
+$("advanced-robustness-run").addEventListener("click",async()=>{
+ try{
+  if(!lastWorldWhatIfProof || !episodicLastScene ||
+      !verifiedSourceEpisodes.length || !verifiedGenreEvents.length)
+   throw Error("Replay an independently verified source-world what-if laboratory first");
+  const count=Number($("advanced-robustness-contexts").value);
+  if(!Number.isSafeInteger(count) || count<2 || count>3)
+   throw Error("Only two or three independently signed world contexts allowed");
+  const originalScene=episodicLastScene;
+  const scenes=[originalScene];
+  for(let offset=1;offset<count;offset++){
+   const nextSeed=(Number(originalScene.seed)+offset)%2147483647;
+   const result=await api("/api/advanced-scene-template",{
+    editor:"quest_director",seed:nextSeed,
+    scene_id:"robust_world_"+offset+"_"+lastWorldWhatIfProof.digest.slice(0,8)
+   });
+   if(!result.scene || result.scene.seed!==nextSeed ||
+      result.scene.digest===originalScene.digest ||
+      scenes.some(scene=>scene.digest===result.scene.digest))
+    throw Error("Independent original world scene custody failed");
+   scenes.push(result.scene);
+  }
+  const response=await api("/api/advanced-world-robustness",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scenes:scenes,
+   whatif:lastWorldWhatIfProof,
+   world_settings:interleavedWorldSettings,
+   max_candidates:2
+  });
+  const proof=response.proof;
+  if(!proof || response.original_games_mutated ||
+     response.automatic_scenario_adopted ||
+     response.population_generalization_proven ||
+     response.native_hardware_certified ||
+     proof.source_whatif_digest!==lastWorldWhatIfProof.digest ||
+     proof.world_scenes.length!==scenes.length ||
+     proof.world_scenes.some((id,i)=>id!==scenes[i].digest) ||
+     proof.automatic_ai_weights_promoted ||
+     proof.population_generalization_claimed)
+   throw Error("Cross-context world comparison or original gameplay source invalid");
+  lastWorldRobustnessProof=proof;
+  $("advanced-robustness-proof").textContent=JSON.stringify({
+    objective:proof.objective,
+    actual_world_contexts:proof.world_scenes,
+    measured_baselines:proof.baseline_worlds,
+    fully_replayed_alternatives:proof.fully_replayed_candidates,
+    rejected_alternatives:proof.rejected_candidates,
+    best_bounded_worst_context_score:proof.selected_worst_observed_score,
+    better_than_worst_baseline:proof.selected_beats_worst_baseline,
+    not_worse_any_tested_world:proof.selected_is_noninferior_in_all_contexts,
+    strictly_better_every_tested_world:
+      proof.selected_strictly_improves_every_context,
+    no_claim_about_other_worlds:true,
+    no_automatic_gameplay_or_ai_promotion:true,
+    replay_digest:proof.digest
+  },null,2);
+  status("Authenticated original NPC worlds compared across climate, source scene and witnessed outcomes");
+ }catch(error){status("Cross-context NPC gameplay mirror refused: "+error.message);}
+});
+$("advanced-robustness-copy").addEventListener("click",()=>{
+ try{
+  const proof=lastWorldRobustnessProof;
+  if(!proof || !proof.selected_scenario_id)
+   throw Error("No cross-context authenticated candidate was observed");
+  const scenario=proof.fully_replayed_candidates.find(
+    x=>x.scenario_id===proof.selected_scenario_id);
+  if(!scenario || !scenario.all_world_sources_independently_replayed ||
+     !scenario.not_worse_in_any_authored_context)
+   throw Error("Candidate worsened an authored context; explicit alternate review is required");
+  $("advanced-interleave-editor").value=JSON.stringify(scenario.timeline,null,2);
+  lastInterleavedProof=null;lastInterleavedTimeline=null;
+  status("Non-inferior cross-context candidate copied only to authored editor; independently replay before use");
+ }catch(error){status("Robust world scenario cannot be applied: "+error.message);}
+});
 $("advanced-whatif-run").addEventListener("click",async()=>{
  try{
   if(!episodicLastScene || !verifiedSourceEpisodes.length ||
@@ -3611,6 +3686,7 @@ $("advanced-genre-queue-clear").addEventListener("click",()=>{
  verifiedGenreEvents=[];lastUnifiedGenreProof=null;unifiedWorldFollowups=[];
  lastInterleavedProof=null;lastInterleavedTimeline=null;interleavedWorldSettings=null;
  lastWorldWhatIfProof=null;
+ lastWorldRobustnessProof=null;
  $("advanced-genre-queue-list").textContent="";
  $("advanced-unified-proof").textContent="";
  status("Unpublished genre source acquisitions cleared without modifying original saves");
@@ -3768,6 +3844,7 @@ let unifiedWorldFollowups=[];
 let lastInterleavedProof=null;
 let lastInterleavedTimeline=null;
 let lastWorldWhatIfProof=null;
+let lastWorldRobustnessProof=null;
 let interleavedWorldSettings=null;
 let verifiedSourceEpisodes=[];
 let episodicLastProof=null,episodicLastScene=null;
@@ -4458,6 +4535,22 @@ local until typed revalidation and an explicit human-approved file commit.</smal
          Copy reviewed alternative into timeline editor
         </button>
         <pre id="advanced-whatif-proof" role="status" aria-live="polite"></pre>
+        <fieldset aria-label="Multiple source-authored worlds robustness test">
+         <legend>Adversarial world context and source-validity laboratory</legend>
+         <label>Independent original world contexts
+          <select id="advanced-robustness-contexts">
+           <option value="2">Two separately signed NPC world scenes</option>
+           <option value="3">Three separately signed NPC world scenes</option>
+          </select>
+         </label>
+         <button id="advanced-robustness-run" type="button">
+          Replay candidates across authentic NPC world contexts
+         </button>
+         <button id="advanced-robustness-copy" type="button">
+          Copy best observed cross-context candidate to editor
+         </button>
+         <pre id="advanced-robustness-proof" role="status" aria-live="polite"></pre>
+        </fieldset>
        </fieldset>
        <fieldset aria-label="Portable original multi-engine world clock">
         <legend>Save and restore authored interleaved gameplay</legend>

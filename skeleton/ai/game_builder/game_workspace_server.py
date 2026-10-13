@@ -40,6 +40,9 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_world_robustness import (
+    run_world_robustness,verify_world_robustness,
+)
 from .advanced_world_whatif_lab import (
     run_world_whatif,verify_world_whatif,
 )
@@ -452,6 +455,24 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-world-robustness":
+            report=run_world_robustness(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scenes"],values["whatif"],
+                values.get("world_settings"),
+                max_candidates=values.get("max_candidates",2))
+            if not verify_world_robustness(
+                    report,values["physical_episodes"],
+                    values["genre_sessions"],values["world_scenes"],
+                    values["whatif"],values.get("world_settings")):
+                raise ValueError("cross-context source gameplay proof rejected")
+            return self._json(200,{
+                "proof":report,
+                "original_games_mutated":False,
+                "automatic_scenario_adopted":False,
+                "population_generalization_proven":False,
+                "native_hardware_certified":False,
             })
         if path=="/api/advanced-world-whatif-lab":
             report=run_world_whatif(
