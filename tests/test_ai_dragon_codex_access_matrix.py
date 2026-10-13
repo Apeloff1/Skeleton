@@ -24,7 +24,10 @@ def test_128_original_access_contracts_have_distinct_structural_sources():
     assert len({item.route_type for item in gates})==16
     assert all(item.optional_path for item in gates)
     assert all(not item.mandatory_game_ending for item in gates)
-    assert all(item.reason=="mastery_locked" for item in gates)
+    # A fresh world can be blocked by either mastery or a required era.
+    # Keep the API's typed reasons rather than flattening distinct gates.
+    assert all(item.reason in ("training_required","era_change_required")
+               for item in gates)
     assert all(item.next_possible_turn is not None for item in gates)
     assert all(not item.accessible_now for item in gates)
 
