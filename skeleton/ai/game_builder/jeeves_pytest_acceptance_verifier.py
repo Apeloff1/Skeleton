@@ -10,6 +10,7 @@ from __future__ import annotations
 from hashlib import sha256
 import hmac
 import json
+import re
 from typing import Any, Mapping
 
 from .jeeves_appwide_fabric import JeevesAppwideError, digest
@@ -84,9 +85,8 @@ def verify_pytest(
         _require(type(family) is dict and
                  set(family) == {"family_id", "modules"} and
                  type(family["family_id"]) is str and
-                 family["family_id"].startswith("F") and
-                 family["family_id"][1:].isdigit() and
-                 1 <= int(family["family_id"][1:]) <= 42 and
+                 bool(re.fullmatch(r"F(?:0[1-9]|[1-3][0-9]|4[0-2])",
+                                   family["family_id"])) and
                  family["family_id"] not in family_names and
                  type(family["modules"]) is list and bool(family["modules"]) and
                  all(type(m) is str and m in selected for m in family["modules"]),
