@@ -1,9 +1,9 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13.v6",
+  "version": "2026-10-13.v7",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
-  "scope_note": "42/42 linked; 17 unittest smoke families; 4 pytest smoke families; 21 discovery-only; each is a targeted regression, not full-feature qualification",
+  "scope_note": "42/42 source/test links: 17 unittest smoke families, 8 pytest smoke families, 17 discovery-only. Executable subset selection not full feature acceptance.",
   "runner_mode": "unittest_module_exact_head",
   "default_max_seconds": 480,
   "policies": {
@@ -227,12 +227,12 @@
     {
       "family_id": "F20",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Original game prompting and runtime pipeline subset",
       "unittest_modules": [
         "tests.test_ai_game_builder_runtime"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance, both OS, real nonzero JUnit cases",
       "product_release_qualified": false
     },
     {
@@ -342,34 +342,34 @@
     {
       "family_id": "F31",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Game generation governance and originality policy subset",
       "unittest_modules": [
         "tests.test_ai_game_builder_governance"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance, both OS, real nonzero JUnit cases",
       "product_release_qualified": false
     },
     {
       "family_id": "F32",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Dragon asset and game forge pipeline subset",
       "unittest_modules": [
         "tests.test_ai_webcrawler_dragon_game_forge"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance, both OS, real nonzero JUnit cases",
       "product_release_qualified": false
     },
     {
       "family_id": "F33",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "pytest_smoke",
       "independent_acceptance_question": "Game authoring experience evaluation and adversarial feedback subset",
       "unittest_modules": [
         "tests.test_ai_game_builder_experience_eval"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Pytest Acceptance, both OS, real nonzero JUnit cases",
       "product_release_qualified": false
     },
     {
