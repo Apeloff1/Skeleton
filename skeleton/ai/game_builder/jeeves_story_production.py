@@ -14,7 +14,7 @@ from .contracts import canonical_json
 from .game_project_workspace import GameWorkspace
 from .jeeves_appwide_fabric import AppwideInventory, JeevesAppwideError, digest
 from .story_canon_fabric import (
-    story_bible_template, scene_path, validate_story_bible,
+    story_bible_template, scene_path,
 )
 from .story_workspace import (
     load_story_workspace, load_continuity_contract,
@@ -68,7 +68,6 @@ class JeevesStorySourceWave:
         else:
             if type(act) is not int or type(scene) is not int:
                 raise JeevesAppwideError("original authored scene coordinates required")
-            from .story_chapter_context import chapter_of_act
             if chapter is not None and (
                     type(chapter) is not int or not 1 <= chapter <= 100):
                 raise JeevesAppwideError("story chapter must be in 1..100")
@@ -149,7 +148,6 @@ class JeevesStorySourceWave:
                 raise JeevesAppwideError("authored canon belongs to different game")
         elif authored_document.get("project") != project:
             raise JeevesAppwideError("continuity contract belongs to another project")
-        from .story_canon_fabric import signed
         from .story_canon_fabric import BIBLE, SCENE
         from .story_continuity_assurance import CONTRACT
         expected_schema = {"bible": BIBLE, "scene": SCENE, "contract": CONTRACT}[phase]

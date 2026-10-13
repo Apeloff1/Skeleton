@@ -881,12 +881,17 @@ $("jeeves-release-download").addEventListener("click",()=>dmGuard(async()=>{
   operator_authorized:true,
  });
  const bundle=receipt.result;
- if(bundle.zip_bytes>2210000||!/^[a-z0-9_-]+_[a-z0-9_-]+_source\\.zip$/.test(bundle.filename))
+ if(bundle.zip_bytes>2210000||!/^[a-z0-9_-]+_[a-z0-9_-]+_source\.zip$/.test(bundle.filename))
   throw Error("Unexpected original source export metadata");
  const binary=atob(bundle.base64);
  if(binary.length!==bundle.zip_bytes)
   throw Error("Original source transfer byte count mismatch");
  const bytes=Uint8Array.from(binary,character=>character.charCodeAt(0));
+ if(!crypto.subtle)throw Error("Secure browser digest verification is required");
+ const hashBuffer=await crypto.subtle.digest("SHA-256",bytes);
+ const hex=[...new Uint8Array(hashBuffer)].map(b=>b.toString(16).padStart(2,"0")).join("");
+ if(hex!==bundle.zip_sha256)
+  throw Error("Original project source ZIP failed SHA-256 transfer validation");
  const download=new Blob([bytes],{type:"application/zip"});
  const url=URL.createObjectURL(download);
  const a=document.createElement("a");
