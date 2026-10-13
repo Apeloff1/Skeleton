@@ -178,6 +178,35 @@ def _ecological_turn(state,config):
             state["tick"]%config["outbreak_period"]==0):
             habitat["disease"]=min(100,habitat["disease"]+config["infection_rate"])
         if habitat["protection"]>0:habitat["protection"]-=1
+    # More than 80 authored species remain a bounded food-consuming cohort,
+    # rather than a decorative untracked count. No one-per-animal allocation.
+    if (state["dormant_species"]>0 and
+        state["tick"]%config["cohort_period"]==0):
+        state["background_batches"]+=1
+        need=max(1,state["dormant_population"]//config["cohort_food_divisor"])
+        available=sum(h["food"] for h in state["habitats"])
+        # Reserve a bounded quarter of physically available food for dormant
+        # cohorts before active species draw down the rest. Never mint food.
+        consumed=min(need,available//4)
+        balance=consumed
+        for h in state["habitats"]:
+            take=min(balance,h["food"])
+            h["food"]-=take
+            balance-=take
+            if balance==0:break
+        shortage=need-consumed
+        lost=min(state["dormant_population"],shortage)
+        birth=1 if lost==0 and state["dormant_population"]>0 and (
+            state["dormant_population"]<
+            state["dormant_species"]*config["carrying_capacity"]
+        ) else 0
+        state["dormant_population"]+=birth-lost
+        state["background_births"]+=birth
+        state["background_deaths"]+=lost
+        state["background_food_consumed"]+=consumed
+        state["food_consumed"]+=consumed
+        state["births"]+=birth
+        state["deaths"]+=lost
     for species in state["species"]:
         habitat=state["habitats"][species["habitat"]]
         number=species["population"]
@@ -221,33 +250,6 @@ def _ecological_turn(state,config):
         state["births"]+=births
         state["deaths"]+=losses
         if updated==0:state["extinctions"]+=1
-    # More than 80 authored species remain a bounded food-consuming cohort,
-    # rather than a decorative untracked count. No one-per-animal allocation.
-    if (state["dormant_species"]>0 and
-        state["tick"]%config["cohort_period"]==0):
-        state["background_batches"]+=1
-        need=max(1,state["dormant_population"]//config["cohort_food_divisor"])
-        available=sum(h["food"] for h in state["habitats"])
-        consumed=min(need,available)
-        balance=consumed
-        for h in state["habitats"]:
-            take=min(balance,h["food"])
-            h["food"]-=take
-            balance-=take
-            if balance==0:break
-        shortage=need-consumed
-        lost=min(state["dormant_population"],shortage)
-        birth=1 if lost==0 and state["dormant_population"]>0 and (
-            state["dormant_population"]<
-            state["dormant_species"]*config["carrying_capacity"]
-        ) else 0
-        state["dormant_population"]+=birth-lost
-        state["background_births"]+=birth
-        state["background_deaths"]+=lost
-        state["background_food_consumed"]+=consumed
-        state["food_consumed"]+=consumed
-        state["births"]+=birth
-        state["deaths"]+=lost
     if config["migration"] and state["tick"]%config["migration_period"]==0:
         # A true migration moves population (no cloning), within a reviewed
         # habitat corridor or through a paid spatial ecological crossing.

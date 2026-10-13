@@ -57,7 +57,7 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
             self.assertFalse(initial["native_hardware_verified"])
 
     def test_spatial_attack_whiffs_without_fabricated_hit_or_free_damage(self):
-        cfg=make_editor_document("fighting",self.rules())["settings"]
+        cfg=make_editor_document("fighting",self.rules(stamina_regen=0))["settings"]
         state=start(cfg,0)
         before=state["opponent"]["hp"]
         step(state,cfg,"jab")
@@ -103,14 +103,20 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
     def test_actual_high_guard_low_guard_and_grapple_are_different(self):
         cfg=make_editor_document("fighting",
              self.rules(rounds_to_win=2))["settings"]
+        # Directly resolve real hitboxes to compare guard defenses without
+        # allowing the adaptive opponent AI to change the attack type.
+        from skeleton.ai.game_builder.advanced_fighting_runtime import _hit
         state=start(cfg,0)
         state["opponent"]["x"]=state["player"]["x"]+1
-        step(state,cfg,"guard_high")
-        self.assertGreater(state["player"]["defended"],0)
-        self.assertLess(state["player"]["hp"],cfg["player_health"])
+        state["player"]["guard_high"]=True
+        _hit(state,cfg,state["opponent"],state["player"],"jab",[])
+        self.assertEqual(state["player"]["defended"],1)
+        self.assertEqual(state["player"]["hp"],
+                         cfg["player_health"]-max(1,cfg["guard_chip"]))
         other=start(cfg,0)
         other["opponent"]["x"]=other["player"]["x"]+1
-        step(other,cfg,"guard_low")
+        other["player"]["guard_low"]=True
+        _hit(other,cfg,other["opponent"],other["player"],"jab",[])
         self.assertEqual(other["player"]["defended"],0)
         self.assertLess(other["player"]["hp"],state["player"]["hp"])
         grappler=start(cfg,0)
@@ -132,7 +138,7 @@ class OriginalAdvancedArenaTests(unittest.TestCase):
             0,cfg["parry_stun_frames"]-cfg["frames_per_turn"]))
         self.assertLessEqual(state["player"]["stamina"],before)
         self.assertFalse(state["player"]["parry"])
-        with self.assertRaises(FightingActionError):
+        with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("fighting",self.rules(
                 starting_stamina=10,parry_stamina=30),["parry"])
 

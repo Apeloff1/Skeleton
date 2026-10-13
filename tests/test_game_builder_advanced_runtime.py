@@ -221,11 +221,18 @@ class AdvancedProofTests(unittest.TestCase):
                 with self.assertRaises(AdvancedRuntimeError):
                     verify_advanced_session(bad)
 
-    def test_no_fake_support_for_38_other_systems(self):
-        with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("maze")
-        with self.assertRaises(AdvancedRuntimeError):
-            run_advanced_session("rpg")
+    def test_maze_and_rpg_now_have_real_replay_and_unknown_engines_fail_closed(self):
+        # These families have been promoted into the canonical ENGINES
+        # registry; the historical "unsupported" expectation is obsolete.
+        for editor in ("maze", "rpg"):
+            with self.subTest(editor=editor):
+                session = run_advanced_session(editor)
+                self.assertEqual(session["editor"], editor)
+                self.assertEqual(session["quality_floor"], "advanced")
+                self.assertEqual(session["validated_turn_count"], 0)
+                self.assertFalse(session["native_hardware_verified"])
+                self.assertFalse(session["publication_certified"])
+                self.assertTrue(verify_advanced_session(session))
         with self.assertRaises(AdvancedRuntimeError):
             run_advanced_session("nonexistent")
 
