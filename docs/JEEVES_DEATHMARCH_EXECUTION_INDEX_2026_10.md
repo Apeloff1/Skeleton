@@ -1,3 +1,24 @@
+## DX-49–DX-60 — independently verifiable targeted product regressions (2026-10-13)
+
+| ID | Committed real implementation | Completion contract |
+| --- | --- | --- |
+| DX-49 | `skeleton/ai/game_builder/jeeves_acceptance_run_verifier.py` | Fail closed unless exact run/head/workflow and *both* OS jobs succeeded |
+| DX-50 | `scripts/verify_app_acceptance_ci.py` | Read GitHub Actions REST directly with token-scoped GET; local HEAD must match CI source |
+| DX-51 | Runner evidence adapter | Requires real nonzero `unittest` test count, not only exit status |
+| DX-52 | Per-module and batch unittest counts | Source SHA, selected module identity, bounded logs and result identities |
+| DX-53 | GitHub artifact ZIP and JSON admission | Reject archive traversal, extra files, duplicates, oversized payload, replay |
+| DX-54 | HTTPS redirect control | Strip bearer token when redirected from GitHub API to external artifact blob host |
+| DX-55 | `tests/test_game_builder_jeeves_acceptance_run_verifier.py` | Run origin, job spoof, OS omission, source drift, token leak, altered result adversarial suite |
+| DX-56 | `tests/test_run_app_acceptance_matrix.py` | Explicitly denies `Ran 0 tests` even when subprocess exit code is zero |
+| DX-57 | `machine/app_acceptance_test_matrix.json` | Reviewed targeted smoke tier expanded to 17/42 (19 unittest modules) |
+| DX-58 | `.github/workflows/jeeves-app-acceptance-matrix.yml` | Python 3.11, exact PR checkout, native/model, repo atlas and build authority roots |
+| DX-59 | Studio Deathmarch acceptance status | Distinguish 17 CI-selected vs 25 discovery-only, not a source-only pass |
+| DX-60 | Independent targeted-family test-subset percentage | Computable **only** after GitHub run/artifact verification; not overall app completion |
+
+**Current measured indicators:** 42/42 family source owners located in checked branch (static). 42/42 candidates linked to real tests (static). 17/42 scheduled for actual CI regressions (~40.48% eligible for targeted-subset verification), 25/42 still discovery-only; **actual CI admission not claimed until exact-head run is verified**. The 168 independent user/feature acceptance stages remain unknown in the source census; the installed app and real trained-model quality remain not qualified.
+
+**Known integration risk:** CI queue congestion, absence of a dedicated pytest discovery/runner lane, unreconciled stacked PR dependency chain (#3718 → #3729 → #3730 → #3738 → #3747). Mainline merge not claimed.
+
 ## DX-36–DX-48 — real acceptance execution and last family test links (2026-10-13)
 
 | Milestone | Implemented source or real control | Interpretation |
