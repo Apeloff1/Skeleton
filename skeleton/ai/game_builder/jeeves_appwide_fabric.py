@@ -385,6 +385,8 @@ OPERATIONS = {
     "studio.production.stage":("proposal", "reviewed original game system or scene source proposals",True),
     "studio.production.release_plan":("compute", "original replay-proven browser and Godot source package",True),
     "studio.production.release_stage":("proposal", "original browser and Godot artifact review staging",True),
+    "studio.production.variants_plan":("compute", "bounded real original game source variants",True),
+    "studio.production.variants_stage":("proposal", "stage independently built original game source variants",True),
     "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
     "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
@@ -566,6 +568,13 @@ class JeevesAppwideRuntime:
                 result=prompt_builder.plan(**params, operator_authorized=authorized)
             else:
                 result=prompt_builder.stage(**params, operator_authorized=authorized)
+        elif action in ("studio.production.variants_plan", "studio.production.variants_stage"):
+            from .jeeves_game_variants import JeevesGameVariants
+            variants=JeevesGameVariants(inv, ws)
+            if action=="studio.production.variants_plan":
+                result=variants.plan(**params, operator_authorized=authorized)
+            else:
+                result=variants.stage(**params, operator_authorized=authorized)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
