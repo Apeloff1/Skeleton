@@ -183,6 +183,90 @@ class JeevesVerificationProgress:
             expected_gate_digest=expected_gate_digest)
         return report
 
+
+    def volumes(self, *, offset=0, limit=40, only_not_implementation_verified=False,
+                expected_progress_digest=None, expected_snapshot=None):
+        """Concrete authoritative work rows for every original masterplan volume.
+
+        This is a read-only acceptance inventory with source paths, test and
+        evaluation *declarations*; it does not execute them or sign volumes.
+        """
+        if type(offset) is not int or not 0 <= offset <= 421:
+            raise JeevesAppwideError("bounded volume inventory offset required")
+        if type(limit) is not int or not 1 <= limit <= 80:
+            raise JeevesAppwideError("bounded volume page size required")
+        if type(only_not_implementation_verified) is not bool:
+            raise JeevesAppwideError("explicit boolean volume filter required")
+        report, _, _ = self._collect(expected_snapshot=expected_snapshot)
+        if (expected_progress_digest is not None and
+                expected_progress_digest != report["digest"]):
+            raise JeevesAppwideError("volume verification view stale")
+        from .jeeves_completion_census import _json_object
+        raw = self.inv._safe_file("machine/ai_master_plan.json", max_size=1_000_000)
+        document = _json_object(raw, "machine/ai_master_plan.json")
+        raw_volumes = document.get("volumes", [])
+        if type(raw_volumes) is not list or not 1 <= len(raw_volumes) <= 2000:
+            raise JeevesAppwideError("invalid original AI masterplan volume inventory")
+        rows = []
+        ids = set()
+        for original in raw_volumes:
+            if (type(original) is not dict or
+                    type(original.get("key")) is not str):
+                raise JeevesAppwideError("invalid source-controlled volume")
+            identity = original["key"]
+            if identity in ids:
+                raise JeevesAppwideError("duplicate canonical volume")
+            ids.add(identity)
+            implementation = original.get("implementation_status")
+            enterprise = original.get("enterprise_grade_state")
+            if (only_not_implementation_verified and implementation == "verified"):
+                continue
+            excerpts = {}
+            for kind in ("implementation_paths", "tests", "evaluations"):
+                resources = original.get(kind, [])
+                if (type(resources) is not list or
+                        any(type(p) is not str for p in resources)):
+                    raise JeevesAppwideError("malformed canonical volume source references")
+                excerpts[kind] = {
+                    "declared_count": len(resources),
+                    "sample": sorted(set(resources))[:12],
+                    "references_truncated": len(resources) > 12,
+                    "not_proven_executed_or_passing": True,
+                }
+            rows.append({
+                "id": identity,
+                "title": str(original.get("title", ""))[:160],
+                "implementation_state": implementation,
+                "enterprise_grade_state": enterprise,
+                "source_implementation_verified": implementation == "verified",
+                "enterprise_qualified": enterprise in (
+                    "enterprise_qualified", "superior"),
+                "declared_source_evidence": excerpts,
+                "required_to_close": [
+                    "complete and independently check source-bound implementation",
+                    "observe real test, evaluation and baseline benchmark evidence",
+                    "perform owner-reviewed enterprise promotion and rollback signoff",
+                ],
+                "source_status_is_not_executable_verification": True,
+            })
+        rows.sort(key=lambda row: row["id"])
+        page = rows[offset:offset + limit]
+        body = {
+            "schema": SCHEMA + ".volumes",
+            "inventory_snapshot": self.inv._digest,
+            "progress_digest": report["digest"],
+            "total_declared_volumes": len(raw_volumes),
+            "filtered_remaining_volumes": len(rows),
+            "only_not_implementation_verified": only_not_implementation_verified,
+            "offset": offset, "limit": limit,
+            "next_offset": offset+len(page)
+                if offset+len(page)<len(rows) else None,
+            "volumes": page,
+            "volume_status_metadata_not_release_acceptance": True,
+            "no_tests_or_promotions_executed": True,
+        }
+        return {**body, "digest": digest(body)}
+
     def backlog(self, *, offset=0, limit=40,
                 expected_progress_digest=None,
                 expected_snapshot=None,
