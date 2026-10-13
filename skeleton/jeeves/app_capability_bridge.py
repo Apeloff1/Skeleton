@@ -182,6 +182,127 @@ def capability_concepts(*, query: str = "", limit: int = 20, offset: int = 0,
     }
 
 
+
+def _catalog_strings(value: Any, *, field: str, maximum: int = 128) -> list[str]:
+    """Bound machine-authored descriptions before presenting them to the agent."""
+    if not isinstance(value, list) or len(value) > maximum:
+        raise AppCapabilityBridgeError(f"{field} must be a bounded array")
+    if any(not isinstance(item, str) or not item or len(item) > 1024 for item in value):
+        raise AppCapabilityBridgeError(f"{field} has an invalid entry")
+    return list(value)
+
+
+def _catalog_result(rows: list[dict[str, Any]], *, name: str, query: str,
+                    limit: int, offset: int) -> dict[str, Any]:
+    needle, limit, offset = _page(query, limit, offset)
+    if len(rows) > MAX_ROWS:
+        raise AppCapabilityBridgeError("machine capability catalog exceeds entry budget")
+    identities = [row["id"] for row in rows]
+    if len(set(identities)) != len(identities):
+        raise AppCapabilityBridgeError("machine capability catalog has duplicate IDs")
+    rows.sort(key=lambda row: row["id"])
+    encoded = json.dumps(rows, sort_keys=True, separators=(",", ":"),
+                         ensure_ascii=True, allow_nan=False)
+    digest = sha256(encoded.encode("utf-8")).hexdigest()
+    selected = [row for row in rows if not needle
+                or needle in json.dumps(row, sort_keys=True, ensure_ascii=True).casefold()]
+    page = selected[offset:offset + limit]
+    return {
+        "schema": SCHEMA,
+        "catalog": name,
+        "query": query,
+        "total_declared": len(rows),
+        "total_matched": len(selected),
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + len(page) < len(selected),
+        "index_sha256": digest,
+        "entries": page,
+        "execution_authority": "none",
+        "validation": "machine declaration only; execution requires host grant and live readiness",
+    }
+
+
+def product_capability_catalog(*, query: str = "", limit: int = 20,
+                               offset: int = 0,
+                               root: Path | str | None = None) -> dict[str, Any]:
+    """List declared AI features without mistaking 'enabled' for live availability.
+
+    This registry describes product intent, required planes, provider needs and
+    readiness obligations. The host still decides whether an actual operation
+    exists, is healthy, and is authorized for the current principal.
+    """
+    _page(query, limit, offset)
+    home = _root(root)
+    declared = _manifest(home / "machine" / "ai_capabilities.json").get("capabilities")
+    if not isinstance(declared, list) or len(declared) > MAX_ROWS:
+        raise AppCapabilityBridgeError("AI capability registry is absent or unbounded")
+    rows: list[dict[str, Any]] = []
+    for record in declared:
+        if not isinstance(record, dict):
+            raise AppCapabilityBridgeError("AI capability must be an object")
+        identity = record.get("capability_id")
+        owner = record.get("owner_plane")
+        status = record.get("implementation_state")
+        risk = record.get("risk_class")
+        enabled = record.get("enabled")
+        if (not isinstance(identity, str) or not 1 <= len(identity) <= 192
+                or not isinstance(owner, str) or not 1 <= len(owner) <= 192
+                or not isinstance(status, str) or not 1 <= len(status) <= 80
+                or not isinstance(risk, str) or not 1 <= len(risk) <= 80
+                or type(enabled) is not bool):
+            raise AppCapabilityBridgeError("invalid AI capability record")
+        rows.append({
+            "id": identity,
+            "owner_plane": owner,
+            "implementation_state": status,
+            "risk_class": risk,
+            "enabled_by_contract": enabled,
+            "live_availability": "unverified" if enabled else "disabled",
+            "required_planes": _catalog_strings(
+                record.get("required_planes", []), field="required_planes"),
+            "required_provider_capabilities": _catalog_strings(
+                record.get("required_provider_capabilities", []),
+                field="required_provider_capabilities"),
+            "readiness_requirements": _catalog_strings(
+                record.get("readiness_requirements", []), field="readiness_requirements"),
+            "verification_level": str(record.get("verification_level", ""))[:80],
+            "authority": "declaration-only",
+        })
+    return _catalog_result(rows, name="product-ai-features", query=query,
+                           limit=limit, offset=offset)
+
+
+def interface_catalog(*, query: str = "", limit: int = 20, offset: int = 0,
+                      root: Path | str | None = None) -> dict[str, Any]:
+    """Find canonical cross-plane contracts without acquiring target-plane rights."""
+    _page(query, limit, offset)
+    home = _root(root)
+    declared = _manifest(home / "machine" / "capability_interfaces.json").get("entries")
+    if not isinstance(declared, list) or len(declared) > MAX_ROWS:
+        raise AppCapabilityBridgeError("interface registry is absent or unbounded")
+    rows: list[dict[str, Any]] = []
+    for record in declared:
+        if not isinstance(record, dict):
+            raise AppCapabilityBridgeError("interface entry must be an object")
+        fields = ("id", "relation", "source_plane", "target_plane",
+                  "source_owner", "target_owner", "boundary", "binding")
+        values = {key: record.get(key) for key in fields}
+        if any(not isinstance(value, str) or not value or len(value) > 1024
+               for value in values.values()):
+            raise AppCapabilityBridgeError("invalid canonical interface entry")
+        rows.append({
+            **values,
+            "target_contract_surface": _catalog_strings(
+                record.get("target_contract_surface", []),
+                field="target_contract_surface"),
+            "target_failure_contract": str(record.get("target_failure_contract", ""))[:1024],
+            "authority": "dependency-only; target owner retains execution rights",
+        })
+    return _catalog_result(rows, name="canonical-plane-interfaces",
+                           query=query, limit=limit, offset=offset)
+
+
 def creator_operation_catalog() -> dict[str, Any]:
     from skeleton.forge.creator.command_surface import surface_manifest
     surface = surface_manifest("api")
@@ -242,6 +363,30 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
                 ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
             ),
         ), lambda args, _ctx: capability_concepts(
+            query=args.get("query", ""), limit=args.get("limit", 20),
+            offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="app.features",
+            description="Read declared AI product features, owners, risks and missing readiness proof; no execution.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("query", "string", required=False, max_length=MAX_QUERY),
+                ArgumentRule("limit", "integer", required=False, minimum=1, maximum=MAX_PAGE),
+                ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
+            ),
+        ), lambda args, _ctx: product_capability_catalog(
+            query=args.get("query", ""), limit=args.get("limit", 20),
+            offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="app.interfaces",
+            description="Read canonical cross-plane dependency, owner and failure contracts; no execution.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("query", "string", required=False, max_length=MAX_QUERY),
+                ArgumentRule("limit", "integer", required=False, minimum=1, maximum=MAX_PAGE),
+                ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
+            ),
+        ), lambda args, _ctx: interface_catalog(
             query=args.get("query", ""), limit=args.get("limit", 20),
             offset=args.get("offset", 0), root=home)),
         (ToolSpec(
