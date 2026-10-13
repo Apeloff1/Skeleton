@@ -70,6 +70,19 @@ class GameForgeRun:
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
         cockpit = self.cockpit
+        # Freeze operator intent before stage execution. Implicit cockpit
+        # blending applies only when neither an explicit era nor questionnaire
+        # choices supersede it. Otherwise the declared input wins.
+        inherited_blend = (
+            tuple(cockpit.blend)
+            if blend is None and era is None and not answers and cockpit.blend
+            else None
+        )
+        effective_blend = blend if blend is not None else inherited_blend
+        if inherited_blend is not None and operator_tensor is None:
+            # A manual SET AXIS after BLEND must survive forge execution,
+            # including an operator ROLL ORACLE before the build.
+            operator_tensor = cockpit.tensor
         taken = None
         if answers:
             from skeleton.context.questionnaire import intake
@@ -95,7 +108,7 @@ class GameForgeRun:
             } if bound.get("hit") else None
             resolved_era = bound.get("era")
             # A pinned cockpit or explicit blend outranks automatic reference inference.
-            if not era and not (blend or cockpit.blend) and resolved_era:
+            if not era and not effective_blend and resolved_era:
                 era = str(resolved_era)
             extra = str(bound.get("dialect") or "")
             if extra and extra not in (vision or ""):
@@ -112,7 +125,11 @@ class GameForgeRun:
             "cockpit": cockpit,
             "forge": self.forge,
             "jeeves": self.jeeves,
-            "blend": blend,
+            "blend": effective_blend,
+            "blend_source": (
+                "argument" if blend is not None else
+                "cockpit" if inherited_blend is not None else "none"
+            ),
             "generation": generation,
             "reference": hit,
             "intake_tensor": (
@@ -219,9 +236,8 @@ def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
 def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
     blend = ctx.get("blend")
     cockpit: Cockpit = ctx["cockpit"]
-    if not blend and not ctx.get("era_hint") and getattr(cockpit, "blend", None):
-        blend = cockpit.blend
-        ctx["blend"] = blend
+    # All operator/CLI precedence is resolved at execute() entry. Do not
+    # silently resurrect mutable cockpit blending inside an individual stage.
     from skeleton.forge.hardware import detect_generation
     if not ctx.get("generation"):
         cockpit_generation = getattr(cockpit, "generation", None)
@@ -258,18 +274,19 @@ def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
 def _stage_tensor(ctx: Dict[str, Any]) -> Dict[str, Any]:
     cockpit: Cockpit = ctx["cockpit"]
     blend = ctx.get("blend")
-    if blend and len(blend) >= 2:
+    operator = ctx.get("operator_tensor")
+    if operator is not None and operator.era == ctx["era"]:
+        # An explicitly selected era also uses this branch when the saved
+        # tensor refers to that era; otherwise it is never resurrected.
+        cockpit.tensor = operator
+    elif blend and len(blend) >= 2:
         t = float(blend[2]) if len(blend) > 2 else 0.5
         cockpit.tensor = ContextTensor.from_era(str(blend[0])).lerp(
             ContextTensor.from_era(str(blend[1])), t
         )
-        # keep the blended era label on the cube
         object.__setattr__(cockpit.tensor, "era", ctx["era"])
     elif ctx.get("intake_tensor") is not None:
         cockpit.tensor = ctx["intake_tensor"]
-    elif (ctx.get("operator_tensor") is not None
-          and ctx["operator_tensor"].era == ctx["era"]):
-        cockpit.tensor = ctx["operator_tensor"]
     else:
         cockpit.tensor = ContextTensor.from_era(ctx["era"])
     _commit(ctx, "tensor", ctx["era"], cockpit.tensor.fingerprint(), cockpit.tensor.as_dict())
