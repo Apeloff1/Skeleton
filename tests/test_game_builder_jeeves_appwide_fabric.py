@@ -31,7 +31,7 @@ class AppwideCapabilityTests(unittest.TestCase):
         for directory,name in directories.items():
             folder=root/directory
             folder.mkdir(parents=True)
-            (folder/name).write_text("source test\n",encoding="utf8")
+            (folder/name).write_bytes(b"source test\n")
         (root/"skeleton/ai/game_builder/secret_token.key").write_text(
             "NO TOKEN EXPOSURE",encoding="utf8")
         (root/".env").write_text("PRIVATE_ENV_DATA",encoding="utf8")
