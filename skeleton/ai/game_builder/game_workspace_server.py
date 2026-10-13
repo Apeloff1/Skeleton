@@ -50,6 +50,8 @@ from .advanced_interleaved_objectives import (run_causal_objective_matrix,
     verify_causal_objective_matrix)
 from .advanced_interleaved_counterfactual import (run_counterfactual_lab,
     verify_counterfactual_lab)
+from .advanced_interleaved_counterfactual_mirror import (run_interleaved_counterfactuals,
+    verify_interleaved_counterfactuals)
 from .advanced_world_counterfactuals import (run_counterfactual_laboratory,
     verify_counterfactual_laboratory,derive_counterfactuals)
 from .advanced_interleaved_save import (export_interleaved_save,
@@ -535,6 +537,23 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_project_files_mutated":False,
                 "counterfactuals_promoted":False,
                 "native_all_engines_certified":False,
+            })
+        if path=="/api/advanced-interleaved-counterfactuals":
+            report=run_interleaved_counterfactuals(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["scenarios"],
+                values.get("world_settings"),
+                objective=values.get("objective","site_integrity"))
+            if not verify_interleaved_counterfactuals(
+                    report,values["physical_episodes"],values["genre_sessions"],
+                    values["world_scene"],values["scenarios"],
+                    values.get("world_settings")):
+                raise ValueError("cross-engine counterfactual original-world replay mismatch")
+            return self._json(200,{
+                "report":report,"original_files_changed":False,
+                "automatic_ai_promotion":False,
+                "native_full_world_certified":False,
+                "universal_game_quality_approved":False,
             })
         if path=="/api/advanced-interleaved-save-export":
             saved=export_interleaved_save(
