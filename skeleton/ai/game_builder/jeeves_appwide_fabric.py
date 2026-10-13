@@ -400,6 +400,9 @@ OPERATIONS = {
     "studio.forge.plan":("compute", "actual installed typed Forge blueprint source validation",False),
     "studio.forge.stage":("proposal", "canonical reviewed Universal Forge game asset source",True),
     "studio.forge.verify":("read", "real project Forge source revalidation",False),
+    "studio.advanced.replay.plan":("compute", "execute reference gameplay from actual approved advanced game scene",True),
+    "studio.advanced.replay.stage":("proposal", "stage source-bound verified advanced gameplay receipt",True),
+    "studio.advanced.replay.verify":("read", "reexecute committed advanced game session against approved system/scene",False),
     "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
     "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
@@ -654,6 +657,17 @@ class JeevesAppwideRuntime:
                 result=forge_author.stage(**params, operator_authorized=authorized)
             else:
                 result=forge_author.verify(**params)
+        elif action in ("studio.advanced.replay.plan",
+                        "studio.advanced.replay.stage",
+                        "studio.advanced.replay.verify"):
+            from .jeeves_advanced_replay import JeevesAdvancedReplay
+            session=JeevesAdvancedReplay(inv,ws)
+            if action=="studio.advanced.replay.plan":
+                result=session.plan(**params,operator_authorized=authorized)
+            elif action=="studio.advanced.replay.stage":
+                result=session.stage(**params,operator_authorized=authorized)
+            else:
+                result=session.verify(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":

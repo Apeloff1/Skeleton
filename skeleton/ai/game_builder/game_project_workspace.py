@@ -318,6 +318,78 @@ class GameWorkspace:
         config=validate_editor_document(_json(_read(config_path)))
         validate_advanced_scene(document,config["settings"])
 
+    def _validate_advanced_replay_source(self, project: str, relative: str,
+                                         document: dict):
+        """Commit-time authentic game action replay bound to actual saved sources.
+
+        Scene/system inputs come from human-committed workspace content, not
+        the submitted replay's claimed configuration or arbitrary model text.
+        """
+        from .advanced_level_scenes import scene_path
+        from .advanced_gameplay_runtime import (
+            ENGINES, verify_advanced_session, ACTION_HELP,
+        )
+        from .system_editors import validate_editor_document
+        from .contracts import canonical_digest
+        import re
+        if (type(document) is not dict
+                or set(document) != {
+                    "schema", "project", "editor", "scene_id",
+                    "system_sha256", "scene_sha256", "session", "digest"
+                }
+                or document.get("schema") !=
+                   "skeleton.game_builder.approved_advanced_replay_source.v1"
+                or document.get("project") != project):
+            raise WorkspaceError("exact signed original gameplay replay source required")
+        editor=document["editor"]
+        scene_id=document["scene_id"]
+        if (type(editor) is not str or editor not in ENGINES
+                or type(scene_id) is not str
+                or not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}",scene_id)
+                or relative != "game/replays/" + editor + "_" + scene_id + ".json"):
+            raise WorkspaceError("advanced replay path mismatches its original editor/scene")
+        canonical=dict(document)
+        candidate=canonical.pop("digest")
+        if (type(candidate) is not str or
+                canonical_digest(canonical) != candidate):
+            raise WorkspaceError("advanced replay source fingerprint mismatch")
+        system_file=self._file("current",project,"systems/"+editor+".json")
+        scene_file=self._file(
+            "current",project,
+            "scenes/advanced_"+editor+"_"+scene_id+".json")
+        system_text=_read(system_file)
+        scene_text=_read(scene_file)
+        if (_digest(system_text.encode("utf-8")) != document["system_sha256"]
+                or _digest(scene_text.encode("utf-8")) != document["scene_sha256"]):
+            raise WorkspaceError("original game system/scene versions changed after replay")
+        config=validate_editor_document(_json(system_text))
+        scene=_json(scene_text)
+        if (config["editor"]!=editor or scene_path(scene)!=
+                "scenes/advanced_"+editor+"_"+scene_id+".json"):
+            raise WorkspaceError("advanced replay source/canon binding invalid")
+        session=document["session"]
+        if (type(session) is not dict or session.get("editor")!=editor
+                or session.get("scene")!=scene):
+            raise WorkspaceError("replay transcript does not match original authored scene")
+        if (type(session.get("actions")) is not list
+                or len(session["actions"])>128 or
+                any(action not in ACTION_HELP[editor]
+                    for action in session["actions"])):
+            raise WorkspaceError("unknown or unbounded real game actions")
+        verify_advanced_session(session,config["settings"])
+        return {
+            "schema":document["schema"],
+            "project":project,
+            "source_path":relative,
+            "scene_digest":scene["digest"],
+            "replayed_turns":len(session["actions"]),
+            "original_system_sha256":document["system_sha256"],
+            "original_scene_sha256":document["scene_sha256"],
+            "session_digest":session["digest"],
+            "canonical_reference_gameplay_verified":True,
+            "native_hardware_replay_executed":False,
+        }
+
     def _validate_forge_blueprint(self, relative: str, document: dict):
         """Verify installed Forge kinds, typed ports and DAG before accepting source.
 
@@ -384,6 +456,8 @@ class GameWorkspace:
                 self._validate_advanced_scene_source(project,relative,parsed)
             if relative.startswith("assets/forge/"):
                 self._validate_forge_blueprint(relative,parsed)
+            if relative.startswith("game/replays/"):
+                self._validate_advanced_replay_source(project,relative,parsed)
             if (relative in ("game/story_bible.json","game/continuity_contract.json")
                     or relative.startswith(("story/scenes/","story/chapters/"))):
                 from .story_workspace import validate_story_workspace_source
@@ -434,6 +508,8 @@ class GameWorkspace:
                 self._validate_advanced_scene_source(project,proposal["path"],parsed)
             if proposal["path"].startswith("assets/forge/"):
                 self._validate_forge_blueprint(proposal["path"],parsed)
+            if proposal["path"].startswith("game/replays/"):
+                self._validate_advanced_replay_source(project,proposal["path"],parsed)
             if (proposal["path"] in ("game/story_bible.json",
                                       "game/continuity_contract.json") or
                     proposal["path"].startswith(("story/scenes/","story/chapters/"))):
