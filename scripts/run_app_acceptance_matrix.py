@@ -11,6 +11,7 @@ from hashlib import sha256
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -30,6 +31,20 @@ def _commit(repo):
     if len(head) != 40 or any(c not in "0123456789abcdef" for c in head):
         raise RuntimeError("unexpected exact-head git identity")
     return head
+
+
+_RUN_COUNT = re.compile(r"^Ran ([0-9]+) tests? in ", re.MULTILINE)
+
+
+def _observed_unittest_count(stderr: str):
+    """unittest exits zero even when it discovered NO tests. Deny that case."""
+    if type(stderr) is not str:
+        return None
+    matches = _RUN_COUNT.findall(stderr)
+    if len(matches) != 1:
+        return None
+    count = int(matches[0])
+    return count if count > 0 else None
 
 
 def _safe_output(value):
@@ -88,15 +103,17 @@ def produce(root: Path, output: Path, *, local=False):
                 exc.stderr, bytes) else (exc.stderr or "")
             return_code = None
             timed_out = True
+        actual_cases = _observed_unittest_count(stderr)
         results.append({
             "module": module,
+            "unittest_cases_observed": actual_cases,
             "command": ["python", "-m", "unittest", module, "-q"],
             "started_utc": start,
             "ended_utc": datetime.now(timezone.utc).isoformat(),
             "return_code": return_code,
             "timed_out": timed_out,
             "subprocess_executed": True,
-            "targeted_tests_passed_in_runner": return_code == 0 and not timed_out,
+            "targeted_tests_passed_in_runner": return_code == 0 and not timed_out and actual_cases is not None,
             "stdout": _safe_output(stdout),
             "stderr": _safe_output(stderr),
             "independent_ci_provenance_verified_by_this_script": False,
@@ -131,6 +148,7 @@ def produce(root: Path, output: Path, *, local=False):
         "modules_actually_executed": len(results),
         "modules_reporting_pass": sum(int(row[
             "targeted_tests_passed_in_runner"]) for row in results),
+        "total_unittest_cases_observed": sum(row["unittest_cases_observed"] or 0 for row in results),
         "selected_regression_suite_reported_success": all_pass,
         "run_results": results,
         "independent_github_run_identity_verified_externally": False,
