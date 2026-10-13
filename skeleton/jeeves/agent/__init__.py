@@ -751,6 +751,11 @@ from .orchestrated_capability_runtime import (
     OrchestratedDispatchReceipt,
     JeevesOrchestratedCapabilityRuntime,
 )
+from .shadow_learning_adapter import (
+    ShadowLearningError,
+    ShadowLearningHandoff,
+    prepare_shadow_learning_handoff,
+)
 from .capability_dispatch import (
     AppDispatchError,
     HostCapabilityBinding,
