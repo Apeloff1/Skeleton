@@ -74,6 +74,16 @@ def test_original_macos_game_is_compiled_executed_and_exactly_replayed(tmp_path)
     assert (tmp_path/published["filename"]).is_file()
 
 
+def test_macos_export_rejects_user_controlled_symlink_even_in_temp_tree(tmp_path):
+    actual=tmp_path/"real_destination"
+    actual.mkdir()
+    alias=tmp_path/"user_alias"
+    alias.symlink_to(actual,target_is_directory=True)
+    # Must reject before invoking a native compiler or writing any artifact.
+    with pytest.raises(ValueError,match="symlinked"):
+        publish_macos_game(game(),alias,authorized=True)
+
+
 @pytest.mark.skipif(sys.platform!="darwin" or not shutil.which("cc"),
                     reason="requires real macOS game build host")
 def test_mac_game_archive_rejects_modified_native_binary_even_if_zip_valid():
