@@ -59,8 +59,9 @@ def _private_directory(base: Path, tenant: str, project: str) -> Path:
     namespace = sha256((tenant + "\x00" + project).encode("utf-8")).hexdigest()
     output = base / "jeeves" / namespace
     output.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if output.is_symlink():
-        raise JeevesWorkbenchError("workbench namespace must not be a symlink")
+    if (output.is_symlink() or not output.resolve().is_relative_to(base)
+            or (base / "jeeves").is_symlink()):
+        raise JeevesWorkbenchError("workbench namespace must remain under host state")
     try:
         output.chmod(0o700)
     except OSError as exc:
@@ -221,12 +222,14 @@ class JeevesWorkbench:
             and self._shadow_consume_verify(record, candidate, context) is True
         )
 
-    def _scoped_creator(self, *args: Any, **kwargs: Any) -> bool:
-        if self._creator_authorize is None:
+    def _scoped_creator(self, command: Any, context: Any) -> bool:
+        if not self._context_scoped(context) or self._creator_authorize is None:
             return False
-        # Existing creator tool calls this with its own typed command/context
-        # parameters. Do not reinterpret or weaken that contract.
-        return self._creator_authorize(*args, **kwargs) is True
+        if getattr(command, "project_id", None) != self.project_id:
+            return False
+        # Existing creator tool requires a host decision over the exact typed
+        # command, tenant and authenticated principal on EVERY dispatch.
+        return self._creator_authorize(command, context) is True
 
     def _build_tools(self) -> ToolRegistry:
         if self.atlas is None or self.shadow is None:
