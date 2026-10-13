@@ -66,6 +66,24 @@ class OriginalVerifiedFastSnapshotTests(unittest.TestCase):
                             b["result_world_digest"])
         self.assertEqual(prepared.cursor,8)
 
+    def test_cached_checkpoint_and_bookmark_cannot_be_mutated_after_preparation(self):
+        source=checkpoint()
+        for damage in (
+            lambda p:p._checkpoint["source_world"]["commands"].append("wait"),
+            lambda p:p._checkpoint["bookmarks"][1].__setitem__("action_head","0"*64),
+            lambda p:p._bookmark.__setitem__("action_head","a"*64),
+        ):
+            prepared=prepare_verified_chunk_snapshot(source,cursor=8)
+            damage(prepared)
+            with self.subTest(damage=damage):
+                with self.assertRaises(ChunkTimelineError):
+                    prepared.fork(["wait"])
+                with self.assertRaises(ChunkTimelineError):
+                    _=prepared.actor_count
+        prepared=prepare_verified_chunk_snapshot(source,cursor=8)
+        self.assertEqual(prepared.fork(["wait"]),
+                         continue_chunked_world(source,["wait"],cursor=8))
+
     def test_replay_parity_remains_true_with_different_world_sizes_and_cohorts(self):
         for seed in (0,1,5):
             for side in (3,5):
