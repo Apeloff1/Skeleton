@@ -229,6 +229,52 @@ class CompletionCensusTests(unittest.TestCase):
         with self.assertRaises(JeevesAppwideError):
             self.census.report()
 
+    def test_prioritized_deathmarch_frontier_paged_and_source_bound(self):
+        census = self.census.report()
+        first = self.census.backlog(limit=5, expected_report_digest=census["digest"])
+        self.assertEqual(first["offset"], 0)
+        self.assertEqual(first["next_offset"], 5)
+        self.assertEqual(first["census_digest"], census["digest"])
+        self.assertEqual(first, self.census.backlog(
+            limit=5, expected_report_digest=census["digest"]))
+        self.assertTrue(all(not row["release_qualified"] and
+                            not row["automatic_execution_authorized"]
+                            for row in first["tasks"]))
+        seen = []
+        offset = 0
+        while True:
+            page = self.census.backlog(offset=offset, limit=5)
+            seen.extend(row["id"] for row in page["tasks"])
+            if page["next_offset"] is None:
+                break
+            offset = page["next_offset"]
+        self.assertEqual(len(seen), first["total_work_items"])
+        self.assertEqual(len(seen), len(set(seen)))
+        self.assertIn("AI-CAP-assistant.text", seen)
+        self.assertIn("AI-ENTERPRISE-421", seen)
+        self.assertIn("APP-SERVICE-backend", seen)
+        self.assertIn("WORK-ENT-01", seen)
+        self.assertIn("JOURNEY-01", seen)
+        self.assertEqual(first["total_work_items"], 9)
+
+    def test_deathmarch_stale_identity_and_input_caps_fail_closed(self):
+        old = self.census.report()["digest"]
+        with self.assertRaises(JeevesAppwideError):
+            self.census.backlog(limit=0)
+        with self.assertRaises(JeevesAppwideError):
+            self.census.backlog(offset=True)
+        with self.assertRaises(JeevesAppwideError):
+            self.census.backlog(expected_report_digest="f" * 64)
+        self.docs["machine/ai_capabilities.json"]["capabilities"][0]["enabled"] = False
+        self.flush()
+        self.refresh()
+        with self.assertRaises(JeevesAppwideError):
+            self.census.backlog(expected_report_digest=old)
+        page = JeevesAppwideRuntime(self.inv).invoke(
+            "ai.deathmarch", {"limit": 3})["result"]
+        self.assertTrue(page["operator_approval_required_for_mutations"])
+        self.assertFalse(page["source_edits_performed"])
+
     def test_stale_cursor_rejected(self):
         with self.assertRaises(JeevesAppwideError):
             self.census.report(expected_snapshot="0" * 64)
