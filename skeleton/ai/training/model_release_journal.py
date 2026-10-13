@@ -136,6 +136,12 @@ CREATE TABLE IF NOT EXISTS model_release_proposals (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS model_release_intake
     ON model_release_proposals(intake_id);
+CREATE TABLE IF NOT EXISTS model_release_admissions (
+    proposal_digest TEXT PRIMARY KEY,
+    admission_digest TEXT NOT NULL,
+    authority_id TEXT NOT NULL,
+    checkpoint_digest TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS model_release_events (
     sequence INTEGER PRIMARY KEY,
     proposal_digest TEXT NOT NULL,
@@ -330,14 +336,37 @@ class ModelReleaseJournal:
                             or runtime_admission.checkpoint_digest != proposal.rollback_checkpoint_digest):
                         raise ReleaseJournalError("runtime admission does not match release identity")
                 if receipt.state is ReleaseState.ROLLED_BACK_EXTERNAL:
+                    prior_admission = self._db.execute(
+                        "SELECT admission_digest,authority_id,checkpoint_digest "
+                        "FROM model_release_admissions WHERE proposal_digest=?",
+                        (proposal_digest,),
+                    ).fetchone()
+                    if prior_admission is None:
+                        raise ReleaseJournalError("rollback lacks bound runtime admission")
                     if not isinstance(rollback_proof, RollbackProof):
                         raise ReleaseJournalError("verified external rollback proof required")
                     if (rollback_proof.restored_model_digest != proposal.champion_digest
                             or rollback_proof.checkpoint_digest != proposal.rollback_checkpoint_digest
-                            or not rollback_proof.executed or not rollback_proof.verified):
-                        raise ReleaseJournalError("model was not proven restored to champion")
+                            or not rollback_proof.executed or not rollback_proof.verified
+                            or rollback_proof.admission_digest != prior_admission[0]
+                            or rollback_proof.checkpoint_digest != prior_admission[2]
+                            or rollback_proof.verifier_id in (
+                                receipt.verifier_id, prior_admission[1], proposal.verifier_id,
+                            )):
+                        raise ReleaseJournalError("model was not proven independently restored to champion")
                 if self._verify_external(proposal, receipt) is not True:
                     raise ReleaseJournalError("independent model-serving owner rejected external proof")
+                if receipt.state is ReleaseState.ACTIVE_EXTERNAL:
+                    if runtime_admission.admission_authority in (
+                        proposal.verifier_id, receipt.verifier_id,
+                    ):
+                        raise ReleaseJournalError("model admission needs independent operator")
+                    self._db.execute(
+                        "INSERT INTO model_release_admissions VALUES (?,?,?,?)",
+                        (proposal_digest, runtime_admission.digest,
+                         runtime_admission.admission_authority,
+                         runtime_admission.checkpoint_digest),
+                    )
                 version = expected_version + 1
                 event = self._append_event(
                     proposal=proposal, state=receipt.state,
