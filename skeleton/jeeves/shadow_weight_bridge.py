@@ -84,6 +84,9 @@ def register_shadow_weight_tools(
     pipeline: ShadowWeightPipeline | DurableShadowWeightPipeline,
     read_authorize: Callable[..., bool],
     write_authorize: Callable[..., bool] | None = None,
+    review_verify: Callable[..., bool] | None = None,
+    admission_verify: Callable[..., bool] | None = None,
+    consume_verify: Callable[..., bool] | None = None,
 ) -> tuple[str, ...]:
     """Register only explicitly host-scoped shadow tools.
 
@@ -105,6 +108,10 @@ def register_shadow_weight_tools(
         raise TypeError("tenant-scoped read_authorize is required")
     if write_authorize is not None and not callable(write_authorize):
         raise TypeError("write_authorize must be a host callback")
+    if write_authorize is not None and not all(callable(f) for f in (
+        review_verify, admission_verify, consume_verify,
+    )):
+        raise TypeError("independent host review, admission and candidate verifiers required")
 
     def _gate(name: str, args: Mapping[str, Any], context: Any, *, writing: bool) -> None:
         digest = _intent(name, args)
@@ -184,6 +191,9 @@ def register_shadow_weight_tools(
         def _review_apply(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
             review = _review(args["review"])
             _gate("shadow.review", args, context, writing=True)
+            current = pipeline.get(args["intake_id"])
+            if current is None or review_verify(current, review, context) is not True:
+                raise ToolDenied("independent host rejected shadow corroboration")
             return pipeline.review(
                 args["intake_id"], review,
                 expected_version=args["expected_version"],
@@ -191,6 +201,10 @@ def register_shadow_weight_tools(
 
         def _admit(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
             _gate("shadow.admit_training", args, context, writing=True)
+            current = pipeline.get(args["intake_id"])
+            if current is None or admission_verify(current, args["training_manifest_digest"],
+                                                   args["evidence_digest"], context) is not True:
+                raise ToolDenied("independent host rejected training manifest")
             return pipeline.admit_training(
                 args["intake_id"], expected_version=args["expected_version"],
                 training_manifest_digest=args["training_manifest_digest"],
@@ -208,6 +222,10 @@ def register_shadow_weight_tools(
 
         def _consume(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
             _gate("shadow.consume", args, context, writing=True)
+            current = pipeline.get(args["intake_id"])
+            if current is None or consume_verify(current, args["verified_candidate_digest"],
+                                                 context) is not True:
+                raise ToolDenied("independent host rejected candidate binding")
             return pipeline.consume(
                 args["intake_id"], expected_version=args["expected_version"],
                 verified_candidate_digest=args["verified_candidate_digest"],
