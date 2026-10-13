@@ -19,7 +19,7 @@ import tempfile
 from .config import load_machine_config
 
 SCHEMA = "skeleton.repository-git-atlas.v1"
-HEADER = re.compile(rb"^(?P<mode>[0-7]{6}) (?P<kind>blob|commit) (?P<oid>[0-9a-f]{40}|[0-9a-f]{64}) (?P<size>[0-9]+|-)$")
+HEADER = re.compile(rb"^(?P<mode>[0-7]{6}) (?P<kind>blob|commit) (?P<oid>[0-9a-f]{40}|[0-9a-f]{64}) +(?P<size>[0-9]+|-)$")
 MAX_TREE_BYTES = 100_000_000
 MAX_ENTRIES = 500_000
 
