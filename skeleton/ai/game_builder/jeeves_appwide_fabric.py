@@ -360,6 +360,7 @@ OPERATIONS = {
     "ai.workwaves":("read", "dependency-safe milestone parallelization with owner leases",False),
     "ai.workpack":("read", "source-hashed bounded implementation context for selected milestone IDs",False),
     "ai.change_frontier":("read", "declared downstream change impact from exact repository paths",False),
+    "studio.batch_preview":("compute", "bounded approved adapter previews across game/edit/forge planes",False),
     "source.inspect":("read", "UTF-8 source",False),
     "source.propose":("proposal", "exact-file reviewed code edit",True),
     "editor.catalog":("read", "typed original-game editors",False),
@@ -483,6 +484,9 @@ class JeevesAppwideRuntime:
                 result=director.workpack(**params)
             else:
                 result=director.change_frontier(**params)
+        elif action=="studio.batch_preview":
+            from .jeeves_batch_workbench import run_batch_preview
+            result=run_batch_preview(self, params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
