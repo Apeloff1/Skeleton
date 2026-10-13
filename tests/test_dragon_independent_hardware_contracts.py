@@ -45,7 +45,7 @@ def test_compatible_revisions_have_nonduplicated_parent_and_destination():
 def test_desktop_abi_rejects_unrecognized_targets_and_wrong_inputs():
     assert len(ABI_PROFILES) == 21
     with pytest.raises(ValueError):
-        apply_desktop_abi("ps5", {"CMakeLists.txt": "project(a C)\\n"})
+        apply_desktop_abi("ps5", {"CMakeLists.txt": "project(a C)\n"})
     with pytest.raises(ValueError):
         apply_desktop_abi("linux_arm64", {"src/main.c": "int main(void){return 0;}"})
     with pytest.raises(ValueError):
@@ -53,7 +53,7 @@ def test_desktop_abi_rejects_unrecognized_targets_and_wrong_inputs():
 
 
 def test_desktop_abi_requires_correct_system_and_cpu_at_build_time():
-    original = "cmake_minimum_required(VERSION 3.22)\\nproject(dragon_game C)\\n"
+    original = "cmake_minimum_required(VERSION 3.22)\nproject(dragon_game C)\n"
     patched = apply_desktop_abi("linux_arm64", {"CMakeLists.txt": original})
     assert 'include(cmake/dragon_target_contract.cmake)' in patched["CMakeLists.txt"]
     contract = patched["cmake/dragon_target_contract.cmake"]
@@ -64,7 +64,7 @@ def test_desktop_abi_requires_correct_system_and_cpu_at_build_time():
     assert receipt["compiled"] is False
     assert receipt["device_verified"] is False
     assert receipt["signed_package"] is False
-    assert original == "cmake_minimum_required(VERSION 3.22)\\nproject(dragon_game C)\\n"
+    assert original == "cmake_minimum_required(VERSION 3.22)\nproject(dragon_game C)\n"
 
 
 def test_original_thumby_source_is_deterministic_and_never_auto_deploys():
