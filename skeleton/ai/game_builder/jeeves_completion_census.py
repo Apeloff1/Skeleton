@@ -10,7 +10,7 @@ from collections import Counter
 from hashlib import sha1, sha256
 import json
 
-from .jeeves_appwide_fabric import AppwideInventory, JeevesAppwideError, digest
+from .jeeves_appwide_fabric import AppwideInventory, JeevesAppwideError, OPERATIONS, digest
 
 SCHEMA = "skeleton.ai.jeeves_app_completion_census.v1"
 SOURCE_MAX_BYTES = 1_000_000
@@ -189,6 +189,12 @@ class JeevesCompletionCensus:
         cap_counts = _states(capabilities, "implementation_state")
         volume_counts = _states(master, "implementation_status")
         enterprise_counts = _states(master, "enterprise_grade_state")
+        themes = master and docs[SOURCES[3]].get("thematic_parts", [])
+        if type(themes) is not list:
+            raise JeevesAppwideError("invalid thematic plan groups")
+        source_inventory_report = inv.report()
+        action_effect_counts = dict(sorted(Counter(
+            spec[0] for spec in OPERATIONS.values()).items()))
         closed = sum(g.get("status") == "closed" for g in gaps)
         complete_capabilities = sum(c.get("implementation_state") == "complete"
                                     for c in capabilities)
@@ -225,6 +231,9 @@ class JeevesCompletionCensus:
                 "volume_enterprise_states": enterprise_counts,
                 "enterprise_qualified_volumes": enterprise_qualified,
                 "parse_index_masterplan_git_blob_matches": master_signature_fresh,
+                "thematic_domain_count": len(themes),
+                "thematic_domains": [str(t.get("title", ""))[:120]
+                                     for t in themes if type(t) is dict],
                 "reported_signed_volumes": index.get("volume_summary", {})
                                            .get("verification_signed"),
                 "signed_index_is_not_runtime_acceptance": True,
@@ -255,6 +264,22 @@ class JeevesCompletionCensus:
                 "missing_required_paths": missing_paths,
                 "required_paths_present": len(required) - len(missing_paths),
                 "frontend_and_backends_live_verified": False,
+            },
+            "feature_discovery": {
+                "inventory_domain_file_counts": source_inventory_report["domains"],
+                "inventory_blocked_path_count": source_inventory_report["skipped_paths"],
+                "registered_jeeves_action_count": len(OPERATIONS),
+                "registered_action_effects": action_effect_counts,
+                "actions": [
+                    {"id": name, "effect": values[0],
+                     "operator_gate": values[2],
+                     "release_verified": False}
+                    for name, values in sorted(OPERATIONS.items())
+                ],
+                "domains_are_overlapping_heuristic_labels": True,
+                "adapters_are_not_generic_code_execution": True,
+                "inventory_is_only_as_complete_as_selected_checkout": True,
+                "whole_app_functional_coverage_percent": None,
             },
             "enterprise": {
                 "domain_count": len(domain_rows),
