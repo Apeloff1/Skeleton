@@ -118,10 +118,23 @@ def build_native_release(root:Path,*,title:str="Original Dragon Puzzle Quest")->
     written=emit_native_puzzle(seed=seed,stages=4,difficulty=4)
     root.mkdir(parents=True,exist_ok=True)
     for name,body in written.items():
-        candidate=root/name
-        if candidate.is_absolute() or ".." in Path(name).parts or not isinstance(body,str):
+        # Check the source *entry*, not root/name: root is commonly absolute.
+        # Checking the joined path rejected every ordinary source on CI.
+        if (
+            not isinstance(name,str) or not name or "\\u0000" in name
+            or "\\\\" in name or not isinstance(body,str)
+        ):
             raise ValueError("unsafe native release source entry")
+        relative=Path(name)
+        if (
+            relative.is_absolute() or relative.drive
+            or ".." in relative.parts or "." in relative.parts
+        ):
+            raise ValueError("unsafe native release source entry")
+        candidate=root/relative
         candidate.parent.mkdir(parents=True,exist_ok=True)
+        if candidate.is_symlink() or not candidate.parent.resolve().is_relative_to(root.resolve()):
+            raise ValueError("unsafe native release source entry")
         candidate.write_text(body,encoding="utf-8")
     source_fingerprint=sha256(json.dumps(
         written,sort_keys=True,separators=(",",":"),ensure_ascii=True,
