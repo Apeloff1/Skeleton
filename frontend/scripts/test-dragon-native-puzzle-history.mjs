@@ -113,7 +113,7 @@ test('reordering actual campaign stages updates export order and survives undo/r
   assert.deepEqual(restored.current.boards[1],DIFFERENT);
   const done=redoPuzzleEdit(restored);
   assert.deepEqual(done.current.boards,moved.current.boards);
-  assert.equal(first.current.boards[0],BOARD);
+  assert.deepEqual(first.current.boards[0],BOARD);
   assert.equal(reorderPuzzleStage(first,0,0),first);
 });
 
