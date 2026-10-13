@@ -323,6 +323,18 @@ class RobotsCache:
         parser = RobotFileParser()
         parser.set_url(origin.rstrip("/") + "/robots.txt")
         parser.parse(robots_text.splitlines())
+        # stdlib RobotFileParser matches the *first* applicable rule. RFC 9309
+        # instead selects the longest path match, with Allow winning ties.
+        # Sort only rule lines within each parsed agent group so a broad
+        # Allow: / cannot accidentally override Disallow: /private.
+        groups = [*parser.entries]
+        if parser.default_entry is not None:
+            groups.append(parser.default_entry)
+        for group in groups:
+            group.rulelines.sort(
+                key=lambda rule: (len(rule.path), rule.allowance),
+                reverse=True,
+            )
         self._parsers[origin] = parser
         self._meta[origin] = {"fetched_at": fetched_at, "etag": etag, "last_modified": last_modified}
 

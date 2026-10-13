@@ -166,3 +166,29 @@ def test_http_transport_rejects_private_literal_before_network():
         pass
     else:
         raise AssertionError("private destination must fail closed")
+
+
+def test_robots_longest_specific_path_wins_without_crossing_agent_groups():
+    e = CrawlEngine(FakeFetcher({}), policy=CrawlPolicy(min_host_delay_seconds=0))
+    e.install_robots(
+        "https://example.com",
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /private\n"
+        "Allow: /private/public\n"
+        "Disallow: /private/public/denied\n",
+    )
+    assert e.robots.allowed("https://example.com/open")
+    assert not e.robots.allowed("https://example.com/private")
+    assert e.robots.allowed("https://example.com/private/public")
+    assert not e.robots.allowed("https://example.com/private/public/denied")
+
+    # Site-wide wildcard directives must not override a specific user agent.
+    e.install_robots(
+        "https://example.net",
+        "User-agent: SkeletonResearchBot\n"
+        "Disallow: /sensitive\n"
+        "User-agent: *\n"
+        "Allow: /\n",
+    )
+    assert not e.robots.allowed("https://example.net/sensitive")
