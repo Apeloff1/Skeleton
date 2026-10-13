@@ -161,6 +161,12 @@ _GOVERNANCE_EXPORTS = {
     "authorize_shadow_promotion": ".shadow_weights",
     "ShadowWeightLedger": ".shadow_weight_ledger",
     "ShadowWeightSnapshot": ".shadow_weight_ledger",
+    "ShadowKnowledge": ".shadow_weight_intake",
+    "ShadowIntakePolicy": ".shadow_weight_intake",
+    "ShadowIntakeAssessment": ".shadow_weight_intake",
+    "ShadowIntakeLease": ".shadow_weight_intake",
+    "ShadowKnowledgeQueue": ".shadow_weight_intake",
+    "assess_shadow_intake": ".shadow_weight_intake",
     "require_temporal_compatibility": ".temporal_intervals",
 }
 
