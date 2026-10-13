@@ -22,7 +22,7 @@ completion or model-quality sign-off.
   source excerpts, citation auditing and readable text copy/export. Browser layout
   keeps the composer reachable and uses a library drawer on small screens.
 - Terminal chat has recoverable command errors, session switching, branching,
-  references, backups, adjustable budgets, interrupted-turn replay and one-shot
+  references, JSON backups, Markdown exports, adjustable budgets, interrupted-turn replay and one-shot
   request IDs. JSON mode emits structured command events.
 - `app prepare-local-model` creates a private pinned deployment from existing
   GGUF and llama.cpp files; it never overwrites a manifest, downloads a model or

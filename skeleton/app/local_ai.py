@@ -419,6 +419,33 @@ class DurableOfflineAISession(OfflineAISession):
         self.store.close()
 
 
+def export_offline_markdown(store: OfflineChatStore, session_id: str,
+                            model_digest: str, tokenizer_digest: str) -> bytes:
+    """Readable private export from a single canonical conversation snapshot."""
+    from skeleton.app.offline_grounding import audit_answer_citations
+    with store.read_snapshot():
+        saved = store.load(session_id, model_digest, tokenizer_digest)
+        evidence = store.turn_evidence(session_id, model_digest, tokenizer_digest)
+    lines = ["# Local model conversation", "", "Session: " + saved.session_id,
+             "Model: " + saved.model_digest, "", f"Saved turns: {saved.revision}", ""]
+    turn = 0
+    for message in saved.transcript.messages:
+        speaker = {"system": "Instructions", "user": "You", "assistant": "Local model"}[message.role]
+        lines.extend(["## " + speaker, "", message.content, ""])
+        if message.role == "assistant":
+            supplied = evidence[turn]
+            turn += 1
+            if supplied is not None:
+                audit = audit_answer_citations(message.content, supplied)
+                lines.extend(["### Sources supplied to model", "",
+                              "Source provision does not establish factual accuracy.",
+                              "Citation ID audit: " + audit["status"], ""])
+                for source in supplied["citations"]:
+                    lines.extend([source["title"] + " · " + source["citation"], "",
+                                  source["passage"], ""])
+    return "\n".join(lines).encode("utf-8")
+
+
 def private_desktop_database(model_digest: str) -> Path:
     """Per-model owner-only local data directory, no network or cloud paths."""
     if (not isinstance(model_digest, str) or len(model_digest) != 64

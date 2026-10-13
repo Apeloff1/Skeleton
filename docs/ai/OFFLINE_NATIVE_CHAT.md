@@ -537,6 +537,7 @@ chat implementation. Interactive commands:
 | `/retry` | Recover the original interrupted request before new inference |
 | `/references`, `/add FILE`, `/search QUERY` | Inspect, import and search local sources |
 | `/save NEW_FILE.json`, `/import FILE.json` | Private canonical backup and import |
+| `/text NEW_FILE.md` | Readable Markdown with supplied-source excerpts and citation audit |
 | `/exit` | Close the terminal session |
 
 Invalid commands and failed turns remain recoverable in the interactive session.
@@ -549,3 +550,7 @@ The main Expo Jeeves workspace separately displays the engine's existing provide
 status and cost-routing availability. This is a read-only status projection; it does
 not change provider configuration, bypass cost policy, or promise that every answer
 is generative. Per-reply model metadata records the actual route.
+
+For a one-shot readable export use `--export-text SESSION_ID --output NEW_FILE.md`.
+Like JSON backup export, it refuses to overwrite an existing file. Markdown cannot
+be imported as a canonical conversation backup.

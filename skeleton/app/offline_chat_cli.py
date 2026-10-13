@@ -25,6 +25,7 @@ from skeleton.app.offline_knowledge import (
 )
 from skeleton.app.local_ai import (
     DurableOfflineAISession,
+    export_offline_markdown,
     load_gguf_deployment,
     load_native_checkpoint,
     private_desktop_database,
@@ -147,7 +148,7 @@ def _run_interactive(chat: DurableOfflineAISession, *, max_tokens: int,
     commands = (
         "/help; /id; /history; /list [search]; /new [instructions]; "
         "/resume SESSION_ID; /fork [turn]; /tokens N; /ground QUESTION; "
-        "/retry; /references; /add FILE; /search QUERY; /save FILE; "
+        "/retry; /references; /add FILE; /search QUERY; /save FILE; /text FILE; "
         "/import FILE; /exit"
     )
     _emit("ready", "Local model " + chat.model_digest + "\nSession: " + chat.session_id
@@ -262,6 +263,14 @@ def _run_interactive(chat: DurableOfflineAISession, *, max_tokens: int,
                     if not hits:
                         _emit("search", "No matching local reference passages.", as_json=as_json)
                 continue
+            if command == "/text":
+                if not argument:
+                    raise RuntimeContractError("usage: /text NEW_FILE.md")
+                payload = export_offline_markdown(chat.store, chat.session_id,
+                                                  chat.model_digest, chat.tokenizer_digest)
+                save_private_bundle(Path(argument).expanduser(), payload)
+                _emit("export", "Readable Markdown saved to " + argument, as_json=as_json)
+                continue
             if command == "/save":
                 if not argument:
                     raise RuntimeContractError("usage: /save NEW_FILE.json")
@@ -327,6 +336,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="branch a saved conversation without modifying the parent")
     modes.add_argument("--export-session", metavar="SESSION_ID",
                        help="create a private portable backup of one conversation")
+    modes.add_argument("--export-text", metavar="SESSION_ID",
+                       help="export a readable Markdown conversation with supplied-source excerpts")
     modes.add_argument("--import-bundle", metavar="PATH", type=Path,
                        help="import a valid same-model portable conversation backup")
     modes.add_argument("--add-reference", metavar="FILE", type=Path,
@@ -338,7 +349,7 @@ def build_parser() -> argparse.ArgumentParser:
     modes.add_argument("--delete-reference", metavar="DOCUMENT_ID",
                        help="remove one local model-bound reference and all its chunks")
     parser.add_argument("--output", type=Path,
-                        help="new backup destination; required for --export-session")
+                        help="new destination; required for --export-session or --export-text")
     parser.add_argument("--fork-after-turn", type=int,
                         help="with --fork-session, copy history only through this turn")
     parser.add_argument("--search-limit", type=int, default=6,
@@ -353,16 +364,16 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    manage = bool(args.list or args.delete_session or args.export_session
+    manage = bool(args.list or args.delete_session or args.export_session or args.export_text
                   or args.import_bundle or args.fork_session
                   or args.add_reference or args.list_references
                   or args.search_reference or args.delete_reference)
     if args.request_id is not None and (not args.session or args.interactive or manage):
         parser.error("--request-id requires --session with a one-shot message")
-    if args.output is not None and args.export_session is None:
-        parser.error("--output is valid only with --export-session")
-    if args.export_session and args.output is None:
-        parser.error("--export-session requires --output")
+    if args.output is not None and not (args.export_session or args.export_text):
+        parser.error("--output is valid only with --export-session or --export-text")
+    if (args.export_session or args.export_text) and args.output is None:
+        parser.error("conversation export requires --output")
     if args.session and manage:
         parser.error("--session only applies to --message or --interactive")
     if args.fork_after_turn is not None and not args.fork_session:
@@ -433,6 +444,12 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     print(json.dumps({"source_session_id": args.fork_session,
                                       "forked_session_id": branch_id}))
+                    return 0
+                if args.export_text:
+                    payload = export_offline_markdown(store, args.export_text, model_digest, token_digest)
+                    save_private_bundle(args.output, payload)
+                    print(json.dumps({"exported_session_id": args.export_text,
+                                      "path": str(args.output), "format": "markdown"}))
                     return 0
                 if args.export_session:
                     payload = store.export_bundle(

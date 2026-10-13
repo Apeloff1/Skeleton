@@ -270,6 +270,7 @@ JAVASCRIPT = r"""'use strict';
         const evidence = state.evidence[turn++];
         if (evidence?.citations?.length) {
           lines.push('### Supplied evidence (not factual verification)', '');
+          if (state.audits[turn - 1]) lines.push('Citation ID audit: ' + state.audits[turn - 1].status, '');
           evidence.citations.forEach(source => lines.push(source.title + ' — ' + source.citation, '', source.passage, ''));
         }
       }
