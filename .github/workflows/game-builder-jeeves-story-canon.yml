@@ -15,7 +15,9 @@ on:
       - "skeleton/ai/game_builder/jeeves_capability_intelligence.py"
       - "skeleton/ai/game_builder/jeeves_completion_census.py"
       - "skeleton/ai/game_builder/jeeves_measured_completion.py"
+      - "skeleton/ai/game_builder/jeeves_acceptance_matrix.py"
       - "machine/app_completion_scope.json"
+      - "machine/app_acceptance_test_matrix.json"
       - "skeleton/ai/game_builder/jeeves_evidence_graph.py"
       - "skeleton/ai/game_builder/jeeves_milestone_planner.py"
       - "skeleton/ai/game_builder/jeeves_evidence_coverage.py"
@@ -29,6 +31,7 @@ on:
       - "tests/test_game_builder_jeeves_capability_intelligence.py"
       - "tests/test_game_builder_jeeves_completion_census.py"
       - "tests/test_game_builder_jeeves_measured_completion.py"
+      - "tests/test_game_builder_jeeves_acceptance_matrix.py"
       - "tests/test_game_builder_jeeves_evidence_graph.py"
       - "tests/test_game_builder_jeeves_milestone_planner.py"
       - "tests/test_game_builder_jeeves_evidence_coverage.py"
@@ -98,6 +101,7 @@ jobs:
             skeleton/app/manifest.json
             machine/ai_capabilities.json
             machine/app_completion_scope.json
+            machine/app_acceptance_test_matrix.json
             machine/ai_app_construction.json
             machine/ai_closure_evidence.json
             machine/ai_master_plan.json
@@ -126,6 +130,7 @@ jobs:
             tests/test_game_builder_jeeves_capability_intelligence.py
             tests/test_game_builder_jeeves_completion_census.py
             tests/test_game_builder_jeeves_measured_completion.py
+            tests/test_game_builder_jeeves_acceptance_matrix.py
             tests/test_game_builder_jeeves_evidence_graph.py
             tests/test_game_builder_jeeves_milestone_planner.py
             tests/test_game_builder_jeeves_evidence_coverage.py
@@ -148,11 +153,11 @@ jobs:
       - name: Compile project canon and editor glue
         shell: bash
         run: |
-          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/jeeves_app_runtime.py skeleton/ai/game_builder/jeeves_appwide_fabric.py skeleton/ai/game_builder/jeeves_capability_intelligence.py skeleton/ai/game_builder/jeeves_completion_census.py skeleton/ai/game_builder/jeeves_measured_completion.py skeleton/ai/game_builder/jeeves_evidence_graph.py skeleton/ai/game_builder/jeeves_milestone_planner.py skeleton/ai/game_builder/jeeves_evidence_coverage.py skeleton/ai/game_builder/jeeves_release_gate_inventory.py skeleton/ai/game_builder/jeeves_adapter_dispatch_audit.py skeleton/ai/game_builder/jeeves_source_patchset.py skeleton/ai/game_builder/jeeves_crossplane_route_scout.py skeleton/ai/game_builder/jeeves_change_validation_frontier.py skeleton/ai/game_builder/story_cinematic_review.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
+          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/jeeves_app_runtime.py skeleton/ai/game_builder/jeeves_appwide_fabric.py skeleton/ai/game_builder/jeeves_capability_intelligence.py skeleton/ai/game_builder/jeeves_completion_census.py skeleton/ai/game_builder/jeeves_measured_completion.py skeleton/ai/game_builder/jeeves_acceptance_matrix.py skeleton/ai/game_builder/jeeves_evidence_graph.py skeleton/ai/game_builder/jeeves_milestone_planner.py skeleton/ai/game_builder/jeeves_evidence_coverage.py skeleton/ai/game_builder/jeeves_release_gate_inventory.py skeleton/ai/game_builder/jeeves_adapter_dispatch_audit.py skeleton/ai/game_builder/jeeves_source_patchset.py skeleton/ai/game_builder/jeeves_crossplane_route_scout.py skeleton/ai/game_builder/jeeves_change_validation_frontier.py skeleton/ai/game_builder/story_cinematic_review.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
       - name: Check app-wide Jeeves tools, all system editors, forge graph, Dragon, learning and 9999-scene receipts
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census tests.test_game_builder_jeeves_measured_completion tests.test_game_builder_jeeves_evidence_graph tests.test_game_builder_jeeves_milestone_planner tests.test_game_builder_jeeves_evidence_coverage tests.test_game_builder_jeeves_release_gate_inventory tests.test_game_builder_jeeves_deathmarch_workpacks tests.test_game_builder_jeeves_adapter_dispatch_audit tests.test_game_builder_jeeves_source_patchset tests.test_game_builder_jeeves_crossplane_route_scout tests.test_game_builder_jeeves_change_validation_frontier -v
+          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census tests.test_game_builder_jeeves_measured_completion tests.test_game_builder_jeeves_acceptance_matrix tests.test_game_builder_jeeves_evidence_graph tests.test_game_builder_jeeves_milestone_planner tests.test_game_builder_jeeves_evidence_coverage tests.test_game_builder_jeeves_release_gate_inventory tests.test_game_builder_jeeves_deathmarch_workpacks tests.test_game_builder_jeeves_adapter_dispatch_audit tests.test_game_builder_jeeves_source_patchset tests.test_game_builder_jeeves_crossplane_route_scout tests.test_game_builder_jeeves_change_validation_frontier -v
       - name: Reconcile real exact-head masterplan and product AI authority
         shell: bash
         run: |
