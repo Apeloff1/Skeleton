@@ -235,7 +235,10 @@ def verify(
         })
     body = {
         "schema": SCHEMA, "repository": REPOSITORY,
-        "verified_git_head": head, "run_id": expected_run_id,
+        "verified_git_head": head,
+        "reviewed_matrix_sha256": expected_matrix["matrix_sha256"],
+        "reviewed_scope_sha256": expected_matrix["scope_sha256"],
+        "run_id": expected_run_id,
         "run_attempt": expected_attempt,
         "verified_os": verified_os,
         "scheduled_test_modules_independently_confirmed": len(selected),
