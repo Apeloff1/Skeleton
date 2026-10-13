@@ -144,13 +144,14 @@ def verify(
                  claims.get("os") == operating_system and
                  report.get("local_mode") is False,
                  "runner evidence not bound to trusted CI context")
-        for left, right in (
-            ("matrix_digest", "matrix_digest"),
-            ("matrix_sha256", "matrix_sha256"),
-            ("scope_sha256", "scope_sha256"),
-        ):
-            _require(report.get(left) == expected_matrix.get(right),
-                     "acceptance matrix changed since verified CI")
+        # The full matrix digest includes a checkout file-inventory snapshot,
+        # which can differ between Windows and Linux due to OS metadata/EOL.
+        # Compare the immutable original SOURCE CONTENT digests instead.
+        _require(_valid_sha(report.get("matrix_digest"), 64),
+                 "invalid OS-local acceptance matrix digest")
+        for field in ("matrix_sha256", "scope_sha256"):
+            _require(report.get(field) == expected_matrix.get(field),
+                     "acceptance matrix source changed since verified CI")
         _require(report.get("test_source_receipts") == receipts,
                  "test source digests do not match exact-head registry")
         _require(report.get("candidate_modules") == len(selected) and
@@ -195,6 +196,7 @@ def verify(
             "os": operating_system,
             "job_id": job.get("id"),
             "reported_passed_modules": len(results),
+            "matrix_digest_local_to_runner": report["matrix_digest"],
             "artifact_sha256": sha256(json.dumps(report, sort_keys=True,
                                      separators=(",", ":"),
                                      ensure_ascii=False).encode()).hexdigest(),
