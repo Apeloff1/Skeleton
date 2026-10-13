@@ -170,6 +170,13 @@ _GOVERNANCE_EXPORTS = {
     "ShadowTrainingHandoff": ".shadow_training_handoff",
     "build_shadow_training_handoff": ".shadow_training_handoff",
     "stage_trained_shadow": ".shadow_training_handoff",
+
+    "ShadowTrainingPaused": ".shadow_idle_training",
+    "ShadowTrainingRejected": ".shadow_idle_training",
+    "ShadowTrainingArtifacts": ".shadow_idle_training",
+    "ShadowWorkReceipt": ".shadow_idle_training",
+    "ShadowLeaseSession": ".shadow_idle_training",
+    "ShadowIdleTrainingWorker": ".shadow_idle_training",
     "require_temporal_compatibility": ".temporal_intervals",
 }
 
