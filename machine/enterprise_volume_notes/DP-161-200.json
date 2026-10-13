@@ -1141,7 +1141,7 @@
       "title": "Policy Simulation",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1169,7 +1169,9 @@
           "simulation differs from runtime",
           "biased trace corpus"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_policy_simulation.py",
           "tests/flgb/test_volume_wave4_completion.py"
@@ -1362,7 +1364,7 @@
       "title": "Threat Model",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1390,7 +1392,9 @@
           "stale threat model",
           "unowned mitigation"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_threat_model.py",
           "tests/flgb/test_volume_wave4_completion.py"
@@ -1819,7 +1823,7 @@
       "title": "Security Boundaries",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -1847,7 +1851,9 @@
           "implicit trust crossing",
           "fallback privilege widening"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_security_boundaries.py",
           "tests/flgb/test_volume_wave4_completion.py"
@@ -2496,7 +2502,7 @@
       "title": "Egress Control",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2526,7 +2532,9 @@
           "SSRF",
           "policy bypass via redirects"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_egress_control.py",
           "skeleton/testing/test_outbound_url_resolution_security.py",
@@ -2724,7 +2732,7 @@
       "title": "Secret Security",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2754,7 +2762,9 @@
           "secret in prompt/log",
           "long-lived credentials"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_secret_security.py",
           "skeleton/testing/test_secret_lifecycle_taint.py",
@@ -2948,7 +2958,7 @@
       "title": "Key Management",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -2978,7 +2988,9 @@
           "lost key",
           "revoked key remains trusted"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_key_management.py",
           "tests/flgb/test_volume_wave4_completion.py"
@@ -3171,7 +3183,7 @@
       "title": "Tenant Isolation",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3199,7 +3211,9 @@
           "tenant bleed",
           "shared cache leak"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_tenant_isolation_deep.py",
           "tests/flgb/test_volume_wave4_completion.py"
@@ -3395,7 +3409,7 @@
       "title": "Privacy Engine",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3423,7 +3437,9 @@
           "classification loss",
           "secondary-use violation"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_privacy_engine.py",
           "tests/flgb/test_volume_wave4_completion.py"
@@ -3616,7 +3632,7 @@
       "title": "Data Deletion",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3647,7 +3663,9 @@
           "tombstone resurrection",
           "orphan derivatives"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_data_deletion.py",
           "skeleton/testing/test_deletion_propagation.py",
@@ -3842,7 +3860,7 @@
       "title": "Software Bill of Materials",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3870,7 +3888,9 @@
           "missing transitive dependency",
           "stale vulnerability data"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_sbom.py",
           "tests/flgb/test_volume_wave4_completion.py"
@@ -4283,7 +4303,7 @@
       "title": "Service Level Objectives",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4311,7 +4331,9 @@
           "misleading SLI",
           "unowned objective"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_slo_registry.py",
           "skeleton/testing/test_operations_review.py",
@@ -4505,7 +4527,7 @@
       "title": "Error Budgets",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4533,7 +4555,9 @@
           "bad denominator",
           "budget used to excuse critical failure"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_error_budgets.py",
           "skeleton/testing/test_operations_review.py",
@@ -4727,7 +4751,7 @@
       "title": "Observability Cardinality Control",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4755,7 +4779,9 @@
           "metrics backend overload",
           "PII in labels"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_observability_cardinality.py",
           "skeleton/testing/test_operations_review.py",
@@ -4949,7 +4975,7 @@
       "title": "Trace Model",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -4977,7 +5003,9 @@
           "broken correlation",
           "trace contains secrets"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_trace_model.py",
           "skeleton/testing/test_operations_review.py",
@@ -5171,7 +5199,7 @@
       "title": "Performance Profiling",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5199,7 +5227,9 @@
           "benchmark distortion",
           "profiler overhead misread"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_profile_records.py",
           "skeleton/testing/test_operations_review.py",
@@ -5393,7 +5423,7 @@
       "title": "Latency Budgeting",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5421,7 +5451,9 @@
           "retry hides tail latency",
           "stage budget oversubscription"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_latency_budgets.py",
           "skeleton/testing/test_operations_review.py",
@@ -5615,7 +5647,7 @@
       "title": "Cost Governor",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5643,7 +5675,9 @@
           "double charge",
           "unsafe cheap fallback"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_cost_governor.py",
           "skeleton/testing/test_operations_review.py",
@@ -5837,7 +5871,7 @@
       "title": "Energy / Compute Efficiency",
       "depth_pass": "DP-161-200",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -5865,7 +5899,9 @@
           "greenwashing metric",
           "quality loss hidden by efficiency"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+        ],
         "tests": [
           "skeleton/testing/test_efficiency_metrics.py",
           "skeleton/testing/test_operations_review.py",
