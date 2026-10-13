@@ -122,7 +122,9 @@ class Jeeves:
         return SYSTEM_LAWS
 
     def app_tool_registry(self, *, root=None,
-                          creator_handlers=None, creator_authorize=None):
+                          creator_handlers=None, creator_authorize=None,
+                          shadow_pipeline=None, shadow_read_authorize=None,
+                          shadow_write_authorize=None):
         """Assemble app discovery tools and optionally host-owned creator actions.
 
         By default every tool is READ_ONLY. Editor dispatch is opt-in and only
@@ -145,6 +147,17 @@ class Jeeves:
                 registry,
                 handlers=creator_handlers,
                 authorize=creator_authorize,
+            )
+        if (shadow_pipeline is None) != (shadow_read_authorize is None):
+            raise ValueError("shadow owner and read authorizer must be supplied together")
+        if shadow_pipeline is None and shadow_write_authorize is not None:
+            raise ValueError("shadow write authorizer requires an injected owner")
+        if shadow_pipeline is not None:
+            from skeleton.jeeves.shadow_weight_bridge import register_shadow_weight_tools
+            register_shadow_weight_tools(
+                registry, pipeline=shadow_pipeline,
+                read_authorize=shadow_read_authorize,
+                write_authorize=shadow_write_authorize,
             )
         return registry
 
