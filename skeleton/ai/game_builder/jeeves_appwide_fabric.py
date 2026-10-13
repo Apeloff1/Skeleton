@@ -361,6 +361,14 @@ OPERATIONS = {
     "ai.graph.impact":("read", "source-to-volume-to-enterprise declared impact receipts",False),
     "ai.coverage":("read", "per-volume source/test/evaluation path evidence audit",False),
     "ai.coverage.page":("read", "bounded volume gap inventory",False),
+    "ai.verification.progress":("read", "measured static completion vs independent product and enterprise verification",False),
+    "ai.verification.backlog":("read", "paged exact-source verification blockers with denominators",False),
+    "ai.verification.volumes":("read", "paged 421 masterplan volume source and evidence gap frontier",False),
+    "ai.cognition.uncertainty":("compute", "installed real uncertainty answer-abstain-escalate gate",False),
+    "ai.cognition.strategy":("compute", "actual canonical resource-budgeted reasoning selection",False),
+    "ai.cognition.stop":("compute", "actual guarded bounded cognitive stopping policy",False),
+    "ai.cognition.build_plan":("compute", "actual installed original-game plan quality evaluation",False),
+    "ai.cognition.static_plan":("compute", "installed exact DAG static analyzer and fault-injection simulator",False),
     "ai.release.gates":("read", "required exact-head release-gate authority census",False),
     "ai.release.gates.page":("read", "paged static CI gate provenance and missing workflows",False),
     "ai.adapter.audit":("read", "static registered tool-to-dispatch binding coverage",False),
@@ -391,6 +399,44 @@ OPERATIONS = {
     "studio.assembly":("compute", "approved system integration audit",False),
     "studio.production.plan":("compute", "actual multi-engine original game production source plan",False),
     "studio.production.stage":("proposal", "reviewed original game system or scene source proposals",True),
+    "studio.production.release_plan":("compute", "original replay-proven browser and Godot source package",True),
+    "studio.production.release_stage":("proposal", "original browser and Godot artifact review staging",True),
+    "studio.production.variants_plan":("compute", "bounded real original game source variants",True),
+    "studio.production.variants_stage":("proposal", "stage independently built original game source variants",True),
+    "studio.story.source_plan":("read", "full-story canonical 100-chapter source and continuity context",False),
+    "studio.story.source_stage":("proposal", "signed full-history reviewed story source proposals",True),
+    "studio.forge.plan":("compute", "actual installed typed Forge blueprint source validation",False),
+    "studio.forge.stage":("proposal", "canonical reviewed Universal Forge game asset source",True),
+    "studio.forge.verify":("read", "real project Forge source revalidation",False),
+    "studio.advanced.replay.plan":("compute", "execute reference gameplay from actual approved advanced game scene",True),
+    "studio.advanced.replay.stage":("proposal", "stage source-bound verified advanced gameplay receipt",True),
+    "studio.advanced.replay.verify":("read", "reexecute committed advanced game session against approved system/scene",False),
+    "studio.campaign.plan":("compute", "simulate bounded branching original game campaign across canonical scenes",True),
+    "studio.campaign.stage":("proposal", "reviewed SHA-bound authored campaign source and actual route receipt",True),
+    "studio.campaign.verify":("read", "replay committed original campaign source and endings",False),
+    "studio.campaign.lore.plan":("read", "bind real character/region/plot story history to a committed game campaign",False),
+    "studio.campaign.lore.stage":("proposal", "stage canonical full-story game campaign links for human review",True),
+    "studio.campaign.lore.verify":("read", "reverify source-committed story/game causal binding",False),
+    "studio.campaign.outcomes.plan":("compute", "run real player action variants across original authored campaign branches",True),
+    "studio.campaign.outcomes.stage":("proposal", "stage observed multi-ending gameplay source and uncovered routes",True),
+    "studio.campaign.outcomes.verify":("read", "reexecute committed game outcome portfolio and source identities",False),
+    "studio.campaign.consequences.plan":("read", "historically signed NPC, faction and causal plot differences along real game outcomes",False),
+    "studio.campaign.consequences.stage":("proposal", "original scene/event-to-game consequence source for human review",True),
+    "studio.campaign.consequences.verify":("read", "rebuild full original narrative and real scenario consequences",False),
+    "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
+    "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
+    "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
+    "studio.production.review_manifest":("read", "exact full diff and bounded UTF-8 review pages",False),
+    "studio.production.review_page":("read", "one content-hashed UTF-8 reviewed diff page",False),
+    "studio.production.commit_pages":("external_effect", "human-approved full-page original source commit",True),
+    "studio.source_graph":("read", "paged exact-source game engine, scene, story and release dependency index",False),
+    "studio.production.commit_bundle":("external_effect", "explicit human-approved original source commit group",True),
+    "studio.production.queue":("read", "paged pending and accepted original source proposals",False),
+    "studio.release.catalog":("read", "source-custodied original browser/Godot release identities",False),
+    "studio.release.verify":("read", "approved source hash and canonical package proof verification",False),
+    "studio.release.download":("compute", "designer-authorized deterministic accepted source ZIP",True),
+    "studio.release.replay":("compute", "actual Python winning replay and byte-identical package rebuild",True),
+    "studio.release.compare":("read", "source-hashed actual approved original game variant differences",False),
     "studio.tree":("read", "active project files",False),
     "studio.file":("read", "active project source",False),
     "studio.propose":("proposal", "targeted human-reviewed project edit",True),
@@ -508,6 +554,31 @@ class JeevesAppwideRuntime:
         elif action=="ai.coverage.page":
             from .jeeves_evidence_coverage import JeevesEvidenceCoverage
             result=JeevesEvidenceCoverage(inv).page(**params)
+        elif action in ("ai.verification.progress", "ai.verification.backlog"):
+            from .jeeves_verification_progress import JeevesVerificationProgress
+            verification=JeevesVerificationProgress(inv)
+            if action=="ai.verification.progress":
+                result=verification.overview(**params)
+            else:
+                result=verification.backlog(**params)
+        elif action=="ai.verification.volumes":
+            from .jeeves_verification_progress import JeevesVerificationProgress
+            result=JeevesVerificationProgress(inv).volumes(**params)
+        elif action in ("ai.cognition.uncertainty", "ai.cognition.strategy",
+                        "ai.cognition.stop", "ai.cognition.build_plan",
+                        "ai.cognition.static_plan"):
+            from .jeeves_cognitive_studio import JeevesCognitiveStudio
+            cognitive=JeevesCognitiveStudio(inv)
+            if action=="ai.cognition.uncertainty":
+                result=cognitive.uncertainty(**params)
+            elif action=="ai.cognition.strategy":
+                result=cognitive.strategy(**params)
+            elif action=="ai.cognition.build_plan":
+                result=cognitive.build_plan(**params)
+            elif action=="ai.cognition.static_plan":
+                result=cognitive.static_plan(**params)
+            else:
+                result=cognitive.stopping(**params)
         elif action=="ai.release.gates":
             from .jeeves_release_gate_inventory import JeevesReleaseGateInventory
             result=JeevesReleaseGateInventory(inv).overview(**params)
@@ -571,6 +642,137 @@ class JeevesAppwideRuntime:
                 result=director.plan(**params)
             else:
                 result=director.stage(**params, operator_authorized=authorized)
+        elif action in ("studio.production.release_plan", "studio.production.release_stage"):
+            from .jeeves_original_release_wave import JeevesOriginalReleaseWave
+            release=JeevesOriginalReleaseWave(inv, ws)
+            if action=="studio.production.release_plan":
+                result=release.plan(**params, operator_authorized=authorized)
+            else:
+                result=release.stage(**params, operator_authorized=authorized)
+        elif action in ("studio.production.review_bundle", "studio.production.commit_bundle"):
+            from .jeeves_production_review import JeevesProductionReview
+            review=JeevesProductionReview(inv, ws)
+            if action=="studio.production.review_bundle":
+                result=review.review(**params)
+            else:
+                result=review.commit(**params, operator_authorized=authorized)
+        elif action in ("studio.production.prompt_plan", "studio.production.prompt_stage"):
+            from .jeeves_prompt_production import JeevesPromptProduction
+            prompt_builder=JeevesPromptProduction(inv, ws)
+            if action=="studio.production.prompt_plan":
+                result=prompt_builder.plan(**params, operator_authorized=authorized)
+            else:
+                result=prompt_builder.stage(**params, operator_authorized=authorized)
+        elif action in ("studio.production.variants_plan", "studio.production.variants_stage"):
+            from .jeeves_game_variants import JeevesGameVariants
+            variants=JeevesGameVariants(inv, ws)
+            if action=="studio.production.variants_plan":
+                result=variants.plan(**params, operator_authorized=authorized)
+            else:
+                result=variants.stage(**params, operator_authorized=authorized)
+        elif action=="studio.production.queue":
+            from .jeeves_proposal_queue import JeevesProposalQueue
+            result=JeevesProposalQueue(inv, ws).page(**params)
+        elif action in ("studio.release.catalog", "studio.release.verify",
+                        "studio.release.download", "studio.release.replay",
+                        "studio.release.compare"):
+            from .jeeves_release_custody import JeevesReleaseCustody
+            release=JeevesReleaseCustody(inv, ws)
+            if action=="studio.release.catalog":
+                result=release.catalog(**params)
+            elif action=="studio.release.verify":
+                result=release.verify(**params)
+            elif action=="studio.release.compare":
+                result=release.compare(**params)
+            elif action=="studio.release.replay":
+                result=release.replay(**params, operator_authorized=authorized)
+            else:
+                result=release.download(**params, operator_authorized=authorized)
+        elif action in ("studio.story.source_plan", "studio.story.source_stage"):
+            from .jeeves_story_production import JeevesStorySourceWave
+            story_author=JeevesStorySourceWave(inv, ws)
+            if action=="studio.story.source_plan":
+                result=story_author.plan(**params)
+            else:
+                result=story_author.stage(**params, operator_authorized=authorized)
+        elif action in ("studio.forge.plan", "studio.forge.stage",
+                        "studio.forge.verify"):
+            from .jeeves_forge_production import JeevesForgeProduction
+            forge_author=JeevesForgeProduction(inv, ws)
+            if action=="studio.forge.plan":
+                result=forge_author.plan(**params)
+            elif action=="studio.forge.stage":
+                result=forge_author.stage(**params, operator_authorized=authorized)
+            else:
+                result=forge_author.verify(**params)
+        elif action in ("studio.advanced.replay.plan",
+                        "studio.advanced.replay.stage",
+                        "studio.advanced.replay.verify"):
+            from .jeeves_advanced_replay import JeevesAdvancedReplay
+            session=JeevesAdvancedReplay(inv,ws)
+            if action=="studio.advanced.replay.plan":
+                result=session.plan(**params,operator_authorized=authorized)
+            elif action=="studio.advanced.replay.stage":
+                result=session.stage(**params,operator_authorized=authorized)
+            else:
+                result=session.verify(**params)
+        elif action in ("studio.campaign.plan", "studio.campaign.stage",
+                        "studio.campaign.verify"):
+            from .jeeves_campaign_graph import JeevesCampaignGraph
+            campaign=JeevesCampaignGraph(inv,ws)
+            if action=="studio.campaign.plan":
+                result=campaign.plan(**params,operator_authorized=authorized)
+            elif action=="studio.campaign.stage":
+                result=campaign.stage(**params,operator_authorized=authorized)
+            else:
+                result=campaign.verify(**params)
+        elif action in ("studio.campaign.lore.plan","studio.campaign.lore.stage",
+                        "studio.campaign.lore.verify"):
+            from .jeeves_campaign_lore import JeevesCampaignLore
+            lore=JeevesCampaignLore(inv,ws)
+            if action=="studio.campaign.lore.plan":
+                result=lore.plan(**params)
+            elif action=="studio.campaign.lore.stage":
+                result=lore.stage(**params,operator_authorized=authorized)
+            else:
+                result=lore.verify(**params)
+        elif action in ("studio.campaign.outcomes.plan",
+                        "studio.campaign.outcomes.stage",
+                        "studio.campaign.outcomes.verify"):
+            from .jeeves_campaign_outcomes import JeevesCampaignOutcomes
+            outcomes=JeevesCampaignOutcomes(inv,ws)
+            if action=="studio.campaign.outcomes.plan":
+                result=outcomes.plan(**params,operator_authorized=authorized)
+            elif action=="studio.campaign.outcomes.stage":
+                result=outcomes.stage(**params,operator_authorized=authorized)
+            else:
+                result=outcomes.verify(**params)
+        elif action in ("studio.campaign.consequences.plan",
+                        "studio.campaign.consequences.stage",
+                        "studio.campaign.consequences.verify"):
+            from .jeeves_narrative_consequences import JeevesNarrativeConsequences
+            consequences=JeevesNarrativeConsequences(inv,ws)
+            if action=="studio.campaign.consequences.plan":
+                result=consequences.plan(**params)
+            elif action=="studio.campaign.consequences.stage":
+                result=consequences.stage(
+                    **params,operator_authorized=authorized)
+            else:
+                result=consequences.verify(**params)
+        elif action in ("studio.production.review_manifest",
+                        "studio.production.review_page",
+                        "studio.production.commit_pages"):
+            from .jeeves_paged_diff import JeevesPagedDiff
+            reviewer=JeevesPagedDiff(inv,ws)
+            if action=="studio.production.review_manifest":
+                result=reviewer.manifest(**params)
+            elif action=="studio.production.review_page":
+                result=reviewer.page(**params)
+            else:
+                result=reviewer.commit(**params,operator_authorized=authorized)
+        elif action=="studio.source_graph":
+            from .jeeves_game_source_graph import JeevesGameSourceGraph
+            result=JeevesGameSourceGraph(inv,ws).index(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
@@ -654,8 +856,14 @@ class JeevesAppwideRuntime:
                 raise PermissionError("reviewed production operation requires approval")
             # The existing typed dispatcher remains the single actual
             # compiler/forge/companion executor; no substitute stack.
+            # Project is an outer scoped authority selector, NOT one of the
+            # canonical action's exact typed arguments. Passing it through
+            # would break every underlying _exact() dispatcher contract
+            # (forge, game compiler, crawler, Dragon, tool fabric, etc.).
+            action_args={key:value for key,value in params.items()
+                         if key!="project"}
             underlying=dispatch_app_action(
-                ws,project,action,params,authorized=authorized)
+                ws,project,action,action_args,authorized=authorized)
             result={
                 "canonical_adapter":action,
                 "canonical_receipt_digest":underlying["digest"],

@@ -576,6 +576,1243 @@ $("jeeves-code-dependencies").addEventListener("click",()=>dmGuard(async()=>{
   " incompleteness categories. No imported code was executed.");
 }));
 
+
+/* Installed game editors and authored scene production into real Studio proposals. */
+let jeevesProductionDigest=null,jeevesProductionContext=null;
+function productionParams(){
+ if(!model||selectedTree!=="current"||!model.active||
+    selectedProject!==model.active)
+  throw Error("Select a current writable original project first");
+ const phase=$("jeeves-production-phase").value;
+ const items=JSON.parse($("jeeves-production-items").value);
+ if(!Array.isArray(items)||items.length<1||items.length>24)
+  throw Error("Production wave needs 1–24 typed engine or scene items");
+ return {project:model.active,phase,items,expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-production-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!jeevesAppSnapshot)throw Error("Scan whole application first");
+ const params=productionParams();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.plan",params,operator_authorized:false});
+ const plan=response.result;
+ jeevesProductionDigest=plan.digest;
+ jeevesProductionContext=JSON.stringify(params);
+ $("jeeves-production-output").textContent=JSON.stringify(plan,null,2).slice(0,75000);
+ status(plan.requested_items+" actual game sources generated and source-digested; "+
+  plan.changed_items+" require review proposals before human publication.");
+}));
+$("jeeves-production-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if($("jeeves-production-approval").checked!==true)
+  throw Error("Explicitly approve staging the chosen reviewed source candidates");
+ const params=productionParams();
+ if(!jeevesProductionDigest||jeevesProductionContext!==JSON.stringify(params))
+  throw Error("Regenerate exact production plan after configuration changes");
+ const reason=$("jeeves-production-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Detailed original production review reason required");
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.stage",
+  params:{...params,expected_plan_digest:jeevesProductionDigest,reason},
+  operator_authorized:true,
+ });
+ const staged=response.result;
+ $("jeeves-production-output").textContent=JSON.stringify(staged,null,2).slice(0,75000);
+ $("jeeves-publish-ids").value=staged.proposals.map(x=>x.proposal_id).join("\n");
+ if(staged.proposals.length)
+  $("proposal").textContent=staged.proposals[0].proposal_id;
+ jeevesProductionDigest=null;
+ status(staged.proposal_count+" real source proposals staged in existing Studio. "+
+  "Review exact diffs and commit each proposal explicitly.");
+}));
+
+
+/* Real compiled offline browser + Godot project source review production. */
+let originalReleaseDigest=null,originalReleaseParams=null;
+function releaseIntent(){
+ if(!model||selectedTree!=="current"||!model.active||
+    selectedProject!==model.active)
+  throw Error("Select active writable original Game Studio project");
+ if(!jeevesAppSnapshot)throw Error("Scan app to establish source inventory identity");
+ const release_id=$("jeeves-release-id").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(release_id))
+  throw Error("Release ID must be an original safe identifier");
+ const intent=JSON.parse($("jeeves-release-intent").value);
+ if(!intent||typeof intent!=="object"||Array.isArray(intent))
+  throw Error("Provide bounded original playable game intent");
+ return {project:model.active,release_id,intent,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-release-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if($("jeeves-release-approval").checked!==true)
+  throw Error("Explicit designer approval required to run original compiler");
+ const params=releaseIntent();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.release_plan",
+  params,operator_authorized:true,
+ });
+ const result=receipt.result;
+ originalReleaseDigest=result.digest;
+ originalReleaseParams=JSON.stringify(params);
+ $("jeeves-release-output").textContent=JSON.stringify(result,null,2).slice(0,80000);
+ status(result.source_target_count+" actual browser/Godot game sources compiled; "+
+  "Python winning replay "+result.proof_status+
+  ". Native hardware not certified.");
+}));
+$("jeeves-release-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if($("jeeves-release-approval").checked!==true)
+  throw Error("Human approval is mandatory for source proposal staging");
+ const params=releaseIntent();
+ if(!originalReleaseDigest||originalReleaseParams!==JSON.stringify(params))
+  throw Error("Original game intent changed; compile and review the exact plan again");
+ const reason=$("jeeves-release-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Specific native source review reason required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.release_stage",
+  params:{...params,expected_plan_digest:originalReleaseDigest,reason},
+  operator_authorized:true,
+ });
+ const result=receipt.result;
+ $("jeeves-release-output").textContent=JSON.stringify(result,null,2).slice(0,80000);
+ $("jeeves-publish-ids").value=result.proposals.map(x=>x.proposal_id).join("\n");
+ if(result.proposals.length)
+  $("proposal").textContent=result.proposals[0].proposal_id;
+ originalReleaseDigest=null;
+ status(result.proposal_count+" original runtime sources entered existing "+
+  "human-reviewed proposal custody. No compiled binary has been released.");
+}));
+
+
+/* Finite exact-diff proposal review -> individually approved real source commits. */
+let publishedReview=null, publishedProposalIds=null;
+function publicationIds(){
+ if(!model||!model.active||selectedProject!==model.active||
+    selectedTree!=="current")
+  throw Error("Selected active current Studio project required");
+ const ids=$("jeeves-publish-ids").value.split(/[\s,]+/)
+  .map(x=>x.trim()).filter(Boolean);
+ if(!ids.length||ids.length>24||ids.some(id=>!/^[a-f0-9]{64}$/.test(id))||
+    new Set(ids).size!==ids.length)
+  throw Error("Select 1–24 distinct original SHA-256 proposal IDs");
+ return ids.sort();
+}
+function publicationRenderApprovals(reviews){
+ const container=$("jeeves-publish-approvals");
+ container.replaceChildren();
+ for(const item of reviews){
+  const label=document.createElement("label");
+  const input=document.createElement("input");
+  input.type="checkbox";
+  input.dataset.proposalId=item.proposal_id;
+  input.dataset.sha=item.proposed_sha256;
+  const desc=document.createElement("span");
+  desc.textContent="Approve exact source: "+item.path+" · "+item.proposed_sha256;
+  label.append(input,desc);
+  container.append(label);
+ }
+}
+$("jeeves-publish-review").addEventListener("click",()=>dmGuard(async()=>{
+ if(!jeevesAppSnapshot)throw Error("Scan source inventory first");
+ const ids=publicationIds();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.review_bundle",
+  params:{project:model.active,proposal_ids:ids,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false,
+ });
+ const report=receipt.result;
+ publishedReview=report;
+ publishedProposalIds=JSON.stringify(ids);
+ $("jeeves-publish-report").textContent=JSON.stringify(report,null,2);
+ publicationRenderApprovals(report.proposals);
+ status(report.proposal_count+" real original source diffs ready for individual review. "+
+  (report.some_diffs_truncated?"Split truncated bundles before acceptance.":
+   "Inspect every source diff, then approve each item explicitly."));
+}));
+$("jeeves-publish-commit").addEventListener("click",()=>dmGuard(async()=>{
+ const ids=publicationIds();
+ if(!publishedReview||JSON.stringify(ids)!==publishedProposalIds)
+  throw Error("Proposal selection changed; review exact source again");
+ if(publishedReview.some_diffs_truncated)
+  throw Error("Unreviewed truncated diffs cannot be batch-committed");
+ const checkboxes=[...$("jeeves-publish-approvals").querySelectorAll("input[type=checkbox]")];
+ if(checkboxes.length!==ids.length||checkboxes.some(input=>!input.checked))
+  throw Error("Approve each exact-source proposal separately after reviewing it");
+ const approvals=checkboxes.map(input=>({
+  proposal_id:input.dataset.proposalId,
+  reviewed_sha256:input.dataset.sha,
+  human_approved:input.checked===true,
+ }));
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.commit_bundle",
+  params:{project:model.active,proposal_ids:ids,
+   expected_review_digest:publishedReview.digest,approvals,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:true,
+ });
+ const outcome=receipt.result;
+ $("jeeves-publish-report").textContent=JSON.stringify(outcome,null,2).slice(0,90000);
+ publishedReview=null;
+ publishedProposalIds=null;
+ $("jeeves-publish-approvals").replaceChildren();
+ if(outcome.partial_failure)
+  status("Partially committed "+outcome.committed_count+
+   " real game files; refresh source and review pending proposals before retry.");
+ else status(outcome.source_count+" reviewed original game sources "+
+  "committed to current Studio project. Release is not automatically certified.");
+ await refresh();
+}));
+
+
+/* Reuse original Game Studio intent routing to materialize reviewed engine sources. */
+let jeevesPromptPlan=null, jeevesPromptInputs=null;
+function promptProductionArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select current original project and scan Jeeves application");
+ const prompt=$("jeeves-prompt-production").value.trim();
+ if(prompt.length<12||prompt.length>6000)
+  throw Error("Original design instructions must be 12–6000 characters");
+ const editor_overrides=JSON.parse($("jeeves-prompt-overrides").value);
+ if(!editor_overrides||typeof editor_overrides!=="object"||
+    Array.isArray(editor_overrides))
+  throw Error("Typed editor settings JSON map required");
+ return {project:model.active,prompt,editor_overrides,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-prompt-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-prompt-approval").checked)
+  throw Error("Designer must approve prompt-based source planning");
+ const args=promptProductionArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.prompt_plan",
+  params:args,operator_authorized:true,
+ });
+ const plan=receipt.result;
+ jeevesPromptPlan=plan.digest;jeevesPromptInputs=JSON.stringify(args);
+ $("jeeves-prompt-output").textContent=JSON.stringify(plan,null,2).slice(0,90000);
+ status(plan.editor_count+" concrete installed game engine editors selected; "+
+  plan.non_editor_axes_not_autogenerated.length+" story/asset or other axes "+
+  "require separately authored sources.");
+}));
+$("jeeves-prompt-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-prompt-approval").checked)
+  throw Error("Designer approval required for real source proposals");
+ const args=promptProductionArgs();
+ if(!jeevesPromptPlan||jeevesPromptInputs!==JSON.stringify(args))
+  throw Error("Game design intent has changed; prepare a fresh plan");
+ const reason=$("jeeves-prompt-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Concrete reviewed source production reason required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.prompt_stage",
+  params:{...args,expected_prompt_plan_digest:jeevesPromptPlan,reason},
+  operator_authorized:true,
+ });
+ const result=receipt.result;
+ $("jeeves-prompt-output").textContent=JSON.stringify(result,null,2).slice(0,85000);
+ $("jeeves-publish-ids").value=result.proposals.map(x=>x.proposal_id).join("\n");
+ jeevesPromptPlan=null;
+ status(result.proposal_count+" actual original game system edits staged for "+
+  "independent source diff review and explicit human commit.");
+}));
+
+
+/* Bounded genuinely distinct original game variant render portfolios. */
+let originalPortfolioDigest=null,originalPortfolioInputs=null;
+function originalPortfolioArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select original current project and scan source inventory");
+ const base_intent=JSON.parse($("jeeves-release-intent").value);
+ if(!base_intent||typeof base_intent!=="object"||
+    Array.isArray(base_intent))
+  throw Error("Provide the original browser/Godot game intent first");
+ const release_prefix=$("jeeves-variant-prefix").value.trim();
+ const count=dmPositive("jeeves-variant-count",1,4);
+ const seed_step=dmPositive("jeeves-variant-seed-step",1,1000000);
+ const rotate_themes=$("jeeves-variant-themes").checked===true;
+ return {project:model.active,release_prefix,base_intent,
+  count,seed_step,rotate_themes,expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-variants-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-variant-approval").checked)
+  throw Error("Explicit authorization required for original portfolio compilation");
+ const args=originalPortfolioArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.variants_plan",
+  params:args,operator_authorized:true,
+ });
+ const plan=receipt.result;
+ originalPortfolioDigest=plan.digest;
+ originalPortfolioInputs=JSON.stringify(args);
+ $("jeeves-variants-output").textContent=JSON.stringify(plan,null,2).slice(0,120000);
+ status(plan.variant_count+" real original playable games compiled, "+
+  plan.source_file_count+" browser/Godot project sources, and distinct source worlds.");
+}));
+$("jeeves-variants-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-variant-approval").checked)
+  throw Error("Source staging requires explicit operator authorization");
+ const args=originalPortfolioArgs();
+ if(!originalPortfolioDigest||originalPortfolioInputs!==JSON.stringify(args))
+  throw Error("Portfolio intent changed; regenerate exact reviewed plan");
+ const reason=$("jeeves-variant-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Reviewed portfolio source rationale required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.variants_stage",
+  params:{...args,expected_portfolio_digest:originalPortfolioDigest,reason},
+  operator_authorized:true,
+ });
+ const result=receipt.result;
+ $("jeeves-variants-output").textContent=JSON.stringify(result,null,2).slice(0,140000);
+ const variants=result.variants||result.staged_variants||[];
+ const ids=variants.flatMap(v=>v.proposals.map(p=>p.proposal_id));
+ $("jeeves-publish-ids").value=ids.slice(0,24).join("\n");
+ originalPortfolioDigest=null;
+ status(ids.length+" independently reviewable game files staged in "+
+  variants.length+" source variants. Review/commit in batches of 24 or fewer; "+
+  (ids.length>24?(ids.length-24)+" additional proposal IDs remain in the full receipt.":
+   "No game source was automatically committed."));
+}));
+
+
+/* Real persisted original project review proposal queue, paginated and source-bound. */
+let productionQueueCursor=null,productionQueueResult=null;
+async function fetchProductionQueue(next){
+ if(!model||!model.active||selectedProject!==model.active||
+    selectedTree!=="current"||!jeevesAppSnapshot)
+  throw Error("Select active Studio project and refresh whole-app inventory");
+ const params={
+  project:model.active,limit:60,
+  expected_snapshot:jeevesAppSnapshot,
+  ...(next&&productionQueueCursor?{start_after:productionQueueCursor}:{}),
+ };
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.queue",params,operator_authorized:false,
+ });
+ productionQueueResult=receipt.result;
+ productionQueueCursor=productionQueueResult.next_after;
+ $("jeeves-queue-next").disabled=!productionQueueCursor;
+ $("jeeves-queue-result").textContent=JSON.stringify(productionQueueResult,null,2).slice(0,90000);
+ status(productionQueueResult.returned_current_project_rows+
+  " current-project proposals indexed from "+
+  productionQueueResult.examined_filenames+" custody entries. "+
+  "Stale sources require re-review before any source commit.");
+}
+$("jeeves-queue-fetch").addEventListener("click",()=>dmGuard(async()=>{
+ productionQueueCursor=null;
+ await fetchProductionQueue(false);
+}));
+$("jeeves-queue-next").addEventListener("click",()=>dmGuard(async()=>{
+ if(!productionQueueCursor)throw Error("No more proposal custody pages");
+ await fetchProductionQueue(true);
+}));
+$("jeeves-queue-select").addEventListener("click",()=>dmGuard(async()=>{
+ if(!productionQueueResult)throw Error("Load actual proposal records first");
+ const pending=productionQueueResult.entries.filter(
+  row=>row.status==="awaiting_review").slice(0,24);
+ if(!pending.length)
+  throw Error("No pending current-project source proposal in this page");
+ $("jeeves-publish-ids").value=pending.map(p=>p.proposal_id).join("\n");
+ status(pending.length+" current-project source proposals selected for "+
+  "exact human review and individual approval. Nothing was committed.");
+}));
+
+
+/* Approved source releases: actual source custody, exact hashes, download. */
+let releaseVerification=null;
+let releaseVerificationArgs=null;
+async function releaseCustodyArgs(){
+ if(!model||selectedTree!=="current"||!selectedProject||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select current original project and scan app inventory");
+ const release_id=$("jeeves-accepted-release").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(release_id))
+  throw Error("Safe original release identifier required");
+ return {project:model.active,release_id,expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-release-catalog").addEventListener("click",()=>dmGuard(async()=>{
+ if(!model||!model.active||!jeevesAppSnapshot)
+  throw Error("Select original active project and scan source inventory");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.release.catalog",
+  params:{project:model.active,offset:0,limit:80,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false,
+ });
+ const data=receipt.result;
+ $("jeeves-accepted-report").textContent=JSON.stringify(data,null,2);
+ if(data.release_ids.length)
+  $("jeeves-accepted-release").value=data.release_ids[0];
+ status(data.total_source_release_ids+
+  " original project release folders found. Verify all source hashes and approvals.");
+}));
+$("jeeves-release-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=await releaseCustodyArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.release.verify",params:args,operator_authorized:false,
+ });
+ const evidence=receipt.result;
+ releaseVerification=evidence.digest;
+ releaseVerificationArgs=JSON.stringify(args);
+ $("jeeves-accepted-report").textContent=JSON.stringify(evidence,null,2);
+ status(evidence.source_file_count+" actual project source versions verified "+
+  "against original game manifest and recorded individual human approvals. "+
+  "No native game binary was executed.");
+}));
+$("jeeves-release-download").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-release-download-approval").checked)
+  throw Error("Explicitly approve exporting selected reviewed original source release");
+ const args=await releaseCustodyArgs();
+ if(!releaseVerification||releaseVerificationArgs!==JSON.stringify(args))
+  throw Error("Release selection changed; verify approved source bundle again");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.release.download",
+  params:{...args,expected_verification_digest:releaseVerification},
+  operator_authorized:true,
+ });
+ const bundle=receipt.result;
+ if(bundle.zip_bytes>2210000||!/^[a-z0-9_-]+_[a-z0-9_-]+_source\.zip$/.test(bundle.filename))
+  throw Error("Unexpected original source export metadata");
+ const binary=atob(bundle.base64);
+ if(binary.length!==bundle.zip_bytes)
+  throw Error("Original source transfer byte count mismatch");
+ const bytes=Uint8Array.from(binary,character=>character.charCodeAt(0));
+ if(!crypto.subtle)throw Error("Secure browser digest verification is required");
+ const hashBuffer=await crypto.subtle.digest("SHA-256",bytes);
+ const hex=[...new Uint8Array(hashBuffer)].map(b=>b.toString(16).padStart(2,"0")).join("");
+ if(hex!==bundle.zip_sha256)
+  throw Error("Original project source ZIP failed SHA-256 transfer validation");
+ const download=new Blob([bytes],{type:"application/zip"});
+ const url=URL.createObjectURL(download);
+ const a=document.createElement("a");
+ a.href=url;a.download=bundle.filename;
+ document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),500);
+ $("jeeves-accepted-report").textContent=JSON.stringify({
+  filename:bundle.filename,
+  source_zip_sha256:bundle.zip_sha256,
+  bytes:bundle.zip_bytes,
+  source_verification_digest:bundle.verification_digest,
+  source_files_approved:true,hardware_certified:false
+ },null,2);
+ status("Original approved browser/Godot source archive delivered for local download. "+
+  "Device execution, licensing and commercial release still require signoff.");
+}));
+
+
+/* Actual Python gameplay replay and byte-identical approved game source provenance. */
+$("jeeves-release-replay").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-release-replay-approval").checked)
+  throw Error("Explicitly authorize actual original-game replay execution");
+ const args=await releaseCustodyArgs();
+ if(!releaseVerification||releaseVerificationArgs!==JSON.stringify(args))
+  throw Error("Fresh human-approved source verification is required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.release.replay",
+  params:{...args,expected_verification_digest:releaseVerification},
+  operator_authorized:true,
+ });
+ const proof=receipt.result;
+ $("jeeves-accepted-report").textContent=JSON.stringify(proof,null,2);
+ status(proof.actual_gameplay_steps+" actual reference-gameplay moves executed "+
+  "and "+proof.source_artifacts_regenerated+" approved source members recompiled "+
+  "byte-for-byte. Godot/native binaries not executed.");
+}));
+$("jeeves-release-compare").addEventListener("click",()=>dmGuard(async()=>{
+ if(!model||!model.active||selectedProject!==model.active||
+    selectedTree!=="current"||!jeevesAppSnapshot)
+  throw Error("Select active original project and scan application");
+ const release_ids=$("jeeves-release-compare-ids").value.split(/[,\s]+/)
+  .map(x=>x.trim()).filter(Boolean);
+ if(release_ids.length<2||release_ids.length>6||
+    new Set(release_ids).size!==release_ids.length)
+  throw Error("Choose two to six different approved original release IDs");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.release.compare",
+  params:{project:model.active,release_ids,expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false,
+ });
+ const compare=receipt.result;
+ $("jeeves-release-compare-result").textContent=JSON.stringify(compare,null,2);
+ status(compare.distinct_real_worlds+" truly different authored world sources "+
+  "and "+compare.different_source_members+" distinct changed package members, "+
+  "grounded only in human-approved current Studio source.");
+}));
+
+
+/* Original story canon -> signed source -> full-history validator -> real proposal. */
+let sourceStoryPlan=null,sourceStoryInputs=null,sourceStoryPath=null;
+function sourceStoryArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select an active current game and scan application source");
+ const phase=$("jeeves-story-phase").value;
+ const values={project:model.active,phase,expected_snapshot:jeevesAppSnapshot};
+ if(phase==="scene"){
+  values.act=dmPositive("jeeves-story-act",1,1000);
+  values.scene=dmPositive("jeeves-story-scene",1,9999);
+  const chapter=$("jeeves-story-chapter").value.trim();
+  if(chapter!==""){
+   const n=Number(chapter);
+   if(!Number.isInteger(n)||n<1||n>100)throw Error("Chapter 1–100 required");
+   values.chapter=n;
+  }
+ }
+ return values;
+}
+$("jeeves-story-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const args=sourceStoryArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.story.source_plan",params:args,operator_authorized:false,
+ });
+ const result=receipt.result;
+ sourceStoryPlan=result.digest;
+ sourceStoryInputs=JSON.stringify(args);
+ sourceStoryPath=result.path;
+ $("jeeves-story-authored").value=JSON.stringify(result.source_template,null,2);
+ $("jeeves-story-output").textContent=JSON.stringify({
+  path:result.path,
+  existing_source_sha256:result.expected_source_sha256,
+  latest_history_digest:result.historical_index_digest,
+  scenes_already_committed:result.historical_story_scenes,
+  approved_bible_digest:result.approved_bible_digest,
+  full_plan_digest:result.digest,
+  source_requires_original_authored_content:true
+ },null,2);
+ status("Source-pinned "+result.source_phase+" story template ready. "+
+  "Author actual original writing, sign, then submit to canonical review.");
+}));
+$("jeeves-story-sign").addEventListener("click",()=>dmGuard(async()=>{
+ if(!sourceStoryPlan||sourceStoryInputs!==JSON.stringify(sourceStoryArgs()))
+  throw Error("Rebuild exact original story source plan first");
+ const document=JSON.parse($("jeeves-story-authored").value);
+ const raw=$("jeeves-story-observations").value.trim();
+ const observations=raw?JSON.parse(raw):{};
+ const result=await api("/api/story-sign",{
+  project:model.active,path:sourceStoryPath,document,observations});
+ $("jeeves-story-authored").value=JSON.stringify(result.document,null,2);
+ $("jeeves-story-output").textContent=JSON.stringify(result.evidence,null,2);
+ status("Current original story source signed by canonical continuity validators; "+
+  "no proposed or committed source yet.");
+}));
+$("jeeves-story-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-story-approval").checked)
+  throw Error("Designer must explicitly authorize actual story source staging");
+ const args=sourceStoryArgs();
+ if(!sourceStoryPlan||sourceStoryInputs!==JSON.stringify(args))
+  throw Error("Selected story source or history changed; rebuild exact source plan");
+ const authored_document=JSON.parse($("jeeves-story-authored").value);
+ const reason=$("jeeves-story-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Specific original story change reason is required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.story.source_stage",
+  params:{...args,authored_document,
+   expected_plan_digest:sourceStoryPlan,reason},
+  operator_authorized:true,
+ });
+ const result=receipt.result;
+ $("jeeves-story-output").textContent=JSON.stringify(result,null,2);
+ $("jeeves-publish-ids").value=result.proposal_id;
+ sourceStoryPlan=null;
+ status("Signed original story "+result.phase+" now staged as real source "+
+  result.source_path+". Review exact historical continuity and commit explicitly.");
+}));
+
+
+/* Installed Universal Forge -> actual editor-owned source proposal -> human commit. */
+let jeevesForgePlan=null,jeevesForgeInputs=null;
+function forgeProductionArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active original project and scan application inventory");
+ const blueprint_id=$("jeeves-forge-id").value.trim();
+ const name=$("jeeves-forge-name").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(blueprint_id))
+  throw Error("Safe original Forge blueprint ID required");
+ if(!name||name.length>120)
+  throw Error("Bounded original component graph title required");
+ const components=JSON.parse($("jeeves-forge-components").value);
+ const wires=JSON.parse($("jeeves-forge-wires").value);
+ if(!Array.isArray(components)||components.length<1||components.length>64||
+    !Array.isArray(wires)||wires.length>128)
+  throw Error("Forge needs 1–64 installed components and 0–128 typed wires");
+ return {project:model.active,blueprint_id,name,components,wires,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-forge-kinds").addEventListener("click",()=>dmGuard(async()=>{
+ if(!model||!model.active||selectedProject!==model.active)
+  throw Error("Current original project must be selected");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"forge.kinds",params:{project:model.active},operator_authorized:false,
+ });
+ $("jeeves-forge-output").textContent=JSON.stringify(receipt.result,null,2);
+ status("Installed real Forge component kinds displayed; source tool bindings "+
+  "do not execute arbitrary plugin code.");
+}));
+$("jeeves-forge-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const args=forgeProductionArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.forge.plan",params:args,operator_authorized:false,
+ });
+ const plan=receipt.result;
+ jeevesForgePlan=plan.digest;
+ jeevesForgeInputs=JSON.stringify(args);
+ $("jeeves-forge-output").textContent=JSON.stringify(plan,null,2).slice(0,95000);
+ status(plan.canonical_installed_forge_graph_review.component_count+
+  " actual installed typed components validated for original project source.");
+}));
+$("jeeves-forge-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-forge-approval").checked)
+  throw Error("Approve original Forge graph source proposal explicitly");
+ const args=forgeProductionArgs();
+ if(!jeevesForgePlan||jeevesForgeInputs!==JSON.stringify(args))
+  throw Error("Forge graph changed; prepare a fresh exact-source plan");
+ const reason=$("jeeves-forge-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Concrete reviewed Forge source rationale required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.forge.stage",
+  params:{...args,expected_plan_digest:jeevesForgePlan,reason},
+  operator_authorized:true,
+ });
+ const staged=receipt.result;
+ $("jeeves-forge-output").textContent=JSON.stringify(staged,null,2);
+ $("jeeves-publish-ids").value=staged.proposal_id;
+ jeevesForgePlan=null;
+ status("Real typed original Forge blueprint staged into "+
+  staged.path+" for independent human review. No unreviewed asset execution.");
+}));
+$("jeeves-forge-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=forgeProductionArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.forge.verify",
+  params:{project:args.project,blueprint_id:args.blueprint_id,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false,
+ });
+ $("jeeves-forge-output").textContent=JSON.stringify(receipt.result,null,2);
+ status("Committed original Forge blueprint revalidated against installed "+
+  "component kinds, ports and source identity.");
+}));
+
+
+/* Verification has separate denominators: source status != runtime qualification. */
+let jeevesVerificationDigest=null,jeevesVerificationCursor=0;
+async function verificationInvoke(action,extra={}){
+ if(!jeevesAppSnapshot)throw Error("Scan exact application sources to establish a valid census");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action,params:{expected_snapshot:jeevesAppSnapshot,...extra},
+  operator_authorized:false
+ });
+ return receipt.result;
+}
+function verificationFacetLine(title,item){
+ if(!item||item.denominator===0)
+  return title+": denominator unavailable";
+ return title+": "+item.verified_or_declared_count+"/"+item.denominator+
+  " ("+item.percent_complete+"%) · "+item.remaining+
+  " remaining ("+item.percent_remaining+"%) · "+item.semantic_layer;
+}
+$("jeeves-verify-percent").addEventListener("click",()=>dmGuard(async()=>{
+ const result=await verificationInvoke("ai.verification.progress");
+ jeevesVerificationDigest=result.digest;
+ jeevesVerificationCursor=0;
+ const facets=result.facets;
+ $("jeeves-verify-numbers").textContent=[
+  verificationFacetLine("Implementation source metadata",facets.volume_implementation_metadata),
+  verificationFacetLine("Independent enterprise qualification",facets.enterprise_volume_qualification),
+  verificationFacetLine("Product AI registry complete",facets.ai_capability_registry),
+  verificationFacetLine("Declared P0 construction gap closure",facets.construction_gap_register),
+  verificationFacetLine("Required source paths present",facets.required_paths),
+  verificationFacetLine("Mandatory CI workflow sources present",facets.release_workflow_sources),
+  verificationFacetLine("CI results verified by this source-only scan",
+                         facets.verified_exact_head_ci_from_source_scan),
+  "Overall app completion: NOT MEASURABLE FROM STATIC SOURCE ALONE",
+  "Live exact-head CI: "+result.actual_external_ci_status,
+  "Installed device/service acceptance: "+result.actual_device_and_service_acceptance,
+  "Model quality: "+result.actual_model_quality_status,
+  "Product release verified: "+result.live_product_ready,
+ ].join("\n");
+ $("jeeves-verify-output").textContent=JSON.stringify({
+  digest:result.digest,inventory_snapshot:result.inventory_snapshot,
+  census_digest:result.census_digest,
+  blockers:result.known_blocking_categories,
+ },null,2);
+ status("Verification percentages computed from 8 canonical machine authorities "+
+  "and mandatory CI workflow source registry; external tests are not claimed passed.");
+}));
+async function verificationPage(offset){
+ if(!jeevesVerificationDigest)
+  throw Error("Calculate source-pinned verification progress first");
+ const result=await verificationInvoke("ai.verification.backlog",{
+  expected_progress_digest:jeevesVerificationDigest,
+  offset,limit:50,
+ });
+ jeevesVerificationCursor=result.next_offset;
+ $("jeeves-verify-next").disabled=jeevesVerificationCursor===null;
+ $("jeeves-verify-output").textContent=JSON.stringify(result,null,2);
+ status(result.tasks.length+" source-backed verification work groups of "+
+  result.total_work_item_groups+"; none is automatically signed or accepted.");
+}
+$("jeeves-verify-blockers").addEventListener("click",()=>dmGuard(
+ async()=>{await verificationPage(0);}
+));
+$("jeeves-verify-next").addEventListener("click",()=>dmGuard(
+ async()=>{
+  if(jeevesVerificationCursor===null)
+   throw Error("No more verification blocker pages");
+  await verificationPage(jeevesVerificationCursor);
+ }
+));
+
+
+let jeevesVolumeCursor=0;
+async function verificationVolumePage(reset=false){
+ if(!jeevesVerificationDigest)
+  throw Error("Calculate source-backed verification progress first");
+ if(reset)jeevesVolumeCursor=0;
+ const result=await verificationInvoke("ai.verification.volumes",{
+  expected_progress_digest:jeevesVerificationDigest,
+  offset:jeevesVolumeCursor,limit:40,
+  only_not_implementation_verified:$("jeeves-volume-hardened").checked===true,
+ });
+ jeevesVolumeCursor=result.next_offset;
+ $("jeeves-volume-next").disabled=jeevesVolumeCursor===null;
+ $("jeeves-volume-output").textContent=JSON.stringify(result,null,2);
+ status(result.volumes.length+" actual original masterplan volumes indexed; "+
+  result.filtered_remaining_volumes+" match current filter. "+
+  "Named tests/evaluations are requirements, not executed results.");
+}
+$("jeeves-volume-list").addEventListener("click",()=>dmGuard(
+ async()=>{await verificationVolumePage(true);}
+));
+$("jeeves-volume-next").addEventListener("click",()=>dmGuard(
+ async()=>{
+  if(jeevesVolumeCursor===null)throw Error("End of volume verification index");
+  await verificationVolumePage(false);
+ }
+));
+
+
+/* The installed non-provider Cognitive Core executes bounded real decisions. */
+async function cognitiveExecute(action,params){
+ if(!jeevesAppSnapshot)
+  throw Error("Scan application sources before using canonical reasoning gates");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action,params:{...params,expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false
+ });
+ $("jeeves-cognitive-output").textContent=JSON.stringify(receipt.result,null,2);
+ status("Canonical installed cognition invoked: "+action+
+  ". This computes a decision, not a trained-model quality verification.");
+}
+$("jeeves-cognitive-static-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const steps=JSON.parse($("jeeves-cognitive-static-steps").value);
+ const initial_facts=JSON.parse($("jeeves-cognitive-initial-facts").value);
+ const plan_id=$("jeeves-cognitive-static-id").value.trim();
+ const risk=$("jeeves-reasoning-risk").value;
+ const inject_failure_at=$("jeeves-cognitive-failure").value.trim()||null;
+ await cognitiveExecute("ai.cognition.static_plan",{
+  plan_id,steps,initial_facts,risk,inject_failure_at
+ });
+}));
+$("jeeves-cognitive-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const plan=JSON.parse($("jeeves-cognitive-plan-json").value);
+ const vision=$("jeeves-cognitive-vision").value.trim();
+ await cognitiveExecute("ai.cognition.build_plan",{plan,vision});
+}));
+$("jeeves-cognitive-uncertainty").addEventListener("click",()=>dmGuard(async()=>{
+ const candidates=JSON.parse($("jeeves-uncertainty-candidates").value);
+ await cognitiveExecute("ai.cognition.uncertainty",{candidates});
+}));
+$("jeeves-cognitive-strategy").addEventListener("click",()=>dmGuard(async()=>{
+ const candidates=JSON.parse($("jeeves-reasoning-candidates").value);
+ const risk=$("jeeves-reasoning-risk").value;
+ await cognitiveExecute("ai.cognition.strategy",{candidates,risk});
+}));
+$("jeeves-cognitive-stop").addEventListener("click",()=>dmGuard(async()=>{
+ const history=JSON.parse($("jeeves-reasoning-history").value);
+ const risk=$("jeeves-reasoning-risk").value;
+ await cognitiveExecute("ai.cognition.stop",{history,risk});
+}));
+
+
+/* Approved original authored scenes -> actual installed game runtime -> source custody. */
+let advancedReplayPlanDigest=null,advancedReplayPlanArgs=null;
+function advancedReplayArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select a writable original game project and scan app inventory");
+ const editor=$("jeeves-advanced-replay-editor").value.trim();
+ const scene_id=$("jeeves-advanced-replay-scene").value.trim();
+ if(!/^[a-z][a-z0-9_]{1,63}$/.test(editor)||
+    !/^[a-z][a-z0-9_-]{1,63}$/.test(scene_id))
+  throw Error("Use the installed advanced editor and signed original scene identity");
+ const actions=JSON.parse($("jeeves-advanced-replay-actions").value);
+ if(!Array.isArray(actions)||actions.length>128||
+    actions.some(a=>typeof a!=="string"||a.length>30))
+  throw Error("0–128 typed original game action commands required");
+ return {project:model.active,editor,scene_id,actions,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-advanced-replay-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-advanced-replay-approval").checked)
+  throw Error("Authorize actual advanced game simulation for original authored scene");
+ const args=advancedReplayArgs();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.advanced.replay.plan",params:args,operator_authorized:true
+ });
+ const receipt=response.result;
+ advancedReplayPlanDigest=receipt.digest;
+ advancedReplayPlanArgs=JSON.stringify(args);
+ $("jeeves-advanced-replay-output").textContent=JSON.stringify(receipt,null,2);
+ status(receipt.turn_count+" actual "+receipt.editor+
+  " game commands executed against current approved system and scene. "+
+  "Terminal: "+receipt.terminal+"; human source signoff still required.");
+}));
+$("jeeves-advanced-replay-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-advanced-replay-approval").checked)
+  throw Error("Review and approve original gameplay source staging");
+ const args=advancedReplayArgs();
+ if(!advancedReplayPlanDigest||
+    advancedReplayPlanArgs!==JSON.stringify(args))
+  throw Error("Scene/actions changed; reexecute the original game plan");
+ const reason=$("jeeves-advanced-replay-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Specific reviewed original gameplay source rationale required");
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.advanced.replay.stage",
+  params:{...args,expected_plan_digest:advancedReplayPlanDigest,reason},
+  operator_authorized:true
+ });
+ const result=response.result;
+ $("jeeves-advanced-replay-output").textContent=JSON.stringify(result,null,2);
+ $("jeeves-publish-ids").value=result.proposal_id;
+ $("jeeves-paged-review-id").value=result.proposal_id;
+ advancedReplayPlanDigest=null;
+ status("Actual verified "+result.editor+" game session staged at "+
+  result.source_path+". Human diff review and commit remain required.");
+}));
+$("jeeves-advanced-replay-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=advancedReplayArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.advanced.replay.verify",
+  params:{project:args.project,editor:args.editor,scene_id:args.scene_id,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false
+ });
+ const result=receipt.result;
+ $("jeeves-advanced-replay-output").textContent=JSON.stringify(result,null,2);
+ status(result.turns_reexecuted+" committed original reference game moves "+
+  "reexecuted with exact SHA-bound original scene and system.");
+}));
+
+
+/* Real multi-scene campaign compiler: choices depend on observed game state. */
+let jeevesCampaignPlanDigest=null,jeevesCampaignInput=null;
+function campaignInput(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active original project and scan application inventory");
+ const spec=JSON.parse($("jeeves-campaign-spec").value);
+ if(!spec||typeof spec!=="object"||Array.isArray(spec)||
+    !Array.isArray(spec.nodes)||spec.nodes.length<2||spec.nodes.length>8)
+  throw Error("Author a bounded original campaign with two to eight scenes");
+ return {project:model.active,spec,expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-campaign-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-campaign-approval").checked)
+  throw Error("Approve original story/game scenario reference execution");
+ const args=campaignInput();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.plan",params:args,operator_authorized:true
+ });
+ const plan=response.result;
+ jeevesCampaignPlanDigest=plan.digest;
+ jeevesCampaignInput=JSON.stringify(args);
+ $("jeeves-campaign-output").textContent=JSON.stringify(plan,null,2);
+ status(plan.real_reference_sessions_executed+
+  " actual original game scenes executed; "+plan.actual_route.length+
+  " scene choices followed, ending: "+plan.actual_reached_ending+
+  ". Other player choices still require authored scenes.");
+}));
+$("jeeves-campaign-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-campaign-approval").checked)
+  throw Error("Designer approval needed for source review");
+ const args=campaignInput();
+ if(!jeevesCampaignPlanDigest||jeevesCampaignInput!==JSON.stringify(args))
+  throw Error("Recompile changed original campaign before staging");
+ const reason=$("jeeves-campaign-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Specific reviewed campaign source rationale required");
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.stage",
+  params:{...args,expected_plan_digest:jeevesCampaignPlanDigest,reason},
+  operator_authorized:true
+ });
+ const receipt=response.result;
+ $("jeeves-campaign-output").textContent=JSON.stringify(receipt,null,2);
+ $("jeeves-publish-ids").value=receipt.proposal_id;
+ $("jeeves-paged-review-id").value=receipt.proposal_id;
+ jeevesCampaignPlanDigest=null;
+ status("Approved-scene multi-ending campaign staged as source. "+
+  "Real game journey and both source versions must pass human diff/commit.");
+}));
+$("jeeves-campaign-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=campaignInput();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.verify",
+  params:{project:args.project,campaign_id:args.spec.campaign_id,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false
+ });
+ const report=response.result;
+ $("jeeves-campaign-output").textContent=JSON.stringify(report,null,2);
+ status(report.actual_reference_sessions_reexecuted+
+  " real original game sessions independently reexecuted from committed "+
+  "campaign source; observed ending: "+report.actual_reached_ending);
+}));
+
+
+/* Link real original game journeys to complete historically signed story canon. */
+let lorePlanDigest=null,lorePlanInputs=null;
+function loreArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active original game and scan source inventory");
+ const campaign_id=$("jeeves-lore-campaign").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(campaign_id))
+  throw Error("Safe current project campaign ID required");
+ const bindings=JSON.parse($("jeeves-lore-bindings").value);
+ if(!Array.isArray(bindings)||bindings.length<2||bindings.length>8)
+  throw Error("Map every approved game node to a source-signed story scene");
+ return {project:model.active,campaign_id,bindings,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-lore-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const args=loreArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.lore.plan",params:args,operator_authorized:false
+ });
+ const result=receipt.result;
+ lorePlanDigest=result.digest;lorePlanInputs=JSON.stringify(args);
+ $("jeeves-lore-output").textContent=JSON.stringify(result,null,2);
+ status(result.game_nodes_with_verified_narrative_links+
+  " real game nodes linked to source-signed original story, "+
+  result.referred_causal_events+" canonical cited causal events.");
+}));
+$("jeeves-lore-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-lore-approval").checked)
+  throw Error("Original full-history narrative source signoff required");
+ const args=loreArgs();
+ if(!lorePlanDigest||lorePlanInputs!==JSON.stringify(args))
+  throw Error("Reverify original story and game campaign after mapping edits");
+ const reason=$("jeeves-lore-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Concrete review reason required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.lore.stage",
+  params:{...args,expected_plan_digest:lorePlanDigest,reason},
+  operator_authorized:true
+ });
+ const result=receipt.result;
+ $("jeeves-lore-output").textContent=JSON.stringify(result,null,2);
+ $("jeeves-publish-ids").value=result.proposal_id;
+ lorePlanDigest=null;
+ status("Actual original campaign story/cast/region/causal sources staged "+
+  "for exact human review; no unapproved prose or lore has been created.");
+}));
+$("jeeves-lore-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=loreArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.lore.verify",
+  params:{project:args.project,campaign_id:args.campaign_id,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false
+ });
+ $("jeeves-lore-output").textContent=JSON.stringify(receipt.result,null,2);
+ status("Committed multi-ending game campaign checked against full original "+
+  "cast, region and causal history and exact game source versions.");
+}));
+
+
+/* Actual original multi-ending action portfolios and honest observed route coverage. */
+let campaignOutcomePlan=null,campaignOutcomeInputs=null;
+function outcomeInputs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active current original project and scan application sources");
+ const campaign_id=$("jeeves-outcomes-campaign").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(campaign_id))
+  throw Error("Existing reviewed original campaign ID required");
+ const scenarios=JSON.parse($("jeeves-outcomes-scenarios").value);
+ if(!Array.isArray(scenarios)||scenarios.length<2||scenarios.length>12)
+  throw Error("Author 2–12 distinct bounded player-action scenarios");
+ return {project:model.active,campaign_id,scenarios,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-outcomes-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-outcomes-approval").checked)
+  throw Error("Approve real original-game variant execution");
+ const args=outcomeInputs();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.outcomes.plan",params:args,operator_authorized:true
+ });
+ const result=response.result;
+ campaignOutcomePlan=result.digest;campaignOutcomeInputs=JSON.stringify(args);
+ $("jeeves-outcomes-report").textContent=JSON.stringify(result,null,2);
+ status(result.actually_observed_ending_nodes+"/"+result.authored_ending_nodes+
+  " authored ending nodes observed in "+result.real_scenarios_executed+
+  " actual player-action scenarios; "+result.actually_exercised_branch_edges+
+  "/"+result.authored_branch_edges+" branch edges exercised. "+
+  "Unobserved routes are not counted as verified gameplay.");
+}));
+$("jeeves-outcomes-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-outcomes-approval").checked)
+  throw Error("Authorize source staging for real original game outcome evidence");
+ const args=outcomeInputs();
+ if(!campaignOutcomePlan||campaignOutcomeInputs!==JSON.stringify(args))
+  throw Error("Review a fresh source-linked action portfolio before staging");
+ const reason=$("jeeves-outcomes-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Specific source review and game scenario rationale required");
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.outcomes.stage",
+  params:{...args,expected_plan_digest:campaignOutcomePlan,reason},
+  operator_authorized:true
+ });
+ const result=response.result;
+ $("jeeves-outcomes-report").textContent=JSON.stringify(result,null,2);
+ $("jeeves-publish-ids").value=result.proposal_id;
+ $("jeeves-paged-review-id").value=result.proposal_id;
+ campaignOutcomePlan=null;
+ status("Source-verified original-game outcomes staged. Human diff review "+
+  "and exact commit required before the historical coverage evidence exists.");
+}));
+$("jeeves-outcomes-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=outcomeInputs();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.outcomes.verify",
+  params:{project:args.project,campaign_id:args.campaign_id,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false
+ });
+ const verified=response.result;
+ $("jeeves-outcomes-report").textContent=JSON.stringify(verified,null,2);
+ status(verified.real_endings_exercised+"/"+verified.authored_endings+
+  " actual original game endings replayed and verified against "+
+  verified.reference_gameplay_sessions_reexecuted+" real session executions. "+
+  "No claim to unseen player actions.");
+}));
+
+
+/* Original narrative consequences derived from real game branches and signed story. */
+let consequencePlan=null,consequenceInput=null;
+function consequenceArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active original game and current app snapshot");
+ const campaign_id=$("jeeves-consequence-campaign").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(campaign_id))
+  throw Error("Signed original campaign ID is required");
+ return {project:model.active,campaign_id,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-consequence-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const args=consequenceArgs();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.consequences.plan",
+  params:args,operator_authorized:false
+ });
+ const result=response.result;
+ consequencePlan=result.digest;consequenceInput=JSON.stringify(args);
+ $("jeeves-consequence-report").textContent=JSON.stringify(result,null,2);
+ status(result.game_scenarios_reexecuted+" approved original-game scenarios "+
+  "connected to "+result.original_signed_causal_event_ids.length+
+  " source-signed causal events. Character changes are narrative records, "+
+  "not automatically applied game mechanics.");
+}));
+$("jeeves-consequence-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-consequence-approval").checked)
+  throw Error("Human source review authorization required");
+ const args=consequenceArgs();
+ if(!consequencePlan||consequenceInput!==JSON.stringify(args))
+  throw Error("Original game and story source changed; rebuild consequence plan");
+ const reason=$("jeeves-consequence-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Concrete source review and narrative reason required");
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.consequences.stage",
+  params:{...args,expected_plan_digest:consequencePlan,reason},
+  operator_authorized:true
+ });
+ const result=response.result;
+ $("jeeves-consequence-report").textContent=JSON.stringify(result,null,2);
+ $("jeeves-publish-ids").value=result.proposal_id;
+ $("jeeves-paged-review-id").value=result.proposal_id;
+ consequencePlan=null;
+ status("Human-readable source-linked cast, location and causal history "+
+  "now staged for independent source diff and commit.");
+}));
+$("jeeves-consequence-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=consequenceArgs();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.consequences.verify",
+  params:args,operator_authorized:false
+ });
+ const result=response.result;
+ $("jeeves-consequence-report").textContent=JSON.stringify(result,null,2);
+ status(result.actual_player_scenarios_reexecuted+" actual story-bound "+
+  "gameplay variants reverified. No unsupported karma/faction mutations "+
+  "or native-game execution asserted.");
+}));
+
+
+/* Full-source human review: each page must be presented and acknowledged. */
+let pagedDiffManifest=null,pagedDiffIndex=0,pagedDiffShown=null;
+let pagedDiffApproved={};
+function pagedDiffArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active original project and scan source inventory");
+ const proposal_id=$("jeeves-paged-review-id").value.trim();
+ if(!/^[a-f0-9]{64}$/.test(proposal_id))
+  throw Error("Exact existing game source proposal SHA-256 required");
+ return {project:model.active,proposal_id,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-paged-manifest").addEventListener("click",()=>dmGuard(async()=>{
+ const args=pagedDiffArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.review_manifest",
+  params:args,operator_authorized:false
+ });
+ pagedDiffManifest=receipt.result;
+ pagedDiffIndex=0;pagedDiffApproved={};pagedDiffShown=null;
+ $("jeeves-paged-review-text").textContent=JSON.stringify({
+  path:pagedDiffManifest.source_path,
+  source_sha256:pagedDiffManifest.new_source_sha256,
+  full_diff_sha256:pagedDiffManifest.full_unified_diff_sha256,
+  full_diff_bytes:pagedDiffManifest.full_unified_diff_utf8_bytes,
+  pages:pagedDiffManifest.page_count,
+  manifest_digest:pagedDiffManifest.digest
+ },null,2);
+ $("jeeves-paged-review-ack").checked=false;
+ status(pagedDiffManifest.page_count+
+  " complete SHA-pinned original source diff pages. "+
+  "Read and separately approve every page before game source publication.");
+}));
+$("jeeves-paged-next").addEventListener("click",()=>dmGuard(async()=>{
+ const args=pagedDiffArgs();
+ if(!pagedDiffManifest||pagedDiffManifest.proposal_id!==args.proposal_id||
+    pagedDiffIndex>=pagedDiffManifest.page_count)
+  throw Error("No current reviewed diff page; load a current proposal manifest");
+ if(pagedDiffIndex>0&&!pagedDiffApproved[pagedDiffIndex-1])
+  throw Error("Confirm the previous source diff page before advancing");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.review_page",
+  params:{...args,index:pagedDiffIndex,
+   expected_review_digest:pagedDiffManifest.digest},
+  operator_authorized:false
+ });
+ const item=receipt.result;
+ const metadata=pagedDiffManifest.page_receipts[pagedDiffIndex];
+ if(item.page_index!==pagedDiffIndex||item.full_utf8_sha256!==metadata.sha256)
+  throw Error("Source diff page SHA receipt differs from current exact manifest");
+ pagedDiffShown=item;
+ $("jeeves-paged-review-text").textContent=item.review_text;
+ $("jeeves-paged-review-ack").checked=false;
+ status("Original source diff page "+(pagedDiffIndex+1)+"/"+
+  pagedDiffManifest.page_count+" · content SHA "+item.full_utf8_sha256+
+  ". Read full source before approving this page.");
+}));
+$("jeeves-paged-accept").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-paged-review-ack").checked)
+  throw Error("Explicitly mark the displayed exact source page human reviewed");
+ if(!pagedDiffManifest||!pagedDiffShown||
+    pagedDiffShown.manifest_digest!==pagedDiffManifest.digest||
+    pagedDiffShown.page_index!==pagedDiffIndex)
+  throw Error("Source page/manifest changed; read from the beginning");
+ pagedDiffApproved[pagedDiffIndex]={
+  index:pagedDiffIndex,sha256:pagedDiffShown.full_utf8_sha256,
+  human_approved:true
+ };
+ pagedDiffIndex++;pagedDiffShown=null;
+ $("jeeves-paged-review-ack").checked=false;
+ $("jeeves-paged-review-text").textContent="Page acknowledged by exact source SHA.\n"+
+  Object.keys(pagedDiffApproved).length+"/"+pagedDiffManifest.page_count+
+  " reviewed. Load the next original diff page.";
+ status(Object.keys(pagedDiffApproved).length+
+  "/"+pagedDiffManifest.page_count+" entire original source diff pages reviewed.");
+}));
+$("jeeves-paged-commit").addEventListener("click",()=>dmGuard(async()=>{
+ const args=pagedDiffArgs();
+ if(!pagedDiffManifest||pagedDiffManifest.proposal_id!==args.proposal_id||
+    Object.keys(pagedDiffApproved).length!==pagedDiffManifest.page_count||
+    !$("jeeves-paged-commit-approval").checked)
+  throw Error("All pages and separate final designer source commit approval required");
+ const reviewed_pages=Object.values(pagedDiffApproved).sort(
+  (a,b)=>a.index-b.index);
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.commit_pages",
+  params:{...args,expected_review_digest:pagedDiffManifest.digest,
+   reviewed_pages},
+  operator_authorized:true
+ });
+ const result=receipt.result;
+ $("jeeves-paged-review-text").textContent=JSON.stringify(result,null,2);
+ pagedDiffManifest=null;pagedDiffShown=null;pagedDiffApproved={};
+ $("jeeves-paged-commit-approval").checked=false;
+ if(result.source_files_committed===1)
+  status("One human-reviewed original source committed with every full diff "+
+   "page SHA acknowledged. Refresh project tree.");
+ else
+  status("Partial source commit condition; reconcile observed files and "+
+   "acceptance custody before any retry.");
+}));
+
+
+/* Actual game-project content dependency index, not a fabricated app map. */
+let jeevesGameGraphDigest=null,jeevesGameGraphCursor=0;
+async function loadGameGraph(reset){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select current original game and scan repository inventory");
+ if(reset){jeevesGameGraphDigest=null;jeevesGameGraphCursor=0;}
+ const args={
+  project:model.active,offset:jeevesGameGraphCursor,limit:40,
+  expected_snapshot:jeevesAppSnapshot
+ };
+ if(jeevesGameGraphDigest)
+  args.expected_graph_digest=jeevesGameGraphDigest;
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.source_graph",params:args,operator_authorized:false
+ });
+ const report=receipt.result;
+ jeevesGameGraphDigest=report.graph_digest;
+ jeevesGameGraphCursor=report.next_offset;
+ $("jeeves-graph-next").disabled=jeevesGameGraphCursor===null;
+ $("jeeves-graph-output").textContent=JSON.stringify(report,null,2);
+ status(report.nodes_scanned+"/"+report.total_relevant_game_source_nodes+
+  " actual project source nodes inspected; "+report.edges_missing+
+  " missing, "+report.edges_drifted+" changed and "+
+  report.edges_unknown+" uninspected source links. "+
+  (report.full_game_source_inventory_scanned?"":"Inventory scan bounded."));
+}
+$("jeeves-graph-scan").addEventListener("click",()=>dmGuard(
+ async()=>{await loadGameGraph(true);}
+));
+$("jeeves-graph-next").addEventListener("click",()=>dmGuard(
+ async()=>{
+  if(jeevesGameGraphCursor===null)
+   throw Error("No more verified original source graph pages");
+  await loadGameGraph(false);
+ }
+));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -4524,6 +5761,424 @@ model promotion and release still require independent approval and evidence.</sm
 <pre id="jeeves-dm-output" role="status" aria-live="polite"></pre>
 </fieldset>
 
+
+
+<fieldset><legend>Jeeves · Prompt-to-Working-Engine Authoring</legend>
+<p><small>Turn game-building instructions into installed engine source files
+through the existing original prompt router. No provider/model output is
+fabricated. Story, dialogue and original art remain separate authoring work.</small></p>
+<label>Describe the original game you want to build
+<textarea id="jeeves-prompt-production" rows="4" spellcheck="false">Build an original RPG with deep quests, a maze with moving topology, and NPC society behavior.</textarea></label>
+<label>Optional exact installed editor settings overrides
+<textarea id="jeeves-prompt-overrides" rows="4" spellcheck="false">{
+ "rpg":{"quest_depth":24},
+ "maze":{"topology":"moving"}
+}</textarea></label>
+<label><input id="jeeves-prompt-approval" type="checkbox"> Approve original game design source generation</label>
+<button id="jeeves-prompt-plan" type="button">Plan real engine sources from prompt</button>
+<label>Designer proposal justification
+<textarea id="jeeves-prompt-reason" rows="2" spellcheck="false">Create reviewed original RPG, maze, and NPC game engine source templates.</textarea></label>
+<button id="jeeves-prompt-stage" type="button">Stage prompt-selected engine source proposals</button>
+<pre id="jeeves-prompt-output" role="status" aria-live="polite"></pre>
+</fieldset>
+<fieldset><legend>Jeeves · Multi-Engine Game Production</legend>
+<p><small>Author real normalized engine settings and original playable scenes
+in the selected project. Reviewable source proposals enter existing Studio;
+nothing is secretly accepted or deployed.</small></p>
+<label>Source production phase<select id="jeeves-production-phase">
+<option value="systems">Installed game engine configuration sources</option>
+<option value="scenes">Authored playable scenes (requires approved systems)</option>
+</select></label>
+<label>Engine or scene specifications JSON (1–24)
+<textarea id="jeeves-production-items" rows="7" spellcheck="false">[
+ {"editor":"rpg","settings":{"quest_depth":24}},
+ {"editor":"maze","settings":{"topology":"moving"}},
+ {"editor":"npc_society","settings":{}}
+]</textarea></label>
+<button id="jeeves-production-plan" type="button">Build actual engine/scene source plan</button>
+<label>Reason for staged production edits
+<textarea id="jeeves-production-reason" rows="2" spellcheck="false">Create original, reviewed game engine configurations for my selected project.</textarea></label>
+<label><input id="jeeves-production-approval" type="checkbox">
+Explicitly authorize reviewed original project source proposals</label>
+<button id="jeeves-production-stage" type="button">Stage source proposals in real Studio workspace</button>
+<pre id="jeeves-production-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Original Playable Browser & Godot Source Builder</legend>
+<p><small>Actually compile an original game world, discover a Python-winning
+replay, render offline HTML and Godot source. Stage its real source package
+for per-file designer review. Native binaries are not produced.</small></p>
+<label>Original source-release ID<input id="jeeves-release-id" value="demo_01"></label>
+<label>Bounded game intent JSON
+<textarea id="jeeves-release-intent" spellcheck="false" rows="6">{
+ "title":"Original Adventure",
+ "subtitle":"A new world built with Skeleton Game Studio",
+ "seed":13712,"width":19,"height":15,
+ "levels":2,"collectibles_per_level":3,
+ "hazards_per_level":3,"theme":"forest",
+ "starting_health":4
+}</textarea></label>
+<label><input id="jeeves-release-approval" type="checkbox">
+Explicit designer approval for original-game generation and source staging</label>
+<button id="jeeves-release-plan" type="button">Compile real browser and Godot game source</button>
+<label>Reviewed source-package justification
+<textarea id="jeeves-release-reason" rows="2" spellcheck="false">Review original offline browser gameplay and native Godot 4 project source.</textarea></label>
+<button id="jeeves-release-stage" type="button">Stage real browser + Godot files for review</button>
+<pre id="jeeves-release-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Publish Reviewed Game Sources</legend>
+<p><small>Review actual staged source diffs before committing to the current
+game project. Each proposed file requires a separate explicit SHA-based
+designer approval. Large diff batches must be split, never blindly accepted.</small></p>
+<label>Exact pending proposal IDs (comma, space or newline separated)
+<textarea id="jeeves-publish-ids" rows="3" spellcheck="false"></textarea></label>
+<button id="jeeves-publish-review" type="button">Inspect complete source diffs and custody</button>
+<div id="jeeves-publish-approvals" role="group"></div>
+<button id="jeeves-publish-commit" type="button">Commit individually approved source versions</button>
+<pre id="jeeves-publish-report" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Original Game Variants</legend>
+<p><small>Produce real, distinct original gameplay worlds and offline
+browser/Godot source alternatives using the authored game intent above.
+Maximum four compiled variants per bounded production wave.</small></p>
+<label>Safe output portfolio prefix
+<input id="jeeves-variant-prefix" value="original_variant"></label>
+<label>Compiled game variants (1–4)
+<input id="jeeves-variant-count" type="number" min="1" max="4" value="2"></label>
+<label>Distinct deterministic seed step
+<input id="jeeves-variant-seed-step" type="number" min="1" max="1000000" value="1009"></label>
+<label><input id="jeeves-variant-themes" type="checkbox" checked> Cycle original game artwork palettes</label>
+<label><input id="jeeves-variant-approval" type="checkbox"> Approve compilation and source proposal staging</label>
+<button id="jeeves-variants-plan" type="button">Build genuine playable game alternatives</button>
+<label>Original game portfolio review rationale
+<textarea id="jeeves-variant-reason" rows="2" spellcheck="false">Review actual original source and gameplay alternatives across independent themes and seeds.</textarea></label>
+<button id="jeeves-variants-stage" type="button">Stage independently authored alternatives</button>
+<pre id="jeeves-variants-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Durable Source Proposal Queue</legend>
+<p><small>Browse persisted original game production proposals and human
+acceptance status. Select pending sources for complete diff review and
+individual source publication; no automatic approval.</small></p>
+<button id="jeeves-queue-fetch" type="button">Read current project proposal queue</button>
+<button id="jeeves-queue-next" type="button" disabled>Next proposal custody page</button>
+<button id="jeeves-queue-select" type="button">Select pending proposals for source review</button>
+<pre id="jeeves-queue-result" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Approved Game Release Source Export</legend>
+<p><small>Read actual human-committed game files, verify every current-source
+SHA and acceptance receipt against the canonical browser/Godot manifest,
+then export a portable original source ZIP. Godot binaries are not built.</small></p>
+<button id="jeeves-release-catalog" type="button">Discover current project release source folders</button>
+<label>Human-approved original source release
+<input id="jeeves-accepted-release" placeholder="demo_01" value="demo_01"></label>
+<button id="jeeves-release-verify" type="button">Verify exact accepted release sources</button>
+<label><input id="jeeves-release-download-approval" type="checkbox">
+Authorize original source-only ZIP download</label>
+<button id="jeeves-release-download" type="button">Download approved browser + Godot source archive</button>
+<label><input id="jeeves-release-replay-approval" type="checkbox">
+Approve real replay of the checked, accepted original game source</label>
+<button id="jeeves-release-replay" type="button">Recompile and execute real winning replay</button>
+<label>Compare approved original release IDs (2–6)
+<textarea id="jeeves-release-compare-ids" spellcheck="false" rows="2">demo_01 original_variant_01</textarea></label>
+<button id="jeeves-release-compare" type="button">Compare actually committed original game variants</button>
+<pre id="jeeves-release-compare-result" role="status" aria-live="polite"></pre>
+<pre id="jeeves-accepted-report" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Canonical 100-Chapter Story Source Production</legend>
+<p><small>Full-source story foundation, immutable continuity contracts
+and strictly sequential authored scenes. The assistant must write original
+content; generated templates are not mistaken for completed chapters.</small></p>
+<label>Story source phase<select id="jeeves-story-phase">
+<option value="bible">Story/world bible (foundation → cast → design)</option>
+<option value="contract">Immutable approved voice/face/region continuity</option>
+<option value="scene">Next original story chapter/act/scene</option>
+</select></label>
+<label>Chapter 1–100 (optional if not using signed chapter canon)
+<input id="jeeves-story-chapter" type="number" min="1" max="100" value="1"></label>
+<label>Act 1–1000<input id="jeeves-story-act" type="number" min="1" max="1000" value="1"></label>
+<label>Next scene 1–9999<input id="jeeves-story-scene" type="number" min="1" max="9999" value="1"></label>
+<button id="jeeves-story-plan" type="button">Load exact source-bound story template</button>
+<label>Fully authored, originally written story source JSON
+<textarea id="jeeves-story-authored" rows="9" spellcheck="false">{}</textarea></label>
+<details><summary>Signed production observation receipts (for continuity-sealed scenes)</summary>
+<label>Externally substantiated voice/face/shot/timeline observations JSON
+<textarea id="jeeves-story-observations" rows="4" spellcheck="false">{}</textarea></label>
+</details>
+<button id="jeeves-story-sign" type="button">Sign and verify original story canon</button>
+<label>Human review reason
+<textarea id="jeeves-story-reason" rows="2" spellcheck="false">Continue the original world narrative with exactly witnessed plot and character continuity.</textarea></label>
+<label><input id="jeeves-story-approval" type="checkbox"> Authorize real signed original story source proposal</label>
+<button id="jeeves-story-stage" type="button">Stage signed canon for exact source review</button>
+<pre id="jeeves-story-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Real Universal Forge Source Authoring</legend>
+<p><small>Compose installed Forge components and typed wire connections,
+validate actual component-port registry and stage original source into
+the current game project. Invalid graphs cannot be human-committed.</small></p>
+<button id="jeeves-forge-kinds" type="button">Discover installed Forge component kinds</button>
+<label>Original Forge blueprint ID
+<input id="jeeves-forge-id" value="original_graph"></label>
+<label>Forge blueprint display name
+<input id="jeeves-forge-name" value="My Original Game Asset Graph"></label>
+<label>Installed Forge component instances JSON (1–64)
+<textarea id="jeeves-forge-components" rows="5" spellcheck="false">[
+ {"id":"my_component","kind":"choose_installed_kind","config":{}}
+]</textarea></label>
+<label>Typed connections JSON (0–128)
+<textarea id="jeeves-forge-wires" rows="3" spellcheck="false">[]</textarea></label>
+<button id="jeeves-forge-plan" type="button">Validate real Forge graph and prepare source</button>
+<label>Design/source review justification
+<textarea id="jeeves-forge-reason" rows="2" spellcheck="false">Author the original installed Forge blueprint for my currently selected game project.</textarea></label>
+<label><input id="jeeves-forge-approval" type="checkbox">
+Approve original Forge source proposal</label>
+<button id="jeeves-forge-stage" type="button">Stage validated Forge source into Game Studio</button>
+<button id="jeeves-forge-verify" type="button">Verify committed source against installed Forge</button>
+<pre id="jeeves-forge-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Measured Verification and Completion %</legend>
+<p><small>Real canonical source-ledger numerators and denominators, separated
+from independent product execution. No guessed overall application percentage,
+automatic source signoff, invented successful CI or fictional model training.</small></p>
+<button id="jeeves-verify-percent" type="button">Calculate live source-anchored completion %</button>
+<pre id="jeeves-verify-numbers" role="status" aria-live="polite"></pre>
+
+<label><input id="jeeves-volume-hardened" type="checkbox" checked>
+Show only source volumes NOT marked verified (currently seven)</label>
+<button id="jeeves-volume-list" type="button">Show exact incomplete AI masterplan volumes</button>
+<button id="jeeves-volume-next" type="button" disabled>Next 40 volume acceptance records</button>
+<pre id="jeeves-volume-output" role="status" aria-live="polite"></pre>
+<button id="jeeves-verify-blockers" type="button">List independent verification blockers</button>
+<button id="jeeves-verify-next" type="button" disabled>Next verification blocker page</button>
+<pre id="jeeves-verify-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Installed Cognitive Core Reasoning</legend>
+<p><small>Real source-backed uncertainty, strategy selection and stopping
+policy. These are deterministic cognitive gates, not an LLM/provider
+inference. Self-reported confidence is not proven calibrated probability.</small></p>
+<label>Candidate answers and uncalibrated confidence JSON
+<textarea id="jeeves-uncertainty-candidates" rows="5" spellcheck="false">[
+ {"text":"An original playable maze can be compiled with bounded walls.","confidence":0.75},
+ {"text":"An original playable maze can be compiled with bounded walls.","confidence":0.81}
+]</textarea></label>
+<button id="jeeves-cognitive-uncertainty" type="button">Execute installed uncertainty / abstention gate</button>
+<label>Original game build vision (quality verification input)
+<textarea id="jeeves-cognitive-vision" rows="2" spellcheck="false">An original retro fantasy RPG with tactical dungeon encounter exploration.</textarea></label>
+<label>Source-backed game plan fields for canonical planning quality gate
+<textarea id="jeeves-cognitive-plan-json" rows="4" spellcheck="false">{
+ "title":"Original Retro Fantasy RPG",
+ "era":"Retro Fantasy 1990s", "primary_dps":"Tactical melee",
+ "room_bias":"Dungeon encounter exploration"
+}</textarea></label>
+<button id="jeeves-cognitive-plan" type="button">Run installed original game plan verifier</button>
+<label>Source plan identity
+<input id="jeeves-cognitive-static-id" value="original_game_plan"></label>
+<label>Canonical static plan initial facts JSON
+<textarea id="jeeves-cognitive-initial-facts" rows="2" spellcheck="false">["source_exists"]</textarea></label>
+<label>Original source plan DAG steps, with explicit dependencies and bounded capabilities
+<textarea id="jeeves-cognitive-static-steps" rows="9" spellcheck="false">[
+ {"step_id":"inspect","preconditions":["source_exists"],
+  "postconditions":["source_reviewed"],"required_capabilities":["source.inspect"],
+  "max_tokens":300,"max_cost_units":0.5,"max_wall_time_s":2.0},
+ {"step_id":"preview","depends_on":["inspect"],
+  "preconditions":["source_reviewed"],"postconditions":["game_previewed"],
+  "required_capabilities":["game.preview"],
+  "max_tokens":500,"max_cost_units":1.0,"max_wall_time_s":3.0,
+  "terminal":true}
+]</textarea></label>
+<label>Optional simulated failure at plan step ID
+<input id="jeeves-cognitive-failure" placeholder="inspect"></label>
+<button id="jeeves-cognitive-static-plan" type="button">Analyze real plan DAG and simulate bounded failure</button>
+
+<label>Reasoning risk level<select id="jeeves-reasoning-risk">
+<option value="low">Low</option>
+<option value="medium" selected>Medium</option>
+<option value="high">High</option>
+<option value="critical">Critical</option>
+</select></label>
+<label>Canonical resource-costed strategy candidates
+<textarea id="jeeves-reasoning-candidates" rows="7" spellcheck="false">[
+ {"strategy":"direct","expected_quality":0.6,
+  "expected_uncertainty_reduction":0.1,"expected_cost_units":1.0,
+  "expected_tokens":200,"expected_wall_time_s":1.0,"verification_capable":false},
+ {"strategy":"verify","expected_quality":0.85,
+  "expected_uncertainty_reduction":0.65,"expected_cost_units":2.0,
+  "expected_tokens":450,"expected_wall_time_s":2.0,"verification_capable":true}
+]</textarea></label>
+<button id="jeeves-cognitive-strategy" type="button">Select actual canonical reasoning strategy</button>
+<label>Finite historical reasoning step measurements
+<textarea id="jeeves-reasoning-history" rows="5" spellcheck="false">[
+ {"step_index":1,"cumulative_tokens":600,"cumulative_cost_units":1.0,
+  "elapsed_s":2.0,"confidence":0.6,"uncertainty":0.4,
+  "value_of_information":0.3,
+  "progress_digest":"0000000000000000000000000000000000000000000000000000000000000000",
+  "verification_passed":false,"explicit_stop":false}
+]</textarea></label>
+<button id="jeeves-cognitive-stop" type="button">Execute actual bounded stop/continue policy</button>
+<pre id="jeeves-cognitive-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Real Advanced Game Scene Replay (29 Engines)</legend>
+<p><small>Uses actual installed gameplay, previously human-committed engine
+settings and an authored original scene. The simulated action trace is
+checked against the exact source both when staged and human committed.</small></p>
+<label>Installed advanced game editor ID
+<input id="jeeves-advanced-replay-editor" value="rpg"></label>
+<label>Already approved original scene ID
+<input id="jeeves-advanced-replay-scene" value="scene_01"></label>
+<label>Actual original game action commands JSON (0–128)
+<textarea id="jeeves-advanced-replay-actions" rows="5" spellcheck="false">[]</textarea></label>
+<label><input id="jeeves-advanced-replay-approval" type="checkbox">
+Explicitly authorize reference gameplay execution and review proposal</label>
+<button id="jeeves-advanced-replay-plan" type="button">Execute real advanced reference game session</button>
+<label>Game session source review rationale
+<textarea id="jeeves-advanced-replay-reason" rows="2" spellcheck="false">Review original approved game scene action trace and enforce replay source custody.</textarea></label>
+<button id="jeeves-advanced-replay-stage" type="button">Stage actual game replay as reviewed project source</button>
+<button id="jeeves-advanced-replay-verify" type="button">Reexecute and verify committed session source</button>
+<pre id="jeeves-advanced-replay-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Multi-Ending Original Game Campaign</legend>
+<p><small>Run actual current approved game scenes, connect deterministic
+outcome-dependent paths and require at least two original endings. All
+terminal routes, real game state receipts and original source hashes are
+reviewed again when humans commit the authored campaign.</small></p>
+<label>Authored campaign program JSON — 2–8 previously approved original scenes
+<textarea id="jeeves-campaign-spec" rows="14" spellcheck="false">{
+ "campaign_id":"first_original_campaign",
+ "start":"prologue",
+ "nodes":[
+  {"id":"prologue","editor":"rpg","scene_id":"scene_01",
+   "actions":[],"ending":null},
+  {"id":"redemption","editor":"maze","scene_id":"scene_01",
+   "actions":[],"ending":"good"},
+  {"id":"exile","editor":"rpg","scene_id":"scene_02",
+   "actions":[],"ending":"evil"}
+ ],
+ "edges":[
+  {"source":"prologue","target":"redemption","priority":0,
+   "predicate":"finished","threshold":null},
+  {"source":"prologue","target":"exile","priority":1,
+   "predicate":"always","threshold":null}
+ ]
+}</textarea></label>
+<caption>Referenced scenes and their engine configurations must already exist
+in the current project and have been human committed. Edit the actions
+and original outcomes to reflect the actual game you are authoring.</caption>
+<label><input id="jeeves-campaign-approval" type="checkbox">
+Authorize real multi-scene gameplay compilation and source staging</label>
+<button id="jeeves-campaign-plan" type="button">Compile real branching original-game campaign</button>
+<label>Original authored campaign source review reason
+<textarea id="jeeves-campaign-reason" rows="2" spellcheck="false">Review original linked RPG and maze game scenes with deterministic branching and multiple endings.</textarea></label>
+<button id="jeeves-campaign-stage" type="button">Stage real original campaign for human source approval</button>
+<button id="jeeves-campaign-verify" type="button">Verify committed campaign against current real engines</button>
+<pre id="jeeves-campaign-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Game Campaign, Cast & Plot Continuity</legend>
+<p><small>Connect every existing game campaign node to a genuine
+human-committed canonical story scene. Verify full chapter history, cast,
+region and causal event identity. Missing lore cannot be fabricated.</small></p>
+<label>Previously committed original game campaign ID
+<input id="jeeves-lore-campaign" value="first_original_campaign"></label>
+<label>Exact game node IDs to human-authored story source paths
+<textarea id="jeeves-lore-bindings" rows="7" spellcheck="false">[
+ {"node":"prologue",
+  "story_path":"story/chapters/chapter_001/acts/act_0001/scene_000001.json"},
+ {"node":"redemption",
+  "story_path":"story/chapters/chapter_001/acts/act_0001/scene_000002.json"},
+ {"node":"exile",
+  "story_path":"story/chapters/chapter_001/acts/act_0001/scene_000003.json"}
+]</textarea></label>
+<button id="jeeves-lore-plan" type="button">Check all original cast, region and plot sources</button>
+<label>Human-authored lore and campaign review reason
+<textarea id="jeeves-lore-reason" rows="2" spellcheck="false">Bind each original campaign outcome to a verified historical story scene, cast and region.</textarea></label>
+<label><input id="jeeves-lore-approval" type="checkbox">
+Explicitly approve reviewed game/story narrative source link</label>
+<button id="jeeves-lore-stage" type="button">Stage complete narrative/campaign source links</button>
+<button id="jeeves-lore-verify" type="button">Verify committed narrative source against entire history</button>
+<pre id="jeeves-lore-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Actual Multiple-Ending Game Scenario Coverage</legend>
+<p><small>Compare distinct player action transcripts against actual
+human-committed game campaigns. Reexecute the installed original game
+engines, identify observed ending nodes and branches, and expose missing
+outcomes without inventing unplayed alternative paths.</small></p>
+<label>Existing source-committed original campaign
+<input id="jeeves-outcomes-campaign" value="first_original_campaign"></label>
+<label>Two–twelve distinct bounded original player-action scenario profiles
+<textarea id="jeeves-outcomes-scenarios" rows="12" spellcheck="false">[
+ {"scenario_id":"first_original_choice",
+  "overrides":{"prologue":["inspect"]}},
+ {"scenario_id":"another_original_choice",
+  "overrides":{"prologue":["inspect","inspect"]}}
+]</textarea></label>
+<caption>Replace example action strings with actual installed engine
+actions. Every override must change a source scene's existing actions;
+different submitted profiles do not guarantee different endings.</caption>
+<label><input id="jeeves-outcomes-approval" type="checkbox">
+Authorize actual simulation of supplied original player actions</label>
+<button id="jeeves-outcomes-plan" type="button">Reexecute multiple real game outcomes and measure coverage</button>
+<label>Human source review rationale
+<textarea id="jeeves-outcomes-reason" rows="2" spellcheck="false">Review executable player decisions and the actual observed outcomes across my authored campaign.</textarea></label>
+<button id="jeeves-outcomes-stage" type="button">Stage reproducible game outcome evidence for human review</button>
+<button id="jeeves-outcomes-verify" type="button">Reexecute source-committed outcome portfolio</button>
+<pre id="jeeves-outcomes-report" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Player Choices, Characters & Consequences</legend>
+<p><small>Rebuild current approved multiple-endings evidence against full
+signed original story scenes, cast/region identities and causally witnessed
+character changes. Differences between played routes are sourced, not
+invented. Written character changes are not automatically game mechanics.</small></p>
+<label>Approved original game campaign ID
+<input id="jeeves-consequence-campaign" value="first_original_campaign"></label>
+<button id="jeeves-consequence-plan" type="button">Analyze actual alternative story and player consequences</button>
+<label>Original story/character source review reason
+<textarea id="jeeves-consequence-reason" rows="2" spellcheck="false">Verify causal character, regional and narrative consequences of the actual played original game routes.</textarea></label>
+<label><input id="jeeves-consequence-approval" type="checkbox">
+Authorize human-reviewed consequence source proposal</label>
+<button id="jeeves-consequence-stage" type="button">Stage real player consequence matrix as original game source</button>
+<button id="jeeves-consequence-verify" type="button">Reverify signed story and actually played outcomes</button>
+<pre id="jeeves-consequence-report" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Full-Source Paged Human Diff Review</legend>
+<p><small>Review complete large original game-source diffs, even when the
+standard multi-file diff is too large for one response. Every reviewed
+page carries its own content SHA, and all pages must be individually
+acknowledged before the existing canonical GameWorkspace source writer
+can commit the file.</small></p>
+<label>One exact source review proposal SHA-256
+<input id="jeeves-paged-review-id" placeholder="64 lowercase hexadecimal characters"></label>
+<button id="jeeves-paged-manifest" type="button">Create exact full-source page inventory</button>
+<button id="jeeves-paged-next" type="button">Display current full source diff page</button>
+<pre id="jeeves-paged-review-text" role="status" aria-live="polite"></pre>
+<label><input id="jeeves-paged-review-ack" type="checkbox">
+I read the entire displayed source diff page and reviewed its checksum</label>
+<button id="jeeves-paged-accept" type="button">Acknowledge this exact source page</button>
+<label><input id="jeeves-paged-commit-approval" type="checkbox">
+Authorize final commit only after all source diff pages are acknowledged</label>
+<button id="jeeves-paged-commit" type="button">Commit exactly one completely reviewed original source</button>
+</fieldset>
+
+<fieldset><legend>Jeeves · Live Game Source Dependency Graph</legend>
+<p><small>Index actual original project system editors, playable scenes,
+approved game replays, branching campaigns, source-signed cast/plot lore,
+outcome coverage, consequence matrices and portable game packages.
+Show stale/missing SHA links and explicit scan bounds.</small></p>
+<button id="jeeves-graph-scan" type="button">Index actual current original game source dependencies</button>
+<button id="jeeves-graph-next" type="button" disabled>Next verified source dependency page</button>
+<pre id="jeeves-graph-output" role="status" aria-live="polite"></pre>
+</fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
 operator-reviewed multi-file diffs; never executes files or silently writes code.</small></p>

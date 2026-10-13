@@ -62,7 +62,8 @@ class JeevesCodeNavigator:
             raise JeevesAppwideError("reviewed source inventory required")
         inventory._require_scanned()
         self.inv = inventory
-        self.paths = list(inventory._files)
+        # bisect pagination must use a guaranteed, stable lexical ordering.
+        self.paths = sorted(inventory._files)
 
     def _snapshot(self, expected):
         if expected is not None and expected != self.inv._digest:

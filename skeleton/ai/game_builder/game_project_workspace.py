@@ -22,7 +22,7 @@ IDENT=re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
 SEGMENT=re.compile(r"^[A-Za-z0-9_.-]{1,96}$")
 ALLOWED=frozenset({
     ".json",".md",".txt",".py",".gd",".tscn",".cfg",".toml",
-    ".yml",".yaml",".html",".js",".css",".ini",".csv",
+    ".yml",".yaml",".html",".js",".css",".ini",".csv",".godot",
 })
 SOURCE_MAX=256000
 PROJECT_MAX_FILES=12512
@@ -318,6 +318,197 @@ class GameWorkspace:
         config=validate_editor_document(_json(_read(config_path)))
         validate_advanced_scene(document,config["settings"])
 
+    def _validate_narrative_consequences_source(self, project, relative, document):
+        """Reconstruct actual alternate route NPC event consequences before commit."""
+        from .jeeves_narrative_consequences import rebuild_narrative_consequences
+        if type(document) is not dict:
+            raise WorkspaceError("typed approved real-game consequence source required")
+        rebuilt=rebuild_narrative_consequences(self,project,document)
+        if rebuilt!=document or relative!=(
+                "game/campaigns/"+document["campaign_id"]+"_consequences.json"):
+            raise WorkspaceError("actual game/story consequence evidence source changed")
+        return {
+            "schema":document["schema"],
+            "game_campaign":document["campaign_id"],
+            "real_game_scenarios":document["real_player_scenarios_run"],
+            "original_character_source_attested":True,
+            "original_signed_causality_attested":True,
+            "mechanically_applied_faction_or_karma_game_state":False,
+        }
+
+    def _validate_campaign_outcomes_source(self, project, relative, document):
+        """Re-execute real portfolio scenes before publication, with source CAS."""
+        from .jeeves_campaign_outcomes import rebuild_outcome_portfolio
+        if type(document) is not dict:
+            raise WorkspaceError("original game outcome portfolio must be a typed document")
+        rebuilt=rebuild_outcome_portfolio(self,project,document)
+        if rebuilt!=document or relative!=(
+                "game/campaigns/"+document["campaign_id"]+"_outcomes.json"):
+            raise WorkspaceError("observed original game outcomes or source have changed")
+        return {
+            "schema":document["schema"],
+            "campaign_id":document["campaign_id"],
+            "verified_real_game_scenarios":len(document["executed_scenarios"]),
+            "observed_ending_nodes":document["observed_ending_node_count"],
+            "unobserved_endings":document["unobserved_authored_ending_node_ids"],
+            "original_game_reference_reexecuted":True,
+            "all_possible_player_decisions_verified":False,
+        }
+
+    def _validate_campaign_lore_source(self, project, relative, document):
+        """Reject uncommitted narrative links and invalid full-history evidence."""
+        from .jeeves_campaign_lore import rebuild_campaign_lore_document
+        if type(document) is not dict:
+            raise WorkspaceError("exact original campaign narrative source required")
+        rebuilt=rebuild_campaign_lore_document(self,project,document)
+        if rebuilt!=document or relative!=(
+                "game/campaigns/"+document["campaign_id"]+"_lore.json"):
+            raise WorkspaceError("campaign original cast/plot/location source changed")
+        return {
+            "schema":document["schema"],
+            "campaign_id":document["campaign_id"],
+            "full_approved_story_history_reverified":True,
+            "gameplay_campaign_sha256":document["campaign_source_sha256"],
+            "source_files_mutated":False,
+        }
+
+    def _validate_advanced_campaign_source(self, project, relative, document):
+        """Replay actual scene-linked, choice-branching game campaign at commit.
+
+        A digest alone is not a game. Rebuild graph, endings and all real
+        engine action receipts from saved current source versions.
+        """
+        from .jeeves_campaign_graph import rebuild_campaign_document
+        if type(document) is not dict:
+            raise WorkspaceError("typed original campaign document required")
+        expected = rebuild_campaign_document(self, project, document)
+        if expected != document:
+            raise WorkspaceError(
+                "game campaign graph, choices or actual gameplay proof changed")
+        if relative != "game/campaigns/" + document["campaign_id"] + ".json":
+            raise WorkspaceError("campaign source path mismatches authored campaign ID")
+        return {
+            "schema":document["schema"],
+            "campaign_id":document["campaign_id"],
+            "path":relative,
+            "original_source_reexecuted_at_commit":True,
+            "source_gameplay_receipt_digest":document["digest"],
+            "native_or_external_model_execution_claimed":False,
+        }
+
+    def _validate_advanced_replay_source(self, project: str, relative: str,
+                                         document: dict):
+        """Commit-time authentic game action replay bound to actual saved sources.
+
+        Scene/system inputs come from human-committed workspace content, not
+        the submitted replay's claimed configuration or arbitrary model text.
+        """
+        from .advanced_level_scenes import scene_path
+        from .advanced_gameplay_runtime import (
+            ENGINES, verify_advanced_session, ACTION_HELP,
+        )
+        from .system_editors import validate_editor_document
+        from .contracts import canonical_digest
+        import re
+        if (type(document) is not dict
+                or set(document) != {
+                    "schema", "project", "editor", "scene_id",
+                    "system_sha256", "scene_sha256", "session", "digest"
+                }
+                or document.get("schema") !=
+                   "skeleton.game_builder.approved_advanced_replay_source.v1"
+                or document.get("project") != project):
+            raise WorkspaceError("exact signed original gameplay replay source required")
+        editor=document["editor"]
+        scene_id=document["scene_id"]
+        if (type(editor) is not str or editor not in ENGINES
+                or type(scene_id) is not str
+                or not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}",scene_id)
+                or relative != "game/replays/" + editor + "_" + scene_id + ".json"):
+            raise WorkspaceError("advanced replay path mismatches its original editor/scene")
+        canonical=dict(document)
+        candidate=canonical.pop("digest")
+        if (type(candidate) is not str or
+                canonical_digest(canonical) != candidate):
+            raise WorkspaceError("advanced replay source fingerprint mismatch")
+        system_file=self._file("current",project,"systems/"+editor+".json")
+        scene_file=self._file(
+            "current",project,
+            "scenes/advanced_"+editor+"_"+scene_id+".json")
+        system_text=_read(system_file)
+        scene_text=_read(scene_file)
+        if (_digest(system_text.encode("utf-8")) != document["system_sha256"]
+                or _digest(scene_text.encode("utf-8")) != document["scene_sha256"]):
+            raise WorkspaceError("original game system/scene versions changed after replay")
+        config=validate_editor_document(_json(system_text))
+        scene=_json(scene_text)
+        if (config["editor"]!=editor or scene_path(scene)!=
+                "scenes/advanced_"+editor+"_"+scene_id+".json"):
+            raise WorkspaceError("advanced replay source/canon binding invalid")
+        session=document["session"]
+        if (type(session) is not dict or session.get("editor")!=editor
+                or session.get("scene")!=scene):
+            raise WorkspaceError("replay transcript does not match original authored scene")
+        if (type(session.get("actions")) is not list
+                or len(session["actions"])>128 or
+                any(action not in ACTION_HELP[editor]
+                    for action in session["actions"])):
+            raise WorkspaceError("unknown or unbounded real game actions")
+        verify_advanced_session(session,config["settings"])
+        return {
+            "schema":document["schema"],
+            "project":project,
+            "source_path":relative,
+            "scene_digest":scene["digest"],
+            "replayed_turns":len(session["actions"]),
+            "original_system_sha256":document["system_sha256"],
+            "original_scene_sha256":document["scene_sha256"],
+            "session_digest":session["digest"],
+            "canonical_reference_gameplay_verified":True,
+            "native_hardware_replay_executed":False,
+        }
+
+    def _validate_forge_blueprint(self, relative: str, document: dict):
+        """Verify installed Forge kinds, typed ports and DAG before accepting source.
+
+        Both proposal and actual human commit use this same canonical check;
+        no untrusted submitted graph bypasses the real installed Forge.
+        """
+        from .contracts import canonical_digest
+        from .jeeves_app_runtime import _review_forge_graph
+        if (type(document) is not dict
+                or set(document) != {
+                    "schema", "id", "name", "components", "wires",
+                    "review_digest", "digest"
+                }
+                or document.get("schema") !=
+                   "skeleton.game_builder.reviewed_forge_source.v1"):
+            raise WorkspaceError("exact original Forge source schema required")
+        blueprint_id = document["id"]
+        if (type(blueprint_id) is not str
+                or not IDENT.fullmatch(blueprint_id)
+                or relative != "assets/forge/" + blueprint_id + ".json"):
+            raise WorkspaceError("Forge source filename must match blueprint identity")
+        signed = dict(document)
+        recorded = signed.pop("digest")
+        if type(recorded) is not str or canonical_digest(signed) != recorded:
+            raise WorkspaceError("original Forge blueprint source digest mismatch")
+        current = _review_forge_graph({
+            "name": document["name"],
+            "components": document["components"],
+            "wires": document["wires"],
+        })
+        if current["valid"] is not True or current["digest"] != document["review_digest"]:
+            raise WorkspaceError("Forge ports/kinds/wires differ from installed graph validation")
+        return {
+            "schema": document["schema"],
+            "blueprint_id": blueprint_id,
+            "source_sha256": canonical_digest(document),
+            "review_digest": current["digest"],
+            "canonical_forge_graph_accepted": True,
+            "forge_runtime_asset_built": False,
+        }
+
     def propose(self,project: str,relative: str,text: str,*,expected_sha256: str,
                 reason: str,authorized: bool):
         if not authorized:
@@ -341,6 +532,19 @@ class GameWorkspace:
                     raise WorkspaceError("editor source path does not match typed system ID")
             if relative.startswith("scenes/advanced_"):
                 self._validate_advanced_scene_source(project,relative,parsed)
+            if relative.startswith("assets/forge/"):
+                self._validate_forge_blueprint(relative,parsed)
+            if relative.startswith("game/replays/"):
+                self._validate_advanced_replay_source(project,relative,parsed)
+            if relative.startswith("game/campaigns/"):
+                if relative.endswith("_lore.json"):
+                    self._validate_campaign_lore_source(project,relative,parsed)
+                elif relative.endswith("_outcomes.json"):
+                    self._validate_campaign_outcomes_source(project,relative,parsed)
+                elif relative.endswith("_consequences.json"):
+                    self._validate_narrative_consequences_source(project,relative,parsed)
+                else:
+                    self._validate_advanced_campaign_source(project,relative,parsed)
             if (relative in ("game/story_bible.json","game/continuity_contract.json")
                     or relative.startswith(("story/scenes/","story/chapters/"))):
                 from .story_workspace import validate_story_workspace_source
@@ -368,6 +572,15 @@ class GameWorkspace:
         if not isinstance(proposal_id,str) or not re.fullmatch(r"[a-f0-9]{64}",proposal_id):
             raise WorkspaceError("content-addressed original edit ID required")
         proposal_path=self.root/"reviews/proposals"/(proposal_id+".json")
+        accepted=self.root/"reviews/accepted"/(proposal_id+".json")
+        # Never change the game source when the acceptance receipt cannot be
+        # exclusively created, including a prior successful commit or a
+        # symlinked/corrupted acceptance path. This is a preflight: it does
+        # not claim a cross-process filesystem transaction.
+        if accepted.exists() or accepted.is_symlink():
+            raise WorkspaceError("proposal already accepted or accepted path occupied")
+        if accepted.parent.is_symlink() or not accepted.parent.is_dir():
+            raise WorkspaceError("canonical acceptance custody is unavailable")
         proposal=_json(_read(proposal_path,300000))
         if canonical_digest(proposal)!=proposal_id:
             raise WorkspaceError("review proposal was changed after signoff")
@@ -389,6 +602,19 @@ class GameWorkspace:
                     raise WorkspaceError("editor document path mismatches its system identity")
             if proposal["path"].startswith("scenes/advanced_"):
                 self._validate_advanced_scene_source(project,proposal["path"],parsed)
+            if proposal["path"].startswith("assets/forge/"):
+                self._validate_forge_blueprint(proposal["path"],parsed)
+            if proposal["path"].startswith("game/replays/"):
+                self._validate_advanced_replay_source(project,proposal["path"],parsed)
+            if proposal["path"].startswith("game/campaigns/"):
+                if proposal["path"].endswith("_lore.json"):
+                    self._validate_campaign_lore_source(project,proposal["path"],parsed)
+                elif proposal["path"].endswith("_outcomes.json"):
+                    self._validate_campaign_outcomes_source(project,proposal["path"],parsed)
+                elif proposal["path"].endswith("_consequences.json"):
+                    self._validate_narrative_consequences_source(project,proposal["path"],parsed)
+                else:
+                    self._validate_advanced_campaign_source(project,proposal["path"],parsed)
             if (proposal["path"] in ("game/story_bible.json",
                                       "game/continuity_contract.json") or
                     proposal["path"].startswith(("story/scenes/","story/chapters/"))):
@@ -406,7 +632,6 @@ class GameWorkspace:
             self._atomic(path,proposal["new_content"])
         else:
             _newfile(path,proposal["new_content"])
-        accepted=self.root/"reviews/accepted"/(proposal_id+".json")
         _newfile(accepted,canonical_json({
             "schema":"skeleton.game_builder.approved_targeted_edit.v1",
             "proposal":proposal_id,"project":project,
