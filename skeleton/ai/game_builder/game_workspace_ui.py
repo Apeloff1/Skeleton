@@ -1247,6 +1247,76 @@ $("jeeves-cognitive-stop").addEventListener("click",()=>dmGuard(async()=>{
  await cognitiveExecute("ai.cognition.stop",{history,risk});
 }));
 
+
+/* Approved original authored scenes -> actual installed game runtime -> source custody. */
+let advancedReplayPlanDigest=null,advancedReplayPlanArgs=null;
+function advancedReplayArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select a writable original game project and scan app inventory");
+ const editor=$("jeeves-advanced-replay-editor").value.trim();
+ const scene_id=$("jeeves-advanced-replay-scene").value.trim();
+ if(!/^[a-z][a-z0-9_]{1,63}$/.test(editor)||
+    !/^[a-z][a-z0-9_-]{1,63}$/.test(scene_id))
+  throw Error("Use the installed advanced editor and signed original scene identity");
+ const actions=JSON.parse($("jeeves-advanced-replay-actions").value);
+ if(!Array.isArray(actions)||actions.length>128||
+    actions.some(a=>typeof a!=="string"||a.length>30))
+  throw Error("0–128 typed original game action commands required");
+ return {project:model.active,editor,scene_id,actions,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-advanced-replay-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-advanced-replay-approval").checked)
+  throw Error("Authorize actual advanced game simulation for original authored scene");
+ const args=advancedReplayArgs();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.advanced.replay.plan",params:args,operator_authorized:true
+ });
+ const receipt=response.result;
+ advancedReplayPlanDigest=receipt.digest;
+ advancedReplayPlanArgs=JSON.stringify(args);
+ $("jeeves-advanced-replay-output").textContent=JSON.stringify(receipt,null,2);
+ status(receipt.turn_count+" actual "+receipt.editor+
+  " game commands executed against current approved system and scene. "+
+  "Terminal: "+receipt.terminal+"; human source signoff still required.");
+}));
+$("jeeves-advanced-replay-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-advanced-replay-approval").checked)
+  throw Error("Review and approve original gameplay source staging");
+ const args=advancedReplayArgs();
+ if(!advancedReplayPlanDigest||
+    advancedReplayPlanArgs!==JSON.stringify(args))
+  throw Error("Scene/actions changed; reexecute the original game plan");
+ const reason=$("jeeves-advanced-replay-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Specific reviewed original gameplay source rationale required");
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.advanced.replay.stage",
+  params:{...args,expected_plan_digest:advancedReplayPlanDigest,reason},
+  operator_authorized:true
+ });
+ const result=response.result;
+ $("jeeves-advanced-replay-output").textContent=JSON.stringify(result,null,2);
+ $("jeeves-publish-ids").value=result.proposal_id;
+ advancedReplayPlanDigest=null;
+ status("Actual verified "+result.editor+" game session staged at "+
+  result.source_path+". Human diff review and commit remain required.");
+}));
+$("jeeves-advanced-replay-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=advancedReplayArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.advanced.replay.verify",
+  params:{project:args.project,editor:args.editor,scene_id:args.scene_id,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false
+ });
+ const result=receipt.result;
+ $("jeeves-advanced-replay-output").textContent=JSON.stringify(result,null,2);
+ status(result.turns_reexecuted+" committed original reference game moves "+
+  "reexecuted with exact SHA-bound original scene and system.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5449,6 +5519,26 @@ inference. Self-reported confidence is not proven calibrated probability.</small
 ]</textarea></label>
 <button id="jeeves-cognitive-stop" type="button">Execute actual bounded stop/continue policy</button>
 <pre id="jeeves-cognitive-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Real Advanced Game Scene Replay (29 Engines)</legend>
+<p><small>Uses actual installed gameplay, previously human-committed engine
+settings and an authored original scene. The simulated action trace is
+checked against the exact source both when staged and human committed.</small></p>
+<label>Installed advanced game editor ID
+<input id="jeeves-advanced-replay-editor" value="rpg"></label>
+<label>Already approved original scene ID
+<input id="jeeves-advanced-replay-scene" value="scene_01"></label>
+<label>Actual original game action commands JSON (0–128)
+<textarea id="jeeves-advanced-replay-actions" rows="5" spellcheck="false">[]</textarea></label>
+<label><input id="jeeves-advanced-replay-approval" type="checkbox">
+Explicitly authorize reference gameplay execution and review proposal</label>
+<button id="jeeves-advanced-replay-plan" type="button">Execute real advanced reference game session</button>
+<label>Game session source review rationale
+<textarea id="jeeves-advanced-replay-reason" rows="2" spellcheck="false">Review original approved game scene action trace and enforce replay source custody.</textarea></label>
+<button id="jeeves-advanced-replay-stage" type="button">Stage actual game replay as reviewed project source</button>
+<button id="jeeves-advanced-replay-verify" type="button">Reexecute and verify committed session source</button>
+<pre id="jeeves-advanced-replay-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
