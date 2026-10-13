@@ -1,3 +1,43 @@
+## DX-89–DX-105 — independently verifiable 100%-app release frontier (2026-10-13)
+
+| Milestone | Committed source | Proof boundary |
+| --- | --- | --- |
+| DX-89 | `machine/app_release_journey_contract.json` | Exact 12 golden enterprise journeys from canonical machine authority |
+| DX-90 | Seven individual acceptance axes per journey | **84** required actual user/runtime/recovery/device proof observations |
+| DX-91 | 42 families, 9 AI capabilities, 26 required gates and 16 enterprise workstreams cross-linked | Freeze release denominator against silent scope shrinkage |
+| DX-92 | `jeeves_enterprise_journey_frontier.py` | Source-bound read-only journey and required-gate audit |
+| DX-93 | Strict source SHA checks and stable cursor digests | Stale source reviews invalid; neither signed plan nor test file is an acceptance result |
+| DX-94 | Real candidate test modules with AST case enumeration | Reject empty, duplicate, invalid, missing or unreviewed journey test paths |
+| DX-95 | `ai.product.journeys` / `ai.product.journeys.page` | Bounded governed user-journey queries |
+| DX-96 | `tests/test_game_builder_jeeves_enterprise_journey_frontier.py` | Reject false signoff, optionalized mandatory gates and truncated denominators |
+| DX-97 | Authenticated local Studio HTTP journey evidence audit | Token enforcement, paged source cursor, no project writes |
+| DX-98 | `jeeves_release_execution_queue.py` | Priority-indexed **729** leaf evidence requirements; no fake percentage |
+| DX-99 | 421 volume + 168 family + 84 journey + 26 gate + 16 workstream + 9 AI + 5 service proofs | Source-defined independent lower-level obligations; not equal-weight functionality |
+| DX-100 | `ai.product.release.queue` / `ai.product.release.queue.page` | Model-context-bounded top 30 or filtered blockers, hash-bound |
+| DX-101 | `tests/test_ai_native_session_recovery_journey.py` | Actual tiny local CPU model, multi-turn recovery and exactly-once stream acceptance |
+| DX-102 | F07 and J01 matrix/contract source links | Real runnable regression candidate for native conversation persistence; not production model quality |
+| DX-103 | Studio Deathmarch Deck release buttons | 12 journeys / 729-leaf queue / first 30 prioritized blockers |
+| DX-104 | `tests/test_game_builder_jeeves_release_execution_queue.py` | Stable 729-shape expected on production source, synthetic 310-leaf determinism and tamper tests |
+| DX-105 | Windows/Linux acceptance workflows include new source-contract tests | Exact-head CI and human-reviewed external evidence still mandatory |
+
+### Latest real source measures
+
+- Canonical plan volumes **421**; independent user journeys **12**; product AI capabilities **9**; mandatory release gates **26**; assembled service declarations **5**; enterprise workstreams **16**; bounded product family scope **42**.
+- **729** leaf evidence obligations at the source level: 421 + 168 (42×4) + 84 (12×7) + 26 + 16 + 9 + 5. These include dependent requirements and must **not** be averaged as an application-completion percentage.
+- Independently accepted E2E user journeys **none observed by source reader**; 84 remain **unverified**, not failed.
+- **Full installed-app completion: unknown.** Runtime source, a passing subset, planning signatures, draft checks or GitHub queue entries cannot certify it.
+
+### Next critical engineering path
+
+1. Execute and repair exact-head Windows/Linux `unittest` and `pytest` suite failures; independent run and artifact verification.
+2. Extend J01–J12 from linked tests into actual end-to-end fixtures on deployed service/state, including restart, negative cases, device export and rollback.
+3. Bind true source/evidence receipts for all 26 mandatory gates and 16 workstream exits; never mark missing/queued/skipped as success.
+4. Qualify nine AI product capabilities with a real trained model and held-out evaluations, appwide Jeeves operator integration and functional game creation.
+5. Run installed-app, backed-up state restoration, user security and native game-export proof, then repeat post-merge.
+6. Only publish a full-app percentage derived from independently accepted user outcomes and complete release gates; no auto-signoff.
+
+**Release runbook:** `docs/JEEVES_VERIFIED_FULL_APP_RELEASE_FRONTIER_2026_10.md`. **Source branch:** draft PR #3747, stacked on #3738 → #3730 → #3729 → #3718. No mainline merge claimed.
+
 ## DX-76–DX-88 — exact-head product execution hardening and Studio game journey (2026-10-13)
 
 | Milestone | Change committed on feature branch | Independent evidence boundary |
