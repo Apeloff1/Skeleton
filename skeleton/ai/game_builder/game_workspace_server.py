@@ -40,6 +40,16 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_world_robustness import (
+    run_world_robustness,verify_world_robustness,
+)
+from .advanced_world_whatif_lab import (
+    run_world_whatif,verify_world_whatif,
+)
+from .advanced_interleaved_objectives import (run_causal_objective_matrix,
+    verify_causal_objective_matrix)
+from .advanced_interleaved_counterfactual import (run_counterfactual_lab,
+    verify_counterfactual_lab)
 from .advanced_interleaved_counterfactual_mirror import (run_interleaved_counterfactuals,
     verify_interleaved_counterfactuals)
 from .advanced_world_counterfactuals import (run_counterfactual_laboratory,
@@ -453,6 +463,80 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-world-robustness":
+            report=run_world_robustness(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scenes"],values["whatif"],
+                values.get("world_settings"),
+                max_candidates=values.get("max_candidates",2))
+            if not verify_world_robustness(
+                    report,values["physical_episodes"],
+                    values["genre_sessions"],values["world_scenes"],
+                    values["whatif"],values.get("world_settings")):
+                raise ValueError("cross-context source gameplay proof rejected")
+            return self._json(200,{
+                "proof":report,
+                "original_games_mutated":False,
+                "automatic_scenario_adopted":False,
+                "population_generalization_proven":False,
+                "native_hardware_certified":False,
+            })
+        if path=="/api/advanced-world-whatif-lab":
+            report=run_world_whatif(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["timeline"],
+                values.get("world_settings"),
+                objective=values.get("objective","eyewitness_coverage"),
+                max_depth=values.get("max_depth",2),
+                max_attempts=values.get("max_attempts",12),
+                max_accepted=values.get("max_accepted",6))
+            if not verify_world_whatif(
+                    report,values["physical_episodes"],
+                    values["genre_sessions"],values["world_scene"],
+                    values["timeline"],values.get("world_settings")):
+                raise ValueError("source-backed adversarial world replay rejected")
+            return self._json(200,{
+                "report":report,
+                "original_game_files_mutated":False,
+                "automatic_scenario_committed":False,
+                "native_hardware_certified":False,
+                "model_weight_promotion_approved":False,
+            })
+        if path=="/api/advanced-interleaved-objectives":
+            matrix=run_causal_objective_matrix(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["timeline"],
+                values.get("world_settings"),
+                goals=values["goals"],
+                max_candidates=values.get("max_candidates",8))
+            if not verify_causal_objective_matrix(
+                    matrix,values["physical_episodes"],
+                    values["genre_sessions"],values["world_scene"],
+                    values["timeline"],values.get("world_settings")):
+                raise ValueError("objective evidence could not independently replay")
+            return self._json(200,{
+                "matrix":matrix,
+                "source_project_files_mutated":False,
+                "objective_ranking_auto_applied":False,
+                "ai_model_promotion_approved":False,
+            })
+        if path=="/api/advanced-interleaved-counterfactual":
+            analysis=run_counterfactual_lab(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["timeline"],
+                values.get("world_settings"),
+                max_candidates=values.get("max_candidates",8))
+            if not verify_counterfactual_lab(
+                    analysis,values["physical_episodes"],
+                    values["genre_sessions"],values["world_scene"],
+                    values["timeline"],values.get("world_settings")):
+                raise ValueError("game causal trial replay did not match original world")
+            return self._json(200,{
+                "analysis":analysis,
+                "original_project_files_mutated":False,
+                "counterfactuals_promoted":False,
+                "native_all_engines_certified":False,
             })
         if path=="/api/advanced-interleaved-counterfactuals":
             report=run_interleaved_counterfactuals(
