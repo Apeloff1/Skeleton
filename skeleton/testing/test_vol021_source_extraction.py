@@ -33,3 +33,22 @@ def test_relative_resolution_normalizes_module_paths():
  g=build_repository_graph((s("pkg/sub/a.py","from .. import b"),s("pkg/b.py",""),s("web/sub/a.ts","import x from '../b'"),s("web/b.ts","")))
  assert ("pkg/sub/a.py","pkg/b.py","import") in g.edges
  assert ("web/sub/a.ts","web/b.ts","import") in g.edges
+
+
+def test_python_relative_from_imports_resolve_siblings_and_parent_modules():
+ g=build_repository_graph((
+  s("pkg/sub/a.py","from .. import b as parent\nfrom . import sibling\nfrom ..core import helper"),
+  s("pkg/b.py",""),s("pkg/sub/sibling.py",""),s("pkg/core.py",""),
+ ))
+ assert ("pkg/sub/a.py","pkg/b.py","import") in g.edges
+ assert ("pkg/sub/a.py","pkg/sub/sibling.py","import") in g.edges
+ assert ("pkg/sub/a.py","pkg/core.py","import") in g.edges
+ assert len(g.edges)==3
+
+
+def test_python_relative_imports_fail_closed_at_package_boundary():
+ g=build_repository_graph((
+  s("pkg/sub/a.py","from ... import stray\nfrom . import *"),
+  s("stray.py",""),s("pkg/stray.py",""),
+ ))
+ assert g.edges==()

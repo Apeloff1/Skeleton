@@ -88,8 +88,8 @@ The canonical first-run path is split into three bounded layers:
 
 - `preload` is read-only. It validates Python, pip, Docker Compose, repository
   structure, and disk headroom before setup mutates anything.
-- `setup` creates or repairs `.env` atomically. It generates local Mongo and
-  JWT secrets when required, preserves valid existing values, never prints
+- `setup` creates or repairs `.env` atomically. It generates local Mongo,
+  JWT and backend-to-engine service secrets when required, preserves valid existing values, never prints
   secret values, and can rotate locally generated credentials explicitly.
 - `install` composes the two phases, optionally installs the Python package,
   validates runtime prerequisites, and validates the rendered Compose topology.
@@ -115,6 +115,17 @@ The installer does not silently install Docker or elevate privileges. Missing
 host dependencies fail closed with a remediation message. Setup writes only to
 the ignored local `.env` file; installer receipts contain key names and phase
 status, never generated secret values.
+
+Older installations with a missing, placeholder or invalid-length
+`SKL_ENGINE_SERVICE_TOKEN` are repaired by rerunning `app setup`. Runtime
+preflight requires a normalized token of 32–4096 characters, matching the
+engine client contract. Both services receive the same generated value from
+Compose. After explicitly rotating secrets, restart backend and engine together
+so their authentication values agree. Secret rotation also changes local Mongo
+credentials; existing databases require coordinated credential migration.
+Keep the previous private environment backup for rollback; never attach it to
+diagnostic reports. Setup alone does not install trained AI weights or prove
+model readiness.
 
 ### Windows Setup.exe
 

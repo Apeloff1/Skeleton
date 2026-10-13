@@ -1,0 +1,246 @@
+name: Advanced Godot Native Tower Defense Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_defense_godot.py"
+      - "skeleton/ai/game_builder/advanced_godot_export.py"
+      - "docs/GAME_BUILDER_SYSTEM_EDITOR_FABRIC.md"
+      - ".github/workflows/game-builder-advanced-system-engines.yml"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/advanced_genre_engines.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_defense_godot.py"
+      - ".github/workflows/game-builder-advanced-defense-native.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: advanced-native-defense-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  independently-execute-defense:
+    name: Python/Godot defense parity on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 23
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact PR head with safe source scope
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_defense_godot.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Godot 4.4.1 native runtime and export templates
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Validate exact source and Python proof contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+          python -m py_compile skeleton/ai/game_builder/advanced_godot_export.py skeleton/ai/game_builder/advanced_defense_godot.py
+          python -m unittest tests.test_game_builder_advanced_defense_godot -v
+      - name: Build eight original authored tower defense economies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+          from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session
+          from skeleton.ai.game_builder.advanced_defense_godot import render_defense_godot_package
+          from skeleton.ai.game_builder.advanced_godot_export import write_advanced_godot_package
+          root=Path(os.environ["RUNNER_TEMP"])/"advanced-native-defense"
+          root.mkdir()
+          cases=(
+              ("original",{},["build:0","tick:4","tick:4"],None,3),
+              ("upgrades",{"starting_credits":100,"tower_damage":5},
+               ["build:0","upgrade:0","upgrade:0","priority:strong","tick:4"],
+               {"build_slots":[0,2],"waves":2},9),
+              ("sell_rebuild",{"starting_credits":85},
+               ["build:1","sell:1","build:2","tick"],
+               {"build_slots":[1,2],"waves":1},5),
+              ("target_priority",{"starting_credits":80,"wave_size":2},
+               ["build:0","priority:strong","tick:4","priority:first","tick:4"],
+               {"build_slots":[0],"waves":2},1),
+              ("short_waves",{"wave_size":1,"lane_length":4,
+                              "tower_damage":10,"tower_range":10},
+               ["build:0","tick:4"],
+               {"build_slots":[0],"waves":1},6),
+              ("long_lane",{"lane_length":24,"tower_range":2,"starting_credits":0},
+               ["tick:4","tick:4","tick:4"],
+               {"build_slots":[2],"waves":3},12),
+              ("escaped",{"lane_length":4,"wave_size":3,"starting_credits":0},
+               ["tick:4","tick:4","tick:4"],
+               {"build_slots":[0],"waves":4},17),
+              ("base_lost",{"lane_length":4,"wave_size":3,"starting_credits":0},
+               ["tick:4"]*6,{"build_slots":[0],"waves":12},7),
+          )
+          witnessed=set()
+          for name,settings,actions,layout,seed in cases:
+              scene=make_advanced_scene("tower_defense",settings,seed=seed,layout=layout)
+              gameplay=run_advanced_session("tower_defense",settings,actions,
+                                            seed=seed,scene=scene)
+              witnessed.update(e for record in gameplay["trace"]
+                               for e in record["events"])
+              if name=="short_waves":
+                  assert gameplay["state"]["finished"] and gameplay["terminal"]
+              if name=="base_lost":
+                  assert gameplay["state"]["failed"] and gameplay["terminal"]
+              pkg=render_defense_godot_package(gameplay,settings,authorized=True)
+              write_advanced_godot_package(pkg,root/name,authorized=True)
+              print("NATIVE_DEFENSE_SOURCE",name,"ticks",gameplay["state"]["tick"],
+                    "waves",gameplay["state"]["waves_completed"],
+                    "events",gameplay["state"]["events"],"digest",gameplay["digest"])
+          assert {"tower_fired","enemy_spawned","enemy_defeated","enemy_escaped",
+                  "tower_sold","wave_resolved","authored_waves_resolved",
+                  "base_destroyed"} <= witnessed,witnessed
+          PY
+      - name: Independently execute eight real authored Godot defense games
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/advanced-native-defense"
+          python - "$root" <<'PY'
+          import os, pathlib, subprocess, sys
+          root=pathlib.Path(sys.argv[1])
+          cases=("original","upgrades","sell_rebuild","target_priority",
+                 "short_waves","long_lane","escaped","base_lost")
+          for case in cases:
+              project=root/case/"godot"
+              print("NATIVE_ADVANCED_DEFENSE_CASE",case,flush=True)
+              for args in (["--headless","--path",str(project),"--import"],
+                           ["--headless","--path",str(project),"--","--verify-defense"]):
+                  try:
+                      # Git Bash provides the Godot launcher on Windows, but
+                      # CreateProcess cannot resolve that shell-only command.
+                      # Use the exact Git Bash installed by actions' bash shell.
+                      cmd=(["godot",*args] if sys.platform!="win32" else [
+                          str(pathlib.Path(os.environ["ProgramFiles"])/"Git"/"bin"/"bash.exe"),
+                          "-c",'godot "$@"',"godot",*args])
+                      result=subprocess.run(cmd,stdout=subprocess.PIPE,
+                                            stderr=subprocess.STDOUT,text=True,
+                                            encoding="utf-8",errors="replace",timeout=45)
+                  except subprocess.TimeoutExpired as exc:
+                      print("NATIVE_ADVANCED_DEFENSE_TIMEOUT",case,args,flush=True)
+                      if exc.stdout:
+                          print(exc.stdout.decode("utf-8","replace") if isinstance(exc.stdout,bytes) else exc.stdout)
+                      raise
+                  print(result.stdout,flush=True)
+                  if "--verify-defense" in args:
+                      (root/case/"native-replay.log").write_text(result.stdout,encoding="utf-8")
+                      if "NATIVE_ADVANCED_DEFENSE_OK" not in result.stdout:
+                          raise SystemExit("native gameplay proof marker absent: "+case)
+                  if result.returncode:
+                      raise SystemExit(f"Godot returned {result.returncode} on {case} {args}")
+          PY
+      - name: Export Linux desktop defense executable and execute the actual binary
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/advanced-native-defense/short_waves/godot"
+          executable="$RUNNER_TEMP/advanced-native-defense/original-advanced-defense.x86_64"
+          godot --headless --path "$project" --export-release Linux "$executable"
+          test -s "$executable"
+          chmod +x "$executable"
+          "$executable" --headless -- --verify-defense | tee "$RUNNER_TEMP/advanced-native-defense/linux-export-replay.log"
+          grep -q "NATIVE_ADVANCED_DEFENSE_OK" "$RUNNER_TEMP/advanced-native-defense/linux-export-replay.log"
+      - name: Export actual Windows game and verify native console executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'advanced-native-defense'
+          $project = Join-Path $root 'short_waves/godot'
+          $binary = Join-Path $root 'original-advanced-defense.exe'
+          # The setup-godot Windows GUI editor can detach without a reliable
+          # synchronous exit code. Use the same pinned official console engine
+          # already required by the repository's Windows native integration.
+          $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
+          $engineDir = Join-Path $root 'pinned-godot-console'
+          if (-not (Test-Path $archive)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
+            Invoke-WebRequest -Uri 'https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip' -OutFile $archive -MaximumRedirection 5
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          $nativeEditor = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $nativeEditor) {
+            throw "Version-pinned official Godot Windows console editor unavailable"
+          }
+          & $nativeEditor.FullName --version
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows console startup failed" }
+          & $nativeEditor.FullName --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Advanced defense Windows resource import failed" }
+          & $nativeEditor.FullName --headless --path $project --export-release 'Windows Desktop' $binary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $binary)) {
+            throw "Advanced Godot Windows console game executable export failed"
+          }
+          if ((Get-Item $binary).Length -le 1024) {
+            throw "Advanced Godot Windows game executable is empty"
+          }
+          $console = Join-Path $root 'original-advanced-defense.console.exe'
+          if (-not (Test-Path $console)) {
+            throw "Exported original defense lacks an observable Windows console binary"
+          }
+          $python = @'
+          import subprocess,sys
+          result=subprocess.run(
+              [sys.argv[1],"--headless","--","--verify-defense"],
+              capture_output=True,text=True,timeout=90)
+          print(result.stdout)
+          print(result.stderr)
+          sys.exit(0 if result.returncode==0 and
+              "NATIVE_ADVANCED_DEFENSE_OK" in result.stdout+result.stderr else 1)
+          '@
+          $proofScript = Join-Path $root 'verify_windows_native.py'
+          [IO.File]::WriteAllText($proofScript, $python)
+          & python $proofScript $console
+          if ($LASTEXITCODE -ne 0) {
+            throw "Exported Windows homebrew defense gameplay diverged from reviewed Python"
+          }
+          Write-Host "Native Windows executable SHA256:"
+          Get-FileHash -Algorithm SHA256 $binary | Format-List
+          Get-FileHash -Algorithm SHA256 $console | Format-List
+      - name: Upload native gameplay proof logs and source release manifests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-advanced-defense-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/advanced-native-defense/*/native-replay.log
+            ${{ runner.temp }}/advanced-native-defense/*/release.json
+            ${{ runner.temp }}/advanced-native-defense/linux-export-replay.log
+            ${{ runner.temp }}/advanced-native-defense/original-advanced-defense.exe
+            ${{ runner.temp }}/advanced-native-defense/original-advanced-defense.console.exe
+            ${{ runner.temp }}/advanced-native-defense/original-advanced-defense.x86_64
+          if-no-files-found: warn
+          retention-days: 7

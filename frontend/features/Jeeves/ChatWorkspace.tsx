@@ -13,6 +13,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import api from '../../src/utils/apiClient';
 import { WorkspaceController } from './WorkspaceController';
 import MessageContent from './MessageContent';
+import JeevesRuntimeStatus from './JeevesRuntimeStatus';
+import ChatTaskActions from './workbench/ChatTaskActions';
+import ChatSceneActions from './ChatSceneActions';
+import ChatStoryActions from './ChatStoryActions';
 import type { ChatHistoryResponse, ChatResponse } from './WorkspaceController';
 import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
 import type { Artifact, Attachment, Conversation, Message } from './workspace';
@@ -69,6 +73,15 @@ function MessageCard({ message, controller, busy }: { message: Message; controll
       </View>
       {!user && message.model && <Text style={s.metadata}>{message.model}{message.tier ? ` · ${message.tier}` : ''}</Text>}
       <MessageContent text={message.text} notify={controller.notify} />
+      {!user && message.status === 'complete' && <ChatTaskActions
+        text={message.text} conversationId={controller.active.id}
+        messageId={message.id} notify={controller.notify} />}
+      {!user && message.status === 'complete' && <ChatSceneActions
+        text={message.text} conversationId={controller.active.id}
+        messageId={message.id} notify={controller.notify} />}
+      {!user && message.status === 'complete' && !!message.text.trim() &&
+        <ChatStoryActions text={message.text} conversationId={controller.active.sessionId || controller.active.id}
+          messageId={message.id} notify={controller.notify} />}
       {message.attachmentName && <Text style={s.metadata}>Attachment · {message.attachmentName}</Text>}
       {(message.artifacts || []).map((artifact, i) => <ArtifactCard key={`${artifact.type}-${i}`} artifact={artifact} notify={controller.notify} />)}
       {!message.artifacts?.length && !!message.artifactCount && <Text style={s.metadata}>{message.artifactCount} artifact(s) from an earlier visit. File contents are not stored locally.</Text>}
@@ -76,6 +89,14 @@ function MessageCard({ message, controller, busy }: { message: Message; controll
         <Button icon="copy-outline" label="Copy" onPress={() => {
           void Clipboard.setStringAsync(message.text).then(() => controller.notify('Message copied.')).catch(() => controller.notify('Clipboard is unavailable. Select the message text to copy it.'));
         }} />
+        {failed && <Button icon="cloud-download-outline" label="Check server" disabled={busy} onPress={() => {
+          void controller.refreshCanonical().then(() => {
+            const current = controller.active.messages.find(item => item.id === message.id);
+            controller.notify(current?.status === 'complete'
+              ? 'The completed reply was recovered from canonical history.'
+              : 'No confirmed reply yet. Retry will reuse the original message ID.');
+          });
+        }} />}
         {failed && <Button icon="refresh-outline" label="Retry" disabled={busy} onPress={() => { void controller.retry(message.id); }} />}
         {message.status === 'complete' && !!message.text.trim() && <Button icon="book-outline" label="Save note" onPress={() => setCapture(captureInput(controller.active, message, ''))} />}
       </View>
@@ -140,6 +161,7 @@ export default function ChatWorkspace() {
           : result.status === 408 ? 'Jeeves took too long to answer. Try again.'
             : result.status >= 500 ? 'Jeeves is temporarily unavailable on the server.'
               : result.status === 413 ? 'This attachment is too large.'
+                : result.status === 409 ? 'This turn conflicts with the saved request. Retry with the original file and message, or start a new conversation.'
                 : result.status === 422 ? 'Jeeves could not accept this message. Check its length and attachments.'
                   : 'The connection to Jeeves was interrupted. Check your connection and retry.';
         throw new Error(message);
@@ -239,7 +261,11 @@ export default function ChatWorkspace() {
     const pending = controller.send(attachment);
     // A full conversation is rejected before its draft is cleared.
     if (!controller.active.draft) setAttachment(undefined);
-    void pending;
+    void pending.then(() => {
+      if (controller.active.id === conversation.id && !controller.active.draft) {
+        setAttachment(current => current === attachment ? undefined : current);
+      }
+    });
   };
 
   return <SafeAreaView style={s.safe}>
@@ -258,6 +284,7 @@ export default function ChatWorkspace() {
         <Button icon={conversation.pinned ? 'star' : 'star-outline'} label="Pin" selected={conversation.pinned} onPress={() => controller.edit({ pinned: !conversation.pinned })} />
         <Button icon="options-outline" label="Details" onPress={() => { setTitle(conversation.title); setContext(conversation.context); setSettings(true); }} />
       </View>
+      <JeevesRuntimeStatus />
       {(snapshot.notice || snapshot.saveState === 'error') && <View style={s.notice} accessibilityRole="alert">
         <Text style={[s.small, s.flex]}>{snapshot.notice || 'Changes could not be saved to this device.'}</Text>
         {snapshot.saveState === 'error' ? <Button icon="refresh-outline" label="Save again" onPress={controller.retrySave} /> : <TouchableOpacity accessibilityLabel="Dismiss notice" onPress={controller.dismissNotice}><Ionicons name="close" size={20} color={C.text} /></TouchableOpacity>}

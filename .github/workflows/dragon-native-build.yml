@@ -123,8 +123,14 @@ jobs:
           python -m skeleton.ai.webcrawler.dragon_native_cli \
             --target nes --out /tmp/dragon-nes --compile
           test -s /tmp/dragon-nes/build/dragon.nes
+      - name: Compile actual NES horizontal scrolling platformer cartridge
+        run: |
+          python -m skeleton.ai.webcrawler.dragon_native_cli \
+            --target nes --style side_scrolling_platformer \
+            --out /tmp/dragon-nes-platform --compile
+          test -s /tmp/dragon-nes-platform/build/dragon.nes
       - name: Publish original homebrew ROM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dragon-native-homebrew-roms
           path: |
@@ -132,6 +138,7 @@ jobs:
             /tmp/dragon-nes/build/dragon.nes
             /tmp/dragon-gameboy-color/build/dragon.gbc
             /tmp/dragon-gameboy-platform/build/dragon.gb
+            /tmp/dragon-nes-platform/build/dragon.nes
           if-no-files-found: error
           retention-days: 7
 

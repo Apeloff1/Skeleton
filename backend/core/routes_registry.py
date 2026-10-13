@@ -300,6 +300,8 @@ KNOWN_ROUTES: List[RouteEntry] = [
 # the original lines 7980-8170 of server.py.
 # ───────────────────────────────────────────────────────────────────────
 KNOWN_ROUTES_WITH_PREFIX: List[RouteEntry] = [
+    # Project-scoped Jeeves story index; writes remain creator-authenticated.
+    ("routes.story_index",                 "router", "/api/playable"),
     ("routes.health",                       "router", "/api"),
     ("routes.feature_flags",                "router", "/api"),
     ("routes.observability_v2",             "router", "/api"),

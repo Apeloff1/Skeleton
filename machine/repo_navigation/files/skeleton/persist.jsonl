@@ -1,0 +1,7 @@
+{"b":191,"f":"skeleton/persist","g":"e3f95145ee030a3d25f596658ff2cd06bd4e1f81","m":"100644","p":"skeleton/persist/__init__.py","t":"blob","z":"persist-compat"}
+{"b":172,"f":"skeleton/persist","g":"4f03973c3174633c99d2826e955cc9c7fa74a989","m":"100644","p":"skeleton/persist/capabilities.py","t":"blob","z":"persist-compat"}
+{"b":158,"f":"skeleton/persist","g":"04ead8773875553549a9b1b3c696bed2baf2cbeb","m":"100644","p":"skeleton/persist/cards.py","t":"blob","z":"persist-compat"}
+{"b":160,"f":"skeleton/persist","g":"72852c5161616e8da679ee8df6804bdc21438056","m":"100644","p":"skeleton/persist/engine.py","t":"blob","z":"persist-compat"}
+{"b":154,"f":"skeleton/persist","g":"ea76a218e66900b78bf711da42d410e410bd170b","m":"100644","p":"skeleton/persist/law.py","t":"blob","z":"persist-compat"}
+{"b":158,"f":"skeleton/persist","g":"b4cdadcf343f0f13a1109616d9513c25f29960e7","m":"100644","p":"skeleton/persist/store.py","t":"blob","z":"persist-compat"}
+{"b":160,"f":"skeleton/persist","g":"b62137c020ec95c26f12a082c275f2ab66339e53","m":"100644","p":"skeleton/persist/verify.py","t":"blob","z":"persist-compat"}

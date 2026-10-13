@@ -72,3 +72,12 @@ def test_rejects_expired_signal_and_invalid_owner():
         ledger.append("alice", (signal("expired", observed_at=100),), now=300)
     with pytest.raises(ValueError):
         ledger.recent("")
+
+
+def test_default_query_limit_respects_smaller_owner_capacity():
+    ledger=DragonSignalLedger(sqlite3.connect(":memory:"),
+                              policy=SignalLedgerPolicy(max_per_owner=2))
+    ledger.append("alice",(signal("one"),signal("two")),now=100)
+    assert len(ledger.recent("alice"))==2
+    with pytest.raises(ValueError,match="limit"):
+        ledger.recent("alice",limit=3)
