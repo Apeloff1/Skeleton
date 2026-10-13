@@ -97,7 +97,7 @@ def produce(root: Path, output: Path, *, local=False):
         })
         print(f"ACCEPTANCE {module} status={return_code} timeout={timed_out}",flush=True)
 
-    all_pass = len(results) == audit["unique_test_module_count"] and all(
+    all_pass = len(results) == audit["scheduled_test_module_count"] and all(
         row["targeted_tests_passed_in_runner"] for row in results)
     body = {
         "schema": SCHEMA,
@@ -119,7 +119,9 @@ def produce(root: Path, output: Path, *, local=False):
         "test_source_receipts": audit["module_source_receipts"],
         "curated_family_count": audit["curated_test_family_count"],
         "full_family_denominator": audit["family_denominator"],
-        "candidate_modules": audit["unique_test_module_count"],
+        "candidate_modules": audit["scheduled_test_module_count"],
+        "discovery_only_family_count": audit["discovery_only_family_count"],
+        "all_source_linked_test_module_count": audit["unique_test_module_count"],
         "modules_actually_executed": len(results),
         "modules_reporting_pass": sum(int(row[
             "targeted_tests_passed_in_runner"]) for row in results),
