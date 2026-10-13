@@ -281,7 +281,7 @@ class JeevesApplicationRuntime:
     def reconcile_idle_effect(
         self, *, context: JeevesHostContext,
         intent_digest: str, external_event_digest: str,
-        confirmed_completed: bool,
+        confirmed_completed: bool, observed_at_ns: int,
         verify_external: Callable[[str, str, JeevesHostContext], bool],
     ):
         """Host-only external reconciliation for an interrupted idle worker."""
@@ -289,13 +289,14 @@ class JeevesApplicationRuntime:
             raise JeevesHostRuntimeError("independent host recovery verifier required")
         with self._lock:
             self._require_live()
-            self._context(context)
+            self._context(context, observed_at_ns=observed_at_ns)
             if self.workbench.idle_executor is None:
                 raise JeevesHostRuntimeError("idle worker has not been enabled")
             return self.workbench.idle_executor.reconcile(
                 intent_digest,
                 external_event_digest=external_event_digest,
                 confirmed_completed=confirmed_completed,
+                observed_at_ns=observed_at_ns,
                 verify_external=lambda intent, proof: (
                     verify_external(intent, proof, context) is True
                 ),
