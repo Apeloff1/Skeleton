@@ -1217,6 +1217,16 @@ async function cognitiveExecute(action,params){
  status("Canonical installed cognition invoked: "+action+
   ". This computes a decision, not a trained-model quality verification.");
 }
+$("jeeves-cognitive-static-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const steps=JSON.parse($("jeeves-cognitive-static-steps").value);
+ const initial_facts=JSON.parse($("jeeves-cognitive-initial-facts").value);
+ const plan_id=$("jeeves-cognitive-static-id").value.trim();
+ const risk=$("jeeves-reasoning-risk").value;
+ const inject_failure_at=$("jeeves-cognitive-failure").value.trim()||null;
+ await cognitiveExecute("ai.cognition.static_plan",{
+  plan_id,steps,initial_facts,risk,inject_failure_at
+ });
+}));
 $("jeeves-cognitive-plan").addEventListener("click",()=>dmGuard(async()=>{
  const plan=JSON.parse($("jeeves-cognitive-plan-json").value);
  const vision=$("jeeves-cognitive-vision").value.trim();
@@ -5394,6 +5404,25 @@ inference. Self-reported confidence is not proven calibrated probability.</small
  "room_bias":"Dungeon encounter exploration"
 }</textarea></label>
 <button id="jeeves-cognitive-plan" type="button">Run installed original game plan verifier</button>
+<label>Source plan identity
+<input id="jeeves-cognitive-static-id" value="original_game_plan"></label>
+<label>Canonical static plan initial facts JSON
+<textarea id="jeeves-cognitive-initial-facts" rows="2" spellcheck="false">["source_exists"]</textarea></label>
+<label>Original source plan DAG steps, with explicit dependencies and bounded capabilities
+<textarea id="jeeves-cognitive-static-steps" rows="9" spellcheck="false">[
+ {"step_id":"inspect","preconditions":["source_exists"],
+  "postconditions":["source_reviewed"],"required_capabilities":["source.inspect"],
+  "max_tokens":300,"max_cost_units":0.5,"max_wall_time_s":2.0},
+ {"step_id":"preview","depends_on":["inspect"],
+  "preconditions":["source_reviewed"],"postconditions":["game_previewed"],
+  "required_capabilities":["game.preview"],
+  "max_tokens":500,"max_cost_units":1.0,"max_wall_time_s":3.0,
+  "terminal":true}
+]</textarea></label>
+<label>Optional simulated failure at plan step ID
+<input id="jeeves-cognitive-failure" placeholder="inspect"></label>
+<button id="jeeves-cognitive-static-plan" type="button">Analyze real plan DAG and simulate bounded failure</button>
+
 <label>Reasoning risk level<select id="jeeves-reasoning-risk">
 <option value="low">Low</option>
 <option value="medium" selected>Medium</option>
