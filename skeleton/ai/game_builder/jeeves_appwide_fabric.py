@@ -392,6 +392,9 @@ OPERATIONS = {
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
     "studio.production.commit_bundle":("external_effect", "explicit human-approved original source commit group",True),
     "studio.production.queue":("read", "paged pending and accepted original source proposals",False),
+    "studio.release.catalog":("read", "source-custodied original browser/Godot release identities",False),
+    "studio.release.verify":("read", "approved source hash and canonical package proof verification",False),
+    "studio.release.download":("compute", "designer-authorized deterministic accepted source ZIP",True),
     "studio.tree":("read", "active project files",False),
     "studio.file":("read", "active project source",False),
     "studio.propose":("proposal", "targeted human-reviewed project edit",True),
@@ -579,6 +582,16 @@ class JeevesAppwideRuntime:
         elif action=="studio.production.queue":
             from .jeeves_proposal_queue import JeevesProposalQueue
             result=JeevesProposalQueue(inv, ws).page(**params)
+        elif action in ("studio.release.catalog", "studio.release.verify",
+                        "studio.release.download"):
+            from .jeeves_release_custody import JeevesReleaseCustody
+            release=JeevesReleaseCustody(inv, ws)
+            if action=="studio.release.catalog":
+                result=release.catalog(**params)
+            elif action=="studio.release.verify":
+                result=release.verify(**params)
+            else:
+                result=release.download(**params, operator_authorized=authorized)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
