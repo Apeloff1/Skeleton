@@ -129,12 +129,12 @@ def build_artifacts(
             total_bytes += int(source["size"])
             zone["bytes"] += int(source["size"])
         families[family] += 1
+        zone_families = zone["families"]
+        zone_families[family] = zone_families.get(family, 0) + 1
         if source["type"] == "blob":
             duplicates[(str(source["oid"]), str(source["mode"]))].append(path)
-    for zone_name, zone in groups.items():
-        zone["families"] = dict(sorted(
-            (f, count) for f, count in families_for_zone(files, config, zone_name).items()
-        ))
+    for zone in groups.values():
+        zone["families"] = dict(sorted(zone["families"].items()))
     repeated = [
         {"oid": oid, "mode": mode, "paths": sorted(paths), "count": len(paths)}
         for (oid, mode), paths in duplicates.items() if len(paths) > 1
@@ -170,16 +170,6 @@ def build_artifacts(
     }
     outputs["manifest.json"] = _json_bytes(manifest)
     return outputs
-
-
-def families_for_zone(
-    files: list[dict[str, object]], config: MachineConfig, zone: str
-) -> Counter[str]:
-    return Counter(
-        _feature_family(str(item["path"]))
-        for item in files
-        if placement_for_path(config, str(item["path"])).zone == zone
-    )
 
 
 def build_from_git(root: str | Path, *, max_files: int = 250_000) -> dict[str, bytes]:
