@@ -141,6 +141,14 @@ jobs:
           assert report["ai_product"]["capability_total"] == 9
           assert report["construction"]["plane_total"] == 27
           assert report["enterprise"]["domain_count"] == 11
+          frontier = JeevesCompletionCensus(inventory).backlog(
+              limit=20, expected_report_digest=report["digest"])
+          assert frontier["total_work_items"] >= 43
+          assert len(frontier["tasks"]) == 20
+          assert frontier["next_offset"] == 20
+          assert frontier["census_digest"] == report["digest"]
+          assert all(not task["automatic_execution_authorized"] and
+                     not task["release_qualified"] for task in frontier["tasks"])
           assert not report["readiness"]["release_qualified"]
           print({"source_receipts":len(report["source_receipts"]),
                  "capabilities":report["ai_product"]["capability_states"],
