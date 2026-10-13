@@ -455,6 +455,67 @@ def creator_proposal(operation: str, project_id: str,
     }
 
 
+
+def creator_plan(project_id: str, steps: list[Mapping[str, Any]]) -> dict[str, Any]:
+    """Compile a bounded, ordered, dependency-aware set of creator proposals.
+
+    This never dispatches an operation. Each command must be re-authorized by
+    the host using its exact digest, project, principal, scope and current state.
+    No implicit wildcard authorization is produced from a plan digest.
+    """
+    from skeleton.forge.creator.command_surface import build_creator_command
+
+    if not isinstance(steps, list) or not 1 <= len(steps) <= 32:
+        raise AppCapabilityBridgeError("creator plan must contain 1..32 steps")
+    names: set[str] = set()
+    commands: list[dict[str, Any]] = []
+    for index, step in enumerate(steps):
+        if not isinstance(step, Mapping) or set(step) != {
+            "step_id", "operation", "payload", "after",
+        }:
+            raise AppCapabilityBridgeError(
+                "creator step requires step_id, operation, payload and after"
+            )
+        name, after = step["step_id"], step["after"]
+        if (not isinstance(name, str) or not 1 <= len(name) <= 128
+                or not name.replace("_", "").replace("-", "").replace(".", "").isalnum()
+                or name in names):
+            raise AppCapabilityBridgeError("creator step has invalid or duplicate step_id")
+        if (not isinstance(after, list) or len(after) > 32
+                or any(not isinstance(dep, str) for dep in after)
+                or len(after) != len(set(after)) or any(dep not in names for dep in after)):
+            raise AppCapabilityBridgeError("creator dependencies must name earlier steps")
+        if not isinstance(step["payload"], Mapping):
+            raise AppCapabilityBridgeError("creator step payload must be an object")
+        command = build_creator_command(
+            step["operation"], project_id=project_id, payload=step["payload"],
+        )
+        commands.append({
+            "index": index,
+            "step_id": name,
+            "after": list(after),
+            "command": command.to_dict(),
+            "dispatch_performed": False,
+        })
+        names.add(name)
+    serialized = json.dumps(
+        commands, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        allow_nan=False,
+    ).encode("utf-8")
+    if len(serialized) > 256 * 1024:
+        raise AppCapabilityBridgeError("creator plan exceeds proposal byte budget")
+    return {
+        "schema": SCHEMA,
+        "kind": "creator-plan",
+        "project_id": project_id,
+        "steps": commands,
+        "plan_sha256": sha256(serialized).hexdigest(),
+        "execution_authority": "none",
+        "dispatch_performed": False,
+        "authorization": "each command requires a separate host permit and exact digest",
+    }
+
+
 def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str, ...]:
     """Add only READ_ONLY tools to the existing trusted host registry.
 
@@ -543,6 +604,15 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
         ), lambda args, _ctx: interface_catalog(
             query=args.get("query", ""), limit=args.get("limit", 20),
             offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="creator.plan",
+            description="Compile ordered creator commands with explicit prior-step dependencies; never dispatch.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("project_id", "string", max_length=128),
+                ArgumentRule("steps", "array", max_length=32),
+            ),
+        ), lambda args, _ctx: creator_plan(args["project_id"], args["steps"])),
         (ToolSpec(
             name="creator.operations",
             description="Read the canonical bounded creator operation schema; no execution.",
