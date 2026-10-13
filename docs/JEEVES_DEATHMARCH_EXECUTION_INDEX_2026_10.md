@@ -1,6 +1,52 @@
 # Deathmarch execution index — 2026-10-13
 
 
+## DX-85–DX-95 — measurable verification frontier and real cognition
+
+This workpass establishes explicit progress denominators **without**
+incorrectly treating source files, AI status fields, code volume or a draft
+branch as tested and enterprise-qualified product functionality.
+
+| Milestone | Concrete source code shipped on draft head | Authority |
+| --- | --- | --- |
+| DX-85 | Precise 414/421 verified volume *source-state* percentage (98.34%) | \`JeevesVerificationProgress.overview\` |
+| DX-86 | Real 0/421 enterprise-qualified denominator and 100% remaining | \`machine/ai_master_plan.json\` |
+| DX-87 | Real 0/9 completed registered AI product capabilities | \`machine/ai_capabilities.json\` |
+| DX-88 | Separately track 17/17 declared gaps, required paths, workflow sources | \`JeevesVerificationProgress._collect\` |
+| DX-89 | Page concrete exact-source blocking categories for qualification | \`JeevesVerificationProgress.backlog\` |
+| DX-90 | Traverse 421 individual source volumes, including 7 hardened exceptions | \`JeevesVerificationProgress.volumes\` |
+| DX-91 | Display percent complete/remaining and browse real volume gaps in Studio | \`game_workspace_ui.py\` |
+| DX-92 | Invoke installed actual uncertainty answer/abstain/escalate gate | \`JeevesCognitiveStudio.uncertainty\` |
+| DX-93 | Invoke installed source-canonical cost/risk-budgeted strategy selection | \`JeevesCognitiveStudio.strategy\` |
+| DX-94 | Invoke canonical bounded stop/continue/escalate policy without forged verification | \`JeevesCognitiveStudio.stopping\` |
+| DX-95 | Run real finite cognitive policies interactively from Game Studio | \`game_workspace_ui.py\` |
+
+### Specific source-level implementation frontier
+
+The seven canonical volumes **not** marked implementation-verified are:
+
+- \`VOL-013\` Cognitive Core
+- \`VOL-014\` Planning Engine
+- \`VOL-015\` Tool & Action System
+- \`VOL-016\` Agent Runtime
+- \`VOL-017\` Multi-Agent Orchestration
+- \`VOL-248\` Uncertainty Representation
+- \`VOL-253\` Stopping Policies
+
+Their implementation state is \`hardened\`. All 421 enterprise grades are
+still \`designed\`. The new actual installed cognition actions make these
+areas addressable by Jeeves but **do not** promote any volume or claim
+independent product/model validation.
+
+In the latest live PR check observation, 25 initial workflow-run entries
+were returned at the observed draft SHA; many remained queued and some
+were skipped. A new commit invalidates that head, so **zero checks may
+be claimed independently passed on the current exact head** without a fresh
+observation. This workpass did not launch or run repository tests, per user
+instruction. Overall product completion remains uncomputable until
+external app, model, platform, CI and qualification evidence exists.
+
+
 ## DX-59–DX-84 — completed-source custody, actual replay, original story and Forge
 
 These milestones use existing game-builder authorities and real current
