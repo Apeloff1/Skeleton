@@ -144,8 +144,8 @@ def test_game_checkpoint_supports_revisiting_a_branch_but_not_lying_about_custod
         previous_token=saved["new_checkpoint"],
         actions=("forage","observe"),now=1_800_000_002)
     assert civic["current_history_digest"]!=alternate["current_history_digest"]
-    assert civic["player"]["endings_seen"]==["civic_union"]
-    assert alternate["player"]["endings_seen"]==[]
+    assert civic["player"]["endings_seen"]==("civic_union",)
+    assert alternate["player"]["endings_seen"]==()
 
 
 @pytest.mark.parametrize("garbage",[
