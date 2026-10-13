@@ -1,6 +1,57 @@
 # Deathmarch execution index — 2026-10-13
 
 
+## DX-59–DX-84 — completed-source custody, actual replay, original story and Forge
+
+These milestones use existing game-builder authorities and real current
+project sources. Some require a deliberate human review before the committed
+code path can publish files; none asserts that a draft PR is merged or that
+a native executable is release-certified.
+
+| Milestone | Committed implementation | Canonical execution/authority |
+| --- | --- | --- |
+| DX-59 | Discover source-backed original release IDs within the active game | \`JeevesReleaseCustody.catalog\` |
+| DX-60 | Check approved game package's exact source manifest and SHA-256 | \`JeevesReleaseCustody.verify\` |
+| DX-61 | Validate world/replay/manifest cross-source identities | \`JeevesReleaseCustody._collect\` |
+| DX-62 | Require matching active human-approved source version for each member | \`JeevesReleaseCustody._approved\` |
+| DX-63 | Deterministic authorized source-only ZIP for actual approved game | \`JeevesReleaseCustody.download\` |
+| DX-64 | Studio release catalog, verification and source download controls | \`game_workspace_ui.py\` |
+| DX-65 | Recompile human-approved sources and **actually execute** winning Python replay | \`JeevesReleaseCustody.replay\` |
+| DX-66 | Byte-for-byte check entire replay-rendered HTML/Godot native source | \`JeevesReleaseCustody.replay\` |
+| DX-67 | Compare hashes of 2–6 actually approved distinct game source releases | \`JeevesReleaseCustody.compare\` |
+| DX-68 | Require exact source-proposal provenance for accepted custody records | \`JeevesReleaseCustody._approved\` |
+| DX-69 | Sorted deterministic content-search index before bisect pagination | \`JeevesCodeNavigator.search\` |
+| DX-70 | Display untruncated source diff reviews to human approver | \`game_workspace_ui.py\` |
+| DX-71 | Source-pin reviewed original story/world bible and phased cast/canon | \`JeevesStorySourceWave.plan\` |
+| DX-72 | Preserve immutable voice, face, wardrobe and geography continuity contract | \`JeevesStorySourceWave.stage\` |
+| DX-73 | Require precise next chapter/act/scene against approved history | \`next_story_scene_template\` |
+| DX-74 | Stage externally authored and signed scene through full-history validator | \`JeevesStorySourceWave.stage\` |
+| DX-75 | Studio story authoring, signing, historical continuity and reviewed staging UI | \`game_workspace_ui.py\` |
+| DX-76 | Browser locally verifies downloaded game ZIP SHA-256 before saving | \`game_workspace_ui.py\` |
+| DX-77 | Fix exact source filename matcher and source authoring imports | \`game_workspace_ui.py\` |
+| DX-78 | Construct original typed installed Universal Forge blueprint source | \`JeevesForgeProduction.plan\` |
+| DX-79 | Validate actual Forge kinds, port endpoint types, graph cycles | \`jeeves_app_runtime._review_forge_graph\` |
+| DX-80 | Stage human-reviewed actual original-game Forge \`assets/forge/*.json\` | \`JeevesForgeProduction.stage\` |
+| DX-81 | Re-validate Forge schema/ports on *both* proposal and human commit | \`GameWorkspace._validate_forge_blueprint\` |
+| DX-82 | Verify committed original Forge source against installed component registry | \`JeevesForgeProduction.verify\` |
+| DX-83 | Interactive Forge kinds, graph layout, source proposal and verify cockpit | \`game_workspace_ui.py\` |
+| DX-84 | Repair scoped canonical app runtime calls: strip outer project selector | \`JeevesAppwideRuntime.invoke\` |
+
+**Actual execution distinctions:** Python original game generation and
+replay execute when invoked and verify source byte equivalence. Godot 4
+native project source is rendered but Godot binaries/hardware are not
+executed or certified. Forge graphs are checked against installed typed
+components but this does not execute the graph as a game asset or prove
+runtime rendering. Original story templates require separately authored,
+signed, reviewed content before their source can be staged; 100 chapters
+and 9999 scenes are targets, not claims of authored completion.
+
+**All tests skipped during this workpass at the user's direction.**
+These are commits on a stacked draft development PR, not deployed
+application completion. Exact-head regression/CI/release qualification
+remains open.
+
+
 ## DX-31–DX-58 — real original-game authoring, source output, human publication
 
 The existing game editor, authoring workspace, game compiler, offline browser
