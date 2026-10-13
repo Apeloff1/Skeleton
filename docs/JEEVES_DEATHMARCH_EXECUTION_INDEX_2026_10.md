@@ -1,3 +1,81 @@
+## DX-129–DX-154 — real alternative endings, consequences, full source review and graph index
+
+**Committed source implementation; tests deliberately not run.** Code is on
+a stacked draft branch and not an independently qualified app release.
+
+| Milestone | Source implementation |
+| --- | --- |
+| DX-129 | Bound and deduplicate typed player-action override scenarios |
+| DX-130 | Recompile each profile in the actual canonical original game engines |
+| DX-131 | Attribute exact witnessed branch edge by real priority/predicate |
+| DX-132 | Compute genuinely reached ending node/category evidence |
+| DX-133 | Preserve all unobserved authored endings and uncovered branch edges |
+| DX-134 | Bind action portfolios to exact approved campaign SHA and replay receipts |
+| DX-135 | Stage actual gameplay portfolio as canonical reviewed original source |
+| DX-136 | Re-run all portfolio gameplay when source is proposed or human committed |
+| DX-137 | Re-verify actual committed source portfolio and gameplay transcripts |
+| DX-138 | Game Studio panel for active player-choice/ending coverage |
+| DX-139 | Join observed game paths to full source-signed story history |
+| DX-140 | Record true authored cast and region identity on played paths |
+| DX-141 | Preserve signed event causes, references and source file identities |
+| DX-142 | Compare source-authored status/location/affiliation/outfit changes per route |
+| DX-143 | Build pairwise narrative-causality differences among observed routes |
+| DX-144 | Re-check signed game, scene, story and causal event sources at human commit |
+| DX-145 | Interactive game/story consequence matrix with honest mechanics scope |
+| DX-146 | Generate SHA-pinned complete large-source unified diff manifests |
+| DX-147 | Page every UTF-8-complete original source diff without silent truncation |
+| DX-148 | Require separately acknowledged SHA for **every** human-reviewed page |
+| DX-149 | Invoke the existing sole canonical source writer only after all approvals |
+| DX-150 | Report uncertain partial writes/receipt failures for manual reconciliation |
+| DX-151 | Studio complete-page source reviewer and separately approved commit |
+| DX-152 | Scan live game editor, advanced scene, replay, campaign, story and release source dependencies |
+| DX-153 | Detect exact SHA/canon dependency drift, missing links and uninspected sources |
+| DX-154 | Bounded SHA-pinned graph pagination, accurate scan limits and Studio UI |
+
+Canonical owners:
+\`jeeves_campaign_outcomes.py\`,
+\`jeeves_narrative_consequences.py\`,
+\`jeeves_paged_diff.py\`,
+\`jeeves_game_source_graph.py\`,
+\`game_project_workspace.py\`,
+\`jeeves_appwide_fabric.py\`,
+and \`game_workspace_ui.py\`.
+
+A source-authored NPC/affiliation change referenced by a story scene is
+**not** a mechanically applied game-engine reputation mutation. Evidence
+counts include only actual submitted gameplay action profiles; unseen
+player choices remain unverified. A static dependency graph is not
+proof that source files execute correctly. Full diff acknowledgement
+is not a claim of independent CI or physical hardware verification.
+
+## DX-102–DX-128 — actual gameplay reference sessions and signed story campaigns
+
+Implemented earlier in this draft branch:
+- DX-102–108: current approved advanced engine+scene source loaded and
+  real 29-family reference gameplay transcripts executed, SHA-bound and
+  reverified at source proposal/commit.
+- DX-109–118: multiple ending categories, source-bound finite campaign
+  graph compilation, real observed branch decisions, cycle/reachability/
+  fallback checks, canonical scene loader and Studio controls.
+- DX-119–127: full-history original signed story scene links, cast,
+  locations, authored causal event IDs and source SHA binding;
+  human-committed lore verified again against actual source history.
+- DX-128: immutable accepted-review record preflight before actual
+  original game source write.
+
+### Measured verification gaps (metadata vs independent release evidence)
+
+| Qualification track | Done | Still remaining |
+| --- | ---: | ---: |
+| Masterplan implementation **metadata** | 414/421 · 98.34% | 7/421 · **1.66%** |
+| Independently enterprise-qualified volumes | 0/421 · 0% | **100%** |
+| Product AI capability declarations complete | 0/9 · 0% | **100%** |
+| Declared construction source gaps closed | 17/17 · 100% | 0% |
+
+Model quality, exact-head CI, device execution and user acceptance are
+unobserved or independently unqualified; an overall whole-app completion
+percentage cannot be established. No test suite was run in this workpass.
+
 # Deathmarch execution index — 2026-10-13
 
 
