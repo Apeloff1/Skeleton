@@ -18,7 +18,8 @@ from typing import Iterator
 
 from .flgb_training_runtime import CandidateWeights, digest_json, require_digest, require_id
 from .shadow_weights import (
-    ShadowWeightError, ShadowWeightPolicy, SourceAttestation, _count, _utc,
+    ShadowWeightError, ShadowWeightPolicy, SourceAttestation,
+    independent_evidence_roots, _count, _utc,
 )
 
 _MAX_INTAKE_SOURCES = 10_000
@@ -149,13 +150,13 @@ def assess_shadow_intake(
         reasons.add("unresolved-contradiction")
     if any(not source.allowed_for_training for source in item.sources):
         reasons.add("training-rights-unresolved")
-    independent_roots = {
-        source.root_id
-        for source in item.sources
+    credible_sources = [
+        source for source in item.sources
         if source.allowed_for_training
         and not source.contradiction
         and source.quality_ppm >= policy.evidence.minimum_quality_ppm
-    }
+    ]
+    independent_roots = independent_evidence_roots(credible_sources)
     if len(independent_roots) < policy.evidence.minimum_independent_roots:
         reasons.add("insufficient-independent-evidence")
     if any(source.quality_ppm < policy.evidence.minimum_quality_ppm for source in item.sources):
