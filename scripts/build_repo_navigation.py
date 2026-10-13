@@ -82,6 +82,14 @@ def feature_of(path: str) -> str:
     return "/".join(parts[:2] if len(parts) >= 3 else parts[:1])
 
 
+def feature_route(feature: str) -> str:
+    """Stable first- or second-level feature selector for tiny agent views."""
+    parts = feature.split("/")
+    if len(parts) >= 2 and parts[0] in ("skeleton", "satellites", "backend", "frontend"):
+        return "/".join(parts[:2])
+    return parts[0]
+
+
 def shard_of(path: str) -> str:
     parts = path.split("/")
     if len(parts) == 1:
@@ -161,6 +169,7 @@ def build(root: Path, *, compute_near: bool = True) -> dict[str, str]:
     rules = zones(root)
     shards: dict[str, list[dict[str, object]]] = defaultdict(list)
     grouped: dict[str, dict[str, object]] = {}
+    feature_shards: dict[str, set[str]] = defaultdict(set)
     dirs: dict[str, dict[str, object]] = {}
     exact: dict[str, list[str]] = defaultdict(list)
     unclassified: list[str] = []
@@ -181,6 +190,7 @@ def build(root: Path, *, compute_near: bool = True) -> dict[str, str]:
             exact[str(row["g"])].append(p)
         bytes_total += int(row["b"] or 0)
         shards[shard_of(p)].append(row)
+        feature_shards[f].add(shard_of(p))
         feat = grouped.setdefault(f, {"files": 0, "bytes": 0, "zones": Counter(), "extensions": Counter(), "tests": 0, "entrypoints": [], "examples": []})
         feat["files"] += 1
         feat["bytes"] += int(row["b"] or 0)
@@ -215,7 +225,7 @@ def build(root: Path, *, compute_near: bool = True) -> dict[str, str]:
         "near_duplicate_candidates": len(near),
         "near_scan": near_stats, "unclassified_count": len(unclassified),
         "authorities": {"taxonomy": ".machine/repository.toml", "runtime_atlas": "skeleton/repo_machine/atlas.py", "ai_migrations": "machine/ai_file_tree.json", "symbol_index": ".machine/code-search-index.json (workflow artifact)"},
-        "navigation": {"groups": "features.json", "directory_tree": "tree.json", "all_files": "files/", "duplicates": "duplicates.json", "near_duplicates": "near_duplicates.json", "zones": "zones.json", "unclassified": "unclassified.json"},
+        "navigation": {"feature_router": "routes.json", "feature_groups": "feature_routes/", "line_windows": "shard_index.json", "groups": "features.json", "directory_tree": "tree.json", "all_files": "files/", "duplicates": "duplicates.json", "near_duplicates": "near_duplicates.json", "zones": "zones.json", "unclassified": "unclassified.json"},
         "warnings": ["Duplicate bytes do not imply redundant behavior or safe removal", "Near-duplicates are heuristic review candidates, not proof of equivalent contracts"],
     }
     def counts(c: Counter[str]) -> dict[str, int]:
@@ -223,6 +233,27 @@ def build(root: Path, *, compute_near: bool = True) -> dict[str, str]:
     feature_rows = {k: {**v, "zones": counts(v["zones"]), "extensions": counts(v["extensions"])} for k, v in sorted(grouped.items())}
     directory_rows = {k: {**v, "zones": counts(v["zones"])} for k, v in sorted(dirs.items())}
     zone_rows = [{"name": r["name"], "owner": r["owner"], "lifecycle": r["lifecycle"], "criticality": r["criticality"], "purpose": r["purpose"], "prefixes": r["prefixes"], "file_count": zone_counts[r["name"]]} for r in rules]
+    route_map: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for feature, info in feature_rows.items():
+        route_map[feature_route(feature)].append({
+            "name": feature,
+            "files": info["files"],
+            "zones": info["zones"],
+            "file_shards": sorted(feature_shards[feature]),
+        })
+    shard_windows: dict[str, list[dict[str, object]]] = {}
+    for name, rows in sorted(shards.items()):
+        windows = []
+        for start in range(0, len(rows), 256):
+            chunk = rows[start:start + 256]
+            windows.append({
+                "file": f"files/{name}.jsonl",
+                "start_line": start + 1,
+                "end_line": start + len(chunk),
+                "first_path": str(chunk[0]["p"]),
+                "last_path": str(chunk[-1]["p"]),
+            })
+        shard_windows[name] = windows
     outputs = {
         "manifest.json": dump(record),
         "features.json": dump({"schema": SCHEMA, "features": feature_rows}),
@@ -231,7 +262,14 @@ def build(root: Path, *, compute_near: bool = True) -> dict[str, str]:
         "duplicates.json": dump({"schema": SCHEMA, "identity": "Git blob object ID (byte-identical)", "groups": dupes}),
         "near_duplicates.json": dump({"schema": SCHEMA, "method": "same basename + comparable size + token five-shingle Jaccard >= 0.83", "stats": near_stats, "candidates": near}),
         "unclassified.json": dump({"schema": SCHEMA, "paths": unclassified}),
+        "routes.json": dump({"schema": SCHEMA, "routes": [
+            {"name": name, "path": f"feature_routes/{name}.json", "features": len(items),
+             "files": sum(int(item["files"]) for item in items)}
+            for name, items in sorted(route_map.items())]}),
+        "shard_index.json": dump({"schema": SCHEMA, "max_rows_per_window": 256, "shards": shard_windows}),
     }
+    for name, items in sorted(route_map.items()):
+        outputs[f"feature_routes/{name}.json"] = dump({"schema": SCHEMA, "features": items})
     for s, rows in sorted(shards.items()):
         outputs[f"files/{s}.jsonl"] = "".join(dump(row) for row in rows)
     return outputs
