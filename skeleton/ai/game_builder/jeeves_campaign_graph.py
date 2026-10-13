@@ -19,7 +19,7 @@ import re
 from .contracts import canonical_json,canonical_digest
 from .game_project_workspace import GameWorkspace,_json
 from .jeeves_appwide_fabric import AppwideInventory,JeevesAppwideError,digest
-from .jeeves_advanced_replay import JeevesAdvancedReplay
+from .jeeves_advanced_replay import load_approved_advanced_scene
 from .advanced_gameplay_runtime import ACTION_HELP,run_advanced_session
 
 SCHEMA="skeleton.ai.jeeves_campaign_graph.v1"
@@ -164,13 +164,10 @@ def compile_campaign(workspace,project,spec):
     nodes,outgoing,_=_checked_spec(spec)
     sessions={}
     bindings={}
-    loader=JeevesAdvancedReplay.__new__(JeevesAdvancedReplay)
-    loader.ws=workspace
-    loader.inv=type("Snapshot",(),{"_digest":"not_applicable"})()
     for node in nodes:
         editor=node["editor"];scene_id=node["scene_id"]
-        config,scene,sys_sha,scene_sha,_=loader._loaded(
-            project=project,editor=editor,scene_id=scene_id)
+        config,scene,sys_sha,scene_sha,_=load_approved_advanced_scene(
+            workspace,project=project,editor=editor,scene_id=scene_id)
         report=run_advanced_session(
             editor,config["settings"],node["actions"],
             seed=scene["seed"],scene=scene)

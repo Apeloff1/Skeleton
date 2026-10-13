@@ -30,6 +30,25 @@ MAX_SOURCE_BYTES=220_000
 MAX_ACTIONS=128
 
 
+def load_approved_advanced_scene(workspace, *, project, editor, scene_id):
+    """Use one canonical typed read of current human-authored gameplay sources."""
+    if (not isinstance(workspace,GameWorkspace)
+            or type(project) is not str or workspace.active()!=project
+            or type(editor) is not str or editor not in ENGINES
+            or type(scene_id) is not str or not IDENT.fullmatch(scene_id)):
+        raise JeevesAppwideError("active original project and installed editor/scene required")
+    system=workspace.read("current",project,"systems/"+editor+".json")
+    authored=workspace.read(
+        "current",project,"scenes/advanced_"+editor+"_"+scene_id+".json")
+    config=validate_editor_document(_json(system["content"]))
+    scene=validate_advanced_scene(
+        _json(authored["content"]),config["settings"])
+    if config["editor"]!=editor or scene["scene_id"]!=scene_id:
+        raise JeevesAppwideError("approved scene editor/identity does not match source")
+    path="game/replays/"+editor+"_"+scene_id+".json"
+    return config,scene,system["version"]["sha256"],authored["version"]["sha256"],path
+
+
 class JeevesAdvancedReplay:
     """A real approved game scene -> executed command transcript -> reviewed file."""
 
@@ -45,20 +64,8 @@ class JeevesAdvancedReplay:
     def _loaded(self, *, project, editor, scene_id, expected_snapshot=None):
         if expected_snapshot is not None and expected_snapshot!=self.inv._digest:
             raise JeevesAppwideError("stale exact app inventory")
-        if (type(project) is not str or self.ws.active()!=project
-                or type(editor) is not str or editor not in ENGINES
-                or type(scene_id) is not str or not IDENT.fullmatch(scene_id)):
-            raise JeevesAppwideError("active original project and installed editor/scene required")
-        system=self.ws.read("current",project,"systems/"+editor+".json")
-        authored=self.ws.read(
-            "current",project,"scenes/advanced_"+editor+"_"+scene_id+".json")
-        config=validate_editor_document(_json(system["content"]))
-        scene=validate_advanced_scene(
-            _json(authored["content"]),config["settings"])
-        if config["editor"]!=editor or scene["scene_id"]!=scene_id:
-            raise JeevesAppwideError("approved scene editor/identity does not match source")
-        path="game/replays/"+editor+"_"+scene_id+".json"
-        return config,scene,system["version"]["sha256"],authored["version"]["sha256"],path
+        return load_approved_advanced_scene(
+            self.ws,project=project,editor=editor,scene_id=scene_id)
 
     def _prepare(self, *, project, editor, scene_id, actions,
                  expected_snapshot=None):
