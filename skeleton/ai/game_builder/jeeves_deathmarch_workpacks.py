@@ -8,6 +8,7 @@ completion without separately admitted execution and independent verification.
 """
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections import Counter, defaultdict
 from hashlib import sha256
 from typing import Any
@@ -182,12 +183,71 @@ class JeevesWorkpackDirector:
 
     def _source_paths(self, root_id, nodes, outgoing, *,
                       depth=3, max_sources=MAX_SOURCES):
-        """Traverse only verified declared graph links, never arbitrary imports."""
+        """Resolve graph-linked files and deterministic bounded directory samples.
+
+        Most canonical owner declarations are *directories*. Failing to expand
+        them makes otherwise legitimate application milestone workpacks empty.
+        This index samples representative real descendants and clearly labels
+        them as candidate context, not as validated implementing owners.
+        """
         if root_id not in nodes:
             return []
+        inventory = self.inventory._files
+        sorted_paths = list(inventory)  # already sorted at canonical scan
         pending = [(root_id, 0)]
         seen = set()
-        paths: dict[str, tuple[int, str]] = {}
+        paths: dict[str, tuple[int, str, bool]] = {}
+        direct_preferred = (
+            "__init__.py", "__main__.py", "README.md", "main.py", "server.py",
+            "index.ts", "index.tsx", "app.py", "package.json", "manifest.json",
+        )
+
+        def accept(candidate, hop, relation, sampled):
+            file = inventory.get(candidate)
+            if (file is None or not file.readable or
+                    file.kind not in ("source", "text")):
+                return
+            prior = paths.get(candidate)
+            rank = (int(sampled), hop, relation)
+            if prior is None or rank < (int(prior[2]), prior[0], prior[1]):
+                paths[candidate] = (hop, relation, sampled)
+
+        def sample_directory(directory, hop, relation):
+            # Declared directory links are *not* proof that descendants
+            # implement the capability. Return 6 representative candidates.
+            selected = []
+            for filename in direct_preferred:
+                candidate = directory + "/" + filename
+                if candidate in inventory:
+                    selected.append(candidate)
+            prefix = directory + "/"
+            cursor = bisect_left(sorted_paths, prefix)
+            considered = 0
+            nearby = []
+            while cursor < len(sorted_paths) and considered < 256:
+                candidate = sorted_paths[cursor]
+                if not candidate.startswith(prefix):
+                    break
+                cursor += 1
+                considered += 1
+                file = inventory[candidate]
+                if not file.readable or file.kind not in ("source", "text"):
+                    continue
+                if file.bytes > 256_000:
+                    continue
+                suffix = candidate.rsplit(".", 1)[-1]
+                if suffix not in ("py", "ts", "tsx", "js", "json", "md"):
+                    continue
+                nearby.append(candidate)
+            nearby.sort(key=lambda p: (
+                p[len(prefix):].count("/"),
+                0 if p.endswith((".py", ".ts", ".tsx", ".js")) else 1,
+                p,
+            ))
+            selected.extend(nearby[:12])
+            for candidate in list(dict.fromkeys(selected))[:6]:
+                accept(candidate, hop, relation + ":directory_sample", True)
+
         while pending:
             current, step = pending.pop(0)
             if current in seen or step > depth:
@@ -197,21 +257,23 @@ class JeevesWorkpackDirector:
                 record = nodes[dest]
                 if record["kind"] == "source_path":
                     path = dest[len("path:"):]
-                    source = self.inventory._files.get(path)
-                    if source is not None and source.readable and source.kind in ("source", "text"):
-                        old = paths.get(path)
-                        if old is None or step < old[0]:
-                            paths[path] = (step, relation)
+                    if path in inventory:
+                        accept(path, step + 1, relation, False)
+                    else:
+                        sample_directory(path, step + 1, relation)
                 elif relation in (
                     "owned_by_plane", "requires_plane", "covers_plane",
                     "requires_volume_evidence",
                 ):
                     pending.append((dest, step + 1))
         return [
-            {"path": path, "graph_hops": distance + 1,
-             "declared_relation": relation}
-            for path, (distance, relation) in
-            sorted(paths.items(), key=lambda item: (item[1][0], item[0]))
+            {"path": path, "graph_hops": hop,
+             "declared_relation": relation,
+             "directory_sample_not_owner_proof": sampled}
+            for path, (hop, relation, sampled) in
+            sorted(paths.items(), key=lambda item: (
+                int(item[1][2]), item[1][0], item[0]
+            ))
         ][:max_sources]
 
     def workpack(self, *, task_ids, source_bytes=4096, total_bytes=32768,
@@ -288,6 +350,7 @@ class JeevesWorkpackDirector:
                 "evidence_graph_node": canonical if canonical in nodes else None,
                 "linked_source_paths": available,
                 "source_context_found": bool(available),
+                "linked_paths_are_not_verified_implementation_owners": True,
                 "unlinked_or_missing_context_requires_human_selection": not bool(available),
                 "implementation_verified": False,
                 "ready_to_modify_source": False,
@@ -360,27 +423,41 @@ class JeevesWorkpackDirector:
                 "content_sha256": sha,
                 "source_bytes_verified": sha is not None,
             })
-            start = "path:" + path
-            if start not in nodes:
+            pieces = path.split("/")
+            # A graph may link an owning directory rather than every file.
+            # Consider every declared ancestor, but label this conservatively
+            # as a scope match, not a proven runtime dependency.
+            candidates = ["path:" + path] + [
+                "path:" + "/".join(pieces[:n])
+                for n in range(len(pieces) - 1, 0, -1)
+            ]
+            starts = [key for key in candidates if key in nodes]
+            if not starts:
                 unmapped.append(path)
                 continue
-            frontier = [(start, 0)]
-            visited = {start}
-            while frontier:
-                current, hops = frontier.pop(0)
-                if hops >= 3:
-                    continue
-                for relation, parent in incoming.get(current, []):
-                    if parent in visited:
+            for start in starts:
+                frontier = [(start, 0)]
+                visited = {start}
+                while frontier:
+                    current, hops = frontier.pop(0)
+                    if hops >= 3:
                         continue
-                    visited.add(parent)
-                    kind = nodes[parent]["kind"]
-                    if kind not in ("source_path", "required_app_file"):
-                        affected[parent].add(path)
-                    frontier.append((parent, hops + 1))
+                    for relation, parent in incoming.get(current, []):
+                        if parent in visited:
+                            continue
+                        visited.add(parent)
+                        kind = nodes[parent]["kind"]
+                        if kind not in ("source_path", "required_app_file"):
+                            affected[parent].add(path)
+                        frontier.append((parent, hops + 1))
             if not any(path in owners for owners in affected.values()):
                 unmapped.append(path)
         ordered = sorted(affected)
+        task_owners = defaultdict(list)
+        for task in plan["tasks"]:
+            ref = _graph_ref(task)
+            if ref in affected:
+                task_owners[task["id"]].extend(sorted(affected[ref]))
         body = {
             "schema": SCHEMA + ".change_frontier",
             "inventory_snapshot": plan["inventory_snapshot"],
@@ -395,6 +472,14 @@ class JeevesWorkpackDirector:
                 "live_runtime_impact_verified": False,
             } for node in ordered[:limit]],
             "result_truncated": len(ordered) > limit,
+            "affected_milestone_count": len(task_owners),
+            "affected_milestones": [{
+                "task_id": task_id,
+                "changed_paths": sorted(set(source_paths)),
+                "acceptance_must_be_rechecked": True,
+            } for task_id, source_paths in sorted(task_owners.items())[:MAX_TASK_RESULTS]],
+            "milestones_truncated": len(task_owners) > MAX_TASK_RESULTS,
+            "directory_scope_is_not_runtime_dependency_proof": True,
             "unmapped_paths": sorted(unmapped),
             "unmapped_means_unassessed_not_safe": True,
             "release_quality_not_inferred": True,

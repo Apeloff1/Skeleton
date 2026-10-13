@@ -43,3 +43,23 @@ Every invocation remains audited by \`JeevesAppwideRuntime\` with source invento
 - 3 new fully wired read adapters, no new runtime service, no new credential boundary and no new durable state owner.
 - Regression, load, Windows/Linux behavior, protected review and source-content freshness remain **unverified** for this exact head.
 - Upstream stacked dependencies must be consolidated before a mainline release; a draft feature PR is not a production milestone close.
+
+## DX-12 — directory-to-file coverage
+
+Canonical application service and AI owner paths are often directory declarations.
+Workpack assembly now indexes real descendant source files, prefers familiar
+entrypoints and shallow source modules, skips restricted and oversized sources,
+and caps discovery to 256 inspected entries and 6 candidates per directory.
+These are labeled *directory samples*, not falsely recorded as proof of ownership.
+
+## DX-13 — change-to-milestone propagation
+
+Impact reconnaissance now incorporates explicit directory ancestor scope and
+maps affected graph nodes back to canonical milestone IDs. This surfaces the
+acceptance tasks that must be considered when a source changes, even where the
+owner declaration is a directory and not a per-file dependency.
+
+**Evidence discipline:** No source is considered safe solely because it lacks a
+graph edge. Readiness, runtime fidelity, cross-platform execution and CI still
+require separate execution and review. The source context resolver provides
+bounded, reproducible inputs for those later passes, not those passes themselves.
