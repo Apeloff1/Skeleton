@@ -323,13 +323,57 @@ def _json(value: object) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":")) + "\n"
 
 
+def feature_index(entries: Iterable[Entry]) -> list[dict[str, object]]:
+    """Compact feature pages without storing source or enormous path lists."""
+    groups: dict[str, dict[str, object]] = {}
+    for e in entries:
+        row = groups.setdefault(e.feature, {
+            "id": e.feature, "files": 0, "bytes": 0,
+            "zones": Counter(), "owners": Counter(),
+            "lifecycles": Counter(), "examples": [],
+        })
+        row["files"] += 1
+        row["bytes"] += e.size or 0
+        row["zones"][e.zone] += 1
+        row["owners"][e.owner] += 1
+        row["lifecycles"][e.lifecycle] += 1
+        if len(row["examples"]) < 5:
+            row["examples"].append(e.path)
+    return [
+        {"id": key, "files": value["files"], "bytes": value["bytes"],
+         "zones": dict(sorted(value["zones"].items())),
+         "owners": dict(sorted(value["owners"].items())),
+         "lifecycles": dict(sorted(value["lifecycles"].items())),
+         "examples": value["examples"]}
+        for key, value in sorted(groups.items())
+    ]
+
+
+def directory_index(entries: Iterable[Entry]) -> list[dict[str, object]]:
+    """Aggregate every implicit Git directory, including snapshot ancestry."""
+    groups: dict[str, dict[str, int]] = {}
+    for e in entries:
+        parent = PurePosixPath(e.path).parts[:-1]
+        for depth in range(1, len(parent) + 1):
+            name = "/".join(parent[:depth])
+            record = groups.setdefault(name, {"files": 0, "bytes": 0, "immediate_files": 0})
+            record["files"] += 1
+            record["bytes"] += e.size or 0
+            if depth == len(parent):
+                record["immediate_files"] += 1
+    return [{"path": name, **counts} for name, counts in sorted(groups.items())]
+
+
 def write_index(directory: Path, manifest: dict[str, object], entries: Iterable[Entry],
                 duplicates: Iterable[dict[str, object]], near: dict[str, object]) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     if directory.is_symlink():
         raise AtlasError("atlas destination cannot be symlink")
+    files = tuple(entries)
     parts = {"manifest.json": _json(manifest),
-             "files.jsonl": "".join(_json(e.json()) for e in entries),
+             "files.jsonl": "".join(_json(e.json()) for e in files),
+             "features.jsonl": "".join(_json(e) for e in feature_index(files)),
+             "directories.jsonl": "".join(_json(e) for e in directory_index(files)),
              "exact_duplicates.jsonl": "".join(_json(e) for e in duplicates),
              "near_duplicates.json": _json(near)}
     for name, content in parts.items():
