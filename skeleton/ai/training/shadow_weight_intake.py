@@ -211,7 +211,9 @@ class ShadowKnowledgeQueue:
                     lease_owner TEXT,
                     lease_until TEXT,
                     candidate_digest TEXT,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    retry_after TEXT
                 );
                 CREATE INDEX IF NOT EXISTS shadow_intake_work
                   ON shadow_intake(state,priority_gain DESC,priority_relevance DESC,observed_at,knowledge_id);
@@ -224,6 +226,14 @@ class ShadowKnowledgeQueue:
                     occurred_at TEXT NOT NULL
                 );
             """)
+            # Upgrade SQLite queues created before durable retry scheduling.
+            columns = {row[1] for row in db.execute("PRAGMA table_info(shadow_intake)")}
+            if "attempts" not in columns:
+                db.execute(
+                    "ALTER TABLE shadow_intake ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0"
+                )
+            if "retry_after" not in columns:
+                db.execute("ALTER TABLE shadow_intake ADD COLUMN retry_after TEXT")
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -331,7 +341,8 @@ class ShadowKnowledgeQueue:
             revision = row["revision"] + 1
             db.execute(
                 """UPDATE shadow_intake SET payload=?,priority_gain=?,
-                    priority_relevance=?,state=?,assessment=?,revision=?,updated_at=?
+                    priority_relevance=?,state=?,assessment=?,revision=?,updated_at=?,
+                    attempts=0,retry_after=NULL
                     WHERE knowledge_id=?""",
                 (
                     _encode(item.as_dict()), item.predicted_gain_ppm, item.relevance_ppm,
@@ -359,18 +370,21 @@ class ShadowKnowledgeQueue:
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
-                """SELECT * FROM shadow_intake WHERE state='training-ready'
-                    OR (state='leased' AND lease_until<?)
+                """SELECT * FROM shadow_intake
+                    WHERE (state='training-ready'
+                    OR (state='leased' AND lease_until<=?))
+                    AND (retry_after IS NULL OR retry_after<=?)
                     ORDER BY priority_gain DESC, priority_relevance DESC,
                              observed_at ASC, knowledge_id ASC LIMIT 1""",
-                (now_text,),
+                (now_text, now_text),
             ).fetchone()
             if row is None:
                 return None
             revision = row["revision"] + 1
             db.execute(
                 """UPDATE shadow_intake SET state='leased',lease_owner=?,lease_until=?,
-                    revision=?,updated_at=? WHERE knowledge_id=?""",
+                    revision=?,updated_at=?,attempts=attempts+1,retry_after=NULL
+                    WHERE knowledge_id=?""",
                 (worker_id, expiry, revision, now_text, row["knowledge_id"]),
             )
             item = ShadowKnowledge.from_dict(json.loads(row["payload"]))
@@ -457,7 +471,7 @@ class ShadowKnowledgeQueue:
             db.execute(
                 """UPDATE shadow_intake SET state='quarantined',
                     assessment=?,lease_owner=NULL,lease_until=NULL,
-                    revision=?,updated_at=? WHERE knowledge_id=?""",
+                    revision=?,updated_at=?,retry_after=NULL WHERE knowledge_id=?""",
                 (
                     _encode(asdict(assessment)), revision,
                     _now().isoformat(timespec="microseconds").replace("+00:00", "Z"),
@@ -492,17 +506,43 @@ class ShadowKnowledgeQueue:
             self._event(db, lease.knowledge.knowledge_id, "candidate-trained", revision, candidate.digest)
         return candidate.digest
 
-    def release(self, lease: ShadowIntakeLease) -> None:
+    def release(
+        self, lease: ShadowIntakeLease, *, backoff: bool = False,
+    ) -> None:
+        """Return work to the queue; failures receive exponential retry delay.
+
+        Backoff is durable across process restarts and capped at one hour.
+        Explicit idle preemption uses immediate release. Additional evidence
+        resets the retry count to avoid penalizing a revised observation.
+        """
+        if not isinstance(backoff, bool):
+            raise ShadowWeightError("invalid shadow retry policy")
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = self._bound_lease(db, lease)
             revision = row["revision"] + 1
+            now = _now()
+            retry_after = None
+            if backoff:
+                delay = min(3600, 30 * (1 << min(row["attempts"] - 1, 7)))
+                retry_after = (now + timedelta(seconds=delay)).isoformat(
+                    timespec="microseconds"
+                ).replace("+00:00", "Z")
             db.execute(
                 """UPDATE shadow_intake SET state='training-ready',lease_owner=NULL,
-                    lease_until=NULL,revision=?,updated_at=? WHERE knowledge_id=?""",
-                (revision, _now().isoformat().replace("+00:00", "Z"), lease.knowledge.knowledge_id),
+                    lease_until=NULL,revision=?,retry_after=?,updated_at=?
+                    WHERE knowledge_id=?""",
+                (
+                    revision, retry_after,
+                    now.isoformat(timespec="microseconds").replace("+00:00", "Z"),
+                    lease.knowledge.knowledge_id,
+                ),
             )
-            self._event(db, lease.knowledge.knowledge_id, "release", revision, lease.assessment_digest)
+            self._event(
+                db, lease.knowledge.knowledge_id,
+                "release-with-backoff" if backoff else "release",
+                revision, lease.assessment_digest,
+            )
 
     def status(self, knowledge_id: str) -> dict[str, object]:
         with self._connect() as db:
@@ -519,6 +559,8 @@ class ShadowKnowledgeQueue:
                 "assessment": json.loads(row["assessment"]),
                 "candidate_digest": row["candidate_digest"],
                 "lease_until": row["lease_until"],
+                "attempts": row["attempts"],
+                "retry_after": row["retry_after"],
             }
 
 
