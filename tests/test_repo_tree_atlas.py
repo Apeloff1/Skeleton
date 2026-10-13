@@ -63,7 +63,7 @@ class RepositoryTreeAtlasTests(unittest.TestCase):
         self.assertEqual(mapping["satellites/branch-snapshots/archive/core.py"].lifecycle,
                          "historical-snapshot")
         twins = exact_duplicates(records)
-        self.assertTrue(any(len(group["paths"]) == 3 for group in twins))
+        self.assertTrue(any(len(group["paths"]) == 3 and group["classification"] == "mixed-historical" for group in twins))
         features = {row["id"]: row for row in feature_index(records)}
         self.assertEqual(features["AIFT-QUEST"]["files"], 2)
         directories = {row["path"]: row for row in directory_index(records)}
