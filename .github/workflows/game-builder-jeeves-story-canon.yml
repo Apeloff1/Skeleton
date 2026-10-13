@@ -17,6 +17,7 @@ on:
       - "skeleton/ai/game_builder/jeeves_evidence_graph.py"
       - "skeleton/ai/game_builder/jeeves_milestone_planner.py"
       - "skeleton/ai/game_builder/jeeves_evidence_coverage.py"
+      - "skeleton/ai/game_builder/jeeves_release_gate_inventory.py"
       - "tests/test_game_builder_jeeves_app_runtime.py"
       - "tests/test_game_builder_jeeves_appwide_fabric.py"
       - "tests/test_game_builder_jeeves_capability_intelligence.py"
@@ -24,6 +25,7 @@ on:
       - "tests/test_game_builder_jeeves_evidence_graph.py"
       - "tests/test_game_builder_jeeves_milestone_planner.py"
       - "tests/test_game_builder_jeeves_evidence_coverage.py"
+      - "tests/test_game_builder_jeeves_release_gate_inventory.py"
       - "docs/JEEVES_APP_CAPABILITY_ATLAS.md"
       - "docs/JEEVES_WHOLE_REPO_INVENTORY_AND_GOVERNED_ACTIONS.md"
       - "docs/JEEVES_APP_COMPLETION_CENSUS_2026_10.md"
@@ -88,6 +90,8 @@ jobs:
             machine/ai_master_plan.json
             machine/ai_masterplan_parse_index.json
             machine/enterprise_ai_superiority.json
+            machine/p1_required_gate_authority.json
+            .github/workflows/
             machine/enterprise_system_architecture.json
             frontend/features/
             backend/gameforge/__init__.py
@@ -111,6 +115,7 @@ jobs:
             tests/test_game_builder_jeeves_evidence_graph.py
             tests/test_game_builder_jeeves_milestone_planner.py
             tests/test_game_builder_jeeves_evidence_coverage.py
+            tests/test_game_builder_jeeves_release_gate_inventory.py"
             tests/test_game_builder_story_asset_pixels.py
             tests/test_game_builder_system_editors.py
       - name: Setup Python
@@ -124,11 +129,11 @@ jobs:
       - name: Compile project canon and editor glue
         shell: bash
         run: |
-          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/jeeves_app_runtime.py skeleton/ai/game_builder/jeeves_appwide_fabric.py skeleton/ai/game_builder/jeeves_capability_intelligence.py skeleton/ai/game_builder/jeeves_completion_census.py skeleton/ai/game_builder/jeeves_evidence_graph.py skeleton/ai/game_builder/jeeves_milestone_planner.py skeleton/ai/game_builder/jeeves_evidence_coverage.py skeleton/ai/game_builder/story_cinematic_review.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
+          python -m py_compile skeleton/ai/game_builder/story_canon_fabric.py skeleton/ai/game_builder/story_workspace.py skeleton/ai/game_builder/story_memory.py skeleton/ai/game_builder/story_continuity_assurance.py skeleton/ai/game_builder/story_chapter_context.py skeleton/ai/game_builder/jeeves_chapter_chat.py skeleton/ai/game_builder/jeeves_app_runtime.py skeleton/ai/game_builder/jeeves_appwide_fabric.py skeleton/ai/game_builder/jeeves_capability_intelligence.py skeleton/ai/game_builder/jeeves_completion_census.py skeleton/ai/game_builder/jeeves_evidence_graph.py skeleton/ai/game_builder/jeeves_milestone_planner.py skeleton/ai/game_builder/jeeves_evidence_coverage.py skeleton/ai/game_builder/jeeves_release_gate_inventory.py skeleton/ai/game_builder/story_cinematic_review.py skeleton/ai/game_builder/story_detail_history.py skeleton/ai/game_builder/story_asset_pixels.py skeleton/ai/game_builder/jeeves_production_director.py skeleton/ai/game_builder/game_project_workspace.py skeleton/ai/game_builder/game_workspace_ui.py skeleton/ai/game_builder/game_workspace_server.py skeleton/ai/game_builder/game_prompt_router.py
       - name: Check app-wide Jeeves tools, all system editors, forge graph, Dragon, learning and 9999-scene receipts
         shell: bash
         run: |
-          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census tests.test_game_builder_jeeves_evidence_graph tests.test_game_builder_jeeves_milestone_planner tests.test_game_builder_jeeves_evidence_coverage -v
+          python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census tests.test_game_builder_jeeves_evidence_graph tests.test_game_builder_jeeves_milestone_planner tests.test_game_builder_jeeves_evidence_coverage tests.test_game_builder_jeeves_release_gate_inventory -v
       - name: Reconcile real exact-head masterplan and product AI authority
         shell: bash
         run: |
@@ -170,6 +175,12 @@ jobs:
           audit = JeevesEvidenceCoverage(inventory).overview(
               expected_graph_digest=evidence["digest"])
           assert audit["total_volumes"] == 421
+          from skeleton.ai.game_builder.jeeves_release_gate_inventory import JeevesReleaseGateInventory
+          gates = JeevesReleaseGateInventory(inventory).overview()
+          assert gates["required_gates"] == 26
+          assert gates["independently_verified_checks"] == 0
+          assert gates["no_ci_queries_or_releases_performed"]
+          assert not gates["release_qualified"]
           assert audit["declared_evidence_is_not_executable_qualification"]
           assert audit["executable_test_pass_count"] is None
           assert audit["real_app_capability_coverage"] is None
