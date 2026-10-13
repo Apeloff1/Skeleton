@@ -43,6 +43,7 @@ class ShadowTrainingArtifacts:
     manifest: TrainingManifest
     checkpoint: TrainingCheckpoint
     candidate_id: str
+    checkpoint_path: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.dataset, DatasetRevision):
