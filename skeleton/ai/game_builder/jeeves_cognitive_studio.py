@@ -139,6 +139,39 @@ class JeevesCognitiveStudio:
         }
         return {**body,"digest":digest(body)}
 
+    def build_plan(self, *, plan, vision, expected_snapshot=None):
+        """Run the installed original-game plan quality gate, not a new scorer.
+
+        This is a deterministic heuristic receipt from canonical PlanVerifier,
+        not an independent implementation or consumer playability acceptance.
+        """
+        from skeleton.intelligence.plan_verifier import PlanVerifier
+        self._snapshot(expected_snapshot)
+        if (type(plan) is not dict or not 1 <= len(plan) <= 16 or
+                type(vision) is not str or not 12 <= len(vision) <= 4000):
+            raise JeevesAppwideError("bounded original game build vision and plan required")
+        allowed = frozenset((
+            "era", "primary_dps", "room_bias", "title", "citation", "url",
+        ))
+        if set(plan) - allowed or any(
+                type(value) is not str or not 1 <= len(value) <= 1000
+                for value in plan.values()):
+            raise JeevesAppwideError("reviewed bounded game plan fields required")
+        _bounded_payload({"plan":plan, "vision":vision}, 16000)
+        receipt=PlanVerifier().verify(plan, vision=vision)
+        body={
+            "schema":SCHEMA+".build_plan",
+            "inventory_snapshot":self.inv._digest,
+            "source_plan_digest":digest(plan),
+            "source_vision_digest":digest(vision),
+            "canonical_installed_game_plan_verifier_executed":True,
+            "plan_quality_heuristic":receipt.to_dict(),
+            "quality_result_is_not_independent_runtime_qualification":True,
+            "game_code_compiled_or_executed":False,
+            "model_weights_and_sources_changed":False,
+        }
+        return {**body, "digest":digest(body)}
+
     def stopping(self, *, history, risk="medium", policy=None,
                  expected_snapshot=None):
         from skeleton.intelligence.strategy_registry import (
