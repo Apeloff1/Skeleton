@@ -7,7 +7,8 @@ feature/runtime owners.
 ## Run
 
     python scripts/build_git_atlas.py --root . --output .machine/git-atlas --revision HEAD
-    python -m unittest discover -s tests -p test_git_atlas.py -v
+    python scripts/build_git_atlas_near.py --root . --atlas .machine/git-atlas --output .machine/git-atlas
+    python -m unittest discover -s tests -p 'test_git_atlas*.py' -v
 
 The scanner uses NUL-separated git ls-tree --full-tree -r -z -l at one
 resolved commit. It does not use the bounded working-tree traversal from
@@ -23,11 +24,15 @@ and paths ignored by the developer-oriented context scanner.
 | files.jsonl | One sorted record per tracked Git entry: SHA, mode, size, owner, zone, feature |
 | exact-duplicates.jsonl | All repeated Git blob hashes; snapshot prevalence; review-only disposition |
 | navigation.json | Compact per-feature summaries, representative paths and lexical token routing |
+| normalized-duplicates.jsonl | Python AST-equivalent but byte-different code candidates (nightly/manual) |
+| near-candidates.jsonl | Bounded SimHash and token-Jaccard similarity candidates (nightly/manual) |
+| near-summary.json | Similarity coverage, overflow limits, skips and evidence digests (nightly/manual) |
 
 All artifacts are generated under .machine/git-atlas/ during workflow runs,
 uploaded as an Actions artifact and are **not committed back into main**. The
 workflow triggers on changes to main, relevant PR changes, manual dispatch,
-and a daily reconciliation schedule.
+and a daily reconciliation schedule. The expensive normalized/near audit runs
+nightly and on manual dispatch, not on every PR.
 
 Classification is first-match by .machine/repository.toml. Existing
 machine/ai_file_tree.json mappings take priority for feature IDs.
@@ -38,8 +43,11 @@ contracts. Unknown zones remain visibly unclassified.
 
 - Blob identity is byte-level evidence. Exact copies may be purposeful
   compatibility shims, historical snapshots or empty files; **no deletion**.
-- Similar behavior with different bytes is **not** established by this index.
-  Token/AST/MinHash near-duplicate verification is a separate milestone.
+- AST-normalized Python and token/SimHash candidates are now generated on
+  nightly/manual sweeps. They are **review candidates, not verified behavioral
+  equivalence**. Files larger than the configured bound, oversized search
+  buckets, and pair limits are explicitly reported. Structural and similarity
+  detection are not exhaustive proof of all possible duplicates.
 - Index freshness is bound to the Git commit. Do not use the index for a
   different commit without rebuilding or explicitly verifying change impact.
 - files.jsonl records Git metadata; it does not extract source symbols or
@@ -53,7 +61,8 @@ contracts. Unknown zones remain visibly unclassified.
 ## Follow-on milestones
 
 1. Add incremental commit-diff reconciliation with exact-head freshness gates.
-2. Add bounded AST/token near-duplicate candidates and independent validation.
+2. Broaden source-language AST parsing and independently verify near-duplicate
+   behavioral equivalence (current detection is bounded and advisory).
 3. Link the full inventory to existing runtime symbol, dependency, API, UI and
    test graphs; expose Jeeves context-budgeted retrieval of source spans.
 4. Produce reviewed, reversible path migration proposals. Never automatically
