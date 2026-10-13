@@ -9,7 +9,7 @@ not a bag. No ModelPort.
 from __future__ import annotations
 
 import math
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 Vec = List[float]
 Mat = List[List[float]]
@@ -238,14 +238,21 @@ def sample_logits(
     top_k: int = 0,
     top_p: float = 1.0,
 ) -> int:
-    """Greedy if temperature→0 or top_k=1. Else temperature + top-k + nucleus."""
+    """Sample finite logits, allowing -inf only as an explicit token mask."""
     n = len(logits)
     if n == 0:
-        return 0
+        raise ValueError("cannot sample an empty vocabulary")
+    if any(math.isnan(x) or x == math.inf for x in logits):
+        raise ValueError("sampling logits contain NaN or positive infinity")
+    if not any(math.isfinite(x) for x in logits):
+        raise ValueError("sampling policy masks every token")
     if temperature is None or float(temperature) <= 1e-8 or int(top_k) == 1:
         return max(range(n), key=lambda i: logits[i])
     t = max(1e-6, float(temperature))
-    scaled = [x / t for x in logits]
+    # Center before division: large finite logits and low temperatures must
+    # not overflow into inf before softmax can subtract its maximum.
+    maximum = max(logits)
+    scaled = [(x - maximum) / t for x in logits]
     p = softmax(scaled)
     k = int(top_k or 0)
     if 0 < k < n:
@@ -270,10 +277,10 @@ def sample_logits(
         return max(range(n), key=lambda i: p[i])
     r = rng.random()
     acc = 0.0
-    nxt = n - 1
+    nxt = max(i for i, value in enumerate(p) if value > 0.0)
     for i, pv in enumerate(p):
         acc += pv
-        if acc >= r:
+        if pv > 0.0 and r < acc:
             nxt = i
             break
     return nxt
@@ -303,7 +310,10 @@ def layer_norm_bwd(dy: Vec, hat: Vec, inv: float, g: Vec) -> Tuple[Vec, Vec, Vec
     return dx, dg, db
 
 
-def causal_attend(Q: Mat, K: Mat, V: Mat) -> Tuple[Mat, Mat]:
+def causal_attend(
+    Q: Mat, K: Mat, V: Mat, *, retain_weights: bool = True,
+    interrupt: Callable[[], None] | None = None,
+) -> Tuple[Mat, Mat]:
     """One head. C[i] = Σ_{j≤i} A[i,j] V[j]. Returns (C, A)."""
     n = len(Q)
     if n == 0:
@@ -313,6 +323,8 @@ def causal_attend(Q: Mat, K: Mat, V: Mat) -> Tuple[Mat, Mat]:
     C: Mat = []
     A: Mat = []
     for i in range(n):
+        if interrupt is not None:
+            interrupt()
         scores = [dot(Q[i], K[j]) * inv for j in range(i + 1)]
         w = softmax(scores)
         ctx = zeros(len(V[0]))
@@ -321,7 +333,8 @@ def causal_attend(Q: Mat, K: Mat, V: Mat) -> Tuple[Mat, Mat]:
             for d_i, val in enumerate(vj):
                 ctx[d_i] += aij * val
         C.append(ctx)
-        A.append(w)
+        if retain_weights:
+            A.append(w)
     return C, A
 
 
@@ -348,11 +361,14 @@ def concat_heads(heads: List[Mat]) -> Mat:
     return out
 
 
-def multi_head_attend(Q: Mat, K: Mat, V: Mat, n_heads: int = 1) -> Tuple[Mat, List[Mat]]:
+def multi_head_attend(
+    Q: Mat, K: Mat, V: Mat, n_heads: int = 1, *, retain_weights: bool = True,
+    interrupt: Callable[[], None] | None = None,
+) -> Tuple[Mat, List[Mat]]:
     """n_heads independent causal attends, concat on the feature axis."""
     n_heads = max(1, int(n_heads))
     if n_heads == 1:
-        C, A = causal_attend(Q, K, V)
+        C, A = causal_attend(Q, K, V, retain_weights=retain_weights, interrupt=interrupt)
         return C, [A]
     Cs: List[Mat] = []
     As: List[Mat] = []
@@ -361,6 +377,7 @@ def multi_head_attend(Q: Mat, K: Mat, V: Mat, n_heads: int = 1) -> Tuple[Mat, Li
             slice_head(Q, h, n_heads),
             slice_head(K, h, n_heads),
             slice_head(V, h, n_heads),
+            retain_weights=retain_weights, interrupt=interrupt,
         )
         Cs.append(C)
         As.append(A)

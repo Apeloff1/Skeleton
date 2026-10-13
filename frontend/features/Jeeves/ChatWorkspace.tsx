@@ -13,6 +13,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import api from '../../src/utils/apiClient';
 import { WorkspaceController } from './WorkspaceController';
 import MessageContent from './MessageContent';
+import JeevesRuntimeStatus from './JeevesRuntimeStatus';
 import ChatTaskActions from './workbench/ChatTaskActions';
 import ChatSceneActions from './ChatSceneActions';
 import ChatStoryActions from './ChatStoryActions';
@@ -283,6 +284,7 @@ export default function ChatWorkspace() {
         <Button icon={conversation.pinned ? 'star' : 'star-outline'} label="Pin" selected={conversation.pinned} onPress={() => controller.edit({ pinned: !conversation.pinned })} />
         <Button icon="options-outline" label="Details" onPress={() => { setTitle(conversation.title); setContext(conversation.context); setSettings(true); }} />
       </View>
+      <JeevesRuntimeStatus />
       {(snapshot.notice || snapshot.saveState === 'error') && <View style={s.notice} accessibilityRole="alert">
         <Text style={[s.small, s.flex]}>{snapshot.notice || 'Changes could not be saved to this device.'}</Text>
         {snapshot.saveState === 'error' ? <Button icon="refresh-outline" label="Save again" onPress={controller.retrySave} /> : <TouchableOpacity accessibilityLabel="Dismiss notice" onPress={controller.dismissNotice}><Ionicons name="close" size={20} color={C.text} /></TouchableOpacity>}

@@ -297,6 +297,23 @@ class OfflineChatStore:
                         self._db.execute("ROLLBACK")
                     raise
 
+    @contextmanager
+    def read_snapshot(self) -> Iterator[None]:
+        """Compose validated reads against one cross-process SQLite snapshot.
+
+        Nested reads reuse their caller's transaction. Never acquire a write
+        transaction or commit writes here; the outer authority owns those.
+        """
+        with self._lock:
+            own_snapshot = not self._db.in_transaction
+            if own_snapshot:
+                self._db.execute("BEGIN")
+            try:
+                yield
+            finally:
+                if own_snapshot:
+                    self._db.execute("ROLLBACK")
+
     def close(self) -> None:
         with self._lock:
             self._db.close()
@@ -438,8 +455,8 @@ class OfflineChatStore:
     def turn_evidence(self, session_id: str, model_digest: str,
                       tokenizer_digest: str) -> list[dict[str, Any] | None]:
         """Read validated immutable supplied-source snapshots per saved turn."""
-        record = self.load(session_id, model_digest, tokenizer_digest)
-        with self._lock:
+        with self.read_snapshot():
+            record = self.load(session_id, model_digest, tokenizer_digest)
             rows = self._db.execute(
                 "SELECT t.request_id, t.request_digest, t.revision, t.text, "
                 "t.output_digest, t.prompt_tokens, t.generated_tokens, "
@@ -478,6 +495,70 @@ class OfflineChatStore:
             ).fetchall()
         return tuple((_identifier("session id", sid), revision)
                      for sid, revision in rows)
+
+    def session_summaries(self, model_digest: str, tokenizer_digest: str,
+                          *, query: str = "", cursor: str | None = None,
+                          limit: int = 30) -> dict[str, Any]:
+        """Page model-scoped conversation projections without a shadow index.
+
+        The cursor is a timestamp/identity boundary, not an array offset. Each
+        displayed record is verified against its canonical receipts in the
+        same read snapshot used to select the page.
+        """
+        _sha256(model_digest, "model digest")
+        _sha256(tokenizer_digest, "tokenizer digest")
+        if not isinstance(query, str) or len(query.encode("utf-8")) > 256:
+            raise RuntimeContractError("conversation search exceeds 256 UTF-8 bytes")
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise RuntimeContractError("invalid conversation page size")
+        predicates = ["model_digest=?", "tokenizer_digest=?"]
+        parameters: list[Any] = [model_digest, tokenizer_digest]
+        if query.strip():
+            # Parameterized literal substring search: '%' and '_' are data.
+            predicates.append("instr(lower(transcript_json), lower(?)) > 0")
+            parameters.append(query.strip())
+        if cursor is not None:
+            if not isinstance(cursor, str) or len(cursor) > 160:
+                raise RuntimeContractError("invalid conversation cursor")
+            stamp, separator, sid = cursor.partition(":")
+            if not separator or not stamp.isascii() or not stamp.isdecimal() or len(stamp) > 19:
+                raise RuntimeContractError("invalid conversation cursor")
+            boundary = int(stamp)
+            if boundary > 2**63 - 1:
+                raise RuntimeContractError("invalid conversation cursor")
+            _identifier("cursor session id", sid)
+            predicates.append("(updated_at < ? OR (updated_at = ? AND session_id > ?))")
+            parameters.extend([boundary, boundary, sid])
+        with self._lock:
+            own_snapshot = not self._db.in_transaction
+            if own_snapshot:
+                self._db.execute("BEGIN")
+            try:
+                rows = self._db.execute(
+                    "SELECT session_id, updated_at FROM offline_sessions WHERE "
+                    + " AND ".join(predicates)
+                    + " ORDER BY updated_at DESC, session_id LIMIT ?",
+                    (*parameters, limit + 1),
+                ).fetchall()
+                summaries = []
+                for sid, stamp in rows[:limit]:
+                    saved = self.load(sid, model_digest, tokenizer_digest)
+                    dialogue = [m for m in saved.transcript.messages if m.role != "system"]
+                    title = next((m.content for m in dialogue if m.role == "user"), "New conversation")
+                    summaries.append({
+                        "session_id": sid, "revision": saved.revision,
+                        "title": " ".join(title.split())[:100],
+                        "preview": (dialogue[-1].content[:240] if dialogue else ""),
+                        "updated_at_ms": stamp // 1_000_000,
+                    })
+            finally:
+                if own_snapshot:
+                    self._db.execute("ROLLBACK")
+        next_cursor = None
+        if len(rows) > limit:
+            sid, stamp = rows[limit - 1]
+            next_cursor = f"{stamp}:{sid}"
+        return {"sessions": summaries, "next_cursor": next_cursor}
 
     def delete(self, session_id: str, model_digest: str,
                tokenizer_digest: str) -> None:
@@ -754,6 +835,27 @@ class OfflineChatStore:
         return None if row is None else self._receipt(
             row, session_id, request_id, request_digest, replayed=True
         )
+
+    def committed_turn(self, session_id: str, request_id: str,
+                       model_digest: str, tokenizer_digest: str, *,
+                       expected_request_digest: str | None = None,
+                       ) -> tuple[OfflineTurnReceipt, dict[str, Any] | None] | None:
+        """Recover status from a validated receipt without executing a request."""
+        rid = _identifier("request id", request_id)
+        if expected_request_digest is not None:
+            _sha256(expected_request_digest, "expected request digest")
+        with self.read_snapshot():
+            saved = self.load(session_id, model_digest, tokenizer_digest)
+            row = self._db.execute(
+                "SELECT request_digest, revision, text, output_digest, prompt_tokens, "
+                "generated_tokens FROM offline_turns WHERE session_id=? AND request_id=?",
+                (saved.session_id, rid),
+            ).fetchone()
+            if row is None or (expected_request_digest is not None and row[0] != expected_request_digest):
+                return None
+            receipt = self._receipt(row, saved.session_id, rid, row[0], replayed=True)
+            evidence = self.turn_evidence(saved.session_id, model_digest, tokenizer_digest)
+            return receipt, evidence[receipt.revision - 1]
 
     @staticmethod
     def ensure_can_append(session: StoredChat) -> None:

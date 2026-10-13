@@ -2,13 +2,17 @@
 
 This implements *searchable evidence retrieval*, not a claim that arbitrary
 generated model text is grounded. It deliberately never downloads, crawls,
-executes, follows file paths or interprets stored text as instructions.
+executes, follows stored file paths or interprets stored text as instructions.
+Explicit operator-selected files use bounded regular-file admission.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
 import math
+import os
+from pathlib import Path
+import stat
 import re
 import unicodedata
 from typing import Any
@@ -34,6 +38,59 @@ _STOP = frozenset({
     "their", "then", "than", "they", "will", "would", "should",
 })
 
+
+
+def read_reference_file(path: Path) -> str:
+    """Read one bounded local UTF-8 file through a stable regular-file handle.
+
+    Inspect the path both before and after opening, bind the opened file to
+    that identity, and reject any replacement or in-place change during read.
+    O_NOFOLLOW also prevents symlink traversal on supporting operating systems.
+    """
+    try:
+        before = path.lstat()
+        if not stat.S_ISREG(before.st_mode):
+            raise RuntimeContractError(
+                "reference path must be a local regular non-symlink file"
+            )
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_BINARY", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
+        fd = os.open(path, flags)
+        with os.fdopen(fd, "rb") as source:
+            opened = os.fstat(source.fileno())
+            if (not stat.S_ISREG(opened.st_mode)
+                    or (opened.st_dev, opened.st_ino) !=
+                    (before.st_dev, before.st_ino)):
+                raise RuntimeContractError("reference changed during file admission")
+            if not 1 <= opened.st_size <= MAX_DOCUMENT_BYTES:
+                raise RuntimeContractError("reference file exceeds the 64 KiB limit")
+            payload = source.read(MAX_DOCUMENT_BYTES + 1)
+            after = os.fstat(source.fileno())
+            current = path.lstat()
+            if (not stat.S_ISREG(current.st_mode)
+                    or (current.st_dev, current.st_ino) !=
+                    (opened.st_dev, opened.st_ino)
+                    or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns) !=
+                    (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)):
+                raise RuntimeContractError("reference changed during file admission")
+    except (OSError, ValueError) as exc:
+        if isinstance(exc, RuntimeContractError):
+            raise
+        raise RuntimeContractError("reference path is not a readable regular file") from exc
+    if not 1 <= len(payload) <= MAX_DOCUMENT_BYTES or len(payload) != opened.st_size:
+        raise RuntimeContractError("reference changed or exceeded size budget")
+    try:
+        text = payload.decode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise RuntimeContractError("reference must be UTF-8 text") from exc
+    if "\x00" in text:
+        raise RuntimeContractError("binary reference content is prohibited")
+    return text
 
 def _identity(value: str, label: str) -> str:
     if (not isinstance(value, str) or len(value) != 64
@@ -269,6 +326,20 @@ class OfflineKnowledgeLibrary:
             if deleted.rowcount != 1:
                 raise RuntimeContractError("unknown local reference document")
 
+    def get_document(self, document_id: str) -> dict[str, Any]:
+        """Return the exact verified source for inspection or private export."""
+        if not isinstance(document_id, str) or len(document_id) > 100:
+            raise RuntimeContractError("invalid reference document id")
+        documents, _ = self._verified_snapshot()
+        for row in documents:
+            if row[0] == document_id:
+                return {
+                    "document_id": row[0], "title": row[1], "sha256": row[2],
+                    "text": row[3], "created_ns": str(row[4]),
+                    "size_bytes": len(row[3].encode("utf-8")),
+                }
+        raise RuntimeContractError("unknown local reference document")
+
     def search(self, query: str, *, limit: int = 6) -> list[dict[str, Any]]:
         if (not isinstance(query, str) or not query.strip()
                 or len(query.encode("utf-8")) > MAX_QUERY_BYTES):
@@ -313,6 +384,6 @@ class OfflineKnowledgeLibrary:
 
 
 __all__ = [
-    "OfflineKnowledgeLibrary", "LocalKnowledgeHit",
+    "OfflineKnowledgeLibrary", "LocalKnowledgeHit", "read_reference_file",
     "MAX_DOCUMENT_BYTES", "MAX_DOCUMENTS_PER_MODEL", "MAX_CHUNKS_PER_MODEL",
 ]
