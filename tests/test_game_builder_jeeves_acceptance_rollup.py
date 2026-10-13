@@ -24,6 +24,8 @@ class IndependentTargetedAcceptanceRollupTests(unittest.TestCase):
             "schema": schema,
             "repository": "Apeloff1/Skeleton",
             "verified_git_head": self.head,
+            "reviewed_matrix_sha256":"b"*64,
+            "reviewed_scope_sha256":"c"*64,
             "run_id": run,
             "run_attempt": 1,
             "independent_ci_execution_verified": True,
@@ -121,6 +123,17 @@ class IndependentTargetedAcceptanceRollupTests(unittest.TestCase):
             with self.subTest(field=field),self.assertRaises(JeevesAppwideError):
                 self.rollup()
             self.pytest[field]=original
+
+    def test_run_source_hash_divergence_rejected_even_if_each_CI_is_green(self):
+        old=deepcopy(self.pytest)
+        for field in ("reviewed_matrix_sha256", "reviewed_scope_sha256"):
+            self.pytest=deepcopy(old)
+            self.pytest[field]="e"*64
+            self.pytest["digest"] = digest({
+                k: v for k, v in self.pytest.items() if k != "digest"})
+            with self.subTest(field=field),self.assertRaises(JeevesAppwideError):
+                self.rollup()
+        self.pytest=old
 
     def test_same_GitHub_run_id_cannot_prove_both_test_modes(self):
         self.pytest["run_id"] = self.junit["run_id"]
