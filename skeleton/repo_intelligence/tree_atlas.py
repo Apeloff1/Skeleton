@@ -311,7 +311,6 @@ def build(root: Path, *, near_limit: int = 0) -> tuple[dict[str, object], tuple[
         "zones": dict(sorted(zones.items())),
         "feature_count": len(feature_counts),
         "directory_count": len(directory_index(entries)),
-        "features": dict(sorted(feature_counts.items())),
         "exact_duplicate_groups": len(duplicates),
         "exact_duplicate_excess": sum(int(g["excess"]) for g in duplicates),
         "near_duplicate_exhaustive": False,
