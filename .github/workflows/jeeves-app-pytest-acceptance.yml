@@ -68,6 +68,8 @@ jobs:
           python -m py_compile \
             skeleton/ai/game_builder/jeeves_acceptance_matrix.py \
             skeleton/ai/game_builder/jeeves_acceptance_rollup.py \
+            skeleton/ai/game_builder/jeeves_enterprise_journey_frontier.py \
+            tests/test_game_builder_jeeves_enterprise_journey_frontier.py \
             tests/test_game_builder_jeeves_acceptance_rollup.py \
             scripts/run_app_pytest_acceptance.py \
             scripts/verify_app_acceptance_ci.py \
@@ -80,7 +82,8 @@ jobs:
           python -m unittest \
             tests.test_run_app_pytest_acceptance \
             tests.test_game_builder_jeeves_pytest_acceptance_verifier \
-            tests.test_game_builder_jeeves_acceptance_rollup -v
+            tests.test_game_builder_jeeves_acceptance_rollup \
+            tests.test_game_builder_jeeves_enterprise_journey_frontier -v
       - name: Execute actual reviewed pytest family regressions
         shell: bash
         run: |
