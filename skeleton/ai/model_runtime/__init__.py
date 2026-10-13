@@ -59,6 +59,8 @@ _LAZY_EXPORTS = {
     "NativeActivationReceipt": ".weight_activation",
     "NativeRollbackReceipt": ".weight_activation",
     "NativeWeightDeployment": ".weight_activation",
+    "WeightShardStoreError": ".weight_shard_store",
+    "WeightShardStore": ".weight_shard_store",
     "WorkspaceEvent": ".chat_workspace",
     "WorkspaceRecord": ".chat_workspace",
     "BatchGenerationResult": ".native_llm_runtime",
