@@ -83,7 +83,11 @@ def _read_corpus(path: str | Path) -> tuple[bytes, str]:
             if opened.st_size > MAX_CORPUS_BYTES:
                 raise OfflineTrainingError("training source exceeds 32 KiB")
             data = stream.read(MAX_CORPUS_BYTES + 1)
-            if len(data) != opened.st_size:
+            # Recheck the open descriptor after reading. A concurrent writer
+            # can extend the corpus while the bounded read still returns the
+            # exact original byte count; that is not a stable training input.
+            if (len(data) != opened.st_size or
+                os.fstat(stream.fileno()).st_size != opened.st_size):
                 raise OfflineTrainingError("training source changed while reading")
     except OSError as exc:
         raise OfflineTrainingError("cannot read local training source") from exc
