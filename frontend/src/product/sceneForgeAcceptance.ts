@@ -40,8 +40,11 @@ export function acceptSceneForgeResponse(
   if (result.mounted !== true || result.clamped !== true && result.clamped !== false) {
     return reject('Asset mounting was not confirmed by Scene Forge.');
   }
+  // Capture the narrowed array locally: a mutable record property cannot
+  // retain its TypeScript narrowing inside nested callbacks.
+  const composed = result.composed;
   if (!Array.isArray(requested) || !requested.length || requested.length > 100 ||
-      !Array.isArray(result.composed) || result.composed.length > requested.length) {
+      !Array.isArray(composed) || composed.length > requested.length) {
     return reject('Scene composition details are missing or invalid.');
   }
   if (!integer(result.total, 1) || !integer(result.primary, 1) ||
@@ -59,7 +62,7 @@ export function acceptSceneForgeResponse(
   }
   const seen = new Set<string>();
   let primary = 0;
-  for (const item of result.composed) {
+  for (const item of composed) {
     const row = object(item);
     const category = row?.category;
     const count = row?.count;
@@ -76,7 +79,7 @@ export function acceptSceneForgeResponse(
   if (!result.clamped &&
       (seen.size !== expected.size ||
        [...expected].some(([category, count]) =>
-         !seen.has(category) || !result.composed.some((row: unknown) => {
+         !seen.has(category) || !composed.some((row: unknown) => {
            const item = object(row);
            return item?.category === category && item.count === count;
          })))) {
