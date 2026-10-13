@@ -40,7 +40,7 @@ def _strict_ref(value: Any) -> str:
     return value
 
 
-def _safe_path(value: Any, inventory: AppwideInventory) -> str | None:
+def _safe_path(value: Any, inventory: AppwideInventory, directories: set[str]) -> str | None:
     if type(value) is not str or len(value) > 360:
         return None
     try:
@@ -52,8 +52,7 @@ def _safe_path(value: Any, inventory: AppwideInventory) -> str | None:
     entry = inventory._files.get(path)
     if entry is not None:
         return path if entry.readable else None
-    if any(p.startswith(path + "/") and e.readable
-           for p, e in inventory._files.items()):
+    if path in directories:
         return path
     return None
 
@@ -77,6 +76,15 @@ class JeevesEvidenceGraph:
         data = {}
         for path in CANONICAL_SOURCES:
             data[path] = _json_object(inv._safe_file(path, max_size=1_000_000), path)
+        # Build one indexed directory set. A 58k-file inventory cannot
+        # afford O(files) prefix traversal for each of many volume paths.
+        directories = set()
+        for item in inv._files.values():
+            if not item.readable:
+                continue
+            chunks = item.path.split("/")
+            for depth in range(1, len(chunks)):
+                directories.add("/".join(chunks[:depth]))
         nodes = {}
         edges = {}
         skips = Counter()
@@ -113,7 +121,7 @@ class JeevesEvidenceGraph:
             }
 
         def source_link(parent_id, path, relation):
-            valid = _safe_path(path, inv)
+            valid = _safe_path(path, inv, directories)
             if valid is None:
                 skips["unavailable_or_restricted_path"] += 1
                 return
@@ -161,7 +169,7 @@ class JeevesEvidenceGraph:
                  role=str(service.get("role", "unspecified")))
             source_link(identifier, service.get("path"), "declares_owner_path")
         for path in app.get("required_paths", []):
-            valid = _safe_path(path, inv)
+            valid = _safe_path(path, inv, directories)
             if valid is None:
                 skips["app_required_path_missing_or_restricted"] += 1
                 continue
