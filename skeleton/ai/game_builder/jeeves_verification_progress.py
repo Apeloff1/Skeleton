@@ -228,8 +228,7 @@ class JeevesVerificationProgress:
                         "update canonical volume state only after signoff",
                     ],
                 })
-        for issue in release["sources_missing"] and
-                     ["missing_required_release_gate_workflows"] or []:
+        if release["sources_missing"]:
             tasks.append({
                 "id": "CI-WORKFLOW-MISSING", "kind": "required_ci_workflow",
                 "priority": "P0", "status": "missing_workflow_source",
