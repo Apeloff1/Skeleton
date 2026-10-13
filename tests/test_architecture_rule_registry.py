@@ -75,12 +75,26 @@ class ArchitectureRuleRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ArchitectureRuleRegistryError, "registry coverage drift"):
             MODULE.validate(root, as_of=AS_OF)
 
+    def test_closed_volumes_accept_exact_empty_gap_bindings(self) -> None:
+        root = self._fixture()
+        self.assertEqual(MODULE.validate(root, as_of=AS_OF)["masterplan_bindings"],
+                         ["VOL-055", "VOL-116"])
+
+    def test_rejects_invented_gap_in_registry(self) -> None:
+        root = self._fixture()
+        path, registry = self._registry(root)
+        registry["masterplan_bindings"][0]["required_gap_texts"] = ["imaginary open gap"]
+        path.write_text(json.dumps(registry), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ArchitectureRuleRegistryError,
+                                    "canonical masterplan gap"):
+            MODULE.validate(root, as_of=AS_OF)
+
     def test_rejects_masterplan_gap_narrowing(self) -> None:
         root = self._fixture()
         master_path = root / "machine/ai_master_plan.json"
         master = json.loads(master_path.read_text(encoding="utf-8"))
         volume = next(item for item in master["volumes"] if item["key"] == "VOL-055")
-        volume["gaps"].remove("add waiver expiry enforcement")
+        volume["gaps"].append("unmapped new architecture validation requirement")
         master_path.write_text(json.dumps(master), encoding="utf-8")
         with self.assertRaisesRegex(MODULE.ArchitectureRuleRegistryError, "canonical masterplan gap"):
             MODULE.validate(root, as_of=AS_OF)

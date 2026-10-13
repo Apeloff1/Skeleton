@@ -27,5 +27,23 @@ def test_rejects_queue_loss(tmp_path:Path):
 
 def test_rejects_self_signoff(tmp_path:Path):
     root=_fixture(tmp_path); path=root/"machine/ai_p3_engineering_task_backlog.json"; payload=json.loads(path.read_text())
-    payload["tasks"][0]["verification_signed"]=True; path.write_text(json.dumps(payload))
+    task=payload["tasks"][0]
+    task.update(status="landed_unpromoted", completion_checkbox=False,
+                completion_checkbox_mark="[ ]", implementation_signed=False, verification_signed=True)
+    path.write_text(json.dumps(payload))
     with pytest.raises(P3EngineeringValidationError,match="self-complete or self-sign"): validate(root)
+
+def test_rejects_unsigned_closed_task(tmp_path:Path):
+    root=_fixture(tmp_path); path=root/"machine/ai_p3_engineering_task_backlog.json"
+    payload=json.loads(path.read_text()); task=payload["tasks"][0]
+    assert task["status"]=="closed"
+    task["verification_signed"]=False
+    path.write_text(json.dumps(payload))
+    with pytest.raises(P3EngineeringValidationError,match="closed requires verified signoffs"): validate(root)
+
+def test_rejects_closed_task_without_matching_workflow_evidence(tmp_path:Path):
+    root=_fixture(tmp_path); path=root/"machine/ai_p3_engineering_task_backlog.json"
+    payload=json.loads(path.read_text()); task=payload["tasks"][0]
+    task["evidence_refs"]=[ref for ref in task["evidence_refs"] if not ref.startswith("workflow:P3 Engineering Extension Authority@")]
+    path.write_text(json.dumps(payload))
+    with pytest.raises(P3EngineeringValidationError,match="pinned successful acceptance evidence"): validate(root)

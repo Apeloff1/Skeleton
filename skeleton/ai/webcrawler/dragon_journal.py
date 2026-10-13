@@ -52,6 +52,8 @@ class DragonEventJournal:
             raise ValueError("invalid event URL")
         if not math.isfinite(at):
             raise ValueError("event time must be finite")
+        # SQLite REAL converts integral timestamps to floats on reread.
+        at = float(at)
         data = dict(payload or {})
         encoded = _canonical(data)
         if len(encoded.encode("utf-8")) > 32768:
@@ -98,7 +100,14 @@ class DragonEventJournal:
             base = {"session_id": session_id, "sequence": seq, "kind": kind,
                     "url": url, "at": at, "payload": json.loads(payload),
                     "previous_digest": parent}
-            if hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest() != digest:
-                return False
+            candidate=hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest()
+            if candidate!=digest:
+                # Backward-compatible verification of old integer-time
+                # records; the complete original digest still must match.
+                if not isinstance(at,(int,float)) or not float(at).is_integer():
+                    return False
+                base["at"]=int(at)
+                if hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest()!=digest:
+                    return False
             previous = digest
         return True

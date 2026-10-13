@@ -12,6 +12,53 @@ import json
 from typing import Mapping, Sequence
 
 from .system_editors import make_editor_document, SystemEditorError
+from .advanced_npc_society_runtime import (
+    ACTIONS as SOCIETY_ACTIONS, SocietyActionError,
+    start as society_start, step as society_step,
+    apply_scene as apply_society_scene,
+)
+from .advanced_dialogue_runtime import (ACTIONS as DIALOGUE_ACTIONS, DialogueActionError,
+    start as dialogue_start, step as dialogue_step, apply_scene as apply_dialogue_scene)
+from .advanced_voxel_runtime import (ACTIONS as VOXEL_ACTIONS, VoxelActionError,
+    start as voxel_start, step as voxel_step, apply_scene as apply_voxel_scene)
+from .advanced_ecosystem_runtime import (
+    ACTIONS as ECOSYSTEM_ACTIONS, EcosystemActionError,
+    start as ecosystem_start, step as ecosystem_step,
+    apply_scene as apply_ecosystem_scene,
+)
+from .advanced_rpg_runtime import (
+    ACTIONS as RPG_ACTIONS, RPGActionError,
+    start as rpg_start, step as rpg_step, apply_scene as apply_rpg_scene,
+)
+from .advanced_procedural_world_runtime import (
+    ACTIONS as PROC_ACTIONS, ProceduralWorldActionError,
+    start as proc_start, step as proc_step, apply_scene as apply_proc_scene,
+)
+from .advanced_maze_runtime import (
+    ACTIONS as MAZE_ACTIONS, MazeActionError,
+    start as maze_start, step as maze_step, apply_scene as apply_maze_scene,
+)
+from .advanced_sports_runtime import (
+    ACTIONS as SPORTS_ACTIONS, SportsActionError,
+    start as sports_start, step as sports_step, apply_scene as apply_sports_scene,
+)
+from .advanced_parkour_runtime import (
+    ACTIONS as PARKOUR_ACTIONS, ParkourActionError,
+    start as parkour_start, step as parkour_step, apply_scene as apply_parkour_scene,
+)
+from .advanced_sailing_runtime import (
+    ACTIONS as SAIL_ACTIONS, SailingActionError,
+    start as sail_start, step as sail_step, apply_scene as apply_sail_scene,
+)
+from .advanced_maritime_rescue_runtime import (
+    ACTIONS as MARITIME_ACTIONS, SailingActionError as MaritimeRescueActionError,
+    start as maritime_start, step as maritime_step,
+    apply_scene as apply_maritime_scene,
+)
+from .advanced_flight_runtime import (
+    ACTIONS as FLIGHT_ACTIONS, FlightActionError,
+    start as flight_start, step as flight_step, apply_scene as apply_flight_scene,
+)
 from .advanced_quest_director_runtime import (ACTIONS as QUEST_ACTIONS,
         QuestDirectorError,start as quest_start,step as quest_step,
         apply_scene as apply_quest_scene)
@@ -48,16 +95,18 @@ from .advanced_factory_runtime import (ACTIONS as FACTORY_ACTIONS, FactoryAction
 from .advanced_farming_runtime import (ACTIONS as FARM_ACTIONS, FarmingActionError,
                                         start as farming_start, step as farming_step,
                                         apply_scene as apply_farm_scene)
-from .advanced_sailing_runtime import (ACTIONS as SAILING_ACTIONS,
-    SailingActionError, start as sailing_start, step as sailing_step,
-    apply_scene as apply_sailing_scene)
+from .advanced_economy_runtime import (
+    ACTIONS as ECONOMY_ACTIONS, EconomyActionError,
+    start as economy_start, step as economy_step,
+    apply_scene as apply_economy_scene,
+)
 from .advanced_genre_engines import (
     GENRE_ACTIONS, STARTS as GENRE_STARTS, STEPS as GENRE_STEPS,
     GenreActionError, apply_genre_scene,
 )
 
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "sailing")
+ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "maritime_rescue", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "voxel", "dialogue", "economy")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
@@ -86,7 +135,19 @@ ACTION_HELP = {
     "rhythm": RHYTHM_ACTIONS,
     "fighting": FIGHT_ACTIONS,
     "quest_director": QUEST_ACTIONS,
-    "sailing": SAILING_ACTIONS,
+    "flight": FLIGHT_ACTIONS,
+    "sailing": SAIL_ACTIONS,
+    "maritime_rescue": MARITIME_ACTIONS,
+    "parkour": PARKOUR_ACTIONS,
+    "sports": SPORTS_ACTIONS,
+    "maze": MAZE_ACTIONS,
+    "rpg": RPG_ACTIONS,
+    "procedural_world": PROC_ACTIONS,
+    "npc_society": SOCIETY_ACTIONS,
+    "ecosystem": ECOSYSTEM_ACTIONS,
+    "voxel": VOXEL_ACTIONS,
+    "dialogue": DIALOGUE_ACTIONS,
+    "economy": ECONOMY_ACTIONS,
     **GENRE_ACTIONS,
 }
 
@@ -700,13 +761,25 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         "rhythm":rhythm_start,
         "fighting":fight_start,
         "quest_director":quest_start,
-        "sailing":sailing_start,
+        "flight":flight_start,
+        "sailing":sail_start,
+        "maritime_rescue":maritime_start,
+        "parkour":parkour_start,
+        "sports":sports_start,
+        "maze":maze_start,
+        "rpg":rpg_start,
+        "procedural_world":proc_start,
+        "npc_society":society_start,
+        "ecosystem":ecosystem_start,
+        "voxel":voxel_start,
+        "dialogue":dialogue_start,
+        "economy": economy_start,
         **GENRE_STARTS,
     }
     try:
         state=starts[editor](rules,seed)
     except (GenreActionError,FarmingActionError,FactoryActionError,
-            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,SailingActionError) as exc:
+            ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,MaritimeRescueActionError,ParkourActionError,SportsActionError,MazeActionError,RPGActionError,ProceduralWorldActionError,SocietyActionError,EcosystemActionError,VoxelActionError,DialogueActionError,EconomyActionError) as exc:
         raise AdvancedRuntimeError(str(exc)) from exc
     if scene is not None:
         from .advanced_level_scenes import validate_advanced_scene
@@ -760,8 +833,32 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             apply_fight_scene(state,rules,layout)
         elif editor=="quest_director":
             apply_quest_scene(state,rules,layout)
+        elif editor=="flight":
+            apply_flight_scene(state,rules,layout)
         elif editor=="sailing":
-            apply_sailing_scene(state,rules,layout)
+            apply_sail_scene(state,rules,layout)
+        elif editor=="maritime_rescue":
+            apply_maritime_scene(state,rules,layout)
+        elif editor=="parkour":
+            apply_parkour_scene(state,rules,layout)
+        elif editor=="sports":
+            apply_sports_scene(state,rules,layout)
+        elif editor=="maze":
+            apply_maze_scene(state,rules,layout)
+        elif editor=="rpg":
+            apply_rpg_scene(state,rules,layout)
+        elif editor=="procedural_world":
+            apply_proc_scene(state,rules,layout)
+        elif editor=="npc_society":
+            apply_society_scene(state,rules,layout)
+        elif editor=="ecosystem":
+            apply_ecosystem_scene(state,rules,layout)
+        elif editor=="voxel":
+            apply_voxel_scene(state,rules,layout)
+        elif editor=="economy":
+            apply_economy_scene(state,rules,layout)
+        elif editor=="dialogue":
+            apply_dialogue_scene(state,rules,layout)
         else:
             apply_genre_scene(editor,state,layout)
     baseline=_digest({"editor":editor,"configuration":config["digest"],"seed":seed,
@@ -790,12 +887,24 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
             "rhythm":rhythm_step,
             "fighting":fight_step,
             "quest_director":quest_step,
-            "sailing":sailing_step,
-            **GENRE_STEPS,
+            "flight":flight_step,
+            "sailing":sail_step,
+            "maritime_rescue":maritime_step,
+            "parkour":parkour_step,
+            "sports":sports_step,
+            "maze":maze_step,
+            "rpg":rpg_step,
+            "procedural_world":proc_step,
+            "npc_society":society_step,
+            "ecosystem":ecosystem_step,
+            "voxel":voxel_step,
+            "dialogue":dialogue_step,
+            "economy": economy_step,
+        **GENRE_STEPS,
         }
         try:
             events=steps[editor](state,rules,action)
-        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,SailingActionError) as exc:
+        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,MaritimeRescueActionError,ParkourActionError,SportsActionError,MazeActionError,RPGActionError,ProceduralWorldActionError,SocietyActionError,EcosystemActionError,VoxelActionError,DialogueActionError,EconomyActionError) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,

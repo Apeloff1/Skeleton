@@ -42,6 +42,50 @@ class NPCEconomyKnowledgeTests(unittest.TestCase):
         self.assertEqual(after.digest,produce_goods(
             before,working,authorized=True).digest)
 
+    def test_one_authoritative_profession_shift_per_world_tick(self):
+        society=make_society(self.world,36,authorized=True)
+        worker=next(i for i,p in enumerate(society.profiles)
+                    if p.profession=="builder")
+        minds=list(society.minds)
+        minds[worker]=replace(minds[worker],scene=society.profiles[worker].workplace,
+                              intent="work")
+        acting=replace(society,minds=tuple(minds),turn=3)
+        initial=new_economy(acting,authorized=True)
+        produced=produce_goods(initial,acting,authorized=True)
+        after_first=dict(produced.accounts[worker].goods)
+        self.assertEqual(after_first["tools"],1)
+        with self.assertRaisesRegex(EconomyError,"authoritative world turn"):
+            produce_goods(produced,acting,authorized=True)
+        advanced=replace(acting,turn=4)
+        produced_twice=produce_goods(produced,advanced,authorized=True)
+        self.assertEqual(dict(produced_twice.accounts[worker].goods)["tools"],2)
+        self.assertEqual(len([event for event in produced_twice.events
+                              if event.from_actor==acting.profiles[worker].key
+                              and event.kind=="produce"]),2)
+
+    def test_full_workshop_refuses_input_consumption_or_ghost_output(self):
+        society=make_society(self.world,36,authorized=True)
+        worker=next(i for i,p in enumerate(society.profiles)
+                    if p.profession=="builder")
+        minds=list(society.minds)
+        minds[worker]=replace(minds[worker],scene=society.profiles[worker].workplace,
+                              intent="work")
+        acting=replace(society,minds=tuple(minds),turn=3)
+        economy=new_economy(acting,authorized=True)
+        accounts=list(economy.accounts)
+        original=dict(accounts[worker].goods)
+        saturated={**original,"tools":255}
+        accounts[worker]=replace(accounts[worker],
+                                 goods=tuple(sorted(saturated.items())))
+        full=replace(economy,accounts=tuple(accounts))
+        after=produce_goods(full,acting,authorized=True)
+        final=dict(after.accounts[worker].goods)
+        self.assertEqual(final["tools"],255)
+        self.assertEqual(final["wood"],original["wood"])
+        self.assertFalse(any(event.kind=="produce" and
+                             event.from_actor==acting.profiles[worker].key
+                             for event in after.events))
+
     def test_money_and_materials_are_conserved_by_real_colocated_trade(self):
         society=make_society(self.world,36,authorized=True)
         seller=society.profiles[0].key

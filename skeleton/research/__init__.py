@@ -34,4 +34,27 @@ __all__ = [
     "RetractionRecord",
     "SourceStatus",
     "content_digest",
+    "EvidenceGraph",
+    "EvidenceNode",
+    "ExperimentPlan",
+    "Outcome",
+    "ReproductionRecord",
+    "ResearchConclusion",
+    "ResearchError",
+    "ResearchQuestion",
+    "synthesize",
+    "validate_reproduction",
 ]
+
+from .evidence_contracts import (
+    EvidenceGraph,
+    EvidenceNode,
+    ExperimentPlan,
+    Outcome,
+    ReproductionRecord,
+    ResearchConclusion,
+    ResearchError,
+    ResearchQuestion,
+    synthesize,
+    validate_reproduction,
+)

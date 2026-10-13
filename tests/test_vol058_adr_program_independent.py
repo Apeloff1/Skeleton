@@ -15,6 +15,7 @@ def _fixture() -> Path:
     temp = Path(tempfile.mkdtemp(prefix="vol058-independent-"))
     for relative in (
         verifier.MASTER,
+        verifier.ACCOUNTABILITY,
         verifier.INDEX,
         verifier.REGISTRY,
         verifier.VALIDATOR,
@@ -52,6 +53,29 @@ def test_current_repository_passes_independent_vol058_verification() -> None:
     assert receipt["registry_binding"]["rule_id"] == "ARCH-ADR-INDEX"
     assert receipt["registry_binding"]["waivable"] is False
     assert len(receipt["receipt_digest"]) == 64
+
+
+def test_verified_closure_requires_distinct_accountability_signatures() -> None:
+    root = _fixture()
+    path = root / verifier.ACCOUNTABILITY
+    data = _load(path)
+    record = next(item for item in data["records"] if item.get("id") == "ACC-VOL-058")
+    record["verification_signoff"]["signer_id"] = record["implementation_signoff"]["signer_id"]
+    _write(path, data)
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("signer collision" in error for error in receipt["errors"])
+
+
+def test_cannot_self_sign_when_accountability_record_missing() -> None:
+    root = _fixture()
+    path = root / verifier.ACCOUNTABILITY
+    data = _load(path)
+    data["records"] = [row for row in data["records"] if row.get("id") != "ACC-VOL-058"]
+    _write(path, data)
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("accountability record missing" in error for error in receipt["errors"])
 
 
 def test_rejects_unindexed_adr_document() -> None:
@@ -112,7 +136,7 @@ def test_rejects_masterplan_gap_binding_loss() -> None:
     path = root / verifier.MASTER
     data = _load(path)
     volume = next(item for item in data["volumes"] if item["key"] == "VOL-058")
-    volume["gaps"].remove("bind cross-cutting changes to ADR check")
+    volume["gaps"].append("new gap missing from ADR index")
     _write(path, data)
 
     receipt = verifier.verify_repository(root)

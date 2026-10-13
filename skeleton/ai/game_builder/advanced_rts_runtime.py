@@ -426,8 +426,14 @@ def _tick(state,config):
             config["ranger_range"] if u["kind"]=="ranger" else
             config["siege_range"] if u["kind"]=="siege" else 1)),None)
         if enemy is not None:
-            _damage(state,config,u,enemy["cell"],events)
-            events.append("original_owned_unit_stance_selected_real_opponent")
+            try:
+                _damage(state,config,u,enemy["cell"],events)
+            except RTSActionError:
+                # Autonomous stances cannot crash the simulation when a wall,
+                # friendly body, weather or changing fog invalidates a shot.
+                events.append("original_autonomous_stance_refused_blocked_attack")
+            else:
+                events.append("original_owned_unit_stance_selected_real_opponent")
     if state["finished"] or state["failed"]:
         _refresh(state,config)
         return events

@@ -17,8 +17,6 @@ from .advanced_gameplay_runtime import (
 )
 from .system_editors import make_editor_document, SystemEditorError
 from .advanced_genre_engines import STARTS as GENRE_STARTS, CARDS, puzzle_default_layout
-from .advanced_sailing_runtime import (default_layout as sailing_layout,
-    normalize_layout as validate_sailing_layout, SailingActionError)
 from .advanced_quest_director_runtime import (default_layout as quest_layout,
     normalize_layout as validate_quest_layout,QuestDirectorError)
 from .advanced_fighting_runtime import (default_layout as fight_layout,
@@ -27,6 +25,58 @@ from .advanced_fighting_runtime import (default_layout as fight_layout,
 from .advanced_rhythm_runtime import (default_layout as rhythm_layout,
                                       normalize_layout as validate_rhythm_layout,
                                       RhythmActionError)
+from .advanced_npc_society_runtime import (
+    default_layout as society_layout, normalize_layout as validate_society_layout,
+    SocietyActionError,
+)
+from .advanced_dialogue_runtime import (
+    default_layout as dialogue_layout, normalize_layout as validate_dialogue_layout,
+    DialogueActionError,
+)
+from .advanced_voxel_runtime import (
+    default_layout as voxel_layout, normalize_layout as validate_voxel_layout,
+    VoxelActionError,
+)
+from .advanced_ecosystem_runtime import (
+    default_layout as ecosystem_layout, normalize_layout as validate_ecosystem_layout,
+    EcosystemActionError,
+)
+from .advanced_economy_runtime import (
+    default_layout as economy_layout, normalize_layout as validate_economy_layout,
+    EconomyActionError,
+)
+from .advanced_rpg_runtime import (
+    default_layout as rpg_layout, normalize_layout as validate_rpg_layout,
+    RPGActionError,
+)
+from .advanced_procedural_world_runtime import (
+    default_layout as proc_layout, normalize_layout as validate_proc_layout,
+    ProceduralWorldActionError,
+)
+from .advanced_maze_runtime import (
+    default_layout as maze_layout, normalize_layout as validate_maze_layout,
+    MazeActionError,
+)
+from .advanced_sports_runtime import (
+    default_layout as sports_layout, normalize_layout as validate_sports_layout,
+    SportsActionError,
+)
+from .advanced_parkour_runtime import (
+    default_layout as parkour_layout, normalize_layout as validate_parkour_layout,
+    ParkourActionError,
+)
+from .advanced_sailing_runtime import (
+    default_layout as sailing_layout, normalize_layout as validate_sailing_layout,
+    SailingActionError,
+)
+from .advanced_maritime_rescue_runtime import (
+    default_layout as maritime_layout, normalize_layout as validate_maritime_layout,
+    SailingActionError as MaritimeRescueActionError,
+)
+from .advanced_flight_runtime import (
+    default_layout as flight_layout, normalize_layout as validate_flight_layout,
+    FlightActionError,
+)
 from .advanced_rts_runtime import (default_layout as rts_layout,
                                    normalize_layout as validate_rts_layout,
                                    RTSActionError)
@@ -172,23 +222,107 @@ def _default_layout(engine, config, seed):
         return fight_layout(config,seed)
     if engine == "quest_director":
         return quest_layout(config,seed)
+    if engine == "flight":
+        return flight_layout(config,seed)
     if engine == "sailing":
         return sailing_layout(config,seed)
+    if engine == "maritime_rescue":
+        return maritime_layout(config,seed)
+    if engine == "parkour":
+        return parkour_layout(config,seed)
+    if engine == "sports":
+        return sports_layout(config,seed)
+    if engine == "maze":
+        return maze_layout(config,seed)
+    if engine == "rpg":
+        return rpg_layout(config,seed)
+    if engine == "procedural_world":
+        return proc_layout(config,seed)
+    if engine == "npc_society":
+        return society_layout(config,seed)
+    if engine == "ecosystem":
+        return ecosystem_layout(config,seed)
+    if engine == "voxel":
+        return voxel_layout(config,seed)
+    if engine == "dialogue":
+        return dialogue_layout(config,seed)
+    if engine == "economy":
+        return economy_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
 def _normalize_layout(engine, config, layout):
     if type(layout) is not dict:
         raise SceneError("authored layout must be a JSON object")
+    if engine=="quest_director":
+        try:
+            return validate_quest_layout(config,layout)
+        except QuestDirectorError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="flight":
+        try:
+            return validate_flight_layout(config,layout)
+        except FlightActionError as exc:
+            raise SceneError(str(exc)) from exc
     if engine=="sailing":
         try:
             return validate_sailing_layout(config,layout)
         except SailingActionError as exc:
             raise SceneError(str(exc)) from exc
-    if engine=="quest_director":
+    if engine=="maritime_rescue":
         try:
-            return validate_quest_layout(config,layout)
-        except QuestDirectorError as exc:
+            return validate_maritime_layout(config,layout)
+        except MaritimeRescueActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="parkour":
+        try:
+            return validate_parkour_layout(config,layout)
+        except ParkourActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="sports":
+        try:
+            return validate_sports_layout(config,layout)
+        except SportsActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="maze":
+        try:
+            return validate_maze_layout(config,layout)
+        except MazeActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="rpg":
+        try:
+            return validate_rpg_layout(config,layout)
+        except RPGActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="procedural_world":
+        try:
+            return validate_proc_layout(config,layout)
+        except ProceduralWorldActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="npc_society":
+        try:
+            return validate_society_layout(config,layout)
+        except SocietyActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="ecosystem":
+        try:
+            return validate_ecosystem_layout(config,layout)
+        except EcosystemActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="voxel":
+        try:
+            return validate_voxel_layout(config,layout)
+        except VoxelActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="economy":
+        try:
+            return validate_economy_layout(config,layout)
+        except EconomyActionError as exc:
+            raise SceneError(str(exc)) from exc
+    if engine=="dialogue":
+        try:
+            return validate_dialogue_layout(config,layout)
+        except DialogueActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="fighting":
         try:

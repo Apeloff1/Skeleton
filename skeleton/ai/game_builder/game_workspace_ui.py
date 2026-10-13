@@ -951,52 +951,6 @@ function drawAdvancedGame(session){
   c.fillStyle="#a9dccc";
   c.fillText("Original sprites are drawn primitives; collision and judging are backend-owned.",12,258);
  }
- if(editor==="sailing"){
-  // Original nautical sprites are derived only from replay-verified state.
-  const ox=12,oy=48,cell=Math.max(6,Math.floor(Math.min(
-   296/state.width,174/state.height)));
-  const xy=(p)=>[ox+p[0]*cell,oy+p[1]*cell];
-  const symbols=[
-   [state.islands,"#586e65"],[state.reefs,"#a58b56"],
-   [state.shoals,"#4c9898"]
-  ];
-  c.fillStyle="#d5e8ed";
-  c.fillText("Original maritime world · "+state.weather+
-   " · wind "+["E","S","W","N"][state.wind_heading],12,36);
-  for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){
-   c.fillStyle=(x+y)%2?"#224a5f":"#29536a";
-   c.fillRect(ox+x*cell,oy+y*cell,cell-1,cell-1);
-  }
-  for(const [cells,color] of symbols)for(const p of cells){
-   const [x,y]=xy(p);c.fillStyle=color;
-   c.fillRect(x+1,y+1,Math.max(2,cell-3),Math.max(2,cell-3));
-  }
-  const marker=(p,color,glyph)=>{
-   const [x,y]=xy(p);c.fillStyle=color;
-   c.fillRect(x+1,y+1,Math.max(3,cell-2),Math.max(3,cell-2));
-   if(cell>=11){c.fillStyle="#102d38";c.font="bold 10px monospace";
-    c.fillText(glyph,x+2,y+cell-3);}
-  };
-  marker(state.home,"#a8d8b2","H");
-  marker(state.destination,"#e9bd81","D");
-  if(!state.rescued_identity)marker(state.castaway,"#edce76","!");
-  marker(state.pirate,"#dd8b8b","P");
-  marker(state.position,"#ffffff",["›","⌄","‹","⌃"][state.heading]);
-  const hudX=ox+state.width*cell+13;
-  c.font="11px monospace";c.fillStyle="#cde9df";
-  [
-   "Hull "+state.hull+"/"+state.max_hull,
-   "Bilge "+state.flooding,
-   "Buoyancy "+state.buoyancy_margin,
-   "Cargo "+state.cargo,
-   "Delivered "+state.delivered,
-   "Rescued "+state.passengers_ashore,
-   "Supplies "+state.supplies,
-   "Coins "+state.coins,
-   "Heading "+["E","S","W","N"][state.heading],
-   state.docked?"DOCKED":state.anchored?"ANCHORED":"AT SEA"
-  ].forEach((t,i)=>c.fillText(t,Math.min(hudX,338),53+i*17));
- }
  if(editor==="quest_director"){
   const ox=14,oy=47,cell=25;
   c.fillStyle="#dbece5";
@@ -1035,6 +989,459 @@ function drawAdvancedGame(session){
     " · evidence "+active.testimonies.length,tx,225);
   c.fillStyle="#a7dcc6";
   c.fillText("Witness (!) / forensic (F) / rumor (?) differ · original player P",12,256);
+ }
+ if(editor==="flight"){
+  const ox=15,trackY=83,trackW=W-188,trackH=154;
+  const extent=Math.max(state.runway_end,1);
+  c.fillStyle="#c9e6f2";
+  c.fillText(state.title+" · "+state.weather+" · "+String(state.tick)+" steps",12,36);
+  c.fillStyle="#345568";c.fillRect(ox,trackY,trackW,trackH);
+  for(const ridge of state.ridges){
+   const x=ox+ridge.x/extent*trackW;
+   const height=Math.min(trackH-12,ridge.altitude/Math.max(1,state.altitude+90)*trackH);
+   c.fillStyle="#d6a67d";c.fillRect(x-4,trackY+trackH-height,8,height);
+  }
+  for(const b of state.beacons){
+   const x=ox+b.x/extent*trackW;
+   c.strokeStyle=state.beacons_seen.includes(b.x)?"#79e0b9":
+      state.beacons_missed.includes(b.x)?"#e9978e":"#e4d68a";
+   c.setLineDash([3,4]);c.beginPath();c.moveTo(x,trackY+5);
+   c.lineTo(x,trackY+trackH-2);c.stroke();c.setLineDash([]);
+  }
+  const runwayX=ox+state.runway_start/extent*trackW;
+  c.fillStyle="#8ca8a8";
+  c.fillRect(runwayX,trackY+trackH-7,Math.max(3,trackW-(runwayX-ox)),7);
+  const ax=ox+Math.min(extent+2,state.x)/extent*trackW;
+  const ay=trackY+trackH-14-Math.min(trackH-24,
+    state.altitude/Math.max(1,250)*trackH);
+  c.fillStyle="#a6f1d2";
+  c.beginPath();c.moveTo(ax+10,ay);c.lineTo(ax-9,ay-6);
+  c.lineTo(ax-7,ay+6);c.closePath();c.fill();
+  c.fillStyle="#eaf7ef";const tx=W-157;
+  c.fillText("Speed "+state.speed,tx,68);
+  c.fillText("Altitude "+state.altitude,tx,91);
+  c.fillText("Fuel "+state.fuel,tx,114);
+  c.fillText("Hull "+state.hull,tx,137);
+  c.fillText("Heat "+state.temperature,tx,160);
+  c.fillText("Wind "+state.wind_direction,tx,183);
+  c.fillText("NAV "+state.beacons_seen.length+"/"+state.beacons.length,tx,206);
+  c.fillText("Gear "+(state.gear?"DOWN":"UP"),tx,229);
+  c.fillStyle="#a6e9ce";
+  c.fillText("Arcade / simcade / simulation · full replay-owned physics",12,265);
+ }
+ if(editor==="sailing"){
+  const ox=17,trackY=75,trackW=W-177,trackH=157;
+  const extent=Math.max(1,state.harbor_end);
+  c.fillStyle="#d0e9ef";
+  c.fillText(state.title+" · "+state.sea+" · day tick "+String(state.tick),12,36);
+  c.fillStyle="#255368";c.fillRect(ox,trackY,trackW,trackH);
+  const shoreX=ox+state.harbor_start/extent*trackW;
+  c.fillStyle="#bdb498";c.fillRect(shoreX,trackY,trackW-(shoreX-ox),trackH);
+  for(const mark of state.buoys){
+   const x=ox+mark/extent*trackW;
+   c.fillStyle=state.buoys_seen.includes(mark)?"#8ef0c4":"#f1d187";
+   c.fillRect(x-2,trackY+13,4,trackH-26);
+  }
+  for(const shoal of state.shoals){
+   const x=ox+shoal.x/extent*trackW;
+   const y=trackY+trackH/2+shoal.lane*17;
+   c.fillStyle="#d79e75";c.fillRect(x-4,y-3,8,7);
+  }
+  const sx=ox+Math.min(extent+2,state.x)/extent*trackW;
+  const sy=trackY+trackH/2+state.lane*17;
+  c.fillStyle="#d5f4e4";c.fillRect(sx-9,sy-3,18,10);
+  if(state.sails){c.fillStyle="#f9e3ab";c.beginPath();
+   c.moveTo(sx,sy-25);c.lineTo(sx,sy-4);c.lineTo(sx+12,sy-4);c.fill();}
+  c.fillStyle="#eaf7ef";const tx=W-155;
+  c.fillText("Speed "+state.speed,tx,66);
+  c.fillText("Hull "+state.hull,tx,90);
+  c.fillText("Mast "+state.mast,tx,114);
+  c.fillText("Cargo "+state.cargo,tx,138);
+  c.fillText("Fuel "+state.fuel,tx,162);
+  c.fillText("Crew "+state.crew_morale,tx,186);
+  c.fillText("NAV "+state.buoys_seen.length+"/"+state.buoys.length,tx,210);
+  c.fillText(state.anchor?"ANCHORED":"Underway",tx,234);
+  c.fillStyle="#b6edcf";
+  c.fillText("Skiff / sloop / schooner · physical port cargo delivery",12,265);
+ }
+ if(editor==="parkour"){
+  const ox=16,oy=62,courseW=W-180,laneH=55,scale=courseW/Math.max(1,state.exit_x);
+  c.fillStyle="#cbece5";
+  c.fillText(state.title+" · "+state.style+" · "+state.weather,12,36);
+  for(let lane=0;lane<3;lane++){
+   c.fillStyle=lane%2?"#324e61":"#254454";
+   c.fillRect(ox,oy+lane*laneH,courseW,laneH-3);
+   c.strokeStyle="#507385";
+   c.beginPath();c.moveTo(ox,oy+(lane+1)*laneH-3);
+   c.lineTo(ox+courseW,oy+(lane+1)*laneH-3);c.stroke();
+  }
+  for(const cp of state.checkpoints){
+   c.fillStyle=state.checkpoint>=cp?"#8ceac3":"#809ca6";
+   c.fillRect(ox+cp*scale-1,oy-2,2,laneH*3+2);
+  }
+  for(const obstacle of state.obstacles){
+   const x=ox+obstacle.x*scale,y=oy+obstacle.lane*laneH;
+   const t=obstacle.kind;
+   c.fillStyle=t==="gap"?"#151b2a":t==="hazard"?"#df8075":
+      t==="wall"||t==="ledge"?"#b6a88b":"#9b9bd9";
+   c.fillRect(x-4,y+19,9,24);
+   c.fillStyle="#f0e9d8";c.fillText(t[0].toUpperCase(),x-3,y+16);
+  }
+  for(const mark of state.medals){
+   if(state.medals_collected.includes(mark.x))continue;
+   const x=ox+mark.x*scale,y=oy+mark.lane*laneH+14;
+   c.fillStyle="#f4d984";c.beginPath();c.arc(x,y,5,0,Math.PI*2);c.fill();
+  }
+  const px=ox+state.x*scale,py=oy+state.lane*laneH+26;
+  c.fillStyle="#9df5d2";c.fillRect(px-5,py-13,11,19);
+  c.fillStyle="#f6e1a5";c.beginPath();c.arc(px,py-17-Math.min(12,state.height),5,0,Math.PI*2);c.fill();
+  const tx=W-157;c.fillStyle="#e6f4ea";
+  c.fillText("Position "+state.x+"/"+state.exit_x,tx,61);
+  c.fillText("Stamina "+state.stamina,tx,86);
+  c.fillText("Health "+state.health,tx,111);
+  c.fillText("Momentum "+state.momentum,tx,136);
+  c.fillText("Height "+state.height,tx,161);
+  c.fillText("Flow "+state.flow_chain,tx,186);
+  c.fillText("Medals "+state.medals_collected.length+"/"+state.medals.length,tx,211);
+  c.fillText("Falls "+state.falls,tx,236);
+  c.fillStyle="#a4ebca";
+  c.fillText("Verified course mechanics: climb · parkour · swing · grapple",12,265);
+ }
+ if(editor==="npc_society"){
+  const ox=16,oy=59,tile=20;
+  c.fillStyle="#e4f3e8";
+  c.fillText(state.title+" · "+state.season+" · "+advancedSettings.simulation_lod+" LOD",12,35);
+  const siteNames=Object.entries(state.sites);
+  for(let y=0;y<=8;y++)for(let x=0;x<=8;x++){
+   const sx=ox+x*tile,sy=oy+(8-y)*tile;
+   c.fillStyle=(x+y)%2?"#304f48":"#34574d";
+   c.fillRect(sx,sy,tile-1,tile-1);
+   const site=siteNames.find(([key,p])=>p[0]===x&&p[1]===y);
+   if(site){
+    const symbol={home:"H",market:"$",hall:"C",farm:"F",workshop:"W"}[site[0]];
+    c.fillStyle="#f8d78b";c.fillText(symbol,sx+5,sy+15);
+   }
+  }
+  for(const resident of state.residents){
+   const x=ox+resident.position[0]*tile+10,y=oy+(8-resident.position[1])*tile+10;
+   c.fillStyle=resident.id===state.focus?"#f6e3ad":"#88d5d3";
+   c.beginPath();c.arc(x,y,resident.id===state.focus?5:3,0,Math.PI*2);c.fill();
+  }
+  const px=ox+state.position[0]*tile+10,py=oy+(8-state.position[1])*tile+10;
+  c.fillStyle="#d8ffda";c.beginPath();c.arc(px,py,7,0,Math.PI*2);c.fill();
+  c.fillStyle="#123222";c.fillText("@",px-4,py+4);
+  const tx=W-165;c.fillStyle="#eaf4eb";
+  c.fillText("Pop "+state.population,tx,62);
+  c.fillText("Embodied "+state.embodied,tx,84);
+  c.fillText("Trust "+state.trust,tx,106);
+  c.fillText("Food "+state.food,tx,128);
+  c.fillText("Materials "+state.materials,tx,150);
+  c.fillText("Gold "+state.gold,tx,172);
+  c.fillText("Memories "+state.memories.length,tx,194);
+  c.fillText("Witnesses "+state.evidence.length,tx,216);
+  c.fillStyle="#a6ead0";
+  c.fillText(state.community_checkpoint?"Civic milestone earned · world continues":
+    "H home · $ market · C civic hall · F farm · W workshop",12,269);
+ }
+ if(editor==="ecosystem"){
+  const ox=18,oy=63,w=100,h=82;
+  c.fillStyle="#e8f5e7";
+  c.fillText(state.title+" · "+state.season+" · day "+state.tick,12,35);
+  for(const habitat of state.habitats){
+   const sx=ox+habitat.site[0]*(w+10),sy=oy+(1-habitat.site[1])*(h+8);
+   const shades=["#45684d","#3b7583","#7d8053","#677b7e"];
+   c.fillStyle=shades[habitat.id];c.fillRect(sx,sy,w,h);
+   c.fillStyle="#f3f4e2";
+   c.fillText(habitat.kind,sx+6,sy+17);
+   c.fillText("Food "+habitat.food,sx+6,sy+35);
+   c.fillText("Water "+habitat.moisture,sx+6,sy+51);
+   c.fillText("Disease "+habitat.disease,sx+6,sy+67);
+   if(habitat.site[0]===state.position[0]&&
+      habitat.site[1]===state.position[1]){
+    c.strokeStyle="#f8de97";c.lineWidth=3;c.strokeRect(sx+2,sy+2,w-4,h-4);
+    c.lineWidth=1;
+   }
+  }
+  const tx=W-171;
+  const living=state.species.reduce((v,s)=>v+s.population,0);
+  c.fillStyle="#eaf4ef";
+  c.fillText("Species "+state.species_total,tx,62);
+  c.fillText("Pop "+living,tx,84);
+  c.fillText("Births "+state.births,tx,106);
+  c.fillText("Deaths "+state.deaths,tx,128);
+  c.fillText("Surveys "+state.surveys.length+"/2",tx,150);
+  c.fillText("Migration "+state.migration_events,tx,172);
+  c.fillText("Credits "+state.credits,tx,194);
+  c.fillText("Seeds "+state.seed_bank,tx,216);
+  c.fillStyle="#abe7ce";
+  c.fillText(state.conservation_checkpoint?"Restored · nonterminal biodiversity study":
+    "Source habitats · predator-prey dynamics · finite restoration",12,269);
+ }
+ if(editor==="dialogue"){
+  c.fillStyle="#e8eef8";
+  c.fillText(state.title+" · original first-hand conversation · turn "+state.tick,13,34);
+  for(let i=0;i<3;i++){
+   const x=18+i*132,y=69;
+   const located=state.position===i;
+   c.fillStyle=located?"#326d6d":"#32475f";
+   c.fillRect(x,y,120,166);
+   c.fillStyle="#f3e2b6";
+   c.fillText(state.locations[i],x+8,y+19);
+   const local=state.speakers.filter(s=>s.location===i);
+   for(let j=0;j<Math.min(5,local.length);j++){
+    const voice=local[j];
+    c.fillStyle=voice.heard?"#a6e8ca":"#cddbec";
+    c.fillText("#"+voice.id+" "+voice.name.slice(0,13),x+8,y+43+j*22);
+    c.fillStyle="#efddad";
+    c.fillText("T"+voice.trust+" · "+voice.patience+" turns",x+8,y+55+j*22);
+   }
+   if(located){c.strokeStyle="#ffcf78";c.lineWidth=3;c.strokeRect(x+1,y+1,118,164);c.lineWidth=1;}
+  }
+  const x=W-187;
+  c.fillStyle="#edeee3";
+  c.fillText("Influence "+state.influence,x,62);
+  c.fillText("Reputation "+state.reputation,x,84);
+  c.fillText("Sources "+state.direct_statements.length,x,106);
+  c.fillText("Corroborated "+state.corroborations.length,x,128);
+  c.fillText("Supported "+state.support_count,x,150);
+  c.fillText("Choices "+state.choices.length,x,172);
+  c.fillText("Detailed "+state.active_speakers,x,194);
+  c.fillStyle="#bee6d6";
+  c.fillText(state.checkpoint?"Social agreement earned · optional epilogue":
+   "Listen to multiple sources; compare evidence at archive",14,269);
+ }
+ if(editor==="economy"){
+  const left=14,top=57,cellW=90,cellH=42;
+  c.fillStyle="#eff6df";
+  c.fillText(state.title+" · turn "+state.tick+" · finite original goods",12,35);
+  for(const market of state.markets){
+   const x=left+(market.id%4)*96,y=top+Math.floor(market.id/4)*49;
+   const located=market.id===state.position;
+   c.fillStyle=located?"#355d53":"#31495d";
+   c.fillRect(x,y,cellW,cellH);
+   c.fillStyle="#f1d8a4";
+   c.fillText(market.id+" "+market.kind,x+5,y+15);
+   const onHand=market.inventory[state.focus]||0;
+   const price=market.prices[state.focus]||0;
+   c.fillStyle="#c8e9e2";
+   c.fillText("Stock "+onHand+" · "+price+" cr",x+5,y+33);
+   if(located){
+    c.strokeStyle="#ffe29c";c.lineWidth=3;
+    c.strokeRect(x+1,y+1,cellW-2,cellH-2);c.lineWidth=1;
+   }
+  }
+  const rx=W-183;
+  const allStock=state.markets.reduce((n,m)=>n+
+   m.inventory.reduce((a,b)=>a+b,0),0);
+  c.fillStyle="#eef6e7";
+  c.fillText("Cash "+state.cash,rx,63);
+  c.fillText("Cargo "+state.cargo.reduce((a,b)=>a+b,0),rx,84);
+  c.fillText("Food & goods "+allStock,rx,105);
+  c.fillText("Factory "+state.manufactured,rx,126);
+  c.fillText("Harvest "+state.harvested,rx,147);
+  c.fillText("Imports "+state.imports_sold,rx,168);
+  c.fillText("Audits "+state.audited.length,rx,189);
+  c.fillText("Households "+state.household_consumed,rx,210);
+  c.fillStyle="#cceab9";
+  c.fillText(state.checkpoint?"Real trade milestone earned · market stays alive":
+   "Physical cargo · market prices · finite deposits",12,269);
+ }
+ if(editor==="rpg"){
+  const ox=15,oy=64,tile=19;
+  const w=advancedSettings.world_width,h=advancedSettings.world_height;
+  const at=(a,b)=>a[0]===b[0]&&a[1]===b[1];
+  c.fillStyle="#e0ece2";
+  c.fillText(state.title+" · "+state.climate+" · chapter "+state.chapters_completed,12,35);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+   const bx=ox+x*tile,by=oy+(h-y-1)*tile;
+   const cell=[x,y];
+   c.fillStyle=(x+y)%2?"#314e42":"#38594b";
+   c.fillRect(bx,by,tile-1,tile-1);
+   if(state.blocked.some(p=>at(p,cell))){
+    c.fillStyle="#7b858b";c.fillRect(bx+2,by+2,tile-5,tile-5);
+   }
+   let glyph="";
+   if(at(state.camp,cell))glyph="C";
+   if(at(state.relic,cell)&&!state.quest_relic)glyph="◆";
+   if(at(state.enemy,cell)&&state.enemy_hp>0)glyph="!";
+   if(at(state.exit,cell))glyph="E";
+   const npc=state.npcs.find(p=>at(p.at,cell));
+   if(npc)glyph=npc.role==="archivist"?"A":"M";
+   if(glyph){c.fillStyle="#f5d18e";c.fillText(glyph,bx+4,by+14);}
+   if(at(state.position,cell)){
+    c.fillStyle="#b1f6cd";c.beginPath();
+    c.arc(bx+9,by+9,7,0,Math.PI*2);c.fill();
+    c.fillStyle="#244031";c.fillText("@",bx+4,by+13);
+   }
+  }
+  const tx=W-171,hero=state.party[state.selected];
+  c.fillStyle="#edf4e9";
+  c.fillText("Role "+hero.class,tx,62);
+  c.fillText("Level "+hero.level+" · XP "+hero.xp,tx,84);
+  c.fillText("HP "+hero.hp+" · Mana "+hero.mana,tx,106);
+  c.fillText("Party "+state.party.length,tx,128);
+  c.fillText("Gold "+state.gold,tx,150);
+  c.fillText("Reputation "+state.factions.guild+"/"+state.factions.village,tx,172);
+  c.fillText("Quests "+Object.values(state.quests).filter(v=>v==="completed").length+"/3",tx,194);
+  c.fillText("Stories "+state.social_memories.length,tx,216);
+  c.fillStyle="#a8e3bc";
+  c.fillText(state.chapter_claimed?"Postgame explorable · retire is optional":
+    "Evidence, faction choices and party tactics determine progress",12,275);
+ }
+ if(editor==="procedural_world"){
+  const ox=15,oy=55,fw=W-187,fh=178,scale=20;
+  c.fillStyle="#e1edf3";
+  c.fillText(state.title+" · "+state.climate+" · "+advancedSettings.persistence,12,35);
+  c.fillStyle="#253c50";c.fillRect(ox,oy,fw,fh);
+  const xcenter=ox+fw/2,ycenter=oy+fh/2;
+  c.strokeStyle="#496176";
+  for(let ix=0;ix<Math.ceil(fw/scale);ix++){
+   const xx=ox+ix*scale;c.beginPath();c.moveTo(xx,oy);c.lineTo(xx,oy+fh);c.stroke();
+  }
+  for(let iy=0;iy<Math.ceil(fh/scale);iy++){
+   const yy=oy+iy*scale;c.beginPath();c.moveTo(ox,yy);c.lineTo(ox+fw,yy);c.stroke();
+  }
+  const place=(x,y,colour,glyph)=>{
+   const px=xcenter+(x-state.position[0])*scale;
+   const py=ycenter-(y-state.position[1])*scale;
+   if(px<ox||px>=ox+fw||py<oy||py>=oy+fh)return;
+   c.fillStyle=colour;c.beginPath();c.arc(px,py,7,0,Math.PI*2);c.fill();
+   c.fillStyle="#173044";c.fillText(glyph,px-4,py+4);
+  };
+  place(0,0,"#bfebb1","H");
+  for(const mark of state.landmarks)
+   place(mark.at[0],mark.at[1],state.surveyed.includes(mark.id)?"#82dcc4":"#f3d085",
+     mark.id===0?"R":"O");
+  for(const [key,change] of Object.entries({...state.persisted,...state.edits})){
+   const vals=key.split(":").map(Number);
+   if(change.structure==="shelter")place(vals[0],vals[1],"#d1eeb0","S");
+   else if(change.planted)place(vals[0],vals[1],"#a0e9ac","P");
+  }
+  place(state.position[0],state.position[1],"#f2f6e1","@");
+  const tx=W-171;
+  c.fillStyle="#eef6ed";
+  c.fillText("Chunk loads "+state.chunk_loads,tx,62);
+  c.fillText("Resident "+state.chunks.length,tx,85);
+  c.fillText("Evictions "+state.chunk_evictions,tx,108);
+  c.fillText("Health "+state.health,tx,131);
+  c.fillText("Energy "+state.energy,tx,154);
+  c.fillText("Food "+state.inventory.food,tx,177);
+  c.fillText("Water "+state.inventory.water,tx,200);
+  c.fillText("Survey "+state.surveyed.length+"/2",tx,223);
+  c.fillStyle="#b3e4cf";
+  c.fillText(state.expedition_complete?"Nonterminal expedition complete · return home to retire":
+    "H home · R ruins · O observatory · S shelter · source-owned chunk edits",12,272);
+ }
+ if(editor==="maze"){
+  const ox=14,oy=56,tile=19,radiusX=6,radiusY=5;
+  const viewX=Math.max(1,state.position[0]-radiusX);
+  const viewY=Math.max(1,state.position[1]-radiusY);
+  const onFloor=point=>point[2]===state.position[2];
+  const at=(a,b)=>a[0]===b[0]&&a[1]===b[1]&&a[2]===b[2];
+  c.fillStyle="#d8e6e5";
+  c.fillText(state.title+" · "+state.topology+" · floor "+
+    (state.position[2]+1),12,34);
+  for(let row=0;row<10;row++){
+   for(let col=0;col<13;col++){
+    const px=viewX+col,py=viewY+row;
+    const loc=[px,py,state.position[2]];
+    const bx=ox+col*tile,by=oy+row*tile;
+    c.fillStyle=(px>0&&px<advancedSettings.width-1&&
+                 py>0&&py<advancedSettings.height-1)?
+                 "#27485b":"#101c29";
+    c.fillRect(bx,by,tile-1,tile-1);
+    if(state.walls.some(w=>at(w.at,loc)&&
+       (state.topology!=="moving"||w.phase===state.phase))){
+     c.fillStyle="#758395";c.fillRect(bx+2,by+2,tile-5,tile-5);
+    }
+    if(state.hazards.some(v=>at(v,loc))){
+     c.fillStyle="#e68c84";c.beginPath();c.arc(bx+9,by+9,5,0,Math.PI*2);c.fill();
+    }
+    if(state.stairs.some(v=>at(v,loc))){
+     c.fillStyle="#9ab5e7";c.fillText("⇅",bx+3,by+14);
+    }
+    if(state.portals.some(v=>at(v.entry,loc))){
+     c.fillStyle="#bc94ed";c.fillText("◎",bx+3,by+14);
+    }
+    if(state.keys.some(v=>at(v,loc))&&
+       !state.collected_keys.some(v=>at(v,loc))){
+     c.fillStyle="#f4d18b";c.fillText("◆",bx+3,by+14);
+    }
+    if(at(state.door,loc)){
+     c.fillStyle=state.door_open?"#9aefd2":"#cf8f8b";
+     c.fillText(state.door_open?"O":"D",bx+4,by+14);
+    }
+    if(at(state.exit,loc)){
+     c.fillStyle="#a8efa7";c.fillText("E",bx+4,by+14);
+    }
+    if(at(state.position,loc)){
+     c.fillStyle="#fbf5c6";c.beginPath();c.arc(bx+9,by+9,7,0,Math.PI*2);c.fill();
+     c.fillStyle="#213040";c.fillText("@",bx+4,by+13);
+    }
+   }
+  }
+  const tx=W-171;
+  c.fillStyle="#e5f1ef";
+  c.fillText("Health "+state.health,tx,62);
+  c.fillText("Stamina "+state.stamina,tx,86);
+  c.fillText("Keys "+state.collected_keys.length+"/"+state.keys.length,tx,110);
+  c.fillText("Floors "+state.floor_visits.length,tx,134);
+  c.fillText("Torches "+state.torches,tx,158);
+  c.fillText("Phase "+state.phase,tx,182);
+  c.fillText("Hazard hits "+state.hazard_hits,tx,206);
+  c.fillText("Visited "+state.explored.length,tx,230);
+  c.fillStyle="#b8eddd";
+  c.fillText("Source-bound levels · real doors · replayed transitions",12,270);
+ }
+ if(editor==="sports"){
+  const ox=14,oy=66,fw=W-181,fh=165;
+  const scale=fw/Math.max(1,state.width);
+  c.fillStyle="#d9f2eb";
+  c.fillText(state.title+" · "+state.mode+" · "+state.weather,12,35);
+  c.fillStyle=state.mode==="racket"?"#31506b":"#255548";
+  c.fillRect(ox,oy,fw,fh);
+  c.strokeStyle="#e0ece3";c.lineWidth=1;
+  c.strokeRect(ox+7,oy+7,fw-14,fh-14);
+  c.beginPath();c.moveTo(ox+fw/2,oy+7);c.lineTo(ox+fw/2,oy+fh-7);c.stroke();
+  for(let i=1;i<3;i++){
+   const yy=oy+fh*i/3;
+   c.strokeStyle="#638c84";c.beginPath();
+   c.moveTo(ox+7,yy);c.lineTo(ox+fw-7,yy);c.stroke();
+  }
+  for(const cell of state.cover){
+   c.fillStyle="#a4a4a0";
+   c.fillRect(ox+cell[0]*scale-4,oy+(cell[1]+0.5)*fh/3-6,8,12);
+  }
+  const player=(p,color,letter)=>{
+   const x=ox+Math.max(0,Math.min(state.width,p[0]))*scale;
+   const y=oy+(p[1]+0.5)*fh/3;
+   c.fillStyle=color;c.beginPath();c.arc(x,y,7,0,Math.PI*2);c.fill();
+   c.fillStyle="#10242a";c.fillText(letter,x-4,y+4);
+  };
+  player(state.home,"#9cf2c7","H");
+  if(state.mode!=="racket")player(state.teammate,"#d7f2a7","T");
+  player(state.away,"#ffc1a4","A");
+  c.fillStyle="#ffffff";const bx=ox+state.ball[0]*scale;
+  const by=oy+(state.ball[1]+0.5)*fh/3;
+  c.beginPath();c.arc(bx,by,3,0,Math.PI*2);c.fill();
+  c.fillStyle="#8feccb";c.fillRect(ox+state.goal_x*scale-2,oy+fh/3,3,fh/3);
+  const tx=W-160;c.fillStyle="#f0eee8";
+  c.fillText("HOME "+state.home_score,tx,62);
+  c.fillText("AWAY "+state.away_score,tx,85);
+  c.fillText("Target "+state.target_score,tx,108);
+  c.fillText("Energy "+state.stamina,tx,131);
+  c.fillText("Ball "+state.owner,tx,154);
+  c.fillText(state.mode==="racket"?"Rally "+state.rally_strokes:
+      "Passes "+state.passes,tx,177);
+  c.fillText(state.mode==="turn_based"?"AP "+state.ap_remaining:
+      "Tempo "+state.tempo,tx,200);
+  c.fillText("Clock "+state.elapsed_minutes+"/"+state.match_minutes+"m",tx,223);
+  if(state.finished){
+   c.fillStyle="#dfefc1";
+   c.fillText("Outcome "+state.winner,12,247);
+  }
+  c.fillStyle="#a7e6cc";
+  c.fillText("Original rule-specific scoring · source-replayed state",12,264);
  }
  if(state.finished||state.failed){
   c.fillStyle=state.finished?"#a2f5cb":"#ffaba6";
@@ -1093,6 +1500,739 @@ let selectedSandboxCell=0;
 let selectedCityParcel=0;
 function renderAdvancedActions(actions){
  const target=$("advanced-actions");target.replaceChildren();
+ if(advancedSession?.editor==="dialogue"){
+  const state=advancedSession.state;
+  const info=document.createElement("p");
+  // Source statements, rather than an assistant's guessed speech, determine
+  // which choices become legal. The backend remains the authority.
+  info.textContent="Speakers "+state.active_speakers+
+   " · station "+state.locations[state.position]+
+   " · direct statements "+state.direct_statements.length+
+   " · verified topics "+state.corroborations.length+
+   " · patience and influence are finite.";
+  target.append(info);
+  const label=document.createElement("label");
+  label.textContent="Local speaker / archived testimony / original social action";
+  const select=document.createElement("select");
+  select.id="original-dialogue-command";
+  select.setAttribute("aria-label","Choose original dialogue action");
+  const recommended=actions.filter(action=>{
+   if(action.startsWith("travel:"))
+    return Math.abs(Number(action.split(":")[1])-state.position)===1;
+   if(action.startsWith("speak:")||action.startsWith("support:")||
+      action.startsWith("challenge:")){
+    const id=Number(action.split(":")[1]);
+    const speaker=state.speakers[id];
+    return speaker&&speaker.location===state.position;
+   }
+   if(action.startsWith("compare:"))return state.position===2;
+   return true;
+  });
+  for(const action of recommended){
+   const option=document.createElement("option");
+   option.value=action;
+   option.textContent=action.replaceAll("_"," ");
+   select.append(option);
+  }
+  label.append(select);target.append(label);
+  const execute=document.createElement("button");
+  execute.type="button";
+  execute.textContent="Perform source-bound social choice";
+  execute.disabled=Boolean(advancedSession.terminal)||!recommended.length;
+  execute.addEventListener("click",()=>advanceAdvanced(select.value));
+  target.append(execute);
+  const hint=document.createElement("small");
+  hint.textContent="First-hand testimony cannot be copied; compare two distinct original sources in the archive. Trust, patience and influence actually change.";
+  target.append(hint);
+  return;
+ }
+ if(advancedSession?.editor==="economy"){
+  const state=advancedSession.state;
+  const label=document.createElement("label");
+  label.textContent="Original trade economy · "+state.active_market_count+
+   " detailed markets · "+state.active_goods.length+" playable products";
+  const select=document.createElement("select");
+  select.id="original-economy-action";
+  for(const action of actions){
+   const option=document.createElement("option");
+   option.value=action;option.textContent=action.replaceAll("_"," ");
+   select.append(option);
+  }
+  label.append(select);target.append(label);
+  const play=document.createElement("button");
+  play.type="button";play.textContent="Perform verified market action";
+  play.disabled=Boolean(advancedSession.terminal);
+  play.addEventListener("click",()=>advanceAdvanced(select.value));
+  target.append(play);
+  const info=document.createElement("small");
+  info.textContent="Market "+state.position+" · "+state.active_goods[state.focus]+
+   " · cash "+state.cash+" · cargo "+state.cargo.reduce((a,b)=>a+b,0)+
+   " · imports sold "+state.imports_sold+
+   (state.checkpoint?" · trade milestone earned; trading continues":"");
+  target.append(info);
+  const retireLabel=document.createElement("label");
+  const retire=document.createElement("input");retire.type="checkbox";
+  retireLabel.append(retire," Retire after earned milestone");
+  target.append(retireLabel);
+  const planBtn=document.createElement("button");planBtn.type="button";
+  planBtn.textContent="AI trade director: prove finite-market cooperation";
+  planBtn.disabled=Boolean(advancedSession.terminal);
+  const proof=document.createElement("pre");
+  proof.setAttribute("role","status");
+  proof.setAttribute("aria-live","polite");
+  planBtn.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="economy"||systemEditor().id!=="economy")
+     throw Error("Source editor changed while preparing trade plan");
+    const scene=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(scene.seed!==advancedSession.seed)
+     throw Error("Trade scene seed changed during source review");
+    const result=await api("/api/economy-plan",{
+     scene,settings:advancedSettings,max_actions:100,retire:retire.checked
+    });
+    const plan=result.plan;
+    proof.textContent=JSON.stringify({
+     status:plan.status,actions:plan.actions,
+     imports_sold:plan.imported_deliveries,
+     manufactured:plan.manufactured_units,audits:plan.verified_audits,
+     ending_cash:plan.final_cash,source_digest:plan.source_digest,
+     independently_replayed:plan.independent_replay_verified,
+     receipt_digest:plan.digest,native_hardware_verified:false
+    },null,2);
+    target.querySelector("#trade-economy-adopt-proof")?.remove();
+    if(plan.status!=="replay_verified_trade"){
+     status("Original economic plan inconclusive; no false trade success awarded.");
+     return;
+    }
+    const adopt=document.createElement("button");
+    adopt.id="trade-economy-adopt-proof";adopt.type="button";
+    adopt.textContent="Explicitly replay verified original trade milestone";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="economy"||systemEditor().id!=="economy"||
+         advancedCommands.length!==0||advancedSession.seed!==scene.seed)
+       throw Error("Trade adoption requires unchanged initial reviewed source");
+      const checked=await api("/api/economy-plan-verify",{
+       record:plan,scene,settings:advancedSettings
+      });
+      if(!checked.verified)throw Error("Source trade proof could not be verified");
+      const played=await api("/api/advanced-play",{
+       editor:"economy",settings:advancedSettings,actions:plan.actions,
+       seed:scene.seed,scene
+      });
+      if(played.session.digest!==plan.replay_digest||
+         !played.session.state.checkpoint||
+         played.session.state.retired!==plan.retired)
+       throw Error("Original replay did not earn verified trade milestone");
+      advancedCommands=plan.actions.slice();
+      advancedScene=scene;
+      showAdvanced(played);
+      status("Independent economic replay adopted by explicit operator choice.");
+     }catch(error){status("Trade milestone adoption refused: "+error.message);}
+    });
+    target.append(adopt);
+    status("Verified original trade plan ready for explicit player adoption.");
+   }catch(error){proof.textContent="";status("Economic director refused: "+error.message);}
+  });
+  target.append(planBtn);target.append(proof);
+  const mirrorBtn=document.createElement("button");
+  mirrorBtn.type="button";
+  mirrorBtn.textContent="Strategy mirror: compare real economic trade-offs";
+  mirrorBtn.disabled=Boolean(advancedSession.terminal);
+  const mirrorView=document.createElement("pre");
+  mirrorView.id="original-economy-mirror-evidence";
+  mirrorView.setAttribute("role","status");
+  mirrorView.setAttribute("aria-live","polite");
+  mirrorBtn.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="economy"||systemEditor().id!=="economy")
+     throw Error("Economy editor selection changed");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("Cannot compare stale authored market world");
+    const result=await api("/api/economy-mirror",{
+     scene:source,settings:advancedSettings,horizon:12,max_scenarios:24
+    });
+    const report=result.report;
+    const proofCheck=await api("/api/economy-mirror-verify",{
+     record:report,scene:source,settings:advancedSettings
+    });
+    if(!proofCheck.verified||report.weights_promoted||
+       !report.comparison_is_simulated_game_only)
+     throw Error("Market comparison failed strict source review");
+    mirrorView.textContent=JSON.stringify({
+     source:report.source_digest,
+     scenarios_attempted:report.scenarios_attempted,
+     scenarios_verified:report.scenarios_verified,
+     infeasible:report.scenarios_infeasible,
+     pareto_frontier:report.pareto_frontier,
+     relative_policy_leader:report.top_relative_policy,
+     evidence:report.evaluated.map(x=>({
+      strategy:x.strategy,relative_score:x.relative_policy_score,
+      households_served:x.metrics.households_served,
+      imports:x.metrics.imported_deliveries,
+      production:x.metrics.manufactured_units,
+      player_cash:x.metrics.player_cash,
+      public_treasury:x.metrics.public_treasury,
+      cargo_supply:x.metrics.market_inventory,
+      verified_session:x.gameplay_session_digest
+     })),
+     source_bound_replay:true,model_weights_promoted:false,
+     hardware_certified:false,mirror_receipt:report.digest
+    },null,2);
+    target.querySelector("#original-economy-mirror-apply")?.remove();
+    target.querySelector("#original-economy-mirror-choice")?.remove();
+    const chooser=document.createElement("select");
+    chooser.id="original-economy-mirror-choice";
+    chooser.setAttribute("aria-label","Select independently simulated market policy");
+    for(const option of report.evaluated){
+     const item=document.createElement("option");
+     item.value=option.strategy;
+     item.textContent=option.strategy+" · relative score "+option.relative_policy_score;
+     chooser.append(item);
+    }
+    target.append(chooser);
+    const apply=document.createElement("button");
+    apply.id="original-economy-mirror-apply";apply.type="button";
+    apply.textContent="Explicitly replay selected market policy from original state";
+    apply.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="economy"||systemEditor().id!=="economy"||
+         advancedCommands.length!==0||advancedSession.seed!==source.seed)
+       throw Error("Counterfactual adoption requires unchanged initial market world");
+      const choice=report.evaluated.find(x=>x.strategy===chooser.value);
+      if(!choice)throw Error("Unknown evidence-backed market policy");
+      const checked=await api("/api/economy-mirror-verify",{
+       record:report,scene:source,settings:advancedSettings
+      });
+      if(!checked.verified)throw Error("Economic policy verification failed");
+      const played=await api("/api/advanced-play",{
+       editor:"economy",settings:advancedSettings,
+       scene:source,seed:source.seed,actions:choice.actions
+      });
+      if(played.session.digest!==choice.gameplay_session_digest)
+       throw Error("Applied real policy diverged from market evidence");
+      advancedCommands=choice.actions.slice();
+      advancedScene=source;
+      showAdvanced(played);
+      status("Selected original market policy replayed after explicit adoption.");
+     }catch(error){status("Market policy adoption rejected: "+error.message);}
+    });
+    target.append(apply);
+    status("Compared actual original economic decisions; no weights promoted.");
+   }catch(error){mirrorView.textContent="";status("Economic mirror refused: "+error.message);}
+  });
+  target.append(mirrorBtn);target.append(mirrorView);
+  return;
+ }
+ if(advancedSession?.editor==="npc_society"||
+    advancedSession?.editor==="ecosystem"){
+  const state=advancedSession.state;
+  const ecological=advancedSession.editor==="ecosystem";
+  const box=document.createElement("label");
+  box.textContent=ecological?
+    "Original conservation and habitat interaction":
+    "Original living society, witnesses and economic choices";
+  const input=document.createElement("select");
+  input.id=ecological?"ecosystem-original-action":"npc-society-original-action";
+  for(const a of actions){
+   const option=document.createElement("option");
+   option.value=a;option.textContent=a.replaceAll("_"," ");
+   input.append(option);
+  }
+  box.append(input);target.append(box);
+  const execute=document.createElement("button");execute.type="button";
+  execute.textContent=ecological?
+   "Execute source-bound habitat intervention":
+   "Execute physically witnessed society action";
+  execute.disabled=Boolean(advancedSession.terminal);
+  execute.addEventListener("click",()=>advanceAdvanced(input.value));
+  target.append(execute);
+  const info=document.createElement("small");
+  info.textContent=ecological?
+   ("Habitat "+state.position.join(",")+" · focused species "+
+    state.focus+" · active "+state.species.length+" · "+
+    state.surveys.length+" survey receipts · "+
+    (state.conservation_checkpoint?"conservation achieved; optional retirement":
+     "living ecology remains open")):
+   ("Resident "+state.focus+" · LOD "+
+    advancedSettings.simulation_lod+" · testimony "+
+    state.evidence.join(",")+" · "+
+    (state.community_checkpoint?"civic objective earned; optional retirement":
+     "proximity and direct witness proof required"));
+  target.append(info);
+  const retireLabel=document.createElement("label");
+  const retire=document.createElement("input");
+  retire.type="checkbox";
+  retireLabel.append(retire," Include optional home retirement");
+  target.append(retireLabel);
+  const planBtn=document.createElement("button");planBtn.type="button";
+  planBtn.textContent=ecological?
+    "AI conservationist: prove a living biome recovery milestone":
+    "AI civic director: prove an original two-witness resolution";
+  planBtn.disabled=Boolean(advancedSession.terminal);
+  const proof=document.createElement("pre");
+  proof.setAttribute("role","status");
+  proof.setAttribute("aria-live","polite");
+  planBtn.addEventListener("click",async()=>{
+   try{
+    const name=ecological?"ecosystem":"npc_society";
+    if(advancedEditor!==name||systemEditor().id!==name)
+     throw Error("The source editor changed while preparing AI planning");
+    const scene=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(scene.seed!==advancedSession.seed)
+     throw Error("Reviewed scene seed is not the current gameplay session");
+    const url=ecological?"/api/ecology-plan":"/api/civic-plan";
+    const result=await api(url,{
+     scene,settings:advancedSettings,
+     max_actions:100,retire:retire.checked
+    });
+    const plan=result.plan;
+    proof.textContent=JSON.stringify({
+     result:plan.status,
+     source_digest:plan.source_digest,
+     actions:plan.actions,
+     witness_ids:plan.witnesses,
+     conservation_surveys:plan.surveys,
+     population:plan.live_population,
+     trust:plan.trust,
+     world_still_playable:plan.world_still_playable,
+     independent_replay_verified:plan.independent_replay_verified,
+     proof_digest:plan.digest,
+     native_hardware_verified:false
+    },null,2);
+    target.querySelector("#living-world-adopt-proof")?.remove();
+    const required=ecological?
+     "replay_verified_conservation":"replay_verified_civic_resolution";
+    if(plan.status!==required){
+     status("AI search inconclusive; the original living world remains playable.");
+     return;
+    }
+    const adopt=document.createElement("button");
+    adopt.type="button";adopt.id="living-world-adopt-proof";
+    adopt.textContent="Explicitly replay independently proven living-world milestone";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!==name||systemEditor().id!==name||
+         advancedCommands.length!==0||advancedSession.seed!==scene.seed)
+       throw Error("AI plan requires unchanged initial reviewed living-world state");
+      const verify=await api(ecological?
+       "/api/ecology-plan-verify":"/api/civic-plan-verify",{
+       record:plan,scene,settings:advancedSettings
+      });
+      if(!verify.verified)
+       throw Error("Living-world planner failed independent verification");
+      const played=await api("/api/advanced-play",{
+       editor:name,settings:advancedSettings,
+       actions:plan.actions,seed:scene.seed,scene
+      });
+      const earned=ecological?
+       played.session.state.conservation_checkpoint:
+       played.session.state.community_checkpoint;
+      if(played.session.digest!==plan.replay_digest||!earned||
+         played.session.state.retired!==plan.retired)
+       throw Error("Real simulation did not prove the authored milestone");
+      advancedCommands=plan.actions.slice();
+      advancedScene=scene;
+      showAdvanced(played);
+      status("Source-bound society/ecology milestone independently replayed.");
+     }catch(error){status("Living-world proof refused: "+error.message);}
+    });
+    target.append(adopt);
+    status("Real original milestone verified. Human adoption remains explicit.");
+   }catch(error){
+    proof.textContent="";
+    status("Living-world director rejected: "+error.message);
+   }
+  });
+  target.append(planBtn);target.append(proof);
+  return;
+ }
+ if(advancedSession?.editor==="rpg"){
+  const state=advancedSession.state;
+  const box=document.createElement("label");
+  box.textContent="Original party / witnessed-world gameplay";
+  const cmd=document.createElement("select");cmd.id="rpg-authoritative-command";
+  for(const action of actions){
+   const item=document.createElement("option");item.value=action;
+   item.textContent=action.replaceAll("_"," ");cmd.append(item);
+  }
+  box.append(cmd);target.append(box);
+  const submit=document.createElement("button");submit.type="button";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.textContent="Perform replay-verified RPG action";
+  submit.addEventListener("click",()=>advanceAdvanced(cmd.value));
+  target.append(submit);
+  const notes=document.createElement("small");
+  const hero=state.party[state.selected];
+  notes.textContent="Selected "+hero.class+" level "+hero.level+
+   " · NPC memories "+state.social_memories.length+
+   " · "+Object.entries(state.quests).map(([q,s])=>q+": "+s).join(" · ")+
+   (state.chapter_claimed?" · optional post-story play remains open":"");
+  target.append(notes);
+  const choice=document.createElement("select");
+  choice.setAttribute("aria-label","Witnessed social strategy");
+  for(const social of ["choose:trust","choose:challenge","choose:trade"]){
+   const option=document.createElement("option");
+   option.value=social;option.textContent=social.replace("choose:","");
+   choice.append(option);
+  }
+  target.append(choice);
+  const planBtn=document.createElement("button");planBtn.type="button";
+  planBtn.textContent="AI director: prove original RPG chapter";
+  planBtn.disabled=Boolean(advancedSession.terminal);
+  const proof=document.createElement("pre");
+  proof.setAttribute("role","status");proof.setAttribute("aria-live","polite");
+  planBtn.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="rpg"||systemEditor().id!=="rpg")
+     throw Error("Source editor changed before RPG planning");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("RPG scene seed differs from current session");
+    const result=await api("/api/rpg-story-plan",{
+      scene:source,settings:advancedSettings,
+      max_nodes:4000,max_actions:128,social_choice:choice.value
+    });
+    const planned=result.plan;
+    proof.textContent=JSON.stringify({
+      status:planned.status,choice:planned.social_choice,
+      actions:planned.actions,quests:planned.earned_quests,
+      faction_effects:planned.resulting_faction_reputation,
+      source_digest:planned.source_digest,
+      independent_replay_verified:planned.independent_replay_verified,
+      receipt:planned.digest
+    },null,2);
+    target.querySelector("#rpg-adopt-proof")?.remove();
+    if(planned.status!=="replay_verified_chapter"){
+     status("Original RPG director search inconclusive; no fabricated story completion.");
+     return;
+    }
+    const adopt=document.createElement("button");
+    adopt.type="button";adopt.id="rpg-adopt-proof";
+    adopt.textContent="Play independently verified witnessed RPG chapter";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="rpg"||systemEditor().id!=="rpg"||
+         advancedCommands.length!==0||source.seed!==advancedSession.seed)
+       throw Error("RPG evidence requires unchanged initial source state");
+      const check=await api("/api/rpg-story-plan-verify",{
+       record:planned,scene:source,settings:advancedSettings
+      });
+      if(!check.verified)throw Error("RPG narrative proof cannot be reproduced");
+      const game=await api("/api/advanced-play",{
+       editor:"rpg",settings:advancedSettings,
+       actions:planned.actions,seed:source.seed,scene:source
+      });
+      if(game.session.digest!==planned.replay_digest||
+         !game.session.state.chapter_claimed)
+       throw Error("RPG storyline did not earn its witnessed completion");
+      advancedCommands=planned.actions.slice();
+      advancedScene=source;
+      showAdvanced(game);
+      status("Original RPG quest, choices and chapter replayed from verified source.");
+     }catch(error){status("RPG chapter adoption rejected: "+error.message);}
+    });
+    target.append(adopt);
+    status("RPG director proved an original chapter; human adoption is optional.");
+   }catch(error){proof.textContent="";status("RPG planner refused: "+error.message);}
+  });
+  target.append(planBtn);target.append(proof);
+  return;
+ }
+ if(advancedSession?.editor==="procedural_world"){
+  const state=advancedSession.state;
+  const box=document.createElement("label");
+  box.textContent="Original frontier travel, ecology and persistent tile actions";
+  const cmd=document.createElement("select");cmd.id="frontier-source-command";
+  for(const action of actions){
+   const item=document.createElement("option");item.value=action;
+   item.textContent=action.replaceAll("_"," ");cmd.append(item);
+  }
+  box.append(cmd);target.append(box);
+  const submit=document.createElement("button");submit.type="button";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.textContent="Execute source-bound world action";
+  submit.addEventListener("click",()=>advanceAdvanced(cmd.value));
+  target.append(submit);
+  const status=document.createElement("small");
+  status.textContent="Position "+state.position.join(",")+
+    " · resident chunks "+state.chunks.length+"/"+advancedSettings.active_chunks+
+    " · saved tile deltas "+Object.keys(state.persisted).length+
+    " · active modifications "+Object.keys(state.edits).length+
+    " · landmark evidence "+state.surveyed.length+"/2";
+  target.append(status);
+  const chooseRetire=document.createElement("label");
+  const retire=document.createElement("input");retire.type="checkbox";
+  chooseRetire.append(retire," Return home and explicitly retire after expedition");
+  target.append(chooseRetire);
+  const planBtn=document.createElement("button");planBtn.type="button";
+  planBtn.textContent="AI: prove frontier landmark expedition";
+  planBtn.disabled=Boolean(advancedSession.terminal);
+  const proof=document.createElement("pre");
+  proof.setAttribute("role","status");proof.setAttribute("aria-live","polite");
+  planBtn.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="procedural_world"||systemEditor().id!=="procedural_world")
+     throw Error("Frontier source editor changed");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("Frontier scene seed differs from playing session");
+    const result=await api("/api/frontier-expedition-plan",{
+     scene:source,settings:advancedSettings,max_actions:100,retire:retire.checked
+    });
+    const planned=result.plan;
+    proof.textContent=JSON.stringify({
+     status:planned.status,actions:planned.actions,
+     landmarks_surveyed:planned.landmarks_surveyed,
+     chunk_loads:planned.chunk_loads,
+     open_world_continues:planned.world_still_playable,
+     deliberately_retired:planned.retired,
+     verified:planned.independent_replay_verified,
+     source_digest:planned.source_digest,receipt:planned.digest
+    },null,2);
+    target.querySelector("#frontier-adopt-proof")?.remove();
+    if(planned.status!=="replay_verified_expedition"){
+     status("Frontier search inconclusive; open-world play remains available.");
+     return;
+    }
+    const adopt=document.createElement("button");
+    adopt.type="button";adopt.id="frontier-adopt-proof";
+    adopt.textContent="Replay verified original frontier expedition";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="procedural_world"||
+         systemEditor().id!=="procedural_world"||
+         advancedCommands.length!==0||advancedSession.seed!==source.seed)
+       throw Error("Frontier strategy requires original unmodified initial source");
+      const check=await api("/api/frontier-expedition-plan-verify",{
+       record:planned,scene:source,settings:advancedSettings
+      });
+      if(!check.verified)throw Error("Frontier expedition evidence recheck failed");
+      const game=await api("/api/advanced-play",{
+       editor:"procedural_world",settings:advancedSettings,
+       actions:planned.actions,seed:source.seed,scene:source
+      });
+      if(game.session.digest!==planned.replay_digest||
+         !game.session.state.expedition_complete||
+         game.session.state.retired!==planned.retired)
+       throw Error("Original frontier expedition could not independently replay");
+      advancedCommands=planned.actions.slice();
+      advancedScene=source;showAdvanced(game);
+      status("Original seeded world expedition independently replayed.");
+     }catch(error){status("Frontier plan adoption rejected: "+error.message);}
+    });
+    target.append(adopt);
+    status("AI proved an original nonterminal expedition; no world mutation until explicit adoption.");
+   }catch(error){proof.textContent="";status("Frontier planner refused: "+error.message);}
+  });
+  target.append(planBtn);target.append(proof);
+  return;
+ }
+ if(advancedSession?.editor==="maze"){
+  const state=advancedSession.state;
+  const allowed=new Set(["north","south","east","west","ascend","descend",
+    "wait","open","light_torch","rest","inspect","finish"]);
+  if(state.topology==="braided")
+   for(const v of ["northeast","northwest","southeast","southwest"])allowed.add(v);
+  if(state.topology==="non_euclidean")allowed.add("warp");
+  const chooser=document.createElement("label");
+  chooser.textContent="Original "+state.topology+" maze command";
+  const command=document.createElement("select");
+  command.id="maze-physical-action";
+  for(const v of actions.filter(v=>allowed.has(v))){
+   const item=document.createElement("option");
+   item.value=v;item.textContent=v.replaceAll("_"," ");
+   command.append(item);
+  }
+  chooser.append(command);target.append(chooser);
+  const submit=document.createElement("button");submit.type="button";
+  submit.disabled=Boolean(advancedSession.terminal);
+  submit.textContent="Apply source-verified maze move";
+  submit.addEventListener("click",()=>advanceAdvanced(command.value));
+  target.append(submit);
+  const legend=document.createElement("small");
+  legend.textContent="◆ key · D locked gate · ⇅ stairs · ◎ portal · E exit. "+
+    "Keys, walls and hazards use the original authored geometry. "+
+    "Moving walls change with simulated turns, not clock time.";
+  target.append(legend);
+  const planButton=document.createElement("button");
+  planButton.type="button";
+  planButton.textContent="AI: prove an original maze escape";
+  planButton.disabled=Boolean(advancedSession.terminal);
+  const report=document.createElement("pre");
+  report.id="maze-original-route-proof";
+  report.setAttribute("role","status");
+  report.setAttribute("aria-live","polite");
+  planButton.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="maze"||systemEditor().id!=="maze")
+     throw Error("Original maze editor changed; start a new source session");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("Authored maze source uses a different game seed");
+    const result=await api("/api/maze-plan",{
+      scene:source,settings:advancedSettings,
+      max_states:8000,max_depth:80,beam_width:64
+    });
+    const plan=result.plan;
+    report.textContent=JSON.stringify({
+      topology:plan.topology,
+      result:plan.status,earned_actions:plan.actions,
+      keys:plan.actual_keys??plan.best_partial_keys,
+      expanded_transitions:plan.expanded_transitions,
+      source_digest:plan.source_digest,
+      independent_replay_verified:plan.independent_replay_verified,
+      native_hardware_certified:false,proof_digest:plan.digest
+    },null,2);
+    target.querySelector("#maze-adopt-proven-route")?.remove();
+    if(plan.status!=="replay_verified_exit"){
+      status("Search was inconclusive. The original labyrinth is NOT certified impossible.");
+      return;
+    }
+    const adopt=document.createElement("button");
+    adopt.type="button";adopt.id="maze-adopt-proven-route";
+    adopt.textContent="Play the independently proven authored maze route";
+    adopt.addEventListener("click",async()=>{
+     try{
+      if(advancedEditor!=="maze"||systemEditor().id!=="maze"||
+         advancedSession.seed!==source.seed||advancedCommands.length!==0)
+        throw Error("Verified route requires a fresh unchanged original maze");
+      const accepted=await api("/api/maze-plan-verify",{
+        record:plan,scene:source,settings:advancedSettings
+      });
+      if(!accepted.verified)throw Error("Source-bound maze route recheck failed");
+      const played=await api("/api/advanced-play",{
+        editor:"maze",settings:advancedSettings,
+        actions:plan.actions,seed:source.seed,scene:source
+      });
+      if(played.session.digest!==plan.gameplay_receipt_digest||
+         !played.session.state.finished||played.session.state.failed)
+        throw Error("Original maze did not actually reach the earned exit");
+      advancedCommands=plan.actions.slice();
+      advancedScene=source;
+      showAdvanced(played);
+      status("Real authored maze exit replayed and verified. No untrusted state or automatic game-file mutation.");
+     }catch(error){status("Maze route adoption blocked: "+error.message);}
+    });
+    target.append(adopt);
+    status("A full original maze path passed independent replay; review its steps before adoption.");
+   }catch(error){
+    report.textContent="";
+    status("Original maze route planner rejected: "+error.message);
+   }
+  });
+  target.append(planButton);target.append(report);
+  return;
+ }
+ if(advancedSession?.editor==="sports"){
+  const state=advancedSession.state;
+  const byMode={
+   team:["advance","sprint","pass","shoot","block","intercept","dribble","cross"],
+   racket:["serve","drive","slice","lob","smash","net"],
+   arena:["carry","dash","sidestep","tackle","throw","guard","score"],
+   turn_based:["move","dash","switch_lane","tackle","pass","shoot","end_turn"]
+  };
+  const common=["inspect","rest","tactic:balanced","tactic:press","tactic:hold"];
+  if(state.mode!=="racket")common.push("substitute");
+  const legal=new Set([...common,...(byMode[state.mode]||[])]);
+  const shown=actions.filter(a=>legal.has(a));
+  const type=document.createElement("label");
+  type.textContent="Original "+state.mode.replaceAll("_"," ")+
+    " sport · rule-specific physical command";
+  const command=document.createElement("select");
+  command.id="sports-original-command";
+  command.setAttribute("aria-label","Original sports gameplay command");
+  for(const act of shown){
+   const option=document.createElement("option");
+   option.value=act;option.textContent=act.replaceAll("_"," ");
+   command.append(option);
+  }
+  type.append(command);target.append(type);
+  const execute=document.createElement("button");
+  execute.type="button";execute.textContent="Execute original sporting action";
+  execute.disabled=Boolean(advancedSession.terminal)||shown.length===0;
+  execute.addEventListener("click",()=>advanceAdvanced(command.value));
+  target.append(execute);
+  const info=document.createElement("small");
+  info.textContent="Source-verified score "+state.home_score+" : "+state.away_score+
+    " · possession "+state.owner+" · energy "+state.stamina+
+    (state.mode==="turn_based"?" · AP "+state.ap_remaining:"")+
+    (state.mode==="racket"?" · rally "+(state.rally?"live":"waiting serve"):"")+
+    " · all results independently replayable";
+  target.append(info);
+  const coach=document.createElement("button");
+  coach.type="button";
+  coach.textContent="AI coach: search actual original winning match strategy";
+  coach.disabled=Boolean(advancedSession.terminal);
+  const evidence=document.createElement("pre");
+  evidence.id="sports-coach-proof";
+  evidence.setAttribute("role","status");
+  evidence.setAttribute("aria-live","polite");
+  coach.addEventListener("click",async()=>{
+   try{
+    if(advancedEditor!=="sports"||systemEditor().id!=="sports")
+     throw Error("AI coach requires current original sports editor");
+    const source=advancedScene||(await reviewedSceneTemplate()).scene;
+    if(source.seed!==advancedSession.seed)
+     throw Error("Authored match scene does not match gameplay seed");
+    const report=await api("/api/sports-coach",{
+      scene:source,settings:advancedSettings,
+      max_states:6000,max_depth:48,beam_width:36
+    });
+    const plan=report.plan;
+    evidence.textContent=JSON.stringify({
+      rules:plan.rules,status:plan.status,
+      commands:plan.actions,
+      home_score:plan.final_home_score??plan.best_observed_home_score,
+      away_score:plan.final_away_score??plan.best_observed_away_score,
+      expanded:plan.expanded_transitions,
+      proven_original_replay:plan.independently_verified,
+      source_digest:plan.source_digest,
+      proof_digest:plan.digest,
+      native_hardware_certified:false
+    },null,2);
+    target.querySelector("#sports-coach-adopt")?.remove();
+    if(plan.status!=="replay_verified_win"){
+      status("Original AI coach search was inconclusive. No false claim that the game is unwinnable.");
+      return;
+    }
+    const adopt=document.createElement("button");
+    adopt.type="button";adopt.id="sports-coach-adopt";
+    adopt.textContent="Play independently proven original match strategy";
+    adopt.addEventListener("click",async()=>{
+      try{
+        if(advancedEditor!=="sports"||systemEditor().id!=="sports"||
+           advancedSession.seed!==source.seed||advancedCommands.length!==0)
+          throw Error("Coach strategy can only start from the reviewed unchanged initial match");
+        const checked=await api("/api/sports-coach-verify",{
+          record:plan,scene:source,settings:advancedSettings
+        });
+        if(!checked.verified)throw Error("AI match coach proof failed re-search");
+        const replay=await api("/api/advanced-play",{
+          editor:"sports",settings:advancedSettings,
+          actions:plan.actions,seed:source.seed,scene:source
+        });
+        if(replay.session.digest!==plan.original_replay_digest||
+           !replay.session.state.finished||!replay.session.state.victory)
+          throw Error("Proposed coach strategy did not earn actual match victory");
+        advancedCommands=plan.actions.slice();
+        advancedScene=source;
+        showAdvanced(replay);
+        status("Original AI coach match fully replay-verified. No untrusted score, hardware release or automatic file mutation.");
+      }catch(error){status("AI coach strategy refused: "+error.message);}
+    });
+    target.append(adopt);
+    status("AI coach proved a winning original strategy. Review its actions, then explicitly adopt.");
+   }catch(error){
+    evidence.textContent="";
+    status("AI sports coach rejected: "+error.message);
+   }
+  });
+  target.append(coach);target.append(evidence);
+  return;
+ }
+
  if(advancedSession?.editor==="quest_director"){
   const state=advancedSession.state;
   const picker=document.createElement("label");picker.textContent="Original player action";
@@ -1696,7 +2836,7 @@ function showAdvanced(reply){
  advancedAvailableActions=reply.available_actions;
  const nativeSourceFamilies=new Set(["puzzle","platformer","deck_battler",
   "shooter","tactics","tower_defense","racing","survival","farming",
-  "factory","colony"]);
+  "factory","colony","economy"]);
  $("advanced-godot-export").disabled=!nativeSourceFamilies.has(advancedSession.editor);
  $("advanced-godot-export").title=nativeSourceFamilies.has(advancedSession.editor)?
   "Package original Godot source; native hardware verification is a separate CI gate":
@@ -2856,7 +3996,7 @@ $("advanced-scene-stage").addEventListener("click",async()=>{
 });
 $("advanced-godot-export").addEventListener("click",async()=>{
  try{
-  if(!advancedSession||(!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)&&advancedSession.editor!=="colony"))
+  if(!advancedSession||(!["puzzle","platformer","deck_battler","shooter","tactics","tower_defense","racing","survival","farming","factory"].includes(advancedSession.editor)&&advancedSession.editor!=="colony"&&advancedSession.editor!=="economy"))
    throw Error("Native Godot export requires a verified advanced gameplay session in one of the supported playable native genres");
   if(!advancedSettings)
    throw Error("Original authored game settings must be available");

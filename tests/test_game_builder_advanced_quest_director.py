@@ -283,11 +283,17 @@ class LivingOriginalQuestTests(unittest.TestCase):
                           ending_policy="persistent")
         itinerary=self.witness_start()+["choose:0:support","help:0","resolve:0"]
         sample=run_advanced_session("quest_director",common,itinerary)
+        # A discover event has rules index 2: event_rules=1 excludes
+        # it and must not fabricate a quest. Use three rule families, which
+        # include the real witnessed discover event, to test rule payments.
+        with self.assertRaises(AdvancedRuntimeError):
+            run_advanced_session("quest_director",
+                                 {**common,"event_rules":1},itinerary)
         one=run_advanced_session("quest_director",
-                  {**common,"event_rules":1},itinerary)
+                  {**common,"event_rules":3},itinerary)
         self.assertTrue(verify_advanced_session(sample,common))
-        self.assertTrue(verify_advanced_session(one,{**common,"event_rules":1}))
-        self.assertEqual(one["state"]["quests"][0]["rule_id"],0)
+        self.assertTrue(verify_advanced_session(one,{**common,"event_rules":3}))
+        self.assertLess(one["state"]["quests"][0]["rule_id"],3)
         self.assertGreater(sample["state"]["quests"][0]["rule_id"],0)
         self.assertNotEqual(sample["state"]["gold"],one["state"]["gold"])
 

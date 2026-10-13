@@ -65,6 +65,8 @@ def test_gameforge_run_route_executes_pipeline(client):
     assert body["forge"]["verify_loop"]["repair_mode"] == "apply"
     assert "project.godot" in body["file_names"]
     assert "files" not in body
+    assert body["source_manifest"]["file_count"] == len(body["file_names"])
+    assert body["source_manifest"]["files"]["project.godot"]
     assert body["playtest"] is None
 
 
@@ -76,6 +78,8 @@ def test_gameforge_intake_route_questionnaire_to_verified_build(client):
     assert body["era"] == body["intake"]["era"]
     assert body["sim"]["passed"] is True
     assert "project.godot" in body["files"]
+    from skeleton.forge.source_manifest import source_manifest
+    assert body["source_manifest"] == source_manifest(body["files"])
 
 
 def test_run_route_accepts_answers(client):

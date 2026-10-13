@@ -32,13 +32,16 @@ def test_cs_300_does_not_break_volume_freeze():
     assert data["scope"]["frozen_volume_range"] == ["VOL-000", "VOL-420"]
     assert data["scope"]["relationship_to_frontier_96"] == "strictly-above"
 
-def test_cs_300_starts_unsigned():
+def test_cs_300_signed_status_matches_current_layer_evidence():
     data = json.loads(DATA.read_text(encoding="utf-8"))
-    assert data["completion"]["signed_complete"] == 0
-    assert data["completion"]["cs_300_qualified"] is False
-    assert all(not x["complete"] for x in data["layers"])
-    assert all(not x["implementation_signed"] for x in data["layers"])
-    assert all(not x["independent_verification_signed"] for x in data["layers"])
+    signed = [x for x in data["layers"] if x["complete"]]
+    assert data["completion"]["signed_complete"] == len(signed)
+    assert data["completion"]["cs_300_qualified"] is (len(signed) == 300)
+    for layer in signed:
+        assert layer["maturity"] == "signed_complete"
+        assert layer["implementation_signed"]
+        assert layer["independent_verification_signed"]
+        assert layer["evidence"]
 
 def test_each_layer_has_contract_proof_owner_and_dependency_discipline():
     data = json.loads(DATA.read_text(encoding="utf-8"))

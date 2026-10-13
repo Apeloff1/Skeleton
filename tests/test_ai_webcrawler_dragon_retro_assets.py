@@ -42,7 +42,7 @@ def test_real_cartridge_assembly_receives_original_tiles_and_animated_dragon():
     asm=gb.files["src/main.asm"]
     assert "AnimFrame: ds 1" in asm and "    inc [hl]" in asm
     assert asm.count("db $")>=16
-    assert "ld [OAM+6], a" in asm
+    assert "ld [DRAGON_OAM+6], a" in asm
     assert "original dragon_blink" in asm
     assert gb.files["dragon-pixel-art.json"].endswith("\n")
     nes=render_native_project(target_id="nes",**args)
@@ -59,3 +59,38 @@ def test_patchers_fail_closed_on_foreign_rom_templates():
         enrich_nes_asm("anything")
     assert "Tiles:" in gb_assembly()
     assert ".res $2000-" in nes_assembly()
+
+
+def test_rgbds_reserved_identifiers_are_removed_only_after_asm_sprite_enrichment():
+    # Regression: canonical source uses whitespace variations, and OAM / VRAM
+    # became reserved lexer names in RGBDS 1.0.0.  Both can coexist without
+    # disabling the original animated character and sound instructions.
+    for target,style in (
+        ("game_boy","arcade_score_attack"),
+        ("game_boy_color","arcade_score_attack"),
+        ("game_boy","side_scrolling_platformer"),
+    ):
+        project=render_native_project(
+            title="Dragon RGBDS 1.0",target_id=target,style=style,
+            candidate_id=sha256((target+style).encode()).hexdigest(),
+            mechanics=(Mechanic.MOVEMENT,Mechanic.EXPLORATION),
+            authorized=True,
+        )
+        asm=project.files["src/main.asm"]
+        assert "DEF DRAGON_OAM EQU $FE00" in asm
+        assert "DEF DRAGON_VRAM EQU $8000" in asm
+        assert "DEF OAM EQU" not in asm
+        assert "DEF VRAM EQU" not in asm
+        assert "ld [DRAGON_OAM+6]" in asm
+        assert "ldh [$FF26],a" in asm
+        assert "SECTION \"Entry\", ROM0[$100]" in asm
+        if style=="side_scrolling_platformer":
+            assert "DEF GOAL_X EQU" in asm
+            assert "ld hl,DRAGON_VRAM" in asm
+        else:
+            assert "ld hl, DRAGON_VRAM" in asm
+            assert "ld hl, DRAGON_OAM" in asm
+            assert "ld hl, VRAM" not in asm
+            assert "ld hl, OAM" not in asm
+            assert "AnimFrame: ds 1" in asm
+            assert "ld a, 4" in asm

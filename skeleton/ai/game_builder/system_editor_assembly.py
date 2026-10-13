@@ -157,7 +157,19 @@ def compile_system_assembly(project_id: str,
         "rhythm": ("inspect",),
         "fighting": ("inspect",),
         "quest_director": ("inspect",),
-        "sailing": ("wait",),
+        "flight": ("coast",),
+        "sailing": ("coast",)
+        "maritime_rescue": ("wait",),
+        "parkour": ("inspect",),
+        "sports": ("inspect",),
+        "maze": ("inspect",),
+        "rpg": ("inspect",),
+        "procedural_world": ("inspect",),
+        "npc_society": ("inspect",),
+        "ecosystem": ("inspect",),
+        "economy": ("inspect",),
+        "voxel": ("inspect",),
+        "dialogue": ("inspect",),
     }
     if set(advanced_smoke) != set(ADVANCED_ENGINE_IDS):
         raise AssemblyError("every playable editor needs an explicit assembly gameplay proof")
@@ -207,7 +219,19 @@ def compile_system_assembly(project_id: str,
             "rhythm":("inspect",),
             "fighting":("inspect",),
             "quest_director":("inspect",),
-            "sailing":("wait",),
+            "flight":("coast",),
+            "sailing":("coast",)
+            "maritime_rescue":("wait",),
+            "parkour":("inspect",),
+            "sports":("inspect",),
+            "maze":("inspect",),
+            "rpg":("inspect",),
+            "procedural_world":("inspect",),
+            "npc_society":("inspect",),
+            "ecosystem":("inspect",),
+            "economy":("inspect",),
+            "voxel":("inspect",),
+            "dialogue":("inspect",),
         }
         if set(scene_smoke) != set(ADVANCED_ENGINE_IDS):
             raise AssemblyError("every playable editor needs a source-bound scene proof")
