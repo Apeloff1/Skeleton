@@ -418,6 +418,9 @@ OPERATIONS = {
     "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
     "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
+    "studio.production.review_manifest":("read", "exact full diff and bounded UTF-8 review pages",False),
+    "studio.production.review_page":("read", "one content-hashed UTF-8 reviewed diff page",False),
+    "studio.production.commit_pages":("external_effect", "human-approved full-page original source commit",True),
     "studio.production.commit_bundle":("external_effect", "explicit human-approved original source commit group",True),
     "studio.production.queue":("read", "paged pending and accepted original source proposals",False),
     "studio.release.catalog":("read", "source-custodied original browser/Godot release identities",False),
@@ -723,6 +726,17 @@ class JeevesAppwideRuntime:
                     **params,operator_authorized=authorized)
             else:
                 result=consequences.verify(**params)
+        elif action in ("studio.production.review_manifest",
+                        "studio.production.review_page",
+                        "studio.production.commit_pages"):
+            from .jeeves_paged_diff import JeevesPagedDiff
+            reviewer=JeevesPagedDiff(inv,ws)
+            if action=="studio.production.review_manifest":
+                result=reviewer.manifest(**params)
+            elif action=="studio.production.review_page":
+                result=reviewer.page(**params)
+            else:
+                result=reviewer.commit(**params,operator_authorized=authorized)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":

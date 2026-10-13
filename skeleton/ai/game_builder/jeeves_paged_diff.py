@@ -29,8 +29,7 @@ def _chunks(diff):
         raise JeevesAppwideError("diff exceeds reviewed bounded single source size")
     result=[]
     if not diff:
-        # Even an unchanged source needs one explicit reviewed page.
-        diff="(no source diff; exact revision is unchanged)"
+        raise JeevesAppwideError("unchanged source has no diff to review")
     for at in range(0,len(diff),PAGE_CHARS):
         text=diff[at:at+PAGE_CHARS]
         data=text.encode("utf-8")
