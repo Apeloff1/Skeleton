@@ -5,7 +5,7 @@ Workers. Reverse delegation is rejected.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Mapping, Sequence
 
@@ -96,6 +96,78 @@ class OrchestrLedger:
         if not isinstance(record, OrchestrRecord):
             raise ValueError("invalid record")
         return OrchestrLedger(self.records + (record,))
+
+    def ready_names(self) -> tuple[str, ...]:
+        """Deterministic dependency frontier; blocked and failed work stays withheld.
+
+        A child may only enter the frontier when its parent has explicitly
+        become ready/running. The frontier is information, not a dispatch queue.
+        """
+        by_name = {record.name: record for record in self.records}
+        ready: list[str] = []
+        for record in self.records:
+            if record.state not in (OrchestrState.NEW, OrchestrState.READY):
+                continue
+            if not all(by_name[dep].state is OrchestrState.DONE
+                       for dep in record.dependencies):
+                continue
+            if record.parent is not None and by_name[record.parent].state not in (
+                OrchestrState.READY, OrchestrState.RUNNING,
+            ):
+                continue
+            ready.append(record.name)
+        return tuple(sorted(ready))
+
+    def transition(self, name: str, state: OrchestrState, *,
+                   evidence: tuple[str, ...] = ()) -> "OrchestrLedger":
+        """Return an authority-preserving, evidence-bearing state update.
+
+        This transition never executes the task, mints a tool grant, or
+        substitutes orchestration completion for external execution proof.
+        """
+        bounded_text(name, "task name")
+        if not isinstance(state, OrchestrState):
+            raise ValueError("invalid target orchestration state")
+        if not isinstance(evidence, tuple):
+            raise ValueError("transition evidence must be a tuple")
+        transitions = {
+            OrchestrState.NEW: frozenset({OrchestrState.READY, OrchestrState.BLOCKED}),
+            OrchestrState.READY: frozenset({
+                OrchestrState.RUNNING, OrchestrState.BLOCKED, OrchestrState.FAILED,
+            }),
+            OrchestrState.RUNNING: frozenset({
+                OrchestrState.DONE, OrchestrState.BLOCKED, OrchestrState.FAILED,
+            }),
+            OrchestrState.BLOCKED: frozenset({
+                OrchestrState.READY, OrchestrState.FAILED,
+            }),
+            OrchestrState.FAILED: frozenset({OrchestrState.READY}),
+            OrchestrState.DONE: frozenset(),
+        }
+        by_name = {record.name: record for record in self.records}
+        current = by_name.get(name)
+        if current is None:
+            raise ValueError("unknown orchestration task")
+        if state not in transitions[current.state]:
+            raise ValueError("invalid orchestration state transition")
+        if state in (OrchestrState.READY, OrchestrState.RUNNING, OrchestrState.DONE):
+            if any(by_name[dep].state is not OrchestrState.DONE
+                   for dep in current.dependencies):
+                raise ValueError("orchestration dependencies have not completed")
+            if current.parent is not None and by_name[current.parent].state not in (
+                OrchestrState.READY, OrchestrState.RUNNING,
+            ):
+                raise ValueError("parent is not accepting delegated work")
+        if state is OrchestrState.DONE:
+            if any(child.parent == name and child.state is not OrchestrState.DONE
+                   for child in self.records):
+                raise ValueError("cannot close task with unfinished children")
+            if not current.evidence and not evidence:
+                raise ValueError("completed orchestration requires evidence")
+        updated = replace(current, state=state, evidence=current.evidence + evidence)
+        return OrchestrLedger(tuple(
+            updated if record.name == name else record for record in self.records
+        ))
 
     @property
     def digest(self) -> str:
