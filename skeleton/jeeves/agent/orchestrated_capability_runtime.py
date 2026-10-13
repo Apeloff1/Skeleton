@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
-from typing import Any
+from typing import Any, Callable
 
 from skeleton.jeeves.ai.contracts import Authority
 from skeleton.jeeves.ai.orchestration import OrchestrState
@@ -31,7 +31,7 @@ class OrchestratedDispatchError(ValueError):
 def _digest(data: Any) -> str:
     encoded = json.dumps(data, sort_keys=True, separators=(",", ":"),
                          ensure_ascii=True, allow_nan=False).encode("utf-8")
-    if len(encoded) > 64 * 1024:
+    if len(encoded) > 1024 * 1024:
         raise OrchestratedDispatchError("orchestrated evidence exceeds byte budget")
     return sha256(encoded).hexdigest()
 
@@ -62,13 +62,17 @@ class JeevesOrchestratedCapabilityRuntime:
         self, *,
         ledger: DurableOrchestrLedger,
         dispatcher: JeevesCapabilityDispatcher,
+        verify_result: Callable[[CapabilityIntent, ToolObservation, ToolExecutionContext], str | None],
     ) -> None:
         if not isinstance(ledger, DurableOrchestrLedger):
             raise OrchestratedDispatchError("durable host-owned orchestration ledger required")
         if not isinstance(dispatcher, JeevesCapabilityDispatcher):
             raise OrchestratedDispatchError("owner-bound host dispatcher required")
+        if not callable(verify_result):
+            raise OrchestratedDispatchError("independent host outcome verifier required")
         self.ledger = ledger
         self.dispatcher = dispatcher
+        self.verify_result = verify_result
 
     def ready(self) -> tuple[str, ...]:
         """List the exact durable plan tasks eligible to begin."""
@@ -126,7 +130,16 @@ class JeevesOrchestratedCapabilityRuntime:
             # Retain RUNNING to block a blind retry. Host reconciliation must
             # attach an externally verified receipt before any new attempt.
             raise
+        # Only an independent, host-supplied receipt verifier can complete a
+        # task. Tool success alone does not prove the intended app effect.
+        qualification = self.verify_result(intent, observation, context)
+        if qualification is not None and (
+            not isinstance(qualification, str) or len(qualification) != 64
+            or any(ch not in "0123456789abcdef" for ch in qualification)
+        ):
+            raise OrchestratedDispatchError("invalid host completion evidence digest")
         observation_digest = _digest({
+            "host_qualification_digest": qualification,
             "call_id": observation.call_id,
             "tool_name": observation.tool_name,
             "ok": observation.ok,
@@ -134,7 +147,8 @@ class JeevesOrchestratedCapabilityRuntime:
             "payload_digest": _digest(observation.payload),
             "error_digest": _digest(observation.error),
         })
-        next_state = OrchestrState.DONE if observation.ok else OrchestrState.BLOCKED
+        confirmed = observation.ok and qualification is not None
+        next_state = OrchestrState.DONE if confirmed else OrchestrState.BLOCKED
         _ledger, terminal_head = self.ledger.transition(
             task_name, next_state,
             evidence=(observation_digest,),
@@ -146,7 +160,7 @@ class JeevesOrchestratedCapabilityRuntime:
             task_name=task_name, request_digest=intent.digest,
             observation_digest=observation_digest,
             plan_event_digest=terminal_head,
-            outcome="completed" if observation.ok else "in_doubt",
+            outcome="completed" if confirmed else "in_doubt",
             tool_ok=observation.ok,
         )
 
