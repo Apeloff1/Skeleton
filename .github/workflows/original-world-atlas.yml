@@ -1,0 +1,271 @@
+name: Original World Atlas
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/game/generation/original_*.py"
+      - "skeleton/game/generation/world_*.py"
+      - "tests/test_original_world*.py"
+      - "tests/test_original_foundation*.py"
+      - "docs/ORIGINAL_WORLD_MECHANIC_ATLAS.md"
+      - "docs/ORIGINAL_WORLD_FOUNDATIONS_10K.md"
+      - "docs/ORIGINAL_WORLD_MILLION_FORGE.md"
+      - "docs/ORIGINAL_WORLD_TENFOLD_SPATIAL_FORGE.md"
+      - "docs/ORIGINAL_WORLD_LIVING_122M.md"
+      - "docs/ORIGINAL_WORLD_PRODUCT_DELIVERY.md"
+      - "docs/ORIGINAL_WORLD_NPC_CIVIC_EDUCATION_GENERATIONS.md"
+      - "docs/ORIGINAL_WORLD_NPC_PLATFORM_GENRE_FIDELITY.md"
+      - "docs/ORIGINAL_WORLD_NPC_ERA_FIDELITY.md"
+      - "docs/ORIGINAL_WORLD_NPC_COGNITION_V2.md"
+      - ".github/workflows/original-world-atlas.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/game/generation/original_*.py"
+      - "skeleton/game/generation/world_*.py"
+      - "tests/test_original_world*.py"
+      - "tests/test_original_foundation*.py"
+      - "docs/ORIGINAL_WORLD_MECHANIC_ATLAS.md"
+      - "docs/ORIGINAL_WORLD_FOUNDATIONS_10K.md"
+      - "docs/ORIGINAL_WORLD_MILLION_FORGE.md"
+      - "docs/ORIGINAL_WORLD_TENFOLD_SPATIAL_FORGE.md"
+      - "docs/ORIGINAL_WORLD_LIVING_122M.md"
+      - "docs/ORIGINAL_WORLD_PRODUCT_DELIVERY.md"
+      - "docs/ORIGINAL_WORLD_NPC_CIVIC_EDUCATION_GENERATIONS.md"
+      - "docs/ORIGINAL_WORLD_NPC_PLATFORM_GENRE_FIDELITY.md"
+      - "docs/ORIGINAL_WORLD_NPC_ERA_FIDELITY.md"
+      - "docs/ORIGINAL_WORLD_NPC_COGNITION_V2.md"
+      - ".github/workflows/original-world-atlas.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: original-world-atlas-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  atlas:
+    name: Validate authorship, exact indexing and abstract rule replay
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runner
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Compile atlas and simulation modules
+        run: python -m compileall -q skeleton/game/generation
+      - name: Verify originals, styles and rule simulations
+        run: python -m pytest -q --noconftest tests/test_original_world_mechanic_atlas.py tests/test_original_world_simulator.py tests/test_original_world_campaign.py tests/test_original_world_campaign_cli.py tests/test_original_world_nexus.py tests/test_original_world_society.py tests/test_original_world_play_cli.py tests/test_original_world_frontier.py tests/test_original_world_frontier_cli.py tests/test_original_world_era_runtime.py tests/test_original_world_era_cli.py tests/test_original_foundation_compiler.py tests/test_original_foundation_cli.py tests/test_original_foundation_discovery.py tests/test_original_world_million_compiler.py tests/test_original_world_million_cli.py tests/test_original_world_million_objectives.py tests/test_original_world_million_synergy.py tests/test_original_world_tenfold_compiler.py tests/test_original_world_tenfold_cli.py tests/test_original_world_tenfold_navigation.py tests/test_original_world_living_10x_compiler.py tests/test_original_world_living_10x_cli.py tests/test_original_world_living_10x_objectives.py tests/test_original_world_living_10x_synergy.py tests/test_original_world_product_terrain.py tests/test_original_world_product_agents.py tests/test_original_world_product_session.py tests/test_original_world_product_bundle.py tests/test_original_world_product_missions.py tests/test_original_world_npc_cognition_v2.py tests/test_original_world_npc_cognition_projects.py tests/test_original_world_npc_social_knowledge.py tests/test_original_world_npc_laboratory.py tests/test_original_world_npc_civics.py tests/test_original_world_npc_apprenticeships.py tests/test_original_world_npc_households.py tests/test_original_world_npc_era_population.py tests/test_original_world_npc_fidelity_scheduler.py tests/test_original_world_npc_platform_profiles.py tests/test_original_world_npc_era_fidelity.py tests/test_original_world_npc_cost_lab.py
+      - name: Exercise era and theology preview
+        run: |
+          python -m skeleton.game.generation.original_world_cli --seed gentle-history --era paleolithic --chronology remote-past --theology animist-invented --theme comfort --tone ultra-snuggly --comfort 100 --realism 95 --brief >/dev/null
+          python -m skeleton.game.generation.original_world_cli --index 123456789 --era deep-future --theology cosmic-mythic --theme cosmic-horror --visual-style photorealistic-target --tone nightmarish --simulation-realism hyperrealism-target --demo-rules >/dev/null
+      - name: Play four authored worlds with real actions
+        run: |
+          python -m skeleton.game.generation.original_world_campaign_cli --world topology-02 --seed maze --actions-json '[{"verb":"observe"},{"verb":"end_turn"},{"verb":"move","target":1}]' --show-map
+          python -m skeleton.game.generation.original_world_campaign_cli --world ecology-03 --seed living-rain --actions-json '[{"verb":"redirect_rain","option":"west","amount":2},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_campaign_cli --world civilization-01 --seed promises --actions-json '[{"verb":"pledge"},{"verb":"fulfill"},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_campaign_cli --world serenity-05 --seed cozy --actions-json '[{"verb":"weave","amount":2},{"verb":"rest"},{"verb":"end_turn"}]' --show-map
+      - name: Run connected four-world expedition
+        run: |
+          python - <<'PY'
+          from skeleton.game.generation.original_world_campaign import CampaignAction
+          from skeleton.game.generation.original_world_nexus import (
+              create_nexus, act, travel, recharge, nexus_save, nexus_restore,
+          )
+          state = create_nexus("cross-world-expedition")
+          state, _ = act(state, CampaignAction("weave", amount=2))
+          for realm in (1, 2, 3, 0):
+              state, _ = travel(state, realm)
+              state, _ = act(state, CampaignAction("end_turn"))
+          restored = nexus_restore(nexus_save(state))
+          assert restored == state
+          assert state.realms[0].quilt == 4
+          assert sum(realm.wood for realm in state.realms) == 1
+          assert len(state.realms) == 4
+          print("Four-world traversal and non-duplicated inventory verified")
+          PY
+      - name: Simulate autonomous inhabitants and persist their consequences
+        run: |
+          python - <<'PY'
+          from skeleton.game.generation.original_world_campaign import CampaignAction
+          from skeleton.game.generation.original_world_society import SocietyAction
+          from skeleton.game.generation.original_world_living_session import (
+              create_living_session, living_step, living_save, living_restore,
+          )
+          session = create_living_session("topology-02", "resident-sim")
+          for event in (
+              SocietyAction("greet"), SocietyAction("invite"),
+              CampaignAction("move", target=1),
+              CampaignAction("end_turn"), CampaignAction("forage"),
+              CampaignAction("end_turn"),
+          ):
+              session, receipt = living_step(session, event)
+          assert session.society.day == session.campaign.turn == 2
+          assert session.society.residents[0].following
+          assert session.society.residents[0].location == session.campaign.position
+          assert living_restore(living_save(session)) == session
+          print("Autonomous resident economy and save/replay verified")
+          PY
+      - name: Exercise unified playable terminal in all three modes
+        run: |
+          python -m skeleton.game.generation.original_world_play_cli --mode campaign --world serenity-05 --actions-json '[{"verb":"weave","amount":2},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_play_cli --mode living --world topology-02 --actions-json '[{"social":"greet"},{"social":"invite"},{"verb":"move","target":1},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_play_cli --mode nexus --actions-json '[{"verb":"weave","amount":2},{"portal":1},{"verb":"end_turn"},{"portal":2},{"verb":"redirect_rain","option":"west","amount":2}]' --show-map
+      - name: Execute persistent procedurally generated frontier
+        run: |
+          python -m skeleton.game.generation.original_world_frontier_cli --world topology-02 --seed maze-expedition --actions-json '[{"verb":"move","option":"north"},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_frontier_cli --world ecology-03 --seed weather-expedition --actions-json '[{"verb":"redirect_rain","option":"west","amount":2},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_frontier_cli --world civilization-01 --seed promise-expedition --actions-json '[{"verb":"pledge"},{"verb":"fulfill"},{"verb":"settle"}]' --show-map
+          python -m skeleton.game.generation.original_world_frontier_cli --world serenity-05 --seed comfy-expedition --actions-json '[{"verb":"weave","amount":2},{"verb":"rest"}]' --show-map
+      - name: Play era-specific technology and original cosmologies
+        run: |
+          python -m skeleton.game.generation.original_world_era_cli --world serenity-05 --era iron-age --actions-json '[{"tech":"smelt"},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_era_cli --world ecology-03 --theology faith-as-power --actions-json '[{"ritual":"weather_invocation"},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_era_cli --world topology-02 --chronology time-loop --actions-json '[{"verb":"end_turn"},{"verb":"end_turn"},{"verb":"end_turn"},{"verb":"end_turn"},{"verb":"end_turn"},{"verb":"end_turn"},{"verb":"end_turn"},{"verb":"end_turn"}]' --show-map
+      - name: Exercise audited 10k-plus causal foundation studio
+        run: |
+          python -m skeleton.game.generation.original_foundation_cli --report
+          python -m skeleton.game.generation.original_foundation_cli --page 10232 --limit 8 >/dev/null
+          python -m skeleton.game.generation.original_foundation_cli --index 9999 --actions-json '[{"verb":"intervene"},{"verb":"study"},{"verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_foundation_cli --seed cross-era-habitat --actions-json '[{"verb":"negotiate"},{"verb":"intervene"},{"verb":"end_turn"}]' --show-map
+      - name: Search authorial causal laws for diverse useful game foundations
+        run: |
+          python -m skeleton.game.generation.original_foundation_cli --find habitat --limit 16 --no-diversify >/dev/null
+          python -m skeleton.game.generation.original_foundation_cli --find consent --operator veto --limit 12 >/dev/null
+          python -m skeleton.game.generation.original_foundation_cli --find memory --domain memory --limit 16 >/dev/null
+      - name: Validate 102400 modes and 1228800 advanced worlds
+        run: |
+          python -m skeleton.game.generation.original_world_million_cli --inventory
+          python -m skeleton.game.generation.original_world_million_cli --page 1228797 --limit 3 >/dev/null
+          python -m skeleton.game.generation.original_world_million_cli --base 0 --form puzzle --arc chapters --actions-json '[{"layer":"mode","verb":"toggle","target":0},{"layer":"mode","verb":"toggle","target":2},{"layer":"mode","verb":"pass"},{"layer":"arc","verb":"commit"}]' --show-map
+          python -m skeleton.game.generation.original_world_million_cli --base 9999 --form colony --arc civilization --actions-json '[{"layer":"mode","verb":"construct","amount":2},{"layer":"mode","verb":"cultivate"},{"layer":"causal","verb":"end_turn"},{"layer":"causal","verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_million_cli --index 1228799 --actions-json '[{"layer":"mode","verb":"tap","target":0},{"layer":"arc","verb":"reflect"},{"layer":"causal","verb":"end_turn"}]' --show-map
+      - name: Prove nonterminal quest-ledger consequences across three layers
+        run: |
+          python -m skeleton.game.generation.original_world_million_cli --base 0 --form puzzle --arc endless --actions-json '[{"layer":"mode","verb":"toggle","target":0},{"layer":"mode","verb":"toggle","target":2},{"layer":"mode","verb":"pass"},{"layer":"causal","verb":"end_turn"}]' --objectives >/dev/null
+          python -m skeleton.game.generation.original_world_cli --advanced-index 1228799 --brief >/dev/null
+          python -m skeleton.game.generation.original_world_cli --mode-index 102399 >/dev/null
+      - name: Check authored domain × game-form pressure effects
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_million_synergy.py
+      - name: Prove 12.288 million world graph rules, real resources and play
+        run: |
+          python -m skeleton.game.generation.original_world_tenfold_cli --inventory
+          python -m skeleton.game.generation.original_world_tenfold_cli --page 12287997 --limit 3 >/dev/null
+          python -m skeleton.game.generation.original_world_tenfold_cli --base 0 --form puzzle --architecture lattice --arc endless --actions-json '[{"layer":"spatial","verb":"extract","amount":2},{"layer":"spatial","verb":"travel","target":1},{"layer":"mode","verb":"toggle","target":0},{"layer":"causal","verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_tenfold_cli --base 4 --form puzzle --architecture phase --arc branching --actions-json '[{"layer":"spatial","verb":"stabilize"},{"layer":"mode","verb":"toggle","target":0},{"layer":"causal","verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_tenfold_cli --base 123 --form tactics --architecture orbit --arc roguelite --actions-json '[{"layer":"spatial","verb":"align"},{"layer":"mode","verb":"guard"},{"layer":"causal","verb":"end_turn"}]' --show-map
+      - name: Ensure original atlas can select new spatial world tiers
+        run: |
+          python -m skeleton.game.generation.original_world_cli --spatial-index 1023999 >/dev/null
+          python -m skeleton.game.generation.original_world_cli --tenfold-index 12287999 --brief >/dev/null
+      - name: Prove resource-bounded route planning instead of guessed distances
+        run: |
+          python -m skeleton.game.generation.original_world_tenfold_cli --base 0 --form puzzle --architecture lattice --arc sandbox --route-target 1 --execute-route >/dev/null
+          python -m skeleton.game.generation.original_world_tenfold_cli --base 0 --form puzzle --architecture pocket --arc sandbox --actions-json '[{"layer":"spatial","verb":"attune"}]' --route-target 12 --execute-route >/dev/null
+      - name: Exercise 122880000 indexed living-world simulations
+        run: |
+          python -m skeleton.game.generation.original_world_living_10x_cli --inventory
+          python -m skeleton.game.generation.original_world_living_10x_cli --page 122879997 --limit 3 >/dev/null
+          python -m skeleton.game.generation.original_world_living_10x_cli --base 0 --form puzzle --architecture lattice --system trophic --arc endless --actions-json '[{"layer":"living","verb":"graze","amount":2},{"layer":"spatial","verb":"travel","target":1},{"layer":"mode","verb":"toggle","target":0},{"layer":"causal","verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_living_10x_cli --base 0 --form puzzle --architecture phase --system knowledge --arc mystery --actions-json '[{"layer":"living","verb":"observe"},{"layer":"living","verb":"verify"},{"layer":"living","verb":"teach"},{"layer":"causal","verb":"end_turn"}]' --show-map
+          python -m skeleton.game.generation.original_world_living_10x_cli --base 0 --form tactics --architecture orbit --system power --arc roguelite --actions-json '[{"layer":"living","verb":"generate"},{"layer":"mode","verb":"guard"},{"layer":"causal","verb":"end_turn"}]' --show-map
+      - name: Verify cross-system crisis and sustainable objectives
+        run: |
+          python -m skeleton.game.generation.original_world_living_10x_cli --base 0 --form puzzle --architecture lattice --system watershed --arc endless --actions-json '[{"layer":"living","verb":"irrigate"},{"layer":"causal","verb":"end_turn"}]' --objectives >/dev/null
+          python -m skeleton.game.generation.original_world_cli --living-index 122879999 --brief >/dev/null
+          python -m skeleton.game.generation.original_world_cli --living-foundation-index 10239999 >/dev/null
+      - name: Prove living-system costs alter real original-world gameplay
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_living_10x_synergy.py
+      - name: Build portable complete offline game and smoke interactive systems
+        run: |
+          python -m skeleton.game.generation.original_world_product_bundle --output /tmp/original-world-studio.pyz
+          python /tmp/original-world-studio.pyz --inventory >/dev/null
+          python /tmp/original-world-studio.pyz --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --actions-json '[{"layer":"terrain","verb":"forage","amount":2},{"layer":"studio","verb":"share_food","amount":2},{"layer":"causal","verb":"end_turn"}]' --svg /tmp/original-world.svg --ppm /tmp/original-world.ppm --save /tmp/original-world-save.json
+          python /tmp/original-world-studio.pyz --load /tmp/original-world-save.json --actions-json '[{"layer":"causal","verb":"end_turn"}]' >/dev/null
+          test -s /tmp/original-world.svg
+          test -s /tmp/original-world.ppm
+          python -m skeleton.game.generation.original_world_product_cli --inventory
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --actions-json '[{"layer":"causal","verb":"intervene"},{"layer":"causal","verb":"end_turn"}]' --missions > /tmp/original-world-missions.json
+          python -c "import json; d=json.load(open('/tmp/original-world-missions.json')); assert d['product']['missions']['authored_root_id'].startswith('root-')"
+      - name: Prove NPC cognition issues real work orders and saves memory
+        run: |
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --inhabitants 1 --actions-json '[{"layer":"npc","verb":"commission","target":0,"option":"food"},{"layer":"causal","verb":"end_turn"},{"layer":"causal","verb":"end_turn"}]' --npc-report > /tmp/npc-v2-receipt.json
+          python -c "import json; p=json.load(open('/tmp/npc-v2-receipt.json')); assert p['product']['npc_cognition']['contracts'][0]['status']=='fulfilled'"
+      - name: Prove funded cooperative NPC labor creates real world structures
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_npc_cognition_v2.py tests/test_original_world_npc_cognition_projects.py tests/test_original_world_npc_social_knowledge.py
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --actions-json '[{"layer":"npc","verb":"project","option":"hearth","x":0,"y":0}]' --npc-report > /tmp/npc-civic-project.json
+          python -c "import json; p=json.load(open('/tmp/npc-civic-project.json')); assert p['product']['npc_cognition']['civic_projects'][0]['status']=='open'"
+      - name: Run physical NPC starvation, trauma and collaboration laboratory
+        run: |
+          python -m skeleton.game.generation.original_world_npc_laboratory --scenario baseline --turns 8 --population 12 >/tmp/real-npc-baseline.json
+          python -m skeleton.game.generation.original_world_npc_laboratory --scenario food-shortage --turns 8 --population 12 >/tmp/real-npc-shortage.json
+          python -m skeleton.game.generation.original_world_npc_laboratory --scenario injured-community --turns 8 --population 12 >/tmp/real-npc-injury.json
+          python -m skeleton.game.generation.original_world_npc_laboratory --scenario social-isolation --turns 8 --population 12 >/tmp/real-npc-social.json
+          python -m skeleton.game.generation.original_world_npc_laboratory --scenario public-construction --turns 8 --population 12 >/tmp/real-npc-civic.json
+          python -c "import json; p=json.load(open('/tmp/real-npc-baseline.json')); assert p['citizen_decisions']==96 and p['actual_world_ticks']==8"
+      - name: Verify real resident votes and resource-conserving public services
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_npc_civics.py
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --inhabitants 2 --actions-json '[{"layer":"npc","verb":"propose","target":0,"option":"conservation"},{"layer":"causal","verb":"end_turn"}]' --npc-report > /tmp/real-civic-vote.json
+          python -c "import json; x=json.load(open('/tmp/real-civic-vote.json')); assert len(x['product']['npc_cognition']['public_institutions']['assemblies'])==1"
+      - name: Verify physically situated masters and genuine earned professions
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_npc_civics.py tests/test_original_world_npc_apprenticeships.py
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --inhabitants 2 --npc-report > /tmp/npc-professional-skills.json
+          python -c "import json; x=json.load(open('/tmp/npc-professional-skills.json')); assert x['product']['npc_cognition']['earned_apprenticeships']['graduates']==0"
+      - name: Verify new generations do not bypass family resources or NPC identities
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_npc_households.py
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --inhabitants 2 --npc-report >/tmp/npc-generation-proof.json
+          python -c "import json; p=json.load(open('/tmp/npc-generation-proof.json')); assert p['product']['npc_cognition']['generational_households']['actually_established_dependents']==0"
+      - name: Verify scalable NPC citizens in every era and physical regional transport
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_npc_era_population.py
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --era interstellar --population-report --actions-json '[{"layer":"population","verb":"dispatch_food","target":0,"option":"to-region","amount":2},{"layer":"causal","verb":"end_turn"}]' --save /tmp/npc-era-sim.json --svg /tmp/npc-era-view.svg > /tmp/npc-era-proof.json
+          python -c "import json; p=json.load(open('/tmp/npc-era-proof.json'))['product']['regional_population']; assert 0 < p['regional_aggregated_residents'] <= 144 and p['platform_genre_profile']['genre']=='puzzle' and not p['legacy_high_density']"
+          python -m skeleton.game.generation.original_world_product_cli --load /tmp/npc-era-sim.json --population-report >/dev/null
+          test -s /tmp/npc-era-view.svg
+      - name: Verify 40-era adaptive local NPC CPU budgets and bounded animated crowds
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_npc_era_fidelity.py
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --era digital-network --npc-fidelity economy --actions-json '[{"layer":"causal","verb":"end_turn"}]' --population-report >/tmp/era-adaptive-npcs.json
+          python -c "import json; p=json.load(open('/tmp/era-adaptive-npcs.json'))['product']['regional_population']['hardware_fidelity']; assert p['preset']=='economy' and p['maximum_individual_brain_decisions_per_turn']==3"
+      - name: Measure real bounded adaptive NPC simulation cost
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_npc_cost_lab.py
+          python -m skeleton.game.generation.original_world_npc_cost_lab --era digital-network --preset economy --turns 2 >/tmp/actual-npc-cost.json
+          python -c "import json; p=json.load(open('/tmp/actual-npc-cost.json')); assert p['actual_wall_time_ns']>0 and p['local_brain_slots_saved_against_full_simulation']>0"
+      - name: Validate hardware-fidelity brain budgets, fair scheduling and real district emigration
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_npc_fidelity_scheduler.py
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --era interstellar --npc-fidelity economy --actions-json '[{"layer":"population","verb":"set_detail","option":"vivid"},{"layer":"causal","verb":"end_turn"}]' --population-report > /tmp/npc-fidelity.json
+          python -c "import json; p=json.load(open('/tmp/npc-fidelity.json'))['product']['regional_population']; assert p['full_local_brain_budget_per_turn']<=p['detailed_limit']<=24 and p['regional_aggregated_residents']<=144"
+      - name: Enforce conservative per-console, per-PC-generation and per-genre NPC populations
+        run: |
+          python -m pytest -q --noconftest tests/test_original_world_npc_platform_profiles.py
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form colony --architecture lattice --system trophic --arc sandbox --era interstellar --hardware-target nes --npc-fidelity unrestricted --population-report > /tmp/nes-npc-budget.json
+          python -c "import json; p=json.load(open('/tmp/nes-npc-budget.json'))['product']['regional_population']; assert p['detailed_limit']==3 and p['regional_aggregated_residents']<=2 and p['full_local_brain_budget_per_turn']<=2"
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form colony --architecture lattice --system trophic --arc sandbox --era interstellar --hardware-target pc-windows --pc-generation 2020s-highend --npc-fidelity vivid --population-report > /tmp/highend-npc-budget.json
+          python -c "import json; p=json.load(open('/tmp/highend-npc-budget.json'))['product']['regional_population']; assert p['detailed_limit']==24 and p['regional_aggregated_residents']==144 and p['full_local_brain_budget_per_turn']==14"
+      - name: Confirm exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"

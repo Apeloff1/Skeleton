@@ -12,6 +12,7 @@ import re
 
 from .contracts import canonical_digest
 from .game_project_workspace import GameWorkspace,WorkspaceError,FileVersion
+from .system_editors import CATALOG, ADVANCED_ENGINE_IDS, editor_path
 
 
 class PromptRoutingError(ValueError):
@@ -80,6 +81,46 @@ AXES=(
     AuthoringAxis("demo",("demo","prototype","practice","playtest","shipping","release"),
                   ("notes/release_plan.md","reviews/consumer_gate.json"),"product",92,"human",
                   ("product.browser",)),
+)
+
+# Every specialized system editor is now an addressable target for supervised
+# prompt routing. Exact genre names are deliberately preferred over generic
+# "game" phrasing; routing proposes sources and never grants write authority.
+SYSTEM_GENRE_ALIASES = {
+    "maze": ("labyrinth", "mazes"),
+    "rpg": ("role playing", "role-playing game"),
+    "platformer": ("platform game", "side scroller", "side-scroller"),
+    "tower_defense": ("tower defence", "defense towers", "tower defense"),
+    "tactics": ("tactical combat", "turn based tactics", "turn-based tactics"),
+    "racing": ("race game", "motorsport", "racing game"),
+    "survival": ("survival crafting", "survival game"),
+    "fighting": ("fighting game", "one on one combat"),
+    "rts": ("real time strategy", "real-time strategy"),
+    "factory": ("factory automation", "automation factory"),
+    "voxel": ("voxel world", "blocks game"),
+    "sandbox": ("open ended sandbox", "open-world sandbox"),
+    "roguelike": ("roguelite", "rogue-like"),
+    "deck_battler": ("deckbuilding", "deck-builder", "card battler"),
+    "rhythm": ("rhythm game", "beat game"),
+    "quest_director": ("quest director", "causal quest triggers"),
+}
+AXES += tuple(
+    AuthoringAxis(
+        "system_" + spec["id"],
+        tuple(dict.fromkeys((
+            spec["id"].replace("_"," "),
+            spec["title"].casefold(),
+            *SYSTEM_GENRE_ALIASES.get(spec["id"],()),
+        ))),
+        (editor_path(spec["id"]),),
+        "system",
+        97 if spec["id"] in ADVANCED_ENGINE_IDS else 76,
+        "mirror" if spec["id"] in ADVANCED_ENGINE_IDS else "human",
+        ("system.advanced_floor","system.source_review",
+         "system.reference_playable" if spec["id"] in ADVANCED_ENGINE_IDS
+         else "system.authoring_only"),
+    )
+    for spec in CATALOG
 )
 
 

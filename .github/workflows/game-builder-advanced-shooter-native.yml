@@ -1,0 +1,219 @@
+name: Advanced Godot Native Shooter Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_shooter_godot.py"
+      - "skeleton/ai/game_builder/advanced_godot_export.py"
+      - "docs/GAME_BUILDER_SYSTEM_EDITOR_FABRIC.md"
+      - ".github/workflows/game-builder-advanced-system-engines.yml"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/advanced_genre_engines.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_shooter_godot.py"
+      - ".github/workflows/game-builder-advanced-shooter-native.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: advanced-native-shooter-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  independently-execute-shooter:
+    name: Python/Godot shooter parity on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 23
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact PR head with safe source scope
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_shooter_godot.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Godot 4.4.1 native runtime and export templates
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Validate exact source and Python proof contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+          python -m py_compile skeleton/ai/game_builder/advanced_godot_export.py skeleton/ai/game_builder/advanced_shooter_godot.py
+          python -m unittest tests.test_game_builder_advanced_shooter_godot -v
+      - name: Build nine authored arenas and combat replay transcripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+          from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session,AdvancedRuntimeError
+          from skeleton.ai.game_builder.advanced_shooter_godot import render_shooter_godot_package
+          from skeleton.ai.game_builder.advanced_godot_export import write_advanced_godot_package
+          root=Path(os.environ["RUNNER_TEMP"])/"advanced-native-shooters"
+          root.mkdir()
+          scenarios=(
+              ("original",{"player_health":80},["wait","east","east"],None,2),
+              ("cover",{"player_health":100},["cover","wait","cover"],None,3),
+              ("dash",{"player_health":60},["dash:east","wait","wait"],None,5),
+              ("movement",{"player_health":60},["north","south","west","east"],None,11),
+              ("tactical",{"player_health":70},["wait","wait","wait","wait"],None,17),
+              ("fire",{"player_health":100,"weapon_damage":2,"enemy_count":3},
+               ["fire","reload"],[8,4],4),
+              ("eliminate",{"player_health":100,"weapon_damage":50,"enemy_count":3},
+               ["fire","fire","fire"],[8,4],1),
+              ("reinforcements",{"player_health":100,"weapon_damage":50,"enemy_count":4},
+               ["fire","fire","fire","fire"],[8,4],12),
+              ("extract",{"player_health":100,"weapon_damage":50,"enemy_count":1},
+               ["fire"]+["east"]*5+["extract"],[8,4],0),
+          )
+          witnessed=set()
+          for name,cfg,actions,player,seed in scenarios:
+              layout=None
+              if player is not None:
+                  layout=make_advanced_scene("shooter",cfg,seed=seed)["layout"]
+                  layout["player_spawn"]=list(player)
+                  layout["enemy_spawns"]=[[8,2],[10,4],[8,6]]
+              scene=make_advanced_scene("shooter",cfg,seed=seed,layout=layout)
+              try:
+                  game=run_advanced_session("shooter",cfg,actions,
+                                            seed=seed,scene=scene)
+              except AdvancedRuntimeError as exc:
+                  raise RuntimeError(f"Original authored shooter {name} is invalid: {exc}") from exc
+              for step in game["trace"]:
+                  witnessed.update(step["events"])
+              if name=="extract":
+                  assert game["terminal"] and game["state"]["finished"]
+              if name=="reinforcements":
+                  assert game["state"]["wave"]>=2 and game["state"]["defeated"]>=3
+              package=render_shooter_godot_package(game,cfg,authorized=True)
+              write_advanced_godot_package(package,root/name,authorized=True)
+              print("NATIVE_SHOOTER_SOURCE",name,"turns",len(actions),
+                    "events",game["state"]["events"],
+                    "score",game["state"]["score"],
+                    "source_sha",game["digest"])
+          assert {"weapon_hit","enemy_patrolled","evasive_movement",
+                  "mission_extracted","enemy_reinforcement_wave"}<=witnessed, witnessed
+          PY
+      - name: Independently run nine authored arena games with full combat state parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/advanced-native-shooters"
+          for mode in original cover dash movement tactical fire eliminate reinforcements extract; do
+            project="$root/$mode/godot"
+            echo "Native shooter scenario $mode"
+            godot --headless --path "$project" --import
+            godot --headless --path "$project" -- --verify-shooter | tee "$root/$mode/native-replay.log"
+            grep -q "NATIVE_ADVANCED_SHOOTER_OK" "$root/$mode/native-replay.log"
+          done
+      - name: Export Linux desktop shooter executable and execute the actual binary
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/advanced-native-shooters/extract/godot"
+          executable="$RUNNER_TEMP/advanced-native-shooters/original-advanced-shooter.x86_64"
+          godot --headless --path "$project" --export-release Linux "$executable"
+          test -s "$executable"
+          chmod +x "$executable"
+          "$executable" --headless -- --verify-shooter | tee "$RUNNER_TEMP/advanced-native-shooters/linux-export-replay.log"
+          grep -q "NATIVE_ADVANCED_SHOOTER_OK" "$RUNNER_TEMP/advanced-native-shooters/linux-export-replay.log"
+      - name: Export actual Windows game and verify native console executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'advanced-native-shooters'
+          $project = Join-Path $root 'extract/godot'
+          $binary = Join-Path $root 'original-advanced-shooter.exe'
+          # The setup-godot Windows GUI editor can detach without a reliable
+          # synchronous exit code. Use the same pinned official console engine
+          # already required by the repository's Windows native integration.
+          $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
+          $engineDir = Join-Path $root 'pinned-godot-console'
+          if (-not (Test-Path $archive)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
+            Invoke-WebRequest -Uri 'https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip' -OutFile $archive -MaximumRedirection 5
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          $nativeEditor = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $nativeEditor) {
+            throw "Version-pinned official Godot Windows console editor unavailable"
+          }
+          & $nativeEditor.FullName --version
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows console startup failed" }
+          & $nativeEditor.FullName --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Advanced shooter Windows resource import failed" }
+          & $nativeEditor.FullName --headless --path $project --export-release 'Windows Desktop' $binary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $binary)) {
+            throw "Advanced Godot Windows console game executable export failed"
+          }
+          if ((Get-Item $binary).Length -le 1024) {
+            throw "Advanced Godot Windows game executable is empty"
+          }
+          $console = Join-Path $root 'original-advanced-shooter.console.exe'
+          if (-not (Test-Path $console)) {
+            throw "Exported original shooter lacks an observable Windows console binary"
+          }
+          $python = @'
+          import subprocess,sys
+          result=subprocess.run(
+              [sys.argv[1],"--headless","--","--verify-shooter"],
+              capture_output=True,text=True,timeout=90)
+          print(result.stdout)
+          print(result.stderr)
+          sys.exit(0 if result.returncode==0 and
+              "NATIVE_ADVANCED_SHOOTER_OK" in result.stdout+result.stderr else 1)
+          '@
+          $proofScript = Join-Path $root 'verify_windows_native.py'
+          [IO.File]::WriteAllText($proofScript, $python)
+          & python $proofScript $console
+          if ($LASTEXITCODE -ne 0) {
+            throw "Exported Windows homebrew shooter gameplay diverged from reviewed Python"
+          }
+          Write-Host "Native Windows executable SHA256:"
+          Get-FileHash -Algorithm SHA256 $binary | Format-List
+          Get-FileHash -Algorithm SHA256 $console | Format-List
+      - name: Upload native gameplay proof logs and source release manifests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-advanced-shooter-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/advanced-native-shooters/*/native-replay.log
+            ${{ runner.temp }}/advanced-native-shooters/*/release.json
+            ${{ runner.temp }}/advanced-native-shooters/linux-export-replay.log
+            ${{ runner.temp }}/advanced-native-shooters/original-advanced-shooter.exe
+            ${{ runner.temp }}/advanced-native-shooters/original-advanced-shooter.console.exe
+            ${{ runner.temp }}/advanced-native-shooters/original-advanced-shooter.x86_64
+          if-no-files-found: warn
+          retention-days: 7

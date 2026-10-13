@@ -107,7 +107,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -155,7 +155,7 @@ jobs:
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "${{ env.NODE_VERSION }}"
           cache: yarn
@@ -327,7 +327,9 @@ jobs:
 
   readiness:
     name: Merge Readiness
-    if: ${{ always() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
+    # !cancelled() (not always()): a superseded/cancelled run must not queue this
+    # summary job, or it holds the merge-readiness-<PR#> slot and starves the new head.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
     needs:
       - quarantine_policy
       - unit

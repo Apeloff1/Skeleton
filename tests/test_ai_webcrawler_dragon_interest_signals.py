@@ -80,3 +80,11 @@ def test_future_timestamp_is_rejected():
         now=1000.0,
     )
     assert profile.rejected_signals == 1
+
+
+@pytest.mark.parametrize("tag",["dragon\nmalware","science\tart","sky\rcloud","x\x7ffoo"])
+def test_raw_control_characters_do_not_reenter_after_normalization(tag):
+    profile=build_interest_profile(
+        [make_signal("bad",SignalKind.LIKE,[tag])],now=1000.0)
+    assert profile.accepted_signals==0
+    assert profile.rejected_signals==1

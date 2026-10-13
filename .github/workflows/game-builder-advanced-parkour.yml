@@ -1,0 +1,63 @@
+name: Game Builder Advanced Parkour Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_parkour_runtime.py"
+      - "skeleton/ai/game_builder/advanced_parkour_planner.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "tests/test_game_builder_advanced_parkour_planner.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/system_editor_assembly.py"
+      - "skeleton/ai/game_builder/system_editors.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_parkour.py"
+      - ".github/workflows/game-builder-advanced-parkour.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: game-builder-advanced-parkour-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  signed-traversal-replay:
+    name: Original parkour course replay (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact-head original source checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_parkour.py
+            tests/test_game_builder_advanced_parkour_planner.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Compile source and verify exact commit
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python -m py_compile skeleton/ai/game_builder/advanced_parkour_runtime.py skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_level_scenes.py skeleton/ai/game_builder/system_editor_assembly.py skeleton/ai/game_builder/system_editors.py skeleton/ai/game_builder/advanced_parkour_planner.py skeleton/ai/game_builder/system_editor_cli.py skeleton/ai/game_builder/game_workspace_server.py tests/test_game_builder_advanced_parkour.py tests/test_game_builder_advanced_parkour_planner.py
+      - name: Run genuine signed traversal, victory and forgery attacks
+        shell: bash
+        run: python -m unittest tests.test_game_builder_advanced_parkour tests.test_game_builder_advanced_parkour_planner -v

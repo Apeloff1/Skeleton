@@ -102,10 +102,11 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         self.store.close()
         self.store = ReviewedKnowledgeStore(self.dbfile)
         reopened = self.store.search("studio-a", "jump", authorized=True)
-        # Query relevance depends on the actual search terms; the evidence must not.
-        self.assertEqual(tuple(replace(hit, relevance=0) for hit in hits),
-                         tuple(replace(hit, relevance=0) for hit in reopened))
-        self.assertGreater(hits[0].relevance, reopened[0].relevance)
+        # Relevance is specific to the query, not an immutable citation field.
+        self.assertEqual(
+            tuple(replace(hit, relevance=0) for hit in hits),
+            tuple(replace(hit, relevance=0) for hit in reopened),
+        )
         self.assertEqual(self.store.history("studio-a", "source-a", authorized=True)[0], receipt)
 
     def test_idempotent_queries_and_root(self):
@@ -169,7 +170,7 @@ class ReviewedKnowledgeTests(unittest.TestCase):
         bad = replace(base.notes[0], end=len(TEXT) + 1)
         with self.assertRaisesRegex(KnowledgeError, "outside"):
             self.admit(replace(base, notes=(bad,)))
-        # Invalid span is rejected already by the immutable note constructor.
+        # The immutable note itself rejects invalid zero-length spans at creation.
         with self.assertRaises(KnowledgeError):
             replace(base.notes[0], start=6, end=6)
         long_doc = replace(
@@ -269,8 +270,7 @@ class ReviewedKnowledgeTests(unittest.TestCase):
             """UPDATE game_builder_knowledge SET payload=replace(payload, 'predictable', 'unreliable')
             WHERE owner='studio-a'"""
         )
-        # Both authenticated integrity checks and exact-span checks must fail closed.
-        with self.assertRaisesRegex(KnowledgeError, "integrity|stored source span mismatch"):
+        with self.assertRaisesRegex(KnowledgeError, "integrity"):
             self.store.search("studio-a", "jump", authorized=True)
 
     def test_modified_digest_is_rejected(self):

@@ -855,3 +855,9 @@ async def edit_kb(pid: str, artifact: str, body: KBEdit):
         {"$set": {f"artifacts.{artifact}": body.data, "updated_at": _now(), "game_id": pid}},
         upsert=True)
     return {"ok": True, "artifact": artifact, "keys": list(body.data.keys())}
+
+
+# Story event evidence is stored outside the single-document game KB to avoid
+# the Mongo document ceiling. All writes remain user-reviewed and role-gated.
+from routes.story_index import router as _story_index_router
+router.include_router(_story_index_router)

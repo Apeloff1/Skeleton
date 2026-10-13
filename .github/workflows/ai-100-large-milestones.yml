@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ai-100-large-milestones-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   validate:
     name: Verify 100 milestones and canonical source pins

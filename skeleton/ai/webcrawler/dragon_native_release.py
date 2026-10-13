@@ -15,8 +15,13 @@ from time import monotonic
 from zipfile import ZIP_DEFLATED,ZipFile,ZipInfo
 import json,os,platform,shutil,subprocess,sys
 
-from .dragon_native_cli import emit_demo
-from .dragon_native_projects import digest
+# Can run as a standalone Python file from an intentionally sparse checkout.
+# Importing skeleton.ai's package initializer would pull in unrelated AI
+# subsystems, defeating an offline/native-host isolated compilation pipeline.
+if __package__:
+    from .dragon_native_puzzle import emit_native_puzzle
+else:
+    from dragon_native_puzzle import emit_native_puzzle
 
 RELEASE_NAME="dragon_game.exe" if sys.platform=="win32" else "dragon_game"
 TARGETS={"linux":"pc_linux","windows":"pc_windows","darwin":"pc_macos"}
@@ -91,8 +96,25 @@ def build_native_release(root:Path,*,title:str="Original Dragon Puzzle Quest")->
         raise ValueError("native release output must be an empty regular directory")
     host=platform.system().lower()
     target=host_target(host)
-    written=emit_demo(target,root,title=title,style="fixed_screen_puzzle")
-    source_fingerprint=digest(written)
+    if not isinstance(title,str) or not 1<=len(title)<=100 or any(
+        ord(ch)<32 or ord(ch)==127 for ch in title
+    ):
+        raise ValueError("invalid native release title")
+    # Only this pure-stdlib puzzle generator is required. Source emitted
+    # here is exactly the source compiled, hashed and embedded in the proof.
+    seed=int.from_bytes(sha256(title.encode("utf-8")).digest()[:4],"big")
+    written=emit_native_puzzle(seed=seed,stages=4,difficulty=4)
+    root.mkdir(parents=True,exist_ok=True)
+    for name,body in written.items():
+        candidate=root/name
+        if candidate.is_absolute() or ".." in Path(name).parts or not isinstance(body,str):
+            raise ValueError("unsafe native release source entry")
+        candidate.parent.mkdir(parents=True,exist_ok=True)
+        candidate.write_text(body,encoding="utf-8")
+    source_fingerprint=sha256(json.dumps(
+        written,sort_keys=True,separators=(",",":"),ensure_ascii=True,
+        allow_nan=False
+    ).encode("utf-8")).hexdigest()
     build_dir=root/"build"
     started=monotonic()
     cfg=_run(["cmake","-S",str(root.resolve()),"-B",str(build_dir.resolve()),
