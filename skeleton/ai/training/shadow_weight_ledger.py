@@ -6,6 +6,7 @@ runtime admission must consume an eligible promotion permit explicitly.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import json
@@ -127,12 +128,20 @@ class ShadowWeightLedger:
             elif row[0] != str(_SCHEMA_VERSION):
                 raise ShadowWeightError("unsupported shadow ledger schema")
 
-    def _connection(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
         db = sqlite3.connect(str(self.path), isolation_level=None, timeout=30)
-        db.row_factory = sqlite3.Row
-        db.execute("PRAGMA busy_timeout=30000")
-        db.execute("PRAGMA foreign_keys=ON")
-        return db
+        try:
+            db.row_factory = sqlite3.Row
+            db.execute("PRAGMA busy_timeout=30000")
+            db.execute("PRAGMA foreign_keys=ON")
+            yield db
+            db.commit()
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     @staticmethod
     def _atomic(db: sqlite3.Connection) -> None:
