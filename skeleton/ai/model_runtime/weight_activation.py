@@ -266,6 +266,74 @@ class NativeWeightDeployment:
             rollback=rollback, expected_revision=expected_revision,
         )
 
+    def activate_from_shard_plan(
+        self,
+        candidate_id: str,
+        *,
+        store: "WeightShardStore",
+        plan_digest: str,
+        model_identity: "ModelIdentity",
+        admission: RuntimeAdmission,
+        rollback: RollbackProof,
+        expected_revision: int,
+    ) -> NativeActivationReceipt:
+        """Restore physical CAS weight shards before consuming a promotion permit.
+
+        A plan can contain a checkpoint split into ordered binary shards.
+        Every shard is rehashed while read, with a strict aggregate memory
+        ceiling. Loading never treats the plan digest as evidence of model
+        improvement; the normal independent mirror and rollback admission
+        remains mandatory in activate().
+        """
+        from .flgb_model_runtime import ModelIdentity
+        from .native_llm_runtime import NativeLLMRuntime
+        from .weight_shard_store import WeightShardStore
+
+        if not isinstance(store, WeightShardStore):
+            raise ShadowWeightError("content-addressed shard store required")
+        if not isinstance(model_identity, ModelIdentity):
+            raise ShadowWeightError("native weight identity required")
+        require_digest(plan_digest, "plan_digest")
+        with self._lock:
+            snapshot = self._ledger.snapshot(candidate_id)
+            if snapshot.revision != expected_revision or snapshot.permit is None:
+                raise ShadowWeightError("stale or missing shadow promotion permit")
+            if snapshot.state != "eligible":
+                raise ShadowWeightError("only eligible shadow weights may be loaded")
+            if model_identity.weights_digest != snapshot.permit.weights_digest:
+                raise ShadowWeightError("shard identity does not match promoted weights")
+            plan = store.load_plan(plan_digest)
+            if plan.model_identity_digest != model_identity.identity_digest:
+                raise ShadowWeightError("shard plan model identity mismatch")
+            maximum = self.runtime.limits.max_checkpoint_bytes
+            if plan.expected_total_bytes > maximum:
+                raise ShadowWeightError("native candidate exceeds checkpoint memory limit")
+            materialized = bytearray()
+            with store.open_verified(plan_digest, model_identity=model_identity) as streams:
+                for shard, stream in zip(plan.shards, streams):
+                    observed = sha256()
+                    count = 0
+                    while True:
+                        chunk = stream.read(min(1024 * 1024, maximum + 1 - len(materialized)))
+                        if not chunk:
+                            break
+                        count += len(chunk)
+                        materialized.extend(chunk)
+                        observed.update(chunk)
+                        if len(materialized) > maximum:
+                            raise ShadowWeightError("candidate checkpoint byte limit exceeded")
+                    if count != shard.bytes or observed.hexdigest() != shard.digest:
+                        raise ShadowWeightError("candidate shard mutated during restoration")
+            if len(materialized) != plan.expected_total_bytes:
+                raise ShadowWeightError("candidate checkpoint length mismatch")
+            loaded = NativeLLMRuntime.restore_json(bytes(materialized))
+            if loaded.model_identity.identity_digest != model_identity.identity_digest:
+                raise ShadowWeightError("decoded native candidate identity mismatch")
+            return self.activate(
+                candidate_id, loaded, admission=admission, rollback=rollback,
+                expected_revision=expected_revision,
+            )
+
     def new_model_service(self, **options: object):
         """Bind a fresh inference service to the currently promoted model."""
         from .runtime_service import NativeModelService
