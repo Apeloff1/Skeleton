@@ -292,7 +292,7 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
             }
             for target in ("Linux","Windows")
         ]
-        source.artifact=lambda artifact_id: (
+        source.artifact=lambda artifact_id, **_kw: (
             self.evidence["Linux"] if artifact_id==91
             else self.evidence["Windows"])
         run, jobs, reports=source.load(self.run_id)
@@ -315,7 +315,7 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
             }
             for target in ("Linux","Windows")
         ]
-        source.artifact=lambda artifact_id: (
+        source.artifact=lambda artifact_id, **_kw: (
             self.evidence["Linux"] if artifact_id==91
             else self.evidence["Windows"])
         with self.assertRaises(JeevesAppwideError):
