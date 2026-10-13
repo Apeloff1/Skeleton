@@ -116,3 +116,46 @@ The curated product test matrix is now maintained at `machine/app_acceptance_tes
 4. Attach functional frontend-to-backend, game engine, real-model, user journey, installed-device and rollback evidence to each of the 42 families.
 5. Preserve upstream PR landing order (#3718 → #3729 → #3730 → #3738 → #3747) and do not sign unmerged code as production release.
 
+
+
+## DX-49–DX-60 — independent CI test evidence and no-zero-test scoring
+
+The candidate matrix now schedules **17/42 feature families** for actual cross-platform `unittest` execution (19 distinct selected modules), including the repo atlas, build authority and model-serving capacity suites. Another **25/42** have real source/test links but are deliberately discovery-only, often because their real tests use **pytest and fixtures**, which `python -m unittest` would silently skip. No discovery-only suite is counted as passed.
+
+The existing `unittest` runner previously relied on a successful subprocess return code. This has been hardened: `scripts/run_app_acceptance_matrix.py` now parses unittest's `Ran N tests in ...` report, requires `N > 0` for **every scheduled module**, and records per-module and total actual-case counts. A module that reports success with zero discovered tests, missing execution data or a timeout **fails** the acceptance run.
+
+### Separate independent read-only verifier
+
+`skeleton/ai/game_builder/jeeves_acceptance_run_verifier.py` supplies a fail-closed exact-head acceptance algorithm. The separate operator-side `scripts/verify_app_acceptance_ci.py` uses a **read-only GitHub Actions API token** to obtain trusted GitHub run metadata, all jobs and both source-hashed artifact ZIPs. It verifies:
+
+- Repository and workflow identity, exact SHA and run attempt; full successful completed run.
+- Both Ubuntu and Windows jobs on the **same SHA**, with the actual regression execution step successful.
+- Exact selected-module list, actual positive unittest case counts, per-source SHA-256, matrix and family-scope SHA-256, runner receipt digest and CI artifact custody.
+- Artifact origin, run ID, bounded ZIP/JSON input, unique JSON keys, absence of secret-bearing logs, and token stripping on cross-origin HTTPS ZIP redirects.
+- No model promotion, device qualification, whole-feature certification, user-journey success or invented full-app percentage.
+
+A verified result can report the independently confirmed **targeted regression-subset coverage**, e.g. **17/42 = 40.48% of family test subsets** when the reviewed exact-head workflow actually passes both platforms. It **cannot** report 40.48% functional app completion, and **must not** be counted while runs remain queued/failed. It explicitly records `complete_family_stage_qualifications_admitted=0` because each subset may be narrower than complete feature acceptance.
+
+This verifier must run from a **trusted code checkout at the exact tested SHA**, with credentials scoped to read GitHub Actions only. Do not give untrusted PR code access to a privileged token. Use a review/operator process rather than automatically triggering a privileged `workflow_run` job that checks out an untrusted pull request.
+
+Once the corresponding CI run is complete:
+
+```bash
+# From the exact reviewed repository commit, with a read-only token.
+git rev-parse HEAD
+GITHUB_TOKEN="<read-only-token-from-secure-environment>" \
+  python scripts/verify_app_acceptance_ci.py \
+  --run-id <github-actions-run-id> \
+  --attempt 1 \
+  --head <exact-40-character-commit-sha> \
+  --output build/verified_acceptance_ci.json
+```
+
+Do not commit the downloaded CI artifacts or tokens. Output reports are run-identity/source-bound but are **not** permissions, live application execution or final product signoff.
+
+### Remaining prioritized work
+
+1. Drain the queued exact-head Windows/Linux workflow runs. Investigate missing Python dependencies, missing fixture roots and actual assertion failures from their logs.
+2. For the **25 pytest-backed discovery families**, build a separate reviewed pytest execution lane with pinned dependencies and real nonzero-test counts. Never let unittest report 0 tests as progress.
+3. Independently verify any CI outputs, then advance from *targeted regressions* to real runtime integration, story/world/game/Dragon/AI user journeys, installed Windows app smoke, model-quality holdouts, rollback and performance.
+4. Keep enterprise acceptance, the 26 required gates, 421 masterplan volumes and 9 AI capability labels in distinct denominators until individually verified.
