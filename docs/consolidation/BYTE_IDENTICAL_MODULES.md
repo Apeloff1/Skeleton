@@ -70,3 +70,10 @@ Top 30 directory pairs by number of identical modules:
 3. Run the family's tests, rewrite the baseline, and land one family per PR so each diff stays reviewable.
 
 No files are moved or deleted by this change.
+
+## Burn-down: `skeleton/ai/shell` → `skeleton/shells/ai` (issue #80)
+
+On current `main`, `skeleton/ai/shell` held **150 byte-identical modules** plus `__init__.py` that duplicated `skeleton/shells/ai`. Callers already import from both paths, and **121 files under `skeleton/ai/shell` imported `skeleton.shells.ai`**, so `shells/ai` is the effective implementation owner. Making `ai/shell` the shim (rather than the reverse) satisfies the rule that the canonical owner must never depend back on a shim.
+
+This PR replaces every `skeleton/ai/shell/**` module with a thin re-export of its `skeleton/shells/ai/**` twin, registers the shims in `scripts/check_compat_shim_inventory.py`, and rewrites the byte-identical baseline so those 150 groups count as resolved. No Internal Systems surfaces (`machine/ai_file_tree.json`, masterplan volumes, Assembly Contract, VOL-000, ai-tree / traceability / contracts-export) were touched. `fix/ai-file-tree-volumes-p0` / PR #3621 were not used.
+

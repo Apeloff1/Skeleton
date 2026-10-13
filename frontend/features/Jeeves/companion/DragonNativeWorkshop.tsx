@@ -1,5 +1,5 @@
 import React,{useMemo,useState} from 'react';
-import{Pressable,ScrollView,StyleSheet,Text,TextInput,View}from'react-native';
+import{FlatList,Pressable,ScrollView,StyleSheet,Text,TextInput,View}from'react-native';
 import{Ionicons}from'@expo/vector-icons';
 import{type NativeAttempt,type NativeTarget,type NativeCurriculum,titleCaseId}from'./dragonNativeTargets';
 
@@ -32,7 +32,8 @@ export default function DragonNativeWorkshop({
  const enabled=!!current&&current.status==='native_source'&&!!selectedStyle&&!!onGenerate;
  return <View style={s.root}>
   <Text style={s.title}>Native game forge · every era</Text>
-  <Text style={s.copy}>Original Game Boy, NES, DOS and desktop source projects. Real ROMs or executables require their actual compilers, emulators and playtests. Console names alone never count as implemented engines.</Text>
+  <Text style={s.copy}>Curated hardware coverage from first-generation consoles through 2026 PCs and handhelds. Real ROMs or executables require their actual compilers, emulators and playtests. Console names alone never count as implemented engines.</Text>
+  <Text style={s.note}>Catalog: {targets.length} identified systems · {targets.filter(t=>t.status==='native_source').length} native source producers · {targets.filter(t=>t.status==='licensed_sdk').length} licensed-only · {targets.filter(t=>t.status==='historical_reference').length} nonprogrammable references. Source is not a verified build.</Text>
   {curriculum&&<View style={s.selectedInfo}>
     <Ionicons name="school-outline" color={C.gold} size={20}/>
     <View style={{flex:1,gap:5}}>
@@ -62,10 +63,14 @@ export default function DragonNativeWorkshop({
    </Pressable>
   </View>
   <TextInput value={search} onChangeText={setSearch}
-   style={s.search} placeholder="Find Game Boy, PlayStation, Xbox, Sega, PC…"
+   style={s.search} placeholder="Find any console, computer, handheld, OS or chipset…"
    placeholderTextColor="#94a3b8" accessibilityLabel="Search native platform catalog"/>
-  <ScrollView nestedScrollEnabled style={s.platformList} keyboardShouldPersistTaps="handled">
-   {visible.map(t=><Pressable key={t.id} onPress={()=>setSelected(t.id)}
+  <FlatList<NativeTarget> nestedScrollEnabled style={s.platformList}
+   keyboardShouldPersistTaps="handled" data={visible}
+   keyExtractor={(target)=>target.id}
+   initialNumToRender={14} maxToRenderPerBatch={14} windowSize={5}
+   ListEmptyComponent={<Text style={s.note}>No matching hardware targets. Clear the search or choose All platforms.</Text>}
+   renderItem={({item:t})=><Pressable onPress={()=>setSelected(t.id)}
     accessibilityRole="button" accessibilityState={{selected:t.id===selected}}
     style={[s.platform,t.id===selected&&s.active]}>
     <View style={{flex:1,gap:2}}>
@@ -73,10 +78,9 @@ export default function DragonNativeWorkshop({
      <Text style={s.note}>{t.generation} · {t.toolchain}</Text>
     </View>
     <Text style={[s.state,t.status!=='native_source'&&s.unavailable]}>
-     {t.status==='native_source'?'Source ready':t.status==='licensed_sdk'?'Licensed SDK':'Adapter needed'}
+     {t.status==='native_source'?'Source ready':t.status==='licensed_sdk'?'Licensed SDK':t.status==='historical_reference'?'Hardware reference':'Adapter needed'}
     </Text>
-   </Pressable>)}
-  </ScrollView>
+   </Pressable>}/>
   <Text style={s.label}>Original gameplay style</Text>
   <ScrollView horizontal showsHorizontalScrollIndicator={false}
    style={s.styleScroll} contentContainerStyle={s.styleRow}>
@@ -92,7 +96,7 @@ export default function DragonNativeWorkshop({
     <View style={{flex:1}}>
      <Text style={s.infoTitle}>{current.family} · {current.output.toUpperCase()} target</Text>
      <Text style={s.note}>{current.cpu} · {current.graphics}</Text>
-     <Text style={s.note}>{current.status==='native_source'?'Source project implemented; native compilation and gameplay require verification':current.status==='licensed_sdk'?'Licensed console SDK access required':'Platform-specific emitter is not built yet'}</Text>
+     <Text style={s.note}>{current.status==='native_source'?'Source project implemented; native compilation and gameplay require verification':current.status==='licensed_sdk'?'Licensed console SDK access required':current.status==='historical_reference'?'Historical nonprogrammable system: hardware documentation only':'Platform-specific emitter is not built yet'}</Text>
     </View>
    </View>}
   {onGenerate&&<Pressable accessibilityRole="button"

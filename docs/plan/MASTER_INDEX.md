@@ -49,6 +49,25 @@ For status, signing, and next-work scans, read `machine/ai_masterplan_parse_inde
 
 The parse index is a derived navigation accelerator only. It never replaces the canonical masterplan or accountability ledger and never grants completion authority.
 
+## October 2026 capability and evidence navigation
+
+This section indexes **existing authorities and validation entrypoints**. It does not grant deployment readiness, sign masterplan volumes, or substitute for exact-head independent proof. All new capability depth remains mapped to the frozen VOL-000..420 masterplan.
+
+| Capability / responsibility | Human and machine authority | Verification / implementation entrypoint |
+| --- | --- | --- |
+| Large implementation milestones | [100 delivery milestones](AI_100_LARGE_DELIVERY_MILESTONES.md) · [100-milestone machine contract](../../machine/ai_100_large_delivery_milestones.json) | [Milestone validator](../../scripts/check_ai_100_large_milestones.py) |
+| AI chat and assistant runtime | [Chat masterplan](AI_CHAT_MASTERPLAN_2026-10-06.md) · [Runtime contract](../../machine/ai_chat_runtime_contract.json) · [Model routing](../../machine/ai_chat_model_routing.json) | [Chat runtime validator](../../scripts/check_ai_chat_runtime.py) · `skeleton/ai/assistant/` |
+| AI chat recovery and provenance | [Cross-plane resilience](../../machine/ai_chat_cross_plane_resilience.json) · [Tool recovery](../../machine/ai_chat_tool_recovery.json) · [Evidence citations](../../machine/ai_chat_evidence_citations.json) · [Attachments](../../machine/ai_chat_attachments.json) | [Resilience validator](../../scripts/check_ai_chat_cross_plane_resilience.py) · [Evidence validator](../../scripts/check_ai_chat_evidence_citations.py) |
+| Webcrawler / learning acquisition | `skeleton/ai/webcrawler/` | [Crawler exact-head validator](../../scripts/check_ai_webcrawler.py) |
+| Game-builder research and engineering | [500-level game-builder architecture](../architecture/AI_GAME_BUILDER_500_LEVELS.md) · [Level authority](../../machine/ai_game_builder_500_levels.json) · [Dual-rival forge](../../machine/ai_game_builder_dual_rival_forge.json) | [500-level validator](../../scripts/check_ai_game_builder_500_levels.py) |
+| Functional LLM + game-builder work | [Functional LLM atlas](FUNCTIONAL_LLM_GAME_BUILDER_10MB/README.md) · [Machine manifest](../../machine/functional_llm_game_builder_10mb_manifest.json) · [Execution backlog](../../machine/functional_llm_game_builder_execution_backlog.json) | [Coverage validator](../../scripts/check_functional_llm_game_builder_10mb.py) |
+| Native model, training and learning | [P3 model foundation](P3_MODEL_FOUNDATION.md) · [P3 training execution map](../../machine/ai_p3_training_execution_map.json) · [P3 learning execution map](../../machine/ai_p3_learning_execution_map.json) | [Training map validator](../../scripts/check_p3_training_execution_map.py) · [Learning map validator](../../scripts/check_p3_learning_execution_map.py) |
+| AI-tree ownership and staged migration | [AI-tree migration plan](AI_FILE_TREE_MIGRATION.md) · [Canonical file-tree map](../../machine/ai_file_tree.json) | [Mirror validator](../../scripts/check_ai_file_tree.py) · [Ownership verifier](../../scripts/check_ai_file_tree_ownership.py) |
+| Volume-to-evidence dependency graph | [Master traceability index](../../machine/master_traceability.json) · [Traceability shards](../../machine/traceability) | [Deterministic generator](../../scripts/generate_master_traceability.py) · [Graph validator](../../scripts/check_master_traceability.py) |
+| Repository metadata and architecture decisions | [Repository machine contract](../../.machine/repository.toml) · [Architecture ADR index](../../machine/adr_index.json) | [Repository machine validator](../../scripts/check_repo_machine.py) · [ADR index validator](../../scripts/check_architecture_adr_index.py) |
+
+**Status discipline:** Signed/checked values in [the derived parse index](../../machine/ai_masterplan_parse_index.json) describe ledger records at the two bound source blob identities only. They are not independent evidence that any standalone application, runtime, model, or end-to-end game builder works. For any release or completion claim, inspect the exact-head tests, evidence, signatures, and unresolved blockers at their original authorities.
+
 Master build sequence: [`MASTER_BUILD_SEQUENCE.md`](MASTER_BUILD_SEQUENCE.md)
 
 Machine build sequence: [`machine/ai_master_build_sequence.json`](../../machine/ai_master_build_sequence.json)

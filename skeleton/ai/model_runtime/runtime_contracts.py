@@ -1,7 +1,7 @@
 """Typed contracts for the native FLGB-02 language-model runtime."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import math
 from typing import Any, Mapping
 
@@ -112,15 +112,41 @@ class RuntimeLimits:
 class DevicePolicy:
     requested: str = "cpu"
     allow_fallback: bool = True
+    kv_dtype: str = "fp32"
+    kv_limit_bytes: int | None = None
+    prefill_query_chunk: int | None = None
 
     def __post_init__(self) -> None:
-        if self.requested not in {"cpu", "auto", "cuda", "gpu", "torch", "torch-cpu"}:
+        if self.requested not in {"cpu", "auto", "cuda", "gpu", "mps", "torch", "torch-cpu"}:
             raise RuntimeContractError("unsupported device request")
         if not isinstance(self.allow_fallback, bool):
             raise RuntimeContractError("allow_fallback must be boolean")
+        if self.kv_dtype not in {"fp32", "fp16", "bf16"}:
+            raise RuntimeContractError("unsupported KV cache precision")
+        if self.kv_limit_bytes is not None and (
+            not is_int(self.kv_limit_bytes) or self.kv_limit_bytes <= 0
+            or self.kv_limit_bytes > MAX_KV_BYTES
+        ):
+            raise RuntimeContractError("KV cache byte ceiling out of bounds")
+        if self.prefill_query_chunk is not None and (
+            not is_int(self.prefill_query_chunk)
+            or not 1 <= self.prefill_query_chunk <= MAX_CONTEXT
+        ):
+            raise RuntimeContractError("prefill query chunk outside context bounds")
 
     def to_dict(self) -> dict[str, Any]:
-        return {"requested": self.requested, "allow_fallback": self.allow_fallback}
+        # Preserve historic checkpoint/device-policy digests by omitting
+        # new cache options unless explicitly selected by the operator.
+        result: dict[str, Any] = {
+            "requested": self.requested, "allow_fallback": self.allow_fallback,
+        }
+        if self.kv_dtype != "fp32":
+            result["kv_dtype"] = self.kv_dtype
+        if self.kv_limit_bytes is not None:
+            result["kv_limit_bytes"] = self.kv_limit_bytes
+        if self.prefill_query_chunk is not None:
+            result["prefill_query_chunk"] = self.prefill_query_chunk
+        return result
 
 
 @dataclass(frozen=True)
@@ -129,15 +155,25 @@ class DeviceReceipt:
     actual: str
     resident: bool
     degraded: bool
+    kv_dtype: str = "fp32"
+    kv_limit_bytes: int | None = None
+    prefill_query_chunk: int | None = None
 
-    def to_dict(self) -> dict[str, str | bool]:
+    def to_dict(self) -> dict[str, Any]:
         """Return the canonical device receipt fields for runtime identity binding."""
-        return {
+        result: dict[str, Any] = {
             "requested": self.requested,
             "actual": self.actual,
             "resident": self.resident,
             "degraded": self.degraded,
         }
+        if self.kv_dtype != "fp32":
+            result["kv_dtype"] = self.kv_dtype
+        if self.kv_limit_bytes is not None:
+            result["kv_limit_bytes"] = self.kv_limit_bytes
+        if self.prefill_query_chunk is not None:
+            result["prefill_query_chunk"] = self.prefill_query_chunk
+        return result
 
     @property
     def digest(self) -> str:
@@ -198,9 +234,55 @@ class GenerationConfig:
     top_p: float = 1.0
     use_cache: bool = True
     stop_token_ids: tuple[int, ...] = ()
+    min_new_tokens: int = 0
+    repetition_penalty: float = 1.0
+    presence_penalty: float = 0.0
+    frequency_penalty: float = 0.0
+    penalty_window: int = 64
+    suppress_token_ids: tuple[int, ...] = ()
+    stop_strings: tuple[str, ...] = ()
+    include_stop_tokens: bool = True
+
+    @classmethod
+    def from_dict(
+        cls, value: Mapping[str, Any], *, limits: RuntimeLimits, vocab_size: int,
+    ) -> "GenerationConfig":
+        """Admit a serialized policy; reject unknown options instead of ignoring them."""
+        if not isinstance(value, Mapping):
+            raise RuntimeContractError("generation configuration must be an object")
+        if set(value) - {field.name for field in fields(cls)}:
+            raise RuntimeContractError("unknown generation configuration field")
+        admitted = dict(value)
+        for name in ("stop_token_ids", "suppress_token_ids", "stop_strings"):
+            if name in admitted:
+                if not isinstance(admitted[name], (list, tuple)):
+                    raise RuntimeContractError(f"{name} must be an array")
+                admitted[name] = tuple(admitted[name])
+        return cls(**admitted).validate(limits=limits, vocab_size=vocab_size)
 
     def validate(self, *, limits: RuntimeLimits, vocab_size: int) -> "GenerationConfig":
         nonnegative_int(self.max_new_tokens, "max_new_tokens", limits.max_new_tokens)
+        nonnegative_int(self.min_new_tokens, "min_new_tokens", self.max_new_tokens)
+        positive_int(self.penalty_window, "penalty_window", MAX_TOTAL_TOKENS)
+        if not isinstance(self.include_stop_tokens, bool):
+            raise RuntimeContractError("include_stop_tokens must be boolean")
+        if not isinstance(self.stop_strings, tuple) or len(self.stop_strings) > 16:
+            raise RuntimeContractError("stop_strings must contain at most 16 markers")
+        if any(not isinstance(marker, str) or not marker or len(marker) > 256
+               or any(0xD800 <= ord(char) <= 0xDFFF for char in marker)
+               for marker in self.stop_strings):
+            raise RuntimeContractError("invalid stop string")
+        if len(set(self.stop_strings)) != len(self.stop_strings):
+            raise RuntimeContractError("duplicate stop string")
+        for name, lower, upper in (
+            ("repetition_penalty", 0.01, 100.0),
+            ("presence_penalty", -2.0, 2.0),
+            ("frequency_penalty", -2.0, 2.0),
+        ):
+            value = getattr(self, name)
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(float(value)) or not lower <= value <= upper):
+                raise RuntimeContractError(f"{name} outside supported range")
         if not is_int(self.seed):
             raise RuntimeContractError("seed must be an integer")
         if (
@@ -221,15 +303,24 @@ class GenerationConfig:
             raise RuntimeContractError("top_p outside supported range")
         if not isinstance(self.use_cache, bool):
             raise RuntimeContractError("use_cache must be boolean")
-        seen: set[int] = set()
-        for token_id in self.stop_token_ids:
-            if not is_int(token_id) or not 0 <= token_id < vocab_size or token_id in seen:
-                raise RuntimeContractError("invalid stop token id")
-            seen.add(token_id)
+        for name in ("stop_token_ids", "suppress_token_ids"):
+            values = getattr(self, name)
+            if not isinstance(values, tuple):
+                raise RuntimeContractError(f"{name} must be an immutable tuple")
+            seen: set[int] = set()
+            for token_id in values:
+                if not is_int(token_id) or not 0 <= token_id < vocab_size or token_id in seen:
+                    raise RuntimeContractError(f"invalid {name}")
+                seen.add(token_id)
+        blocked = set(self.suppress_token_ids)
+        if self.min_new_tokens:
+            blocked.update(self.stop_token_ids)
+        if self.max_new_tokens and len(blocked) >= vocab_size:
+            raise RuntimeContractError("generation policy suppresses the entire vocabulary")
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "max_new_tokens": self.max_new_tokens,
             "seed": self.seed,
             "temperature": float(self.temperature),
@@ -238,6 +329,22 @@ class GenerationConfig:
             "use_cache": self.use_cache,
             "stop_token_ids": list(self.stop_token_ids),
         }
+        # Default policies retain historical request and replay digests.
+        for name, default in (
+            ("min_new_tokens", 0), ("repetition_penalty", 1.0),
+            ("presence_penalty", 0.0), ("frequency_penalty", 0.0),
+            ("penalty_window", 64),
+        ):
+            value = getattr(self, name)
+            if value != default:
+                result[name] = float(value) if isinstance(default, float) else value
+        if self.suppress_token_ids:
+            result["suppress_token_ids"] = list(self.suppress_token_ids)
+        if self.stop_strings:
+            result["stop_strings"] = list(self.stop_strings)
+        if not self.include_stop_tokens:
+            result["include_stop_tokens"] = False
+        return result
 
 
 @dataclass(frozen=True)

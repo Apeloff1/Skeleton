@@ -25,7 +25,7 @@ from .offline_snapshot import (
 from .offline_audit import audit_database
 from .local_ai import (
     OfflineAISession,
-    OfflineGGUFSession,
+    load_gguf_deployment,
     load_native_checkpoint,
     smoke_offline_native_inference,
 )
@@ -605,7 +605,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     hits = ()
     try:
         session = (
-            OfflineGGUFSession(args.deployment)
+            OfflineAISession(load_gguf_deployment(args.deployment))
             if args.deployment is not None
             else OfflineAISession(load_native_checkpoint(args.model))
         )

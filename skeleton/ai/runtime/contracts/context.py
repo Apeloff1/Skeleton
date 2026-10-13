@@ -401,8 +401,6 @@ class ContextEnvelope:
         snapshot_ids = [segment_id for segment_id, _ in self.source_snapshot]
         if len(snapshot_ids) != len(set(snapshot_ids)):
             raise ContextContractError("source_snapshot segment ids must be unique")
-        if tuple(sorted(self.source_snapshot)) != self.source_snapshot:
-            raise ContextContractError("source_snapshot must be canonical order")
         snapshot = dict(self.source_snapshot)
         for value in snapshot.values():
             if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
@@ -429,6 +427,8 @@ class ContextEnvelope:
         expected_candidate_ids = source_ids | omitted_ids
         if set(snapshot) != expected_candidate_ids:
             raise ContextContractError("source_snapshot must exactly cover candidate segments")
+        if tuple(sorted(self.source_snapshot)) != self.source_snapshot:
+            raise ContextContractError("source_snapshot must be canonical order")
 
         digest = context_digest_payload(
             operation_id=self.operation_id,

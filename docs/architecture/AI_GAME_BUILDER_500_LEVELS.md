@@ -140,3 +140,33 @@ No Stage-10 level can self-sign. Round count, prose completeness, model confiden
 ## Completion semantics
 
 The machine shards carry the exact task obligations for **GBL-001..GBL-500**. Every level starts `planned`, `signed: false`. A level becomes complete only after exact-head implementation evidence satisfies its declared requirements, adversarial campaign, recovery/continuity checks, rights/provenance gates, quality metrics, and promotion requirements. This authority deepens the frozen masterplan; it does not create top-level volumes beyond `VOL-420`.
+
+## All-era native platform applicability and completion debt (2026-10-09)
+
+The actual **hardware identities and source-emitter inventory** for Dragon's
+reviewed native practice layer are maintained by
+skeleton/ai/webcrawler/dragon_native_targets.py,
+skeleton/ai/webcrawler/dragon_platform_expansion.py and
+skeleton/ai/webcrawler/dragon_platform_readiness.py. Read the
+machine-generated hardware-readiness.json from the Dragon All-Era
+Platform Coverage workflow to reproduce the versioned coverage digest.
+
+The current implementation inventory has **169 curated hardware/OS/device
+identities, 45 native source producers, and 124 without original source
+support**. Do not assign a completed GBL task or a signed volume to a
+catalog entry merely because a platform name, CMake project or SDK
+dependency is documented. Real source, exact-ABI cross compilation,
+emulator replay, controller/audio/graphics validation, physical hardware
+QA and legally authorized release are separately necessary gates.
+
+This work supplies five distinct legacy native game producers (Atari 2600,
+Apple II, Sinclair ZX Spectrum, DOS 8086, Win95) and twenty-one further
+OS/CPU-restricted native C99/SDL2 desktop source profiles. Remaining
+console SDK migrations, signed mobile application packaging, real handheld
+power/input tests and licensed platform exports stay explicitly OPEN in
+the backlog. The 500-level game builder's dual-rival and evidence promotion
+contracts remain unchanged; this hardware audit is a source of proof and
+gaps, not an override for engineering sign-off.
+
+Detailed per-era expansion and prioritized next SDK tasks:
+docs/DRAGON_2026_ALL_PLATFORM_COVERAGE.md.

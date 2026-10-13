@@ -10,6 +10,7 @@ from hashlib import sha256
 import json,re
 from pathlib import Path
 from .dragon_native_targets import STYLES,CATALOG
+from .dragon_desktop_abi import DESKTOP_NATIVE
 
 FIELDS=frozenset({
   "schema","title","target","genre","palette","stages","candidates",
@@ -52,7 +53,7 @@ def parse_design(data:object)->GameDesign:
     palette=_text("palette",r"[a-z_]{3,30}",30)
     hero=_text("hero",r"[a-z_]{2,32}",32)
     theme=_text("quest_theme",r"[a-z_]{2,32}",32)
-    notes=_text("project_notes",r"[A-Za-z0-9 .,!?_:;'()/+-]{0,200}",200)
+    notes=_text("project_notes",r"[A-Za-z0-9 .,!?_:;'()+-]{0,200}",200)
     for k,low,high in (("stages",1,8),("candidates",1,24),
                        ("seed",0,2**32-1),("difficulty",1,10)):
         val=data[k]
@@ -64,7 +65,7 @@ def parse_design(data:object)->GameDesign:
         raise ValueError("unsupported genre identifier")
     if palette not in PALETTES or hero not in HEROES or theme not in THEMES:
         raise ValueError("unknown game art or thematic controls")
-    if target not in ("pc_linux","pc_windows","pc_macos","steam_deck"):
+    if target not in DESKTOP_NATIVE:
         if data["stages"]!=1 or data["candidates"]!=1:
             raise ValueError("cartridge generator has one stage/seed per design")
         if palette not in ("dmg_green","handheld","vga_dusk"):

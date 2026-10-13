@@ -128,15 +128,9 @@ def test_cgroup_max_string_is_not_converted_to_fake_infinity() -> None:
 
 def test_malformed_linux_meminfo_does_not_escalate_hardware_profile() -> None:
     files = {"/proc/meminfo": "MemTotal: Infinity kB\nMemAvailable: 999999999 kB\n"}
-
-    def read(path: str) -> str:
-        if path not in files:
-            raise FileNotFoundError(path)
-        return files[path]
-
     o = observe_resources(
         platform="linux",
-        read_text=read,
+        read_text=lambda path: files[path],
         cpu_count=lambda: 32, sysconf=lambda _key: None,
     )
     assert o.physical_ram_bytes is None

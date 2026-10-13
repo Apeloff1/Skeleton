@@ -67,55 +67,50 @@ def _parser() -> argparse.ArgumentParser:
 
     local_ai = sub.add_parser("local-ai", help="run native AI locally, without Docker or provider credentials")
     local_ai.add_argument("--model", help="native content-addressed checkpoint for headless inference")
-    local_ai.add_argument("--deployment", help="digest-pinned local GGUF/llama.cpp deployment manifest")
-    local_ai.add_argument("--prompt", help="headless text request (requires --model or --deployment)")
-    local_ai.add_argument("--backup-in", help="restore an exact-model local transcript before inference")
-    local_ai.add_argument("--backup-out", help="atomically save the completed local transcript after inference")
-    local_ai.add_argument("--workspace", help="local SQLite file for automatic durable conversation recovery")
-    local_ai.add_argument("--session-id", default="default", help="offline workspace conversation identity")
-    local_ai.add_argument("--max-output-tokens", type=int, default=8)
+    local_ai.add_argument("--gguf-model", help="explicit local GGUF open-weight artifact for llama.cpp inference")
+    local_ai.add_argument("--llama-executable", help="explicit local llama.cpp executable (not downloaded)")
+
+    local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
+    local_ai.add_argument("--prepare-dataset", help="flat folder of explicit UTF-8 .txt documents")
+    local_ai.add_argument("--dataset-output", help="new directory for disjoint train/validation and identity manifest")
+    local_ai.add_argument("--improve-dataset", help="verified dataset folder for held-out checkpoint continuation")
+    local_ai.add_argument("--verify-dataset", help="check published dataset hashes, split contract and canonical manifest")
+    local_ai.add_argument("--verify-sources", help="optional original source folder for strict source-to-dataset verification")
+    local_ai.add_argument("--validation-percent", type=int, default=25, help="source-document validation split percent (10–50)")
+    local_ai.add_argument("--split-seed", type=int, default=41, help="reproducible source-document split seed")
+    local_ai.add_argument("--self-check", action="store_true", help="verify bundled offline native inference, CPU training and benchmarking")
+    local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
+    local_ai.add_argument("--improve-model", help="previous native checkpoint for independent held-out improvement")
+    local_ai.add_argument("--compare-model", help="baseline checkpoint for read-only held-out comparison")
+    local_ai.add_argument("--candidate-model", help="candidate checkpoint for read-only held-out comparison")
+
+    local_ai.add_argument("--eval-corpus", help="separate held-out UTF-8 evaluation text (required for improvement)")
+    local_ai.add_argument("--benchmark-suite", help="strict offline multi-category native model evaluation JSON")
+    local_ai.add_argument("--exclude-train-corpus", help="reject benchmark cases copied from a specified local training text")
+    local_ai.add_argument("--protect-suite", help="require an independent category benchmark pass before publishing trained weights")
+    local_ai.add_argument("--replay-improvement", help="verify JSON receipt by regenerating exact native weights in temporary storage")
+
+    local_ai.add_argument("--output-model", help="new native checkpoint filename for --train-corpus")
+    local_ai.add_argument("--epochs", type=int, default=None, help="bounded native CPU training passes (1-4)")
+
+    local_ai.add_argument("--load-chat", help="restore verified turns from explicit model-bound local transcript")
+    local_ai.add_argument("--save-chat", help="atomically export model-bound local transcript after inference")
+
+    local_ai.add_argument("--prompt", help="headless text request (requires --model)")
+    local_ai.add_argument("--max-output-tokens", type=int, default=None)
     local_ai.add_argument("--json", action="store_true", dest="as_json", help="print a bound inference receipt")
-    local_ai.add_argument("--doctor", action="store_true", help="verify local artifacts without running inference")
-    local_ai.add_argument("--qualify-model", action="store_true", help="execute and verify two persisted on-device inference turns")
-    capability = local_ai.add_mutually_exclusive_group()
-    capability.add_argument("--capability-file", help="execute an admitted deterministic local JSON task")
-    capability.add_argument("--capability-graph-file", help="execute a bounded chain of deterministic local tasks")
-    capability.add_argument("--capability-list", action="store_true", help="list model-free deterministic operations")
-    capability.add_argument("--game-preview", action="store_true", help="open native offline playable game window")
-    capability.add_argument("--game-preview-check", action="store_true", help="verify deterministic native game replay without desktop")
-    capability.add_argument("--homebrew-editor", help="visual editor for a rights-checked original homebrew project")
-    capability.add_argument("--homebrew-port-check", action="store_true", help="verify original Windows port aesthetics/hybrid gameplay")
-    local_ai.add_argument("--homebrew-port-project", help="original project to verify Windows destination port")
-    local_ai.add_argument("--homebrew-port-blueprint", help="Windows port blueprint to verify")
-    local_ai.add_argument("--homebrew-editor-output", help="new project output for visual editor Save As")
-    capability.add_argument("--chip8-demo-output", help="write a genuine original CHIP-8 homebrew ROM")
-    capability.add_argument("--chip8-demo-check", action="store_true", help="verify a native original CHIP-8 game through actual machine instructions")
-    capability.add_argument("--chip8-export-capsule", help="legal-source authored capsule for CHIP-8 export")
-    local_ai.add_argument("--chip8-rom-output", help="new ROM output path for CHIP-8 capsule export")
-    local_ai.add_argument("--game-seed", type=int, help="optional explicit offline game preview seed")
-    local_ai.add_argument("--game-project", help="verified portable game project file for native preview")
-    local_ai.add_argument("--library", help="local SQLite document index")
-    local_ai.add_argument("--index-dir", help="index an explicitly selected local text folder")
-    local_ai.add_argument("--search", help="search local indexed documents without a model")
-    local_ai.add_argument("--use-library", action="store_true", help="include bounded local excerpts as untrusted context")
-    local_ai.add_argument("--context-limit", type=int, default=3, help="local document hit budget")
-    local_ai.add_argument("--queue-db", help="SQLite indexing work queue")
-    local_ai.add_argument("--enqueue-dir", help="queue explicit local document scan")
-    local_ai.add_argument("--queue-library", help="local SQLite FTS5 index for queued scan")
-    local_ai.add_argument("--run-queue", action="store_true", help="run bounded queued indexing work")
-    local_ai.add_argument("--queue-status", action="store_true", help="list locally queued indexing jobs")
-    local_ai.add_argument("--cancel-queue-job", help="cancel queued job by ID")
-    local_ai.add_argument("--retry-queue-job", help="retry terminal failed job by ID")
-    local_ai.add_argument("--drain-limit", type=int, default=5, help="maximum jobs processed per invocation")
-    local_ai.add_argument("--snapshot-to", help="create verified local state recovery bundle")
-    local_ai.add_argument("--restore-from", help="restore verified local recovery bundle")
-    local_ai.add_argument("--verify-snapshot", help="verify a local recovery bundle")
-    local_ai.add_argument("--snapshot-workspace", help="conversation SQLite state file")
-    local_ai.add_argument("--snapshot-library", help="document knowledge SQLite state file")
-    local_ai.add_argument("--snapshot-queue", help="indexing job SQLite state file")
-    local_ai.add_argument("--audit-workspace", help="read-only semantic check of chat SQLite")
-    local_ai.add_argument("--audit-library", help="read-only semantic check of document SQLite")
-    local_ai.add_argument("--audit-queue", help="read-only semantic check of job SQLite")
+    prepare = sub.add_parser("prepare-local-model", help="pin an existing local GGUF and llama.cpp executable")
+    prepare.add_argument("--executable", type=Path, required=True, help="local llama.cpp CLI executable")
+    prepare.add_argument("--model", type=Path, required=True, help="local GGUF weights")
+    prepare.add_argument("--output", type=Path, required=True, help="new manifest file; never overwritten")
+    prepare.add_argument("--model-id", help="optional display identifier")
+    prepare.add_argument("--context-size", type=int, default=4096)
+    prepare.add_argument("--threads", type=int)
+    prepare.add_argument("--gpu-layers", type=int, default=0)
+    prepare.add_argument("--timeout", type=float, default=120.0)
+    prepare.add_argument("--json", action="store_true", dest="as_json")
+    sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
+    sub.add_parser("serve-local-ai", add_help=False, help="open the authenticated offline AI workspace (serve-local-ai --help)")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -230,9 +225,42 @@ def _run_compose(
 def run_app_cli(argv: Sequence[str] | None = None) -> int:
     """Run the application assembly CLI and return a process-style exit code."""
 
-    args = _parser().parse_args(list(argv or ()))
+    arguments = list(argv or ())
+    # Delegate parsing to the existing owners, including their complete help.
+    if arguments and arguments[0] == "chat":
+        from skeleton.app.offline_chat_cli import main as chat_main
+        return chat_main(arguments[1:])
+    if arguments and arguments[0] == "serve-local-ai":
+        from skeleton.app.offline_http import main as serve_main
+        return serve_main(arguments[1:])
+    args = _parser().parse_args(arguments)
     command = args.command or "status"
 
+    if command == "prepare-local-model":
+        from skeleton.ai.runtime.inference.deployment import create_local_model_deployment
+        try:
+            model = create_local_model_deployment(
+                args.output, executable_path=args.executable, model_path=args.model,
+                model_id=args.model_id, context_size=args.context_size,
+                threads=args.threads, gpu_layers=args.gpu_layers, timeout_seconds=args.timeout,
+            )
+        except (ValueError, OSError, RuntimeError) as exc:
+            if args.as_json:
+                print(json.dumps({"ok": False, "error": str(exc)}))
+            else:
+                print("Local model preparation failed:", str(exc))
+            return 1
+        if args.as_json:
+            print(json.dumps({"ok": True, "manifest": str(model.manifest_path),
+                              "model_sha256": model.model_sha256,
+                              "executable_sha256": model.executable_sha256,
+                              "runtime_executed": False, "model_qualified": False}))
+        else:
+            print("Local model manifest:", model.manifest_path)
+            print("Model SHA-256:", model.model_sha256)
+            print("Files pinned. No model execution or quality qualification was performed.")
+            print("Start chat: python -m skeleton app chat --gguf-deployment <manifest> --interactive")
+        return 0
     if command == "status":
         return _print_status(
             bool(getattr(args, "as_json", False)),
@@ -257,137 +285,380 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if command == "local-ai":
-        if (
-            args.capability_file or args.capability_graph_file or args.capability_list or args.game_preview or args.game_preview_check or args.game_seed is not None or args.game_project or args.homebrew_editor or args.homebrew_editor_output or args.homebrew_port_check or args.homebrew_port_project or args.homebrew_port_blueprint or args.chip8_demo_output or args.chip8_demo_check or args.chip8_export_capsule or args.chip8_rom_output or args.qualify_model or args.index_dir or args.search or args.use_library or args.enqueue_dir
-            or args.run_queue or args.queue_status or args.cancel_queue_job
-            or args.retry_queue_job or args.snapshot_to
-            or args.restore_from or args.verify_snapshot
-            or args.audit_workspace or args.audit_library or args.audit_queue
-        ):
-            # A single command implementation ensures the GUI's CLI and the
-            # frozen console use identical offline document safety policies.
-            from skeleton.app.offline_cli import main as run_offline_console
-            local_args = []
-            for option, value in (
-                ("--model", args.model),
-                ("--deployment", args.deployment),
-                ("--prompt", args.prompt),
-                ("--backup-in", args.backup_in),
-                ("--backup-out", args.backup_out),
-                ("--workspace", args.workspace),
-                ("--session-id", args.session_id),
-                ("--library", args.library),
-                ("--index-dir", args.index_dir),
-                ("--search", args.search),
-                ("--queue-db", args.queue_db),
-                ("--enqueue-dir", args.enqueue_dir),
-                ("--queue-library", args.queue_library),
-                ("--cancel-queue-job", args.cancel_queue_job),
-                ("--retry-queue-job", args.retry_queue_job),
-                ("--snapshot-to", args.snapshot_to),
-                ("--restore-from", args.restore_from),
-                ("--verify-snapshot", args.verify_snapshot),
-                ("--snapshot-workspace", args.snapshot_workspace),
-                ("--snapshot-library", args.snapshot_library),
-                ("--snapshot-queue", args.snapshot_queue),
-                ("--audit-workspace", args.audit_workspace),
-                ("--audit-library", args.audit_library),
-                ("--audit-queue", args.audit_queue),
-                ("--capability-file", args.capability_file),
-                ("--capability-graph-file", args.capability_graph_file),
-                ("--game-seed", args.game_seed),
-                ("--game-project", args.game_project),
-                ("--homebrew-editor", args.homebrew_editor),
-                ("--homebrew-editor-output", args.homebrew_editor_output),
-                ("--homebrew-port-project", args.homebrew_port_project),
-                ("--homebrew-port-blueprint", args.homebrew_port_blueprint),
-                ("--chip8-demo-output", args.chip8_demo_output),
-                ("--chip8-export-capsule", args.chip8_export_capsule),
-                ("--chip8-rom-output", args.chip8_rom_output),
+        from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
+
+        if args.improve_dataset:
+            if (
+                not args.improve_model or not args.output_model
+                or args.prepare_dataset or args.dataset_output or args.verify_dataset
+                or args.train_corpus or args.eval_corpus
+                or args.model or args.prompt or args.inspect_model
+                or args.gguf_model or args.llama_executable or args.self_check
+                or args.compare_model or args.candidate_model or args.benchmark_suite
+                or args.exclude_train_corpus or args.replay_improvement
+                or args.load_chat or args.save_chat
+                or args.max_output_tokens is not None
+                or args.validation_percent != 25 or args.split_seed != 41
             ):
-                if value is not None:
-                    local_args.extend((option, str(value)))
-            local_args.extend(("--max-output-tokens", str(args.max_output_tokens)))
-            local_args.extend(("--context-limit", str(args.context_limit)))
-            local_args.extend(("--drain-limit", str(args.drain_limit)))
-            if args.run_queue:
-                local_args.append("--run-queue")
-            if args.queue_status:
-                local_args.append("--queue-status")
-            if args.use_library:
-                local_args.append("--use-library")
-            if args.qualify_model:
-                local_args.append("--qualify-model")
-            if args.capability_list:
-                local_args.append("--capability-list")
-            if args.game_preview:
-                local_args.append("--game-preview")
-            if args.game_preview_check:
-                local_args.append("--game-preview-check")
-            if args.chip8_demo_check:
-                local_args.append("--chip8-demo-check")
-            if args.homebrew_port_check:
-                local_args.append("--homebrew-port-check")
-            if args.as_json:
-                local_args.append("--json")
-            return run_offline_console(local_args)
-
-        from skeleton.app.local_ai import (
-            OfflineAISession, OfflineGGUFSession, load_native_checkpoint, run_offline_ai,
-        )
-        from skeleton.app.offline_workspace import DurableOfflineSession
-
-        if args.doctor:
-            if (bool(args.model) == bool(args.deployment)) or args.prompt or args.backup_in or args.backup_out or args.workspace:
-                print("local-ai --doctor requires exactly one local model and no generation parameters")
+                print("--improve-dataset requires --improve-model and --output-model; optional --epochs, --verify-sources and --protect-suite")
                 return 2
-            from skeleton.app.offline_readiness import inspect_local_readiness
+            from skeleton.app.local_ai_dataset import improve_native_dataset
+
             try:
-                report = inspect_local_readiness(model=args.model, deployment=args.deployment)
-            except (ValueError, RuntimeError, OSError, TypeError) as exc:
-                print("local-ai doctor rejected: " + type(exc).__name__ + ": " + str(exc))
+                result = improve_native_dataset(
+                    args.improve_model, args.improve_dataset, args.output_model,
+                    epochs=args.epochs if args.epochs is not None else 1, original_sources=args.verify_sources,
+                    protected_suite=args.protect_suite,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("verified dataset improvement rejected: " + type(exc).__name__ + ": " + str(exc))
                 return 1
             if args.as_json:
-                print(json.dumps(report, sort_keys=True, ensure_ascii=False))
+                print(json.dumps(result, sort_keys=True, ensure_ascii=False))
             else:
-                print("Local artifact VERIFIED; inference and OS isolation not tested")
+                receipt = result["improvement"]
+                print("Native candidate checkpoint written: " + str(args.output_model))
+                print("Dataset ID: " + result["dataset"]["dataset_id"])
+                print("held-out perplexity: "
+                      + f"{receipt['baseline_perplexity']:.3f} -> {receipt['accepted_perplexity']:.3f}")
+                print("Parent checkpoint retained; no independent quality certification")
             return 0
 
-        if (args.model and args.deployment) or (
-            bool(args.prompt) != bool(args.model or args.deployment)
-        ) or ((args.backup_in or args.backup_out) and not args.prompt):
-            print("local-ai requires both --prompt and exactly one of --model or --deployment")
+        if args.verify_dataset or args.verify_sources:
+            if (
+                not args.verify_dataset or args.prepare_dataset or args.dataset_output
+                or args.model or args.prompt or args.inspect_model
+                or args.gguf_model or args.llama_executable or args.self_check
+                or args.train_corpus or args.output_model or args.improve_model
+                or args.compare_model or args.candidate_model or args.eval_corpus
+                or args.benchmark_suite or args.exclude_train_corpus
+                or args.protect_suite or args.replay_improvement
+                or args.load_chat or args.save_chat
+                or args.epochs is not None or args.max_output_tokens is not None
+                or args.validation_percent != 25 or args.split_seed != 41
+            ):
+                print("dataset verification requires --verify-dataset and optional --verify-sources only")
+                return 2
+            from skeleton.app.local_ai_dataset import verify_native_dataset
+
+            try:
+                verification = verify_native_dataset(
+                    args.verify_dataset, original_sources=args.verify_sources,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("native dataset verification failed: "
+                      + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(verification, sort_keys=True, ensure_ascii=False))
+            else:
+                print("Verified prepared native dataset: " + verification["dataset_id"])
+                print("Original sources checked: "
+                      + ("yes" if verification["original_sources_verified"] else "no"))
+                print("No model quality certification")
+            return 0
+
+        if args.prepare_dataset or args.dataset_output:
+            if (
+                not args.prepare_dataset or not args.dataset_output
+                or args.model or args.prompt or args.inspect_model
+                or args.gguf_model or args.llama_executable or args.self_check
+                or args.train_corpus or args.output_model or args.improve_model
+                or args.compare_model or args.candidate_model or args.eval_corpus
+                or args.benchmark_suite or args.exclude_train_corpus
+                or args.protect_suite or args.replay_improvement
+                or args.load_chat or args.save_chat
+                or args.verify_dataset or args.verify_sources
+                or args.epochs is not None or args.max_output_tokens is not None
+            ):
+                print("local-ai dataset preparation requires only --prepare-dataset, --dataset-output and optional split controls")
+                return 2
+            from skeleton.app.local_ai_dataset import prepare_native_dataset
+
+            try:
+                dataset = prepare_native_dataset(
+                    args.prepare_dataset, args.dataset_output,
+                    validation_percent=args.validation_percent,
+                    seed=args.split_seed,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai dataset rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(dataset, ensure_ascii=False, sort_keys=True))
+            else:
+                print("Prepared native train/validation corpus in: " + str(dataset["output_directory"]))
+                print("Source documents: " + str(dataset["source_count"]))
+                print("Training/validation tokens: "
+                      + str(dataset["training_tokens"]) + "/" + str(dataset["validation_tokens"]))
+                print("Dataset ID: " + str(dataset["dataset_id"]))
+                print("Quality: not independently certified")
+            return 0
+        if args.validation_percent != 25 or args.split_seed != 41:
+            print("--validation-percent and --split-seed require --prepare-dataset")
             return 2
-        if args.model or args.deployment:
+        if args.self_check:
+            if any((
+                args.model, args.gguf_model, args.llama_executable,
+                args.inspect_model, args.train_corpus, args.improve_model,
+                args.compare_model, args.candidate_model, args.eval_corpus,
+                args.benchmark_suite, args.exclude_train_corpus, args.protect_suite,
+                args.replay_improvement, args.output_model, args.prompt,
+                args.load_chat, args.save_chat,
+                args.epochs is not None, args.max_output_tokens is not None,
+            )):
+                print("local-ai --self-check does not accept model, dataset or training options")
+                return 2
+            from skeleton.app.local_ai_acceptance import run_offline_acceptance
+
+            result = run_offline_acceptance()
+            if args.as_json:
+                print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            else:
+                for check in result["checks"]:
+                    print(("[PASS] " if check["passed"] else "[FAIL] ") + str(check["name"]))
+                print("Offline native self-check: " + ("PASS" if result["passed"] else "FAIL"))
+                print("Model quality, GGUF weights and enterprise release: not certified")
+            return 0 if result["passed"] else 1
+
+        if args.gguf_model or args.llama_executable:
+            if (
+                not args.gguf_model or not args.llama_executable or not args.prompt
+                or args.model or args.inspect_model or args.train_corpus
+                or args.improve_model or args.compare_model or args.candidate_model
+                or args.eval_corpus or args.benchmark_suite or args.exclude_train_corpus
+                or args.protect_suite or args.replay_improvement or args.output_model
+                or args.load_chat or args.save_chat or args.epochs is not None
+            ):
+                print("GGUF inference requires --gguf-model, --llama-executable and --prompt only")
+                return 2
+            from skeleton.app.local_ai_gguf import generate_local_gguf_sync
+
+            try:
+                evidence = generate_local_gguf_sync(
+                    args.llama_executable, args.gguf_model, args.prompt,
+                    max_output_tokens=(
+                        args.max_output_tokens if args.max_output_tokens is not None
+                        else 128
+                    ),
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local GGUF request rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(evidence, ensure_ascii=False, sort_keys=True))
+            else:
+                print(evidence["text"])
+            return 0
+
+        # Never accept tuning switches that a mode would silently ignore.
+        # A replay always uses epochs pinned inside its original receipt;
+        # inspection, evaluation and inference do not train any weights.
+        if args.epochs is not None and (
+            not args.train_corpus
+            or args.replay_improvement
+            or args.compare_model
+            or (args.candidate_model and not args.improve_model)
+            or args.benchmark_suite
+        ):
+            print("--epochs applies only to local training or continued training")
+            return 2
+        if args.max_output_tokens is not None and (
+            args.train_corpus or args.improve_model or args.replay_improvement
+            or args.benchmark_suite or args.compare_model or args.candidate_model
+            or args.inspect_model
+        ):
+            print("--max-output-tokens applies only to native inference")
+            return 2
+
+        if args.replay_improvement:
+            if (
+                not args.compare_model or not args.candidate_model
+                or not args.train_corpus or not args.eval_corpus
+                or args.model or args.prompt or args.inspect_model
+                or args.output_model or args.load_chat or args.save_chat
+                or args.improve_model or args.benchmark_suite
+                or args.exclude_train_corpus
+            ):
+                print("replay requires --compare-model parent, --candidate-model, --train-corpus and --eval-corpus")
+                return 2
+            from skeleton.app.local_ai_replay import replay_local_improvement
+
+            try:
+                evidence = replay_local_improvement(
+                    args.replay_improvement, args.compare_model,
+                    args.candidate_model, args.train_corpus, args.eval_corpus,
+                    protected_suite=args.protect_suite,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai reproduction rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(evidence, sort_keys=True, ensure_ascii=False))
+            else:
+                print("Native model improvement reproduced: " + evidence["candidate_model_digest"])
+                print("Recorded artifact SHA256: " + evidence["replayed_artifact_sha256"])
+                print("No deployment promotion or independent quality certification")
+            return 0
+        if args.benchmark_suite:
+            if (
+                not args.model or args.prompt or args.inspect_model
+                or args.compare_model or args.improve_model or args.train_corpus
+                or args.eval_corpus or args.output_model or args.load_chat
+                or args.save_chat or args.protect_suite or args.replay_improvement
+            ):
+                print("local-ai --benchmark-suite requires --model and optional --candidate-model only")
+                return 2
+            from skeleton.app.local_ai_benchmark import benchmark_native_models
+
+            try:
+                result = benchmark_native_models(
+                    args.benchmark_suite, baseline=args.model,
+                    candidate=args.candidate_model,
+                    excluded_training_text=args.exclude_train_corpus,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai benchmark rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            else:
+                print("suite digest: " + result["suite_digest"])
+                print("cases/categories: "
+                      + str(result["case_count"]) + "/" + str(result["category_count"]))
+                print("baseline perplexity: " + f"{result['baseline']['overall_perplexity']:.3f}")
+                if result["candidate"] is not None:
+                    print("candidate perplexity: " + f"{result['candidate']['overall_perplexity']:.3f}")
+                    print("all categories protected: "
+                          + ("yes" if result["passes_local_regression_gate"] else "no"))
+                print("No general quality certification or automatic model promotion")
+            return 0 if result["passes_local_regression_gate"] is not False else 1
+
+        if args.exclude_train_corpus:
+            print("--exclude-train-corpus requires --benchmark-suite")
+            return 2
+        if args.protect_suite and not args.improve_model and not args.replay_improvement:
+            print("--protect-suite requires incremental --improve-model")
+            return 2
+        if args.compare_model or args.candidate_model:
+            if (
+                not args.compare_model or not args.candidate_model or not args.eval_corpus
+                or args.improve_model or args.train_corpus or args.output_model
+                or args.model or args.prompt or args.load_chat or args.save_chat
+                or args.inspect_model or args.benchmark_suite
+            ):
+                print("local-ai comparison requires --compare-model, --candidate-model, --eval-corpus only")
+                return 2
+            from skeleton.app.local_ai_improvement import compare_local_models
+
+            try:
+                verdict = compare_local_models(
+                    args.compare_model, args.candidate_model, args.eval_corpus,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai comparison rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(verdict.to_dict(), ensure_ascii=False, sort_keys=True))
+            else:
+                print("Baseline held-out perplexity: " + f"{verdict.baseline_perplexity:.3f}")
+                print("Candidate held-out perplexity: " + f"{verdict.candidate_perplexity:.3f}")
+                print("Improvement: " + ("yes" if verdict.improves else "no"))
+                print("No weight mutation, no release promotion")
+            # A comparison is a release gate, not a best-effort status query.
+            return 0 if verdict.improves else 1
+        if args.improve_model:
+            if (
+                not args.train_corpus or not args.eval_corpus or not args.output_model
+                or args.model or args.prompt or args.inspect_model
+                or args.load_chat or args.save_chat
+                or args.compare_model or args.candidate_model or args.benchmark_suite or args.replay_improvement
+            ):
+                print("local-ai improvement requires --improve-model, --train-corpus, --eval-corpus and --output-model only")
+                return 2
+            from skeleton.app.local_ai_improvement import improve_local_model
+
+            try:
+                receipt = improve_local_model(
+                    args.improve_model, args.train_corpus, args.eval_corpus,
+                    args.output_model, epochs=args.epochs if args.epochs is not None else 1,
+                    protected_suite=args.protect_suite,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai candidate rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(receipt.to_dict(), ensure_ascii=False, sort_keys=True))
+            else:
+                print("Native candidate checkpoint written: " + str(args.output_model))
+                print("held-out perplexity: "
+                      + f"{receipt.baseline_perplexity:.3f} -> {receipt.accepted_perplexity:.3f}")
+                print("parent weights untouched; not an independent quality certification")
+            return 0
+        if args.train_corpus:
+            if (
+                not args.output_model or args.model or args.prompt
+                or args.inspect_model or args.load_chat or args.save_chat
+                or args.eval_corpus or args.improve_model
+                or args.compare_model or args.candidate_model or args.benchmark_suite
+            ):
+                print("local-ai training requires --train-corpus and --output-model without chat/inference options")
+                return 2
+            from skeleton.app.local_ai_training import train_local_text
+
+            try:
+                receipt = train_local_text(args.train_corpus, args.output_model, epochs=args.epochs if args.epochs is not None else 1)
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai training rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(receipt.as_dict(), ensure_ascii=False, sort_keys=True))
+            else:
+                print("Trained bounded CPU checkpoint: " + str(args.output_model))
+                print("model digest: " + receipt.model_digest)
+                print("training steps: " + str(receipt.training_steps))
+                print("quality: not independently certified; not foundation-model weights")
+            return 0
+        if args.output_model or args.eval_corpus:
+            print("--output-model/--eval-corpus require local training or improvement")
+            return 2
+        if args.inspect_model:
+            if not args.model or args.prompt or args.load_chat or args.save_chat:
+                print("local-ai --inspect-model requires only --model")
+                return 2
+            try:
+                report = inspect_local_model(load_native_checkpoint(args.model))
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai model rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+            else:
+                print("model: " + str(report["model_id"]))
+                print("digest: " + str(report["model_digest"]))
+                print("context: " + str(report["max_context_tokens"]) + " tokens")
+                print("output limit: " + str(report["max_output_tokens"]) + " tokens")
+                print("native model bytes: " + str(report["model_bytes"]))
+                print("model quality: not independently certified")
+            return 0
+        if bool(args.model) != bool(args.prompt):
+            print("local-ai headless inference requires both --model and --prompt")
+            return 2
+        if (args.load_chat or args.save_chat) and not args.model:
+            print("local-ai chat import/export requires --model and --prompt")
+            return 2
+        if args.model:
             import asyncio
 
-            if args.workspace and args.backup_in:
-                print("local-ai rejects --backup-in with a revisioned workspace")
-                return 2
-            durable = None
             try:
-                session = (
-                    OfflineGGUFSession(args.deployment)
-                    if args.deployment
-                    else OfflineAISession(load_native_checkpoint(args.model))
-                )
-                if args.workspace:
-                    durable = DurableOfflineSession(
-                        session, args.workspace, session_id=args.session_id
-                    )
-                elif args.backup_in:
-                    session.restore_history_backup(args.backup_in)
-                answer = asyncio.run(
-                    (durable or session).ask(args.prompt, max_output_tokens=args.max_output_tokens)
-                )
-                if args.backup_out:
-                    session.save_history_backup(args.backup_out)
+                session = OfflineAISession(load_native_checkpoint(args.model))
+                if args.load_chat:
+                    session.import_transcript(args.load_chat)
+                answer = asyncio.run(session.ask(args.prompt, max_output_tokens=args.max_output_tokens if args.max_output_tokens is not None else 8))
+                chat_digest = session.export_transcript(args.save_chat) if args.save_chat else None
             except (ValueError, RuntimeError, OSError) as exc:
                 print("local-ai request rejected: " + type(exc).__name__ + ": " + str(exc))
                 return 1
-            finally:
-                if durable is not None:
-                    durable.close()
             if args.as_json:
                 print(json.dumps({
                     "schema_version": 1,
@@ -396,6 +667,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     "execution_receipt_digest": answer.execution_receipt_digest,
                     "input_tokens": answer.input_tokens,
                     "output_tokens": answer.output_tokens,
+                    "conversation_turns": len(session.history) // 2,
+                    "chat_sha256": chat_digest,
                 }, ensure_ascii=False, sort_keys=True))
             else:
                 print(answer.text)

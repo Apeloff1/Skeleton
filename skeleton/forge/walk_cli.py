@@ -44,6 +44,7 @@ class WalkArgs:
     seed: Optional[str] = None
     all_eras: bool = False
     steps: bool = False
+    repeats: int = 1
 
 
 def _value(rest: Sequence[str], i: int, flag: str) -> str:
@@ -86,6 +87,15 @@ def parse_walk_args(rest: Sequence[str]) -> WalkArgs:
             args.all_eras = True; i += 1
         elif a == "--steps":
             args.steps = True; i += 1
+        elif a in ("-n", "--repeat"):
+            raw = _value(rest, i, a)
+            try:
+                args.repeats = int(raw)
+            except ValueError:
+                raise UsageError(f"{a} must be an integer, got {raw!r}") from None
+            if not 1 <= args.repeats <= 100:
+                raise UsageError(f"{a} must be between 1 and 100")
+            i += 2
         else:
             raise UsageError(f"unknown walk option: {a}")
     if args.all_eras and args.blend:
@@ -170,14 +180,25 @@ def run_walk(rest: Sequence[str], out: Printer = print) -> int:
         out(f"walk: {exc}")
         return EXIT_USAGE
 
+    def attempt_seed(index: int) -> Optional[str]:
+        # Repeat runs vary the seed deterministically; single-run behavior is
+        # unchanged, including an explicitly supplied seed.
+        if args.repeats == 1:
+            return args.seed
+        return f"{args.seed or 'walk'}:{index:03d}"
+
     if args.all_eras:
         from skeleton.forge.eras import list_eras
 
-        results = [walk_once(e, mode=args.mode, seed=args.seed) for e in list_eras()]
+        results = [
+            walk_once(e, mode=args.mode, seed=attempt_seed(i))
+            for e in list_eras() for i in range(args.repeats)
+        ]
         failed = [r["label"] for r in results if not r["passed"]]
         if args.as_json:
             out(json.dumps({
                 "mode": args.mode,
+                "repeats": args.repeats,
                 "total": len(results),
                 "passed": len(results) - len(failed),
                 "failed": failed,
@@ -188,6 +209,31 @@ def run_walk(rest: Sequence[str], out: Printer = print) -> int:
                 out(_summary_line(r))
             out(f"{len(results) - len(failed)}/{len(results)} eras passed ({args.mode})")
         return EXIT_FAIL if failed else EXIT_OK
+
+    if args.repeats > 1:
+        results = [
+            walk_once(args.era, blend=args.blend, t=args.t, mode=args.mode,
+                      seed=attempt_seed(index))
+            for index in range(args.repeats)
+        ]
+        failures = [r for r in results if not r["passed"]]
+        if args.as_json:
+            out(json.dumps({
+                "mode": args.mode,
+                "repeats": args.repeats,
+                "passed": len(results) - len(failures),
+                "failed": len(failures),
+                "walks": [_public(r, full_steps=args.steps) for r in results],
+            }, indent=2, default=str))
+        else:
+            for index, result in enumerate(results, start=1):
+                out(f"attempt {index}/{args.repeats}: {_summary_line(result)}")
+                if args.steps:
+                    for step in result["_steps_full"]:
+                        out(f"  t={step['t']:>8.3f} {step['room']:12} "
+                            f"{step['action']:10} {step['detail']}")
+            out(f"{len(results) - len(failures)}/{args.repeats} walks passed ({args.mode})")
+        return EXIT_FAIL if failures else EXIT_OK
 
     p = walk_once(args.era, blend=args.blend, t=args.t, mode=args.mode, seed=args.seed)
     if args.as_json:

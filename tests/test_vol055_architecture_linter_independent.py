@@ -15,6 +15,7 @@ def _fixture() -> Path:
     temp = Path(tempfile.mkdtemp(prefix="vol055-independent-"))
     for relative in (
         verifier.MASTER,
+        verifier.ACCOUNTABILITY,
         verifier.REGISTRY,
         verifier.ARCHITECTURE,
         verifier.VALIDATOR,
@@ -97,12 +98,66 @@ def test_rejects_masterplan_gap_binding_loss() -> None:
     path = root / verifier.MASTER
     data = _load(path)
     volume = next(item for item in data["volumes"] if item["key"] == "VOL-055")
-    volume["gaps"].remove("add waiver expiry enforcement")
+    # A completed canonical volume has zero gaps. Introducing a new
+    # unacknowledged gap is the live drift regression.
+    volume["gaps"].append("new unacknowledged architecture requirement")
     _write(path, data)
 
     receipt = verifier.verify_repository(root)
     assert receipt["valid"] is False
     assert any("gap binding drift" in error for error in receipt["errors"])
+
+
+def test_rejects_unverified_accountability_closure() -> None:
+    root = _fixture()
+    path = root / verifier.ACCOUNTABILITY
+    data = _load(path)
+    item = next(record for record in data["records"] if record["id"] == "ACC-VOL-055")
+    item["verification_signoff"]["signed"] = False
+    _write(path, data)
+
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("verification_signoff is not signed" in error for error in receipt["errors"])
+
+
+def test_rejects_nonindependent_signers() -> None:
+    root = _fixture()
+    path = root / verifier.ACCOUNTABILITY
+    data = _load(path)
+    item = next(record for record in data["records"] if record["id"] == "ACC-VOL-055")
+    item["verification_signoff"]["signer_id"] = item["implementation_signoff"]["signer_id"]
+    _write(path, data)
+
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("independent identities" in error for error in receipt["errors"])
+
+
+def test_rejects_mismatched_evidence_commits() -> None:
+    root = _fixture()
+    path = root / verifier.ACCOUNTABILITY
+    data = _load(path)
+    item = next(record for record in data["records"] if record["id"] == "ACC-VOL-055")
+    item["verification_signoff"]["git_sha"] = "0" * 40
+    _write(path, data)
+
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("evidence commits must match" in error for error in receipt["errors"])
+
+
+def test_rejects_missing_completed_lifecycle_event() -> None:
+    root = _fixture()
+    path = root / verifier.ACCOUNTABILITY
+    data = _load(path)
+    item = next(record for record in data["records"] if record["id"] == "ACC-VOL-055")
+    item["history"] = [event for event in item["history"] if event["event_type"] != "completed"]
+    _write(path, data)
+
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("completion lifecycle evidence missing" in error for error in receipt["errors"])
 
 
 def test_rejects_expiry_enforcement_source_weakening() -> None:

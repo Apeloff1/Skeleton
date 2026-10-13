@@ -1,0 +1,64 @@
+name: Original Quest Scene Director
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/game_builder/quest_scene_*.py"
+      - "skeleton/ai/game_builder/quest_director_*.py"
+      - "tests/test_game_builder_quest_scene_*.py"
+      - "tests/test_game_builder_quest_director_studio.py"
+      - ".github/workflows/game-builder-quest-director.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quest-director-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scene-quest-execution:
+    name: Execute original director on Linux and Windows
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_quest_scene_engine.py
+            tests/test_game_builder_quest_scene_export.py
+            tests/test_game_builder_quest_director_studio.py
+            tests/test_game_builder_quest_encounters.py
+            tests/test_game_builder_quest_scene_endings.py
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Verify exact head source
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python -m compileall -q skeleton/ai/game_builder
+      - name: Execute actual nonlinear quests, cutscenes and consumer source
+        shell: bash
+        run: |
+          python -m unittest tests.test_game_builder_quest_scene_engine tests.test_game_builder_quest_scene_export tests.test_game_builder_quest_director_studio tests.test_game_builder_quest_encounters tests.test_game_builder_quest_scene_endings -v

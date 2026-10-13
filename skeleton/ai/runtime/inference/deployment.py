@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
-import stat
 import threading
+import tempfile
 from typing import Any
 
 from .llama_cpp import (
@@ -30,28 +30,10 @@ from .local import (
 SCHEMA = "skeleton.local_model.deployment.v1"
 QUALIFICATION_SCHEMA = "skeleton.local_model.qualification.v1"
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
-_MAX_MANIFEST_BYTES = 128 * 1024
 
 
 class LocalModelDeploymentError(RuntimeError):
     """A local-model deployment manifest or artifact failed closed."""
-
-
-def _unambiguous_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise LocalModelDeploymentError(
-                "duplicate deployment manifest JSON key: " + key
-            )
-        result[key] = value
-    return result
-
-
-def _reject_nonfinite(value: str) -> None:
-    raise LocalModelDeploymentError(
-        "deployment manifest contains nonfinite JSON constant: " + value
-    )
 
 
 def _sha256_file(path: Path) -> str:
@@ -134,38 +116,14 @@ class LocalModelDeployment:
     @classmethod
     def load(cls, manifest_path: str | Path) -> "LocalModelDeployment":
         source = Path(manifest_path).expanduser()
-        if source.is_symlink():
-            raise LocalModelDeploymentError("deployment manifest symlink is forbidden")
         try:
             resolved_manifest = source.resolve(strict=True)
-            with resolved_manifest.open("rb") as reader:
-                info = os.fstat(reader.fileno())
-                if (
-                    not stat.S_ISREG(info.st_mode) or info.st_size < 1
-                    or info.st_size > _MAX_MANIFEST_BYTES
-                ):
-                    raise LocalModelDeploymentError(
-                        "deployment manifest must be a bounded regular file"
-                    )
-                raw = reader.read(_MAX_MANIFEST_BYTES + 1)
         except OSError as exc:
-            raise LocalModelDeploymentError(
-                f"deployment manifest could not be read: {source}"
-            ) from exc
-        if len(raw) > _MAX_MANIFEST_BYTES or len(raw) != info.st_size:
-            raise LocalModelDeploymentError(
-                "deployment manifest changed or exceeded admitted size"
-            )
+            raise LocalModelDeploymentError(f"deployment manifest not found: {source}") from exc
         try:
-            payload = json.loads(
-                raw.decode("utf-8", errors="strict"),
-                object_pairs_hook=_unambiguous_object,
-                parse_constant=_reject_nonfinite,
-            )
-        except (UnicodeError, json.JSONDecodeError) as exc:
-            raise LocalModelDeploymentError(
-                "deployment manifest is not valid UTF-8 JSON"
-            ) from exc
+            payload = json.loads(resolved_manifest.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise LocalModelDeploymentError("deployment manifest is not valid JSON") from exc
         if not isinstance(payload, dict):
             raise LocalModelDeploymentError("deployment manifest root must be an object")
         if payload.get("schema_version") != SCHEMA:
@@ -331,6 +289,71 @@ class LocalModelDeployment:
         )
 
 
+def create_local_model_deployment(
+    destination: str | Path,
+    *,
+    executable_path: str | Path,
+    model_path: str | Path,
+    model_id: str | None = None,
+    context_size: int = 4096,
+    threads: int | None = None,
+    gpu_layers: int = 0,
+    timeout_seconds: float = 120.0,
+) -> LocalModelDeployment:
+    """Prepare a pinned configuration from existing files, without execution.
+
+    All admission rules stay in LocalModelDeployment.load/LlamaCppConfig.
+    Publish only after that authority validates a private candidate. Hard-link
+    publication is create-only: an existing destination is never replaced.
+    """
+    target = Path(destination).expanduser().absolute()
+    if not target.parent.is_dir():
+        raise LocalModelDeploymentError("manifest destination directory must already exist")
+    if target.exists() or target.is_symlink():
+        raise LocalModelDeploymentError("manifest destination already exists; choose a new file")
+    executable = _resolve(Path.cwd(), str(executable_path), "executable_path")
+    model = _resolve(Path.cwd(), str(model_path), "model_path", reject_symlink=True)
+    if not os.access(executable, os.X_OK):
+        raise LocalModelDeploymentError("selected llama.cpp runtime is not executable")
+    # Reject obvious incompatible files before hashing a potentially large model.
+    inspect_gguf(model)
+    identity = model.stem if model_id is None else model_id
+    if not isinstance(identity, str) or not identity.strip() or len(identity.encode("utf-8")) > 256:
+        raise LocalModelDeploymentError("model_id must contain 1–256 UTF-8 bytes")
+    validated = LlamaCppConfig(
+        executable=str(executable), model_path=str(model), model_id=identity.strip(),
+        context_size=context_size, threads=threads, gpu_layers=gpu_layers,
+        timeout_seconds=timeout_seconds, reject_model_symlink=True,
+    )
+    payload = {
+        "schema_version": SCHEMA, "runtime_kind": "llama.cpp-cli",
+        "model_id": validated.model_id,
+        "executable_path": str(executable), "executable_sha256": _sha256_file(executable),
+        "model_path": str(model), "model_sha256": _sha256_file(model),
+        "config": {"context_size": validated.context_size, "threads": validated.threads,
+                   "gpu_layers": validated.gpu_layers, "timeout_seconds": validated.timeout_seconds,
+                   "temperature": 0.0, "extra_args": []},
+    }
+    candidate: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json",
+                                         prefix=".skeleton-model-", dir=target.parent,
+                                         delete=False) as handle:
+            candidate = Path(handle.name)
+            json.dump(payload, handle, indent=2, ensure_ascii=False, allow_nan=False)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        admitted = LocalModelDeployment.load(candidate)
+        os.link(candidate, target)
+        return replace(admitted, manifest_path=target)
+    except (ValueError, OSError, LlamaCppRuntimeError) as exc:
+        raise LocalModelDeploymentError("cannot prepare local model deployment: " + str(exc)) from exc
+    finally:
+        if candidate is not None:
+            candidate.unlink(missing_ok=True)
+
+
 def load_local_model_adapter(
     manifest_path: str | Path,
     *,
@@ -492,6 +515,7 @@ __all__ = [
     "LocalModelDeploymentError",
     "QUALIFICATION_SCHEMA",
     "SCHEMA",
+    "create_local_model_deployment",
     "load_local_model_adapter",
     "qualify_local_model_deployment",
     "qualify_local_model_deployment_sync",

@@ -12,6 +12,9 @@ Templates
   HUD.
 * ``blank2d``      — minimal Node2D root (previous behaviour, kept for CI).
 
+Combat-capable templates (``platformer2d``, ``topdown2d``) also emit:
+    scenes/combat_vfx.tscn · scripts/combat_vfx.gd and nest CombatVfx in main.
+
 Every template emits:
     project.godot · export_presets.cfg (Linux/Windows/Web/Android) ·
     scenes/main.tscn · scenes/player.tscn · scripts/{main,player,hud}.gd
@@ -190,6 +193,12 @@ color = Color(0.2, 0.2, 0.24, 1)
 [sub_resource type="RectangleShape2D" id="ground"]
 size = Vector2(1280, 40)
 
+[node name="CombatVfx" type="Node2D" parent="."]
+script = preload("res://scripts/combat_vfx.gd")
+metadata/era = "modern"
+metadata/severity = "moderate"
+metadata/shape = "cone"
+
 [node name="HUD" type="CanvasLayer" parent="."]
 script = preload("res://scripts/hud.gd")
 
@@ -219,20 +228,29 @@ func _ready() -> void:
     print("%s ready" % ProjectSettings.get_setting("application/config/name"))
 '''
 
+
+_COMBAT_VFX_GD = 'class_name CombatVfx\nextends Node2D\n\n## Plays combat cues from Tutolage\'s VFX catalog. Colour indices come from\n## the cue; severity is metadata so HUD can share DANGER_RAMP tiers.\n\n@export var hit_frame: int = -1\n@export var severity: String = ""\n@export var shape: String = "cone"\n@export var duration_ms: int = 450\n@export var particle_count: int = 16\n@export var trauma: float = 0.0\n\nvar _elapsed_ms: float = 0.0\nvar _playing: bool = false\n\n\nfunc play_cue(cue_shape: String, duration: int, particles: int, cue_trauma: float,\n        cue_severity: String = "", cue_hit_frame: int = -1) -> void:\n    shape = cue_shape\n    duration_ms = duration\n    particle_count = particles\n    trauma = cue_trauma\n    severity = cue_severity\n    hit_frame = cue_hit_frame\n    _elapsed_ms = 0.0\n    _playing = true\n    visible = true\n    _apply_shape()\n    _emit_particles()\n\n\nfunc play_telegraph(damage: float, max_health: float, era_key: String = "modern",\n        cue_shape: String = "", cue_hit_frame: int = -1) -> void:\n    ## Stretches lead time with damage share; colour slots come from DANGER_RAMP.\n    var lead := int(clamp(250.0 + 650.0 * (damage / max(max_health, 0.001)), 250.0, 1500.0))\n    var share := clamp(damage / max(max_health, 0.001), 0.0, 1.0)\n    var tier := "low"\n    var slots := 1\n    if share > 0.85:\n        tier = "lethal"\n        slots = 4\n    elif share > 0.5:\n        tier = "high"\n        slots = 3\n    elif share > 0.25:\n        tier = "moderate"\n        slots = 2\n    var chosen := cue_shape if cue_shape != "" else shape\n    play_cue(chosen, lead, 16 * slots, 0.0, tier, cue_hit_frame)\n\n\nfunc notify_hit_frame(frame: int) -> void:\n    if hit_frame >= 0 and frame == hit_frame and not _playing:\n        _playing = true\n        _elapsed_ms = 0.0\n        visible = true\n        _emit_particles()\n\n\nfunc _process(delta: float) -> void:\n    if not _playing:\n        return\n    _elapsed_ms += delta * 1000.0\n    if _elapsed_ms >= duration_ms:\n        _playing = false\n        visible = false\n\n\nfunc _apply_shape() -> void:\n    for child in get_children():\n        if child is Node2D:\n            child.visible = child.name.to_lower().begins_with(shape.to_lower())\n\n\nfunc _emit_particles() -> void:\n    for child in get_children():\n        if child is GPUParticles2D:\n            child.amount = particle_count\n            child.emitting = true'
+
+_COMBAT_VFX_TSCN = '[gd_scene load_steps=2 format=3 uid="uid://tutolage_combat_vfx"]\n\n[ext_resource type="Script" path="res://scripts/combat_vfx.gd" id="1"]\n\n[node name="CombatVfx" type="Node2D"]\nscript = ExtResource("1")\nmetadata/era = "modern"\nmetadata/severity = "moderate"\nmetadata/shape = "cone"\nmetadata/duration_ms = 450\nmetadata/particles = 16\nmetadata/trauma = 0.0\nmetadata/colors = 2\nmetadata/hit_frame = -1\n\n[node name="Circle" type="Node2D" parent="CombatVfx"]\nvisible = false\n\n[node name="Cone" type="Node2D" parent="CombatVfx"]\nvisible = true\n\n[node name="Particles" type="GPUParticles2D" parent="CombatVfx/Cone"]\namount = 16\nemitting = false\n\n[node name="Line" type="Node2D" parent="CombatVfx"]\nvisible = false\n\n[node name="Ring" type="Node2D" parent="CombatVfx"]\nvisible = false\n'
+
 _TEMPLATES = {
     "platformer2d": {
         "scenes/main.tscn": _SCENE_MAIN_PLATFORMER,
         "scenes/player.tscn": _SCENE_PLAYER,
+        "scenes/combat_vfx.tscn": _COMBAT_VFX_TSCN,
         "scripts/player.gd": _PLAYER_PLATFORMER,
         "scripts/main.gd": _MAIN_PLATFORMER,
         "scripts/hud.gd": _HUD,
+        "scripts/combat_vfx.gd": _COMBAT_VFX_GD,
     },
     "topdown2d": {
         "scenes/main.tscn": _SCENE_MAIN_TOPDOWN,
         "scenes/player.tscn": _SCENE_PLAYER,
+        "scenes/combat_vfx.tscn": _COMBAT_VFX_TSCN,
         "scripts/player.gd": _PLAYER_TOPDOWN,
         "scripts/main.gd": _MAIN_PLATFORMER,
         "scripts/hud.gd": _HUD,
+        "scripts/combat_vfx.gd": _COMBAT_VFX_GD,
     },
     "blank2d": {
         "scenes/main.tscn": _SCENE_MAIN_BLANK,

@@ -13,7 +13,7 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
-from .local_ai import OfflineAISession, OfflineGGUFSession, load_native_checkpoint
+from .local_ai import OfflineAISession, load_gguf_deployment, load_native_checkpoint
 from .offline_readiness import inspect_local_readiness
 from .offline_workspace import DurableOfflineSession, OfflineWorkspace
 
@@ -40,10 +40,10 @@ def qualify_offline_model(
     initial = inspect_local_readiness(model=model, deployment=deployment)
     identity = (initial["model_digest"], initial["runtime_digest"])
 
-    def open_model() -> OfflineAISession | OfflineGGUFSession:
+    def open_model() -> OfflineAISession:
         if model is not None:
             return OfflineAISession(load_native_checkpoint(model))
-        return OfflineGGUFSession(deployment)
+        return OfflineAISession(load_gguf_deployment(deployment))
 
     receipts: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="skeleton-local-qualification-") as scratch:

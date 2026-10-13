@@ -109,6 +109,7 @@ export function worldProjectLinks(id: unknown): readonly ProjectLink[] {
     ['physics','Physics Studio','Compose the game physics configuration.','/physics-studio'],
     ['review','Design Review','Review a game design with the canonical compiler.','/design-review'],
     ['knowledge','Knowledge Base','Edit, review and approve canonical game artifacts.','/game-kb'],
+    ['story','Story Continuity','Audit scene history, character witnesses and causal threads.','/story-index'],
     ['studio','Galaxy Studio','Rebuild, refine and package the selected game.','/studio'],
   ] as const;
   return links.map(([key,title,description,route]) => ({ id:key,title,description,href:projectHref(route,project)! }));

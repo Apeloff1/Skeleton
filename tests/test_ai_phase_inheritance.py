@@ -84,18 +84,110 @@ class PhaseInheritanceVerifierTests(unittest.TestCase):
         self.assertFalse(receipt["valid"])
         self.assertIn("P2 queued volume count must remain 257", receipt["errors"])
 
-    def test_p2_task_cannot_self_promote(self) -> None:
-        values = docs()
-        task = next(
-            row
-            for row in values["machine/ai_p2_task_backlog.json"]["tasks"]
+    def _functional_task(self, values: dict[str, dict]) -> dict:
+        return next(
+            row for row in values["machine/ai_p2_task_backlog.json"]["tasks"]
             if row["task_id"] == "P2-T1-FUNCTIONAL-01"
         )
-        task["completion_checkbox"] = True
+
+    def test_signed_functional_task_closure_requires_workflow_evidence(self) -> None:
+        values = docs()
+        task = self._functional_task(values)
+        self.assertEqual(task["status"], "closed")
+        self.assertTrue(task["implementation_signed"])
+        self.assertTrue(task["verification_signed"])
+        receipt = self.verify_docs(values)
+        self.assertTrue(receipt["valid"], receipt["errors"])
+
+    def test_unpromoted_task_still_permitted_without_self_signing(self) -> None:
+        values = docs()
+        task = self._functional_task(values)
+        task["status"] = "landed_unpromoted"
+        task["completion_checkbox"] = False
+        task["completion_checkbox_mark"] = "[ ]"
+        task["implementation_signed"] = False
+        task["verification_signed"] = False
+        receipt = self.verify_docs(values)
+        self.assertTrue(receipt["valid"], receipt["errors"])
+
+    def test_p2_task_cannot_self_promote(self) -> None:
+        values = docs()
+        task = self._functional_task(values)
+        task["verification_signed"] = False
         receipt = self.verify_docs(values)
         self.assertFalse(receipt["valid"])
         self.assertIn(
-            "P2-T1-FUNCTIONAL-01 must not self-promote completion",
+            "P2-T1-FUNCTIONAL-01 closed task requires completed, signed evidence",
+            receipt["errors"],
+        )
+
+    def test_self_signed_unpromoted_task_rejected(self) -> None:
+        values = docs()
+        task = self._functional_task(values)
+        task["status"] = "landed_unpromoted"
+        task["completion_checkbox"] = False
+        task["completion_checkbox_mark"] = "[ ]"
+        task["implementation_signed"] = False
+        task["verification_signed"] = True
+        receipt = self.verify_docs(values)
+        self.assertFalse(receipt["valid"])
+        self.assertIn(
+            "P2-T1-FUNCTIONAL-01 unpromoted task must keep verification_signed false",
+            receipt["errors"],
+        )
+
+    def test_closed_task_rejects_missing_acceptance_workflow(self) -> None:
+        values = docs()
+        task = self._functional_task(values)
+        task["evidence_refs"] = [
+            ref for ref in task["evidence_refs"]
+            if not ref.startswith("workflow:P2 Functional AI Acceptance@")
+        ]
+        receipt = self.verify_docs(values)
+        self.assertFalse(receipt["valid"])
+        self.assertIn(
+            "P2-T1-FUNCTIONAL-01 lacks pinned independent acceptance evidence",
+            receipt["errors"],
+        )
+
+    def test_closed_task_rejects_unpinned_workflow(self) -> None:
+        values = docs()
+        task = self._functional_task(values)
+        task["evidence_refs"] = [
+            ref.replace("@c6e966454b6ecb1b2a8d8fe51ce3f752c507f29f:", "@"
+                        + "0" * 40 + ":")
+            if ref.startswith("workflow:P2 Functional AI Acceptance@") else ref
+            for ref in task["evidence_refs"]
+        ]
+        receipt = self.verify_docs(values)
+        self.assertFalse(receipt["valid"])
+        self.assertIn(
+            "P2-T1-FUNCTIONAL-01 lacks pinned independent acceptance evidence",
+            receipt["errors"],
+        )
+
+    def test_closed_task_rejects_missing_action_run(self) -> None:
+        values = docs()
+        task = self._functional_task(values)
+        task["evidence_refs"] = [
+            ref for ref in task["evidence_refs"]
+            if not ref.startswith("github-actions-run:")
+        ]
+        receipt = self.verify_docs(values)
+        self.assertFalse(receipt["valid"])
+        self.assertIn(
+            "P2-T1-FUNCTIONAL-01 lacks pinned independent acceptance evidence",
+            receipt["errors"],
+        )
+
+    def test_closed_task_rejects_duplicate_evidence(self) -> None:
+        values = docs()
+        task = self._functional_task(values)
+        task["evidence_refs"].append(task["evidence_refs"][0])
+        receipt = self.verify_docs(values)
+        self.assertFalse(receipt["valid"])
+        self.assertIn(
+            "P2-T1-FUNCTIONAL-01 evidence references must be unique non-empty text",
             receipt["errors"],
         )
 

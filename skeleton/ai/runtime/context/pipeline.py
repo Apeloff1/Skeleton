@@ -54,7 +54,8 @@ class GameForgeRun:
                 blend: Optional[tuple] = None,
                 generation: Optional[str] = None,
                 playtest: Optional[str] = None,
-                repair_mode: str = "apply") -> Dict[str, Any]:
+                repair_mode: str = "apply",
+                operator_tensor: Optional[ContextTensor] = None) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
 
         ``playtest``: ``None``/"off" (default, static checks only), "auto"
@@ -69,11 +70,27 @@ class GameForgeRun:
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
         cockpit = self.cockpit
+        # Freeze operator intent before stage execution. Implicit cockpit
+        # blending applies only when neither an explicit era nor questionnaire
+        # choices supersede it. Otherwise the declared input wins.
+        inherited_blend = (
+            tuple(cockpit.blend)
+            if blend is None and era is None and not answers and cockpit.blend
+            else None
+        )
+        effective_blend = blend if blend is not None else inherited_blend
+        if inherited_blend is not None and operator_tensor is None:
+            # A manual SET AXIS after BLEND must survive forge execution,
+            # including an operator ROLL ORACLE before the build.
+            operator_tensor = cockpit.tensor
+        taken = None
         if answers:
             from skeleton.context.questionnaire import intake
             taken = intake(answers)
             vision = vision or taken.vision
             era = era or taken.era
+            # Keep the questionnaire's nuanced axis votes through the tensor
+            # stage instead of resetting them to a generic era preset.
             cockpit.tensor = taken.tensor
         if generation is None:
             generation = getattr(cockpit, "generation", None)
@@ -89,7 +106,10 @@ class GameForgeRun:
                 "url": bound.get("url"),
                 "dialect": bound.get("dialect"),
             } if bound.get("hit") else None
-            era = era or str(bound.get("era") or era)
+            resolved_era = bound.get("era")
+            # A pinned cockpit or explicit blend outranks automatic reference inference.
+            if not era and not effective_blend and resolved_era:
+                era = str(resolved_era)
             extra = str(bound.get("dialect") or "")
             if extra and extra not in (vision or ""):
                 vision = f"{vision} {extra}".strip()
@@ -105,9 +125,17 @@ class GameForgeRun:
             "cockpit": cockpit,
             "forge": self.forge,
             "jeeves": self.jeeves,
-            "blend": blend,
+            "blend": effective_blend,
+            "blend_source": (
+                "argument" if blend is not None else
+                "cockpit" if inherited_blend is not None else "none"
+            ),
             "generation": generation,
             "reference": hit,
+            "intake_tensor": (
+                taken.tensor if taken is not None and era == taken.era and operator_tensor is None else None
+            ),
+            "operator_tensor": operator_tensor,
             "repair": True,
             "max_rounds": 3,
             "playtest_mode": playtest_mode,
@@ -126,6 +154,11 @@ class GameForgeRun:
             Stage("seal", _stage_seal),
         ]
         run = self.composer.execute("gameforge", stages, initial_context=ctx)
+        from skeleton.forge.source_manifest import source_manifest
+        generated = run.context.get("files") or {}
+        # A failed pipeline may have partial output. Never present its digest
+        # as a sealed, verified source manifest.
+        emitted_manifest = source_manifest(generated) if run.succeeded and generated else None
         payload = {
             "run": run.to_dict(),
             "succeeded": run.succeeded,
@@ -134,6 +167,7 @@ class GameForgeRun:
             "reference": (run.context.get("reference") or {}).get("title") if isinstance(run.context.get("reference"), dict) else None,
             "citation": (run.context.get("reference") or {}).get("citation") if isinstance(run.context.get("reference"), dict) else None,
             "stored_prose": 0,
+            "intake": taken.to_dict() if taken is not None else None,
             "mass": cockpit.snowball.mass,
             "complete": cockpit.snowball.complete,
             "tensor": cockpit.tensor.to_dict(),
@@ -160,8 +194,10 @@ class GameForgeRun:
             "G": ((run.context.get("cortex") or {}) or {}).get("G"),
             "law": ((run.context.get("cortex") or {}) or {}).get("law"),
             "files": run.context.get("files") or {},
+            "source_manifest": emitted_manifest,
             "sim": run.context.get("sim"),
             "project": run.context.get("project"),
+            "build_report": run.context.get("build_report"),
             "playtest": run.context.get("playtest"),
             "cortex_observe": run.context.get("cortex_observe"),
             "build_plan": (run.context.get("build_plan").to_dict()
@@ -206,9 +242,8 @@ def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
 def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
     blend = ctx.get("blend")
     cockpit: Cockpit = ctx["cockpit"]
-    if not blend and getattr(cockpit, "blend", None):
-        blend = cockpit.blend
-        ctx["blend"] = blend
+    # All operator/CLI precedence is resolved at execute() entry. Do not
+    # silently resurrect mutable cockpit blending inside an individual stage.
     from skeleton.forge.hardware import detect_generation
     if not ctx.get("generation"):
         cockpit_generation = getattr(cockpit, "generation", None)
@@ -245,13 +280,19 @@ def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
 def _stage_tensor(ctx: Dict[str, Any]) -> Dict[str, Any]:
     cockpit: Cockpit = ctx["cockpit"]
     blend = ctx.get("blend")
-    if blend and len(blend) >= 2:
+    operator = ctx.get("operator_tensor")
+    if operator is not None and operator.era == ctx["era"]:
+        # An explicitly selected era also uses this branch when the saved
+        # tensor refers to that era; otherwise it is never resurrected.
+        cockpit.tensor = operator
+    elif blend and len(blend) >= 2:
         t = float(blend[2]) if len(blend) > 2 else 0.5
         cockpit.tensor = ContextTensor.from_era(str(blend[0])).lerp(
             ContextTensor.from_era(str(blend[1])), t
         )
-        # keep the blended era label on the cube
         object.__setattr__(cockpit.tensor, "era", ctx["era"])
+    elif ctx.get("intake_tensor") is not None:
+        cockpit.tensor = ctx["intake_tensor"]
     else:
         cockpit.tensor = ContextTensor.from_era(ctx["era"])
     _commit(ctx, "tensor", ctx["era"], cockpit.tensor.fingerprint(), cockpit.tensor.as_dict())
@@ -383,27 +424,16 @@ def _stage_jeeves(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.forge.gdscript_check import check_ok
+    from skeleton.forge.source_manifest import source_manifest
+
     files = ctx.get("files") or {}
+    # Validate names in both API/in-memory and disk build modes, before any
+    # expensive engine checks or project publication.
+    source_manifest(files)
     ok, problems = check_ok(files)
     if not ok:
         raise RuntimeError("gdscript check failed: " + "; ".join(problems[:8]))
-    project = None
-    root = ctx.get("project_root")
-    if root:
-        from skeleton.forge.projector import write_project
-        import json
-        from pathlib import Path
-        project = write_project(
-            root, files, overwrite=bool(ctx.get("overwrite")),
-            meta={"era": ctx.get("era"), "dps": ctx.get("primary_dps")},
-        )
-        cockpit = ctx["cockpit"]
-        Path(root, "CONTEXT_LEDGER.json").write_text(
-            json.dumps(cockpit.ledger.to_dict(), indent=2, default=str), encoding="utf-8"
-        )
-        Path(root, "CONTEXT_TENSOR.json").write_text(
-            json.dumps(cockpit.tensor.to_dict(), indent=2), encoding="utf-8"
-        )
+    # A required Godot boot failure must never publish an unverified tree.
     played = None
     mode = ctx.get("playtest_mode") or "off"
     if mode != "off":
@@ -412,6 +442,14 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         if mode == "require" and not played.get("passed"):
             detail = "; ".join(played.get("errors") or []) or played.get("reason") or played.get("status")
             raise RuntimeError(f"playtest {played.get('status')}: {detail}"[:600])
+    project = None
+    root = ctx.get("project_root")
+    if root:
+        from skeleton.forge.projector import write_project
+        project = write_project(
+            root, files, overwrite=bool(ctx.get("overwrite")),
+            meta={"era": ctx.get("era"), "dps": ctx.get("primary_dps")},
+        )
     _commit(ctx, "emit", ctx["era"], f"{len(files)} files", {
         "file_count": len(files),
         "root": None if not project else project["root"],
@@ -421,12 +459,112 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     return {"emitted": True, "project": project, "check_ok": True, "playtest": played}
 
 
+def _publish_build_evidence(root, documents: Dict[str, str]) -> None:
+    """Publish the final three receipt files without following output symlinks.
+
+    All documents are serialized before writing; staging keeps partial
+    serialization failures out of the project. Per-file os.replace does not
+    traverse an existing link at the destination.
+    """
+    import os
+    import shutil
+    import tempfile
+    from pathlib import Path
+
+    root = Path(root)
+    fixed = {"CONTEXT_LEDGER.json", "CONTEXT_TENSOR.json", "build_report.md"}
+    if set(documents) != fixed:
+        raise ValueError("unexpected final-evidence path set")
+    if root.is_symlink() or not root.is_dir():
+        raise ValueError("final evidence project root must be a real directory")
+    if any((root / name).is_symlink() for name in fixed):
+        raise ValueError("final evidence destination is a symlink")
+    stage = Path(tempfile.mkdtemp(prefix=".gameforge-evidence-", dir=root))
+    try:
+        for name, body in documents.items():
+            if not isinstance(body, str):
+                raise ValueError("evidence must be UTF-8 text")
+            (stage / name).write_text(body, encoding="utf-8")
+        for name in sorted(fixed):
+            os.replace(stage / name, root / name)
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
 def _stage_seal(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Seal the ledger and only then persist final build provenance.
+
+    The emit stage cannot write a *final* ledger: the seal block and final mass
+    do not exist yet. A corrupt ledger is an actual failed stage, never a
+    successful response containing `sealed=False`.
+    """
     cockpit: Cockpit = ctx["cockpit"]
     problems = cockpit.ledger.verify()
-    _commit(ctx, "seal", "operator", "sealed" if not problems else "invalid",
-            {"valid": not problems, "problems": problems, "mass": cockpit.snowball.mass})
-    return {"sealed": not problems, "ledger_problems": problems}
+    if problems:
+        raise RuntimeError("pre-seal ledger verification failed: " + "; ".join(problems[:8]))
+    _commit(ctx, "seal", "operator", "sealed",
+            {"valid": True, "problems": [], "mass_before_seal": cockpit.snowball.mass})
+    problems = cockpit.ledger.verify()
+    if problems:
+        raise RuntimeError("post-seal ledger verification failed: " + "; ".join(problems[:8]))
+    build_report = None
+    project = ctx.get("project")
+    if project:
+        import json
+        from pathlib import Path
+        from skeleton.forge.source_manifest import source_manifest
+
+        root = Path(project["root"])
+        ledger = cockpit.ledger.to_dict()
+        tensor = cockpit.tensor.to_dict()
+        # Serialize the final ledger and tensor, then publish all receipts
+        # together after the report has been computed and validated.
+        raw_plan = ctx.get("build_plan")
+        plan = raw_plan.to_dict() if hasattr(raw_plan, "to_dict") else (raw_plan or {})
+        if not isinstance(plan, dict):
+            plan = {}
+        seed = plan.get("seed")
+        oracle = ctx.get("oracle_text")
+        raw_field = ctx.get("field_pct")
+        field = (f"{raw_field:.2f}%" if isinstance(raw_field, (int, float))
+                 and not isinstance(raw_field, bool) and 0 <= raw_field <= 100
+                 else "unmeasured (no verified field metric in this pipeline)")
+        # Exactly the same source digest as CLI, API and FORGE_MANIFEST.
+        files = ctx.get("files") or {}
+        manifest_sha = source_manifest(files)["sha256"]
+        sim = ctx.get("sim") or {}
+        playtest = ctx.get("playtest") or {}
+        content = "\n".join([
+            "# GameForge build report", "",
+            f"- Era: {ctx.get('era') or 'not resolved'}",
+            f"- Build seed: {seed if seed is not None else 'not recorded'}",
+            f"- Rotor/oracle cue: {str(oracle or 'not recorded').replace(chr(10), ' ')[:160]}",
+            f"- Conserved stage mass: {cockpit.snowball.mass:.6f}",
+            f"- Field coverage: {field}",
+            f"- Door graph simulation: {'passed' if sim.get('passed') else 'not passed'}",
+            f"- Godot playtest: {playtest.get('status') or 'not requested'}",
+            f"- Generated source files: {len(files)}",
+            f"- Source manifest SHA-256: `{manifest_sha}`",
+            f"- Ledger height: {cockpit.ledger.height}",
+            f"- Ledger head SHA-256: `{cockpit.ledger.head.hash}`",
+            "",
+            "This report records pipeline results, not a manual gameplay QA signoff.",
+            "An unmeasured metric does not establish its acceptance gate.",
+            "",
+        ])
+        destination = root / "build_report.md"
+        _publish_build_evidence(root, {
+            "CONTEXT_LEDGER.json": json.dumps(ledger, indent=2, default=str),
+            "CONTEXT_TENSOR.json": json.dumps(tensor, indent=2),
+            "build_report.md": content,
+        })
+        build_report = {
+            "path": str(destination),
+            "manifest_sha256": manifest_sha,
+            "ledger_head": cockpit.ledger.head.hash,
+            "mass": cockpit.snowball.mass,
+        }
+    return {"sealed": True, "ledger_problems": [], "build_report": build_report}
 
 
 def _stage_sim(ctx: Dict[str, Any]) -> Dict[str, Any]:

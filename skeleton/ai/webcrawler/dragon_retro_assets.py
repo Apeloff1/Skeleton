@@ -96,13 +96,16 @@ def nes_assembly() -> str:
     return "\n".join(out)
 
 def enrich_gb_asm(source:str) -> str:
-    if not isinstance(source,str):raise ValueError("GB source required")
-    source,n=re.subn(r"(?s)Tiles:\n.*?\nTilesEnd:",gb_assembly(),source)
-    if n!=1:raise ValueError("GB tile section missing")
-    # Blinking sprite indexes alternate idle/blink, under VBlank OAM refresh.
-    before="""    xor a
-    ld [OAM+2], a
-    ld [OAM+3], a"""
+    if not isinstance(source,str):
+        raise ValueError("GB source required")
+    source,n=re.subn(r"(?s)Tiles:\n.*?\nTilesEnd:",lambda _:gb_assembly(),source)
+    if n!=1:
+        raise ValueError("GB tile section missing")
+    # Source generators use both 'ld [OAM+2],a' and 'ld [OAM+2], a'.
+    # Parse the SM83 instruction boundary, not incidental whitespace.
+    pattern=(r"(?m)^    xor a\s*\n"
+             r"    ld \[OAM\+2\],\s*a\s*\n"
+             r"    ld \[OAM\+3\],\s*a$")
     after="""    ld hl, AnimFrame
     inc [hl]
     ld a, [hl]
@@ -116,19 +119,22 @@ def enrich_gb_asm(source:str) -> str:
     ld [OAM+2], a
     xor a
     ld [OAM+3], a"""
-    if before not in source:raise ValueError("GB sprite update anchor unavailable")
-    source=source.replace(before,after)
-    if "PlayerY: ds 1" not in source:raise ValueError("GB WRAM declaration missing")
-    source=source.replace("PlayerY: ds 1","PlayerY: ds 1\nAnimFrame: ds 1")
+    source,count=re.subn(pattern,lambda _:after,source,count=1)
+    if count!=1:
+        raise ValueError("GB sprite update anchor unavailable")
+    if "PlayerY: ds 1" not in source:
+        raise ValueError("GB WRAM declaration missing")
+    source=source.replace("PlayerY: ds 1","PlayerY: ds 1\nAnimFrame: ds 1",1)
     if "    ld a, 48\n    ld [PlayerX], a" not in source:
         raise ValueError("GB boot sequence missing")
     source=source.replace("    ld a, 48\n    ld [PlayerX], a",
-                          "    xor a\n    ld [AnimFrame], a\n    ld a, 48\n    ld [PlayerX], a")
-    # Star tile moved to index 4.
-    if "    ld a, 1\n    ld [OAM+6], a" not in source:
+                          "    xor a\n    ld [AnimFrame], a\n    ld a, 48\n    ld [PlayerX], a",1)
+    source,count=re.subn(
+        r"(?m)^    ld a,\s*1\n    ld \[OAM\+6\],\s*a$",
+        "    ld a, 4\n    ld [OAM+6], a",source,count=1)
+    if count!=1:
         raise ValueError("GB collectible sprite declaration missing")
-    return source.replace("    ld a, 1\n    ld [OAM+6], a",
-                          "    ld a, 4\n    ld [OAM+6], a")
+    return source
 
 def enrich_nes_asm(source:str) -> str:
     if not isinstance(source,str):raise ValueError("NES source required")

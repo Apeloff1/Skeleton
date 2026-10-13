@@ -36,7 +36,7 @@ def test_scrolling_platformer_has_real_ppu_camera_timing_collision_and_jump():
     assert "CollectStar:" in src
     assert "HasGroundSupport:" in src
     assert "    ld a,72 ; first platform, y104" in src
-    assert "    ld [OAM+6],a" in src
+    assert "    ld [DRAGON_OAM+6],a" in src
     assert "PlayerWorldX: ds 1" in src
     assert "PlatformTilesEnd:" in src
     assert "CMakeLists.txt" not in p.files
@@ -49,7 +49,16 @@ def test_catalog_exposes_only_real_gb_platformer_support():
     by_id={t["id"]:t for t in target_catalog()}
     assert "side_scrolling_platformer" in by_id["game_boy"]["supported_styles"]
     assert "side_scrolling_platformer" not in by_id["game_boy_color"]["supported_styles"]
-    assert "side_scrolling_platformer" not in by_id["nes"]["supported_styles"]
+    assert "side_scrolling_platformer" in by_id["nes"]["supported_styles"]
+    # The NES generator now has its own scrolling camera/physics implementation.
+    nes=render_native_project(
+        title="Original NES Jump Quest",target_id="nes",
+        style="side_scrolling_platformer",
+        candidate_id=sha256(b"nes-scroller-platform-support").hexdigest(),
+        mechanics=(Mechanic.MOVEMENT,Mechanic.PLATFORMING),authorized=True)
+    assert "nes_horizontal_scroll_platformer" in nes.files["dragon-native-manifest.json"]
+    assert "src/main.s" in nes.files
+    assert "nes"==nes.output
 
 
 def test_native_scrolling_cartridge_compile_when_rgbds_available(tmp_path):

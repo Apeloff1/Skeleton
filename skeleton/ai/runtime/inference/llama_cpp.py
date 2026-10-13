@@ -9,7 +9,7 @@ and strips hosted-provider/proxy credentials from the child environment.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import hashlib
 import json
 import math
@@ -23,7 +23,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from skeleton.skills.tool_contract import (
     ToolContractError,
@@ -249,10 +249,249 @@ class LlamaCppConfig:
         object.__setattr__(self, "environment", normalized_env)
 
 
-def _sha256_file(path: Path) -> str:
+@dataclass(frozen=True, slots=True)
+class ConsumerHardwareBudget:
+    """Explicit RAM and KV budget for an offline quantized GGUF deployment.
+
+    kv_bytes_per_token MUST be supplied from the specific model/selected KV
+    representation. GGUF file size alone cannot determine attention memory.
+    ram_bytes is the operator's *available* machine/cgroup memory, not a
+    machine-class guess, and GPU offloading remains an independent backend
+    concern. This is conservative admission planning, not an OOM guarantee.
+    """
+
+    ram_bytes: int
+    physical_cpu_cores: int
+    kv_bytes_per_token: int
+    target_context_tokens: int = 4096
+    reserve_bytes: int = 512 * 1024 * 1024
+    runtime_scratch_bytes: int = 512 * 1024 * 1024
+    max_decode_threads: int = 16
+    prefill_batch_tokens: int = 256
+
+    def __post_init__(self) -> None:
+        for name in (
+            "ram_bytes", "physical_cpu_cores", "kv_bytes_per_token",
+            "target_context_tokens", "max_decode_threads", "prefill_batch_tokens",
+        ):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        for name in ("reserve_bytes", "runtime_scratch_bytes"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{name} must be non-negative")
+        if not 128 <= self.target_context_tokens <= 1_048_576:
+            raise ValueError("target_context_tokens outside llama.cpp bounds")
+
+
+@dataclass(frozen=True, slots=True)
+class ConsumerLlamaPlan:
+    """Auditable configuration chosen without claiming to measure performance."""
+
+    configuration: LlamaCppConfig
+    model_bytes: int
+    reserved_ram_bytes: int
+    reserved_kv_bytes: int
+    estimated_total_bytes: int
+    available_ram_bytes: int
+    context_clamped: bool
+
+
+def estimate_gqa_kv_bytes_per_token(
+    *,
+    layers: int,
+    query_heads: int,
+    kv_heads: int,
+    key_head_dim: int,
+    value_head_dim: int,
+    key_bytes_per_element: int = 2,
+    value_bytes_per_element: int = 2,
+) -> int:
+    """Exact logical K/V tensor bytes per token from known model geometry.
+
+    Supports multi-head (kv_heads=query_heads), grouped-query and multi-query
+    attention. It deliberately excludes allocator padding, paging overhead and
+    backend scratch; the consumer RAM planner reserves those separately.
+    It is not correct to infer KV geometry from GGUF file size alone.
+    """
+    fields = {
+        "layers": layers,
+        "query_heads": query_heads,
+        "kv_heads": kv_heads,
+        "key_head_dim": key_head_dim,
+        "value_head_dim": value_head_dim,
+        "key_bytes_per_element": key_bytes_per_element,
+        "value_bytes_per_element": value_bytes_per_element,
+    }
+    for name, value in fields.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0 or value > 65536:
+            raise ValueError(f"{name} must be a bounded positive integer")
+    if kv_heads > query_heads or query_heads % kv_heads:
+        raise ValueError("query head count must be divisible by KV head count")
+    if key_bytes_per_element > 8 or value_bytes_per_element > 8:
+        raise ValueError("KV element width must be <= 8 bytes")
+    return layers * kv_heads * (
+        key_head_dim * key_bytes_per_element
+        + value_head_dim * value_bytes_per_element
+    )
+
+
+def detect_consumer_hardware_budget(
+    *,
+    kv_bytes_per_token: int,
+    target_context_tokens: int = 4096,
+    available_ram_bytes: int | None = None,
+    physical_cpu_cores: int | None = None,
+) -> ConsumerHardwareBudget:
+    """Conservatively probe an offline host; fail rather than invent capacity.
+
+    psutil, when installed, works on Windows, macOS and Linux. On Linux
+    /proc/meminfo and /proc/cpuinfo allow a standard-library-only fallback.
+    Cgroup v2 memory and CPU quotas and process affinity tighten the budget.
+    Optional explicit overrides support constrained and headless deployments.
+    """
+    def positive(value: object, name: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise LlamaCppRuntimeError(f"invalid detected {name}")
+        return value
+
+    memory = available_ram_bytes
+    cores = physical_cpu_cores
+    if memory is None or cores is None:
+        try:
+            import psutil  # type: ignore[import-not-found]  # optional host probe
+        except ImportError:
+            psutil = None
+        if psutil is not None:
+            if memory is None:
+                memory = int(psutil.virtual_memory().available)
+            if cores is None:
+                detected = psutil.cpu_count(logical=False)
+                cores = int(detected) if detected else None
+    if memory is None:
+        try:
+            for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+                if line.startswith("MemAvailable:"):
+                    memory = int(line.split()[1]) * 1024
+                    break
+        except (OSError, ValueError, IndexError):
+            pass
+    if cores is None:
+        try:
+            pairs = set()
+            physical = logical_core = None
+            for line in Path("/proc/cpuinfo").read_text(encoding="ascii").splitlines() + [""]:
+                if not line.strip():
+                    if physical is not None and logical_core is not None:
+                        pairs.add((physical, logical_core))
+                    physical = logical_core = None
+                elif line.startswith("physical id"):
+                    physical = line.split(":", 1)[1].strip()
+                elif line.startswith("core id"):
+                    logical_core = line.split(":", 1)[1].strip()
+            if pairs:
+                cores = len(pairs)
+        except (OSError, ValueError, IndexError):
+            pass
+    if memory is None or cores is None:
+        raise LlamaCppRuntimeError(
+            "cannot determine available RAM and physical cores; provide explicit values"
+        )
+    memory = positive(memory, "available RAM")
+    cores = positive(cores, "physical CPU count")
+
+    # Linux containers may see the entire host's RAM from psutil or /proc.
+    # The effective budget cannot exceed unallocated cgroup allowance.
+    cgroup = Path("/sys/fs/cgroup")
+    try:
+        max_text = (cgroup / "memory.max").read_text(encoding="ascii").strip()
+        if max_text != "max":
+            mem_limit = int(max_text)
+            mem_current = int((cgroup / "memory.current").read_text(encoding="ascii"))
+            if mem_limit <= 0 or mem_current < 0:
+                raise LlamaCppRuntimeError("invalid cgroup memory accounting")
+            memory = min(memory, max(0, mem_limit - mem_current))
+    except (OSError, ValueError):
+        pass
+    # Container CPU quotas can be smaller than visible physical core count.
+    try:
+        if hasattr(os, "sched_getaffinity"):
+            cores = min(cores, len(os.sched_getaffinity(0)))
+    except OSError:
+        pass
+    try:
+        quota_text, period_text = (cgroup / "cpu.max").read_text(encoding="ascii").split()
+        if quota_text != "max":
+            quota, period = int(quota_text), int(period_text)
+            if quota <= 0 or period <= 0:
+                raise LlamaCppRuntimeError("invalid cgroup CPU quota")
+            cores = min(cores, max(1, (quota + period - 1) // period))
+    except (OSError, ValueError):
+        pass
+    return ConsumerHardwareBudget(
+        ram_bytes=positive(memory, "effective available RAM"),
+        physical_cpu_cores=positive(cores, "effective CPU cores"),
+        kv_bytes_per_token=kv_bytes_per_token,
+        target_context_tokens=target_context_tokens,
+    )
+
+
+def plan_consumer_llama_cpp(
+    config: LlamaCppConfig,
+    budget: ConsumerHardwareBudget,
+    *,
+    model_bytes: int,
+) -> ConsumerLlamaPlan:
+    """Choose context, batch and CPU threads before launching llama.cpp.
+
+    Reserves 20% RAM or the explicit floor for the OS, then charges full GGUF
+    bytes, configured scratch headroom and model-specific KV requirements.
+    Does not fabricate a GPU layer split, infer quantization from file size,
+    or promise that a backend will actually fit (other buffers may exist).
+    """
+    if not isinstance(config, LlamaCppConfig):
+        raise TypeError("config must be LlamaCppConfig")
+    if not isinstance(budget, ConsumerHardwareBudget):
+        raise TypeError("budget must be ConsumerHardwareBudget")
+    if isinstance(model_bytes, bool) or not isinstance(model_bytes, int) or model_bytes <= 0:
+        raise ValueError("model_bytes must be positive")
+    reserved = max(budget.reserve_bytes, budget.ram_bytes // 5)
+    fixed = reserved + budget.runtime_scratch_bytes + model_bytes
+    available_for_kv = budget.ram_bytes - fixed
+    minimum_kv = budget.kv_bytes_per_token * 128
+    if available_for_kv < minimum_kv:
+        raise LlamaCppRuntimeError(
+            "GGUF weights, KV cache and runtime headroom exceed consumer RAM budget"
+        )
+    requested = config.context_size or budget.target_context_tokens
+    possible = min(requested, available_for_kv // budget.kv_bytes_per_token)
+    context = (possible // 128) * 128
+    if context < 128:
+        raise LlamaCppRuntimeError("consumer RAM budget cannot support minimum context")
+    threads = min(config.threads or budget.physical_cpu_cores,
+                  budget.physical_cpu_cores, budget.max_decode_threads)
+    batch = min(config.batch_size or budget.prefill_batch_tokens,
+                budget.prefill_batch_tokens, context)
+    chosen = replace(config, context_size=context, threads=threads, batch_size=batch)
+    kv_total = context * budget.kv_bytes_per_token
+    return ConsumerLlamaPlan(
+        configuration=chosen,
+        model_bytes=model_bytes,
+        reserved_ram_bytes=reserved,
+        reserved_kv_bytes=kv_total,
+        estimated_total_bytes=fixed + kv_total,
+        available_ram_bytes=budget.ram_bytes,
+        context_clamped=context < requested,
+    )
+
+
+def _sha256_file(path: Path, *, interrupt: Callable[[], None] | None = None) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            if interrupt is not None:
+                interrupt()
             digest.update(chunk)
     return digest.hexdigest()
 
@@ -364,6 +603,25 @@ class LlamaCppModel:
         return self._runtime.sha256
 
     @property
+    def execution_profile_digest(self) -> str:
+        """Bind decoding/resource policy without changing executable identity."""
+        return _digest({
+            "schema": "skeleton.llama-cpp.execution-profile.v1",
+            "runtime": self.runtime_digest,
+            "model": self.model_digest,
+            "context_size": self.config.context_size,
+            "threads": self.config.threads,
+            "batch_size": self.config.batch_size,
+            "gpu_layers": self.config.gpu_layers,
+            "temperature": float(self.config.temperature),
+            "extra_args": list(self.config.extra_args),
+            "timeout_seconds": float(self.config.timeout_seconds),
+            "max_output_bytes": self.config.max_output_bytes,
+            "max_stderr_bytes": self.config.max_stderr_bytes,
+            "environment_digest": _digest(self._effective_environment()),
+        })
+
+    @property
     def model_artifact(self) -> ArtifactIdentity:
         return self._model
 
@@ -375,17 +633,25 @@ class LlamaCppModel:
     def gguf_header(self) -> GgufHeader:
         return self._gguf_header
 
-    def _assert_artifacts_stable(self) -> None:
+    def _assert_artifacts_stable(self, *, interrupt: Callable[[], None] | None = None) -> None:
         for label, identity in (("runtime", self._runtime), ("model", self._model)):
+            if interrupt is not None:
+                interrupt()
             if not _stat_matches(identity):
                 raise LlamaCppRuntimeError(f"{label} artifact identity changed")
             if self.config.rehash_artifacts_each_run:
-                observed = _sha256_file(Path(identity.path))
+                observed = _sha256_file(Path(identity.path), interrupt=interrupt)
                 if observed != identity.sha256:
                     raise LlamaCppRuntimeError(f"{label} artifact digest changed")
+                if not _stat_matches(identity):
+                    raise LlamaCppRuntimeError(f"{label} artifact changed during admission")
         observed_header = inspect_gguf(Path(self._model.path))
         if observed_header != self._gguf_header:
             raise LlamaCppRuntimeError("GGUF fixed header changed")
+
+    def assert_identity(self) -> None:
+        """Admit cached answers against the same artifact policy as execution."""
+        self._assert_artifacts_stable()
 
     def _render_prompt(self, request: LocalInferenceRequest) -> str:
         prompt = request.rendered_input
@@ -399,10 +665,14 @@ class LlamaCppModel:
                 + "Do not include markdown fences or prose outside the JSON object."
             )
         allowed: list[dict[str, Any]] = []
+        seen_tool_ids: set[str] = set()
         for item in request.tools:
             tool_id = str(item.get("tool_id", "")).strip()
             if not tool_id:
                 raise LlamaCppRuntimeError("local tool schema missing tool_id")
+            if tool_id in seen_tool_ids:
+                raise LlamaCppRuntimeError("duplicate local tool_id")
+            seen_tool_ids.add(tool_id)
             allowed.append({
                 "tool_id": tool_id,
                 "description": str(item.get("description", "")),
@@ -533,7 +803,7 @@ class LlamaCppModel:
         command.extend(self.config.extra_args)
         return command
 
-    def _child_environment(self, temp_dir: Path) -> dict[str, str]:
+    def _effective_environment(self) -> dict[str, str]:
         env = {
             key: value for key, value in os.environ.items()
             if key in _INHERITED_ENV_ALLOWLIST
@@ -541,6 +811,12 @@ class LlamaCppModel:
             and key not in _PROXY_NAMES
         }
         env.update(dict(self.config.environment))
+        for key in _PROVIDER_SECRET_NAMES | _PROXY_NAMES:
+            env.pop(key, None)
+        return env
+
+    def _child_environment(self, temp_dir: Path) -> dict[str, str]:
+        env = self._effective_environment()
         env["HOME"] = str(temp_dir)
         env["TMPDIR"] = str(temp_dir)
         env["SKELETON_LOCAL_MODEL_NETWORK"] = "disabled"
@@ -576,6 +852,25 @@ class LlamaCppModel:
         except subprocess.TimeoutExpired:
             pass
 
+    @staticmethod
+    def _load_protocol_json(text: str) -> Any:
+        def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            result: dict[str, Any] = {}
+            for key, value in pairs:
+                if key in result:
+                    raise LlamaCppRuntimeError("duplicate JSON key in local model output")
+                result[key] = value
+            return result
+
+        def reject_constant(value: str) -> None:
+            raise LlamaCppRuntimeError("non-finite JSON constant in local model output")
+
+        try:
+            return json.loads(text, object_pairs_hook=unique_object,
+                              parse_constant=reject_constant)
+        except (json.JSONDecodeError, RecursionError) as exc:
+            raise LlamaCppRuntimeError("local model output is not valid bounded JSON") from exc
+
     def _parse_output(
         self, raw: str, request: LocalInferenceRequest,
     ) -> tuple[str | None, tuple[LocalToolCall, ...], Mapping[str, Any] | None, str]:
@@ -588,10 +883,17 @@ class LlamaCppModel:
         }
         if text.startswith("{"):
             try:
-                payload = json.loads(text)
-            except json.JSONDecodeError:
+                payload = self._load_protocol_json(text)
+            except LlamaCppRuntimeError:
+                if request.tools or request.structured_output_schema is not None:
+                    raise
                 payload = None
-            if isinstance(payload, dict) and payload.get("skeleton_local_response") == 1:
+            if isinstance(payload, dict) and "skeleton_local_response" in payload:
+                version = payload["skeleton_local_response"]
+                if type(version) is not int or version != 1:
+                    raise LlamaCppRuntimeError("unsupported local response protocol version")
+                if set(payload) - {"skeleton_local_response", "text", "tool_calls", "structured_output"}:
+                    raise LlamaCppRuntimeError("unsupported field in local response envelope")
                 raw_calls = payload.get("tool_calls", [])
                 if not isinstance(raw_calls, list):
                     raise LlamaCppRuntimeError("tool_calls envelope must be a list")
@@ -599,8 +901,12 @@ class LlamaCppModel:
                 for raw_call in raw_calls:
                     if not isinstance(raw_call, dict):
                         raise LlamaCppRuntimeError("local tool call must be an object")
-                    call_id = str(raw_call.get("call_id", "")).strip()
-                    tool_id = str(raw_call.get("tool_id", "")).strip()
+                    if set(raw_call) != {"call_id", "tool_id", "arguments"}:
+                        raise LlamaCppRuntimeError("invalid local tool call fields")
+                    if not isinstance(raw_call["call_id"], str) or not isinstance(raw_call["tool_id"], str):
+                        raise LlamaCppRuntimeError("local tool identifiers must be strings")
+                    call_id = raw_call["call_id"].strip()
+                    tool_id = raw_call["tool_id"].strip()
                     arguments = raw_call.get("arguments", {})
                     if not call_id:
                         raise LlamaCppRuntimeError("local tool call missing call_id")
@@ -612,6 +918,8 @@ class LlamaCppModel:
                 payload_text = payload.get("text")
                 if payload_text is not None and not isinstance(payload_text, str):
                     raise LlamaCppRuntimeError("local response text must be text or null")
+                if isinstance(payload_text, str) and not payload_text.strip():
+                    raise LlamaCppRuntimeError("local response text cannot be empty")
                 structured = payload.get("structured_output")
                 if structured is not None and not isinstance(structured, dict):
                     raise LlamaCppRuntimeError("structured_output must be an object")
@@ -634,8 +942,8 @@ class LlamaCppModel:
                 return payload_text, tuple(calls), structured, "tool_calls" if calls else "completed"
         if request.structured_output_schema is not None:
             try:
-                structured_payload = json.loads(text)
-            except json.JSONDecodeError as exc:
+                structured_payload = self._load_protocol_json(text)
+            except LlamaCppRuntimeError as exc:
                 raise LlamaCppRuntimeError(
                     "local structured output is not valid JSON"
                 ) from exc
@@ -663,9 +971,19 @@ class LlamaCppModel:
             raise TypeError("cancel must be threading.Event")
         if cancel.is_set():
             raise LocalInferenceCancelled("local generation cancelled before launch")
-        self._assert_artifacts_stable()
         started = time.monotonic()
+
+        def interrupt() -> None:
+            if cancel.is_set():
+                raise LocalInferenceCancelled("local generation cancelled")
+            if time.monotonic() - started >= float(self.config.timeout_seconds):
+                raise TimeoutError("local llama.cpp request exceeded its wall-time budget")
+
+        self._assert_artifacts_stable(interrupt=interrupt)
+        execution_profile = self.execution_profile_digest
         rendered_prompt = self._render_prompt(request)
+        if len(rendered_prompt.encode("utf-8")) > 4 * 1024 * 1024:
+            raise LlamaCppRuntimeError("rendered local prompt exceeds 4 MiB")
 
         with tempfile.TemporaryDirectory(prefix="skeleton-llama-") as temp_name:
             temp_dir = Path(temp_name)
@@ -694,8 +1012,11 @@ class LlamaCppModel:
                 request,
                 schema_file=schema_file,
             )
-            if any(request.prompt in arg for arg in command):
-                raise LlamaCppRuntimeError("prompt text leaked into process argv")
+            # Prompt content reaches the child only through the private file.
+            # Substring searches of argv falsely reject legitimate short
+            # prompts that happen to occur in an executable path or flag.
+            if cancel.is_set():
+                raise LocalInferenceCancelled("local generation cancelled before launch")
 
             with stdout_file.open("wb") as stdout_handle, stderr_file.open("wb") as stderr_handle:
                 process = subprocess.Popen(
@@ -706,24 +1027,45 @@ class LlamaCppModel:
                 timed_out = False
                 output_overflow = False
                 stderr_overflow = False
-                while process.poll() is None:
-                    if cancel.is_set():
-                        self._terminate(process)
-                        raise LocalInferenceCancelled("local generation cancelled")
-                    if time.monotonic() - started > float(self.config.timeout_seconds):
-                        timed_out = True
-                        self._terminate(process)
-                        break
-                    if stdout_file.stat().st_size > self.config.max_output_bytes:
-                        output_overflow = True
-                        self._terminate(process)
-                        break
-                    if stderr_file.stat().st_size > self.config.max_stderr_bytes:
-                        stderr_overflow = True
-                        self._terminate(process)
-                        break
-                    time.sleep(0.01)
-                return_code = process.wait()
+                stop_output_end: int | None = None
+                stop_markers = tuple(marker.encode("utf-8") for marker in request.stop)
+                stop_tail = b""
+                stop_scanned = 0
+                tail_size = max((len(marker) - 1 for marker in stop_markers), default=0)
+                try:
+                    while process.poll() is None:
+                        if cancel.is_set():
+                            raise LocalInferenceCancelled("local generation cancelled")
+                        if time.monotonic() - started > float(self.config.timeout_seconds):
+                            timed_out = True
+                            break
+                        if stdout_file.stat().st_size > self.config.max_output_bytes:
+                            output_overflow = True
+                            break
+                        if stderr_file.stat().st_size > self.config.max_stderr_bytes:
+                            stderr_overflow = True
+                            break
+                        if stop_markers:
+                            with stdout_file.open("rb") as output_reader:
+                                output_reader.seek(stop_scanned)
+                                chunk = output_reader.read(65536)
+                            if chunk:
+                                candidate = stop_tail + chunk
+                                matches = [candidate.find(marker) for marker in stop_markers]
+                                matches = [offset for offset in matches if offset >= 0]
+                                if matches:
+                                    stop_output_end = stop_scanned - len(stop_tail) + min(matches)
+                                    break
+                                stop_scanned += len(chunk)
+                                stop_tail = candidate[-tail_size:] if tail_size else b""
+                        cancel.wait(0.01)
+                finally:
+                    # Filesystem errors and interrupted callers must release
+                    # the child just as cancellation and output limits do.
+                    self._terminate(process)
+                return_code = process.poll()
+                if return_code is None:
+                    raise LlamaCppRuntimeError("local runtime could not be terminated")
                 stdout_handle.flush()
                 stderr_handle.flush()
 
@@ -733,24 +1075,44 @@ class LlamaCppModel:
                 raise LlamaCppRuntimeError("local runtime stdout exceeded configured bound")
             if stderr_overflow:
                 raise LlamaCppRuntimeError("local runtime stderr exceeded configured bound")
-            stdout_bytes = stdout_file.read_bytes()
-            stderr_bytes = stderr_file.read_bytes()
+            if cancel.is_set():
+                raise LocalInferenceCancelled("local generation cancelled")
+            # A fast producer can grow past the polling threshold before
+            # termination. Never allocate that entire file into memory.
+            with stdout_file.open("rb") as handle:
+                stdout_bytes = handle.read(self.config.max_output_bytes + 1)
+            with stderr_file.open("rb") as handle:
+                stderr_bytes = handle.read(self.config.max_stderr_bytes + 1)
             if len(stdout_bytes) > self.config.max_output_bytes:
                 raise LlamaCppRuntimeError("local runtime stdout exceeded configured bound")
             if len(stderr_bytes) > self.config.max_stderr_bytes:
                 raise LlamaCppRuntimeError("local runtime stderr exceeded configured bound")
-            if return_code != 0:
+            if return_code != 0 and stop_output_end is None:
                 diagnostic = stderr_bytes.decode("utf-8", errors="replace").strip()[-4096:]
                 raise LlamaCppRuntimeError(f"local runtime exited with code {return_code}: {diagnostic}")
 
-            self._assert_artifacts_stable()
-            raw = stdout_bytes.decode("utf-8", errors="strict")
+            self._assert_artifacts_stable(interrupt=interrupt)
+            if self.execution_profile_digest != execution_profile:
+                raise LlamaCppRuntimeError("local execution policy changed during generation")
+            visible_bytes = (stdout_bytes if stop_output_end is None
+                             else stdout_bytes[:stop_output_end])
+            raw = visible_bytes.decode("utf-8", errors="strict")
+            if request.stop:
+                matches = [raw.find(marker) for marker in request.stop]
+                matches = [position for position in matches if position >= 0]
+                if matches:
+                    raw = raw[:min(matches)]
             text, tool_calls, structured, finish_reason = self._parse_output(raw, request)
+            input_estimate = _approx_tokens(rendered_prompt)
+            output_estimate = _approx_tokens(raw)
+            if cancel.is_set():
+                raise LocalInferenceCancelled("local generation cancelled")
             response_digest = _digest({
                 "runtime": self.runtime_digest,
                 "model": self.model_digest,
                 "request": request.digest,
                 "stdout": hashlib.sha256(stdout_bytes).hexdigest(),
+                "execution_profile": execution_profile,
             })[:32]
             response_id = (
                 "local:llama:"
@@ -760,37 +1122,29 @@ class LlamaCppModel:
                 + ":"
                 + response_digest
             )
-            # Local execution evidence binds the exact admitted artifacts,
-            # request and process output. This is an integrity checksum, not
-            # independent verification or authorization for side effects.
-            execution_receipt_digest = _digest({
-                "schema": "skeleton.local_execution_receipt.v1",
-                "runtime_sha256": self.runtime_digest,
-                "model_sha256": self.model_digest,
-                "request_digest": request.digest,
-                "stdout_sha256": hashlib.sha256(stdout_bytes).hexdigest(),
-                "finish_reason": finish_reason,
-                "input_tokens": _approx_tokens(rendered_prompt),
-                "output_tokens": _approx_tokens(text or ""),
-                "tool_calls": [
-                    {
-                        "call_id": call.call_id,
-                        "tool_id": call.tool_id,
-                        "arguments": dict(call.arguments),
-                    }
-                    for call in tool_calls
-                ],
-                "structured_output": structured,
-            })
             return LocalInferenceResult(
                 text=text,
-                execution_receipt_digest=execution_receipt_digest,
                 model_id=self.model_id,
                 model_digest=self.model_digest,
-                input_tokens=_approx_tokens(rendered_prompt),
-                output_tokens=_approx_tokens(text or ""),
+                input_tokens=input_estimate,
+                output_tokens=output_estimate,
                 finish_reason=finish_reason,
                 response_id=response_id,
+                execution_receipt_digest=_digest({
+                    "schema": "skeleton.llama-cpp.execution-receipt.v1",
+                    "request": request.digest,
+                    "execution_profile": execution_profile,
+                    "response_id": response_id,
+                    "text": text,
+                    "tool_calls": [
+                        {"call_id": call.call_id, "tool_id": call.tool_id,
+                         "arguments": dict(call.arguments)} for call in tool_calls
+                    ],
+                    "structured_output": structured,
+                    "finish_reason": finish_reason,
+                    "input_tokens_estimate": input_estimate,
+                    "output_tokens_estimate": output_estimate,
+                }),
                 tool_calls=tool_calls,
                 structured_output=structured,
                 latency_ms=(time.monotonic() - started) * 1000.0,
@@ -799,8 +1153,17 @@ class LlamaCppModel:
 
 def build_llama_cpp_adapter(
     config: LlamaCppConfig, *, cache_size: int = 0, default_seed: int = 0,
+    consumer_budget: ConsumerHardwareBudget | None = None,
 ) -> LocalModelAdapter:
-    """Construct the canonical provider-neutral adapter around a llama.cpp model."""
+    """Build an offline adapter, optionally applying measured consumer limits."""
+    if consumer_budget is not None:
+        try:
+            model_bytes = Path(config.model_path).stat().st_size
+        except OSError as exc:
+            raise LlamaCppRuntimeError("cannot size local GGUF for consumer planning") from exc
+        config = plan_consumer_llama_cpp(
+            config, consumer_budget, model_bytes=model_bytes,
+        ).configuration
     return LocalModelAdapter(
         LocalInferenceEngine(LlamaCppModel(config), cache_size=cache_size),
         default_seed=default_seed,
@@ -813,6 +1176,11 @@ __all__ = [
     "LlamaCppConfig",
     "LlamaCppModel",
     "LlamaCppRuntimeError",
+    "ConsumerHardwareBudget",
+    "ConsumerLlamaPlan",
+    "detect_consumer_hardware_budget",
+    "estimate_gqa_kv_bytes_per_token",
+    "plan_consumer_llama_cpp",
     "build_llama_cpp_adapter",
     "inspect_gguf",
 ]

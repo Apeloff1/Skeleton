@@ -66,11 +66,57 @@ class ArchitectureADRIndexTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ADRIndexError, "unknown masterplan volumes"):
             MODULE.validate(root)
 
+    def test_empty_gap_list_matches_fully_remediated_volume(self) -> None:
+        root = self._fixture()
+        plan = json.loads((root / "machine/ai_master_plan.json").read_text(encoding="utf-8"))
+        volume = next(item for item in plan["volumes"] if item["key"] == "VOL-058")
+        self.assertEqual(volume["gaps"], [])
+        self.assertEqual(MODULE.validate(root)["masterplan_binding"], "VOL-058")
+
+    def test_missing_gap_binding_fails_when_volume_has_gaps(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_master_plan.json"
+        plan = json.loads(path.read_text(encoding="utf-8"))
+        volume = next(item for item in plan["volumes"] if item["key"] == "VOL-058")
+        volume["gaps"] = ["ADR policy coverage pending"]
+        path.write_text(json.dumps(plan), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ADRIndexError, "masterplan gap drift"):
+            MODULE.validate(root)
+
+    def test_non_list_gap_binding_fails_closed(self) -> None:
+        root = self._fixture()
+        path = root / "machine/adr_index.json"
+        index = json.loads(path.read_text(encoding="utf-8"))
+        index["masterplan_binding"]["required_gap_texts"] = None
+        path.write_text(json.dumps(index), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ADRIndexError, "unique non-empty strings"):
+            MODULE.validate(root)
+
+    def test_missing_canonical_gap_field_is_not_a_closed_volume(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_master_plan.json"
+        master = json.loads(path.read_text(encoding="utf-8"))
+        volume = next(item for item in master["volumes"] if item["key"] == "VOL-058")
+        del volume["gaps"]
+        path.write_text(json.dumps(master), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ADRIndexError, "canonical masterplan gaps"):
+            MODULE.validate(root)
+
+    def test_duplicate_canonical_gaps_fail_closed(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_master_plan.json"
+        master = json.loads(path.read_text(encoding="utf-8"))
+        volume = next(item for item in master["volumes"] if item["key"] == "VOL-058")
+        volume["gaps"] = ["open problem", "open problem"]
+        path.write_text(json.dumps(master), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ADRIndexError, "canonical masterplan gaps"):
+            MODULE.validate(root)
+
     def test_rejects_stale_masterplan_gap_binding(self) -> None:
         root = self._fixture()
         path = root / "machine/adr_index.json"
         data = json.loads(path.read_text(encoding="utf-8"))
-        data["masterplan_binding"]["required_gap_texts"][0] = "not a real gap"
+        data["masterplan_binding"]["required_gap_texts"].append("not a real gap")
         path.write_text(json.dumps(data), encoding="utf-8")
         with self.assertRaisesRegex(MODULE.ADRIndexError, "masterplan gap drift"):
             MODULE.validate(root)

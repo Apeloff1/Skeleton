@@ -41,6 +41,35 @@ tests, rollback evidence, App Assembly, and signed accountability are explicit.
 Relocation alone never completes an AIQ task or work package.
 
 
+## Standalone offline AI chat entry points
+
+`model_runtime/offline_chat.py` owns the native-transformer checkpoint chat
+product and the model-identified SQLite conversation authority. It implements
+durable full-history preservation, exact-model/tokenizer identity, stable retry
+receipts, transactional turn commits, exact-turn forks, portable backups and
+restart recovery.
+
+`skeleton/app/local_ai.py` and `skeleton/app/offline_chat_cli.py` expose
+that same offline SQLite authority through the installed desktop UI and a
+headless interface. `skeleton/app/offline_http.py` adds a strictly
+loopback-bound, bearer-authenticated HTTP API and same-origin browser UI
+from `skeleton/app/offline_web.py`. `skeleton/app/offline_knowledge.py`
+adds operator-owned, model-scoped reference ingestion and deterministic
+local search with exact source-byte provenance and cited passage offsets.
+All routes support native checkpoints and explicitly operator-installed
+GGUF/llama.cpp deployments. Only the model context *projection* is trimmed;
+the full committed conversation remains durable. The HTTP server enforces
+private credentials, origin/host restrictions, bounded request sizes and
+ordered shutdown.
+
+Reference retrieval currently remains **separate from generated chat**: no
+evidence-grounded-answer quality claim follows simply from finding local
+source text. Track the next closure and required product acceptance in
+[Measured Completion Gaps](../../docs/ai/MEASURED_COMPLETION_GAPS_2026_10.md).
+No weights are downloaded, tools are not granted, and there is no hosted-model
+fallback. See [Offline Native Chat](../../docs/ai/OFFLINE_NATIVE_CHAT.md)
+for runnable commands, release smoke, model requirements and limitations.
+
 ## Planned-path disposition
 
 The machine manifest audits concrete `skeleton/*` roots referenced by the master

@@ -124,3 +124,504 @@ def test_distillation_is_deterministic():
     assert store.distill("alice", authorized=True) == store.distill(
         "alice", authorized=True,
     )
+
+def test_policy_rejects_type_confusion():
+    from skeleton.ai.webcrawler.dragon_game_mechanics import CapturePolicy
+    with pytest.raises(ValueError, match="duration"):
+        GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(max_session_seconds=True))
+    with pytest.raises(ValueError, match="CapturePolicy"):
+        GameMechanicsMemory(sqlite3.connect(":memory:"), policy=None)
+
+
+def test_policy_strict_observation_resource_budget():
+    from skeleton.ai.webcrawler.dragon_game_mechanics import CapturePolicy
+    for attr in ("max_observations", "max_note_chars", "max_sessions_per_owner"):
+        options = {attr: True}
+        with pytest.raises(ValueError):
+            GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(**options))
+
+
+def test_policy_note_budget_zero_is_rejected():
+    from skeleton.ai.webcrawler.dragon_game_mechanics import CapturePolicy
+    with pytest.raises(ValueError, match="note budget"):
+        GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(max_note_chars=0))
+
+
+def test_policy_session_capacity_bool_not_admitted():
+    from skeleton.ai.webcrawler.dragon_game_mechanics import CapturePolicy
+    with pytest.raises(ValueError, match="session capacity"):
+        GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(max_sessions_per_owner=False))
+
+
+def test_policy_confidence_rejects_boolean_and_nonfinite():
+    from skeleton.ai.webcrawler.dragon_game_mechanics import CapturePolicy
+    for bad in (True, float("nan"), float("inf"), -1):
+        with pytest.raises(ValueError, match="confidence"):
+            GameMechanicsMemory(sqlite3.connect(":memory:"), policy=CapturePolicy(min_confidence=bad))
+
+
+def test_owner_identity_rejects_control_and_whitespace():
+    store = setup()
+    for bad in (" alice", "alice ", "alice" + chr(10) + "other", "alice" + chr(0) + "shadow"):
+        with pytest.raises(ValueError, match="owner"):
+            store.sessions(bad, authorized=True)
+
+
+def test_strict_explicit_capture_and_analysis_consent():
+    from dataclasses import replace
+    store = setup()
+    base = session(store)
+    for field in ("capture_consent", "analysis_consent"):
+        with pytest.raises(PermissionError, match="consent"):
+            store.record(replace(base, **{field: 1}), authorized=True)
+    with pytest.raises(PermissionError, match="consent"):
+        store.record(base, authorized=1)
+
+
+def test_raw_video_retention_flag_requires_explicit_false():
+    from dataclasses import replace
+    store = setup()
+    with pytest.raises(ValueError, match="raw"):
+        store.record(replace(session(store), raw_video_retained=0), authorized=True)
+
+
+def test_game_labels_reject_embedded_control_characters():
+    from dataclasses import replace
+    store = setup()
+    for name in ("Example" + chr(0) + "Game", "Example" + chr(10) + "Game"):
+        with pytest.raises(ValueError, match="game label"):
+            store.record(replace(session(store), game_label=name), authorized=True)
+
+
+def test_duration_bool_cannot_cross_recording_boundary():
+    from dataclasses import replace
+    store = setup()
+    with pytest.raises(ValueError, match="duration"):
+        store.record(replace(session(store), duration_ms=True), authorized=True)
+
+
+def test_observation_collection_requires_typed_bounded_tuple():
+    from dataclasses import replace
+    store = setup()
+    base = session(store)
+    for bad in ([observation()], ("not-an-observation",), ()):
+        with pytest.raises(ValueError, match="observation collection"):
+            store.record(replace(base, observations=bad), authorized=True)
+
+
+def test_recorded_observations_require_real_monotone_timestamps():
+    from dataclasses import replace
+    store = setup()
+    base = session(store)
+    for items, reason in (
+        ((observation(timestamp=1000), observation(timestamp=999)), "recording order"),
+        ((observation(timestamp=True),), "outside recording"),
+    ):
+        with pytest.raises(ValueError, match=reason):
+            store.record(replace(base, observations=items), authorized=True)
+
+
+def test_observation_confidence_rejects_boolean_nonfinite_and_string():
+    store = setup()
+    for bad in (True, float("nan"), float("inf"), "0.9", -0.1, 1.1):
+        with pytest.raises(ValueError, match="confidence"):
+            store.record(session(store, observations=(observation(confidence=bad),)), authorized=True)
+
+
+def test_observation_confirmation_rejects_numeric_truthiness():
+    from dataclasses import replace
+    store = setup()
+    item = observation(preference=PreferenceSignal.ENJOYED, confirmed=True)
+    with pytest.raises(ValueError, match="confirmation must be boolean"):
+        store.record(session(store, observations=(replace(item, user_confirmed=1),)), authorized=True)
+
+
+def test_observation_note_refuses_control_and_surrogate_text():
+    from dataclasses import replace
+    store = setup()
+    base = observation()
+    for bad in ("embedded" + chr(0) + "nul", "two" + chr(10) + "lines", "bad" + chr(0xd800)):
+        with pytest.raises(ValueError, match="observation note"):
+            store.record(session(store, observations=(replace(base, description=bad),)), authorized=True)
+
+
+def test_session_identity_rejects_invalid_digest_and_replay():
+    from dataclasses import replace
+    store = setup()
+    base = session(store)
+    for bad in ("A" * 64, "0" * 64, "not-a-digest"):
+        with pytest.raises(ValueError, match="session identifier"):
+            store.record(replace(base, session_id=bad), authorized=True)
+
+
+def test_read_limit_requires_integer_not_boolean():
+    store = setup()
+    for value in (True, 1.5, -1, 1001):
+        with pytest.raises(ValueError, match="history limit"):
+            store.sessions("alice", authorized=True, limit=value)
+
+
+def test_session_id_must_have_canonical_lowercase_content_digest():
+    from dataclasses import replace
+    store = setup()
+    good = session(store)
+    for forged in (good.session_id.upper(), good.session_id[:-1] + "Z", "0" * 64):
+        if forged == good.session_id:
+            continue
+        with pytest.raises(ValueError, match="session identifier"):
+            store.record(replace(good, session_id=forged), authorized=True)
+
+
+def test_session_reads_require_explicit_boolean_true():
+    store = setup()
+    for authorization in (1, "yes", None):
+        with pytest.raises(PermissionError, match="authorization"):
+            store.sessions("alice", authorized=authorization)
+
+
+def test_session_erasure_requires_explicit_boolean_true():
+    store = setup()
+    store.record(session(store), authorized=True)
+    with pytest.raises(PermissionError, match="authorization"):
+        store.erase("alice", authorized=1)
+    assert len(store.sessions("alice", authorized=True)) == 1
+
+
+def test_session_record_refuses_unbounded_serialized_payload(monkeypatch):
+    import skeleton.ai.webcrawler.dragon_game_mechanics as module
+    store = setup()
+    monkeypatch.setattr(module, "MAX_STORED_SESSION_BYTES", 48)
+    with pytest.raises(ValueError, match="byte budget"):
+        store.record(session(store), authorized=True)
+    assert store.sessions("alice", authorized=True) == ()
+
+
+def test_session_byte_budget_accepts_regular_observations():
+    store = setup()
+    value = session(store)
+    store.record(value, authorized=True)
+    assert store.sessions("alice", authorized=True)[0].session_id == value.session_id
+
+
+def test_corrupted_stored_payload_over_budget_fails_before_decode(monkeypatch):
+    import skeleton.ai.webcrawler.dragon_game_mechanics as module
+    store = setup()
+    store.record(session(store), authorized=True)
+    monkeypatch.setattr(module, "MAX_STORED_SESSION_BYTES", 4)
+    with pytest.raises(ValueError, match="byte budget"):
+        store.sessions("alice", authorized=True)
+
+
+def test_history_reads_are_bounded_and_ordered_across_sessions():
+    store = setup()
+    for text in ("First", "Second", "Third"):
+        record = store.build_session("alice", text, 20000, (observation(),),
+                                     capture_consent=True, analysis_consent=True)
+        store.record(record, authorized=True)
+    result = store.sessions("alice", authorized=True, limit=2)
+    assert len(result) == 2
+    assert [s.session_id for s in result] == sorted(s.session_id for s in result)
+
+
+def test_corrupt_stored_observation_json_fails_closed():
+    store = setup()
+    store.record(session(store), authorized=True)
+    store.db.execute("UPDATE dragon_game_sessions SET observations_json=? WHERE owner=?",
+                     ("{corrupted", "alice"))
+    with pytest.raises(ValueError, match="JSON corrupt"):
+        store.sessions("alice", authorized=True)
+
+
+def test_stored_observation_shape_refuses_partial_records():
+    store = setup()
+    store.record(session(store), authorized=True)
+    for body in ("{}", "[[1,2]]", "[]"):
+        store.db.execute("UPDATE dragon_game_sessions SET observations_json=? WHERE owner=?",
+                         (body, "alice"))
+        with pytest.raises(ValueError, match="invalid shape"):
+            store.sessions("alice", authorized=True)
+
+
+def test_tampered_stored_metadata_is_rejected():
+    store = setup()
+    store.record(session(store), authorized=True)
+    store.db.execute("UPDATE dragon_game_sessions SET duration_ms=? WHERE owner=?",
+                     (-1, "alice"))
+    with pytest.raises(ValueError, match="metadata invalid"):
+        store.sessions("alice", authorized=True)
+
+
+def test_stored_observation_bool_confidence_and_timestamp_are_rejected():
+    import json
+    store = setup()
+    store.record(session(store), authorized=True)
+    for index, value in ((0, True), (3, True), (5, 1)):
+        body = [[1000, "combat", "Timing-based interaction", 0.9, "unknown", False]]
+        body[0][index] = value
+        store.db.execute("UPDATE dragon_game_sessions SET observations_json=? WHERE owner=?",
+                         (json.dumps(body), "alice"))
+        with pytest.raises(ValueError, match="cell validation failed"):
+            store.sessions("alice", authorized=True)
+
+
+def test_persisted_event_order_is_validated():
+    import json
+    store = setup()
+    observations = (observation(timestamp=100), observation(timestamp=200))
+    store.record(session(store, observations=observations), authorized=True)
+    raw = store.db.execute("SELECT observations_json FROM dragon_game_sessions").fetchone()[0]
+    entries = list(reversed(json.loads(raw)))
+    store.db.execute("UPDATE dragon_game_sessions SET observations_json=?",
+                     (json.dumps(entries),))
+    with pytest.raises(ValueError, match="time order"):
+        store.sessions("alice", authorized=True)
+
+def test_persisted_json_must_be_canonical():
+    import json
+    store = setup()
+    store.record(session(store), authorized=True)
+    raw = store.db.execute("SELECT observations_json FROM dragon_game_sessions").fetchone()[0]
+    altered = json.dumps(json.loads(raw), indent=2)
+    store.db.execute("UPDATE dragon_game_sessions SET observations_json=?", (altered,))
+    with pytest.raises(ValueError, match="not canonical"):
+        store.sessions("alice", authorized=True)
+
+
+def test_persisted_game_label_tampering_invalidates_session_identity():
+    store = setup()
+    store.record(session(store), authorized=True)
+    store.db.execute("UPDATE dragon_game_sessions SET game_label=? WHERE owner=?",
+                     ("Replaced Title", "alice"))
+    with pytest.raises(ValueError, match="identity differs"):
+        store.sessions("alice", authorized=True)
+    with pytest.raises(ValueError, match="identity differs"):
+        store.distill("alice", authorized=True)
+
+
+def test_persisted_notes_cannot_bypass_byte_budget():
+    import json
+    store = setup()
+    store.record(session(store), authorized=True)
+    original = json.loads(store.db.execute("SELECT observations_json FROM dragon_game_sessions").fetchone()[0])
+    original[0][2] = "X" * 6000
+    store.db.execute("UPDATE dragon_game_sessions SET observations_json=?", (json.dumps(original),))
+    with pytest.raises(ValueError, match="cell validation"):
+        store.sessions("alice", authorized=True)
+
+
+def test_history_aggregate_memory_cap(monkeypatch):
+    import skeleton.ai.webcrawler.dragon_game_mechanics as module
+    store = setup()
+    store.record(session(store), authorized=True)
+    monkeypatch.setattr(module, "MAX_HISTORY_BYTES", 8)
+    with pytest.raises(ValueError, match="history memory"):
+        store.sessions("alice", authorized=True)
+
+
+def test_bounded_history_can_read_multiple_small_sessions():
+    store = setup()
+    for name in ("First", "Second"):
+        value = store.build_session("alice", name, 20000, (observation(),),
+                                    capture_consent=True, analysis_consent=True)
+        store.record(value, authorized=True)
+    assert len(store.sessions("alice", authorized=True)) == 2
+
+
+def test_session_history_budget_fail_closed_after_first_row(monkeypatch):
+    import skeleton.ai.webcrawler.dragon_game_mechanics as module
+    store = setup()
+    store.record(session(store), authorized=True)
+    monkeypatch.setattr(module, "MAX_HISTORY_BYTES", 0)
+    with pytest.raises(ValueError, match="history memory"):
+        store.sessions("alice", authorized=True)
+
+
+def test_partial_confirmation_keeps_profile_under_review():
+    store = setup()
+    confirmed = observation(preference=PreferenceSignal.ENJOYED, confirmed=True)
+    unconfirmed = observation(timestamp=2000)
+    store.record(session(store, observations=(confirmed, unconfirmed)), authorized=True)
+    profile = store.distill("alice", authorized=True)
+    assert profile.review_required
+    assert not profile.insights[0].user_confirmed
+
+
+def test_one_long_session_cannot_outvote_an_independent_session():
+    store = setup()
+    many_positive = tuple(observation(preference=PreferenceSignal.ENJOYED,
+        confirmed=True, timestamp=1000 + n) for n in range(12))
+    negative = (observation(preference=PreferenceSignal.DISLIKED, confirmed=True),)
+    first = store.build_session("alice", "First", 20000, many_positive,
+                                capture_consent=True, analysis_consent=True)
+    second = store.build_session("alice", "Second", 20000, negative,
+                                 capture_consent=True, analysis_consent=True)
+    store.record(first, authorized=True)
+    store.record(second, authorized=True)
+    assert store.distill("alice", authorized=True).insights[0].preference_score == 0
+
+
+def test_confidence_reflects_sessions_not_raw_event_volume():
+    store = setup()
+    frequent = tuple(observation(confidence=1.0, timestamp=100+n)
+                     for n in range(8))
+    uncertain = (observation(confidence=0.6),)
+    for title, items in (("Long", frequent), ("Short", uncertain)):
+        value = store.build_session("alice", title, 20000, items,
+                                    capture_consent=True, analysis_consent=True)
+        store.record(value, authorized=True)
+    assert store.distill("alice", authorized=True).insights[0].confidence == 0.8
+
+
+def test_conflicting_confirmed_tastes_cannot_self_approve():
+    store = setup()
+    for title, pref in (("Good", PreferenceSignal.ENJOYED),
+                        ("Bad", PreferenceSignal.DISLIKED)):
+        value = store.build_session("alice", title, 20000,
+            (observation(preference=pref, confirmed=True),),
+            capture_consent=True, analysis_consent=True)
+        store.record(value, authorized=True)
+    profile = store.distill("alice", authorized=True)
+    assert profile.insights[0].user_confirmed
+    assert profile.review_required
+    assert profile.design_directives == ()
+
+
+def test_fully_confirmed_unopposed_taste_is_reviewed():
+    store = setup()
+    positive = observation(preference=PreferenceSignal.ENJOYED, confirmed=True)
+    store.record(session(store, observations=(positive,)), authorized=True)
+    assert store.distill("alice", authorized=True).review_required is False
+
+
+def test_taste_fingerprint_binds_quoted_examples_not_just_score():
+    store = setup()
+    first = session(store)
+    store.record(first, authorized=True)
+    one = store.distill("alice", authorized=True)
+    store.erase("alice", authorized=True)
+    from dataclasses import replace
+    changed = replace(observation(), description="Entirely different original gameplay")
+    second = session(store, observations=(changed,))
+    store.record(second, authorized=True)
+    two = store.distill("alice", authorized=True)
+    assert one.insights[0].preference_score == two.insights[0].preference_score
+    assert one.insights[0].confidence == two.insights[0].confidence
+    assert one.fingerprint != two.fingerprint
+
+
+def test_distillation_work_budget_is_finite(monkeypatch):
+    import skeleton.ai.webcrawler.dragon_game_mechanics as module
+    store = setup()
+    events = (observation(timestamp=100), observation(timestamp=200))
+    store.record(session(store, observations=events), authorized=True)
+    monkeypatch.setattr(module, "MAX_DISTILL_OBSERVATIONS", 1)
+    with pytest.raises(ValueError, match="resource budget"):
+        store.distill("alice", authorized=True)
+
+def test_unobserved_game_taste_has_no_approval_authority():
+    store = setup()
+    result = store.distill("alice", authorized=True)
+    assert result.insights == ()
+    assert result.review_required is True
+    assert result.design_directives == ()
+
+def test_taste_fingerprint_changes_with_source_session_lineage():
+    store = setup()
+    first = store.build_session("alice", "First original game", 20000,
+        (observation(),), capture_consent=True, analysis_consent=True)
+    store.record(first, authorized=True)
+    left = store.distill("alice", authorized=True)
+    store.erase("alice", authorized=True)
+    second = store.build_session("alice", "Second original game", 20000,
+        (observation(),), capture_consent=True, analysis_consent=True)
+    store.record(second, authorized=True)
+    right = store.distill("alice", authorized=True)
+    assert left.insights == right.insights
+    assert left.fingerprint != right.fingerprint
+
+def test_session_idempotence_detects_corrupt_prior_evidence():
+    store = setup()
+    original = session(store)
+    store.record(original, authorized=True)
+    store.db.execute("UPDATE dragon_game_sessions SET game_label=? WHERE owner=?",
+                     ("tampered prior source", "alice"))
+    with pytest.raises(ValueError, match="evidence drift"):
+        store.record(original, authorized=True)
+
+def test_selective_erasure_preserves_other_game_and_other_owner():
+    store = setup()
+    first = store.build_session("alice", "One", 20000, (observation(),),
+                                capture_consent=True, analysis_consent=True)
+    second = store.build_session("alice", "Two", 20000, (observation(),),
+                                 capture_consent=True, analysis_consent=True)
+    foreign = session(store, owner="bob")
+    for entry in (first, second, foreign):
+        store.record(entry, authorized=True)
+    with pytest.raises(PermissionError):
+        store.erase_session("alice", first.session_id, authorized=1)
+    assert store.erase_session("alice", first.session_id, authorized=True)
+    assert not store.erase_session("alice", first.session_id, authorized=True)
+    assert {x.session_id for x in store.sessions("alice", authorized=True)} == {second.session_id}
+    assert {x.session_id for x in store.sessions("bob", authorized=True)} == {foreign.session_id}
+
+def test_game_observation_history_receipt_is_content_bound_without_raw_notes():
+    import json
+    store = setup()
+    first = session(store)
+    store.record(first, authorized=True)
+    receipt = store.history_receipt("alice", authorized=True)
+    assert receipt == store.history_receipt("alice", authorized=True)
+    assert receipt["session_count"] == 1
+    assert receipt["observation_count"] == 1
+    assert receipt["source_session_digests"] == [first.session_id]
+    assert receipt["memory_promotion_authorized"] is False
+    assert "Timing-based interaction" not in json.dumps(receipt)
+    store.erase_session("alice", first.session_id, authorized=True)
+    assert store.history_receipt("alice", authorized=True)["digest"] != receipt["digest"]
+
+def test_public_taste_snapshot_does_not_expose_raw_gameplay_notes():
+    import json
+    store = setup()
+    example = observation(preference=PreferenceSignal.ENJOYED, confirmed=True)
+    store.record(session(store, observations=(example,)), authorized=True)
+    receipt = store.public_taste_snapshot("alice", authorized=True)
+    assert receipt["signals"][0]["mechanic"] == "combat"
+    assert receipt["signals"][0]["fully_user_confirmed"] is True
+    assert receipt["memory_promotion_authorized"] is False
+    assert receipt["training_authorized"] is False
+    assert "Timing-based interaction" not in json.dumps(receipt)
+    with pytest.raises(PermissionError):
+        store.public_taste_snapshot("alice", authorized=1)
+
+def test_mechanic_insight_cannot_publish_invalid_evidence_numbers():
+    from dataclasses import replace
+    from skeleton.ai.webcrawler.dragon_game_mechanics import MechanicInsight
+    store = setup()
+    store.record(session(store), authorized=True)
+    base = store.distill("alice", authorized=True).insights[0]
+    assert isinstance(base, MechanicInsight)
+    for update in (
+        {"observation_count": True},
+        {"supporting_sessions": 3},
+        {"preference_score": float("nan")},
+        {"confidence": 1.2},
+        {"user_confirmed": 1},
+        {"examples": ("bad" + chr(10) + "note",)},
+    ):
+        with pytest.raises(ValueError, match="mechanic insight"):
+            replace(base, **update)
+
+def test_taste_profile_rejects_duplicate_evidence_and_forged_review_flags():
+    from dataclasses import replace
+    store = setup()
+    store.record(session(store), authorized=True)
+    good = store.distill("alice", authorized=True)
+    for kwargs in (
+        {"owner": "alice" + chr(10)},
+        {"insights": (good.insights[0], good.insights[0])},
+        {"review_required": 1},
+        {"fingerprint": "not-a-digest"},
+        {"design_directives": ("bad" + chr(0) + "directive",)},
+    ):
+        with pytest.raises(ValueError, match="taste profile"):
+            replace(good, **kwargs)
