@@ -473,7 +473,9 @@ and grounding choice. It polls a bounded execution ticket and displays queued,
 running, cancellation requested and terminal states. Each HTTP server instance admits one generation
 at a time across the selected model. Separate processes still use SQLite conflict
 checks; they do not share a global compute reservation. It retains at most 32 tickets in memory;
-terminal entries are evicted for later work. SQLite remains the only durable
+terminal entries are evicted for later work. Status lookup can reconstruct a
+completed result from its verified SQLite receipt after eviction or restart; it
+never fabricates timestamps or the state of uncommitted work. SQLite remains the only durable
 conversation and retry authority. No queue or additional execution database exists.
 
 A normal submission is:

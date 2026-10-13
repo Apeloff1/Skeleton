@@ -836,6 +836,27 @@ class OfflineChatStore:
             row, session_id, request_id, request_digest, replayed=True
         )
 
+    def committed_turn(self, session_id: str, request_id: str,
+                       model_digest: str, tokenizer_digest: str, *,
+                       expected_request_digest: str | None = None,
+                       ) -> tuple[OfflineTurnReceipt, dict[str, Any] | None] | None:
+        """Recover status from a validated receipt without executing a request."""
+        rid = _identifier("request id", request_id)
+        if expected_request_digest is not None:
+            _sha256(expected_request_digest, "expected request digest")
+        with self.read_snapshot():
+            saved = self.load(session_id, model_digest, tokenizer_digest)
+            row = self._db.execute(
+                "SELECT request_digest, revision, text, output_digest, prompt_tokens, "
+                "generated_tokens FROM offline_turns WHERE session_id=? AND request_id=?",
+                (saved.session_id, rid),
+            ).fetchone()
+            if row is None or (expected_request_digest is not None and row[0] != expected_request_digest):
+                return None
+            receipt = self._receipt(row, saved.session_id, rid, row[0], replayed=True)
+            evidence = self.turn_evidence(saved.session_id, model_digest, tokenizer_digest)
+            return receipt, evidence[receipt.revision - 1]
+
     @staticmethod
     def ensure_can_append(session: StoredChat) -> None:
         """Preflight full-history room before spending CPU on a model turn.

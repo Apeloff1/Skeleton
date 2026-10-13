@@ -10,6 +10,8 @@ completion or model-quality sign-off.
 - Authenticated loopback AI requests can run in a background worker with a bounded
   status ticket, cancellation acknowledgement, explicit retry and durable replay.
   Compatibility synchronous clients use the same single-worker admission fence.
+  Status lookup recovers verified completed receipts after restart/eviction, including
+  a peer process winning the same request, without resubmitting or generating.
 - Browser polling backs off and pauses without silently generating again. Lock
   clears in-tab credentials and content; reconnect can find an active request.
 - Browser conversation search, pagination, previews, optional instructions,

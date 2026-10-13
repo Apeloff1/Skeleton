@@ -184,7 +184,10 @@ class OfflineHTTPApplication:
         if type(retry) is not bool:
             raise OfflineHTTPError(400, "retry must be a boolean")
         rid, digest = self._turn_identity(request, self.default_output_tokens)
-        self._session(session_id)
+        with self._store.read_snapshot():
+            self._session(session_id)
+            # Reject an already-owned ID with changed inputs before admission.
+            self._store.replay(session_id, rid, digest)
         key = (session_id, rid)
         with self._turn_lock:
             if self._closing:
@@ -252,11 +255,43 @@ class OfflineHTTPApplication:
         rid = _identifier("request id", request_id)
         with self._turn_lock:
             turn = self._turns.get((session_id, rid))
-            if turn is None:
-                raise OfflineHTTPError(404, "turn ticket expired; resubmit the exact original request to recover")
-            if cancel:
-                self._request_cancel(turn)
-            return turn.public()
+            if turn is not None:
+                if cancel:
+                    self._request_cancel(turn)
+                observed = turn.public()
+                if turn.state not in {"failed", "cancelled"}:
+                    return observed
+            else:
+                observed = None
+        # A process restart/eviction cannot erase a committed turn's status.
+        # This also recovers a peer process winning the same request ID while
+        # our own execution was settling. Uncommitted work is never invented.
+        committed = self._store.committed_turn(
+            session_id, rid, self.model_digest, self.tokenizer_digest,
+            expected_request_digest=turn.request_digest if turn is not None else None,
+        )
+        if committed is not None:
+            receipt, evidence = committed
+            return {
+                "session_id": session_id, "request_id": rid,
+                "state": "complete", "terminal": True, "cancel_requested": False,
+                "created_at": observed["created_at"] if observed else None,
+                "finished_at": observed["finished_at"] if observed else None,
+                "recovered_from_store": True, "error": None,
+                "result": {
+                    "session_id": session_id, "request_id": rid,
+                    "revision": receipt.revision, "text": receipt.text,
+                    "output_digest": receipt.output_digest,
+                    "input_tokens": receipt.prompt_tokens,
+                    "output_tokens": receipt.generated_tokens,
+                    "replayed": True, "model_digest": self.model_digest,
+                    "evidence": evidence,
+                    "citation_audit": audit_answer_citations(receipt.text, evidence) if evidence else None,
+                },
+            }
+        if observed is not None:
+            return observed
+        raise OfflineHTTPError(404, "uncommitted turn ticket unavailable; resubmit the exact original request to recover")
 
     def authenticate(self, authorization: str | None) -> bool:
         if not isinstance(authorization, str) or not authorization.startswith("Bearer "):

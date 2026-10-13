@@ -383,7 +383,7 @@ JAVASCRIPT = r"""'use strict';
           state.pending = null;
           await selectSession(ticket.session_id);
           const result = ticket.result;
-          status('Reply saved' + (result?.replayed ? ' · recovered without new generation' : '') +
+          status('Reply saved' + (result?.replayed ? ' · recovered saved answer' : '') +
             (result ? ' · ' + result.output_tokens + ' output tokens' : '') + '.');
         } else {
           status(ticket.error || 'Cancelled without a completed reply. Retry original turn or edit your next request.');
