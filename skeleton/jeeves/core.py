@@ -143,6 +143,20 @@ class Jeeves:
         from skeleton.jeeves.app_capability_bridge import capability_concepts
         return capability_concepts(query=query, limit=limit, offset=offset, root=root)
 
+    def app_product_features(self, *, query: str = "", limit: int = 20,
+                             offset: int = 0, root=None):
+        """Look up declared AI features and readiness prerequisites, not grants."""
+        from skeleton.jeeves.app_capability_bridge import product_capability_catalog
+        return product_capability_catalog(
+            query=query, limit=limit, offset=offset, root=root,
+        )
+
+    def app_interface_catalog(self, *, query: str = "", limit: int = 20,
+                              offset: int = 0, root=None):
+        """Discover owning planes, dependency contracts and failure semantics."""
+        from skeleton.jeeves.app_capability_bridge import interface_catalog
+        return interface_catalog(query=query, limit=limit, offset=offset, root=root)
+
     def creator_proposal(self, operation: str, project_id: str, payload):
         """Compile a validated creator proposal, without dispatch authority."""
         from skeleton.jeeves.app_capability_bridge import creator_proposal
