@@ -6188,8 +6188,28 @@ for _entry in CATALOG:
             ],
         }[_entry["id"]]
         _entry["fields"].extend(_extension)
+# Source-verified bounded voxel mechanics; no claim of full GPU world streaming.
+for _entry in CATALOG:
+    if _entry["id"] == "voxel":
+        _entry["fields"].extend([
+            {"key":"initial_wood","kind":"int","default":3,"minimum":0,"maximum":60,"options":[]},
+            {"key":"initial_soil","kind":"int","default":4,"minimum":0,"maximum":60,"options":[]},
+            {"key":"initial_stone","kind":"int","default":2,"minimum":0,"maximum":60,"options":[]},
+            {"key":"initial_sand","kind":"int","default":1,"minimum":0,"maximum":60,"options":[]},
+            {"key":"initial_torches","kind":"int","default":1,"minimum":0,"maximum":16,"options":[]},
+            {"key":"max_health","kind":"int","default":20,"minimum":1,"maximum":100,"options":[]},
+            {"key":"max_stamina","kind":"int","default":20,"minimum":1,"maximum":100,"options":[]},
+            {"key":"mining_energy","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
+            {"key":"building_energy","kind":"int","default":1,"minimum":1,"maximum":20,"options":[]},
+            {"key":"day_length","kind":"int","default":12,"minimum":2,"maximum":128,"options":[]},
+            {"key":"darkness_damage","kind":"int","default":1,"minimum":0,"maximum":20,"options":[]},
+            {"key":"fall_damage","kind":"int","default":3,"minimum":0,"maximum":20,"options":[]},
+            {"key":"ore_goal","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
+            {"key":"light_radius","kind":"int","default":4,"minimum":1,"maximum":12,"options":[]},
+            {"key":"sand_gravity","kind":"bool","default":True,"minimum":None,"maximum":None,"options":[]},
+        ])
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem", "voxel"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6297,6 +6317,11 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
             raise SystemEditorError("civic checkpoint must be physically achievable")
         if normalized["memory_records"]==0 and normalized["relationship_factors"]>50:
             raise SystemEditorError("complex witness scoring requires nonzero memory records")
+    if editor_id == "voxel":
+        if normalized["mining_energy"] > normalized["max_stamina"]:
+            raise SystemEditorError("voxel miner needs achievable stamina")
+        if normalized["building_energy"] > normalized["max_stamina"]:
+            raise SystemEditorError("voxel builder needs achievable stamina")
     if editor_id == "ecosystem":
         if normalized["predators"]>normalized["species"]:
             raise SystemEditorError("predator species cannot exceed authored species count")
