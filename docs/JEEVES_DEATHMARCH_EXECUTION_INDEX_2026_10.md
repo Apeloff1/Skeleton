@@ -1,6 +1,77 @@
 # Deathmarch execution index — 2026-10-13
 
 
+## DX-31–DX-58 — real original-game authoring, source output, human publication
+
+The existing game editor, authoring workspace, game compiler, offline browser
+renderer, Godot source exporter, and prompt router now share **one governed
+Jeeves production lane**, rather than independent mock demonstrations.
+These are committed source implementations; product qualification awaits
+separate exact-head and installed-platform acceptance.
+
+| Milestone | Real committed functionality | Existing canonical owner |
+| --- | --- | --- |
+| DX-31 | 1–24 installed engine source configurations generated with actual schema | \`jeeves_production_wave.py\` |
+| DX-32 | Exact-plan source SHA/active-project reviewed configuration staging | \`JeevesProductionWave.stage\` |
+| DX-33 | Real procedural original authored playable scene sources | \`JeevesProductionWave.plan(phase="scenes")\` |
+| DX-34 | Scene source binds actual previously committed system settings | \`GameWorkspace._validate_advanced_scene_source\` |
+| DX-35 | Per-source optimistic concurrency and user-controlled game source ownership | \`GameWorkspace.propose\` |
+| DX-36 | Interactive multi-engine/scene plan-and-stage Game Studio panel | \`game_workspace_ui.py\` |
+| DX-37 | Actual original playable world compilation from typed finite intent | \`jeeves_original_release_wave.py\` |
+| DX-38 | Executed winning path by existing original-game simulator | \`compile_original_game\` |
+| DX-39 | Actual standalone offline browser game source output | \`render_dual_runtime_package\` |
+| DX-40 | Actual Godot 4 source project, world JSON, proof and tile editor output | \`render_dual_runtime_package\` |
+| DX-41 | Source SHA-256 and manifest-bound native project review proposals | \`JeevesOriginalReleaseWave.stage\` |
+| DX-42 | Native \`.godot\` source support in canonical reviewed workspace | \`game_project_workspace.py\` |
+| DX-43 | Interactive original browser/Godot source compilation/staging cockpit | \`game_workspace_ui.py\` |
+| DX-44 | Persisted source proposals become complete per-file unified diff reviews | \`jeeves_production_review.py\` |
+| DX-45 | Explicit per-file SHA approval uses **real** canonical workspace commits | \`JeevesProductionReview.commit\` |
+| DX-46 | Partial commits report completed prefix and outstanding IDs honestly | \`JeevesProductionReview.commit\` |
+| DX-47 | Canonical natural-language game prompt router connected to editor construction | \`jeeves_prompt_production.py\` |
+| DX-48 | Real typed engine sources selected by prompt axis, not guessed model behavior | \`JeevesPromptProduction.plan\` |
+| DX-49 | Exact prompt and source plan digests before any source proposals | \`JeevesPromptProduction.stage\` |
+| DX-50 | Live prompt-based user editor source production and review cockpit | \`game_workspace_ui.py\` |
+| DX-51 | Real original multiple game worlds generated from controlled seed changes | \`jeeves_game_variants.py\` |
+| DX-52 | Optional supported original-theme variation across independent worlds | \`JeevesGameVariants.plan\` |
+| DX-53 | Actual individual offline browser/native source manifests for each world | \`JeevesOriginalReleaseWave.plan\` |
+| DX-54 | Source-custodied portfolio proposal staging with partial-stage honesty | \`JeevesGameVariants.stage\` |
+| DX-55 | Live original-game source variants Studio cockpit | \`game_workspace_ui.py\` |
+| DX-56 | Durable pending/accepted proposal records inventoried with active project identity | \`jeeves_proposal_queue.py\` |
+| DX-57 | Stale/conflicting and malformed source proposal custody identified | \`JeevesProposalQueue.page\` |
+| DX-58 | Interactive paginated proposal custody and exact-review queue handoff | \`game_workspace_ui.py\` |
+
+### Concrete source changes
+
+- **Core/runtime adapters:** \`jeeves_production_wave.py\`,
+  \`jeeves_original_release_wave.py\`, \`jeeves_production_review.py\`,
+  \`jeeves_prompt_production.py\`, \`jeeves_game_variants.py\`,
+  \`jeeves_proposal_queue.py\`.
+- **Actual write boundary:** the existing \`game_project_workspace.GameWorkspace\`
+  with source proposals and explicit human-approved commit; no second
+  filesystem writer, tool authority, provider SDK or background worker.
+- **Client:** the installed \`game_workspace_ui.py\` gains production sources,
+  playable/native game exports, independently different game variants,
+  prompt-based studio authoring, exact diff approval, commit, and queue
+  browsing. All source content is rendered as text, not executable HTML.
+- **Compatibility:** all new adapters route through the existing Jeeves
+  \`jeeves_appwide_fabric.JeevesAppwideRuntime\`, which already uses the
+  authenticated local Game Studio API; source runtime boundaries remain intact.
+
+### Build-only truth
+
+No repository unit tests, CI suites or hardware smoke tests were executed
+in this workpass, at the user's direction. The *product feature*, when
+called by a designer, runs the existing original-game compiler and its
+intrinsic winning replay, which is a compilation prerequisite rather than
+a repository test suite.
+
+Actual generated browser source and Godot source packages are **code**, not
+certified binaries. GameWorkspace source files become real project contents
+only after independent human review and explicit commit. No trained model
+self-modification, model-performance gain, production deployment, mainline
+merge, or enterprise qualification is claimed.
+
+
 ## DX-18–DX-30 — multi-file construction, real source navigation and critical path
 
 | Milestone | Committed feature | Source |
