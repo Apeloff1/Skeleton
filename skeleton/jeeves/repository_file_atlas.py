@@ -189,10 +189,25 @@ class JeevesRepositoryFileAtlas:
     def _hash(path: Path, size: int) -> str | None:
         if size > MAX_HASH_BYTES:
             return None
+        # Never follow a newly swapped source symlink when O_NOFOLLOW is
+        # supported by the host. Bounded reads also reject mid-scan growth.
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags)
         digest = sha256()
-        with path.open("rb") as stream:
-            while chunk := stream.read(128 * 1024):
-                digest.update(chunk)
+        try:
+            with os.fdopen(fd, "rb") as stream:
+                current = os.fstat(stream.fileno())
+                if not os.path.isfile(path) or current.st_size != size:
+                    raise RepositoryAtlasError("source changed during content hashing")
+                read_total = 0
+                while chunk := stream.read(128 * 1024):
+                    read_total += len(chunk)
+                    if read_total > MAX_HASH_BYTES:
+                        raise RepositoryAtlasError("hashed source exceeded byte cap")
+                    digest.update(chunk)
+        except BaseException:
+            # fdopen owns the descriptor and closes it even on errors.
+            raise
         return digest.hexdigest()
 
     def _walk(self, *, hash_contents: bool) -> list[IndexedFile]:
@@ -459,6 +474,9 @@ class JeevesRepositoryFileAtlas:
             raise RepositoryAtlasError("invalid duplicate page limit")
         with self._lock:
             meta = self._meta()
+            hashed_files = self._db.execute(
+                "SELECT COUNT(*) FROM jeeves_atlas_files WHERE content_sha256 IS NOT NULL"
+            ).fetchone()[0]
             digests = self._db.execute(
                 "SELECT content_sha256,COUNT(*),SUM(bytes) "
                 "FROM jeeves_atlas_files WHERE content_sha256 IS NOT NULL "
@@ -468,6 +486,8 @@ class JeevesRepositoryFileAtlas:
             ).fetchall()
             return {
                 **meta,
+                "hashed_files": hashed_files,
+                "hash_coverage": "partial" if hashed_files < meta["file_count"] else "complete",
                 "duplicate_groups": [
                     {
                         "content_sha256": digest,
