@@ -98,6 +98,10 @@ class JeevesWorkbench:
         source_edit_handler: Callable[..., Any] | None = None,
         source_edit_allowlist: Sequence[str] | None = None,
         release_verify_external: Callable[..., bool] | None = None,
+        idle_handlers: Mapping[Any, Callable[..., Any]] | None = None,
+        idle_authorize: Callable[..., bool] | None = None,
+        idle_verify_result: Callable[..., bool] | None = None,
+        idle_policy: Any = None,
     ) -> None:
         from skeleton.jeeves.app_capability_bridge import _root
         self.root = _root(root)
@@ -152,11 +156,23 @@ class JeevesWorkbench:
         if release_verify_external is not None and not callable(release_verify_external):
             raise JeevesWorkbenchError("model release verification requires host callback")
         self._release_verify_external = release_verify_external
+        provided_idle = (idle_handlers, idle_authorize, idle_verify_result)
+        if any(value is not None for value in provided_idle) and not all(
+            value is not None for value in provided_idle
+        ):
+            raise JeevesWorkbenchError("idle execution needs handlers, authorizer and verifier together")
+        if idle_policy is not None and idle_handlers is None:
+            raise JeevesWorkbenchError("idle policy requires a real host worker")
+        self._idle_handlers = idle_handlers
+        self._idle_authorize = idle_authorize
+        self._idle_verify_result = idle_verify_result
+        self._idle_policy = idle_policy
         self._open_runbooks: list[CreatorRunbookStore] = []
         self.atlas: JeevesRepositoryFileAtlas | None = None
         self.shadow: DurableShadowWeightPipeline | None = None
         self.orchestration: DurableOrchestrLedger | None = None
         self.model_releases = None
+        self.idle_executor = None
         try:
             if self._source_edit_allowlist is not None:
                 from skeleton.jeeves.source_edit_host import JeevesAtomicSourceEditor
@@ -181,6 +197,21 @@ class JeevesWorkbench:
                 self.model_releases = ModelReleaseJournal(
                     self._scope / "model_release_evidence.sqlite",
                     verify_external=self._scoped_release_verify,
+                )
+            if self._idle_handlers is not None:
+                from skeleton.jeeves.ai.idle_learning_scheduler import IdleLearningPolicy
+                from skeleton.jeeves.ai.idle_learning_runtime import JeevesIdleWorkExecutor
+                if self._idle_policy is not None and not isinstance(self._idle_policy, IdleLearningPolicy):
+                    raise JeevesWorkbenchError("idle policy must be a typed host policy")
+                self.idle_executor = JeevesIdleWorkExecutor(
+                    store_path=self._scope / "idle_effects.sqlite",
+                    policy=self._idle_policy or IdleLearningPolicy(),
+                    host_authorize=self._scoped_idle_authorize,
+                    handlers={
+                        kind: self._scoped_idle_handler(handler)
+                        for kind, handler in self._idle_handlers.items()
+                    },
+                    verify_result=self._scoped_idle_verify,
                 )
             self.tools = self._build_tools()
             self.executor = ToolExecutor(self.tools)
@@ -458,59 +489,129 @@ class JeevesWorkbench:
             self._open_runbooks.append(store)
             return runner
 
+    def _scoped_idle_authorize(self, assignment, intent: str, context) -> bool:
+        return (
+            self._context_scoped(context)
+            and self._idle_authorize is not None
+            and self._idle_authorize(
+                self.tenant_id, self.project_id, self.principal_id,
+                assignment, intent, context,
+            ) is True
+        )
+
+    def _scoped_idle_handler(self, handler):
+        def invoke(assignment, context):
+            if not self._context_scoped(context):
+                raise JeevesWorkbenchError("idle worker crossed tenant/project scope")
+            return handler(assignment, context)
+        return invoke
+
+    def _scoped_idle_verify(self, assignment, receipt, context) -> bool:
+        return (
+            self._context_scoped(context)
+            and self._idle_verify_result is not None
+            and self._idle_verify_result(
+                self.tenant_id, self.project_id, self.principal_id,
+                assignment, receipt, context,
+            ) is True
+        )
+
+    @staticmethod
+    def _idle_candidate(record):
+        """Derive a work item exclusively from current verified shadow custody."""
+        from skeleton.jeeves.ai.idle_learning_scheduler import (
+            IdleWorkCandidate, IdleWorkKind,
+        )
+        intake = record.intake
+        kind = {
+            "inbox": IdleWorkKind.EVIDENCE_CORROBORATION,
+            "quarantined": IdleWorkKind.SOURCE_RESEARCH,
+            "corroborated": IdleWorkKind.CANDIDATE_PREPARATION,
+        }.get(record.state.value)
+        if kind is None:
+            raise JeevesWorkbenchError("shadow intake is not eligible for idle work")
+        scope = intake.target_scope
+        return IdleWorkCandidate(
+            work_id="shadow-" + sha256(intake.intake_id.encode("utf-8")).hexdigest()[:48],
+            scope_id=scope if len(scope) <= 192 else "scope-" + sha256(scope.encode("utf-8")).hexdigest(),
+            source_digest=intake.digest,
+            kind=kind,
+            relevance_ppm=intake.relevance_ppm,
+            novelty_ppm=intake.novelty_ppm,
+            evidence_confidence_ppm=intake.confidence_ppm,
+            created_at_ns=intake.observed_at_ns,
+            cost_units=2 if kind is IdleWorkKind.SOURCE_RESEARCH else 1,
+            requires_network=kind is IdleWorkKind.SOURCE_RESEARCH,
+        )
+
+    def invoke_idle_shadow_work(
+        self, *, intake_id: str, plan, assignment, telemetry,
+        host_now_ns: int, context,
+    ):
+        """Execute one host-approved idle task from fresh durable shadow state.
+
+        The caller cannot substitute model-authored work parameters: every
+        candidate field is recomputed from the tenant's current shadow record.
+        The idle executor persists the intent before entering a worker handler.
+        """
+        from skeleton.jeeves.ai.idle_learning_scheduler import (
+            HostIdleTelemetry, IdleWorkPlan, IdleWorkAssignment,
+        )
+        from skeleton.jeeves.agent.tools import ToolExecutionContext
+        if not isinstance(context, ToolExecutionContext) or not self._context_scoped(context):
+            raise JeevesWorkbenchError("host idle request has wrong tenant/project")
+        if not isinstance(plan, IdleWorkPlan) or not isinstance(assignment, IdleWorkAssignment):
+            raise JeevesWorkbenchError("idle dispatch requires typed plan and assignment")
+        if not isinstance(telemetry, HostIdleTelemetry):
+            raise JeevesWorkbenchError("host telemetry is required for actual work")
+        with self._lock:
+            self._ensure_open()
+            if self.idle_executor is None:
+                raise JeevesWorkbenchError("no host idle worker handlers configured")
+            record = self.shadow.get(intake_id)
+            if record is None:
+                raise JeevesWorkbenchError("idle work refers to unknown shadow intake")
+            candidate = self._idle_candidate(record)
+            return self.idle_executor.invoke_one(
+                plan=plan, assignment=assignment, candidate=candidate,
+                telemetry=telemetry, host_now_ns=host_now_ns,
+                context=context,
+            )
+
+    def pending_idle_effects(self, *, limit: int = 100):
+        """List unresolved idle work for host-only, no-retry reconciliation."""
+        with self._lock:
+            self._ensure_open()
+            if self.idle_executor is None:
+                raise JeevesWorkbenchError("idle worker is not configured")
+            return self.idle_executor.pending(limit=limit)
+
     def propose_idle_shadow_work(
         self, telemetry, *,
         host_now_ns: int,
         active_work_ids: tuple[str, ...] = (),
         policy=None,
     ):
-        """Rank outstanding shadow knowledge without consuming idle resources.
-
-        A host MUST recheck real serving pressure, idle duration, and all
-        per-item rights before dispatch. The generated batch is a non-executing
-        proposal. Jeeves cannot start background work by calling this method.
-        """
+        """Propose non-executing idle jobs using actual shadow custody only."""
         from skeleton.jeeves.ai.idle_learning_scheduler import (
-            HostIdleTelemetry, IdleWorkCandidate, IdleWorkKind,
-            JeevesIdleLearningScheduler,
+            HostIdleTelemetry, JeevesIdleLearningScheduler,
         )
-        from skeleton.ai.training.flgb_training_runtime import digest_json
         if not isinstance(telemetry, HostIdleTelemetry):
             raise JeevesWorkbenchError("trusted host idle telemetry required")
         with self._lock:
             self._ensure_open()
-            rows = self.shadow.snapshot()["records"]
-            # Only unapproved evidence can be proposed for additional work.
-            # Already consumed or rejected knowledge may not be queued again.
-            pending = [row for row in rows if row["state"] in (
-                "inbox", "quarantined", "corroborated",
-            )]
-            pending.sort(key=lambda row: (
-                -row["intake"]["relevance_ppm"], row["intake"]["intake_id"],
-            ))
-            candidates = []
-            for record in pending[:8192]:
-                intake = record["intake"]
-                kind = {
-                    "inbox": IdleWorkKind.EVIDENCE_CORROBORATION,
-                    "quarantined": IdleWorkKind.SOURCE_RESEARCH,
-                    "corroborated": IdleWorkKind.CANDIDATE_PREPARATION,
-                }[record["state"]]
-                scope = intake["target_scope"]
-                candidates.append(IdleWorkCandidate(
-                    work_id="shadow-" + sha256(intake["intake_id"].encode("utf-8")).hexdigest()[:48],
-                    scope_id=scope if len(scope) <= 192 else "scope-" + sha256(scope.encode("utf-8")).hexdigest(),
-                    source_digest=digest_json(intake),
-                    kind=kind,
-                    relevance_ppm=intake["relevance_ppm"],
-                    novelty_ppm=intake["novelty_ppm"],
-                    evidence_confidence_ppm=intake["confidence_ppm"],
-                    created_at_ns=intake["observed_at_ns"],
-                    cost_units=2 if kind is IdleWorkKind.SOURCE_RESEARCH else 1,
-                    requires_network=kind is IdleWorkKind.SOURCE_RESEARCH,
-                    requires_accelerator=False,
-                ))
-            return JeevesIdleLearningScheduler(policy=policy).propose(
+            if self.idle_executor is not None:
+                current_policy = self.idle_executor.policy
+                if policy is not None and policy != current_policy:
+                    raise JeevesWorkbenchError("proposal policy must equal host execution policy")
+            else:
+                current_policy = policy
+            records = [
+                record for record in self.shadow._pipeline.entries(limit=1000)
+                if record.state.value in ("inbox", "quarantined", "corroborated")
+            ]
+            candidates = tuple(self._idle_candidate(record) for record in records)
+            return JeevesIdleLearningScheduler(policy=current_policy).propose(
                 candidates, telemetry, host_now_ns=host_now_ns,
                 active_work_ids=active_work_ids,
             )
@@ -530,6 +631,7 @@ class JeevesWorkbench:
             for owner in (
                 getattr(self, "_local_source_editor", None),
                 getattr(self, "model_releases", None),
+                getattr(self, "idle_executor", None),
                 getattr(self, "orchestration", None),
                 getattr(self, "shadow", None),
                 getattr(self, "atlas", None),
