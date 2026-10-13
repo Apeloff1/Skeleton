@@ -243,6 +243,73 @@ class JeevesCapabilityDispatcher:
             "status": "bound_unverified",
         } for item in sorted(self._bindings.values(), key=lambda x: x.capability_id))
 
+    def readiness_catalog(
+        self, *, context: ToolExecutionContext,
+        now_ns: int,
+        limit: int = 32,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Resolve actual binding health, rather than claim it from source code.
+
+        Owner callbacks must attest an unexpired typed readiness receipt.
+        Unavailable/error cases remain unavailable; no fallback handler is
+        manufactured and no tool is executed.
+        """
+        if not isinstance(context, ToolExecutionContext):
+            raise AppDispatchError("host execution context required")
+        _identifier(context.metadata.get("tenant_id"), "tenant_id")
+        _identifier(context.metadata.get("project_id"), "project_id")
+        if (type(now_ns) is not int or now_ns < 0
+                or type(limit) is not int or not 1 <= limit <= 64
+                or type(offset) is not int or offset < 0):
+            raise AppDispatchError("invalid readiness query bounds")
+        with self._lock:
+            items = sorted(self._bindings.values(), key=lambda x: x.capability_id)
+            rows: list[dict[str, Any]] = []
+            for item in items[offset:offset + limit]:
+                live, reason, receipt_hash, valid_until_ns = (
+                    False, "unavailable", None, None,
+                )
+                try:
+                    proof = self._readiness(item.capability_id, item.owner_plane, context)
+                    if isinstance(proof, ReadinessReceipt):
+                        if (proof.capability_id == item.capability_id
+                                and proof.owner_plane == item.owner_plane
+                                and proof.healthy
+                                and proof.valid_until_ns > now_ns):
+                            live, reason = True, "owner_verified_healthy"
+                            receipt_hash = proof.digest
+                            valid_until_ns = proof.valid_until_ns
+                        else:
+                            reason = "owner_proof_unhealthy_or_expired"
+                    else:
+                        reason = "untyped_owner_proof"
+                except Exception:
+                    # The model never receives host exception text or secrets.
+                    reason = "owner_readiness_error"
+                rows.append({
+                    "capability_id": item.capability_id,
+                    "owner_plane": item.owner_plane,
+                    "tool_name": item.tool_name,
+                    "binding_digest": item.digest,
+                    "live_availability": live,
+                    "reason": reason,
+                    "readiness_digest": receipt_hash,
+                    "valid_until_ns": valid_until_ns,
+                })
+            return {
+                "schema": "jeeves.bound_runtime_readiness.v1",
+                "observed_at_ns": now_ns,
+                "tenant_id": context.metadata["tenant_id"],
+                "project_id": context.metadata["project_id"],
+                "total_bound": len(items),
+                "offset": offset, "limit": limit,
+                "has_more": offset + len(rows) < len(items),
+                "capabilities": rows,
+                "dispatch_performed": False,
+                "execution_authority": "none",
+            }
+
     def prepare(
         self, capability_id: str, *,
         context: ToolExecutionContext,
