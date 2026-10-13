@@ -3,7 +3,7 @@ schema_version = 1
 name = "Skeleton"
 machine_root = ".machine"
 default_owner = "automation-supervisor"
-max_files = 50000
+max_files = 75000
 max_file_bytes = 2000000
 max_context_bytes = 30000
 
@@ -628,6 +628,8 @@ prefixes = [
   ".git/",
   # Generated machine artifacts are outputs of the indexer, not inventory inputs.
   ".machine/",
+  # Tracked index snapshots are discovery outputs, not code-search inputs.
+  "machine/repo_navigation/",
   # Local runtime state, never source inventory. Canonical provenance remains indexed.
   ".skeleton/",
   "chronicle/",
