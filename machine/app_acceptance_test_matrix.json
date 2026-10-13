@@ -1,9 +1,9 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13.v3",
+  "version": "2026-10-13.v4",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
-  "scope_note": "12 CI smoke families and 28 discovery-only candidate families; missing F07 offline native and F37 shells require genuine source-linked tests",
+  "scope_note": "All 42 feature families now have literal test-module links; 14 CI smoke, 28 discovery-only. Even passing subsets do NOT independently qualify complete features, models, or app devices.",
   "runner_mode": "unittest_module_exact_head",
   "default_max_seconds": 480,
   "policies": {
@@ -80,6 +80,17 @@
         "tests.test_ai_context_conductor"
       ],
       "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F07",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "ci_smoke",
+      "independent_acceptance_question": "Local CPU native transformer actually runs and replays, without claiming trained-model quality",
+      "unittest_modules": [
+        "tests.test_ai_offline_native_functional_boundary"
+      ],
+      "workflow_hint": "Jeeves App Acceptance Matrix",
       "product_release_qualified": false
     },
     {
@@ -391,6 +402,17 @@
         "tests.test_tools_integrations_namespace_migration"
       ],
       "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F37",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "ci_smoke",
+      "independent_acceptance_question": "Shell approvals validate immutable fingerprints, identity, expiry and single consumption",
+      "unittest_modules": [
+        "tests.test_ai_shell_approval_contract"
+      ],
+      "workflow_hint": "Jeeves App Acceptance Matrix",
       "product_release_qualified": false
     },
     {
