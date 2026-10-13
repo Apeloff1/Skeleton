@@ -225,6 +225,65 @@ class MeasuredCompletionTests(unittest.TestCase):
         self.assertEqual(len(family["families"]), 1)
         self.assertTrue(family["product_release_not_claimed"])
 
+    def test_real_loopback_studio_measurement_route_is_authenticated_and_inert(self):
+        import http.client
+        import threading
+        from pathlib import Path
+        from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
+        from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
+
+        root = self.fixture.root
+        ws = GameWorkspace.create(str(root / "studio_workspace"), authorized=True)
+        ws.create_project("measurement", "rpg", authorized=True)
+        server = create_workspace_server(ws, port=0, repo_root=root)
+        runner = threading.Thread(target=server.serve_forever, daemon=True)
+        runner.start()
+        try:
+            def request(method, endpoint, data=None, authorized=True):
+                connection = http.client.HTTPConnection(
+                    "127.0.0.1", server.server_port, timeout=8)
+                headers = {"Host": f"127.0.0.1:{server.server_port}"}
+                if authorized:
+                    headers["X-Game-Studio-Token"] = server.secret
+                if data is not None:
+                    headers["Content-Type"] = "application/json"
+                connection.request(
+                    method, endpoint,
+                    body=json.dumps(data) if data is not None else None,
+                    headers=headers,
+                )
+                response = connection.getresponse()
+                result = response.status, json.loads(response.read())
+                connection.close()
+                return result
+
+            self.assertEqual(
+                request("POST", "/api/jeeves-appwide-invoke", {
+                    "action": "ai.product.measure", "params": {}},
+                    authorized=False)[0], 403)
+            status, report = request("POST", "/api/jeeves-appwide-invoke", {
+                "action": "ai.product.measure", "params": {}})
+            self.assertEqual(status, 200)
+            self.assertEqual(report["result"]["family_count"], 42)
+            self.assertIsNone(report["result"]["full_app_completion_percent"])
+            self.assertEqual(report["result"]["atomic_product_contract_obligations"], 9)
+            digest = report["result"]["digest"]
+            status, page = request("POST", "/api/jeeves-appwide-invoke", {
+                "action": "ai.product.measure.page",
+                "params": {"limit": 2, "expected_measurement_digest": digest},
+            })
+            self.assertEqual(status, 200)
+            self.assertEqual(len(page["result"]["families"]), 2)
+            self.assertTrue(page["result"]["product_release_not_claimed"])
+            self.assertEqual(request("POST", "/api/jeeves-appwide-invoke", {
+                "action": "ai.product.measure.page",
+                "params": {"expected_measurement_digest": "0" * 64}})[0], 400)
+            self.assertFalse((root / "source_mutated.txt").exists())
+        finally:
+            server.shutdown()
+            server.server_close()
+            runner.join(timeout=2)
+
     def test_finite_exact_percent_never_overflows(self):
         self.assertEqual(_percent(0, 42), 0.0)
         self.assertEqual(_percent(1, 42), 2.38)
