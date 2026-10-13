@@ -1,0 +1,399 @@
+"""Pre-training shadow knowledge intake, deduplication and idle-only leasing.
+
+Incoming Dragon/crawler knowledge belongs in a *shadow evidence queue*, not
+in durable tensor weights. A bounded independent-origin qualification decides
+which observations may enter a training batch. No intake decision authorizes
+model promotion; every trained candidate must still pass the mirror, rights
+and native admission chain.
+"""
+from __future__ import annotations
+
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
+import json
+from pathlib import Path
+import sqlite3
+from typing import Iterator
+
+from .flgb_training_runtime import CandidateWeights, digest_json, require_digest, require_id
+from .shadow_weights import (
+    ShadowWeightError, ShadowWeightPolicy, SourceAttestation, _count, _utc,
+)
+
+_MAX_INTAKE_SOURCES = 10_000
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _encode(value: object) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+
+
+@dataclass(frozen=True, slots=True)
+class ShadowKnowledge:
+    knowledge_id: str
+    content_digest: str
+    base_model_digest: str
+    topic: str
+    relevance_ppm: int
+    predicted_gain_ppm: int
+    observed_at: str
+    sources: tuple[SourceAttestation, ...]
+
+    def __post_init__(self) -> None:
+        require_id(self.knowledge_id, "knowledge_id")
+        require_digest(self.content_digest, "content_digest")
+        require_digest(self.base_model_digest, "base_model_digest")
+        require_id(self.topic, "topic")
+        _count("relevance_ppm", self.relevance_ppm)
+        _count("predicted_gain_ppm", self.predicted_gain_ppm)
+        _utc("observed_at", self.observed_at)
+        if not self.sources or len(self.sources) > _MAX_INTAKE_SOURCES:
+            raise ShadowWeightError("intake source count out of bounds")
+        if any(not isinstance(x, SourceAttestation) for x in self.sources):
+            raise ShadowWeightError("intake sources must be provenance attestations")
+        ids = [x.source_id for x in self.sources]
+        if len(set(ids)) != len(ids):
+            raise ShadowWeightError("duplicated intake source identity")
+        object.__setattr__(self, "sources", tuple(sorted(self.sources, key=lambda x: x.source_id)))
+
+    @property
+    def digest(self) -> str:
+        return digest_json(self.as_dict())
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "knowledge_id": self.knowledge_id,
+            "content_digest": self.content_digest,
+            "base_model_digest": self.base_model_digest,
+            "topic": self.topic,
+            "relevance_ppm": self.relevance_ppm,
+            "predicted_gain_ppm": self.predicted_gain_ppm,
+            "observed_at": self.observed_at,
+            "sources": [x.as_dict() for x in self.sources],
+        }
+
+    @classmethod
+    def from_dict(cls, record: dict[str, object]) -> "ShadowKnowledge":
+        fields = dict(record)
+        sources = fields.pop("sources")
+        return cls(**fields, sources=tuple(SourceAttestation(**x) for x in sources))
+
+
+@dataclass(frozen=True, slots=True)
+class ShadowIntakePolicy:
+    evidence: ShadowWeightPolicy = ShadowWeightPolicy()
+    minimum_relevance_ppm: int = 650_000
+    minimum_predicted_gain_ppm: int = 600_000
+    max_pending: int = 50_000
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.evidence, ShadowWeightPolicy):
+            raise ShadowWeightError("intake must carry a shadow evidence policy")
+        _count("minimum_relevance_ppm", self.minimum_relevance_ppm)
+        _count("minimum_predicted_gain_ppm", self.minimum_predicted_gain_ppm)
+        _count("max_pending", self.max_pending, lower=1, upper=1_000_000)
+
+    @property
+    def digest(self) -> str:
+        return digest_json({
+            "evidence_policy_digest": self.evidence.digest,
+            "minimum_relevance_ppm": self.minimum_relevance_ppm,
+            "minimum_predicted_gain_ppm": self.minimum_predicted_gain_ppm,
+            "max_pending": self.max_pending,
+        })
+
+
+@dataclass(frozen=True, slots=True)
+class ShadowIntakeAssessment:
+    knowledge_digest: str
+    policy_digest: str
+    independent_roots: int
+    reason_codes: tuple[str, ...]
+    disposition: str
+
+    def __post_init__(self) -> None:
+        require_digest(self.knowledge_digest, "knowledge_digest")
+        require_digest(self.policy_digest, "policy_digest")
+        _count("independent_roots", self.independent_roots)
+        if tuple(sorted(set(self.reason_codes))) != self.reason_codes:
+            raise ShadowWeightError("intake reason codes must be unique and sorted")
+        if self.disposition not in {"training-ready", "pending", "quarantined"}:
+            raise ShadowWeightError("invalid intake disposition")
+        if self.disposition == "training-ready" and self.reason_codes:
+            raise ShadowWeightError("training-ready intake cannot have unresolved evidence")
+
+    @property
+    def digest(self) -> str:
+        return digest_json(asdict(self))
+
+
+def assess_shadow_intake(
+    item: ShadowKnowledge, policy: ShadowIntakePolicy,
+) -> ShadowIntakeAssessment:
+    if not isinstance(item, ShadowKnowledge) or not isinstance(policy, ShadowIntakePolicy):
+        raise ShadowWeightError("intake assessment requires knowledge and policy")
+    reasons: set[str] = set()
+    if len(item.sources) > policy.evidence.maximum_sources:
+        reasons.add("source-budget-exceeded")
+    if item.relevance_ppm < policy.minimum_relevance_ppm:
+        reasons.add("low-task-relevance")
+    if item.predicted_gain_ppm < policy.minimum_predicted_gain_ppm:
+        reasons.add("low-predicted-gain")
+    if any(source.contradiction for source in item.sources):
+        reasons.add("unresolved-contradiction")
+    if any(not source.allowed_for_training for source in item.sources):
+        reasons.add("training-rights-unresolved")
+    independent_roots = {
+        source.root_id
+        for source in item.sources
+        if source.allowed_for_training
+        and not source.contradiction
+        and source.quality_ppm >= policy.evidence.minimum_quality_ppm
+    }
+    if len(independent_roots) < policy.evidence.minimum_independent_roots:
+        reasons.add("insufficient-independent-evidence")
+    if any(source.quality_ppm < policy.evidence.minimum_quality_ppm for source in item.sources):
+        reasons.add("low-source-quality")
+    blockers = {"unresolved-contradiction", "training-rights-unresolved"}
+    disposition = (
+        "quarantined" if reasons.intersection(blockers)
+        else "pending" if reasons
+        else "training-ready"
+    )
+    return ShadowIntakeAssessment(
+        knowledge_digest=item.digest,
+        policy_digest=policy.digest,
+        independent_roots=len(independent_roots),
+        reason_codes=tuple(sorted(reasons)),
+        disposition=disposition,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ShadowIntakeLease:
+    knowledge: ShadowKnowledge
+    lease_owner: str
+    lease_until: str
+    revision: int
+    assessment_digest: str
+
+    def __post_init__(self) -> None:
+        require_id(self.lease_owner, "lease_owner")
+        _utc("lease_until", self.lease_until)
+        require_digest(self.assessment_digest, "assessment_digest")
+
+
+class ShadowKnowledgeQueue:
+    """SQLite queue with lease fencing, deduplicated content and idle-only work."""
+
+    def __init__(self, database: str | Path, *, policy: ShadowIntakePolicy | None = None) -> None:
+        self.path = Path(database)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.policy = policy or ShadowIntakePolicy()
+        with self._connect() as db:
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS shadow_intake (
+                    knowledge_id TEXT PRIMARY KEY,
+                    content_digest TEXT NOT NULL UNIQUE,
+                    payload TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    revision INTEGER NOT NULL,
+                    assessment TEXT NOT NULL,
+                    lease_owner TEXT,
+                    lease_until TEXT,
+                    candidate_digest TEXT,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS shadow_intake_work
+                  ON shadow_intake(state,lease_until,updated_at);
+                CREATE TABLE IF NOT EXISTS shadow_intake_events (
+                    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    knowledge_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    revision INTEGER NOT NULL,
+                    payload_digest TEXT NOT NULL,
+                    occurred_at TEXT NOT NULL
+                );
+            """)
+
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        db = sqlite3.connect(str(self.path), timeout=30, isolation_level=None)
+        try:
+            db.row_factory = sqlite3.Row
+            db.execute("PRAGMA busy_timeout=30000")
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA synchronous=FULL")
+            yield db
+            db.commit()
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    @staticmethod
+    def _event(db: sqlite3.Connection, item: str, action: str, revision: int, digest: str) -> None:
+        db.execute(
+            """INSERT INTO shadow_intake_events(
+                knowledge_id,action,revision,payload_digest,occurred_at
+            ) VALUES (?,?,?,?,?)""",
+            (item, action, revision, digest, _now().isoformat().replace("+00:00", "Z")),
+        )
+
+    def enqueue(self, item: ShadowKnowledge) -> ShadowIntakeAssessment:
+        if not isinstance(item, ShadowKnowledge):
+            raise ShadowWeightError("knowledge intake payload required")
+        assessment = assess_shadow_intake(item, self.policy)
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = db.execute(
+                "SELECT payload,assessment FROM shadow_intake WHERE knowledge_id=?",
+                (item.knowledge_id,),
+            ).fetchone()
+            if current is not None:
+                if json.loads(current["payload"]) != item.as_dict():
+                    raise ShadowWeightError("knowledge ID already bound to other shadow content")
+                return ShadowIntakeAssessment(**json.loads(current["assessment"]))
+            queued = db.execute(
+                "SELECT count(*) FROM shadow_intake WHERE state IN ('pending','training-ready','leased')"
+            ).fetchone()[0]
+            if queued >= self.policy.max_pending:
+                raise ShadowWeightError("bounded shadow knowledge queue at capacity")
+            duplicate = db.execute(
+                "SELECT knowledge_id FROM shadow_intake WHERE content_digest=?",
+                (item.content_digest,),
+            ).fetchone()
+            if duplicate is not None:
+                raise ShadowWeightError("knowledge content was previously acquired")
+            db.execute(
+                """INSERT INTO shadow_intake(
+                    knowledge_id,content_digest,payload,state,revision,assessment,
+                    lease_owner,lease_until,candidate_digest,updated_at
+                ) VALUES (?,?,?,?,1,?,NULL,NULL,NULL,?)""",
+                (
+                    item.knowledge_id, item.content_digest, _encode(item.as_dict()),
+                    assessment.disposition, _encode(asdict(assessment)),
+                    _now().isoformat().replace("+00:00", "Z"),
+                ),
+            )
+            self._event(db, item.knowledge_id, "enqueue", 1, assessment.digest)
+        return assessment
+
+    def lease(
+        self, worker_id: str, *, idle: bool,
+        duration_seconds: int = 900,
+    ) -> ShadowIntakeLease | None:
+        require_id(worker_id, "worker_id")
+        if not isinstance(idle, bool):
+            raise ShadowWeightError("idle scheduler state must be boolean")
+        if not idle:
+            return None
+        _count("duration_seconds", duration_seconds, lower=15, upper=86_400)
+        now = _now()
+        now_text = now.isoformat().replace("+00:00", "Z")
+        expiry = (now + timedelta(seconds=duration_seconds)).isoformat().replace("+00:00", "Z")
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            rows = db.execute(
+                """SELECT * FROM shadow_intake WHERE state='training-ready'
+                    OR (state='leased' AND lease_until<?)""", (now_text,),
+            ).fetchall()
+            if not rows:
+                return None
+            # Stable priority: expected utility, relevance, age, then identity.
+            row = min(rows, key=lambda r: (
+                -json.loads(r["payload"])["predicted_gain_ppm"],
+                -json.loads(r["payload"])["relevance_ppm"],
+                json.loads(r["payload"])["observed_at"],
+                r["knowledge_id"],
+            ))
+            revision = row["revision"] + 1
+            db.execute(
+                """UPDATE shadow_intake SET state='leased',lease_owner=?,lease_until=?,
+                    revision=?,updated_at=? WHERE knowledge_id=?""",
+                (worker_id, expiry, revision, now_text, row["knowledge_id"]),
+            )
+            item = ShadowKnowledge.from_dict(json.loads(row["payload"]))
+            assessment = ShadowIntakeAssessment(**json.loads(row["assessment"]))
+            self._event(db, row["knowledge_id"], "lease", revision, assessment.digest)
+            return ShadowIntakeLease(item, worker_id, expiry, revision, assessment.digest)
+
+    @staticmethod
+    def _bound_lease(db: sqlite3.Connection, lease: ShadowIntakeLease) -> sqlite3.Row:
+        row = db.execute(
+            "SELECT * FROM shadow_intake WHERE knowledge_id=?",
+            (lease.knowledge.knowledge_id,),
+        ).fetchone()
+        if row is None or row["state"] != "leased" or row["revision"] != lease.revision:
+            raise ShadowWeightError("shadow work lease has been revoked or superseded")
+        if row["lease_owner"] != lease.lease_owner or row["lease_until"] != lease.lease_until:
+            raise ShadowWeightError("shadow work is leased to another worker")
+        if row["lease_until"] <= _now().isoformat().replace("+00:00", "Z"):
+            raise ShadowWeightError("shadow work lease expired")
+        if json.loads(row["payload"]) != lease.knowledge.as_dict():
+            raise ShadowWeightError("leased shadow knowledge was changed")
+        if ShadowIntakeAssessment(**json.loads(row["assessment"])).digest != lease.assessment_digest:
+            raise ShadowWeightError("lease assessment is not current")
+        return row
+
+    def acknowledge(self, lease: ShadowIntakeLease, candidate: CandidateWeights) -> str:
+        """Record resulting *candidate* weights, not unreviewed production weights."""
+        if not isinstance(candidate, CandidateWeights) or candidate.status != "candidate":
+            raise ShadowWeightError("only unpromoted trained candidates may consume intake")
+        if candidate.base_model_digest != lease.knowledge.base_model_digest:
+            raise ShadowWeightError("trained candidate baseline differs from intake")
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = self._bound_lease(db, lease)
+            revision = row["revision"] + 1
+            db.execute(
+                """UPDATE shadow_intake SET state='trained',candidate_digest=?,
+                    lease_owner=NULL,lease_until=NULL,revision=?,updated_at=?
+                    WHERE knowledge_id=?""",
+                (
+                    candidate.digest, revision, _now().isoformat().replace("+00:00", "Z"),
+                    lease.knowledge.knowledge_id,
+                ),
+            )
+            self._event(db, lease.knowledge.knowledge_id, "candidate-trained", revision, candidate.digest)
+        return candidate.digest
+
+    def release(self, lease: ShadowIntakeLease) -> None:
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = self._bound_lease(db, lease)
+            revision = row["revision"] + 1
+            db.execute(
+                """UPDATE shadow_intake SET state='training-ready',lease_owner=NULL,
+                    lease_until=NULL,revision=?,updated_at=? WHERE knowledge_id=?""",
+                (revision, _now().isoformat().replace("+00:00", "Z"), lease.knowledge.knowledge_id),
+            )
+            self._event(db, lease.knowledge.knowledge_id, "release", revision, lease.assessment_digest)
+
+    def status(self, knowledge_id: str) -> dict[str, object]:
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT * FROM shadow_intake WHERE knowledge_id=?",
+                (require_id(knowledge_id, "knowledge_id"),),
+            ).fetchone()
+            if row is None:
+                raise ShadowWeightError("unknown shadow intake record")
+            return {
+                "knowledge_id": row["knowledge_id"],
+                "state": row["state"],
+                "revision": row["revision"],
+                "assessment": json.loads(row["assessment"]),
+                "candidate_digest": row["candidate_digest"],
+                "lease_until": row["lease_until"],
+            }
+
+
+__all__ = [
+    "ShadowKnowledge", "ShadowIntakePolicy", "ShadowIntakeAssessment",
+    "ShadowIntakeLease", "ShadowKnowledgeQueue", "assess_shadow_intake",
+]
