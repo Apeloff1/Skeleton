@@ -318,6 +318,47 @@ class GameWorkspace:
         config=validate_editor_document(_json(_read(config_path)))
         validate_advanced_scene(document,config["settings"])
 
+    def _validate_forge_blueprint(self, relative: str, document: dict):
+        """Verify installed Forge kinds, typed ports and DAG before accepting source.
+
+        Both proposal and actual human commit use this same canonical check;
+        no untrusted submitted graph bypasses the real installed Forge.
+        """
+        from .contracts import canonical_digest
+        from .jeeves_app_runtime import _review_forge_graph
+        if (type(document) is not dict
+                or set(document) != {
+                    "schema", "id", "name", "components", "wires",
+                    "review_digest", "digest"
+                }
+                or document.get("schema") !=
+                   "skeleton.game_builder.reviewed_forge_source.v1"):
+            raise WorkspaceError("exact original Forge source schema required")
+        blueprint_id = document["id"]
+        if (type(blueprint_id) is not str
+                or not IDENT.fullmatch(blueprint_id)
+                or relative != "assets/forge/" + blueprint_id + ".json"):
+            raise WorkspaceError("Forge source filename must match blueprint identity")
+        signed = dict(document)
+        recorded = signed.pop("digest")
+        if type(recorded) is not str or canonical_digest(signed) != recorded:
+            raise WorkspaceError("original Forge blueprint source digest mismatch")
+        current = _review_forge_graph({
+            "name": document["name"],
+            "components": document["components"],
+            "wires": document["wires"],
+        })
+        if current["valid"] is not True or current["digest"] != document["review_digest"]:
+            raise WorkspaceError("Forge ports/kinds/wires differ from installed graph validation")
+        return {
+            "schema": document["schema"],
+            "blueprint_id": blueprint_id,
+            "source_sha256": canonical_digest(document),
+            "review_digest": current["digest"],
+            "canonical_forge_graph_accepted": True,
+            "forge_runtime_asset_built": False,
+        }
+
     def propose(self,project: str,relative: str,text: str,*,expected_sha256: str,
                 reason: str,authorized: bool):
         if not authorized:
@@ -341,6 +382,8 @@ class GameWorkspace:
                     raise WorkspaceError("editor source path does not match typed system ID")
             if relative.startswith("scenes/advanced_"):
                 self._validate_advanced_scene_source(project,relative,parsed)
+            if relative.startswith("assets/forge/"):
+                self._validate_forge_blueprint(relative,parsed)
             if (relative in ("game/story_bible.json","game/continuity_contract.json")
                     or relative.startswith(("story/scenes/","story/chapters/"))):
                 from .story_workspace import validate_story_workspace_source
@@ -389,6 +432,8 @@ class GameWorkspace:
                     raise WorkspaceError("editor document path mismatches its system identity")
             if proposal["path"].startswith("scenes/advanced_"):
                 self._validate_advanced_scene_source(project,proposal["path"],parsed)
+            if proposal["path"].startswith("assets/forge/"):
+                self._validate_forge_blueprint(proposal["path"],parsed)
             if (proposal["path"] in ("game/story_bible.json",
                                       "game/continuity_contract.json") or
                     proposal["path"].startswith(("story/scenes/","story/chapters/"))):
