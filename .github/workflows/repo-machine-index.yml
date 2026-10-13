@@ -3,8 +3,12 @@ name: Repository machine index
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - ".machine/**"
+  pull_request:
+    paths:
+      - "skeleton/repo_machine/tracked_inventory.py"
+      - "tests/test_tracked_inventory.py"
+      - ".github/workflows/repo-machine-index.yml"
+      - ".machine/repository.toml"
   workflow_dispatch:
   schedule:
     - cron: "17 3 * * *"
@@ -13,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: repo-machine-index-main
+  group: repo-machine-index-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -40,6 +44,9 @@ jobs:
           python -m pip install .
           mkdir -p .machine
           skeleton-repo-machine --root . --output .machine/repository-machine.json --build-code-search .machine/code-search-index.json
+          python -m unittest discover -s tests -p "test_tracked_inventory.py" -v
+          python -m skeleton.repo_machine.tracked_inventory --root . --output .machine/tracked-inventory
+          python -m skeleton.repo_machine.tracked_inventory --root . --output .machine/tracked-inventory --check
           python - <<'PY'
           from hashlib import sha256
           import json
@@ -76,7 +83,14 @@ jobs:
                   f"artifact source mismatch: checkout={checked_out_sha} event={event_sha}"
               )
 
-          artifact_files = (manifest_path, code_index_path)
+          atlas_dir = Path(".machine/tracked-inventory")
+          atlas_files = tuple(atlas_dir / name for name in (
+              "files.jsonl", "groups.json", "exact-duplicates.json", "manifest.json"
+          ))
+          atlas_manifest = json.loads((atlas_dir / "manifest.json").read_text(encoding="utf-8"))
+          if atlas_manifest["source_commit"] != checked_out_sha or atlas_manifest["coverage"] != "complete":
+              raise RuntimeError("tracked atlas is incomplete or not pinned to checkout")
+          artifact_files = (manifest_path, code_index_path, *atlas_files)
           provenance = {
               "schema": "skeleton.repository-machine-artifact.v1",
               "source_commit": checked_out_sha,
@@ -103,6 +117,10 @@ jobs:
             .machine/repository-machine.json
             .machine/code-search-index.json
             .machine/index-artifact-manifest.json
+            .machine/tracked-inventory/files.jsonl
+            .machine/tracked-inventory/groups.json
+            .machine/tracked-inventory/exact-duplicates.json
+            .machine/tracked-inventory/manifest.json
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 14

@@ -1,0 +1,115 @@
+name: Game Builder Competitive Threat Radar
+on:
+  pull_request:
+    paths:
+      - "skeleton/ai/game_builder/competitive_title_radar.py"
+      - "skeleton/ai/game_builder/competitive_delivery_gate.py"
+      - "skeleton/ai/game_builder/competitive_watch_book.py"
+      - "skeleton/ai/game_builder/competitive_watch_service.py"
+      - "skeleton/ai/game_builder/competitive_watch_cli.py"
+      - "skeleton/ai/game_builder/competitive_dragon_recrawl.py"
+      - "skeleton/ai/game_builder/competitive_deep_analysis.py"
+      - "skeleton/ai/game_builder/competitive_evolution_chain.py"
+      - "skeleton/ai/game_builder/competitive_counterproposals.py"
+      - "skeleton/ai/game_builder/competitive_deep_service.py"
+      - "skeleton/ai/game_builder/competitive_ancestry_frontier.py"
+      - "skeleton/ai/game_builder/competitive_probe_runner.py"
+      - "skeleton/ai/game_builder/competitive_deep_archive.py"
+      - "skeleton/ai/game_builder/competitive_scrutiny_extension.py"
+      - "skeleton/ai/game_builder/competitive_user_critique.py"
+      - "skeleton/ai/game_builder/competitive_tri_council.py"
+      - "skeleton/ai/game_builder/competitive_pdf_pack.py"
+      - "skeleton/ai/game_builder/competitive_research_missions.py"
+      - "skeleton/ai/game_builder/competitive_battle_approval.py"
+      - "skeleton/ai/game_builder/competitive_battle_review_cli.py"
+      - "skeleton/ai/game_builder/competitive_4080_scrutiny.py"
+      - "skeleton/ai/game_builder/competitive_4080_role_reviews.py"
+      - "skeleton/ai/game_builder/competitive_27page_pdf_campaign.py"
+      - "skeleton/ai/game_builder/competitive_27page_approval.py"
+      - "skeleton/ai/game_builder/game_post_weight_forensics.py"
+      - "skeleton/ai/game_builder/game_post_weight_dragon.py"
+      - "skeleton/ai/game_builder/game_secondary_wisdom_loop.py"
+      - "skeleton/ai/game_builder/game_wisdom_report_archive.py"
+      - "skeleton/ai/game_builder/game_second_train_replay_custody.py"
+      - "skeleton/ai/game_builder/game_18round_relevance.py"
+      - "skeleton/ai/game_builder/game_18round_shadow_sandbox.py"
+      - "skeleton/ai/game_builder/game_18round_evolution.py"
+      - "skeleton/ai/game_builder/game_18round_journal.py"
+      - "skeleton/ai/game_builder/game_18round_runtime.py"
+      - "skeleton/ai/game_builder/game_18round_executor_extensions.py"
+      - "tests/test_game_builder_18round_evolution.py"
+      - "docs/ai/game_18round_hyperweight_evolution_2026_10.md"
+      - "tests/test_game_builder_secondary_wisdom.py"
+      - "docs/ai/game_secondary_wisdom_aftercare_2026_10.md"
+      - "tests/test_game_builder_competitive_4080_campaign.py"
+      - "docs/ai/game_competitive_4080_campaign_2026_10.md"
+      - "skeleton/ai/webcrawler/dragon_research_missions.py"
+      - "skeleton/ai/webcrawler/dragon_research_discovery.py"
+      - "tests/test_game_builder_competitive_council_pdfs.py"
+      - "docs/ai/game_competitive_tri_council_2026_10.md"
+      - "tests/test_game_builder_competitive_deep_archive.py"
+      - "docs/ai/game_deep_enemy_evolution_2026_10.md"
+      - "tests/test_game_builder_competitive_probe_runner.py"
+      - "tests/test_game_builder_competitive_deep.py"
+      - "skeleton/ai/webcrawler/dragon_mission_scheduler.py"
+      - "tests/test_game_builder_competitive_radar.py"
+      - "docs/ai/game_competitive_threat_radar_2026_10.md"
+      - ".github/workflows/game-builder-competitive-radar.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: game-competing-title-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-verified-competitive-intelligence:
+    name: Exact-head competing-title review and individuality (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+      EXACT_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Verify exact-head source with no credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            skeleton/ai/webcrawler/
+            tests/__init__.py
+            tests/test_game_builder_competitive_radar.py
+            tests/test_game_builder_competitive_deep.py
+            tests/test_game_builder_competitive_probe_runner.py
+            tests/test_game_builder_competitive_deep_archive.py
+            tests/test_game_builder_competitive_council_pdfs.py
+            tests/test_game_builder_competitive_4080_campaign.py
+            tests/test_game_builder_secondary_wisdom.py
+            tests/test_game_builder_18round_evolution.py
+            tests/test_game_builder_optimizer_and_wisdom.py
+            tests/test_game_builder_reviewer_promotion.py
+            tests/test_game_builder_knowledge_rights_bridge.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Compile and verify exact commit
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXACT_SHA"
+          python -m compileall -q skeleton/ai/game_builder
+      - name: Adversarial competitor, originality and delivery gate tests
+        shell: bash
+        run: |
+          python -m unittest tests.test_game_builder_18round_evolution tests.test_game_builder_secondary_wisdom tests.test_game_builder_competitive_4080_campaign tests.test_game_builder_competitive_council_pdfs tests.test_game_builder_competitive_deep_archive tests.test_game_builder_competitive_probe_runner tests.test_game_builder_competitive_deep tests.test_game_builder_competitive_radar tests.test_game_builder_knowledge_rights_bridge -v

@@ -4,7 +4,7 @@
  * A step being opened is NOT evidence that an operation ran or a build finished.
  * No model execution, asset or project data is stored by this module.
  */
-import { projectHref } from './worldWorkspace';
+import { projectHref } from './worldWorkspace.ts';
 
 export type JourneyStep = {
   id: string;

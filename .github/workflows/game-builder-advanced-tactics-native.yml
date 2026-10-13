@@ -1,0 +1,210 @@
+name: Advanced Godot Native Tactics Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_tactics_godot.py"
+      - "skeleton/ai/game_builder/advanced_godot_export.py"
+      - "docs/GAME_BUILDER_SYSTEM_EDITOR_FABRIC.md"
+      - ".github/workflows/game-builder-advanced-system-engines.yml"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/advanced_genre_engines.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_tactics_godot.py"
+      - ".github/workflows/game-builder-advanced-tactics-native.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: advanced-native-tactics-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  independently-execute-tactics:
+    name: Python/Godot tactics parity on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 23
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact PR head with safe source scope
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_tactics_godot.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Godot 4.4.1 native runtime and export templates
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Validate exact source and Python proof contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+          python -m py_compile skeleton/ai/game_builder/advanced_godot_export.py skeleton/ai/game_builder/advanced_tactics_godot.py
+          python -m unittest tests.test_game_builder_advanced_tactics_godot -v
+      - name: Build seven reviewed original squad tactics games
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+          from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session
+          from skeleton.ai.game_builder.advanced_tactics_godot import render_tactics_godot_package
+          from skeleton.ai.game_builder.advanced_godot_export import write_advanced_godot_package
+          root=Path(os.environ["RUNNER_TEMP"])/"advanced-native-tactics"
+          root.mkdir()
+          arena={"obstacles":[],"squad_spawns":[[0,0],[0,1]],
+                 "enemy_spawns":[[2,0],[2,1]],"objective":[3,3]}
+          obstacle={"obstacles":[[1,0]],"squad_spawns":[[0,0],[0,1]],
+                    "enemy_spawns":[[2,0],[2,1]],"objective":[3,3]}
+          cases=(
+              ("original",{},["guard","end_turn","switch","overwatch","end_turn"],None,7),
+              ("squad_moves",{"board_width":4,"board_height":4},
+               ["east","switch","east","end_turn"],arena,2),
+              ("line_of_sight",{"board_width":4,"board_height":4,"attack_range":4},
+               ["guard","end_turn","switch","overwatch","end_turn"],obstacle,3),
+              ("overwatch",{"board_width":4,"board_height":4,"attack_range":4},
+               ["overwatch","switch","overwatch","end_turn"],arena,5),
+              ("healing",{"board_width":4,"board_height":4,"unit_health":20},
+               ["heal","switch","guard","end_turn"],arena,0),
+              ("victory",{"board_width":4,"board_height":4,"unit_health":4,
+                         "attack_range":4},["attack:0","attack:1"],arena,1),
+              ("long_rounds",{"board_width":4,"board_height":4,"unit_health":30},
+               ["end_turn","end_turn","end_turn","switch","guard"],arena,11),
+          )
+          witnessed=set()
+          for name,settings,commands,layout,seed in cases:
+              scene=make_advanced_scene("tactics",settings,seed=seed,layout=layout)
+              game=run_advanced_session("tactics",settings,commands,seed=seed,scene=scene)
+              witnessed.update(e for step in game["trace"] for e in step["events"])
+              if name=="victory":
+                  assert game["terminal"] and game["state"]["finished"]
+                  assert game["state"]["score"]==200
+              package=render_tactics_godot_package(game,settings,authorized=True)
+              write_advanced_godot_package(package,root/name,authorized=True)
+              print("NATIVE_TACTICS_SOURCE",name,"commands",len(commands),
+                    "round",game["state"]["round"],"events",game["state"]["events"],
+                    "digest",game["digest"])
+          assert {"unit_moved","direct_attack","mission_complete","overwatch_hit"} <= witnessed,witnessed
+          PY
+      - name: Independently execute seven real native squad tactics scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/advanced-native-tactics"
+          for mode in original squad_moves line_of_sight overwatch healing victory long_rounds; do
+            project="$root/$mode/godot"
+            echo "Native tactical combat case $mode"
+            godot --headless --path "$project" --import
+            godot --headless --path "$project" -- --verify-tactics | tee "$root/$mode/native-replay.log"
+            grep -q "NATIVE_ADVANCED_TACTICS_OK" "$root/$mode/native-replay.log"
+          done
+      - name: Export Linux desktop tactics executable and execute the actual binary
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/advanced-native-tactics/victory/godot"
+          executable="$RUNNER_TEMP/advanced-native-tactics/original-advanced-tactics.x86_64"
+          godot --headless --path "$project" --export-release Linux "$executable"
+          test -s "$executable"
+          chmod +x "$executable"
+          "$executable" --headless -- --verify-tactics | tee "$RUNNER_TEMP/advanced-native-tactics/linux-export-replay.log"
+          grep -q "NATIVE_ADVANCED_TACTICS_OK" "$RUNNER_TEMP/advanced-native-tactics/linux-export-replay.log"
+      - name: Export actual Windows game and verify native console executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'advanced-native-tactics'
+          $project = Join-Path $root 'victory/godot'
+          $binary = Join-Path $root 'original-advanced-tactics.exe'
+          # The setup-godot Windows GUI editor can detach without a reliable
+          # synchronous exit code. Use the same pinned official console engine
+          # already required by the repository's Windows native integration.
+          $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
+          $engineDir = Join-Path $root 'pinned-godot-console'
+          if (-not (Test-Path $archive)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
+            Invoke-WebRequest -Uri 'https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip' -OutFile $archive -MaximumRedirection 5
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          $nativeEditor = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $nativeEditor) {
+            throw "Version-pinned official Godot Windows console editor unavailable"
+          }
+          & $nativeEditor.FullName --version
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows console startup failed" }
+          & $nativeEditor.FullName --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Advanced tactics Windows resource import failed" }
+          & $nativeEditor.FullName --headless --path $project --export-release 'Windows Desktop' $binary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $binary)) {
+            throw "Advanced Godot Windows console game executable export failed"
+          }
+          if ((Get-Item $binary).Length -le 1024) {
+            throw "Advanced Godot Windows game executable is empty"
+          }
+          $console = Join-Path $root 'original-advanced-tactics.console.exe'
+          if (-not (Test-Path $console)) {
+            throw "Exported original tactics lacks an observable Windows console binary"
+          }
+          $python = @'
+          import subprocess,sys
+          result=subprocess.run(
+              [sys.argv[1],"--headless","--","--verify-tactics"],
+              capture_output=True,text=True,timeout=90)
+          print(result.stdout)
+          print(result.stderr)
+          sys.exit(0 if result.returncode==0 and
+              "NATIVE_ADVANCED_TACTICS_OK" in result.stdout+result.stderr else 1)
+          '@
+          $proofScript = Join-Path $root 'verify_windows_native.py'
+          [IO.File]::WriteAllText($proofScript, $python)
+          & python $proofScript $console
+          if ($LASTEXITCODE -ne 0) {
+            throw "Exported Windows homebrew tactics gameplay diverged from reviewed Python"
+          }
+          Write-Host "Native Windows executable SHA256:"
+          Get-FileHash -Algorithm SHA256 $binary | Format-List
+          Get-FileHash -Algorithm SHA256 $console | Format-List
+      - name: Upload native gameplay proof logs and source release manifests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-advanced-tactics-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/advanced-native-tactics/*/native-replay.log
+            ${{ runner.temp }}/advanced-native-tactics/*/release.json
+            ${{ runner.temp }}/advanced-native-tactics/linux-export-replay.log
+            ${{ runner.temp }}/advanced-native-tactics/original-advanced-tactics.exe
+            ${{ runner.temp }}/advanced-native-tactics/original-advanced-tactics.console.exe
+            ${{ runner.temp }}/advanced-native-tactics/original-advanced-tactics.x86_64
+          if-no-files-found: warn
+          retention-days: 7

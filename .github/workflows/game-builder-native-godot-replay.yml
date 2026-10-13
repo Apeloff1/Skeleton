@@ -1,0 +1,352 @@
+name: Game Builder Native Godot Replay
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/**"
+      - "tests/test_game_builder_dual_runtime.py"
+      - "tests/test_game_builder_authored_tiles.py"
+      - "tests/test_game_builder_tile_editor.py"
+      - "tests/test_game_builder_studio_pipeline.py"
+      - "tests/test_game_builder_studio_research.py"
+      - "tests/test_game_builder_consumer_release_assurance.py"
+      - "tests/test_game_builder_studio_execution.py"
+      - "tests/test_game_builder_companion_curriculum.py"
+      - "tests/test_game_builder_tiled_map_import.py"
+      - "tests/test_game_builder_living_story.py"
+      - "tests/test_game_builder_studio_living_world.py"
+      - "tests/test_game_builder_living_story_authoring.py"
+      - "tests/test_game_builder_quest_scene_engine.py"
+      - ".github/workflows/game-builder-native-godot-replay.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/ai/game_builder/**"
+      - "tests/test_game_builder_dual_runtime.py"
+      - "tests/test_game_builder_authored_tiles.py"
+      - "tests/test_game_builder_studio_pipeline.py"
+      - "tests/test_game_builder_studio_research.py"
+      - "tests/test_game_builder_consumer_release_assurance.py"
+      - "tests/test_game_builder_studio_execution.py"
+      - "tests/test_game_builder_companion_curriculum.py"
+      - "tests/test_game_builder_tiled_map_import.py"
+      - "tests/test_game_builder_living_story.py"
+      - "tests/test_game_builder_studio_living_world.py"
+      - "tests/test_game_builder_living_story_authoring.py"
+      - "tests/test_game_builder_quest_scene_engine.py"
+      - ".github/workflows/game-builder-native-godot-replay.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-builder-native-godot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-replay:
+    name: Native Godot 4 replay of Python-proved game
+    runs-on: ubuntu-24.04
+    timeout-minutes: 42
+    env:
+      PYTHONPATH: "."
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install non-.NET Godot 4
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789 # v2.4.1
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Verify exact-head and installed engine
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+      - name: Compile native exporter and integration tests
+        run: >-
+          python -m py_compile
+          skeleton/ai/game_builder/dual_runtime_export.py
+          skeleton/ai/game_builder/dual_runtime_cli.py
+          skeleton/ai/game_builder/authored_tiles.py
+          tests/test_game_builder_dual_runtime.py
+          tests/test_game_builder_authored_tiles.py
+          skeleton/ai/game_builder/studio_tool_fabric.py
+          skeleton/ai/game_builder/mirror_room_runtime.py
+          skeleton/ai/game_builder/original_game_studio.py
+          skeleton/ai/game_builder/original_game_studio_cli.py
+          tests/test_game_builder_studio_pipeline.py
+          tests/test_game_builder_studio_research.py
+          skeleton/ai/game_builder/consumer_release_assurance.py
+          tests/test_game_builder_consumer_release_assurance.py
+          skeleton/ai/game_builder/studio_execution_plane.py
+          tests/test_game_builder_studio_execution.py
+          skeleton/ai/game_builder/companion_curriculum.py
+          tests/test_game_builder_companion_curriculum.py
+          skeleton/ai/game_builder/tiled_map_import.py
+          skeleton/ai/game_builder/tiled_map_cli.py
+          tests/test_game_builder_tiled_map_import.py
+          skeleton/ai/game_builder/living_story_runtime.py
+          skeleton/ai/game_builder/living_story_export.py
+          skeleton/ai/game_builder/living_story_mirror.py
+          tests/test_game_builder_living_story.py
+          tests/test_game_builder_studio_living_world.py
+          skeleton/ai/game_builder/living_story_authoring.py
+          skeleton/ai/game_builder/living_story_blueprint_cli.py
+          tests/test_game_builder_living_story_authoring.py
+          skeleton/ai/game_builder/quest_scene_engine.py
+          skeleton/ai/game_builder/quest_scene_forge.py
+          tests/test_game_builder_quest_scene_engine.py
+      - name: Run actual Godot native winning replays
+        run: |
+          set -euo pipefail
+          python -m unittest             tests.test_game_builder_dual_runtime             tests.test_game_builder_authored_tiles             tests.test_game_builder_tile_editor             tests.test_game_builder_studio_pipeline             tests.test_game_builder_studio_research             tests.test_game_builder_consumer_release_assurance             tests.test_game_builder_studio_execution             tests.test_game_builder_companion_curriculum             tests.test_game_builder_tiled_map_import             tests.test_game_builder_living_story             tests.test_game_builder_studio_living_world             tests.test_game_builder_living_story_authoring             tests.test_game_builder_quest_scene_engine -v
+      - name: Create reproducible native desktop release fixture
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/game-builder/builds"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'game-builder'
+          body = {
+              'project_id': 'skeleton-original-native-2026',
+              'title': 'Original Orbit Labyrinth',
+              'subtitle': 'Original multi-level offline homebrew.',
+              'seed': 204611, 'width': 15, 'height': 13,
+              'levels': 2, 'collectibles_per_level': 2,
+              'hazards_per_level': 3, 'theme': 'space', 'starting_health': 4,
+          }
+          (root / 'intent.json').write_text(json.dumps(body), encoding='utf-8')
+          PY
+          python -m skeleton.ai.game_builder.original_game_studio_cli \
+            --intent "$RUNNER_TEMP/game-builder/intent.json" \
+            --output "$RUNNER_TEMP/game-builder/project" \
+            --companion-practice 1 --mirror-attempts 64 \
+            --living-world-npcs 64 --living-world-regions 9 --living-world-arcs 24 --living-world-quests 8 \
+            --living-world-mode postgame --trusted-local-operator
+          test -s "$RUNNER_TEMP/game-builder/project/living_story/godot/project.godot"
+          test -s "$RUNNER_TEMP/game-builder/project/godot/export_presets.cfg"
+          test -s "$RUNNER_TEMP/game-builder/project/practice/slot-01/godot/project.godot"
+          test -s "$RUNNER_TEMP/game-builder/project/studio/companion_almanac.json"
+      - name: Export runnable Linux and Windows desktop applications
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/game-builder/project/godot"
+          builds="$RUNNER_TEMP/game-builder/builds"
+          godot --headless --path "$project" --import
+          godot --headless --path "$project" --export-release Linux "$builds/original-game.x86_64"
+          godot --headless --path "$project" --export-release 'Windows Desktop' "$builds/original-game.exe"
+          test -s "$builds/original-game.x86_64"
+          test -s "$builds/original-game.exe"
+          file "$builds/original-game.x86_64" "$builds/original-game.exe"
+          chmod +x "$builds/original-game.x86_64"
+          "$builds/original-game.x86_64" --headless --quit-after 200 -- --verify-proof | tee "$builds/linux-native-replay.txt"
+          grep -q NATIVE_REPLAY_OK "$builds/linux-native-replay.txt"
+          # Companion practice games are genuine native titles too, not just
+          # lessons: export and execute the independently replay-proved slot.
+          companion="$RUNNER_TEMP/game-builder/project/practice/slot-01/godot"
+          godot --headless --path "$companion" --import
+          godot --headless --path "$companion" --export-release Linux "$builds/companion-practice.x86_64"
+          godot --headless --path "$companion" --export-release 'Windows Desktop' "$builds/companion-practice.exe"
+          chmod +x "$builds/companion-practice.x86_64"
+          "$builds/companion-practice.x86_64" --headless --quit-after 200 -- --verify-proof | tee "$builds/linux-companion-replay.txt"
+          grep -q NATIVE_REPLAY_OK "$builds/linux-companion-replay.txt"
+          # Independent second genre: original NPC, quest and faction world,
+          # with a separate Python -> native story-state convergence proof.
+          living="$RUNNER_TEMP/game-builder/project/living_story/godot"
+          godot --headless --path "$living" --import
+          godot --headless --path "$living" --export-release Linux "$builds/living-world.x86_64"
+          godot --headless --path "$living" --export-release 'Windows Desktop' "$builds/living-world.exe"
+          chmod +x "$builds/living-world.x86_64"
+          "$builds/living-world.x86_64" --headless --quit-after 240 -- --verify-story | tee "$builds/linux-story-replay.txt"
+          grep -q STORY_NATIVE_REPLAY_OK "$builds/linux-story-replay.txt"
+          cp "$RUNNER_TEMP/game-builder/project/release.json" "$builds/source-release.json"
+          cp "$RUNNER_TEMP/game-builder/project/studio/companion_almanac.json" "$builds/companion-almanac.json"
+          (cd "$builds" && sha256sum original-game.x86_64 original-game*.exe companion-practice.x86_64 companion-practice*.exe living-world.x86_64 living-world*.exe source-release.json companion-almanac.json > SHA256SUMS)
+      - name: Preserve unsigned desktop release candidates
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: skeleton-original-game-linux-windows
+          path: ${{ runner.temp }}/game-builder/builds/*
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  windows-native-studio:
+    name: Execute original Godot consumer candidate on Windows
+    runs-on: windows-2022
+    timeout-minutes: 32
+    env:
+      PYTHONPATH: "."
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+    steps:
+      - name: Enable long-path Git support
+        shell: pwsh
+        run: git config --global core.longpaths true
+      - name: Checkout exact source head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_studio_pipeline.py
+            tests/test_game_builder_consumer_release_assurance.py
+            tests/test_game_builder_studio_execution.py
+            tests/test_game_builder_companion_curriculum.py
+            tests/test_game_builder_tiled_map_import.py
+            tests/test_game_builder_living_story.py
+            tests/test_game_builder_studio_living_world.py
+            tests/test_game_builder_living_story_authoring.py
+            tests/test_game_builder_quest_scene_engine.py
+            tests/test_game_builder_dual_runtime.py
+            tests/test_game_builder_authored_tiles.py
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Install non-.NET Godot 4 on Windows
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789 # v2.4.1
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Verify exact-head and native editor installation
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD).Trim() -ne "$env:EXPECTED_SHA") {
+            throw "Windows runner did not checkout exact source head"
+          }
+          godot --version
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows install failed" }
+      - name: Exercise Python, authored and mirror studio contracts on Windows
+        shell: pwsh
+        run: |
+          python -m unittest tests.test_game_builder_studio_pipeline tests.test_game_builder_consumer_release_assurance tests.test_game_builder_dual_runtime tests.test_game_builder_authored_tiles tests.test_game_builder_studio_execution tests.test_game_builder_companion_curriculum tests.test_game_builder_tiled_map_import tests.test_game_builder_living_story tests.test_game_builder_studio_living_world tests.test_game_builder_living_story_authoring tests.test_game_builder_quest_scene_engine -v
+          if ($LASTEXITCODE -ne 0) { throw "Windows game studio tests failed" }
+      - name: Build original consumer source on Windows
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'original-studio'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          $json = '{"project_id":"skeleton-windows-native-studio-2026","title":"Original Windows Homebrew","subtitle":"Offline consumer QA candidate.","seed":471126,"width":11,"height":11,"levels":1,"collectibles_per_level":1,"hazards_per_level":1,"theme":"arcade","starting_health":4}'
+          [IO.File]::WriteAllText((Join-Path $root 'intent.json'), $json)
+          python -m skeleton.ai.game_builder.original_game_studio_cli --intent (Join-Path $root 'intent.json') --output (Join-Path $root 'project') --mirror-attempts 64 --companion-practice 1 --living-world-npcs 64 --living-world-regions 9 --living-world-arcs 24 --living-world-quests 8 --living-world-mode postgame --trusted-local-operator
+          if ($LASTEXITCODE -ne 0) { throw "Original two-genre studio project failed" }
+          $gate = Get-Content (Join-Path $root 'project/studio/consumer_gate.json') -Raw | ConvertFrom-Json
+          if ($gate.status -ne 'release-blocked') { throw "Missing consumer publication safeguards" }
+      - name: Export and execute real native Windows game
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'original-studio'
+          $project = Join-Path $root 'project/godot'
+          $binary = Join-Path $root 'original-homebrew.exe'
+          # The Godot Windows GUI binary has no console. Recover the console
+          # twin from the same official version-pinned setup-godot archive.
+          $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
+          $engineDir = Join-Path $root 'windows-godot'
+          # setup-godot's cache contains only the GUI executable in some
+          # runner versions. Fetch the pinned official archive when absent;
+          # never silently accept a console-less editor as tested.
+          if (-not (Test-Path $archive)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
+            Invoke-WebRequest -Uri 'https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip' -OutFile $archive -MaximumRedirection 5
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          Write-Host "Official Godot Windows editor contents:"
+          Get-ChildItem $engineDir -Recurse -File | Select-Object -ExpandProperty Name
+          $console = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $console) {
+            throw "Godot Windows console executable unavailable: cannot verify source/native parity"
+          }
+          Write-Host "Using Godot Windows console engine: $($console.FullName)"
+          & $console.FullName --version
+          if ($LASTEXITCODE -ne 0) { throw "Windows console engine failed" }
+          & $console.FullName --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Windows Godot import failed" }
+          & $console.FullName --headless --path $project --export-release 'Windows Desktop' $binary
+          if ($LASTEXITCODE -ne 0) { throw "Windows export failed" }
+          if (-not (Test-Path $binary) -or (Get-Item $binary).Length -le 1024) {
+            throw "No executable Windows consumer candidate"
+          }
+          $wrapper = Get-ChildItem $root -File -Filter '*console.exe' | Select-Object -First 1
+          if ($null -eq $wrapper) {
+            throw "Windows native export has no console wrapper for observable proof replay"
+          }
+          Write-Host "Executing exported Windows native console wrapper: $($wrapper.FullName)"
+          python -c 'import subprocess,sys; p=subprocess.run([sys.argv[1],"--headless","--","--verify-proof"],capture_output=True,text=True,timeout=90); print(p.stdout); print(p.stderr); sys.exit(0 if p.returncode == 0 and "NATIVE_REPLAY_OK" in (p.stdout+p.stderr) else 1)' $wrapper.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Real Windows consumer executable diverged from Python proof" }
+          # The companion's practice game has its own world, scene, digest
+          # and replay. Exercise it as a separate native executable.
+          $practiceProject = Join-Path $root 'project/practice/slot-01/godot'
+          $practiceBinary = Join-Path $root 'companion-practice.exe'
+          & $console.FullName --headless --path $practiceProject --import
+          if ($LASTEXITCODE -ne 0) { throw "Companion Windows Godot import failed" }
+          & $console.FullName --headless --path $practiceProject --export-release 'Windows Desktop' $practiceBinary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $practiceBinary)) { throw "Companion native game export failed" }
+          $practiceWrapper = Join-Path $root 'companion-practice.console.exe'
+          if (-not (Test-Path $practiceWrapper)) { throw "Companion release missing proof console wrapper" }
+          python -c 'import subprocess,sys; p=subprocess.run([sys.argv[1],"--headless","--","--verify-proof"],capture_output=True,text=True,timeout=90); print(p.stdout); print(p.stderr); sys.exit(0 if p.returncode == 0 and "NATIVE_REPLAY_OK" in (p.stdout+p.stderr) else 1)' $practiceWrapper
+          if ($LASTEXITCODE -ne 0) { throw "Companion Windows game diverged from independently verified practice proof" }
+          $livingProject = Join-Path $root 'project/living_story/godot'
+          $livingBinary = Join-Path $root 'living-world.exe'
+          & $console.FullName --headless --path $livingProject --import
+          if ($LASTEXITCODE -ne 0) { throw "Living-world Godot import failed" }
+          & $console.FullName --headless --path $livingProject --export-release 'Windows Desktop' $livingBinary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $livingBinary)) {
+            throw "Original living-world native export failed"
+          }
+          $livingWrapper = Join-Path $root 'living-world.console.exe'
+          if (-not (Test-Path $livingWrapper)) { throw "Living-world native console wrapper missing" }
+          python -c 'import subprocess,sys; p=subprocess.run([sys.argv[1],"--headless","--","--verify-story"],capture_output=True,text=True,timeout=100); print(p.stdout); print(p.stderr); sys.exit(0 if p.returncode == 0 and "STORY_NATIVE_REPLAY_OK" in (p.stdout+p.stderr) else 1)' $livingWrapper
+          if ($LASTEXITCODE -ne 0) { throw "Native Windows NPC and quest state diverged from Python" }
+          Get-FileHash $livingBinary -Algorithm SHA256 | Format-List
+          Get-FileHash $livingWrapper -Algorithm SHA256 | Format-List
+          Get-FileHash $practiceBinary -Algorithm SHA256 | Format-List
+          Get-FileHash $practiceWrapper -Algorithm SHA256 | Format-List
+          Get-FileHash $binary -Algorithm SHA256 | Format-List
+          Get-FileHash $wrapper.FullName -Algorithm SHA256 | Format-List
+          $hashes = @($binary, $wrapper.FullName, $practiceBinary, $practiceWrapper, $livingBinary, $livingWrapper) | ForEach-Object {
+            $item = $_
+            $hash = (Get-FileHash -LiteralPath $item -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path -Leaf $item)"
+          }
+          [IO.File]::WriteAllLines((Join-Path $root 'SHA256SUMS'), [string[]]$hashes)
+      - name: Upload Windows-executed original game and companion source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: original-windows-native-homebrew-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/original-studio/original-homebrew.exe
+            ${{ runner.temp }}/original-studio/original-homebrew.console.exe
+            ${{ runner.temp }}/original-studio/companion-practice.exe
+            ${{ runner.temp }}/original-studio/companion-practice.console.exe
+            ${{ runner.temp }}/original-studio/living-world.exe
+            ${{ runner.temp }}/original-studio/living-world.console.exe
+            ${{ runner.temp }}/original-studio/SHA256SUMS
+            ${{ runner.temp }}/original-studio/project/
+          retention-days: 7
+          if-no-files-found: error

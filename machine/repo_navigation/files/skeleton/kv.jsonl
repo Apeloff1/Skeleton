@@ -1,0 +1,5 @@
+{"p":"skeleton/kv/__init__.py","g":"b4bc60a3ed0e919889e9dce3aafa045ace22fffe","b":500,"m":"100644","t":"blob","z":"platform","f":"skeleton/kv"}
+{"p":"skeleton/kv/cache_service.py","g":"d076dcda5fc49b8cac9f1a76eb51422326708a49","b":2618,"m":"100644","t":"blob","z":"platform","f":"skeleton/kv"}
+{"p":"skeleton/kv/manager.py","g":"20b0b29ad427efae55b6be3738842a45f3584cc7","b":21981,"m":"100644","t":"blob","z":"platform","f":"skeleton/kv"}
+{"p":"skeleton/kv/prefix_cache.py","g":"ae775d63dff61eadb50e1f0a784b7c0bf0eec0aa","b":1774,"m":"100644","t":"blob","z":"platform","f":"skeleton/kv"}
+{"p":"skeleton/kv/types.py","g":"ed01c2a46054d26d4a1027749bd2404d640f6045","b":5134,"m":"100644","t":"blob","z":"platform","f":"skeleton/kv"}
