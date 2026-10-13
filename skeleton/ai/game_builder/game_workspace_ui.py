@@ -631,7 +631,7 @@ $("jeeves-publish-review").addEventListener("click",()=>dmGuard(async()=>{
  const report=receipt.result;
  publishedReview=report;
  publishedProposalIds=JSON.stringify(ids);
- $("jeeves-publish-report").textContent=JSON.stringify(report,null,2).slice(0,190000);
+ $("jeeves-publish-report").textContent=JSON.stringify(report,null,2);
  publicationRenderApprovals(report.proposals);
  status(report.proposal_count+" real original source diffs ready for individual review. "+
   (report.some_diffs_truncated?"Split truncated bundles before acceptance.":
@@ -825,6 +825,83 @@ $("jeeves-queue-select").addEventListener("click",()=>dmGuard(async()=>{
  $("jeeves-publish-ids").value=pending.map(p=>p.proposal_id).join("\n");
  status(pending.length+" current-project source proposals selected for "+
   "exact human review and individual approval. Nothing was committed.");
+}));
+
+
+/* Approved source releases: actual source custody, exact hashes, download. */
+let releaseVerification=null;
+let releaseVerificationArgs=null;
+async function releaseCustodyArgs(){
+ if(!model||selectedTree!=="current"||!selectedProject||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select current original project and scan app inventory");
+ const release_id=$("jeeves-accepted-release").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(release_id))
+  throw Error("Safe original release identifier required");
+ return {project:model.active,release_id,expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-release-catalog").addEventListener("click",()=>dmGuard(async()=>{
+ if(!model||!model.active||!jeevesAppSnapshot)
+  throw Error("Select original active project and scan source inventory");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.release.catalog",
+  params:{project:model.active,offset:0,limit:80,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false,
+ });
+ const data=receipt.result;
+ $("jeeves-accepted-report").textContent=JSON.stringify(data,null,2);
+ if(data.release_ids.length)
+  $("jeeves-accepted-release").value=data.release_ids[0];
+ status(data.total_source_release_ids+
+  " original project release folders found. Verify all source hashes and approvals.");
+}));
+$("jeeves-release-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=await releaseCustodyArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.release.verify",params:args,operator_authorized:false,
+ });
+ const evidence=receipt.result;
+ releaseVerification=evidence.digest;
+ releaseVerificationArgs=JSON.stringify(args);
+ $("jeeves-accepted-report").textContent=JSON.stringify(evidence,null,2);
+ status(evidence.source_file_count+" actual project source versions verified "+
+  "against original game manifest and recorded individual human approvals. "+
+  "No native game binary was executed.");
+}));
+$("jeeves-release-download").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-release-download-approval").checked)
+  throw Error("Explicitly approve exporting selected reviewed original source release");
+ const args=await releaseCustodyArgs();
+ if(!releaseVerification||releaseVerificationArgs!==JSON.stringify(args))
+  throw Error("Release selection changed; verify approved source bundle again");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.release.download",
+  params:{...args,expected_verification_digest:releaseVerification},
+  operator_authorized:true,
+ });
+ const bundle=receipt.result;
+ if(bundle.zip_bytes>2210000||!/^[a-z0-9_-]+_[a-z0-9_-]+_source\\.zip$/.test(bundle.filename))
+  throw Error("Unexpected original source export metadata");
+ const binary=atob(bundle.base64);
+ if(binary.length!==bundle.zip_bytes)
+  throw Error("Original source transfer byte count mismatch");
+ const bytes=Uint8Array.from(binary,character=>character.charCodeAt(0));
+ const download=new Blob([bytes],{type:"application/zip"});
+ const url=URL.createObjectURL(download);
+ const a=document.createElement("a");
+ a.href=url;a.download=bundle.filename;
+ document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),500);
+ $("jeeves-accepted-report").textContent=JSON.stringify({
+  filename:bundle.filename,
+  source_zip_sha256:bundle.zip_sha256,
+  bytes:bundle.zip_bytes,
+  source_verification_digest:bundle.verification_digest,
+  source_files_approved:true,hardware_certified:false
+ },null,2);
+ status("Original approved browser/Godot source archive delivered for local download. "+
+  "Device execution, licensing and commercial release still require signoff.");
 }));
 
 function storyProject(){
@@ -4872,6 +4949,20 @@ individual source publication; no automatic approval.</small></p>
 <button id="jeeves-queue-next" type="button" disabled>Next proposal custody page</button>
 <button id="jeeves-queue-select" type="button">Select pending proposals for source review</button>
 <pre id="jeeves-queue-result" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Approved Game Release Source Export</legend>
+<p><small>Read actual human-committed game files, verify every current-source
+SHA and acceptance receipt against the canonical browser/Godot manifest,
+then export a portable original source ZIP. Godot binaries are not built.</small></p>
+<button id="jeeves-release-catalog" type="button">Discover current project release source folders</button>
+<label>Human-approved original source release
+<input id="jeeves-accepted-release" placeholder="demo_01" value="demo_01"></label>
+<button id="jeeves-release-verify" type="button">Verify exact accepted release sources</button>
+<label><input id="jeeves-release-download-approval" type="checkbox">
+Authorize original source-only ZIP download</label>
+<button id="jeeves-release-download" type="button">Download approved browser + Godot source archive</button>
+<pre id="jeeves-accepted-report" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
