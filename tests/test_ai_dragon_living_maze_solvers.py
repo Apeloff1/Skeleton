@@ -143,7 +143,9 @@ def test_changing_maze_replay_rejects_tampered_path_costs_and_truncated_search_r
     assert verify_proof(world,proof)["verified"]
     for forged in (
         replace(proof,actual_turns=proof.actual_turns+1),
-        replace(proof,search_budget=100),
+        # Budgets of 100 or more can be independently replay-valid.
+        # A value below the canonical minimum must always be rejected.
+        replace(proof,search_budget=99),
         replace(proof,replay_digest="0"*64),
         replace(proof,steps=proof.steps+("wait",)),
         replace(proof,ending_is_required=True),
