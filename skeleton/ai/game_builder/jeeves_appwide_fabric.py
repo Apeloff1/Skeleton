@@ -346,6 +346,7 @@ OPERATIONS = {
     "ai.impact":("read", "selected-source dependency and blast-radius preview",False),
     "ai.context":("read", "budgeted source-linked metadata context for Jeeves",False),
     "ai.duplicates":("read", "exact and heuristic near-duplicate review candidates",False),
+    "ai.completion":("read", "full-app canonical readiness and evidence-gap census",False),
     "source.inspect":("read", "UTF-8 source",False),
     "source.propose":("proposal", "exact-file reviewed code edit",True),
     "editor.catalog":("read", "typed original-game editors",False),
@@ -427,6 +428,9 @@ class JeevesAppwideRuntime:
                 result=intelligence.context(**params)
             else:
                 result=intelligence.duplicates(**params)
+        elif action=="ai.completion":
+            from .jeeves_completion_census import JeevesCompletionCensus
+            result=JeevesCompletionCensus(inv).report(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
