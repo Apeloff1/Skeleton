@@ -180,23 +180,42 @@ class JeevesCapabilityDispatcher:
         from skeleton.jeeves.app_capability_bridge import _manifest, _root
         home = _root(root)
         raw = _manifest(home / "machine" / "ai_capabilities.json").get("capabilities")
-        if not isinstance(raw, list) or len(raw) > MAX_FEATURES:
-            raise AppDispatchError("canonical AI feature list is unavailable")
+        planes = _manifest(home / "machine" / "capability_registry.json").get("capabilities")
+        if (not isinstance(raw, list) or not isinstance(planes, list)
+                or len(raw) + len(planes) > MAX_FEATURES):
+            raise AppDispatchError("canonical application capability registries unavailable")
         declared: dict[str, dict[str, Any]] = {}
         for item in raw:
             if not isinstance(item, dict):
-                raise AppDispatchError("canonical feature descriptor is invalid")
+                raise AppDispatchError("canonical AI feature descriptor is invalid")
             name = _identifier(item.get("capability_id"), "capability_id")
             if name in declared:
-                raise AppDispatchError("canonical features include duplicate IDs")
+                raise AppDispatchError("canonical features contain duplicate IDs")
             declared[name] = item
+        # Runtime plane contracts extend Jeeves action routing beyond chat/AI.
+        # A plane with no resolved production owner cannot be made executable.
+        for item in planes:
+            if not isinstance(item, dict):
+                raise AppDispatchError("canonical app plane descriptor is invalid")
+            name = _identifier(item.get("id"), "runtime capability_id")
+            owner = _identifier(item.get("plane"), "runtime owner_plane")
+            owners = item.get("owners")
+            if name in declared:
+                raise AppDispatchError("app capability identifiers collide")
+            if not isinstance(owners, list):
+                raise AppDispatchError("runtime capability has malformed owners")
+            declared[name] = {
+                "capability_id": name,
+                "owner_plane": owner,
+                "enabled": item.get("status") == "present" and len(owners) > 0,
+            }
         configured: dict[str, HostCapabilityBinding] = {}
         for binding in bindings:
             if not isinstance(binding, HostCapabilityBinding):
                 raise AppDispatchError("binding must be typed")
             feature = declared.get(binding.capability_id)
             if feature is None:
-                raise AppDispatchError("host bound an undeclared AI capability")
+                raise AppDispatchError("host bound an undeclared application capability")
             if feature.get("owner_plane") != binding.owner_plane:
                 raise AppDispatchError("host binding would transfer feature ownership")
             if feature.get("enabled") is not True:
@@ -235,7 +254,7 @@ class JeevesCapabilityDispatcher:
             feature_id = _identifier(capability_id, "capability_id")
             binding = self._bindings.get(feature_id)
             if binding is None:
-                raise AppDispatchError("AI feature is not bound to a trusted host tool")
+                raise AppDispatchError("app capability is not bound to a trusted host tool")
             if not isinstance(context, ToolExecutionContext):
                 raise AppDispatchError("host execution context is required")
             _identifier(project_id, "project_id")
