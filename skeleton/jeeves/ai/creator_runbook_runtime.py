@@ -258,8 +258,9 @@ class CreatorRunbookRunner:
             current = self._statuses[self.plan.get(step_id).step_id]
             if current.status is not RunbookState.IN_FLIGHT:
                 raise CreatorRunbookError("only in-flight work can be quarantined")
-            if not isinstance(evidence_digest, str) or len(evidence_digest) != 64:
-                raise CreatorRunbookError("quarantine requires evidence digest")
+            if (not isinstance(evidence_digest, str) or len(evidence_digest) != 64
+                    or any(ch not in "0123456789abcdef" for ch in evidence_digest)):
+                raise CreatorRunbookError("quarantine requires SHA-256 evidence digest")
             item = RunbookStepStatus(
                 step_id, RunbookState.IN_DOUBT, current.attempts,
                 observation_digest=evidence_digest, outcome_reason=reason[:128],
@@ -268,6 +269,61 @@ class CreatorRunbookRunner:
             updated[step_id] = item
             self._persist(updated)
             return item
+
+    def reconcile_effect(
+        self, step_id: str, *,
+        verifier_id: str,
+        proof_digest: str,
+        verify_external: Callable[
+            [CreatorRunbookStep, CreatorCommandReceipt | None, str, str], bool
+        ],
+        receipt: CreatorCommandReceipt | None = None,
+    ) -> RunbookStepStatus:
+        """Independently settle an uncertain effect without invoking it again.
+
+        A verified command receipt resolves the step as succeeded. An absence
+        receipt verified by the external owner can close it as ABORTED; neither
+        outcome authorizes a new attempt of that non-idempotent command.
+        """
+        if (not isinstance(verifier_id, str) or not verifier_id.strip()
+                or len(verifier_id) > 192):
+            raise CreatorRunbookError("independent verifier identity required")
+        if (not isinstance(proof_digest, str) or len(proof_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in proof_digest)):
+            raise CreatorRunbookError("external effect proof must be SHA-256")
+        if not callable(verify_external):
+            raise CreatorRunbookError("host external-effect verifier required")
+        with self._lock:
+            step = self.plan.get(step_id)
+            prior = self._statuses[step_id]
+            if prior.status not in (RunbookState.IN_DOUBT, RunbookState.IN_FLIGHT):
+                raise CreatorRunbookError("only uncertain or in-flight effects can be settled")
+            if receipt is not None:
+                if not isinstance(receipt, CreatorCommandReceipt):
+                    raise CreatorRunbookError("typed external creator receipt required")
+                validate_creator_receipt(receipt, step.command)
+            outcome = "completed" if receipt is not None else "confirmed_no_effect"
+            if verify_external(step, receipt, proof_digest, verifier_id) is not True:
+                raise CreatorRunbookError("independent host could not settle external effect")
+            evidence = _digest({
+                "step_id": step_id, "command_digest": step.command.digest,
+                "previous_status": prior.status.value,
+                "prior_observation": prior.observation_digest,
+                "verifier_id": verifier_id, "proof_digest": proof_digest,
+                "receipt_digest": receipt.digest if receipt is not None else None,
+                "outcome": outcome,
+            })
+            settled = RunbookStepStatus(
+                step_id=step_id,
+                status=RunbookState.SUCCEEDED if receipt else RunbookState.ABORTED,
+                attempts=prior.attempts,
+                receipt_digest=receipt.digest if receipt is not None else None,
+                observation_digest=evidence, outcome_reason=outcome,
+            )
+            revised = dict(self._statuses)
+            revised[step_id] = settled
+            self._persist(revised)
+            return settled
 
     def execute_step(self, step_id: str, *, context: ToolExecutionContext,
                      grant: ToolGrant) -> RunbookStepStatus:
