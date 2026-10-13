@@ -1513,6 +1513,67 @@ $("jeeves-outcomes-verify").addEventListener("click",()=>dmGuard(async()=>{
   "No claim to unseen player actions.");
 }));
 
+
+/* Original narrative consequences derived from real game branches and signed story. */
+let consequencePlan=null,consequenceInput=null;
+function consequenceArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active original game and current app snapshot");
+ const campaign_id=$("jeeves-consequence-campaign").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(campaign_id))
+  throw Error("Signed original campaign ID is required");
+ return {project:model.active,campaign_id,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-consequence-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const args=consequenceArgs();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.consequences.plan",
+  params:args,operator_authorized:false
+ });
+ const result=response.result;
+ consequencePlan=result.digest;consequenceInput=JSON.stringify(args);
+ $("jeeves-consequence-report").textContent=JSON.stringify(result,null,2);
+ status(result.game_scenarios_reexecuted+" approved original-game scenarios "+
+  "connected to "+result.original_signed_causal_event_ids.length+
+  " source-signed causal events. Character changes are narrative records, "+
+  "not automatically applied game mechanics.");
+}));
+$("jeeves-consequence-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-consequence-approval").checked)
+  throw Error("Human source review authorization required");
+ const args=consequenceArgs();
+ if(!consequencePlan||consequenceInput!==JSON.stringify(args))
+  throw Error("Original game and story source changed; rebuild consequence plan");
+ const reason=$("jeeves-consequence-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Concrete source review and narrative reason required");
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.consequences.stage",
+  params:{...args,expected_plan_digest:consequencePlan,reason},
+  operator_authorized:true
+ });
+ const result=response.result;
+ $("jeeves-consequence-report").textContent=JSON.stringify(result,null,2);
+ $("jeeves-publish-ids").value=result.proposal_id;
+ consequencePlan=null;
+ status("Human-readable source-linked cast, location and causal history "+
+  "now staged for independent source diff and commit.");
+}));
+$("jeeves-consequence-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=consequenceArgs();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.consequences.verify",
+  params:args,operator_authorized:false
+ });
+ const result=response.result;
+ $("jeeves-consequence-report").textContent=JSON.stringify(result,null,2);
+ status(result.actual_player_scenarios_reexecuted+" actual story-bound "+
+  "gameplay variants reverified. No unsupported karma/faction mutations "+
+  "or native-game execution asserted.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5824,6 +5885,23 @@ Authorize actual simulation of supplied original player actions</label>
 <button id="jeeves-outcomes-stage" type="button">Stage reproducible game outcome evidence for human review</button>
 <button id="jeeves-outcomes-verify" type="button">Reexecute source-committed outcome portfolio</button>
 <pre id="jeeves-outcomes-report" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Player Choices, Characters & Consequences</legend>
+<p><small>Rebuild current approved multiple-endings evidence against full
+signed original story scenes, cast/region identities and causally witnessed
+character changes. Differences between played routes are sourced, not
+invented. Written character changes are not automatically game mechanics.</small></p>
+<label>Approved original game campaign ID
+<input id="jeeves-consequence-campaign" value="first_original_campaign"></label>
+<button id="jeeves-consequence-plan" type="button">Analyze actual alternative story and player consequences</button>
+<label>Original story/character source review reason
+<textarea id="jeeves-consequence-reason" rows="2" spellcheck="false">Verify causal character, regional and narrative consequences of the actual played original game routes.</textarea></label>
+<label><input id="jeeves-consequence-approval" type="checkbox">
+Authorize human-reviewed consequence source proposal</label>
+<button id="jeeves-consequence-stage" type="button">Stage real player consequence matrix as original game source</button>
+<button id="jeeves-consequence-verify" type="button">Reverify signed story and actually played outcomes</button>
+<pre id="jeeves-consequence-report" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
