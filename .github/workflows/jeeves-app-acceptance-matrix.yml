@@ -14,6 +14,7 @@ on:
       - "scripts/run_app_acceptance_matrix.py"
       - "scripts/verify_app_acceptance_ci.py"
       - "tests/test_game_builder_jeeves_acceptance_matrix.py"
+      - "tests/test_game_builder_jeeves_product_studio_journey.py"
       - "tests/test_run_app_acceptance_matrix.py"
       - "tests/test_ai_offline_native_functional_boundary.py"
       - "tests/test_ai_shell_approval_contract.py"
@@ -99,6 +100,7 @@ jobs:
             scripts/run_app_acceptance_matrix.py \
             scripts/verify_app_acceptance_ci.py \
             tests/test_game_builder_jeeves_acceptance_matrix.py \
+            tests/test_game_builder_jeeves_product_studio_journey.py \
             tests/test_run_app_acceptance_matrix.py \
             tests/test_game_builder_jeeves_acceptance_run_verifier.py
       - name: Adversarial candidate-binding and CI evidence validation
