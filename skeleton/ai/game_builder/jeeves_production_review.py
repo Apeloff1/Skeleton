@@ -152,6 +152,7 @@ class JeevesProductionReview:
             "proposals": reviews,
             "some_diffs_truncated": any(r["diff_truncated"] for r in reviews),
             "source_files_committed": 0,
+            "complete_review_text_must_be_rendered_before_acceptance": True,
             "independent_human_acceptance_required": True,
             "reviewed_bundle_is_not_atomic_commit": True,
         }

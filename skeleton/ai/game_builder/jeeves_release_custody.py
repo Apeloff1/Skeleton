@@ -135,6 +135,31 @@ class JeevesReleaseCustody:
             checksum = receipt.get("result_sha256")
             if (path in wanted and type(checksum) is str
                     and SHA.fullmatch(checksum)):
+                # The accepted record must correspond to a genuine canonical
+                # *exact-source* review proposal. A stray editable receipt
+                # with a matching SHA alone must not qualify a source release.
+                proposed_path = (
+                    self.ws.root / "reviews" / "proposals" /
+                    (file.stem + ".json")
+                )
+                if (proposed_path.is_symlink() or
+                        not proposed_path.is_file()):
+                    continue
+                try:
+                    proposed = _json(_read(proposed_path, 300_000))
+                except (ValueError, OSError):
+                    continue
+                if (type(proposed) is not dict
+                        or canonical_digest(proposed) != file.stem
+                        or proposed.get("schema") !=
+                           "skeleton.game_builder.targeted_edit.v1"
+                        or proposed.get("project") != project
+                        or proposed.get("path") != path
+                        or proposed.get("new_sha256") != checksum
+                        or type(proposed.get("new_content")) is not str
+                        or sha256(proposed["new_content"].encode()).hexdigest()
+                           != checksum):
+                    continue
                 approved[path].add(checksum)
         return approved
 
