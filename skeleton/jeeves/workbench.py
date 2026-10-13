@@ -355,6 +355,7 @@ class JeevesWorkbench:
             HostIdleTelemetry, IdleWorkCandidate, IdleWorkKind,
             JeevesIdleLearningScheduler,
         )
+        from skeleton.ai.training.flgb_training_runtime import digest_json
         if not isinstance(telemetry, HostIdleTelemetry):
             raise JeevesWorkbenchError("trusted host idle telemetry required")
         with self._lock:
@@ -376,10 +377,11 @@ class JeevesWorkbench:
                     "quarantined": IdleWorkKind.SOURCE_RESEARCH,
                     "corroborated": IdleWorkKind.CANDIDATE_PREPARATION,
                 }[record["state"]]
+                scope = intake["target_scope"]
                 candidates.append(IdleWorkCandidate(
-                    work_id="shadow-" + intake["intake_id"],
-                    scope_id=intake["target_scope"],
-                    source_digest=self.shadow.get(intake["intake_id"]).intake.digest,
+                    work_id="shadow-" + sha256(intake["intake_id"].encode("utf-8")).hexdigest()[:48],
+                    scope_id=scope if len(scope) <= 192 else "scope-" + sha256(scope.encode("utf-8")).hexdigest(),
+                    source_digest=digest_json(intake),
                     kind=kind,
                     relevance_ppm=intake["relevance_ppm"],
                     novelty_ppm=intake["novelty_ppm"],
