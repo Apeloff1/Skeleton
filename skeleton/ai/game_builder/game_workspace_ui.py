@@ -336,6 +336,27 @@ function dmPositive(id,min,max){
   throw Error("Expected a whole number between "+min+" and "+max);
  return number;
 }
+let jeevesReleaseQueueDigest=null;
+$("jeeves-dm-release-queue").addEventListener("click",()=>dmGuard(async()=>{
+ const report=await dmInvoke("ai.product.release.queue",{});
+ jeevesReleaseQueueDigest=report.digest;
+ const lines=[
+  "Independent release-proof obligations: "+report.leaf_evidence_denominator,
+  "Unverified in this source-only scan: "+report.leaf_proofs_unverified_by_this_reader,
+  "Breakdown: "+JSON.stringify(report.category_leaf_breakdown),
+  "Full-app completion: UNKNOWN pending authenticated CI, device, user and AI evidence.",
+ ].join("\n");
+ $("jeeves-dm-output").textContent=lines+"\n\n"+JSON.stringify(report,null,2).slice(0,60000);
+ status("Release work queue indexed; no automatic execution or signoff.");
+}));
+$("jeeves-dm-release-first").addEventListener("click",()=>dmGuard(async()=>{
+ const params={offset:0,limit:30};
+ if(jeevesReleaseQueueDigest)
+  params.expected_queue_digest=jeevesReleaseQueueDigest;
+ const report=await dmInvoke("ai.product.release.queue.page",params);
+ $("jeeves-dm-output").textContent=JSON.stringify(report,null,2).slice(0,60000);
+ status(report.total_matches+" exact-source release obligations; first 30 ordered by proof priority.");
+}));
 let jeevesReleaseJourneyDigest=null;
 $("jeeves-dm-journeys").addEventListener("click",()=>dmGuard(async()=>{
  const receipt=await dmInvoke("ai.product.journeys",{});
@@ -4477,6 +4498,8 @@ and reviewed multi-adapter previews. All previews are non-mutating; source edits
 model promotion and release still require independent approval and evidence.</small></p>
 <button id="jeeves-dm-measure" type="button">Measure full-app acceptance scope</button>
 <button id="jeeves-dm-journeys" type="button">Audit 12 enterprise user journeys</button>
+<button id="jeeves-dm-release-queue" type="button">Measure all independent release blockers</button>
+<button id="jeeves-dm-release-first" type="button">Inspect highest-priority 30 release obligations</button>
 <button id="jeeves-dm-journey-gaps" type="button">Inspect first 6 release-blocked journeys</button>
 <button id="jeeves-dm-test-matrix" type="button">Measure test-linked feature families</button>
 <button id="jeeves-dm-unmapped-tests" type="button">List unbound feature tests</button>
