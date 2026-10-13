@@ -300,13 +300,19 @@ class DurableShadowWeightPipeline:
             reason_digest=reason_digest, authority=authority, at_ns=at_ns,
         ))
 
+    def refresh(self) -> dict[str, object]:
+        """Reload authoritative journal after another writer changed its head."""
+        with self._lock:
+            self._pipeline = self._restore()
+            return self._pipeline.snapshot()
+
     def get(self, intake_id: str) -> ShadowRecord | None:
         with self._lock:
+            self._pipeline = self._restore()
             return self._pipeline.get(intake_id)
 
     def snapshot(self) -> dict[str, object]:
-        with self._lock:
-            return self._pipeline.snapshot()
+        return self.refresh()
 
     def close(self) -> None:
         with self._lock:
