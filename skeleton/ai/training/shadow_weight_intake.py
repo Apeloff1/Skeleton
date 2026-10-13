@@ -119,8 +119,10 @@ class ShadowIntakeAssessment:
         require_digest(self.knowledge_digest, "knowledge_digest")
         require_digest(self.policy_digest, "policy_digest")
         _count("independent_roots", self.independent_roots)
-        if tuple(sorted(set(self.reason_codes))) != self.reason_codes:
+        canonical = tuple(self.reason_codes)
+        if tuple(sorted(set(canonical))) != canonical:
             raise ShadowWeightError("intake reason codes must be unique and sorted")
+        object.__setattr__(self, "reason_codes", canonical)
         if self.disposition not in {"training-ready", "pending", "quarantined"}:
             raise ShadowWeightError("invalid intake disposition")
         if self.disposition == "training-ready" and self.reason_codes:
