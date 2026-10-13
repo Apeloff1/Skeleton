@@ -25,8 +25,8 @@ ALLOWED=frozenset({
     ".yml",".yaml",".html",".js",".css",".ini",".csv",
 })
 SOURCE_MAX=256000
-PROJECT_MAX_FILES=384
-PROJECT_MAX_BYTES=6_000_000
+PROJECT_MAX_FILES=12512
+PROJECT_MAX_BYTES=256_000_000
 
 
 class WorkspaceError(ValueError):
@@ -341,6 +341,10 @@ class GameWorkspace:
                     raise WorkspaceError("editor source path does not match typed system ID")
             if relative.startswith("scenes/advanced_"):
                 self._validate_advanced_scene_source(project,relative,parsed)
+            if (relative in ("game/story_bible.json","game/continuity_contract.json")
+                    or relative.startswith(("story/scenes/","story/chapters/"))):
+                from .story_workspace import validate_story_workspace_source
+                validate_story_workspace_source(self,project,relative,parsed)
         proposal=dict(
             schema="skeleton.game_builder.targeted_edit.v1",
             project=project,path=_relative(relative),reason=reason,
@@ -385,6 +389,11 @@ class GameWorkspace:
                     raise WorkspaceError("editor document path mismatches its system identity")
             if proposal["path"].startswith("scenes/advanced_"):
                 self._validate_advanced_scene_source(project,proposal["path"],parsed)
+            if (proposal["path"] in ("game/story_bible.json",
+                                      "game/continuity_contract.json") or
+                    proposal["path"].startswith(("story/scenes/","story/chapters/"))):
+                from .story_workspace import validate_story_workspace_source
+                validate_story_workspace_source(self,project,proposal["path"],parsed)
             if proposal["path"]=="game/director.json":
                 from .quest_scene_forge import compile_director_blueprint
                 compile_director_blueprint(_json(proposal["new_content"]),

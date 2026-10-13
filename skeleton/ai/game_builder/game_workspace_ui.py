@@ -181,6 +181,376 @@ $("plan").addEventListener("click",async()=>{
          "Choose a target and submit an explicit source proposal.");
  }catch(error){status("Prompt routing failed: "+error.message);}
 });
+
+
+let jeevesAppAtlas=null;
+async function jeevesAppRefresh(){
+ const atlas=await api("/api/jeeves-app-atlas");
+ jeevesAppAtlas=atlas;
+ setOptions("jeeves-app-family",atlas.families.filter(x=>x.present).map(x=>x.id));
+ setOptions("jeeves-app-action",atlas.operator_adapters.map(x=>x.id));
+ $("jeeves-app-results").textContent=[
+  "INSTALLED SKELETON APPLICATION",
+  "Discovered app families: "+atlas.family_count,
+  "Typed system editors: "+atlas.typed_game_editor_count,
+  "Audited Jeeves actions: "+atlas.operator_adapters.length,
+  "Existing executable game builders: "+atlas.local_executable_game_tools.length,
+  "Unwired modules remain discoverable without runnable model authority.",
+  "All projects and source commits remain governed by explicit review.",
+ ].join("\n");
+ $("jeeves-app-args").value="{}";
+}
+$("jeeves-app-refresh").addEventListener("click",async()=>{
+ try{await jeevesAppRefresh();status("Jeeves app taxonomy freshly scanned.");}
+ catch(error){status("App feature discovery failed: "+error.message);}
+});
+$("jeeves-app-family-list").addEventListener("click",async()=>{
+ try{
+  const family=$("jeeves-app-family").value;
+  if(!family)throw Error("Select an installed app subsystem");
+  const result=await api("/api/jeeves-app-atlas?family="+encodeURIComponent(family)+
+   "&offset=0&limit=120");
+  $("jeeves-app-results").textContent=JSON.stringify(result,null,2).slice(0,40000);
+  status(family+" modules enumerated; unwired entries do not imply runtime execution.");
+ }catch(error){status("App family lookup failed: "+error.message);}
+});
+$("jeeves-app-execute").addEventListener("click",async()=>{
+ try{
+  const action=$("jeeves-app-action").value;
+  const args=JSON.parse($("jeeves-app-args").value);
+  const response=await api("/api/jeeves-app-action",{
+   project:storyProject(),action,args});
+  $("jeeves-app-results").textContent=JSON.stringify(response,null,2).slice(0,45000);
+  if(action==="studio.editor.stage"){
+   $("proposal").textContent=response.result.proposal_id;
+   status("Jeeves prepared review proposal "+response.result.proposal_id+
+    ". Open the corresponding source in Studio, check diff and approve explicitly.");
+  }else{
+   status("Jeeves action "+action+" completed with a source-bound receipt; "+
+    "no unsupervised source commits or AI weights changed.");
+  }
+ }catch(error){status("Jeeves app action denied: "+error.message);}
+});
+$("jeeves-app-use-editor").addEventListener("click",async()=>{
+ try{
+  const editor=systemEditor();
+  if(!editor)throw Error("Choose a real game system editor first");
+  const result=await api("/api/jeeves-app-action",{
+   project:storyProject(),action:"studio.editor.stage",
+   args:{editor:editor.id,settings:systemSettings(),
+    reason:"Jeeves reviewed original game system editor configuration proposal."}});
+  $("jeeves-app-results").textContent=JSON.stringify(result,null,2);
+  $("proposal").textContent=result.result.proposal_id;
+  status("Jeeves staged "+editor.id+" (proposal "+result.result.proposal_id+
+   "). Review the exact source and commit only with explicit human approval.");
+ }catch(error){status("Jeeves editor staging rejected: "+error.message);}
+});
+let storyChatSession=null;
+
+let jeevesAppSnapshot=null;
+$("jeeves-app-scan").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/jeeves-appwide-status");
+  const catalog=await api("/api/jeeves-appwide-catalog");
+  jeevesAppSnapshot=result.snapshot_digest;
+  setOptions("jeeves-app-action",catalog.registered_adapters.map(x=>x.name));
+  $("jeeves-app-report").textContent=JSON.stringify({
+   scanned_regular_files:result.scanned_regular_files,
+   readable_files:result.readable_files,
+   restricted_files:result.restricted_files,
+   skipped_paths:result.skipped_paths,
+   subsystem_counts:result.domains,
+   governed_runtime_adapters:catalog.registered_action_count,
+   every_file_executable:false,
+   independently_verified_release_status:false,
+   inventory_digest:result.snapshot_digest,
+  },null,2);
+  status("Whole-application source inventory scanned; only registered, governed adapters can run.");
+ }catch(error){status("Whole-app inventory failed: "+error.message);}
+});
+$("jeeves-app-search").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/jeeves-appwide-invoke",{
+   action:"inventory.search",
+   params:{query:$("jeeves-app-query").value.trim(),
+           domain:$("jeeves-app-domain").value||null,
+           limit:50,offset:0,
+           expected_snapshot:jeevesAppSnapshot},
+  });
+  $("jeeves-app-report").textContent=JSON.stringify(result.result,null,2).slice(0,48000);
+  status(result.result.total_matches+" discoverable files; source visibility does not grant arbitrary execution.");
+ }catch(error){status("Jeeves inventory lookup blocked: "+error.message);}
+});
+$("jeeves-app-invoke").addEventListener("click",async()=>{
+ try{
+  const action=$("jeeves-app-action").value;
+  if(!action)throw Error("Scan application first to discover bound action adapters");
+  const params=JSON.parse($("jeeves-app-params").value);
+  if(!params||typeof params!=="object"||Array.isArray(params))
+   throw Error("Provide a typed JSON object for capability parameters");
+  const authorized=$("jeeves-app-approval").checked===true;
+  if((action==="source.propose"||action==="studio.propose"||
+      action==="learning.improvement_proposal")&&!authorized)
+   throw Error("Source changes require deliberate approval before preview");
+  const receipt=await api("/api/jeeves-appwide-invoke",{
+   action,params,operator_authorized:authorized});
+  $("jeeves-app-report").textContent=JSON.stringify(receipt,null,2).slice(0,65000);
+  status("Jeeves "+action+" completed with a typed receipt. No arbitrary code execution or unreviewed app mutation.");
+ }catch(error){status("Jeeves capability invocation blocked: "+error.message);}
+});
+
+function storyProject(){
+ if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
+  throw Error("Jeeves story editing requires an active current project");
+ return selectedProject;
+}
+async function stageStorySource(path,source){
+ if(selectedTree!=="current"||selectedProject!==model.active)
+  throw Error("Only active current game sources can be staged");
+ let existing;
+ try{
+  existing=await api("/api/file?tree=current&project="+encodeURIComponent(selectedProject)+
+                     "&path="+encodeURIComponent(path));
+ }catch(error){
+  if(!/files must be regular|not a file|No such file|cannot read/i.test(error.message))
+   throw error;
+  existing={content:"",version:{tree:"current",project:selectedProject,
+   path,sha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   bytes:0,editable:true}};
+ }
+ selectedFile=path;loaded=existing;proposal=null;
+ $("editor").value=JSON.stringify(source,null,2)+"\\n";
+ $("file-name").textContent="CANON REVIEW: current/"+selectedProject+"/"+path;
+ $("hash").textContent="Previous SHA-256 "+existing.version.sha256;
+ $("editor").readOnly=false;$("propose").disabled=false;
+ $("commit").disabled=true;$("approval").checked=false;
+ $("reason").value="Human-reviewed original Jeeves story canon and scene consistency.";
+ diff();
+}
+function storyShow(data){
+ $("story-evidence").textContent=JSON.stringify(data,null,2).slice(0,30000);
+}
+
+$("story-continuity-contract").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/story-continuity-template",{
+    project:storyProject()});
+  storyShow(result);
+  await stageStorySource(result.path,result.document);
+  status("Specify immutable voice references and facial geometry, all legal wardrobe variants, item owners and region styles; review before scene one.");
+ }catch(error){status("Continuity contract blocked: "+error.message);}
+});
+$("story-stage-reparse").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/story-stage-confirmation",{
+    project:storyProject()});
+  storyShow(result);
+  status("All accepted scenes reparsed and every voice/face/clothing/item/scene receipt independently verified.");
+ }catch(error){status("Scene chain rejected: "+error.message);}
+});
+$("story-detail-review").addEventListener("click",async()=>{
+ try{
+  const kind=$("story-detail-kind").value;
+  const id=$("story-detail-id").value.trim();
+  const query={project:storyProject(),character:null,item:null,region:null};
+  query[kind]=id;
+  storyShow(await api("/api/story-detail-timeline",query));
+  status("Original historical source appearances and exact prior scene receipts retrieved.");
+ }catch(error){status("Historical detail lookup rejected: "+error.message);}
+});
+$("story-foundation").addEventListener("click",async()=>{
+ try{
+  const response=await api("/api/story-foundation-template",
+                            {project:storyProject()});
+  storyShow(response);
+  await stageStorySource(response.path,response.document);
+  status("Complete foundation, sign/validate, then propose and explicitly approve this source.");
+ }catch(error){status("Foundation blocked: "+error.message);}
+});
+$("story-next").addEventListener("click",async()=>{
+ try{
+  const response=await api("/api/story-scene-template",{
+   project:storyProject(),
+   chapter:Number($("story-chapter").value),
+   act:Number($("story-act").value),scene:Number($("story-scene").value)});
+  storyShow(response);
+  await stageStorySource(response.path,response.document);
+  status("Scene scaffold staged. Populate the story, then sign/validate before supervised commit.");
+ }catch(error){status("Scene authoring blocked: "+error.message);}
+});
+
+
+$("story-highlight-source").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/story-highlight-source",{
+   project:storyProject(),highlight:$("story-highlight-id").value.trim()});
+  storyShow(result);
+  status("Original plot point "+result.highlight+" verified against chapter "+
+    result.chapter+", act "+result.act+", scene "+result.scene+
+    " and receipt "+result.confirmation_receipt);
+ }catch(error){status("Highlighted story point lookup rejected: "+error.message);}
+});
+$("story-chapter-context").addEventListener("click",async()=>{
+ try{
+  const result=await api("/api/story-chapter-context",{
+   project:storyProject(),chapter:Number($("story-chapter").value),
+   max_prior_capsules:12});
+  const markers=result.chapter_highlighters.map(h=>
+   "["+h.kind.toUpperCase()+"] "+h.id+" · scene "+h.sequence+
+   " · "+h.note+" · "+(h.closed?"CLOSED":"OPEN")+" · "+h.color);
+  const unresolved=result.unresolved_prior_highlighters.map(h=>
+   "["+h.kind.toUpperCase()+"] "+h.id+" · source scene "+
+   h.sequence+" · still unresolved");
+  $("story-highlighters").textContent=[
+   "CHAPTER "+result.chapter+"/100 · "+result.chapter_scene_count+" source scenes",
+   "Historical evidence "+result.verified_source_head,
+   "PLOT POINT HIGHLIGHTERS",
+   ...markers,
+   "PRIOR UNRESOLVED PLOT THREADS",
+   ...unresolved,
+   "Prior chapter handoff:",
+   ...result.prior_chapter_endings.map(x=>
+    "Ch. "+x.chapter+" · "+x.ending+" · "+x.hook),
+  ].join("\n").slice(0,60000);
+  storyShow({chapter:result.chapter,chapter_memory_receipt:result.digest,
+   chapter_scene_count:result.chapter_scene_count,
+   highlight_count:markers.length,unresolved_prior_count:unresolved.length,
+   prior_chapter_endings:result.prior_chapter_endings,
+   chapter_scene_sources:result.chapter_scene_sources});
+  status("Source-reparsed chapter memory loaded with visible, linked plot highlighters and cliffhanger handoffs.");
+ }catch(error){status("Chapter memory/highlighter blocked: "+error.message);}
+});
+$("story-context").addEventListener("click",async()=>{
+ try{
+  const response=await api("/api/story-brief",{
+   project:storyProject(),
+   cast:$("story-cast").value.split(",").map(x=>x.trim()).filter(Boolean),
+   region:$("story-region").value.trim(),
+   prompt:$("story-instruction").value.trim()});
+  storyShow(response);
+  status(response.pair_history_complete_in_brief?
+    "Canon context assembled; Jeeves still needs a model and reviewed source.":
+    "Only the latest context page is shown. Earlier history is bookmarked, not silently forgotten.");
+ }catch(error){status("Jeeves history lookup blocked: "+error.message);}
+});
+
+
+$("story-chat-reset").addEventListener("click",()=>{
+ storyChatSession=null;
+ $("story-chat-receipt").textContent="Fresh chat. Approved chapter history remains in source.";
+ status("Conversation receipt reset; story canon and previous chapters were not changed.");
+});
+$("story-chat-send").addEventListener("click",async()=>{
+ try{
+  const project=storyProject();
+  if(storyChatSession && storyChatSession.project!==project)
+   throw Error("Different project selected; explicitly reset the chat.");
+  const cast=$("story-cast").value.split(",").map(x=>x.trim()).filter(Boolean);
+  const region=$("story-region").value.trim();
+  const response=await api("/api/jeeves-chapter-chat",{
+   project,prompt:$("story-instruction").value.trim(),
+   session:storyChatSession,
+   cast:cast.length?cast:null,
+   region:region||null,
+  });
+  storyChatSession=response.session;
+  const chapter=response.active_chapter;
+  const progress=(chapter?"Chapter "+chapter.chapter+"/100 · "+
+    chapter.chapter_scene_count+" approved scenes":"Foundation/cast/design stage");
+  $("story-chat-receipt").textContent=[
+   "JEEVES SOURCE-GROUNDED CHAT · "+progress,
+   "Turn "+storyChatSession.turns.length+" · "+
+     "chain "+storyChatSession.digest,
+   "Next stage "+response.work_order.stage,
+   "Required original source "+response.work_order.target_path,
+   chapter?"Plot highlighters "+chapter.chapter_highlighters.length:"No approved plot memory yet",
+   chapter?"Unresolved prior plot threads "+
+      chapter.all_unresolved_prior_highlighter_count:"Canon not yet locked",
+   "Draft instructions only — no live model or scene publication",
+  ].join("\n");
+  storyShow({
+   chat_receipt:response.session.digest,
+   stage:response.work_order.stage,
+   required_path:response.work_order.target_path,
+   chapter_context:chapter,
+   source_template:response.work_order.source_template,
+  });
+  status("Verified chapter chat context prepared for Jeeves; no model execution or silent source edits.");
+ }catch(error){status("Jeeves chat blocked: "+error.message);}
+});
+$("story-work-order").addEventListener("click",async()=>{
+ try{
+  const plan=await api("/api/jeeves-work-order",{
+   project:storyProject(),prompt:$("story-instruction").value.trim(),
+   cast:$("story-cast").value.split(",").map(x=>x.trim()).filter(Boolean),
+   region:$("story-region").value.trim()||null,
+   chapter:Number($("story-chapter").value),
+   act:Number($("story-act").value),scene:Number($("story-scene").value)});
+  storyShow(plan);
+  status("Jeeves work order prepared with exact source dependencies. A model draft and explicit review are still required.");
+ }catch(error){status("Jeeves production blocked: "+error.message);}
+});
+$("story-assets-queue").addEventListener("click",async()=>{
+ try{
+  const plan=await api("/api/jeeves-asset-orders",{
+   project:storyProject(),prompt:$("story-instruction").value.trim(),
+   region:$("story-region").value.trim()||null});
+  storyShow(plan);
+  status("Original asset tasks checked against regional palette, identity, and source rights.");
+ }catch(error){status("Asset planning blocked: "+error.message);}
+});
+$("story-recall").addEventListener("click",async()=>{
+ try{
+  const refs=$("story-bookmarks").value.split(",").map(s=>s.trim()).filter(Boolean);
+  storyShow(await api("/api/story-memory",{project:storyProject(),references:refs}));
+  status("Exact original bookmarked memory retrieved from approved source scenes.");
+ }catch(error){status("Story-memory lookup rejected: "+error.message);}
+});
+$("story-relationship").addEventListener("click",async()=>{
+ try{
+  const character=$("story-memory-character").value.trim();
+  const query="?project="+encodeURIComponent(storyProject())+
+    "&character="+encodeURIComponent(character)+"&limit=40";
+  storyShow(await api("/api/story-memory-page"+query));
+  status("Chronological pair interaction references retrieved; paginate when history exceeds the page.");
+ }catch(error){status("NPC memory lookup rejected: "+error.message);}
+});
+
+$("story-png-check").addEventListener("click",async()=>{
+ try{
+  const file=$("story-png-preview").files[0];
+  if(!file||file.size>200000)throw Error("Choose a PNG preview under 200 KB");
+  const binary=new Uint8Array(await file.arrayBuffer());
+  let text="";
+  for(const byte of binary)text+=String.fromCharCode(byte);
+  const reply=await api("/api/story-pixel-proof",{
+    project:storyProject(),asset:$("story-asset-id").value.trim(),
+    png_base64:btoa(text),max_channel_delta:0
+  });
+  storyShow(reply.pixel_proof);
+  status("Actual PNG pixels checked against the original approved color palette.");
+ }catch(error){status("Rendered asset rejected: "+error.message);}
+});
+$("story-asset-replay").addEventListener("click",async()=>{
+ try{
+  storyShow(await api("/api/story-asset-history",{
+   project:storyProject(),asset:$("story-asset-id").value.trim()}));
+  status("Original asset lineage, scene usage and source palette retrieved.");
+ }catch(error){status("Asset identity lookup rejected: "+error.message);}
+});
+$("story-check").addEventListener("click",async()=>{
+ try{
+  const response=await api("/api/story-sign",{
+   project:storyProject(),path:selectedFile,
+   document:JSON.parse($("editor").value),
+   observations:$("story-observations").value.trim()?
+     JSON.parse($("story-observations").value):null});
+  $("editor").value=JSON.stringify(response.document,null,2)+"\\n";
+  storyShow(response.evidence);
+  diff();
+  status("Canon signed and fully checked. Review your diff then propose and explicitly approve.");
+ }catch(error){status("Story consistency rejected: "+error.message);}
+});
 $("editor").addEventListener("input",diff);
 $("tree").addEventListener("change",()=>{
  selectedTree=$("tree").value;selectedProject=null;selectedFile=null;refresh();
@@ -3029,6 +3399,7 @@ $("advanced-verify").addEventListener("click",async()=>{
 drawAdvancedGame(null);
 loadSystemEditors();
 refresh();
+jeevesAppRefresh().catch(error=>status("App taxonomy unavailable: "+error.message));
 """
 TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -3066,6 +3437,94 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <label>Natural-language original game design prompt
 <textarea id="user-prompt" rows="4" placeholder="Create a branching escort storyline with eyewitness reactions, alternative endings, NPC memories and cinematic staging..."></textarea></label>
 <button id="plan">Plan affected modules and targets</button>
+<fieldset><legend>Jeeves — complete application capabilities</legend>
+<p><small>Index every discoverable file in the checked-out app, including forges, game builders, crawlers, dragon companion, AI, runtimes, UI editors and internal trees. Read access does not confer program execution or automatic source edits.</small></p>
+<button id="jeeves-app-scan" type="button">Scan all app files and report coverage</button>
+<label>Filter by filename/module<input id="jeeves-app-query" placeholder="forge, dragon, runtime, editor, jeeves..."></label>
+<label>Subsystem<select id="jeeves-app-domain">
+<option value="">All app files</option>
+<option value="forge">Forges</option>
+<option value="crawler">Crawlers and source gathering</option>
+<option value="companion">Dragon companions</option>
+<option value="jeeves">Jeeves and agents</option>
+<option value="editor">Game Studio and UI editors</option>
+<option value="game">Game engines and directors</option>
+<option value="learning">Weights and improvement systems</option>
+<option value="runtime">Internal execution systems</option>
+<option value="frontend">Frontends</option>
+<option value="security">Security and policy</option>
+<option value="build">CI, packaging and builds</option>
+<option value="data">Almanacs and internal data</option>
+<option value="general">Other tracked components</option>
+</select></label>
+<button id="jeeves-app-search" type="button">Search indexed source and resources</button>
+<label>Governed runtime action<select id="jeeves-app-action"></select></label>
+<label>Typed action arguments JSON<textarea id="jeeves-app-params" rows="3" spellcheck="false">{}</textarea></label>
+<label>Explicit approval for a source-change proposal (never automatic commit)
+<input id="jeeves-app-approval" type="checkbox"></label>
+<button id="jeeves-app-invoke" type="button">Invoke reviewed capability</button>
+<pre id="jeeves-app-report" role="status" aria-live="polite"></pre>
+</fieldset>
+<fieldset><legend>Jeeves · Whole-App Capability Cockpit</legend>
+<p><small>Live inventory of installed app families, forges, game editors, Dragon/crawler workers, model and training planes. Source discovery is not execution authority. Only audited local adapters can act; edits create proposals needing explicit human commit. No arbitrary shell, network, AI weight promotion or provider secrets.</small></p>
+<button id="jeeves-app-refresh" type="button">Scan installed app capabilities</button>
+<label>Application family<select id="jeeves-app-family"></select></label>
+<button id="jeeves-app-family-list" type="button">Inspect installed modules</button>
+<label>Typed Jeeves action<select id="jeeves-app-action"></select></label>
+<label>Exact action parameters (reviewable JSON)
+<textarea id="jeeves-app-args" spellcheck="false" rows="5">{}</textarea></label>
+<button id="jeeves-app-execute" type="button">Run bounded Jeeves capability</button>
+<button id="jeeves-app-use-editor" type="button">Jeeves: stage current editor settings for review</button>
+<p><small>For governed self-improvement, select <code>model.improvement</code> and provide baseline/candidate source digests, measurable benchmarks and rollback. This stages review only; neural weights cannot be promoted here.</small></p>
+<pre id="jeeves-app-results" role="status" aria-live="polite"></pre>
+</fieldset>
+<fieldset><legend>Jeeves: story-first AI game production</legend>
+<p><small>Foundation → cast → world/asset design → scene-by-scene review. The
+canon index reads approved history and verifies recurring character and
+regional appearance. It does not invent model output or write hidden files.</small></p>
+<button id="story-foundation" type="button">Show blank story/world foundation</button>
+<button id="story-continuity-contract" type="button">Lock original voices, faces, wardrobe, items and regional style</button>
+<p><small>Strict mode: 100 chapters / 1000 acts / 9999 sequential scenes. Each committed scene has a signed, cross-reparsed confirmation receipt. A metadata voice hash is not an acoustic verification.</small></p>
+<label>Chapter (1–100)<input type="number" id="story-chapter" min="1" max="100" value="1"></label>
+<label>Global act (1–1000)<input type="number" id="story-act" min="1" max="1000" value="1"></label>
+<label>Next scene within act<input type="number" id="story-scene" min="1" max="9999" value="1"></label>
+<button id="story-next" type="button">Prepare next canon-bound scene</button>
+<label>Cast IDs, comma-separated<input id="story-cast" placeholder="alina,boren"></label>
+<label>Approved region ID<input id="story-region" placeholder="lantern_city"></label>
+<label>Jeeves creative instruction<textarea id="story-instruction" rows="3"
+ placeholder="Write the next scene and preserve prior character relationships, visual identities, palette, lore and original events."></textarea></label>
+<button id="story-context" type="button">Retrieve historical Jeeves context</button>
+<button id="story-chapter-context" type="button">Load one chapter, plot highlighters and prior chapter handoff</button>
+<p><small>Jeeves keeps the active chapter's source context and retrieves earlier plot threads by authenticated bookmarks; no unverified infinite context claims.</small></p>
+<pre id="story-highlighters" role="status" aria-live="polite"></pre>
+<label>Source-backed plot highlighter ID<input id="story-highlight-id" placeholder="highlight_27"></label>
+<button id="story-highlight-source" type="button">Inspect exact historic plot point and receipt</button>
+<button id="story-work-order" type="button">Plan next Jeeves production work order</button>
+<button id="story-chat-send" type="button">Chat with Jeeves — source-bound next chapter task</button>
+<button id="story-chat-reset" type="button">Begin a fresh verified chapter chat</button>
+<pre id="story-chat-receipt" role="status" aria-live="polite"></pre>
+<button id="story-assets-queue" type="button">Plan AI original asset generation queue</button>
+<label>Historical bookmark IDs (comma-separated)
+<input id="story-bookmarks" placeholder="line_1, exchange_500"></label>
+<button id="story-recall" type="button">Retrieve exact historical dialogue and events</button>
+<label>Character memory lookup ID<input id="story-memory-character" placeholder="alina"></label>
+<button id="story-relationship" type="button">Review indexed character interactions</button>
+<label>Original asset ID<input id="story-asset-id" placeholder="map_table"></label>
+<button id="story-asset-replay" type="button">Review asset identity across scenes</button>
+<label>Original rendered PNG asset preview (no upload or source write)
+<input type="file" id="story-png-preview" accept="image/png"></label>
+<button id="story-png-check" type="button">Inspect real pixels against regional canon</button>
+<label>Observed voice, facial expression, wardrobe, item, and style details (JSON for the exact next scene)
+<textarea id="story-observations" rows="6" spellcheck="false"
+ placeholder='{"cast":[],"region":{},"items":[],"transfers":[]}'></textarea></label>
+<button id="story-stage-reparse" type="button">Reparse all historical scenes and verify confirmation chain</button>
+<label>Exact history lookup: character, item or region ID<input id="story-detail-id" placeholder="alina"></label>
+<label>History type<select id="story-detail-kind"><option value="character">Character: voice, face, clothes, dialogue</option><option value="item">Item identity and ownership</option><option value="region">Regional palette and style</option></select></label>
+<button id="story-detail-review" type="button">Retrieve historic looks, items and styles</button>
+<button id="story-check" type="button">Sign and validate authored source</button>
+<pre id="story-evidence" role="status" aria-live="polite"></pre>
+</fieldset>
+
 <pre id="plan-results"></pre>
 <label>New exact source path (including subfolder)
 <input id="new-path" placeholder="missions/original_rival_arc.json"></label>

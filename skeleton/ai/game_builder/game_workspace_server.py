@@ -73,10 +73,26 @@ class _LocalStudioServer(ThreadingHTTPServer):
     daemon_threads=True
     allow_reuse_address=False
 
-    def __init__(self,address,workspace,secret):
+    def __init__(self,address,workspace,secret,repo_root):
         super().__init__(address,_StudioHandler)
         self.workspace=workspace
         self.secret=secret
+        self.appwide_repo_root=repo_root
+        self.appwide_runtime=None
+        import threading
+        self.appwide_scan_lock=threading.RLock()
+
+    def jeeves_appwide(self):
+        """Lazy full checkout scan: ordinary Game Studio pages remain fast."""
+        with self.appwide_scan_lock:
+            if self.appwide_runtime is None:
+                from .jeeves_appwide_fabric import (
+                    AppwideInventory,JeevesAppwideRuntime)
+                inventory=AppwideInventory(self.appwide_repo_root)
+                inventory.scan()
+                self.appwide_runtime=JeevesAppwideRuntime(
+                    inventory,workspace=self.workspace)
+            return self.appwide_runtime
 
 
 class _StudioHandler(BaseHTTPRequestHandler):
@@ -194,6 +210,28 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "model_training_or_deployment_running":False,
                 "core_llm_weights_changed":False,
             })
+        if path=="/api/jeeves-app-atlas":
+            from .jeeves_app_runtime import app_atlas
+            family=params.get("family") or None
+            return self._json(200,app_atlas(
+                family=family,offset=int(params.get("offset",0)),
+                limit=int(params.get("limit",80)),
+                query=params.get("query") or None))
+        if path=="/api/jeeves-appwide-status":
+            return self._json(200,self.server.jeeves_appwide().inventory.report())
+        if path=="/api/jeeves-appwide-catalog":
+            return self._json(200,self.server.jeeves_appwide().catalog())
+        if path=="/api/story-memory-page":
+            from .story_memory import character_memory_page
+            return self._json(200,character_memory_page(
+                self.server.workspace,params["project"],params["character"],
+                partner=params.get("partner") or None,
+                offset=int(params.get("offset",0)),
+                limit=int(params.get("limit",40))))
+        if path=="/api/story-status":
+            from .story_workspace import story_workspace_status
+            return self._json(200,story_workspace_status(
+                self.server.workspace,params["project"]))
         if path=="/api/editors":
             return self._json(200,{"schema":"skeleton.game_builder.system_editor_catalog.v1",
                                    "editors":system_editor_catalog()})
@@ -219,6 +257,159 @@ class _StudioHandler(BaseHTTPRequestHandler):
         path=urlsplit(self.path).path
         values=self._body()
         studio=self.server.workspace
+        if path=="/api/jeeves-app-action":
+            from .jeeves_app_runtime import dispatch_app_action
+            return self._json(200,dispatch_app_action(
+                studio,values["project"],values["action"],
+                values["args"],authorized=True))
+        if path=="/api/jeeves-appwide-invoke":
+            action=values.get("action")
+            params=values.get("params",{})
+            operator_approved=values.get("operator_authorized") is True
+            # A local session token is not the same as approval to modify code.
+            receipt=self.server.jeeves_appwide().invoke(
+                action,params,authorized=operator_approved)
+            return self._json(200,receipt)
+        if path=="/api/jeeves-chapter-chat":
+            from .jeeves_chapter_chat import chat_turn
+            result=chat_turn(studio,values["project"],values["prompt"],
+                             session=values.get("session"),
+                             cast=values.get("cast"),
+                             region=values.get("region"),
+                             act=values.get("act"),
+                             scene=values.get("scene"))
+            return self._json(200,result)
+        if path=="/api/jeeves-work-order":
+            from .jeeves_production_director import work_order
+            return self._json(200,work_order(
+                studio,values["project"],values["prompt"],
+                cast=values.get("cast"),region=values.get("region"),
+                act=values.get("act"),scene=values.get("scene")))
+        if path=="/api/jeeves-asset-orders":
+            from .jeeves_production_director import planned_asset_orders
+            return self._json(200,planned_asset_orders(
+                studio,values["project"],values["prompt"],
+                region=values.get("region"),kinds=values.get("kinds"),
+                max_jobs=values.get("max_jobs",128)))
+        if path=="/api/story-memory":
+            from .story_memory import retrieve_bookmarks
+            return self._json(200,retrieve_bookmarks(
+                studio,values["project"],values["references"]))
+        if path=="/api/story-pixel-proof":
+            from .story_asset_pixels import inspect_png_against_canon
+            from .story_workspace import load_story_workspace
+            from base64 import b64decode
+            import binascii
+            bible,_,_=load_story_workspace(studio,values["project"])
+            if bible is None:
+                raise WorkspaceError("approved original world design required")
+            data=values["png_base64"]
+            if type(data) is not str or len(data)>280000:
+                raise WorkspaceError("bounded original image preview only")
+            try:
+                raw=b64decode(data,validate=True)
+            except (ValueError,binascii.Error) as exc:
+                raise WorkspaceError("malformed original asset PNG transport") from exc
+            proof=inspect_png_against_canon(
+                bible,values["asset"],raw,
+                max_channel_delta=values.get("max_channel_delta",0))
+            return self._json(200,{"pixel_proof":proof,
+                                   "preview_size_limited":True,
+                                   "game_source_mutated":False,
+                                   "model_art_generated":False})
+        if path=="/api/story-asset-history":
+            from .story_memory import asset_identity_history
+            return self._json(200,asset_identity_history(
+                studio,values["project"],values["asset"]))
+        if path=="/api/story-highlight-source":
+            from .story_workspace import load_story_workspace,load_continuity_contract
+            from .story_chapter_context import highlight_source
+            bible,scenes,_=load_story_workspace(studio,values["project"])
+            contract=load_continuity_contract(studio,values["project"])
+            if bible is None or contract is None:
+                raise WorkspaceError("reviewed story history and identity contract required")
+            return self._json(200,highlight_source(
+                bible,contract,scenes,values["highlight"]))
+        if path=="/api/story-chapter-context":
+            from .story_workspace import load_story_workspace, load_continuity_contract
+            from .story_chapter_context import chapter_context
+            bible,scenes,_=load_story_workspace(studio,values["project"])
+            contract=load_continuity_contract(studio,values["project"])
+            if bible is None or contract is None:
+                raise WorkspaceError("reviewed 100-chapter strict story source required")
+            return self._json(200,chapter_context(
+                bible,contract,scenes,chapter=values.get("chapter"),
+                max_prior_capsules=values.get("max_prior_capsules",12)))
+        if path=="/api/story-continuity-template":
+            from .story_continuity_assurance import contract_template
+            from .story_workspace import load_story_workspace
+            bible,scenes,_=load_story_workspace(studio,values["project"])
+            if bible is None or scenes:
+                raise WorkspaceError("voice/face contract requires approved design before scene one")
+            return self._json(200,{
+                "path":"game/continuity_contract.json",
+                "document":contract_template(bible),
+                "model_inference_performed":False,"write_authorized":False})
+        if path=="/api/story-stage-confirmation":
+            from .story_continuity_assurance import confirm_stage
+            return self._json(200,confirm_stage(studio,values["project"]))
+        if path=="/api/story-detail-timeline":
+            from .story_detail_history import detail_timeline
+            return self._json(200,detail_timeline(
+                studio,values["project"],character=values.get("character"),
+                item=values.get("item"),region=values.get("region"),
+                offset=values.get("offset",0),limit=values.get("limit",48)))
+        if path=="/api/story-foundation-template":
+            from .story_canon_fabric import story_bible_template
+            return self._json(200,{"path":"game/story_bible.json",
+                                   "document":story_bible_template(values["project"]),
+                                   "model_inference_performed":False,
+                                   "write_authorized":False})
+        if path=="/api/story-scene-template":
+            from .story_workspace import next_story_scene_template
+            return self._json(200,next_story_scene_template(
+                studio,values["project"],values["act"],values["scene"],
+                chapter=values.get("chapter")))
+        if path=="/api/story-brief":
+            from .story_workspace import story_workspace_brief
+            return self._json(200,story_workspace_brief(
+                studio,values["project"],cast=values["cast"],
+                region=values["region"],prompt=values["prompt"],
+                max_bookmarks=values.get("max_bookmarks",48)))
+        if path=="/api/story-sign":
+            from .story_canon_fabric import BIBLE,SCENE,sign
+            from .story_workspace import (
+                validate_story_workspace_source,load_story_workspace,
+                load_continuity_contract)
+            from .story_continuity_assurance import CONTRACT,seal_production_scene
+            source_path=values["path"]
+            schema=(BIBLE if source_path=="game/story_bible.json"
+                    else CONTRACT if source_path=="game/continuity_contract.json"
+                    else SCENE if source_path.startswith(("story/scenes/","story/chapters/"))
+                    else None)
+            if schema is None:
+                raise WorkspaceError("Jeeves signing only permits exact approved story sources")
+            if schema==SCENE and load_continuity_contract(
+                    studio,values["project"]) is not None:
+                bible,history,_=load_story_workspace(studio,values["project"])
+                contract=load_continuity_contract(studio,values["project"])
+                document=seal_production_scene(
+                    bible,contract,history,values["document"],
+                    values["observations"])
+            else:
+                document=sign(values["document"],schema)
+            evidence=validate_story_workspace_source(
+                studio,values["project"],source_path,document)
+            return self._json(200,{"path":source_path,"document":document,
+                                   "evidence":evidence,"write_authorized":False,
+                                   "human_commit_required":True})
+        if path=="/api/story-verify":
+            from .story_workspace import validate_story_workspace_source
+            evidence=validate_story_workspace_source(studio,values["project"],
+                        values["path"],values["document"])
+            return self._json(200,{"evidence":evidence,
+                                   "source_project_mutated":False,
+                                   "source_commit_requires_human_review":True})
         if path=="/api/advanced-godot-package":
             from base64 import b64encode
             session=values["session"]
@@ -529,7 +720,7 @@ class _StudioHandler(BaseHTTPRequestHandler):
 
 
 def create_workspace_server(workspace: GameWorkspace, *, host: str="127.0.0.1",
-                            port: int=0):
+                            port: int=0, repo_root=None):
     """Bind loopback, no public listener, no cross-origin API and no CORS."""
     if host!="127.0.0.1":
         raise StudioServerError("AI game studio never listens on a public address")
@@ -537,8 +728,10 @@ def create_workspace_server(workspace: GameWorkspace, *, host: str="127.0.0.1",
         raise StudioServerError("pre-initialized controlled local game workspace required")
     if type(port) is not int or not 0<=port<=65535:
         raise StudioServerError("invalid bounded local HTTP port")
+    if repo_root is None:
+        repo_root=Path(__file__).resolve().parents[3]
     secret=secrets.token_urlsafe(32)
-    server=_LocalStudioServer((host,port),workspace,secret)
+    server=_LocalStudioServer((host,port),workspace,secret,repo_root)
     return server
 
 

@@ -270,7 +270,7 @@ def _emit(state,config,kind,site,events,*,actor="player"):
             events.append("existing_original_quest_advanced_by_real_followup")
     if (len(state["quests"])<min(config["active_quests"],12)
         and state["next_quest"]<12
-        and kind in EVENTS[:min(4,config["event_rules"])]
+        and kind in EVENTS
         and len(witnesses)>=config["witnesses_required"]):
         # Only a source observed by enough real witnesses becomes a quest.
         # Editor supports many procedural causal rule alternatives, while
