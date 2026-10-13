@@ -302,11 +302,14 @@ class TransformerBlock:
         q = matvec(self.Wq, y)
         k = matvec(self.Wk, y)
         v = matvec(self.Wv, y)
-        Ks.append(k)
+        # Store already-rotated keys once: re-rotating every historical key
+        # on each token makes incremental decode needlessly quadratic in RoPE
+        # work. Window shifts reset the cache, preserving absolute parity
+        # with the reference window-relative full-sequence path.
+        Ks.append(apply_rope(k, pos))
         Vs.append(v)
-        K_rope = [apply_rope(kk, t) for t, kk in enumerate(Ks)]
         q_rope = apply_rope(q, pos)
-        c, _ = cached_mha(q_rope, K_rope, Vs, n_heads)
+        c, _ = cached_mha(q_rope, Ks, Vs, n_heads)
         attn = matvec(self.Wo, c)
         u = add(x, attn)
         if self.d_ff:
@@ -329,11 +332,13 @@ class KVCache:
         self.K: List[List[List[float]]] = [[] for _ in range(self.n_layers)]
         self.V: List[List[List[float]]] = [[] for _ in range(self.n_layers)]
         self.tokens: List[int] = []
+        self.next_position = 0
 
     def reset(self) -> None:
         self.K = [[] for _ in range(self.n_layers)]
         self.V = [[] for _ in range(self.n_layers)]
         self.tokens = []
+        self.next_position = 0
 
     def primed_for(self, window: Sequence[int]) -> bool:
         """True iff cache holds window[:-1] and can extend by window[-1]."""
@@ -357,6 +362,7 @@ class TinyTransformer:
         d_ff: int = 0,
         norm: str = "ln",
         ffn_kind: str = "gelu",
+        position_mode: str = "learned_rope",
         use_mod: bool = False,
         mod_deep: float = 0.25,
         mod_shallow: float = 0.25,
@@ -379,6 +385,9 @@ class TinyTransformer:
         ff = max(0, int(d_ff))
         self.norm = "rms" if str(norm).lower() == "rms" else "ln"
         self.ffn_kind = "swiglu" if str(ffn_kind).lower() == "swiglu" else "gelu"
+        if position_mode not in {"learned_rope", "rope"}:
+            raise ValueError("position_mode must be learned_rope or rope")
+        self.position_mode = position_mode
         self.layers: List[TransformerBlock] = [
             TransformerBlock(D, ff, rng, s, norm=self.norm, ffn_kind=self.ffn_kind)
             for _ in range(nL)
@@ -482,38 +491,109 @@ class TinyTransformer:
     def _encode(self, ids: Sequence[int]) -> List[List[float]]:
         X: List[List[float]] = []
         for t, idx in enumerate(ids):
-            X.append(add(self.E[idx], self.P[t]))
+            X.append(list(self.E[idx]) if self.position_mode == "rope" else add(self.E[idx], self.P[t]))
         return X
 
-    def to(self, device: str = "cpu") -> "TinyTransformer":
-        """Bind a device. CUDA if torch can see a GPU; else CPU. Never throws.
+    def _sync_accelerator(self) -> None:
+        """Fail closed instead of losing trained weights on CPU fallback."""
+        if self._accel is None:
+            return
+        try:
+            self._accel.sync()
+        except Exception as exc:
+            raise RuntimeError(
+                "accelerator synchronization failed; refusing stale model weights"
+            ) from exc
 
-        When torch exists the weights pin on the bound device (GPU-resident
-        if cuda, otherwise torch-cpu). Python lists catch up on snapshot().
+    def to(
+        self,
+        device: str = "cpu",
+        *,
+        kv_dtype: str = "fp32",
+        max_kv_bytes: int | None = None,
+        prefill_query_chunk: int | None = None,
+        max_grad_norm: float | None = None,
+    ) -> "TinyTransformer":
+        """Bind CPU, CUDA or Metal with optional bounded reduced-precision KV.
+
+        FP16/BF16 are explicitly opt-in storage choices for the Torch KV
+        cache only. Core weights and attention computations remain FP32.
+        Preserve canonical weights across device transitions.
         """
+        if kv_dtype not in {"fp32", "fp16", "bf16"}:
+            raise ValueError("kv_dtype must be fp32, fp16 or bf16")
+        if max_kv_bytes is not None and (
+            isinstance(max_kv_bytes, bool)
+            or not isinstance(max_kv_bytes, int)
+            or max_kv_bytes <= 0
+        ):
+            raise ValueError("max_kv_bytes must be a positive integer or None")
+        if prefill_query_chunk is not None and (
+            isinstance(prefill_query_chunk, bool)
+            or not isinstance(prefill_query_chunk, int)
+            or not 1 <= prefill_query_chunk <= self.ctx
+        ):
+            raise ValueError("prefill_query_chunk must be between 1 and context length")
+        if max_grad_norm is not None and (
+            isinstance(max_grad_norm, bool)
+            or not isinstance(max_grad_norm, (int, float))
+            or not math.isfinite(float(max_grad_norm))
+            or max_grad_norm <= 0
+        ):
+            raise ValueError("max_grad_norm must be a finite positive number")
         from skeleton.cortex.device import resolve
         info = resolve(device)
-        self.requested = str(info.get("requested") or device)
-        self.device = str(info.get("actual") or "cpu")
-        if self._accel is not None:
-            try:
-                self._accel.sync()
-            except Exception:
-                pass
-        self._accel = None
-        self.resident = False
-        pin = bool(info.get("torch")) and self.requested != "cpu"
+        # Synchronization itself is transactional: it must finish before any
+        # device and accelerator ownership state can change.
+        self._sync_accelerator()
+        requested = str(info.get("requested") or device)
+        actual = str(info.get("actual") or "cpu")
+        constrained = (
+            kv_dtype != "fp32" or max_kv_bytes is not None
+            or prefill_query_chunk is not None
+            or max_grad_norm is not None
+        )
+        # A Torch projection without Mixture-of-Depths routing would silently
+        # execute a different model. Keep the exact Python graph instead.
+        if self.use_mod:
+            if constrained:
+                raise RuntimeError(
+                    "Mixture of Depths cannot admit requested Torch execution policy"
+                )
+            self.requested, self.device = requested, "cpu"
+            self._accel, self.resident = None, False
+            return self
+        pin = bool(info.get("torch")) and requested != "cpu"
         if pin:
             try:
                 from skeleton.cortex.torch_lm import TorchAccel
-                self._accel = TorchAccel(self, device=self.device)
-                self._accel.pin()
-                self.device = self._accel.device_name
-                self.resident = True
-            except Exception:
-                self._accel = None
-                self.device = "cpu"
-                self.resident = False
+                candidate = TorchAccel(
+                    self, device=actual, kv_dtype=kv_dtype,
+                    max_kv_bytes=max_kv_bytes,
+                    prefill_query_chunk=prefill_query_chunk,
+                    max_grad_norm=max_grad_norm,
+                )
+                candidate.pin()
+            except Exception as exc:
+                if constrained:
+                    raise RuntimeError(
+                        "explicit Torch execution policy cannot be admitted"
+                    ) from exc
+                # Preserve an existing proven resident accelerator rather
+                # than discarding it when a new device upload fails. A
+                # brand-new model remains a CPU reference model.
+                return self
+            self._accel = candidate
+            self.requested = requested
+            self.device = candidate.device_name
+            self.resident = True
+        else:
+            if constrained:
+                raise RuntimeError(
+                    "explicit Torch execution policy unavailable on selected device"
+                )
+            self.requested, self.device = requested, "cpu"
+            self._accel, self.resident = None, False
         return self
 
     def _forward(self, ids: Sequence[int]):
@@ -551,33 +631,96 @@ class TinyTransformer:
         if self._accel is not None:
             try:
                 return list(self._accel.logits(ids))
-            except Exception:
+            except Exception as exc:
+                if getattr(self, "_strict_device_request", False):
+                    raise RuntimeError(
+                        "strict accelerator policy forbids silent CPU fallback"
+                    ) from exc
+                if (
+                    self._accel.kv_dtype_name != "fp32"
+                    or self._accel.max_kv_bytes is not None
+                ):
+                    raise RuntimeError(
+                        "explicit Torch KV policy forbids silent CPU fallback"
+                    ) from exc
+                self._sync_accelerator()
                 self._accel = None
                 self.resident = False
+                self.device = "cpu"
         H, _ = self._forward(ids)
         y = H[-1] if H else zeros(self.dim)
         return self._unembed(y)
 
     def _step(self, idx: int, cache: KVCache) -> List[float]:
         """Extend the cache by one id. RoPE position is window-relative."""
-        t = len(cache.tokens)
+        t = cache.next_position if self.position_mode == "rope" else len(cache.tokens)
         ei = int(idx) if 0 <= int(idx) < self.V else self.unk
-        x = add(self.E[ei], self.P[min(t, self.ctx - 1)])
+        x = list(self.E[ei]) if self.position_mode == "rope" else add(self.E[ei], self.P[min(t, self.ctx - 1)])
         for li, layer in enumerate(self.layers):
             x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t)
         cache.tokens.append(ei)
+        cache.next_position += 1
         return self._unembed(x)
 
     def _logits_window(self, ids: Sequence[int], cache: Optional[KVCache] = None) -> List[float]:
         window = list(ids[-self.ctx:] or [self.unk])
-        # Incremental steps implement the dense CPU graph only. MoD routing and
-        # accelerated backends must execute their full graph until equivalent
-        # incremental implementations are available.
-        if cache is None or self.use_mod or self._accel is not None:
+        if cache is None or self.use_mod:
             if cache is not None:
                 cache.reset()
             return self._logits(window)
+        if self._accel is not None:
+            # Accelerator owns its own resident KV tensors; never reuse the
+            # reference Python float-list cache with another device.
+            cache.reset()
+            try:
+                # Snapshot logits and cache occupancy in the same locked
+                # accelerator transition; separate reads can cross requests.
+                logits, resident_ids = self._accel.logits_window_with_cache(window)
+                cache.tokens.extend(resident_ids)
+                return list(logits)
+            except MemoryError:
+                # An explicit KV allocation ceiling is an admission limit,
+                # not a hint to silently allocate an unbudgeted Python cache.
+                cache.reset()
+                raise
+            except Exception as exc:
+                if getattr(self, "_strict_device_request", False):
+                    raise RuntimeError(
+                        "strict accelerator policy forbids silent CPU fallback"
+                    ) from exc
+                if (
+                    self._accel.kv_dtype_name != "fp32"
+                    or self._accel.max_kv_bytes is not None
+                ):
+                    cache.reset()
+                    raise RuntimeError(
+                        "explicit Torch KV policy forbids silent CPU fallback"
+                    ) from exc
+                self._sync_accelerator()
+                self._accel = None
+                self.resident = False
+                self.device = "cpu"
+                # Exact reference fallback on unsupported kernels/devices.
+                return self._logits(window)
         if cache.primed_for(window):
+            return self._step(window[-1], cache)
+        # In a single-layer pure rotary model, K/V are independent of
+        # preceding tokens: once the cache fills, eviction is sufficient. Learned
+        # absolute position embeddings are NOT shift-equivariant and retain
+        # their conservative re-prime behavior for checkpoint compatibility.
+        if (
+            self.position_mode == "rope"
+            # In deeper models the previous token's K/V depends on evicted
+            # tokens through earlier layers. Reuse would silently change
+            # the full-window reference result; preserve exact parity.
+            and self.n_layers == 1
+            and len(cache.tokens) == self.ctx
+            and cache.tokens[1:] == window[:-1]
+        ):
+            for keys, values in zip(cache.K, cache.V):
+                del keys[0]
+                del values[0]
+            del cache.tokens[0]
             return self._step(window[-1], cache)
         cache.reset()
         for idx in window[:-1]:
@@ -590,21 +733,19 @@ class TinyTransformer:
         return list(seq[-1]) if seq else zeros(self.dim)
 
     def hidden_seq(self, prefix: str) -> List[List[float]]:
-        """Full residual stream. Callosum reads this, not just the last token."""
-        ids = self._ids(prefix)
-        ids = ids[-self.ctx:]
-        if self._accel is not None:
-            try:
-                h = list(self._accel.hidden(ids))
-                H, _ = self._forward(ids)
-                return [list(row) for row in H] if H else [h]
-            except Exception:
-                self._accel = None
-                self.resident = False
+        """Full residual stream for the Callosum, not just the last token.
+
+        The reference graph owns full-sequence introspection. Avoid a redundant
+        GPU forward pass (which yielded only a final state), and explicitly
+        synchronize real SGD mutations before using the Python reference.
+        """
+        ids = self._ids(prefix)[-self.ctx:]
+        self._sync_accelerator()
         H, _ = self._forward(ids)
         return [list(row) for row in H] if H else [zeros(self.dim)]
 
     def weights_last(self, prefix: str) -> List[float]:
+        self._sync_accelerator()
         ids = self._ids(prefix)
         ids = ids[-self.ctx:]
         _H, caches = self._forward(ids)
@@ -624,8 +765,15 @@ class TinyTransformer:
             try:
                 return float(self._accel.sgd(ids, target, lr))
             except Exception:
+                # A partially applied GPU SGD must not be silently replaced
+                # with a second CPU update using stale canonical parameters.
+                self._sync_accelerator()
                 self._accel = None
                 self.resident = False
+                self.device = "cpu"
+                raise RuntimeError(
+                    "accelerated SGD failed; synchronized state requires explicit retry"
+                )
         n = len(ids)
         D = self.dim
         H, caches = self._forward(ids)
@@ -659,7 +807,8 @@ class TinyTransformer:
             dx = dH[t]
             for d in range(D):
                 self.E[idx][d] -= lr * dx[d]
-                self.P[t][d] -= lr * dx[d]
+                if self.position_mode != "rope":
+                    self.P[t][d] -= lr * dx[d]
         self.steps += 1
         return loss
 
@@ -795,13 +944,9 @@ class TinyTransformer:
         return tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in out[:n])
 
     def snapshot(self) -> Dict[str, Any]:
-        if self._accel is not None:
-            try:
-                self._accel.sync()
-            except Exception:
-                pass
+        self._sync_accelerator()
         L0 = self.layers[0]
-        return {
+        snapshot = {
             "dim": self.dim,
             "ctx": self.ctx,
             "n_heads": self.n_heads,
@@ -831,6 +976,11 @@ class TinyTransformer:
             "use_mod": bool(self.use_mod),
             "mod": None if self.mod is None else self.mod.snapshot(),
         }
+        # Keep all legacy learned-position snapshot bytes and digests stable.
+        # A new rotary-only model includes an explicit architecture identity.
+        if self.position_mode == "rope":
+            snapshot["position_mode"] = "rope"
+        return snapshot
 
     @classmethod
     def from_snapshot(cls, data: Dict[str, Any]) -> "TinyTransformer":
@@ -846,6 +996,7 @@ class TinyTransformer:
             d_ff=int((data or {}).get("d_ff") or 0),
             norm=str((data or {}).get("norm") or "ln"),
             ffn_kind=str((data or {}).get("ffn_kind") or "gelu"),
+            position_mode=str((data or {}).get("position_mode") or "learned_rope"),
             use_mod=bool((data or {}).get("use_mod")),
             mod_deep=float(((data or {}).get("mod") or {}).get("router", {}).get("deep_capacity") or 0.25),
             mod_shallow=float(((data or {}).get("mod") or {}).get("router", {}).get("shallow_capacity") or 0.25),
@@ -888,9 +1039,11 @@ class TinyTransformer:
         lm.fitted = int((data or {}).get("fitted") or 0)
         lm.steps = int((data or {}).get("steps") or 0)
         lm.device = str((data or {}).get("device") or "cpu")
-        if lm.device == "cuda":
+        if lm.device in {"cuda", "mps"}:
+            # Snapshots are portable weights, never proof of a bound accelerator.
+            lm.requested = lm.device
             lm.device = "cpu"
-            lm.requested = "cuda"
+            lm.resident = False
         return lm
 
 
