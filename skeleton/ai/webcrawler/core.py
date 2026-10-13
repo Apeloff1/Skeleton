@@ -494,9 +494,9 @@ class CrawlEngine:
             return None
         if not self.robots.allowed(item.url):
             return None
-        host = urlsplit(item.url).hostname or ""
-        delay = max(self.policy.min_host_delay_seconds, self.robots.crawl_delay(item.url) or 0.0)
-        self._host_ready[host] = now + delay
+        # Redirect-aware fetch_with_policy performs the per-hop host cooldown
+        # check and commits its reservation. Reserving here first makes that
+        # very same first hop appear too early and rejects positive crawl delays.
         try:
             from .redirects import fetch_with_policy
             response = fetch_with_policy(self, item.url, now=now)
