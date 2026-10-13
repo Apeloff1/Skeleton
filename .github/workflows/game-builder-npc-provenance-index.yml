@@ -1,0 +1,89 @@
+name: Original NPC Provenance History Index
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_npc_provenance_index.py"
+      - "skeleton/ai/game_builder/advanced_fast_chunk_snapshot.py"
+      - "skeleton/ai/game_builder/advanced_chunked_npc_world.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_npc_provenance_index.py"
+      - ".github/workflows/game-builder-npc-provenance-index.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: original-npc-history-index-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  audited-history-index:
+    name: Original physically indexed game histories (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: "1"
+      PYTHONPATH: "."
+      SOURCE_HEAD: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact-head source without persisted token
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_npc_provenance_index.py
+      - name: Configure Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Exact-head verification and actual source compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
+          python -m py_compile \
+            skeleton/ai/game_builder/advanced_npc_provenance_index.py \
+            skeleton/ai/game_builder/advanced_fast_chunk_snapshot.py \
+            skeleton/ai/game_builder/system_editor_cli.py \
+            skeleton/ai/game_builder/game_workspace_server.py \
+            skeleton/ai/game_builder/game_workspace_ui.py \
+            tests/test_game_builder_npc_provenance_index.py
+      - name: Actually index authored witnessed events and falsifiable branching outcomes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_game_builder_npc_provenance_index -v
+      - name: Reconstruct true indexed source facts on four independent original seeds
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from skeleton.ai.game_builder.advanced_chunked_npc_world import run_chunked_npc_world
+          from skeleton.ai.game_builder.advanced_chunked_world_timeline import make_chunked_bookmarks
+          from skeleton.ai.game_builder.advanced_npc_provenance_index import (
+              analyze_original_npc_histories,verify_original_npc_histories)
+          for seed in (0,1,5,9):
+              source=make_chunked_bookmarks(run_chunked_npc_world(
+                ["wait"]*8,seed=seed,options={"chunks_per_side":5,
+                "citizens":32,"active_limit":6,"chunk_radius":0}))
+              report=analyze_original_npc_histories(source,[
+                {"name":"west","actions":["move:west","wait"]},
+                {"name":"east","actions":["move:east","wait"]},
+              ],cursor=8,query={"kind":"action","limit":16})
+              assert verify_original_npc_histories(report)
+              assert report["matching_record_count"]==20
+              assert not report["model_weights_promoted"]
+              print("SOURCE_PROVENANCE_INDEX_OK",seed,report["digest"])
+          PY

@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_npc_provenance_index import (
+    analyze_original_npc_histories, verify_original_npc_histories,
+)
 from .advanced_fast_chunk_snapshot import (
     run_fast_chunk_branches, verify_fast_chunk_branches,
 )
@@ -203,6 +206,15 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    index_cmd=commands.add_parser("indexed-npc-histories",
+        help="Compare original physical NPC timelines and query source event/action/actor receipts")
+    index_cmd.add_argument("--checkpoint",required=True)
+    index_cmd.add_argument("--variants",required=True)
+    index_cmd.add_argument("--query")
+    index_cmd.add_argument("--cursor",type=int)
+    index_verify=commands.add_parser("verify-indexed-npc-histories",
+        help="Full-source replay of every original NPC history index record")
+    index_verify.add_argument("--record",required=True)
     fast_fork=commands.add_parser("fast-chunk-forks",
         help="Verify source once and execute bounded original story suffixes")
     fast_fork.add_argument("--checkpoint",required=True)
@@ -480,6 +492,13 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "indexed-npc-histories":
+            output=analyze_original_npc_histories(
+                _load(args.checkpoint),_load(args.variants),
+                cursor=args.cursor,
+                query=_load(args.query) if args.query else None)
+        elif args.operation == "verify-indexed-npc-histories":
+            output={"verified":verify_original_npc_histories(_load(args.record))}
         elif args.operation == "fast-chunk-forks":
             output=run_fast_chunk_branches(
                 _load(args.checkpoint),_load(args.branches),cursor=args.cursor)

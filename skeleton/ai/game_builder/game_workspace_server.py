@@ -41,6 +41,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_npc_provenance_index import (
+    analyze_original_npc_histories, verify_original_npc_histories,
+)
 from .advanced_fast_chunk_snapshot import (
     run_fast_chunk_branches, verify_fast_chunk_branches,
 )
@@ -494,6 +497,22 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":validated,
                                    "original_source_mutated":False})
+        if path=="/api/indexed-npc-histories":
+            record=analyze_original_npc_histories(
+                values["checkpoint"],values["variants"],
+                cursor=values.get("cursor"),query=values.get("query"))
+            return self._json(200,{
+                "record":record,
+                "verified":verify_original_npc_histories(record),
+                "source_files_mutated":False,
+                "ai_model_weights_promoted":False,
+            })
+        if path=="/api/indexed-npc-histories-verify":
+            return self._json(200,{
+                "verified":verify_original_npc_histories(values["record"]),
+                "source_files_mutated":False,
+                "ai_model_weights_promoted":False,
+            })
         if path=="/api/fast-chunk-forks":
             batch=run_fast_chunk_branches(
                 values["checkpoint"],values["branches"],
