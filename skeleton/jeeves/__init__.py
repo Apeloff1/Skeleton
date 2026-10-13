@@ -1336,3 +1336,17 @@ __all__ = [
     "Troubleshooter",
     "TroubleshootingStep",
 ]
+
+
+# Workbench construction loads durable stores, agent tooling and stateful
+# adapters. Keep legacy Jeeves package imports free of those host side effects.
+__all__ += ["JeevesWorkbench", "JeevesWorkbenchError"]
+
+
+def __getattr__(name: str):
+    if name in {"JeevesWorkbench", "JeevesWorkbenchError"}:
+        from . import workbench as _workbench
+        value = getattr(_workbench, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
