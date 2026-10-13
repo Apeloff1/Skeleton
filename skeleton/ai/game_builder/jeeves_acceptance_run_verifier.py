@@ -108,6 +108,7 @@ def verify(
                         _valid_sha(p.get("sha256"), 64)}
     _require(len(allowed_receipts) == len(receipts), "duplicate/malformed source receipts")
     expected_result_keys = {"module", "command", "started_utc", "ended_utc",
+                            "unittest_cases_observed",
                             "return_code", "timed_out", "subprocess_executed",
                             "targeted_tests_passed_in_runner", "stdout", "stderr",
                             "independent_ci_provenance_verified_by_this_script"}
@@ -172,8 +173,16 @@ def verify(
                  [row.get("module") for row in results
                   if type(row) is dict] == selected,
                  "executed module ordering differs from reviewed matrix")
+        _require(type(report.get("total_unittest_cases_observed")) is int and
+                 report["total_unittest_cases_observed"] > 0 and
+                 report["total_unittest_cases_observed"] == sum(
+                     row.get("unittest_cases_observed", 0) or 0
+                     for row in results if type(row) is dict),
+                 "untrusted total observed unittest case count")
         for row in results:
             _require(set(row) == expected_result_keys and
+                     type(row.get("unittest_cases_observed")) is int and
+                     row["unittest_cases_observed"] > 0 and
                      row["return_code"] == 0 and
                      type(row["return_code"]) is int and
                      row["timed_out"] is False and
@@ -196,6 +205,7 @@ def verify(
             "os": operating_system,
             "job_id": job.get("id"),
             "reported_passed_modules": len(results),
+            "observed_unittest_cases": report["total_unittest_cases_observed"],
             "matrix_digest_local_to_runner": report["matrix_digest"],
             "artifact_sha256": sha256(json.dumps(report, sort_keys=True,
                                      separators=(",", ":"),
