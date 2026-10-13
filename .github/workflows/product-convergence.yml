@@ -188,6 +188,9 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    env:
+      # Backend pytest also imports the top-level skeleton package.
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

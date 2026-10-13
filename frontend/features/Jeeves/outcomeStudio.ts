@@ -142,6 +142,60 @@ export function acceptSimulation(
   return item;
 }
 
+export type DialogueProjection = {
+  schema_version: 'jeeves.dialogue-projection.v1';
+  plan_digest: string; branch_id: string; projection_digest: string;
+  playthrough_receipt: string; history_length: number;
+  scene: number | null; speaker_name: string | null; place_name: string | null;
+  scene_text: string; scene_text_truncated: boolean;
+  available_replies: { id: string; label: string; dialogue: string }[];
+  ending_reached: boolean; ending_accepted: boolean;
+  ending: StoryEnding | null; simulation_only: true;
+  content_trust: 'creator_authored_untrusted_not_model_instructions';
+  creator_diagnostics_only?: true;
+  locked_choices?: { id: string; label: string; unmet: Record<string, unknown> }[];
+};
+
+/** Bind the separately authorized dialogue projection to one real server replay.
+ * These structural checks are NOT a local cryptographic verification of a server
+ * receipt; only the backend owns the complete story-state computation.
+ */
+export function acceptDialogueProjection(
+  raw: unknown, replay: StorySimulation, branch: string, creator: boolean,
+): DialogueProjection {
+  const x = raw as DialogueProjection | null;
+  if (!x || x.schema_version !== 'jeeves.dialogue-projection.v1' ||
+      x.plan_digest !== replay.plan_digest ||
+      x.playthrough_receipt !== replay.receipt_digest ||
+      x.branch_id !== branch || !HEX.test(x.projection_digest) ||
+      x.simulation_only !== true ||
+      x.content_trust !== 'creator_authored_untrusted_not_model_instructions' ||
+      !Number.isInteger(x.history_length) ||
+      x.history_length !== replay.steps.length ||
+      !Array.isArray(x.available_replies) ||
+      x.scene_text?.length > 5000 ||
+      typeof x.scene_text !== 'string' ||
+      typeof x.scene_text_truncated !== 'boolean' ||
+      x.ending_reached !== Boolean(replay.ending_id) ||
+      x.ending_accepted !== replay.ending_accepted ||
+      Boolean(x.ending) !== Boolean(replay.ending_id) ||
+      (x.ending !== null && x.ending.id !== replay.ending_id) ||
+      x.available_replies.length !== replay.available_options.length ||
+      new Set(x.available_replies.map(reply => reply.id)).size !== x.available_replies.length ||
+      x.available_replies.some(reply =>
+        !SLUG.test(reply.id) || typeof reply.dialogue !== 'string' ||
+        !replay.available_options.some(option => option.id === reply.id)) ||
+      (creator ? x.creator_diagnostics_only !== true ||
+        !Array.isArray(x.locked_choices) :
+        x.locked_choices !== undefined || x.creator_diagnostics_only !== undefined)) {
+    throw new Error('Dialogue projection is not bound to the authoritative player replay.');
+  }
+  if (replay.ending_id && (x.available_replies.length > 0 || x.scene !== null)) {
+    throw new Error('A reached ending cannot offer further player replies.');
+  }
+  return x;
+}
+
 export function acceptOutcomeAudit(raw: unknown, planDigest: string): OutcomeAudit {
   const x = raw as OutcomeAudit | null;
   if (!x || x.schema_version !== OUTCOME_AUDIT_SCHEMA ||

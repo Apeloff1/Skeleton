@@ -3,12 +3,14 @@ name: AI Chat Chapter Continuity Production
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
-    branches: [main]
+    branches: [main, feat/jeeves-chapter-continuity-20261013]
     paths:
       - "backend/core/chapter_continuity.py"
       - "backend/core/story_production_manifest.py"
       - "backend/core/story_tapestry.py"
       - "backend/core/branching_narrative.py"
+      - "backend/core/dialogue_projection.py"
+      - "backend/tests/test_dialogue_projection.py"
       - "backend/core/outcome_chapter_weave.py"
       - "backend/tests/test_outcome_chapter_weave.py"
       - "backend/core/outcome_weaving_matrices.py"
@@ -81,6 +83,7 @@ jobs:
           backend/core/story_production_manifest.py
           backend/core/story_tapestry.py
           backend/core/branching_narrative.py
+          backend/core/dialogue_projection.py
           backend/core/outcome_chapter_weave.py
           backend/core/outcome_weaving_matrices.py
           backend/routes/story_outcomes.py
@@ -93,6 +96,7 @@ jobs:
           backend/tests/test_story_production_manifest.py
           backend/tests/test_story_tapestry.py
           backend/tests/test_branching_narrative.py
+          backend/tests/test_dialogue_projection.py
           backend/tests/test_outcome_chapter_weave.py
           backend/tests/test_outcome_weaving_matrices.py
           backend/tests/test_story_outcomes_routes.py

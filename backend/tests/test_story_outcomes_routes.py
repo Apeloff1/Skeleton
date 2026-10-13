@@ -203,3 +203,35 @@ async def test_witnessed_matrix_prompt_requires_authentic_successful_ending(db):
                 branch_id="main", matrix_id="dialogue.choice_clarity.immediate",
                 level=100, ending_id="good", choices=["violence"]), user=ACTOR)
     assert exc.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_player_dialogue_authority_and_locked_choice_spoiler_barrier(db):
+    authored = simple_plan()
+    authored["nodes"][0]["options"][1]["guard"] = {
+        "op": "flag", "id": "unrevealed_oath"
+    }
+    authored["nodes"][0]["options"][1]["label"] = "UNREVEALED_OATH_PATH"
+    saved = await routes.save_outcome_plan(
+        "game_1", routes.SavePlan(expected_revision=0, plan=authored), user=ACTOR)
+    before = deepcopy(db.items)
+    request = routes.SimulateIn(branch_id="main", choices=[])
+    player = await routes.get_player_dialogue("game_1", request, user=ACTOR)
+    assert player["ok"] and player["revision"] == saved["revision"]
+    assert player["dialogue"]["plan_digest"] == saved["plan_digest"]
+    assert [opt["id"] for opt in player["dialogue"]["available_replies"]] == ["mercy"]
+    assert "UNREVEALED_OATH_PATH" not in str(player)
+    assert "unrevealed_oath" not in str(player)
+    assert player["dialogue"]["simulation_only"] is True
+    diagnostics = await routes.get_creator_dialogue_diagnostics(
+        "game_1", request, user=ACTOR)
+    assert diagnostics["dialogue"]["locked_choices"][0]["id"] == "violence"
+    assert diagnostics["dialogue"]["locked_choices"][0]["unmet"]["id"] == "unrevealed_oath"
+    assert before == db.items
+    with pytest.raises(HTTPException) as denied:
+        await routes.get_player_dialogue("game_1", request, user=OTHER)
+    assert denied.value.status_code == 404
+    with pytest.raises(HTTPException) as invalid:
+        await routes.get_player_dialogue(
+            "game_1", routes.SimulateIn(choices=["violence"]), user=ACTOR)
+    assert invalid.value.status_code == 409
