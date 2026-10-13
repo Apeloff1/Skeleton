@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import re
 from pathlib import Path
 import sys
 from typing import Any, Sequence
@@ -60,6 +61,63 @@ def _canonical_validate(root: Path) -> dict[str, Any]:
     return dict(module.validate(root))
 
 
+def _check_task_state(
+    task_id: str,
+    task: dict[str, Any],
+    *,
+    pr: str,
+    workflow: str,
+    require_matching_head: bool = True,
+) -> None:
+    """Separate task activation from subsequent, evidence-backed signoff."""
+    status = task.get("status")
+    if status == "landed_unpromoted":
+        if any(task.get(flag) is not False for flag in (
+            "completion_checkbox", "implementation_signed", "verification_signed"
+        )):
+            raise P2T1ActivationError(f"{task_id} may not self-sign or self-complete")
+        if task.get("completion_checkbox_mark") not in (None, "[ ]"):
+            raise P2T1ActivationError(f"{task_id} unpromoted marker is checked")
+        return
+
+    if status != "closed":
+        raise P2T1ActivationError(f"{task_id} must be unsigned or evidence-closed")
+    if any(task.get(flag) is not True for flag in (
+        "completion_checkbox", "implementation_signed", "verification_signed"
+    )) or task.get("completion_checkbox_mark") != "[x]":
+        raise P2T1ActivationError(f"{task_id} closed signoff is incomplete")
+    refs = task.get("evidence_refs")
+    if (not isinstance(refs, list) or not refs
+            or any(not isinstance(ref, str) or not ref.strip() for ref in refs)
+            or len(set(refs)) != len(refs)):
+        raise P2T1ActivationError(f"{task_id} has malformed or duplicated evidence refs")
+    evidence = set(refs)
+    if f"github:pr#{pr}" not in evidence:
+        raise P2T1ActivationError(f"{task_id} lacks independent PR provenance")
+    if not any(re.fullmatch(r"github-actions-run:[0-9]+", ref) for ref in evidence):
+        raise P2T1ActivationError(f"{task_id} lacks an Actions acceptance run")
+    if not {"skeleton/masterplan/closure.py", "tests/flgb/test_masterplan_closure.py"} <= evidence:
+        raise P2T1ActivationError(f"{task_id} lacks canonical acceptance verifier refs")
+
+    prefix = f"workflow:{workflow}@"
+    workflow_heads = {
+        ref[len(prefix):-len(":success")]
+        for ref in evidence if ref.startswith(prefix) and ref.endswith(":success")
+    }
+    workflow_heads = {head for head in workflow_heads if re.fullmatch(r"[0-9a-f]{40}", head)}
+    if not workflow_heads:
+        raise P2T1ActivationError(f"{task_id} lacks pinned successful {workflow}")
+    if require_matching_head:
+        git_heads = {
+            ref[len("git-head:"):] for ref in evidence
+            if re.fullmatch(r"git-head:[0-9a-f]{40}", ref)
+        }
+        if not git_heads & workflow_heads:
+            raise P2T1ActivationError(f"{task_id} workflow head does not match source evidence")
+    elif not any(re.fullmatch(r"git:merge:[0-9a-f]{40}", ref) for ref in evidence):
+        raise P2T1ActivationError(f"{task_id} lacks immutable merge evidence")
+
+
 def validate(root: Path = ROOT) -> dict[str, Any]:
     root = root.resolve()
     plan = _load(root, PLAN)
@@ -90,13 +148,13 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         if isinstance(task, dict) and task.get("task_id")
     }
     native = tasks.get("P2-NATIVE-01")
-    if not isinstance(native, dict) or native.get("status") != "landed_unpromoted":
-        raise P2T1ActivationError("P2-NATIVE-01 must be landed_unpromoted")
-    native_evidence = set(map(str, native.get("evidence_refs", [])))
-    required_native_prefixes = ("github:pr#2332", "git:merge:", "workflow:P2 Profile-Gated Acceleration@")
-    for prefix in required_native_prefixes:
-        if not any(ref.startswith(prefix) for ref in native_evidence):
-            raise P2T1ActivationError(f"P2-NATIVE-01 missing evidence prefix: {prefix}")
+    if not isinstance(native, dict):
+        raise P2T1ActivationError("P2-NATIVE-01 is missing")
+    _check_task_state(
+        "P2-NATIVE-01", native, pr="2332",
+        workflow="P2 Profile-Gated Acceleration",
+        require_matching_head=False,
+    )
 
     scheduled = set(p2["first_tranche"]["scheduled_volume_refs"])
     queued = set(p2["first_tranche"]["queued_volume_refs"])
@@ -112,10 +170,9 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             raise P2T1ActivationError(f"{task_id} ownership drift")
         if task.get("depends_on") != EXPECTED_DEPS[task_id]:
             raise P2T1ActivationError(f"{task_id} dependency drift")
-        if task.get("completion_checkbox") is not False:
-            raise P2T1ActivationError(f"{task_id} may not self-complete")
-        if task.get("implementation_signed") is not False or task.get("verification_signed") is not False:
-            raise P2T1ActivationError(f"{task_id} may not self-sign")
+        _check_task_state(
+            task_id, task, pr="2346", workflow="P2 Functional AI Acceptance",
+        )
 
     return {
         "status": "valid",
