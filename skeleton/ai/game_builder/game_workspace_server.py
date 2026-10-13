@@ -40,6 +40,8 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_unified_genre_campaign import (run_unified_game_campaign,
+    verify_unified_game_campaign)
 from .advanced_genre_npc_event_bridge import (run_cross_genre_world,
     verify_cross_genre_world)
 from .advanced_npc_conditional_world import (run_npc_conditional_rules,
@@ -440,6 +442,22 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "navigation":navigation,
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
+                "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-unified-genre-campaign":
+            result=run_unified_game_campaign(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values.get("world_settings"),
+                world_actions=values.get("world_actions",[]))
+            if not verify_unified_game_campaign(
+                    result,values["physical_episodes"],
+                    values["genre_sessions"],values["world_scene"],
+                    values.get("world_settings"),
+                    world_actions=values.get("world_actions",[])):
+                raise ValueError("combined signed genre campaign replay rejected")
+            return self._json(200,{
+                "proof":result,"source_project_files_modified":False,
+                "automatic_game_rewards":False,
                 "native_hardware_verified":False,
             })
         if path=="/api/advanced-cross-genre-npc-world":

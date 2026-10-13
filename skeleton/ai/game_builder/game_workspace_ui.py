@@ -1852,6 +1852,8 @@ function showAdvanced(reply){
    advancedSession.editor)||!advancedSession.scene;
  $("advanced-genre-event-play").disabled=!["farming","sailing","flight"].includes(
    advancedSession.editor)||!advancedSession.scene;
+ $("advanced-genre-queue").disabled=!["farming","sailing","flight"].includes(
+   advancedSession.editor)||!advancedSession.scene;
  $("advanced-interop-godot").disabled=!["platformer","racing","sandbox"].includes(
    advancedSession.editor)||!advancedSession.scene;
  $("advanced-linked-step").disabled=!["platformer","racing","sandbox"].includes(
@@ -3243,6 +3245,95 @@ async function runNPCConditionalRules(mode){
     "No independently earned original world commands were applied");
  }
 }
+function refreshUnifiedGenreQueue(){
+ $("advanced-genre-queue-list").textContent=JSON.stringify(
+  verifiedGenreEvents.map((entry,index)=>({
+   sequence:index+1,original_editor:entry.source_session.editor,
+   source_session_digest:entry.source_session.digest,
+   actual_action_indices:entry.bindings.map(b=>b.trace_index),
+   mapped_sites:entry.bindings.map(b=>b.site_id)
+  })),null,2);
+}
+$("advanced-genre-queue-clear").addEventListener("click",()=>{
+ verifiedGenreEvents=[];lastUnifiedGenreProof=null;
+ $("advanced-genre-queue-list").textContent="";
+ $("advanced-unified-proof").textContent="";
+ status("Unpublished genre source acquisitions cleared without modifying original saves");
+});
+$("advanced-genre-queue").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastScene || !episodicLastProof ||
+     !verifiedSourceEpisodes.length)
+   throw Error("Replay the original physical NPC campaign before adding genre achievements");
+  if(!advancedSession?.scene ||
+      !["farming","sailing","flight"].includes(advancedSession.editor))
+   throw Error("A signed original farming/sailing/flight session is required");
+  if(verifiedGenreEvents.length>=4)
+   throw Error("Maximum four independent original genre achievement sessions");
+  const idx=Number($("advanced-genre-event-index").value);
+  if(!Number.isSafeInteger(idx)||idx<0||idx>=advancedSession.trace.length)
+   throw Error("Inspect and choose a real source event action first");
+  if(verifiedGenreEvents.some(entry=>
+      entry.source_session.digest===advancedSession.digest))
+   throw Error("Original genre session already in persistent NPC campaign");
+  const bindings=[{trace_index:idx,
+                   site_id:Number($("advanced-genre-event-site").value)}];
+  const verified=await api("/api/advanced-cross-genre-npc-world",{
+   session:advancedSession,source_settings:advancedSettings,
+   world_scene:episodicLastScene,bindings,world_actions:[]
+  });
+  if(!verified.report || verified.report.source_session_digest!==advancedSession.digest ||
+      verified.report.world_scene_digest!==episodicLastScene.digest ||
+      verified.original_project_files_modified || verified.native_hardware_certified ||
+      verified.automatic_rewards_or_promotion ||
+      verified.report.earned_events.length!==1)
+   throw Error("Original gameplay genre receipt cannot be independently attributed");
+  verifiedGenreEvents.push({
+   source_session:JSON.parse(JSON.stringify(advancedSession)),
+   source_settings:JSON.parse(JSON.stringify(advancedSettings)),
+   bindings
+  });
+  lastUnifiedGenreProof=null;
+  refreshUnifiedGenreQueue();
+  status("One independently earned original genre event queued for persistent NPC replay");
+ }catch(error){status("Original genre campaign addition rejected: "+error.message);}
+});
+$("advanced-unified-run").addEventListener("click",async()=>{
+ try{
+  if(!episodicLastScene || !episodicLastProof ||
+     !verifiedSourceEpisodes.length || !verifiedGenreEvents.length)
+   throw Error("Requires an original physical campaign plus independently earned genre achievements");
+  const result=await api("/api/advanced-unified-genre-campaign",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,
+   world_actions:[]
+  });
+  const proof=result.proof;
+  if(!proof || result.source_project_files_modified ||
+      result.automatic_game_rewards || result.native_hardware_verified ||
+      proof.physical_campaign_digest!==episodicLastProof.digest ||
+      proof.world_scene_digest!==episodicLastScene.digest ||
+      proof.genre_session_count!==verifiedGenreEvents.length ||
+      proof.original_game_files_mutated || proof.free_game_rewards_minted)
+   throw Error("Unified physical/genre NPC source chronology is not authenticated");
+  lastUnifiedGenreProof=proof;
+  drawNPCForensicMap(proof.world_state);
+  $("advanced-unified-proof").textContent=JSON.stringify({
+   physical_episodes:proof.physical_episode_count,
+   real_genre_achievements:proof.verified_genre_event_count,
+   ordered_source_incidents:proof.genre_history,
+   authentic_npc_positions:proof.world_state.npcs.map(n=>({
+    id:n.id,cell:n.cell,direct:n.memories,rumors:n.heard
+   })),
+   actual_world_sites:proof.world_state.sites,
+   continuing_quests:proof.world_state.quests,
+   full_replayed_world_digest:proof.digest,
+   original_project_files_unchanged:true
+  },null,2);
+  status("Unified real physical and multi-genre NPC world independently replayed with original source custody");
+ }catch(error){status("Unified genre NPC campaign blocked: "+error.message);}
+});
 $("advanced-genre-event-inspect").addEventListener("click",()=>{
  try{
   if(!advancedSession?.scene ||
@@ -3316,6 +3407,8 @@ $("advanced-npc-rule-commit").addEventListener("click",async()=>{
  try{await runNPCConditionalRules("commit");}
  catch(error){status("NPC rule application rejected: "+error.message);}
 });
+let verifiedGenreEvents=[];
+let lastUnifiedGenreProof=null;
 let verifiedSourceEpisodes=[];
 let episodicLastProof=null,episodicLastScene=null;
 let verifiedInvestigationRoute=null;
@@ -3525,6 +3618,9 @@ $("advanced-episodic-save-import").addEventListener("change",async()=>{
 });
 $("advanced-episodic-clear").addEventListener("click",()=>{
  verifiedSourceEpisodes=[];
+ verifiedGenreEvents=[];lastUnifiedGenreProof=null;
+ $("advanced-genre-queue-list").textContent="";
+ $("advanced-unified-proof").textContent="";
  episodicLastProof=null;episodicLastScene=null;verifiedInvestigationRoute=null;
  drawNPCForensicMap(null);
  $("advanced-npc-route-proof").textContent="";
@@ -3951,6 +4047,17 @@ local until typed revalidation and an explicit human-approved file commit.</smal
         Replay original achievement into NPC world
       </button>
       <pre id="advanced-genre-event-proof" role="status" aria-live="polite"></pre>
+      <button id="advanced-genre-queue" type="button">
+        Add reviewed original genre achievement to campaign
+      </button>
+      <button id="advanced-unified-run" type="button">
+        Replay unified original physical and genre NPC world
+      </button>
+      <button id="advanced-genre-queue-clear" type="button">
+        Clear unpublished genre achievements
+      </button>
+      <pre id="advanced-genre-queue-list" role="status" aria-live="polite"></pre>
+      <pre id="advanced-unified-proof" role="status" aria-live="polite"></pre>
     </fieldset>
   </fieldset>
   </fieldset>
