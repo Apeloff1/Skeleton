@@ -2548,6 +2548,93 @@ function renderAdvancedActions(actions){
     }
   });
   target.append(mirrorInput);target.append(mirrorRun);target.append(mirrorOutput);
+  const conditionalTitle=document.createElement("h4");
+  conditionalTitle.textContent="Witness-Conditional Missions · earned player knowledge and real Boolean decisions";
+  target.append(conditionalTitle);
+  const conditionalInput=document.createElement("textarea");
+  conditionalInput.rows=10;
+  conditionalInput.id="original-conditional-npc-program";
+  conditionalInput.setAttribute("aria-label","Original witnessed conditional mission branches and physical objectives");
+  const physicalGoal=(kind,index,action)=>({kind,index,action});
+  const playerFact=(predicate,options)=>({fact:{predicate,...options}});
+  conditionalInput.value=JSON.stringify([
+    {goal:physicalGoal("site",0,"harvest")},
+    {when:{
+      if:{all:[
+        playerFact("own_harvest_at_site",{site:0}),
+        {not:playerFact("paid_support",{actor:0})}
+      ]},
+      then:[physicalGoal("npc",0,"speak")],
+      otherwise:[physicalGoal("site",0,"approach")]
+    }},
+    {when:{
+      if:{all:[
+        playerFact("firsthand_testimony",{actor:0}),
+        playerFact("supplies_at_least",{amount:1})
+      ]},
+      then:[physicalGoal("npc",0,"support")],
+      otherwise:[physicalGoal("site",0,"approach")]
+    }},
+    {when:{
+      if:{all:[
+        playerFact("paid_support",{actor:0}),
+        {not:playerFact("site_quest_resolved",{site:0})}
+      ]},
+      then:[
+        ...Array.from({length:5},()=>physicalGoal("site",0,"repair")),
+        physicalGoal("site",0,"claim")
+      ],
+      otherwise:[physicalGoal("site",0,"approach")]
+    }}
+  ],null,1);
+  const conditionalRun=document.createElement("button");
+  conditionalRun.type="button";
+  conditionalRun.textContent="Execute and source-prove witnessed conditional game missions";
+  const conditionalOutput=document.createElement("pre");
+  conditionalOutput.id="original-conditional-npc-source-proof";
+  conditionalOutput.setAttribute("role","status");
+  conditionalOutput.setAttribute("aria-live","polite");
+  conditionalRun.addEventListener("click",async()=>{
+    try{
+      if(!latestStreamRecord)
+        throw Error("Run and independently verify the original NPC world first");
+      const program=JSON.parse(conditionalInput.value);
+      if(!Array.isArray(program)||program.length<1||program.length>12)
+        throw Error("Use one to twelve bounded original mission nodes");
+      const report=await api("/api/run-original-conditional-npc-mission",{
+        record:latestStreamRecord,program,max_steps_per_goal:24
+      });
+      if(!report.verified||report.source_files_mutated||
+         report.model_weights_promoted||report.native_hardware_certified)
+        throw Error("Real source game did not independently verify");
+      const independently=await api("/api/verify-original-conditional-npc-mission",{
+        record:report.record
+      });
+      if(!independently.verified)
+        throw Error("Original player evidence or conditional actions were forged");
+      const run=report.record;
+      if(!run.only_player_acquired_knowledge_controls_branches||
+         !run.discarded_branches_not_simulated)
+        throw Error("Conditional branch used unseen NPC state");
+      conditionalOutput.textContent=JSON.stringify({
+        original_world_digest:run.starting_world_digest,
+        conditional_branch_decisions:run.evaluated_conditional_nodes,
+        actually_executed_original_goals:run.actual_goal_executions,
+        actual_physical_game_actions:run.physical_actions,
+        earned_original_game_results:run.result,
+        fully_replayed_result_digest:run.final_world_digest,
+        hidden_npc_knowledge_used:false,
+        unselected_goals_falsely_executed:false,
+        project_mutated:false,model_weights_promoted:false
+      },null,2);
+      status("Only acquired player knowledge chose branches; real NPC quest actions replayed.");
+    }catch(error){
+      conditionalOutput.textContent="";
+      status("Witness-Conditional Missions denied: "+error.message);
+    }
+  });
+  target.append(conditionalInput);target.append(conditionalRun);
+  target.append(conditionalOutput);
   return;
  }
  if(advancedSession?.editor==="economy"){

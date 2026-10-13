@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_npc_conditional_mission import (
+    run_original_conditional_mission, verify_original_conditional_mission,
+)
 from .advanced_npc_mission_mirror import (
     analyze_original_npc_missions, verify_original_npc_mission_mirror,
 )
@@ -222,6 +225,14 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    conditional=commands.add_parser("run-original-conditional-npc-mission",
+        help="Execute witnessed original if/and/or/not branches through actual NPC gameplay")
+    conditional.add_argument("--record",required=True)
+    conditional.add_argument("--program",required=True)
+    conditional.add_argument("--max-steps-per-goal",type=int,default=24)
+    conditional_verify=commands.add_parser("verify-original-conditional-npc-mission",
+        help="Reconstruct all player-knowledge guards and physical missions from authentic source")
+    conditional_verify.add_argument("--record",required=True)
     mirror=commands.add_parser("analyze-original-npc-missions",
         help="Compare only genuine source-replayed NPC mission contenders and rejected shortcuts")
     mirror.add_argument("--record",required=True)
@@ -552,6 +563,12 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "run-original-conditional-npc-mission":
+            output=run_original_conditional_mission(
+                _load(args.record),_load(args.program),
+                max_steps_per_goal=args.max_steps_per_goal)
+        elif args.operation == "verify-original-conditional-npc-mission":
+            output={"verified":verify_original_conditional_mission(_load(args.record))}
         elif args.operation == "analyze-original-npc-missions":
             output=analyze_original_npc_missions(
                 _load(args.record),_load(args.candidates))

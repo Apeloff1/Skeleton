@@ -1,0 +1,99 @@
+name: Original Witness-Conditional NPC Missions
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_npc_conditional_mission.py"
+      - "skeleton/ai/game_builder/advanced_npc_mission_mirror.py"
+      - "skeleton/ai/game_builder/advanced_npc_waypoint_mission.py"
+      - "skeleton/ai/game_builder/advanced_npc_dynamic_route_planner.py"
+      - "skeleton/ai/game_builder/advanced_chunked_npc_world.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_npc_conditional_mission.py"
+      - ".github/workflows/game-builder-npc-conditional-missions.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: original-witness-conditional-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  verified-player-decisions:
+    name: Original witness knowledge and physical conditional missions (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: "1"
+      PYTHONPATH: "."
+      EXPECTED_HEAD: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact authenticated source head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_npc_conditional_mission.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Check exact head and compile original condition/mission source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          python -m py_compile \
+            skeleton/ai/game_builder/advanced_npc_conditional_mission.py \
+            skeleton/ai/game_builder/advanced_npc_waypoint_mission.py \
+            skeleton/ai/game_builder/system_editor_cli.py \
+            skeleton/ai/game_builder/game_workspace_server.py \
+            skeleton/ai/game_builder/game_workspace_ui.py \
+            tests/test_game_builder_npc_conditional_mission.py
+      - name: Real firsthand knowledge and finite material quests; adversarial false proof tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_game_builder_npc_conditional_mission -v
+      - name: Real source proofs from four seeded worlds and two body budgets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from skeleton.ai.game_builder.advanced_chunked_npc_world import run_chunked_npc_world
+          from skeleton.ai.game_builder.advanced_npc_conditional_mission import (
+              run_original_conditional_mission,verify_original_conditional_mission)
+          g=lambda kind,action,index=0:{"kind":kind,"index":index,"action":action}
+          for seed in (0,1,5,9):
+              for chunks in (3,5):
+                  world=run_chunked_npc_world([],seed=seed,options={
+                      "chunks_per_side":chunks,"citizens":64,
+                      "active_limit":8,"chunk_radius":1,"lod_policy":"fair"})
+                  script=[
+                      {"goal":g("site","harvest")},
+                      {"when":{
+                          "if":{"fact":{"predicate":"own_harvest_at_site","site":0}},
+                          "then":[g("site","approach")],
+                          "otherwise":[g("site","claim")],
+                      }},
+                  ]
+                  result=run_original_conditional_mission(world,script,max_steps_per_goal=12)
+                  assert verify_original_conditional_mission(result)
+                  assert result["result"]["real_harvested_events"]==1
+                  assert result["evaluated_conditional_nodes"][0]["branch_taken"]=="then"
+                  assert result["result"]["real_quest_milestones"]==0
+                  assert not result["model_weights_promoted"]
+                  print("ACTUAL_WITNESS_CONDITIONAL_GAME_OK",seed,chunks,result["digest"])
+          PY
