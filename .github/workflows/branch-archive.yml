@@ -111,7 +111,7 @@ jobs:
               return 1
             fi
 
-            while IFS=
+            while read -r branch tip pr; do
               [[ -n "$branch" && -n "$tip" && -n "$pr" ]] || continue
               archive_pr["${branch}:${tip}"]="$pr"
             done < "$candidates_file"
