@@ -403,6 +403,9 @@ OPERATIONS = {
     "studio.advanced.replay.plan":("compute", "execute reference gameplay from actual approved advanced game scene",True),
     "studio.advanced.replay.stage":("proposal", "stage source-bound verified advanced gameplay receipt",True),
     "studio.advanced.replay.verify":("read", "reexecute committed advanced game session against approved system/scene",False),
+    "studio.campaign.plan":("compute", "simulate bounded branching original game campaign across canonical scenes",True),
+    "studio.campaign.stage":("proposal", "reviewed SHA-bound authored campaign source and actual route receipt",True),
+    "studio.campaign.verify":("read", "replay committed original campaign source and endings",False),
     "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
     "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
@@ -668,6 +671,16 @@ class JeevesAppwideRuntime:
                 result=session.stage(**params,operator_authorized=authorized)
             else:
                 result=session.verify(**params)
+        elif action in ("studio.campaign.plan", "studio.campaign.stage",
+                        "studio.campaign.verify"):
+            from .jeeves_campaign_graph import JeevesCampaignGraph
+            campaign=JeevesCampaignGraph(inv,ws)
+            if action=="studio.campaign.plan":
+                result=campaign.plan(**params,operator_authorized=authorized)
+            elif action=="studio.campaign.stage":
+                result=campaign.stage(**params,operator_authorized=authorized)
+            else:
+                result=campaign.verify(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":

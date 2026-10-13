@@ -318,6 +318,30 @@ class GameWorkspace:
         config=validate_editor_document(_json(_read(config_path)))
         validate_advanced_scene(document,config["settings"])
 
+    def _validate_advanced_campaign_source(self, project, relative, document):
+        """Replay actual scene-linked, choice-branching game campaign at commit.
+
+        A digest alone is not a game. Rebuild graph, endings and all real
+        engine action receipts from saved current source versions.
+        """
+        from .jeeves_campaign_graph import rebuild_campaign_document
+        if type(document) is not dict:
+            raise WorkspaceError("typed original campaign document required")
+        expected = rebuild_campaign_document(self, project, document)
+        if expected != document:
+            raise WorkspaceError(
+                "game campaign graph, choices or actual gameplay proof changed")
+        if relative != "game/campaigns/" + document["campaign_id"] + ".json":
+            raise WorkspaceError("campaign source path mismatches authored campaign ID")
+        return {
+            "schema":document["schema"],
+            "campaign_id":document["campaign_id"],
+            "path":relative,
+            "original_source_reexecuted_at_commit":True,
+            "source_gameplay_receipt_digest":document["digest"],
+            "native_or_external_model_execution_claimed":False,
+        }
+
     def _validate_advanced_replay_source(self, project: str, relative: str,
                                          document: dict):
         """Commit-time authentic game action replay bound to actual saved sources.
@@ -458,6 +482,8 @@ class GameWorkspace:
                 self._validate_forge_blueprint(relative,parsed)
             if relative.startswith("game/replays/"):
                 self._validate_advanced_replay_source(project,relative,parsed)
+            if relative.startswith("game/campaigns/"):
+                self._validate_advanced_campaign_source(project,relative,parsed)
             if (relative in ("game/story_bible.json","game/continuity_contract.json")
                     or relative.startswith(("story/scenes/","story/chapters/"))):
                 from .story_workspace import validate_story_workspace_source
@@ -510,6 +536,8 @@ class GameWorkspace:
                 self._validate_forge_blueprint(proposal["path"],parsed)
             if proposal["path"].startswith("game/replays/"):
                 self._validate_advanced_replay_source(project,proposal["path"],parsed)
+            if proposal["path"].startswith("game/campaigns/"):
+                self._validate_advanced_campaign_source(project,proposal["path"],parsed)
             if (proposal["path"] in ("game/story_bible.json",
                                       "game/continuity_contract.json") or
                     proposal["path"].startswith(("story/scenes/","story/chapters/"))):
