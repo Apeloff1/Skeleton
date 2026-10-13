@@ -776,6 +776,18 @@
     "http_owner": "skeleton/app/offline_http.py",
     "ui_owner": "skeleton/app/offline_web.py",
     "inference_owner": "skeleton/ai/runtime/inference/local.py",
+    "inference_implementation": {
+      "status": "unverified-implementation-candidate",
+      "record": "docs/plan/AI_INFERENCE_TRANSFORMER_2026-10-13.md",
+      "native_runtime": "skeleton/ai/model_runtime/native_llm_runtime.py",
+      "transformer": "skeleton/cortex/transformer.py",
+      "generation_contract": "skeleton/ai/model_runtime/runtime_contracts.py",
+      "result_schema": "skeleton/ai/model_runtime/contracts/native_llm_runtime.schema.json",
+      "capacity": "default one concurrent backend execution; bounded configurable batches and scheduler admission",
+      "interruption": "cooperative layer, prefill-chunk, queue and process boundaries; individual kernels remain atomic",
+      "receipt_policy": "bind execution configuration; reject mixed model or device bindings; no automatic generation retry",
+      "verification": "not run; operator requested direct implementation without checks or tests"
+    },
     "state_authority": "skeleton/ai/model_runtime/offline_chat.py",
     "knowledge_owner": "skeleton/app/offline_knowledge.py",
     "network": "authenticated numeric-loopback only; no hosted-provider fallback",

@@ -120,6 +120,11 @@ class LocalInferenceRequest:
             "stop",
             tuple(dict.fromkeys(item for item in self.stop if isinstance(item, str) and item)),
         )
+        if len(self.stop) > 16 or any(
+            len(marker) > 256 or any(0xD800 <= ord(char) <= 0xDFFF for char in marker)
+            for marker in self.stop
+        ):
+            raise ValueError("stop supports at most 16 valid Unicode markers of 256 characters")
         object.__setattr__(self, "tools", tuple(dict(item) for item in self.tools))
         if self.structured_output_schema is not None:
             if not isinstance(self.structured_output_schema, Mapping):
@@ -531,15 +536,64 @@ class CallableLocalModel:
 
 
 class LocalInferenceEngine:
-    def __init__(self, model: LocalModelBackend, *, cache_size: int = 128) -> None:
+    def __init__(
+        self, model: LocalModelBackend, *, cache_size: int = 128,
+        max_concurrency: int = 1, max_batch_size: int = 256,
+    ) -> None:
         if not hasattr(model, "infer") or not hasattr(model, "model_digest"):
             raise TypeError("model must implement LocalModelBackend")
         if isinstance(cache_size, bool) or not isinstance(cache_size, int) or cache_size < 0:
             raise ValueError("cache_size must be a non-negative integer")
+        for name, value, upper in (("max_concurrency", max_concurrency, 32),
+                                   ("max_batch_size", max_batch_size, 4096)):
+            if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= upper:
+                raise ValueError(f"{name} must be between 1 and {upper}")
         self.model = model
         self.cache_size = cache_size
+        self.max_concurrency = max_concurrency
+        self.max_batch_size = max_batch_size
+        self._execution_slots = threading.BoundedSemaphore(max_concurrency)
         self._cache: OrderedDict[str, LocalInferenceResult] = OrderedDict()
         self._cache_lock = asyncio.Lock()
+
+    def _infer_admitted(
+        self, request: LocalInferenceRequest, cancel: threading.Event,
+    ) -> LocalInferenceResult:
+        # A thread semaphore is shared across event loops. Desktop callers
+        # can create a new asyncio loop per turn without weakening capacity.
+        while not self._execution_slots.acquire(timeout=0.05):
+            if cancel.is_set():
+                raise LocalInferenceCancelled("local inference cancelled while queued")
+        try:
+            if cancel.is_set():
+                raise LocalInferenceCancelled("local inference cancelled before execution")
+            result = self.model.infer(request, cancel)
+            if not isinstance(result, LocalInferenceResult):
+                raise TypeError("local backend must return LocalInferenceResult")
+            return result
+        finally:
+            self._execution_slots.release()
+
+    @staticmethod
+    async def _await_worker(worker: asyncio.Task[Any], cancel: threading.Event) -> Any:
+        """Keep ownership of an OS worker until it actually leaves its boundary."""
+        try:
+            return await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            cancel.set()
+            while not worker.done():
+                try:
+                    await asyncio.shield(worker)
+                except asyncio.CancelledError:
+                    continue
+                except Exception:
+                    break
+            if worker.done():
+                try:
+                    worker.result()
+                except (asyncio.CancelledError, Exception):
+                    pass
+            raise
 
     def _key(self, request: LocalInferenceRequest) -> str:
         # Native runtime identities include tokenizer, architecture and policy.
@@ -551,13 +605,18 @@ class LocalInferenceEngine:
             or any(ch not in "0123456789abcdef" for ch in runtime_digest)
         ):
             raise ValueError("local runtime digest must be lowercase sha256")
-        return _digest(
-            {
-                "model": self.model.model_digest,
-                "runtime": runtime_digest,
-                "request": request.digest,
-            }
-        )
+        identity = {
+            "model": self.model.model_digest,
+            "runtime": runtime_digest,
+            "request": request.digest,
+        }
+        profile = getattr(self.model, "execution_profile_digest", None)
+        if profile is not None:
+            if (not isinstance(profile, str) or len(profile) != 64
+                    or any(ch not in "0123456789abcdef" for ch in profile)):
+                raise ValueError("execution profile digest must be lowercase sha256")
+            identity["execution_profile"] = profile
+        return _digest(identity)
 
     async def generate(self, request: LocalInferenceRequest) -> LocalInferenceResult:
         if not isinstance(request, LocalInferenceRequest):
@@ -566,40 +625,21 @@ class LocalInferenceEngine:
         if self.cache_size:
             async with self._cache_lock:
                 cached = self._cache.get(key)
-                if cached is not None:
-                    if self._key(request) != key:
-                        raise ValueError("local runtime identity changed before cache hit")
-                    self._cache.move_to_end(key)
-                    return replace(cached, cached=True)
+            if cached is not None:
+                admit_cached = getattr(self.model, "assert_identity", None)
+                if callable(admit_cached):
+                    admission = asyncio.create_task(asyncio.to_thread(admit_cached))
+                    await self._await_worker(admission, threading.Event())
+                if self._key(request) != key:
+                    raise ValueError("local runtime identity changed before cache hit")
+                async with self._cache_lock:
+                    if key in self._cache:
+                        self._cache.move_to_end(key)
+                return replace(cached, cached=True)
 
         cancel = threading.Event()
-        worker = asyncio.create_task(asyncio.to_thread(self.model.infer, request, cancel))
-        try:
-            # Never let asyncio task cancellation cancel the Future owning a
-            # native inference worker. Doing so marks the Future done while
-            # the OS thread (or subprocess) can remain alive. That allows
-            # SQLite/session shutdown while a previous inference still runs.
-            result = await asyncio.shield(worker)
-        except asyncio.CancelledError:
-            cancel.set()
-            # Cancellation is advisory to the worker, not a license to detach
-            # it. Repeated task.cancel() calls must not cut short cleanup.
-            # Drain until the underlying OS worker has actually terminated.
-            while not worker.done():
-                try:
-                    await asyncio.shield(worker)
-                except asyncio.CancelledError:
-                    # The UI may send a second cancellation while the model
-                    # process is terminating. Keep waiting for the real worker.
-                    continue
-                except Exception:
-                    break
-            if worker.done():
-                try:
-                    worker.result()
-                except (asyncio.CancelledError, Exception):
-                    pass
-            raise
+        worker = asyncio.create_task(asyncio.to_thread(self._infer_admitted, request, cancel))
+        result = await self._await_worker(worker, cancel)
 
         if result.model_digest != self.model.model_digest:
             raise ValueError("local inference result model identity drift")
@@ -665,6 +705,10 @@ class LocalInferenceEngine:
     ) -> tuple[LocalInferenceResult, ...]:
         if not requests:
             return ()
+        if len(requests) > self.max_batch_size:
+            raise ValueError("local inference batch exceeds configured capacity")
+        if any(not isinstance(item, LocalInferenceRequest) for item in requests):
+            raise TypeError("batch requires LocalInferenceRequest values")
         return tuple(await asyncio.gather(*(self.generate(item) for item in requests)))
 
 
@@ -672,6 +716,7 @@ class LocalInferenceEngine:
 class _BatchItem:
     request: LocalInferenceRequest
     future: asyncio.Future[LocalInferenceResult]
+    task: asyncio.Task[None] | None = None
 
 
 class LocalInferenceScheduler:
@@ -705,6 +750,7 @@ class LocalInferenceScheduler:
         )
         self._worker: asyncio.Task[None] | None = None
         self._closed = False
+        self._close_task: asyncio.Task[None] | None = None
 
     def _ensure_worker(self) -> None:
         if self._worker is None or self._worker.done():
@@ -715,9 +761,35 @@ class LocalInferenceScheduler:
             raise RuntimeError("local inference scheduler is closed")
         loop = asyncio.get_running_loop()
         future: asyncio.Future[LocalInferenceResult] = loop.create_future()
+        item = _BatchItem(request=request, future=future)
+
+        def cancelled(done: asyncio.Future[LocalInferenceResult]) -> None:
+            if done.cancelled() and item.task is not None and not item.task.done():
+                item.task.cancel()
+
+        future.add_done_callback(cancelled)
         self._ensure_worker()
-        await self._queue.put(_BatchItem(request=request, future=future))
+        try:
+            # Atomic admission relative to close: never leave a blocked
+            # producer able to enqueue behind the terminal sentinel.
+            self._queue.put_nowait(item)
+        except asyncio.QueueFull as exc:
+            future.cancel()
+            raise RuntimeError("local inference scheduler queue is full") from exc
         return await future
+
+    async def _execute_item(self, item: _BatchItem) -> None:
+        try:
+            result = await self.engine.generate(item.request)
+        except asyncio.CancelledError:
+            item.future.cancel()
+            raise
+        except Exception as exc:
+            if not item.future.done():
+                item.future.set_exception(exc)
+        else:
+            if not item.future.done():
+                item.future.set_result(result)
 
     async def _run(self) -> None:
         while True:
@@ -742,23 +814,32 @@ class LocalInferenceScheduler:
 
             active = [item for item in batch if not item.future.cancelled()]
             if active:
+                tasks = []
+                for item in active:
+                    item.task = asyncio.create_task(self._execute_item(item))
+                    tasks.append(item.task)
                 try:
-                    results = await self.engine.generate_many([item.request for item in active])
-                except Exception as exc:
-                    for item in active:
-                        if not item.future.done():
-                            item.future.set_exception(exc)
-                else:
-                    for item, result in zip(active, results):
-                        if not item.future.done():
-                            item.future.set_result(result)
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                except asyncio.CancelledError:
+                    for task in tasks:
+                        task.cancel()
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                    while not self._queue.empty():
+                        queued = self._queue.get_nowait()
+                        if queued is not None:
+                            queued.future.cancel()
+                    raise
             if close_after_batch:
                 return
 
     async def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
+        if self._close_task is None:
+            self._closed = True
+            self._close_task = asyncio.create_task(self._finish_close())
+        # Cancellation of one shutdown waiter must not orphan the worker.
+        await asyncio.shield(self._close_task)
+
+    async def _finish_close(self) -> None:
         if self._worker is not None and not self._worker.done():
             await self._queue.put(None)
             await self._worker
@@ -805,6 +886,14 @@ class LocalModelAdapter(ProviderAdapter):
         status["network_policy"] = "none"
         status["model_digest"] = self.engine.model.model_digest
         status["runtime_digest"] = self.runtime_digest
+        status["execution_profile_digest"] = getattr(
+            self.engine.model, "execution_profile_digest", None,
+        )
+        status["capacity"] = {
+            "max_concurrency": self.engine.max_concurrency,
+            "max_batch_size": self.engine.max_batch_size,
+            "cache_entries": self.engine.cache_size,
+        }
         status["artifact"] = (
             None
             if self._artifact_status is None

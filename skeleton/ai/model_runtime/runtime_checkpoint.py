@@ -101,11 +101,25 @@ def validate_model_snapshot(snapshot: Mapping[str, Any]) -> None:
     if (
         not isinstance(vocab, list)
         or not vocab
-        or len(set(vocab)) != len(vocab)
         or any(not isinstance(token, str) or not token for token in vocab)
+        or len(set(vocab)) != len(vocab)
     ):
         raise RuntimeContractError("invalid model vocabulary")
     vocab_size = len(vocab)
+    special_tokens = snapshot.get("special_tokens")
+    if special_tokens is not None:
+        if (not isinstance(special_tokens, Mapping) or "unk" not in special_tokens
+                or set(special_tokens) - {"unk", "pad", "bos", "eos"}):
+            raise RuntimeContractError("invalid model special token declarations")
+        for token_id in special_tokens.values():
+            nonnegative_int(token_id, "special token id", vocab_size - 1)
+        if len(set(special_tokens.values())) != len(special_tokens):
+            raise RuntimeContractError("special token IDs must be distinct")
+
+    if snapshot.get("norm", "ln") not in {"ln", "rms"}:
+        raise RuntimeContractError("unsupported model normalization")
+    if snapshot.get("ffn_kind", "gelu") not in {"gelu", "swiglu"}:
+        raise RuntimeContractError("unsupported model feed-forward activation")
 
     _matrix(snapshot.get("E"), vocab_size, dim, "token embedding")
     _matrix(snapshot.get("P"), ctx, dim, "position embedding")
@@ -124,9 +138,13 @@ def validate_model_snapshot(snapshot: Mapping[str, Any]) -> None:
             _matrix(layer.get(name), dim, dim, f"{prefix}.{name}")
         for name in ("ln1_g", "ln1_b", "ln2_g", "ln2_b"):
             _vector(layer.get(name), dim, f"{prefix}.{name}")
-        layer_ff = int(layer.get("d_ff", d_ff))
+        layer_ff = nonnegative_int(layer.get("d_ff", d_ff), "layer feed-forward width", 16_000_000)
         if layer_ff != d_ff:
             raise RuntimeContractError("transformer layer FFN width mismatch")
+        if layer.get("norm", "ln") != snapshot.get("norm", "ln"):
+            raise RuntimeContractError("transformer layer normalization mismatch")
+        if layer.get("ffn_kind", "gelu") != snapshot.get("ffn_kind", "gelu"):
+            raise RuntimeContractError("transformer layer activation mismatch")
         if d_ff:
             _matrix(layer.get("W1"), d_ff, dim, f"{prefix}.W1")
             _matrix(layer.get("Wu"), d_ff, dim, f"{prefix}.Wu")
@@ -190,9 +208,21 @@ def parse_checkpoint_json(payload: str | bytes) -> Mapping[str, Any]:
         raise RuntimeContractError("checkpoint JSON must be str or bytes")
     if len(raw) > MAX_CHECKPOINT_BYTES:
         raise RuntimeContractError("checkpoint JSON exceeds global byte budget")
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise RuntimeContractError("duplicate runtime checkpoint JSON key")
+            result[key] = value
+        return result
+
+    def reject_constant(value: str) -> None:
+        raise RuntimeContractError("non-finite runtime checkpoint JSON constant")
+
     try:
-        value = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
+                           parse_constant=reject_constant)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
         raise RuntimeContractError("invalid checkpoint JSON") from exc
     if not isinstance(value, dict):
         raise RuntimeContractError("checkpoint JSON root must be an object")
