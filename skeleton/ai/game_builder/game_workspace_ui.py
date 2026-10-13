@@ -366,8 +366,10 @@ $("jeeves-dm-test-matrix").addEventListener("click",()=>dmGuard(async()=>{
  acceptanceTestMatrixDigest=result.digest;
  const mapped=result.curated_test_family_count;
  status(mapped+"/"+result.family_denominator+" feature families have candidate test links. "+
-  result.ci_smoke_family_count+" selected for exact-head CI across "+
-  result.scheduled_test_module_count+" unittest modules; "+
+  result.ci_smoke_family_count+" selected for exact-head unittest across "+
+  result.scheduled_test_module_count+" modules; "+
+  result.pytest_smoke_family_count+" selected for independent pytest across "+
+  result.scheduled_pytest_module_count+" modules; "+
   result.discovery_only_family_count+" remain discovery-only. "+
   result.unique_static_test_case_count+" declared test functions. "+
   "No CI result is admitted from source presence alone.");
