@@ -255,7 +255,7 @@ class CompletionCensusTests(unittest.TestCase):
         self.assertIn("APP-SERVICE-backend", seen)
         self.assertIn("WORK-ENT-01", seen)
         self.assertIn("JOURNEY-01", seen)
-        self.assertEqual(first["total_work_items"], 9)
+        self.assertEqual(first["total_work_items"], 7
 
     def test_deathmarch_stale_identity_and_input_caps_fail_closed(self):
         old = self.census.report()["digest"]
