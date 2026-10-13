@@ -249,6 +249,23 @@ class Jeeves:
             promotion, expected_head_commit=expected_head_commit,
         )
 
+    def app_capability_dispatcher(self, *, registry, executor,
+                                  bindings, readiness, authorize, root=None):
+        """Bind declared product features to verified, host-owned tool effects.
+
+        No model-created binding, blanket permission, runtime fallback or
+        implicit readiness is accepted. The host remains the final authority.
+        """
+        from skeleton.jeeves.agent.capability_dispatch import JeevesCapabilityDispatcher
+        return JeevesCapabilityDispatcher(
+            registry=registry,
+            executor=executor,
+            bindings=bindings,
+            readiness=readiness,
+            authorize=authorize,
+            root=root,
+        )
+
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
         if not isinstance(mode, SessionMode):
