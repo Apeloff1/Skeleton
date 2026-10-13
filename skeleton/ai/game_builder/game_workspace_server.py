@@ -42,6 +42,8 @@ from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
 from .advanced_interleaved_counterfactual import (run_interleaved_counterfactuals,
     verify_interleaved_counterfactuals)
+from .advanced_world_counterfactuals import (run_counterfactual_laboratory,
+    verify_counterfactual_laboratory,derive_counterfactuals)
 from .advanced_interleaved_save import (export_interleaved_save,
     import_interleaved_save,continue_interleaved_save)
 from .advanced_interleaved_world import (run_interleaved_world,
@@ -497,6 +499,27 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "save":saved,"restored":restored,
                 "original_files_changed":False,
                 "automatic_publishing_approved":False,
+            })
+        if path=="/api/advanced-world-counterfactuals":
+            candidate_cases=values.get("cases")
+            if candidate_cases is None:
+                candidate_cases=derive_counterfactuals(values["timeline"])
+            report=run_counterfactual_laboratory(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["timeline"],candidate_cases,
+                values.get("world_settings"),
+                objective=values.get("objective","preserve_sites"))
+            if not verify_counterfactual_laboratory(
+                    report,values["physical_episodes"],values["genre_sessions"],
+                    values["world_scene"],values["timeline"],candidate_cases,
+                    values.get("world_settings")):
+                raise ValueError("independent original world what-if replay rejected")
+            return self._json(200,{
+                "report":report,
+                "original_source_projects_changed":False,
+                "automatic_scenario_accepted":False,
+                "native_hardware_certified":False,
+                "automatic_ai_weight_promotion":False,
             })
         if path=="/api/advanced-interleaved-world":
             report=run_interleaved_world(
