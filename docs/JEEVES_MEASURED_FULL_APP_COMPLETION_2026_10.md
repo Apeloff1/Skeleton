@@ -206,3 +206,22 @@ Do not give secrets or privileged app tokens to PR code. Verification is an oper
 3. Admit source-bound independent CI observations for each accepted targeted regression, with separate quality and runtime acceptance.
 4. Build a separate installed-app run matrix for each of the 42 feature families, with real user outcome evidence and failure recovery.
 5. Preserve the 26 terminal release gates, 421 volume qualifications, 9 AI product capability statuses and 12 enterprise end-to-end journeys as independent release obligations.
+
+## DX-76–DX-88 — runtime journey and cross-platform source-digest alignment
+
+**Product integration:** `tests.test_game_builder_jeeves_product_studio_journey` starts a real loopback-only local Studio, creates an original project, enforces the operator token and same-origin policy, navigates Jeeves's 42-family measurement/test pages, rejects stale plan hashes, and verifies read operations do not modify the authored project. It additionally follows a real game-production journey via HTTP: original tower-defense prompt planning, gameplay actions with actual trace evidence, independent gameplay replay verification, portable save, reload with authoritative action-log regeneration, and tampered-session rejection. This remains a **local integration test candidate**—not a packaged Windows app test, browser end-user quality pass or a signed native game export.
+
+**Cross-workflow integrity:** The operator-side independent verifier returns explicit SHA256 of the reviewed `machine/app_acceptance_test_matrix.json` and `machine/app_completion_scope.json` authorities for both pytest and unittest. The combined reduction function `JeevesAcceptanceRollup.combine` now rejects a pair of individually green CI proofs if **either** SHA differs, even when the Git commit appears identical. Dedicated negative tests prove a spoofed changed authority cannot inflate verified family counts. This prevents a stale/partial source contract from being silently counted as a complete 42-family targeted-test pass.
+
+**Unittest provisioning:** The `Jeeves App Acceptance Matrix` workflow now installs `pyproject.toml` declared project dependencies before Python regressions and allows a bounded 45-minute acceptance window. The separate pytest workflow already installs the project and pins its runner version. Neither job execution is granted write access to GitHub or automatically signs enterprise closure.
+
+**Current selected exact-head coverage:** 17 product families by unittest, 25 by pytest = 42/42 scheduled targeted regression subsets. The unittest selected set includes the new Studio real HTTP journey. Workflow queued or skipped states are **not** successes. On successful independently verified results, 100% *targeted-subset test coverage* would still not be 100% application functionality, trained-model readiness or release/device qualification.
+
+### Remaining true release path
+
+- Verify actual Windows and Ubuntu job conclusions, case counts and artifact digests at the latest exact head.
+- Investigate real failures: source import/runtime initialization, fixture custody, platform-specific IO, native model replay, game economy/savegame contract and HTTP origin.
+- Build independent **user-journey acceptance** evidence for representative shipped product workflows, e.g. locally trained LLM chat, game creation, editable world and NPC event, Dragon acquisition→fact-check→approved learning, native packaged playable build.
+- Enforce adversarial test and durable save/restore, backend DB/API integration, client UX, installer operation and rollback.
+- Land the stacked draft code only after prerequisite PRs are reconciled and exact-head CI gates qualify it. Never backfill timestamps or sign-off without the actual evidence.
+
