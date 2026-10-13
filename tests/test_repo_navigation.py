@@ -69,6 +69,18 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(nav.feature_of("backend/routes/health.py"), "backend/routes")
         self.assertEqual(nav.feature_of("tests/test_repo_navigation.py"), "tests")
 
+    def test_bounded_line_windows_and_feature_routes(self):
+        with self.fixture() as temp:
+            root = Path(temp)
+            outputs = nav.build(root, compute_near=False)
+            routing = json.loads(outputs["routes.json"])
+            self.assertIn("routes", routing)
+            windows = json.loads(outputs["shard_index.json"])["shards"]
+            self.assertTrue(all(item["end_line"] - item["start_line"] < 256 for
+                                part in windows.values() for item in part))
+            self.assertIn("feature_routes/app.json", outputs)
+            self.assertEqual(nav.feature_route("skeleton/ai/runtime"), "skeleton/ai")
+
     def test_zone_prefix_boundary(self):
         with self.fixture() as temp:
             rules = nav.zones(Path(temp))
