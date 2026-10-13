@@ -238,8 +238,9 @@ class JeevesCampaignOutcomes:
                 document["unobserved_authored_ending_node_ids"],
             "authored_branch_edges":document["authored_branch_edges"],
             "actually_exercised_branch_edges":document["observed_branch_edges"],
-            "all_branch_paths_or_player_choices_covered":
+            "all_declared_edges_observed_in_supplied_scenarios":
                 document["all_declared_branch_edges_observed_in_supplied_scenarios"],
+            "all_possible_player_choices_or_routes_qualified":False,
             "already_current":prior==sha,
             "real_game_source_used":True,
             "evidence_is_only_supplied_action_variants":True,

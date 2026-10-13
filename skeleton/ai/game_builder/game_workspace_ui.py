@@ -6013,9 +6013,9 @@ outcomes without inventing unplayed alternative paths.</small></p>
 <label>Two–twelve distinct bounded original player-action scenario profiles
 <textarea id="jeeves-outcomes-scenarios" rows="12" spellcheck="false">[
  {"scenario_id":"first_original_choice",
-  "overrides":{"prologue":["explore"]}},
+  "overrides":{"prologue":["inspect"]}},
  {"scenario_id":"another_original_choice",
-  "overrides":{"prologue":["rest"]}}
+  "overrides":{"prologue":["inspect","inspect"]}}
 ]</textarea></label>
 <caption>Replace example action strings with actual installed engine
 actions. Every override must change a source scene's existing actions;

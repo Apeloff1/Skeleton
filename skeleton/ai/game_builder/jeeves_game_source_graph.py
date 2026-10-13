@@ -25,7 +25,7 @@ SHA=re.compile(r"[a-f0-9]{64}\Z")
 def _kind(path):
     if re.fullmatch(r"systems/[a-z][a-z0-9_]{1,63}\.json",path):
         return "original_engine_settings"
-    if re.fullmatch(r"scenes/advanced_[a-z0-9_]+\.json",path):
+    if re.fullmatch(r"scenes/advanced_[a-z0-9_-]+\.json",path):
         return "original_advanced_scene"
     if path.startswith("game/replays/") and path.endswith(".json"):
         return "played_game_session"
