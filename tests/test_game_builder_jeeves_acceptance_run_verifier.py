@@ -248,6 +248,79 @@ class IndependentProductAcceptanceVerifierTests(unittest.TestCase):
             report=source.artifact(987)
             self.assertEqual(report["github_claims"]["os"],"Linux")
 
+    def test_HTTPS_artifact_redirect_never_leaks_bearer_token(self):
+        from urllib.request import Request
+        from scripts.verify_app_acceptance_ci import _DropTokenOnRedirect
+        source=Request(
+            "https://api.github.com/repos/Apeloff1/Skeleton/actions/artifacts/1/zip",
+            headers={"Authorization":"Bearer SHOULD_NOT_LEAK"},
+            method="GET")
+        redirected=_DropTokenOnRedirect().redirect_request(
+            source,None,302,"Found",{},
+            "https://results.blob.core.windows.net/test/signed.zip")
+        self.assertEqual(redirected.full_url,
+                         "https://results.blob.core.windows.net/test/signed.zip")
+        self.assertIsNone(redirected.get_header("Authorization"))
+        with self.assertRaises(JeevesAppwideError):
+            _DropTokenOnRedirect().redirect_request(
+                source,None,302,"Found",{},
+                "http://results.blob.core.windows.net/test/signed.zip")
+
+    def test_API_allowlist_does_not_accept_external_or_traversal_URL(self):
+        source=GitHubEvidenceSource("offline-unit-token")
+        for path in (
+            "https://evil.example/api",
+            "/repos/Apeloff1/Other/actions/runs/1",
+            "/repos/Apeloff1/Skeleton/contents/secrets.txt",
+            "/repos/Apeloff1/Skeleton/actions/../secrets",
+            "/repos/Apeloff1/Skeleton/actions//runs/1",
+        ):
+            with self.subTest(path=path),self.assertRaises(JeevesAppwideError):
+                source._request(path)
+
+    def test_source_live_GitHub_artifact_lookup_uses_run_scoped_ids(self):
+        source=GitHubEvidenceSource("offline-unit-token")
+        source.json=lambda path: self.run
+        source._page=lambda route,key: self.jobs if key=="jobs" else [
+            {
+                "id":91 if target=="Linux" else 92,
+                "name":"app-acceptance-candidates-" +
+                    ("ubuntu-24.04" if target=="Linux" else "windows-2022") +
+                    "-" + str(self.run_id),
+                "expired":False,
+                "workflow_run":{"id":self.run_id},
+            }
+            for target in ("Linux","Windows")
+        ]
+        source.artifact=lambda artifact_id: (
+            self.evidence["Linux"] if artifact_id==91
+            else self.evidence["Windows"])
+        run, jobs, reports=source.load(self.run_id)
+        self.assertEqual(run["head_sha"],self.commit)
+        self.assertEqual(len(jobs),2)
+        self.assertEqual(set(reports),{"Linux","Windows"})
+        self.assertEqual(reports["Linux"]["github_claims"]["os"],"Linux")
+
+    def test_mismatched_artifact_parent_run_rejected_before_zip_fetch(self):
+        source=GitHubEvidenceSource("offline-unit-token")
+        source.json=lambda path: self.run
+        source._page=lambda route,key: self.jobs if key=="jobs" else [
+            {
+                "id":91 if target=="Linux" else 92,
+                "name":"app-acceptance-candidates-" +
+                    ("ubuntu-24.04" if target=="Linux" else "windows-2022") +
+                    "-" + str(self.run_id),
+                "expired":False,
+                "workflow_run":{"id":self.run_id+1},
+            }
+            for target in ("Linux","Windows")
+        ]
+        source.artifact=lambda artifact_id: (
+            self.evidence["Linux"] if artifact_id==91
+            else self.evidence["Windows"])
+        with self.assertRaises(JeevesAppwideError):
+            source.load(self.run_id)
+
     def test_artifact_zip_traversal_and_extra_files_rejected(self):
         with TemporaryDirectory() as directory:
             path=Path(directory)/"artifact.zip"
