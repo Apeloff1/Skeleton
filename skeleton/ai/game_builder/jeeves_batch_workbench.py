@@ -8,7 +8,6 @@ catalog, preview and simulation actions may enter a batch.
 """
 from __future__ import annotations
 
-from hashlib import sha256
 from typing import TYPE_CHECKING, Any
 
 from .jeeves_appwide_fabric import (

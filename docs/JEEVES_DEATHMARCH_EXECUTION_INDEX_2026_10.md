@@ -1,5 +1,36 @@
 # Deathmarch execution index — 2026-10-13
 
+## Workpass DX-09–DX-15 — real Jeeves appwide continuation
+
+Source branch: \`feat/jeeves-evidence-graph-scale-20261013\`, stacked
+behind #3738 → #3730 → #3729 → #3718. This workpass adds functional
+source-grounded tooling without inventing a new AI runtime owner.
+
+| Milestone | Delivery | Code |
+| --- | --- | --- |
+| DX-09 | Dependency-respecting, per-owner parallel workwaves with paged receipts | \`jeeves_deathmarch_workpacks.JeevesWorkpackDirector.waves\` |
+| DX-10 | Canonical milestone-to-source workpacks: hashes, source excerpts and budgets | \`JeevesWorkpackDirector.workpack\` |
+| DX-11 | Source-pinned change frontier and conservative graph blast radius | \`JeevesWorkpackDirector.change_frontier\` |
+| DX-12 | Directory-owned app/AI capability context expansion, labeled as sampled | \`JeevesWorkpackDirector._source_paths\` |
+| DX-13 | File-and-directory impact propagation into canonical acceptance milestones | \`JeevesWorkpackDirector.change_frontier\` |
+| DX-14 | Multi-plane editor/director/forge/Dragon/crawler *real* preview batching | \`jeeves_batch_workbench.run_batch_preview\` |
+| DX-15 | Batch-level preflight, typed action allow-list, budgeted result custody | \`jeeves_batch_workbench._admit\` |
+
+Registered in the existing \`JeevesAppwideRuntime\` action dispatch:
+\`ai.workwaves\`, \`ai.workpack\`, \`ai.change_frontier\`,
+\`studio.batch_preview\`. All remain limited to source reads, editor
+templates, simulated previews or other reviewed non-mutating adapters.
+Individual \`source.propose\` and production compilers retain their own
+separate operator gates.
+
+**Scope/status:** source implementation landed on a draft stacked branch.
+No tests were run by request. No production release, merge, model weight
+promotion, successful device build or enterprise AI completion is claimed.
+The existing exact-head CI and app journey blockers remain outstanding.
+
+See \`docs/JEEVES_DEATHMARCH_WORKPACKS_2026_10.md\` and
+\`docs/JEEVES_MULTI_ADAPTER_WORKBENCH_2026_10.md\` for the operator API.
+
 **Active integration PR:** #3730, stacked on #3729 and #3718.  
 **Truth rule:** An unmerged branch and a partially passing CI workflow are not a released application. This file tracks durable implementation changes, exact failures, and the next bounded actions. Update it when CI changes.
 
