@@ -81,6 +81,7 @@ class JeevesApplicationRuntime:
         idle_handlers: Mapping[Any, Callable[..., Any]] | None = None,
         idle_authorize: Callable[..., bool] | None = None,
         idle_verify_result: Callable[..., bool] | None = None,
+        idle_telemetry_probe: Callable[..., Any] | None = None,
         idle_policy: Any = None,
     ) -> None:
         if not isinstance(scope, JeevesHostContext):
@@ -108,6 +109,7 @@ class JeevesApplicationRuntime:
             idle_handlers=idle_handlers,
             idle_authorize=idle_authorize,
             idle_verify_result=idle_verify_result,
+            idle_telemetry_probe=idle_telemetry_probe,
             idle_policy=idle_policy,
         )
 
