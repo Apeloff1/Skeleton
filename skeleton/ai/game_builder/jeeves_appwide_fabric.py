@@ -350,6 +350,8 @@ OPERATIONS = {
     "ai.deathmarch":("read", "prioritized evidence-gated cross-app completion backlog",False),
     "ai.graph":("read", "source-pinned cross-plane feature and release evidence graph",False),
     "ai.graph.neighbors":("read", "bounded graph ownership and dependency traversal",False),
+    "ai.milestones":("read", "dependency-ordered application milestone readiness",False),
+    "ai.milestones.page":("read", "bounded source-pinned milestone page",False),
     "source.inspect":("read", "UTF-8 source",False),
     "source.propose":("proposal", "exact-file reviewed code edit",True),
     "editor.catalog":("read", "typed original-game editors",False),
@@ -443,6 +445,12 @@ class JeevesAppwideRuntime:
         elif action=="ai.graph.neighbors":
             from .jeeves_evidence_graph import JeevesEvidenceGraph
             result=JeevesEvidenceGraph(inv).neighborhood(**params)
+        elif action=="ai.milestones":
+            from .jeeves_milestone_planner import JeevesMilestonePlanner
+            result=JeevesMilestonePlanner(inv).overview(**params)
+        elif action=="ai.milestones.page":
+            from .jeeves_milestone_planner import JeevesMilestonePlanner
+            result=JeevesMilestonePlanner(inv).page(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
