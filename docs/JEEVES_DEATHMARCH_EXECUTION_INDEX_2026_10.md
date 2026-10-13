@@ -1,5 +1,34 @@
 # Deathmarch execution index — 2026-10-13
 
+
+## DX-18–DX-30 — multi-file construction, real source navigation and critical path
+
+| Milestone | Committed feature | Source |
+| --- | --- | --- |
+| DX-18 | Bounded 8-file reviewed exact-hunk source patchsets | \`jeeves_source_patchset.py\` |
+| DX-19 | Whole-patchset preflight, source SHA and overlapping-hunk refusal | \`jeeves_source_patchset.py\` |
+| DX-20 | Real UTF-8 source-content search with stable bounded cursor | \`jeeves_code_navigator.py\` |
+| DX-21 | Exact source SHA-256 and line-paged context | \`jeeves_code_navigator.py\` |
+| DX-22 | Live Studio source-content search controls | \`game_workspace_ui.py\` |
+| DX-23 | Search result → SHA-bound source snippet handoff | \`game_workspace_ui.py\` |
+| DX-24 | Reviewed multi-file patch cockpit, never automatic commit | \`game_workspace_ui.py\` |
+| DX-25 | Python and JS/TS real syntax import topology | \`jeeves_dependency_navigation.py\` |
+| DX-26 | Bounded graph traversal, hashed sources and incompleteness labels | \`jeeves_dependency_navigation.py\` |
+| DX-27 | Source dependency graph inspector in Game Studio | \`game_workspace_ui.py\` |
+| DX-28 | Canonical graph longest structural chain and bottlenecks | \`jeeves_critical_path.py\` |
+| DX-29 | Dependency and priority breakdown by canonical task owner | \`jeeves_critical_path.py\` |
+| DX-30 | Interactive critical-path and owner workload cards | \`game_workspace_ui.py\` |
+
+Registered source adapters: \`source.patchset.preview\`,
+\`ai.code.search\`, \`ai.code.snippet\`, \`ai.code.dependencies\`,
+\`ai.milestones.critical\` and \`ai.milestones.owners\`.
+
+**No tests executed in this build-only pass.** A source patchset is a
+proposal, not a committed patch; a syntax import is not runtime evidence;
+a structural critical chain does not imply an engineering duration.
+All release and completion checks remain dependent on later exact-head
+acceptance and stacked-branch landing.
+
 ## Workpass DX-09–DX-15 — real Jeeves appwide continuation
 
 Source branch: \`feat/jeeves-evidence-graph-scale-20261013\`, stacked
