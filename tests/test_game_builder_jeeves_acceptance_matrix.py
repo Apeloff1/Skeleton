@@ -101,6 +101,25 @@ class AcceptanceMatrixTests(unittest.TestCase):
         self.assertTrue(all(row["independent_execution_verified"] is None
                             for row in discovered))
 
+    def test_pytest_runner_is_separate_and_requires_actual_independent_execution(self):
+        candidate=deepcopy(self.doc["bindings"][0])
+        candidate["family_id"]="F17"
+        candidate["execution_tier"]="pytest_smoke"
+        self.doc["bindings"].append(candidate)
+        self.refresh()
+        report=self.audit.overview()
+        self.assertEqual(report["curated_test_family_count"],2)
+        self.assertEqual(report["ci_smoke_family_count"],1)
+        self.assertEqual(report["pytest_smoke_family_count"],1)
+        self.assertEqual(report["scheduled_test_module_count"],1)
+        self.assertEqual(report["scheduled_pytest_module_count"],1)
+        self.assertEqual(report["selected_modules"],
+                         ["tests.test_game_builder_sample_acceptance"])
+        self.assertEqual(report["pytest_selected_modules"],
+                         ["tests.test_game_builder_sample_acceptance"])
+        self.assertIsNone(report["exact_head_passed_from_source_scan"])
+        self.assertEqual(report["tests_executed_by_this_reader"],0)
+
     def test_invalid_execution_tier_never_increases_verified_coverage(self):
         self.doc["bindings"][0]["execution_tier"] = "autopromote"
         self.refresh()
