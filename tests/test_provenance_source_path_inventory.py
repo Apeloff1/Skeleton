@@ -25,6 +25,8 @@ LIVE_EXAMPLES = (
     ("scripts/check_architecture_boundaries.py", "first-party"),
     ("tests/test_architecture_boundaries.py", "first-party"),
     ("docs/CANONICAL_MODULE_BOUNDARIES.md", "first-party"),
+    ("design/art/visual_identity.md", "first-party"),
+    ("design/art/visual_identity_tokens.json", "first-party"),
     (".github/workflows/provenance-policy.yml", "first-party"),
     (".cursor/rules/architecture.mdc", "first-party"),
     (".machine/README.md", "first-party"),
