@@ -46,7 +46,7 @@ class CompletionCensusTests(unittest.TestCase):
             "machine/ai_app_construction.json": {
                 "planes": [{"id": "application-api", "owner": "backend"},
                            {"id": "orchestration", "owner": "skeleton/ai"}],
-                "gap_register": [{"id": "gap-a", "status": "closed"}]},
+                "gap_register": [{"id": "gap-a", "priority": "P0", "status": "closed"}]},
             "machine/ai_closure_evidence.json": {
                 "entries": [{"gap": "gap-a", "gap_status": "closed"}]},
             "machine/ai_master_plan.json": self.master,
@@ -150,7 +150,7 @@ class CompletionCensusTests(unittest.TestCase):
 
     def test_authority_gap_mismatch_surfaces_precisely(self):
         self.docs["machine/ai_app_construction.json"]["gap_register"].append(
-            {"id": "gap-b", "status": "closed"})
+            {"id": "gap-b", "priority": "P0", "status": "closed"})
         self.flush()
         self.refresh()
         report = self.census.report()
