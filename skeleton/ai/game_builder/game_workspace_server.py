@@ -40,6 +40,8 @@ from .advanced_godot_export import (
 from .advanced_platformer_godot import render_platformer_godot_package
 from .advanced_npc_evidence_navigation import (navigate_verified_investigation,
     verify_investigation_navigation)
+from .advanced_interleaved_world import (run_interleaved_world,
+    verify_interleaved_world)
 from .advanced_unified_genre_save import (export_unified_world_save,
     import_unified_world_save,continue_unified_world_save)
 from .advanced_unified_genre_campaign import (run_unified_game_campaign,
@@ -445,6 +447,22 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 "original_game_changed":False,
                 "automatic_quest_reward_granted":False,
                 "native_hardware_verified":False,
+            })
+        if path=="/api/advanced-interleaved-world":
+            report=run_interleaved_world(
+                values["physical_episodes"],values["genre_sessions"],
+                values["world_scene"],values["timeline"],
+                values.get("world_settings"))
+            if not verify_interleaved_world(
+                    report,values["physical_episodes"],values["genre_sessions"],
+                    values["world_scene"],values["timeline"],
+                    values.get("world_settings")):
+                raise ValueError("interleaved game-world source clock replay failed")
+            return self._json(200,{
+                "proof":report,
+                "source_project_files_changed":False,
+                "automatic_rewards_granted":False,
+                "native_hardware_certified":False,
             })
         if path=="/api/advanced-unified-genre-save-export":
             saved=export_unified_world_save(
