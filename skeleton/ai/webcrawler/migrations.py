@@ -2,7 +2,11 @@
 from __future__ import annotations
 SCHEMA_VERSION=7
 MIGRATIONS={
- 1:(),
+ 1:(
+  "CREATE TABLE IF NOT EXISTS documents(content_hash TEXT PRIMARY KEY, canonical_url TEXT NOT NULL, fetched_url TEXT NOT NULL, title TEXT NOT NULL, text TEXT NOT NULL, content_type TEXT NOT NULL, fetched_at REAL NOT NULL, source_score REAL NOT NULL, provenance TEXT NOT NULL, links TEXT NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS urls(canonical_url TEXT PRIMARY KEY, content_hash TEXT NOT NULL REFERENCES documents(content_hash))",
+  "CREATE TABLE IF NOT EXISTS checkpoints(key TEXT PRIMARY KEY, state TEXT NOT NULL)",
+ ),
  2:(
   "CREATE TABLE IF NOT EXISTS crawl_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS idx_documents_fetched_at ON documents(fetched_at)",
@@ -34,7 +38,7 @@ MIGRATIONS={
 def migrate(db):
  db.execute("CREATE TABLE IF NOT EXISTS schema_version(version INTEGER NOT NULL)")
  row=db.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
- version=int(row[0]) if row else 1
+ version=int(row[0]) if row else 0
  if version>SCHEMA_VERSION:raise ValueError("crawler database schema is newer than runtime")
  for target in range(version+1,SCHEMA_VERSION+1):
   with db:
