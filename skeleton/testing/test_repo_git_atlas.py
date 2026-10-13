@@ -27,6 +27,10 @@ require_readme_for_top_level_code = false
 detect_dependency_cycles = false
 detect_oversized_modules = false
 
+[ignore]
+prefixes = []
+suffixes = []
+
 [[zone]]
 name = "source"
 prefixes = ["src/"]
