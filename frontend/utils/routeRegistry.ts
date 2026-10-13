@@ -199,6 +199,16 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/worlds-gallery', title: 'Worlds Gallery', category: 'build' },
   { path: '/zaibatsu', title: 'Zaibatsu', category: 'build' },
   { path: '/zip-export', title: 'ZIP Export', category: 'tools' },
+
+  // Original production workbenches and operator routes.
+  { path: '/chapter-studio', title: 'Chapter Studio', category: 'build' },
+  { path: '/design-review', title: 'Design Review', category: 'build' },
+  { path: '/forge-operator/cockpit', title: 'Forge Operator Cockpit', category: 'system' },
+  { path: '/forge-operator/intake', title: 'Forge Operator Intake', category: 'system' },
+  { path: '/journeys', title: 'Journeys', category: 'progress' },
+  { path: '/story-index', title: 'Story Index', category: 'build' },
+  { path: '/story-outcomes', title: 'Story Outcomes', category: 'build' },
+  { path: '/world-workbench', title: 'World Workbench', category: 'build' },
 ];
 
 export function getRoutesByCategory(): Record<string, RouteEntry[]> {
