@@ -47,7 +47,8 @@ class AcceptanceRunnerTests(unittest.TestCase):
         self.assertNotIn("SUPER_SECRET",json.dumps(receipt))
 
     def test_local_two_module_run_produces_auditable_but_untrusted_evidence(self):
-        with (patch.object(runner,"_commit",return_value=self.head),
+        with (patch.dict(runner.os.environ,{"EXPECTED_SHA":self.head}),
+              patch.object(runner,"_commit",return_value=self.head),
               patch.object(runner,"AppwideInventory") as inventory,
               patch.object(runner,"JeevesAcceptanceTestMatrix") as matrix,
               patch.object(runner.subprocess,"run") as execute):
@@ -76,7 +77,8 @@ class AcceptanceRunnerTests(unittest.TestCase):
         self.assertNotIn("stdout",json.dumps(evidence["run_results"][0]["stdout"]))
 
     def test_one_failing_module_does_not_forge_batch_pass(self):
-        with (patch.object(runner,"_commit",return_value=self.head),
+        with (patch.dict(runner.os.environ,{"EXPECTED_SHA":self.head}),
+              patch.object(runner,"_commit",return_value=self.head),
               patch.object(runner,"AppwideInventory"),
               patch.object(runner,"JeevesAcceptanceTestMatrix") as matrix,
               patch.object(runner.subprocess,"run") as execute):
@@ -111,7 +113,8 @@ class AcceptanceRunnerTests(unittest.TestCase):
 
     def test_output_must_remain_inside_workspace(self):
         elsewhere=Path(self.tmp.name).parent/"external_evidence.json"
-        with (patch.object(runner,"_commit",return_value=self.head),
+        with (patch.dict(runner.os.environ,{"EXPECTED_SHA":self.head}),
+              patch.object(runner,"_commit",return_value=self.head),
               patch.object(runner,"AppwideInventory"),
               patch.object(runner,"JeevesAcceptanceTestMatrix") as matrix,
               patch.object(runner.subprocess,"run") as execute):
