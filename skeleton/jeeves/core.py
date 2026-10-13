@@ -344,6 +344,26 @@ class Jeeves:
         from skeleton.jeeves.source_read_gateway import JeevesSourceReadGateway
         return JeevesSourceReadGateway(atlas, authorize=authorize)
 
+    def open_workbench(self, *, root, state_directory, tenant_id, project_id,
+                       principal_id, read_authorize, orchestration_authorize,
+                       **host_adapters):
+        """Attach durable application, editor and shadow systems to this Jeeves.
+
+        Reuses the same tutor/session instance; the host must supply all
+        permissions, verifiers, storage locations and optional live handlers.
+        Workbench lifetime must be closed by the caller.
+        """
+        from skeleton.jeeves.workbench import JeevesWorkbench
+        return JeevesWorkbench(
+            root=root, state_directory=state_directory,
+            tenant_id=tenant_id, project_id=project_id,
+            principal_id=principal_id,
+            read_authorize=read_authorize,
+            orchestration_authorize=orchestration_authorize,
+            core=self,
+            **host_adapters,
+        )
+
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
         if not isinstance(mode, SessionMode):
