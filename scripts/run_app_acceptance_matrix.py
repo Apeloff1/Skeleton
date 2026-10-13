@@ -53,8 +53,14 @@ def produce(root: Path, output: Path, *, local=False):
                     "GITHUB_RUN_ATTEMPT", "GITHUB_WORKFLOW", "EXPECTED_SHA")
         if any(not os.environ.get(k) for k in required):
             raise RuntimeError("independent GitHub Actions metadata missing")
-        if not os.environ["GITHUB_REPOSITORY"].endswith("/Skeleton"):
-            raise RuntimeError("unexpected repository acceptance authority")
+        if (os.environ["CI"].lower() != "true" or
+            os.environ["GITHUB_ACTIONS"].lower() != "true" or
+            os.environ["GITHUB_REPOSITORY"] != "Apeloff1/Skeleton" or
+            os.environ["GITHUB_WORKFLOW"] != "Jeeves App Acceptance Matrix" or
+            not os.environ["GITHUB_RUN_ID"].isdigit() or
+            not os.environ["GITHUB_RUN_ATTEMPT"].isdigit() or
+            os.environ.get("RUNNER_OS") not in ("Linux", "Windows")):
+            raise RuntimeError("unexpected independent CI identity claims")
         if expected != head:
             raise RuntimeError("checkout differs from exact PR head")
     elif expected and expected != head:
