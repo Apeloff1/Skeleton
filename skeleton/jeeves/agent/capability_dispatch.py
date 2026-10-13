@@ -121,14 +121,16 @@ class CapabilityIntent:
     binding_digest: str
     readiness_digest: str
     user_id: str
+    tenant_id: str
     project_id: str
     run_id: str
+    trace_id: str
     arguments: Mapping[str, Any]
     arguments_digest: str
 
     def __post_init__(self) -> None:
         for field in ("capability_id", "owner_plane", "tool_name",
-                      "user_id", "project_id", "run_id"):
+                      "user_id", "tenant_id", "project_id", "run_id", "trace_id"):
             _identifier(getattr(self, field), field)
         _sha(self.binding_digest, "binding_digest")
         _sha(self.readiness_digest, "readiness_digest")
@@ -145,8 +147,10 @@ class CapabilityIntent:
             "owner_plane": self.owner_plane, "tool_name": self.tool_name,
             "binding_digest": self.binding_digest,
             "readiness_digest": self.readiness_digest,
-            "user_id": self.user_id, "project_id": self.project_id,
-            "run_id": self.run_id, "arguments_digest": self.arguments_digest,
+            "user_id": self.user_id, "tenant_id": self.tenant_id,
+            "project_id": self.project_id, "run_id": self.run_id,
+            "trace_id": self.trace_id,
+            "arguments_digest": self.arguments_digest,
         })
 
 
@@ -235,6 +239,9 @@ class JeevesCapabilityDispatcher:
             if not isinstance(context, ToolExecutionContext):
                 raise AppDispatchError("host execution context is required")
             _identifier(project_id, "project_id")
+            tenant_id = _identifier(context.metadata.get("tenant_id"), "tenant_id")
+            if context.metadata.get("project_id") != project_id:
+                raise AppDispatchError("trusted execution context must bind exact project")
             if type(now_ns) is not int or now_ns < 0:
                 raise AppDispatchError("now_ns must be host-observed nanoseconds")
             spec = self._registry.get(binding.tool_name)
@@ -253,8 +260,9 @@ class JeevesCapabilityDispatcher:
                 capability_id=feature_id, owner_plane=binding.owner_plane,
                 tool_name=binding.tool_name, binding_digest=binding.digest,
                 readiness_digest=receipt.digest,
-                user_id=context.user_id, project_id=project_id,
-                run_id=context.run_id, arguments=normalized,
+                user_id=context.user_id, tenant_id=tenant_id,
+                project_id=project_id, run_id=context.run_id,
+                trace_id=context.trace_id, arguments=normalized,
                 arguments_digest=stable_fingerprint(normalized),
             )
 
@@ -278,7 +286,10 @@ class JeevesCapabilityDispatcher:
             if (intent.owner_plane != binding.owner_plane
                     or intent.tool_name != binding.tool_name
                     or intent.run_id != context.run_id
-                    or intent.user_id != context.user_id):
+                    or intent.user_id != context.user_id
+                    or intent.trace_id != context.trace_id
+                    or intent.tenant_id != context.metadata.get("tenant_id")
+                    or intent.project_id != context.metadata.get("project_id")):
                 raise AppDispatchError("intent crosses user, run or owner boundary")
             receipt = self._readiness(intent.capability_id, intent.owner_plane, context)
             if (not isinstance(receipt, ReadinessReceipt)
