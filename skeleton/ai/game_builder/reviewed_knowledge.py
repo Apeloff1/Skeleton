@@ -354,14 +354,30 @@ class ReviewedKnowledgeStore:
     to the embedding process. Never expose this object as an unauthenticated API.
     """
 
-    def __init__(self, path: str | Path, *, policy: KnowledgePolicy | None = None) -> None:
+    def __init__(self, path: str | Path, *, policy: KnowledgePolicy | None = None,
+                 read_only: bool = False) -> None:
         self.policy = policy or KnowledgePolicy()
         if not isinstance(self.policy, KnowledgePolicy):
             raise KnowledgeError("KnowledgePolicy required")
-        self.db = sqlite3.connect(str(path), timeout=10, isolation_level=None)
+        if type(read_only) is not bool:
+            raise ValueError("explicit read-only connection mode required")
+        if read_only:
+            verified_path = Path(path).expanduser()
+            if (not verified_path.is_absolute() or not verified_path.is_file()
+                or verified_path.is_symlink()):
+                raise ValueError("existing canonical read-only knowledge store required")
+            # URI-escaped absolute SQLite path; never fall back to creating a
+            # fresh empty DB if an external volume has disappeared.
+            self.db = sqlite3.connect(
+                verified_path.as_uri() + "?mode=ro",
+                timeout=10, isolation_level=None, uri=True)
+            self.db.execute("PRAGMA query_only = ON")
+        else:
+            self.db = sqlite3.connect(str(path), timeout=10, isolation_level=None)
         self.db.execute("PRAGMA busy_timeout = 10000")
         self.db.execute("PRAGMA foreign_keys = ON")
-        self.db.execute("PRAGMA journal_mode = WAL")
+        if not read_only:
+            self.db.execute("PRAGMA journal_mode = WAL")
         self.db.execute(
             """CREATE TABLE IF NOT EXISTS game_builder_knowledge (
                 owner TEXT NOT NULL,

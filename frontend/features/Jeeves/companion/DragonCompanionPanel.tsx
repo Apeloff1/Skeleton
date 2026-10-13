@@ -10,6 +10,8 @@ import DragonQuestBoard from './DragonQuestBoard';
 import DragonDeliveryWorkbench from './DragonDeliveryWorkbench';
 import DragonWisdomSquares from './DragonWisdomSquares';
 import DragonKnowledgePyramid from './DragonKnowledgePyramid';
+import DragonNestProgression, { type DragonNestSnapshot } from './DragonNestProgression';
+import DragonMotherGleanPanel, { type MotherGleanSummary } from './DragonMotherGleanPanel';
 import { dragonWaitingBubble } from './dragonMagicEightBall';
 import type { DragonWisdomReview } from './dragonWisdomReview';
 import type { DragonKnowledgeView } from './dragonKnowledgePyramid';
@@ -28,6 +30,8 @@ export interface CompanionTelemetry {
 export interface CompanionAcademyInput {
   wisdomReview?: DragonWisdomReview | null;
   knowledgeView?: DragonKnowledgeView | null;
+  nest?: DragonNestSnapshot | null;
+  motherGlean?: MotherGleanSummary | null;
   progress?:DragonPracticeProgress|null;
   attempts?:readonly DragonPracticeAttempt[];
   nativeAttempts?:readonly NativeAttempt[];
@@ -108,6 +112,8 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
       busy={academy?.practiceBusy} />}
     {academy?.wisdomReview && <DragonWisdomSquares review={academy.wisdomReview} />}
     {academy?.knowledgeView && <DragonKnowledgePyramid view={academy.knowledgeView} />}
+    {academy?.nest && <DragonNestProgression snapshot={academy.nest} />}
+    {academy?.motherGlean && <DragonMotherGleanPanel summary={academy.motherGlean} />}
     <Text style={s.note}>Petting and animation are just for fun. System reduced-motion settings take priority. These reactions never start research or change memory.</Text>
     <Text style={s.note}>Conversation creates interest signals. Only policy-compliant, provenance-preserved acquisitions may become distilled memory.</Text>
   </View>;

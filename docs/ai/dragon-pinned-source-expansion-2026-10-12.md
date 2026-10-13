@@ -1,5 +1,14 @@
 # Dragon source catalog expansion — 12 October 2026
 
+> **Superseded historical source inventory (reconciled 13 October 2026).**
+> The 10,476-lead, batch-0024-through-0030 sequence below documents earlier
+> acquisition claims, not a currently valid continuous admission chain.
+> Batches 0024 and 0030 are quarantined as nonconsecutive/orphan evidence;
+> intermediary batches 0025–0029 are absent from the current verified tree.
+> Current governed admission uses reviewed consecutive batches 0031–0050,
+> with source and rights promotion still explicitly disabled. This document
+> grants no ingestion, crawling, licensing or model-training permission.
+
 ## Custody and provenance
 
 This protected continuation restores the source-discovery modules, source

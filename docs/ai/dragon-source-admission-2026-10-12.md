@@ -81,126 +81,103 @@ python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-receipts --datab
 
 `discovery-topics` returns the direct children of an observed heading path, with inherited source counts. `discovery-sources` returns one canonical acquisition identity per URL, its existing policy-stage job state and the total count of unreviewed raw provenance receipts. `discovery-receipts` returns the exact original link, catalog evidence path, observed heading paths, pinned identifiers and receipt digest. Each view validates stored source or evidence digests before presentation and carries explicit `training_authorized: false` and `scope: discovery_metadata_only` fields. Pagination is bounded to 100 rows and all queries require an explicit owner. The CLI is a local operator interface, **not** an HTTP endpoint and **not** a new runtime permission.
 
-## Four-batch raw discovery and mission-directed source scouting
 
-The discovered evidence chain now contains four consecutive supplements. The first three retain their original `partial_discovery_only_not_ingested_into_canonical_queue` status and the fourth records `raw_discovery_only_not_ingested_into_canonical_queue`. Both are explicitly **non-authorizing** states; neither can mark a URL fetched, independent, rights-cleared or training-approved. The import bridge validates both historical and current count-field conventions before making any database writes.
+## Current accepted discovery lineage — 12,777 raw leads
 
-A trusted local operator can feed all four supplements, in exact sequence, into an isolated SQLite library:
+The previously completed **10,551 raw-lead** chain comprised batches 0020–0023 and 0031–0037. An additional 12 SHA-pinned public README catalogs now supply **2,226 non-repeating raw URL leads** in consecutively linked batches **0038–0041**, for **12,777 / 44,050 (29.01%)** of the requested raw discovery target. The accepted chain is precisely fifteen evidence files: 0020, 0021, 0022, 0023, 0031–0041. Batches 0024 and 0030 are orphan/fork evidence and remain excluded, not double-counted.
 
-```sh
-python -m skeleton.ai.game_builder.dragon_almanac_cli import-supplements \
-  --database dragon.sqlite --owner studio --trusted-local-operator \
-  --supplement docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json \
-  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json \
-  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json \
-  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json
-```
+The new catalogs add specialized source-discovery coverage of Game Boy, N64, Xbox, PICO-8 and TIC-80 development, game networking, AI game research, level design, game production, and programming. Exact repository commit IDs, README blob SHA-1 identities, original link URLs, line numbers and observed heading paths are captured. The staging observation file `docs/ai/evidence/dragon-new-catalog-metadata-20261012-v1.json` retains 2,358 raw line observations from these 12 catalogs; admission deduplicated 105 already-recorded links and 27 repeated observations within this new source set, yielding **2,226 additional distinct raw links**. Each admitted raw URL retains bounded multiple origin references.
 
-The owner-scoped `mission-scout` command ranks **unreviewed discovery metadata**, allowing the next human or policy worker to focus on a specific console, genre, era, mechanics editor or port target. For example:
+An operator can **verify** the pinned evidence chain without network requests or any database source approval:
 
 ```sh
-python -m skeleton.ai.game_builder.dragon_almanac_cli mission-scout \
-  --database dragon.sqlite --owner studio --trusted-local-operator \
-  --query "gameboy homebrew input collision physics" \
-  --platform "Game Boy" --genre "platformer" --era "1990s" \
-  --limit 25 --scan-budget 4000
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-verify \
+  --database /path/to/staging-dragon.sqlite --owner studio \
+  --trusted-local-operator
 ```
 
-This is an explainable, deterministic **proposal**. It scores intersections between goal terms and URL paths, observed catalog headings and repository names, then displays host-diverse candidates. It does not claim different hosts are independent originals; it never treats a ROM, BIOS, dump or download link as automatically lawful; it **never** starts the durable policy queue or fetches media. Rights-risk indicators require manual review. `scan_truncated` and unmatched terms disclose when the bounded metadata scan cannot cover the entire source corpus.
-
-Progress denominators are not interchangeable: **5,438** records are raw URL leads toward the **44,050** raw target (12.35%), whereas **736 / 4,405** represents sequential first-pass acquisitions of the original registry. Neither measure demonstrates 5,438 usable or independent sources. Canonical deduplicated totals are computed at ingestion, and all discoveries remain unapproved for training.
-
-## Whole-corpus mission facet index and proof of currentness
-
-The mission scout no longer needs to rely solely on the earliest 2,000 source IDs. An owner-scoped inverted index stores **only** tokens derived from canonical URLs, pinned README headings and repository identities. It is an expendable search projection, not a second knowledge library, a neural model, a shadow-weight store or permission to fetch source data.
-
-Run `mission-index` repeatedly using the returned `next_source` cursor. Each call indexes up to 1,000 source rows, verifies canonical source digests and all bounded supplemental receipts, and atomically replaces stale postings for its page. A subsequent `mission-index` pass is idempotent. Indexing a repository is not approval of its contents.
+After independent operator authorization, `import-reconciled` imports the **metadata only**, with one canonical policy-stage job per normalized URL and all distinct raw provenance receipts. It is not a crawling instruction; the separate policy worker must still perform origin-appropriate robots/terms/SSRF/license checks before fetching.
 
 ```sh
-python -m skeleton.ai.game_builder.dragon_almanac_cli mission-index \
-  --database dragon.sqlite --owner studio --trusted-local-operator \
-  --limit 500
-
-# Supply the exact cursor returned by the preceding call to continue.
-python -m skeleton.ai.game_builder.dragon_almanac_cli mission-index \
-  --database dragon.sqlite --owner studio --trusted-local-operator \
-  --limit 500 --after-source 'source-<last-exact-source-id>'
-
-python -m skeleton.ai.game_builder.dragon_almanac_cli mission-scout \
-  --database dragon.sqlite --owner studio --trusted-local-operator \
-  --query 'original Game Boy homebrew input latency collision' \
-  --platform 'Game Boy' --genre platformer --era 1990s \
-  --indexed --limit 30 --scan-budget 3000
+python -m skeleton.ai.game_builder.dragon_almanac_cli import-reconciled \
+  --database /path/to/staging-dragon.sqlite --owner studio \
+  --trusted-local-operator
 ```
 
-Indexed mission retrieval first weights task-goal tokens at 58%, platform tokens at 22%, genre at 12% and era at 8%, then executes the same source-level metadata and provenance validation and fine-grained score as the original scout. All weights are deterministic, bounded integer retrieval coefficients; **they are not model weights**. Ranking is scoped to catalog discovery signals, cannot establish content quality, and still requires a separate policy/rights decision before any crawl. It does not modify lease order in the sequential worker.
+Both commands use `dragon_discovery_reconciled.py`, now bound to the 12,777-lead, fifteen-file sequence, and refuse missing, reordered, duplicated or authority-promoting input. The documentation above covering 5,369 and 10,551 raw leads describes **historical milestones**, not the current maximum. The full current count remains **raw references**, not independent original sources, approved crawler destinations, verified license permissions or model training material. Source independence, current validity, relevance and rights still require separate evidence-backed assessment.
 
-`index_health` separately reports the number of policy-stage source rows, source-digest-current index entries, missing/stale entries and stale policy input digests. A changed source must not bypass a stale `dragon_almanac_jobs.input_digest` fence. When index coverage is incomplete, results mark the scan truncated rather than asserting full coverage.
+### Source-diversity caution
 
-Use the read-only `mission-audit` command to detect older raw provenance, changed source records and forged token postings without altering the index:
+Some new collections contain many entries from GitHub, academic preprint hosts and video services. Several links may refer to the same underlying work or to unavailable destinations. Domain count is not independent-evidence count; raw URL growth is not machine knowledge growth. Source-level legal and factual scrutiny remains necessary before any ingestion, distillation or Wiki/HOAG memory promotion.
+
+
+## Latest cross-platform source cohort — 15,175 raw leads
+
+After the 12,777-lead fifteen-batch milestone, a seventh specialist catalog cohort adds **2,398 nonrepeating raw links** from `8bitworkshop/awesome-8bitgamedev`, `Calinou/awesome-godot`, `StefanoCecere/awesome-opensource-unity`, `mikeroyal/Unity-Guide`, `ellisonleao/magictools`, `kjaylee/awesome-game-design`, and `OTFCG/Awesome-Game-Analysis`. The catalogs contribute 3,187 bounded, original README-link/line observations; **562** URLs were already represented in the accepted historical supplements, and **227** were repeated within this new set. The accepted result is **15,175 / 44,050 = 34.45%** of the raw-link target, not 15,175 verified independently useful works.
+
+The staged `docs/ai/evidence/dragon-catalog-metadata-20261012-round3.json` file retains the exact README Git commit/blob identities, observed link URLs, source line numbers and bounded heading ancestry. It is **staging evidence**, not an imported source list or source-use grant. The final `docs/ai/evidence/dragon-source-expansion-20261012-batch-0042.json` incorporates **2,398 new raw URLs** in one ordered batch. Existing accepted batches 0020–0023 and 0031–0041 remain its immutable parents. The rejected orphan/fork batches 0024 and 0030 are still excluded.
+
+`discovery-verify` and `import-reconciled` now point to the strict **sixteen-file accepted chain**. A trusted operator must first validate this entire chain; any substituted source digest, missing ancestor, changed count, training authorization or rights claim must fail closed. Even after metadata import, all newly created jobs begin at the policy-review stage, not at fetch or training.
+
+The new `discovery-census` operator command reports host concentration, canonical URL deduplication, provisional source categories and words in URL paths that warrant manual rights review. It distinguishes raw-lead counts from canonical source identities and treats every domain-diversity or risk observation as a heuristic rather than a finding about independent knowledge or legal use:
 
 ```sh
-python -m skeleton.ai.game_builder.dragon_almanac_cli mission-audit \
-  --database dragon.sqlite --owner studio --trusted-local-operator \
-  --limit 200
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-census \
+  --database /path/to/staging-dragon.sqlite --owner studio \
+  --trusted-local-operator --limit 30
 ```
 
-An audit provides `current`, `stale` and a resumable `next_source`, while rejecting unexpected posting contents. Auditing never certifies factual truth, legal rights, source independence or model performance. Repeat audit pages until the cursor is absent; the audit's scope is the materialized postings, not unindexed content.
+The census reads and validates the checked-in evidence without network access, writes no source-crawl permits and authorizes no Wiki/HOAG memory or model-weight promotion. Exact-head CI and the policy executor's separate legal, robots and SSRF gates are still required.
 
-## Cross-engine research portfolios
+## Nine more pinned catalogs and a console/era discovery matrix
 
-A single-source mission is insufficient for an actual game project. `mission-portfolio` composes **up to 24 separately defined research axes** (for example: events and quest triggers, platform-specific physics, input latency, renderer architecture, original audio, accessibility, copyright/asset licensing and native homebrew packaging). A typed plan sets an individual minimum of unreviewed discovery leads and importance weight, plus a project-wide selection budget and per-host diversity cap.
+The accepted reconciled discovery chain now extends through raw-only batches
+`0043`–`0047`. These batches contain **4,053 newly recorded, raw-URL-distinct
+hyperlink leads** from nine Git SHA/README-blob-pinned game-development catalogs:
+`Calinou/awesome-gamedev`, `ChessMax/awesome-game-engines`,
+`terrehbyte/awesome-ue4`, `8bitworkshop/awesome-8bitgamedev`,
+`ellisonleao/magictools`, `Dvergar/awesome-haxe-gamedev`,
+`fire/awesome-godot-procedural-manual-generation`,
+`OTFCG/Awesome-Game-Analysis` and `devanshutak25/3d-resources`.
+The pinned READMEs supplied links and observed heading paths only. These are
+**not** confirmations that linked media are live, that a source is independent,
+that games or techniques can be copied, or that source material is lawful for
+training. The linked contents, binaries, artwork and video were not crawled.
+
+The canonical reconciled source-ledger target is now **19,228 raw leads out of
+44,050 (43.65%)**, comprising the 4,405-source original baseline, 10,770 earlier
+accepted raw leads, and 4,053 added leads. Raw URL counts are intentionally
+separate from normalized distinct source counts: a URL fragment, tracking query
+or mirror can create multiple raw mentions of the same destination. The
+`discovery-verify` and `discovery-census` commands calculate canonical
+distinct URLs from the entire evidence chain. Batch `0024` and batch `0030`
+remain excluded independent/orphan evidence paths, not accepted ancestors.
+
+The platform matrix adds explicit, conservatively named search categories for
+**42 consoles, handhelds, computer environments, web/mobile and XR targets**.
+It reports raw metadata mentions, distinct canonical URLs, distinct URL hosts,
+and keyword-triggered rights-review hints per platform, plus union-deduplicated
+generation-level groups. No detected name alone implies technical
+compatibility, native port support or original-asset rights. No matching
+metadata means a *research discovery gap*, not proof the platform is unsupported.
 
 ```sh
-python -m skeleton.ai.game_builder.dragon_almanac_cli mission-portfolio \
+python -m skeleton.ai.game_builder.dragon_almanac_cli platform-matrix \
   --database dragon.sqlite --owner studio --trusted-local-operator \
-  --query "original Game Boy homebrew platform game" \
-  --platform "Game Boy" --genre platformer --era 1990s \
-  --axis "physics:collision dynamics and movement:3:10" \
-  --axis "quests:observed NPC event driven quest triggers:3:9" \
-  --axis "rendering:tile map and scrolling renderer:2:8" \
-  --axis "rights:original music and asset licenses:3:10" \
-  --indexed --scan-budget 3000 --per-axis-candidates 30 \
-  --portfolio-limit 40 --max-per-host 3
+  --samples-per-platform 3
+
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-identity-audit \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --limit 2
 ```
 
-The planner performs **one policy-free metadata search per axis**, with axis-specific matching required beyond the generic project goal. It then selects a deduplicated source portfolio by deterministic marginal gain across unmet axes. One source may contribute to multiple knowledge goals; repeating the same URL does not create artificial independent-source credit. The planner reports unfilled axes, per-axis input budgets and truncations, index freshness, and all rights-review flags.
-
-This mechanism produces better acquisition *orders for human/operator consideration*, not a final curriculum, legal clearance or verified game knowledge. The canonical policy/fetch/extract/analyze/review stages still own all execution authority. The planner neither changes durable job priorities nor executes new crawling, demo builds, human studies, model fine-tuning or memory promotion. A completed **candidate** quota must not be confused with a completed **evidence** quota.
-
-Use `mission-health` to inspect policy-stage index coverage; use `mission-audit` to assess stale postings before project-critical indexed planning. Output from these tools should be included as a provenance-bound planning receipt only after the appropriate higher-level governance workflow accepts it.
-
-## Reproducible research campaigns — versioned receipts and gap changes
-
-`campaign-record` now commits a derived, owner-scoped, append-only research **proposal** to the existing Dragon SQLite store. Each revision binds a canonical digest of the complete typed multi-axis request, selected unapproved discovery sources, per-source metadata digest, raw provenance-lineage digest, coverage gaps, and the previous revision digest. An identical replay is idempotent. Any changed proposal requires compare-and-swap against the exact latest parent digest, so concurrent editors cannot silently overwrite each other's research histories.
-
-```sh
-# After source bootstrap/import and mission-index completion:
-python -m skeleton.ai.game_builder.dragon_almanac_cli campaign-record \
-  --database dragon.sqlite --owner studio --trusted-local-operator \
-  --campaign original-gameboy-study \
-  --query 'original Game Boy homebrew adventure' \
-  --platform 'Game Boy' --genre adventure --era 1990s \
-  --axis 'physics:collision and gravity:2:10' \
-  --axis 'quests:witnessed NPC quest events:2:10' \
-  --axis 'rights:original asset licensing:2:10' \
-  --indexed --scan-budget 3000 --portfolio-limit 30
-
-python -m skeleton.ai.game_builder.dragon_almanac_cli campaign-inspect \
-  --database dragon.sqlite --owner studio --trusted-local-operator \
-  --campaign original-gameboy-study
-
-# To change the request, pass the exact digest of the current revision:
-python -m skeleton.ai.game_builder.dragon_almanac_cli campaign-record \
-  --database dragon.sqlite --owner studio --trusted-local-operator \
-  --campaign original-gameboy-study --expected-parent '<exact-prior-digest>' \
-  --query 'original Game Boy homebrew adventure' \
-  --axis 'physics:collision and gravity:3:10' \
-  --axis 'quests:witnessed NPC quest events:3:10' \
-  --axis 'rights:original asset licensing:3:10' \
-  --indexed --scan-budget 3000 --portfolio-limit 30
-```
-
-`campaign-inspect` validates the complete bounded revision chain, all stored plan digests and owner identities, then checks current canonical source metadata and supplemental provenance hashes. It reports selected sources gained/lost and per-axis discovery-gap changes between revisions. A plan containing stale source metadata remains historical and is explicitly marked stale rather than silently rewritten. Receipt digests establish deterministic consistency, **not** authenticated signatures, peer-reviewed accuracy or independent truth.
-
-The campaign history does **not** own crawler policy, consent, rights grants, model training, knowledge/almanac promotion or application release. Each proposal records `crawl_authorized: false`, `source_rights_approved: false`, `training_authorized: false` and `memory_promotion_authorized: false`. A missing research lead is not filled by generated claims; it remains a declared, actionable discovery gap.
+The separate identity audit verifies the exact Git blob SHA-1 of each source
+supplement in the two frozen 10,770-lead pre-expansion cohorts. It then requires
+all 4,053 newer source IDs to be distinct from those prior raw identities and
+validates the full reconciled chain again. Digest verification is a consistency
+test over repository bytes, **not** a trust signature, license grant, proof of
+source independence or approval to use the content. All new leads remain
+`availability=not_checked`, `rights=not_assessed`,
+`training_authorized=false` and `canonical_admission=false` until separate
+policy review. No automatic network fetch, training or AI-memory promotion has
+been initiated by this source-discovery extension.

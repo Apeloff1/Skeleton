@@ -1,0 +1,53 @@
+name: Dragon Shadow Weight Validation
+on:
+  push:
+    branches:
+      - feat/dragon-wisdom-review-20261010
+    paths:
+      - "skeleton/ai/webcrawler/dragon_shadow_weight_*.py"
+      - "skeleton/ai/webcrawler/dragon_conditional_automation.py"
+      - "tests/test_ai_webcrawler_dragon_shadow_weight_automation.py"
+      - ".github/workflows/dragon-shadow-weight-validation.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/ai/webcrawler/dragon_shadow_weight_*.py"
+      - "skeleton/ai/webcrawler/dragon_conditional_automation.py"
+      - "tests/test_ai_webcrawler_dragon_shadow_weight_automation.py"
+      - ".github/workflows/dragon-shadow-weight-validation.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dragon-shadow-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  shadow-validation:
+    name: Shadow weight scrutiny and replay
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install validation runtime
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Compile shadow and review contracts
+        run: |
+          python -m compileall -q skeleton/ai/webcrawler/dragon_shadow_weight_automation.py skeleton/ai/webcrawler/dragon_shadow_weight_coordinator.py skeleton/ai/webcrawler/dragon_conditional_automation.py
+      - name: Run signed-shadow, negative-canary and promotion regression tests
+        run: |
+          python -m pytest -q --noconftest tests/test_ai_webcrawler_dragon_shadow_weight_automation.py

@@ -339,95 +339,209 @@ def test_latest_batch_cannot_claim_approval_or_fork_history(baseline, chain):
         validate_discovery_chain(baseline, [*chain, bad])
 
 
-NEW_PINNED_BATCHES = [
-    ROOT / f"docs/ai/evidence/dragon-source-expansion-20261012-batch-{n:04d}.json"
-    for n in range(24, 31)
-]
+RECONCILED_BATCHES = tuple(
+    ROOT / f"docs/ai/evidence/dragon-source-expansion-20261012-batch-{number:04d}.json"
+    for number in range(31, 38)
+)
 
 
-def test_five_pinned_readme_catalogs_extend_raw_discovery_to_10476(baseline, chain):
-    """All source identities and lineage are reproducible, never approved."""
-    docs = [*chain, _supplement(
+def test_pinned_five_catalog_expansion_has_complete_importable_lineage(baseline, chain):
+    """Machine-extracted URLs remain raw leads until independent policy review."""
+    authoritative = [*chain, _supplement(
         ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
-    docs.extend(_supplement(path) for path in NEW_PINNED_BATCHES)
-    checked = validate_discovery_chain(baseline, docs)
-    assert len(docs) == 11
-    assert checked["raw_new"] == 6071
-    assert checked["raw_total_discovered"] == 10476
-    assert checked["baseline"] == 4405
-    assert checked["total_discovered"] <= 10476
-    assert checked["new"] <= 6071
-    assert checked["total_discovered"] == 4405 + checked["new"]
-    assert all(row["training_authorized"] is False
-               and row["rights"] == "not_assessed"
-               and row["availability"] == "not_checked"
-               for row in checked["sources"].values())
-    newly_recorded = [row["url"] for _, doc in docs[-7:]
-                      for row in doc["candidates"]]
-    assert len(newly_recorded) == len(set(newly_recorded)) == 5038
-    assert all(row["training_authorized"] is False
-               and row["canonical_admission"] is False
-               for _, doc in docs[-7:] for row in doc["candidates"])
+    resumed = [_supplement(path) for path in RECONCILED_BATCHES]
+    assert all(doc["status"] == "raw_discovery_only_not_ingested_into_canonical_queue"
+               for _, doc in resumed)
+    assert all(len(doc["candidates"]) <= 850 for _, doc in resumed)
+    result = validate_discovery_chain(baseline, [*authoritative, *resumed])
+    assert result["baseline"] == 4405
+    assert result["raw_new"] == 6146
+    assert result["raw_total_discovered"] == 10551
+    assert result["new"] <= result["raw_new"]
+    assert result["total_discovered"] == 4405 + result["new"]
+    assert result["sources"]
+    assert all(item["training_authorized"] is False
+               and item["rights"] == "not_assessed"
+               and item["independence"] == "not_assessed"
+               for item in result["sources"].values())
 
 
-def test_git_pinned_discovery_has_valid_raw_identity_and_cannot_self_approve(baseline, chain):
-    docs = [*chain, _supplement(
+def test_orphan_batches_do_not_silently_satisfy_reconciled_chain(baseline, chain):
+    historical = [*chain, _supplement(
         ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
-    docs.extend(_supplement(path) for path in NEW_PINNED_BATCHES)
-    catalog_refs = {
-        (c["repository"], c["commit_sha"], c["readme_blob_sha"])
-        for c in docs[-1][1]["catalogs"]
-    }
-    assert len(catalog_refs) == 5
-    for _, doc in docs[-7:]:
-        assert doc["status"] == "raw_discovery_only_not_ingested_into_canonical_queue"
-        for row in doc["candidates"]:
-            assert row["source_id"] == "source-" + sha256(
-                row["url"].encode("utf-8")).hexdigest()
-            assert 1 <= len(row["discoveries"]) <= 16
-            assert all((origin["repository"], origin["commit_sha"],
-                        origin["readme_blob_sha"]) in catalog_refs
-                       for origin in row["discoveries"])
-    forged = deepcopy(docs)
-    forged[-1][1]["candidates"][0]["canonical_admission"] = True
+    resumed = [_supplement(path) for path in RECONCILED_BATCHES]
+    # Batch 24 had an independent acquisition provenance format; batch 30
+    # refers to missing batches 25-29. Neither is eligible to masquerade
+    # as the parent of the reconciled 31-37 sequence.
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*historical, resumed[1]])
+    poisoned = deepcopy(resumed)
+    poisoned[-1][1]["candidates"][0]["training_authorized"] = True
     with pytest.raises(ValueError, match="authority"):
-        validate_discovery_chain(baseline, forged)
-    forked = deepcopy(docs)
-    forked[-1][1]["parents"] = forked[-1][1]["parents"][:-1]
-    with pytest.raises(ValueError, match="chain"):
-        validate_discovery_chain(baseline, forked)
+        validate_discovery_chain(baseline, [*historical, *poisoned])
+    poisoned = deepcopy(resumed)
+    poisoned[2][1]["counts"]["raw_provisional_urls"] += 1
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*historical, *poisoned])
 
 
-def test_git_pinned_expansion_imports_into_policy_only_queue(tmp_path, baseline, chain):
-    """Integration of new README pins with actual owner-scoped SQLite custody."""
-    extended = [
-        *chain,
-        _supplement(
-            ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json"),
-        _supplement(NEW_PINNED_BATCHES[0]),
-    ]
-    validated = validate_discovery_chain(baseline, extended)
-    assert validated["raw_total_discovered"] == 6238
-    with ReviewedKnowledgeStore(tmp_path / "pinned-import.sqlite") as store:
-        ingress = DragonDiscoveryAdmission(DragonAlmanacs(store))
-        output = ingress.import_chain("homebrew", baseline, extended, authorized=True)
-        assert output["new_discovery_sources"] == validated["new"]
-        assert output["new_provenance_receipts"] == validated["raw_new"]
-        assert output["new_policy_stage_jobs"] == validated["new"]
-        assert output["approved_sources"] == 0
-        assert output["training_authorized"] is False
+def test_reconciled_operator_projection_keeps_orphans_quarantined(baseline):
+    from skeleton.ai.game_builder.dragon_discovery_reconciled import (
+        verify_reconciled_chain, SOURCE_BATCHES, EXCLUDED_ORPHANS,
+    )
+    projection = verify_reconciled_chain(baseline)
+    assert len(SOURCE_BATCHES) == 24
+    assert projection["raw_url_leads"] == 20860
+    assert projection["raw_new"] == 16455
+    assert projection["canonical_new"] <= projection["raw_new"]
+    assert projection["canonical_candidate_sources"] <= 20860
+    assert projection["excluded_orphan_paths"] == list(EXCLUDED_ORPHANS)
+    assert not any(path in projection["evidence_batch_paths"]
+                   for path in EXCLUDED_ORPHANS)
+    assert projection["crawler_authorized"] is False
+    assert projection["rights_approved"] is False
+    assert projection["training_authorized"] is False
+    assert projection["memory_promotion_authorized"] is False
+
+
+def test_reconciled_import_requires_exact_authorized_owner(tmp_path, baseline):
+    from skeleton.ai.game_builder.dragon_discovery_reconciled import (
+        import_reconciled_chain,
+    )
+    with ReviewedKnowledgeStore(tmp_path / "reconciled-denied.sqlite") as store:
+        almanacs = DragonAlmanacs(store)
+        with pytest.raises(PermissionError):
+            import_reconciled_chain(
+                almanacs, "studio", baseline, authorized=False)
         assert store.db.execute(
-            "SELECT COUNT(*) FROM dragon_almanac_jobs "
-            "WHERE owner='homebrew' AND stage=0 AND state='pending'"
-        ).fetchone()[0] == validated["new"]
-        assert store.db.execute(
-            "SELECT COUNT(*) FROM dragon_almanac_supplement_receipts_v2 "
-            "WHERE owner='homebrew'"
-        ).fetchone()[0] == validated["raw_new"]
-        assert store.db.execute(
-            "SELECT COUNT(*) FROM dragon_almanac_jobs "
-            "WHERE state!='pending' OR stage!=0"
-        ).fetchone()[0] == 0
-        assert ingress.import_chain(
-            "homebrew", baseline, extended, authorized=True
-        )["new_policy_stage_jobs"] == 0
+            "SELECT COUNT(*) FROM dragon_almanac_sources").fetchone()[0] == 0
+
+
+EXTENDED_BATCHES = tuple(
+    ROOT / f"docs/ai/evidence/dragon-source-expansion-20261012-batch-{n:04d}.json"
+    for n in (38, 39, 40, 41)
+)
+
+
+def test_twelve_new_pinned_catalogs_extend_reconciled_chain_without_approval(baseline, chain):
+    """The 2,226 new leads are cumulative, not a parallel/orphan fork."""
+    historical = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    prior = [_supplement(path) for path in RECONCILED_BATCHES]
+    additional = [_supplement(path) for path in EXTENDED_BATCHES]
+    assert [len(doc["candidates"]) for _, doc in additional] == [600, 600, 600, 426]
+    assert [doc["counts"]["raw_provisional_urls"] for _, doc in additional] == [
+        11151, 11751, 12351, 12777]
+    assert all(doc["status"] == "raw_discovery_only_not_ingested_into_canonical_queue"
+               and len(doc["catalogs"]) == 12 for _, doc in additional)
+    full = validate_discovery_chain(baseline, [*historical, *prior, *additional])
+    assert full["raw_new"] == 8372
+    assert full["raw_total_discovered"] == 12777
+    assert full["total_discovered"] <= full["raw_total_discovered"]
+    assert all(row["training_authorized"] is False and
+               row["independence"] == "not_assessed" and
+               row["rights"] == "not_assessed"
+               for row in full["sources"].values())
+
+
+def test_extended_chain_does_not_accept_missing_or_forged_pins(baseline, chain):
+    historical = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    prior = [_supplement(path) for path in RECONCILED_BATCHES]
+    extra = [_supplement(path) for path in EXTENDED_BATCHES]
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*historical, *prior, extra[-1]])
+    malformed = deepcopy(extra)
+    malformed[0][1]["candidates"][0]["training_authorized"] = True
+    with pytest.raises(ValueError, match="authority"):
+        validate_discovery_chain(baseline, [*historical, *prior, *malformed])
+    malformed = deepcopy(extra)
+    malformed[1][1]["candidates"][0]["discoveries"][0]["readme_blob_sha"] = "f" * 40
+    with pytest.raises(ValueError, match="pinned"):
+        validate_discovery_chain(baseline, [*historical, *prior, *malformed])
+    malformed = deepcopy(extra)
+    malformed[2][1]["counts"]["raw_provisional_urls"] += 1
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*historical, *prior, *malformed])
+
+
+def test_extended_catalog_batch_hashes_and_parent_history_are_exact(baseline, chain):
+    old = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    prior = [_supplement(path) for path in RECONCILED_BATCHES]
+    latest = [_supplement(path) for path in EXTENDED_BATCHES]
+    paths = [p for p, _ in (*old, *prior)]
+    raw_urls = {item["url"] for _, doc in (*old, *prior)
+                for item in doc["candidates"]}
+    for path, doc in latest:
+        assert doc["parents"] == paths
+        assert doc["counts"]["previous_raw_provisional_urls"] == 4405 + len(raw_urls)
+        for entry in doc["candidates"]:
+            assert entry["url"] not in raw_urls
+            assert entry["source_id"] == "source-" + sha256(entry["url"].encode()).hexdigest()
+            assert entry["training_authorized"] is False
+            raw_urls.add(entry["url"])
+        paths.append(path)
+    assert len(raw_urls) == 8372
+
+
+def test_seven_more_pinned_retro_and_editor_catalogs_join_one_chain(baseline, chain):
+    """The new 2,398 raw links increase source diversity without approval."""
+    historical = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    resumed = [_supplement(path) for path in RECONCILED_BATCHES]
+    specialized = [_supplement(path) for path in EXTENDED_BATCHES]
+    latest = _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0042.json")
+    assert latest[1]["status"] == "raw_discovery_only_not_ingested_into_canonical_queue"
+    assert latest[1]["counts"]["previous_raw_provisional_urls"] == 12777
+    assert latest[1]["counts"]["new_raw_candidate_urls"] == 2398
+    assert latest[1]["counts"]["raw_provisional_urls"] == 15175
+    assert len(latest[1]["catalogs"]) == 7
+    assert latest[1]["parents"] == [
+        name for name, _ in (*historical, *resumed, *specialized)]
+    snapshot = validate_discovery_chain(
+        baseline, [*historical, *resumed, *specialized, latest])
+    assert snapshot["raw_new"] == 10770
+    assert snapshot["raw_total_discovered"] == 15175
+    assert snapshot["total_discovered"] <= 15175
+    assert all(entry["training_authorized"] is False and
+               entry["rights"] == "not_assessed"
+               for entry in snapshot["sources"].values())
+
+
+def test_seven_catalog_batch_cannot_substitute_a_fork_or_claim_license(baseline, chain):
+    original = [*chain, _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json")]
+    existing = [_supplement(path) for path in (*RECONCILED_BATCHES, *EXTENDED_BATCHES)]
+    latest = _supplement(
+        ROOT / "docs/ai/evidence/dragon-source-expansion-20261012-batch-0042.json")
+    with pytest.raises(ValueError):
+        validate_discovery_chain(baseline, [*original, *existing[:-1], latest])
+    tampered = deepcopy(latest)
+    tampered[1]["candidates"][0]["training_authorized"] = True
+    with pytest.raises(ValueError, match="authority"):
+        validate_discovery_chain(baseline, [*original, *existing, tampered])
+    tampered = deepcopy(latest)
+    tampered[1]["candidates"][0]["discoveries"][0]["readme_blob_sha"] = "f" * 40
+    with pytest.raises(ValueError, match="pinned"):
+        validate_discovery_chain(baseline, [*original, *existing, tampered])
+
+
+def test_full_tenfold_source_milestone_fits_bounded_evidence_partition_budget():
+    from skeleton.ai.game_builder.dragon_discovery_admission import (
+        MAX_SUPPLEMENTS, MAX_BYTES, MAX_CANDIDATES,
+    )
+    from skeleton.ai.game_builder.dragon_discovery_reconciled import (
+        EXPECTED_RAW_TOTAL, SOURCE_BATCHES,
+    )
+    # The current 24-batch history must still leave sufficient finite space to
+    # reach the 44,050-raw-lead goal using at most 1,000 sources per batch.
+    import math
+    more = math.ceil((44_050 - EXPECTED_RAW_TOTAL) / 1_000)
+    assert EXPECTED_RAW_TOTAL == 20_860
+    assert len(SOURCE_BATCHES) == 24
+    assert MAX_SUPPLEMENTS >= len(SOURCE_BATCHES) + more
+    assert MAX_SUPPLEMENTS <= 128
+    assert 1_000 <= MAX_CANDIDATES <= 100_000
+    assert MAX_BYTES <= 8_000_000

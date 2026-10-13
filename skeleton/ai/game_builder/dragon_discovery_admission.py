@@ -28,7 +28,10 @@ STATUS_RAW = "raw_discovery_only_not_ingested_into_canonical_queue"
 DISCOVERY_STATUSES = frozenset((STATUS, STATUS_RAW))
 SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
-MAX_SUPPLEMENTS = 32
+# Supports the full 44,050-raw-lead milestone when source additions are
+# sharded in bounded 500-1,000-link supplements. Individual evidence byte,
+# source, owner and global raw-link caps still apply.
+MAX_SUPPLEMENTS = 64
 MAX_CANDIDATES = 50_000
 MAX_BYTES = 8_000_000
 

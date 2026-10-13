@@ -17,6 +17,8 @@ import {
 } from './dragonProgression';
 import {normalizeDragonWisdomSnapshot,type DragonWisdomReview} from './dragonWisdomReview';
 import {normalizeDragonKnowledgeView,type DragonKnowledgeView} from './dragonKnowledgePyramid';
+import {normalizeDragonNestSnapshot,type DragonNestSnapshot} from './DragonNestProgression';
+import {normalizeMotherGleanSummary,type MotherGleanSummary} from './DragonMotherGleanPanel';
 import type {CompanionAcademyInput,CompanionTelemetry} from './DragonCompanionPanel';
 import {type NativeAttempt,type NativeTarget,type NativeCurriculum,normalizeNativeAttempts,normalizeNativeTargets,normalizeNativeCurriculum} from './dragonNativeTargets';
 import {EMPTY_COMPANION_JOURNAL,reduceDragonJournal,type CompanionJournal,type WireDragonEvent} from './dragonJournal';
@@ -49,6 +51,8 @@ export function useDragonAcademy(){
  const [wisdomReview,setWisdomReview]=useState<DragonWisdomReview|null>(null);
  const [wisdomExpires,setWisdomExpires]=useState(0);
  const [knowledgeView,setKnowledgeView]=useState<DragonKnowledgeView|null>(null);
+ const [nest,setNest]=useState<DragonNestSnapshot|null>(null);
+ const [motherGlean,setMotherGlean]=useState<MotherGleanSummary|null>(null);
  const [curriculum,setCurriculum]=useState<NativeCurriculum|null>(null);
  const [subscription,setSubscription]=useState<DragonPracticeSubscription|null>(null);
  const [busy,setBusy]=useState(false);
@@ -60,6 +64,8 @@ export function useDragonAcademy(){
  const feedBusy=useRef(false);
  const wisdomBusy=useRef(false);
  const pyramidBusy=useRef(false);
+ const nestBusy=useRef(false);
+ const motherBusy=useRef(false);
  const alive=useRef(true);
  const inFlight=useRef(false);
  const load=useCallback(async()=>{
@@ -67,7 +73,7 @@ export function useDragonAcademy(){
    const me=await checkMe();
    if(!alive.current)return;
    if(!me.authenticated||!getAuthToken()){
-    setAuthenticated(false);setProgress(null);setWisdomReview(null);setKnowledgeView(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
+    setAuthenticated(false);setProgress(null);setWisdomReview(null);setKnowledgeView(null);setNest(null);setMotherGlean(null);setMotherGlean(null);setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
     setTelemetry(undefined);sessionRef.current=null;journal.current=EMPTY_COMPANION_JOURNAL;
     setError('Sign in through Studio to connect Dragon Academy.');
     return;
@@ -101,7 +107,7 @@ export function useDragonAcademy(){
     setCurriculum(normalizeNativeCurriculum(course.data));
    setSubscription(snapshot.subscription);setAuthenticated(true);setError('');
   }catch(e){
-   if(alive.current){setAuthenticated(false);setProgress(null);setWisdomReview(null);setKnowledgeView(null);
+   if(alive.current){setAuthenticated(false);setProgress(null);setWisdomReview(null);setKnowledgeView(null);setNest(null);setMotherGlean(null);
     setAttempts([]);setNativeAttempts([]);setNativeTargets([]);setCurriculum(null);setSubscription(null);
     setError(e instanceof Error?e.message:'Could not connect to Dragon Academy.');}
   }
@@ -178,17 +184,49 @@ export function useDragonAcademy(){
    if(alive.current)setKnowledgeView(null);
   }finally{pyramidBusy.current=false;}
  },[]);
+ const pollNest=useCallback(async()=>{
+  const token=getAuthToken();
+  if(nestBusy.current||!token||!['active','unknown'].includes(AppState.currentState))return;
+  nestBusy.current=true;
+  try{
+   const response=await api.get<{ok:boolean;nest:unknown}>(PATH+'/nest',
+    {headers:authHeaders(),timeoutMs:8000,retries:0});
+   if(!alive.current)return;
+   if(!response.ok||!response.data?.ok||getAuthToken()!==token){setNest(null);return;}
+   setNest(normalizeDragonNestSnapshot(response.data.nest));
+  }catch{
+   if(alive.current)setNest(null);
+  }finally{nestBusy.current=false;}
+ },[]);
+ const pollMother=useCallback(async()=>{
+  const token=getAuthToken();
+  if(motherBusy.current||!token||!['active','unknown'].includes(AppState.currentState))return;
+  motherBusy.current=true;
+  try{
+   const response=await api.get<{ok:boolean;glean:unknown}>(PATH+'/mother-glean',
+    {headers:authHeaders(),timeoutMs:8000,retries:0});
+   if(!alive.current)return;
+   if(!response.ok||!response.data?.ok||getAuthToken()!==token){
+    setMotherGlean(null);return;
+   }
+   setMotherGlean(normalizeMotherGleanSummary(response.data.glean));
+  }catch{
+   if(alive.current)setMotherGlean(null);
+  }finally{motherBusy.current=false;}
+ },[]);
  useEffect(()=>{
   alive.current=true;
-  void load().then(()=>{void pollCrawler();void pollPyramid();});
+  void load().then(()=>{void pollCrawler();void pollPyramid();void pollNest();void pollMother();});
   const interval=setInterval(()=>void pollCrawler(),12000);
   const reviewInterval=setInterval(()=>void pollWisdom(),30000);
   const pyramidInterval=setInterval(()=>void pollPyramid(),60000);
+  const nestInterval=setInterval(()=>void pollNest(),60000);
+  const motherInterval=setInterval(()=>void pollMother(),60000);
   const listener=AppState.addEventListener('change',next=>{
-   if(next==='active')void load().then(()=>{void pollCrawler();void pollPyramid();});
+   if(next==='active')void load().then(()=>{void pollCrawler();void pollPyramid();void pollNest();void pollMother();});
   });
-  return()=>{alive.current=false;clearInterval(interval);clearInterval(reviewInterval);clearInterval(pyramidInterval);listener.remove();};
- },[load,pollCrawler,pollWisdom,pollPyramid]);
+  return()=>{alive.current=false;clearInterval(interval);clearInterval(reviewInterval);clearInterval(pyramidInterval);clearInterval(nestInterval);clearInterval(motherInterval);listener.remove();};
+ },[load,pollCrawler,pollWisdom,pollPyramid,pollNest,pollMother]);
  const mutate=useCallback(async(endpoint:string,body:object={})=>{
   if(inFlight.current||!authenticated||!getAuthToken())return;
   inFlight.current=true;setBusy(true);setError('');
@@ -294,7 +332,7 @@ export function useDragonAcademy(){
  },[attempts,authenticated]);
  const closeDemo=useCallback(()=>setDemo(null),[]);
  const view:CompanionAcademyInput={
-  progress,attempts,subscription,practiceBusy:busy,wisdomReview,knowledgeView,
+  progress,attempts,subscription,practiceBusy:busy,wisdomReview,knowledgeView,nest,motherGlean,
   nativeAttempts,nativeTargets,nativeStyles,nativeCurriculum:curriculum,
   onDeliveryGenerated:()=>{void load();},
   onGenerateCurriculum:authenticated?generateCurriculum:undefined,

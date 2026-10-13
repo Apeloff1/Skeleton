@@ -459,6 +459,22 @@ class CrawlEngine:
             self._queued.discard(selected.url)
         return selected
 
+    @property
+    def pending_count(self) -> int:
+        """Number of queued attempts, including delayed retries."""
+        return len(self._frontier)
+
+    def next_ready_at(self) -> float | None:
+        """Earliest eligible attempt under both retry and host cooldowns.
+
+        This is a scheduling hint, not admission: step still applies policy,
+        robots and the shared request budget. No clock advancement or sleep
+        occurs here, and another host may be ready before the heap's head.
+        """
+        return min((max(item.ready_at, self._host_ready.get(
+            urlsplit(item.url).hostname or "", 0.0
+        )) for item in self._frontier), default=None)
+
     def _retry(self, item: FrontierItem, *, now: float, delay: float | None = None) -> None:
         if item.attempts >= self.policy.max_retries:
             return

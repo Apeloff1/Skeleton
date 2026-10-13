@@ -61,6 +61,83 @@ def test_principal_is_tenant_scoped_and_not_request_controllable():
         route._principal({"email":"alice@example.test","tenant_id":123,"role":"viewer"})
 
 
+
+def test_nest_read_api_requires_secret_and_never_mints_progress(tmp_path, monkeypatch):
+    from fastapi import Response
+    from skeleton.ai.webcrawler.dragon_nest_store import DragonNestStore
+    owner=identity()
+    db_path=tmp_path/"nest.sqlite"
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(db_path))
+    monkeypatch.delenv("SKL_DRAGON_NEST_SIGNING_KEY_HEX",raising=False)
+    with pytest.raises(HTTPException) as missing:
+        route.academy_nest(Response(),owner=owner)
+    assert missing.value.status_code==503
+    key=b"signed-unique-nest-testing-key-32bytes"
+    monkeypatch.setenv("SKL_DRAGON_NEST_SIGNING_KEY_HEX",key.hex())
+    empty=route.academy_nest(Response(),owner=owner)
+    assert empty=={"ok":True,"nest":None}
+    with sqlite3.connect(db_path) as db:
+        store=DragonNestStore(db,signing_key=key)
+        store.initialize(owner,("source-1",),focus_tags=("game-code",),
+                         at="2026-10-12T12:00:00Z",authorized=True)
+    headers=Response()
+    first=route.academy_nest(headers,owner=owner)
+    assert headers.headers["cache-control"]=="private, no-store"
+    assert first["nest"]["stage"]=="egg"
+    assert first["nest"]["sources_consumed"]==0
+    assert route.academy_nest(Response(),owner=identity("bob@example.test"))["nest"] is None
+    with sqlite3.connect(db_path) as db:
+        assert db.execute("SELECT COUNT(*) FROM dragon_nest_history").fetchone()[0]==1
+        db.execute("UPDATE dragon_nest_state SET head=? WHERE owner=?",
+                   ("f"*64,owner))
+        db.commit()
+    with pytest.raises(HTTPException) as corruption:
+        route.academy_nest(Response(),owner=owner)
+    assert corruption.value.status_code==409
+    assert not any(r.path.endswith("/nest/create") or r.path.endswith("/nest/grow")
+                   for r in route.router.routes)
+
+
+
+
+def test_mother_glean_read_is_tenant_private_and_requires_signed_custody(tmp_path,monkeypatch):
+    from fastapi import Response
+    from skeleton.ai.webcrawler.dragon_mother_glean_ledger import MotherGleanLedger
+    owner=identity()
+    db_path=tmp_path/"mother.sqlite"
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(db_path))
+    monkeypatch.delenv("SKL_DRAGON_MOTHER_SIGNING_KEY_HEX",raising=False)
+    with pytest.raises(HTTPException) as missing:
+        route.academy_mother_glean(Response(),owner=owner)
+    assert missing.value.status_code==503
+    key=b"mother-route-key-is-separated-32bytes-long"
+    monkeypatch.setenv("SKL_DRAGON_MOTHER_SIGNING_KEY_HEX",key.hex())
+    response=Response()
+    assert route.academy_mother_glean(response,owner=owner)=={"ok":True,"glean":None}
+    assert response.headers["cache-control"]=="private, no-store"
+    assert route.academy_mother_glean(Response(),owner=identity(
+        "bob@example.test"))=={"ok":True,"glean":None}
+    with sqlite3.connect(db_path) as db:
+        MotherGleanLedger(db,signing_key=key)
+        db.execute(
+            "INSERT INTO dragon_mother_glean "
+            "(owner,seq,acquisition_key,payload,previous_head,head,mac) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (owner,1,"a"*64,"{}","0"*64,"b"*64,"c"*64),
+        )
+        db.commit()
+    with pytest.raises(HTTPException) as tampered:
+        route.academy_mother_glean(Response(),owner=owner)
+    assert tampered.value.status_code==409
+    assert route.academy_mother_glean(Response(),owner=identity(
+        "bob@example.test"))=={"ok":True,"glean":None}
+    assert not any(
+        r.path.endswith("/mother-glean/promote")
+        or r.path.endswith("/mother-glean/acquire")
+        for r in route.router.routes
+    )
+
+
 def test_storage_is_fail_closed(monkeypatch):
     monkeypatch.delenv("SKL_DRAGON_PRACTICE_DB_PATH",raising=False)
     with pytest.raises(HTTPException) as exc:
@@ -568,3 +645,84 @@ def test_signed_custody_and_memory_route_fail_closed_on_rollback(tmp_path, monke
                 trusted_worker=True,
             )
         assert client.get("/api/dragon-academy/knowledge/memory").json()["items"] == []
+
+
+def test_mother_glean_api_returns_real_signed_reviewed_lens_summary(tmp_path,monkeypatch):
+    from fastapi import Response
+    from skeleton.ai.game_builder.reviewed_knowledge import (
+        ReviewedDocument,ReviewedKnowledgeStore,ReviewedNote,
+    )
+    from skeleton.ai.webcrawler.dragon_nest_progression import (
+        AcquiredKnowledge,feed_parent,learn_when_idle,new_nest,
+    )
+    from skeleton.ai.webcrawler.dragon_mother_glean_matrix import HatchlingReceipt
+    from skeleton.ai.webcrawler.dragon_mother_glean_ledger import MotherGleanLedger
+
+    owner=identity()
+    at0="2026-10-12T12:00:00Z"
+    at1="2026-10-12T12:10:00Z"
+    at2="2026-10-12T12:20:00Z"
+    db_path=tmp_path/"mother_projection.sqlite"
+    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(db_path))
+    key=b"mother-integration-route-secret-32-bytes-long"
+    monkeypatch.setenv("SKL_DRAGON_MOTHER_SIGNING_KEY_HEX",key.hex())
+    with ReviewedKnowledgeStore(tmp_path/"reviewed.sqlite") as library:
+        for sid,group in (("source-a","reviewer-group-a"),
+                          ("source-b","reviewer-group-b")):
+            library.import_document(
+                ReviewedDocument(
+                    owner,sid,f"https://{sid}.example.org/research",
+                    "Movement studies","Movement reference for game systems.",
+                    at0,"lawful-review",("design_reference",),
+                    "qualified-editor",True,
+                    (ReviewedNote(
+                        "note-"+sid,"movement",
+                        "Movement because feedback enables player choice with latency tradeoff.",
+                        0,8,"supports",950000,group,("gameplay","movement"),
+                    ),),
+                ),
+                expected_parent_digest=None,authorized=True,
+            )
+        hits={hit.source_id:hit for hit in library.search(
+            owner,"movement",authorized=True,diversify=False,
+        )}
+        nest=new_nest(owner,("source-a","source-b"),
+                      focus_tags=("movement",),at=at0)
+        for sid in ("source-a","source-b"):
+            nest=feed_parent(
+                nest,sid,content_sha256=hits[sid].source_text_digest,
+                at=at0,authorized=True,reviewed=True,lawful=True,
+            )
+        nest=learn_when_idle(
+            nest,"article",
+            AcquiredKnowledge(
+                "source-a",hits["source-a"].source_text_digest,at1,
+                ("movement",),True,True,.95,None,"article",
+            ),
+            at=at1,idle_since=at0,consented=True,
+            background_allowed=True,owner_authorized=True,
+        )
+        with sqlite3.connect(db_path) as db:
+            MotherGleanLedger(db,signing_key=key).run(
+                library,nest,(HatchlingReceipt(
+                    "article","source-a",hits["source-a"].source_text_digest,
+                    "note-source-a",at1,
+                ),),at=at2,idle_since=at1,owner_authorized=True,
+                consented=True,background_allowed=True,
+            )
+    response=Response()
+    body=route.academy_mother_glean(response,owner=owner)
+    assert body["ok"] is True and body["glean"] is not None
+    glean=body["glean"]
+    assert glean["schema"]=="skeleton.dragon.mother_glean_summary.v1"
+    assert glean["source_count"]==1
+    assert glean["search_count"]==36
+    assert glean["hypothesis_count"]>=1
+    assert "causal" in glean["lenses"]
+    assert glean["questions"]
+    assert glean["model_promotion_authorized"] is False
+    assert len(glean["evidence_digest"])==64
+    assert response.headers["cache-control"]=="private, no-store"
+    assert route.academy_mother_glean(
+        Response(),owner=identity("bob@example.test"),
+    )=={"ok":True,"glean":None}
