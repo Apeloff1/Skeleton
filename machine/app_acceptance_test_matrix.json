@@ -1,9 +1,9 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13.v11",
+  "version": "2026-10-13.v12",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
-  "scope_note": "All 42 source-linked families selected for actual target regressions: 17 unittest +25 pytest; independent full family, device, quality and enterprise release acceptance remains open",
+  "scope_note": "All 42 family test subsets scheduled; F07 now includes real multi-turn CPU chat session, stream cancellation and checkpointed recovery. Tests still require exact-head CI.",
   "runner_mode": "unittest_module_exact_head",
   "default_max_seconds": 480,
   "policies": {
@@ -88,7 +88,8 @@
       "execution_tier": "ci_smoke",
       "independent_acceptance_question": "Local CPU native transformer actually runs and replays, without claiming trained-model quality",
       "unittest_modules": [
-        "tests.test_ai_offline_native_functional_boundary"
+        "tests.test_ai_offline_native_functional_boundary",
+        "tests.test_ai_native_session_recovery_journey"
       ],
       "workflow_hint": "Jeeves App Acceptance Matrix",
       "product_release_qualified": false
