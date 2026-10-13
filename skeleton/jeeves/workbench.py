@@ -607,7 +607,7 @@ class JeevesWorkbench:
             else:
                 current_policy = policy
             records = [
-                record for record in self.shadow._pipeline.entries(limit=1000)
+                record for record in self.shadow.entries(limit=1000)
                 if record.state.value in ("inbox", "quarantined", "corroborated")
             ]
             candidates = tuple(self._idle_candidate(record) for record in records)
