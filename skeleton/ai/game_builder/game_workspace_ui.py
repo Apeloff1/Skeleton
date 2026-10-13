@@ -784,6 +784,49 @@ $("jeeves-variants-stage").addEventListener("click",()=>dmGuard(async()=>{
    "No game source was automatically committed."));
 }));
 
+
+/* Real persisted original project review proposal queue, paginated and source-bound. */
+let productionQueueCursor=null,productionQueueResult=null;
+async function fetchProductionQueue(next){
+ if(!model||!model.active||selectedProject!==model.active||
+    selectedTree!=="current"||!jeevesAppSnapshot)
+  throw Error("Select active Studio project and refresh whole-app inventory");
+ const params={
+  project:model.active,limit:60,
+  expected_snapshot:jeevesAppSnapshot,
+  ...(next&&productionQueueCursor?{start_after:productionQueueCursor}:{}),
+ };
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.queue",params,operator_authorized:false,
+ });
+ productionQueueResult=receipt.result;
+ productionQueueCursor=productionQueueResult.next_after;
+ $("jeeves-queue-next").disabled=!productionQueueCursor;
+ $("jeeves-queue-result").textContent=JSON.stringify(productionQueueResult,null,2).slice(0,90000);
+ status(productionQueueResult.returned_current_project_rows+
+  " current-project proposals indexed from "+
+  productionQueueResult.examined_filenames+" custody entries. "+
+  "Stale sources require re-review before any source commit.");
+}
+$("jeeves-queue-fetch").addEventListener("click",()=>dmGuard(async()=>{
+ productionQueueCursor=null;
+ await fetchProductionQueue(false);
+}));
+$("jeeves-queue-next").addEventListener("click",()=>dmGuard(async()=>{
+ if(!productionQueueCursor)throw Error("No more proposal custody pages");
+ await fetchProductionQueue(true);
+}));
+$("jeeves-queue-select").addEventListener("click",()=>dmGuard(async()=>{
+ if(!productionQueueResult)throw Error("Load actual proposal records first");
+ const pending=productionQueueResult.entries.filter(
+  row=>row.status==="awaiting_review").slice(0,24);
+ if(!pending.length)
+  throw Error("No pending current-project source proposal in this page");
+ $("jeeves-publish-ids").value=pending.map(p=>p.proposal_id).join("\n");
+ status(pending.length+" current-project source proposals selected for "+
+  "exact human review and individual approval. Nothing was committed.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -4819,6 +4862,16 @@ Maximum four compiled variants per bounded production wave.</small></p>
 <textarea id="jeeves-variant-reason" rows="2" spellcheck="false">Review actual original source and gameplay alternatives across independent themes and seeds.</textarea></label>
 <button id="jeeves-variants-stage" type="button">Stage independently authored alternatives</button>
 <pre id="jeeves-variants-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Durable Source Proposal Queue</legend>
+<p><small>Browse persisted original game production proposals and human
+acceptance status. Select pending sources for complete diff review and
+individual source publication; no automatic approval.</small></p>
+<button id="jeeves-queue-fetch" type="button">Read current project proposal queue</button>
+<button id="jeeves-queue-next" type="button" disabled>Next proposal custody page</button>
+<button id="jeeves-queue-select" type="button">Select pending proposals for source review</button>
+<pre id="jeeves-queue-result" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
