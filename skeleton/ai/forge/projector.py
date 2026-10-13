@@ -1,7 +1,6 @@
 """Safe, content-addressed Godot text project materialization."""
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
@@ -65,10 +64,11 @@ def write_project(root: str | Path, files: Mapping[str, str], *,
         raise ValueError("project destination must be named")
     safe = _validate(files)  # whole-manifest validation before side effects
     _check_existing(root, safe, overwrite)
+    from skeleton.forge.source_manifest import source_manifest
+    receipt = source_manifest(safe)
     manifest = {
         "root": str(root.resolve()), "files": sorted(safe), "count": len(safe),
-        "sha256": {k: hashlib.sha256(v.encode("utf-8")).hexdigest()
-                   for k, v in sorted(safe.items())},
+        "sha256": receipt["files"], "source_sha256": receipt["sha256"],
         "meta": meta or {},
     }
     encoded = json.dumps(manifest, indent=2, sort_keys=True, allow_nan=False)

@@ -154,6 +154,8 @@ class GameForgeRun:
             Stage("seal", _stage_seal),
         ]
         run = self.composer.execute("gameforge", stages, initial_context=ctx)
+        from skeleton.forge.source_manifest import source_manifest
+        emitted_manifest = source_manifest(run.context.get("files") or {})
         payload = {
             "run": run.to_dict(),
             "succeeded": run.succeeded,
@@ -189,6 +191,7 @@ class GameForgeRun:
             "G": ((run.context.get("cortex") or {}) or {}).get("G"),
             "law": ((run.context.get("cortex") or {}) or {}).get("law"),
             "files": run.context.get("files") or {},
+            "source_manifest": emitted_manifest,
             "sim": run.context.get("sim"),
             "project": run.context.get("project"),
             "build_report": run.context.get("build_report"),
@@ -499,9 +502,9 @@ def _stage_seal(ctx: Dict[str, Any]) -> Dict[str, Any]:
     build_report = None
     project = ctx.get("project")
     if project:
-        import hashlib
         import json
         from pathlib import Path
+        from skeleton.forge.source_manifest import source_manifest
 
         root = Path(project["root"])
         ledger = cockpit.ledger.to_dict()
@@ -518,16 +521,9 @@ def _stage_seal(ctx: Dict[str, Any]) -> Dict[str, Any]:
         field = (f"{raw_field:.2f}%" if isinstance(raw_field, (int, float))
                  and not isinstance(raw_field, bool) and 0 <= raw_field <= 100
                  else "unmeasured (no verified field metric in this pipeline)")
-        # Canonical source manifest digest: every emitted path and its content,
-        # not just the file count. A real digest avoids fabricated evidence.
+        # Exactly the same source digest as CLI, API and FORGE_MANIFEST.
         files = ctx.get("files") or {}
-        manifest = {
-            name: hashlib.sha256(body.encode("utf-8")).hexdigest()
-            for name, body in sorted(files.items())
-        }
-        manifest_sha = hashlib.sha256(
-            json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        ).hexdigest()
+        manifest_sha = source_manifest(files)["sha256"]
         sim = ctx.get("sim") or {}
         playtest = ctx.get("playtest") or {}
         content = "\n".join([
