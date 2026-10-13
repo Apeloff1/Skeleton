@@ -87,6 +87,25 @@ lifecycle = "historical"
         self.assertTrue(all("owner" in row for row in result["hits"]))
         self.assertFalse((self.out / "files.jsonl.tmp").exists())
 
+    def test_query_rejects_tampered_shard(self) -> None:
+        M.build(self.root, self.out, near_limit=0)
+        with (self.out / "files.jsonl").open("a", encoding="utf-8") as file:
+            file.write('{"path":"injected.py"}\n')
+        with self.assertRaisesRegex(M.InventoryError, "corrupt navigation shard"):
+            M.query(self.out, "engine")
+
+    def test_query_rejects_wrong_commit(self) -> None:
+        M.build(self.root, self.out, near_limit=0)
+        with self.assertRaisesRegex(M.InventoryError, "stale"):
+            M.query(self.out, "engine", expected_commit="0" * 40)
+
+    def test_readonly_index_does_not_move_canonical_code(self) -> None:
+        before = M.git(self.root, "ls-tree", "-r", "HEAD")
+        M.build(self.root, self.out, near_limit=2)
+        after = M.git(self.root, "ls-tree", "-r", "HEAD")
+        self.assertEqual(before, after)
+        self.assertEqual(M.git(self.root, "status", "--porcelain", "--untracked-files=no"), b"")
+
     def test_idempotent_build(self) -> None:
         first = M.build(self.root, self.out, near_limit=0)
         second = M.build(self.root, self.out, near_limit=0)

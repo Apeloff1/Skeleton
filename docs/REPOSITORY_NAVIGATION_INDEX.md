@@ -17,7 +17,7 @@ python scripts/build_repository_navigation_index.py --root . \
 python -m unittest discover -s tests -p 'test_repository_navigation_index.py' -v
 ```
 
-The `repository-navigation-index.yml` workflow refreshes on every `main` push, nightly, or manual dispatch, validates its HEAD binding and 100% Git-tree path coverage, and publishes versioned artifacts. It has **read-only GitHub permissions**. It does not commit volatile generated index changes to `main` or silently delete code. The stable code and workflow live in the repository; complete generated data lives in build artifacts, in `.machine/repository-navigation` on local builds. The existing `repo-machine-index.yml` remains the canonical richer static and symbol index; generated files under `.machine` are never counted as tracked source unless explicitly committed.
+The `repository-navigation-index.yml` workflow refreshes on every `main` push or targeting pull request, nightly, or manual dispatch, validates its HEAD binding and 100% Git-tree path coverage, and publishes versioned artifacts. It has **read-only GitHub permissions**. It does not commit volatile generated index changes to `main` or silently delete code. The stable code and workflow live in the repository; complete generated data lives in build artifacts, in `.machine/repository-navigation` on local builds. The existing `repo-machine-index.yml` remains the canonical richer static and symbol index; generated files under `.machine` are never counted as tracked source unless explicitly committed.
 
 ## Layers — small context first
 
@@ -33,7 +33,7 @@ The `repository-navigation-index.yml` workflow refreshes on every `main` push, n
 | L3 | Existing `repository-machine.json`, `code-search-index.json` | Scoped imports, symbols, line locations, relationships and testing evidence |
 | L4 | Actual source files | Fetch only SHA-bound file(s) relevant to the proposed edit |
 
-The query CLI emits only bounded metadata hits, never source bodies. For a file edit, fetch the actual file from the **same commit**; the retrieval index is not sufficient evidence to modify code.
+The query CLI emits only bounded metadata hits, never source bodies; it checks the current commit and each artifact digest before trusting a query. For a file edit, fetch the actual file from the **same commit**; the retrieval index is not sufficient evidence to modify code.
 
 The navigation projection groups paths into existing machine zones, owners and lifecycles, plus discoverable feature paths. Path grouping is a *navigation heuristic*, not architecture authority. A discovered feature is not necessarily a working runtime feature. `unclassified` is reported explicitly, never silently assigned.
 

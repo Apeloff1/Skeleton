@@ -17,6 +17,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 import tomllib
 from typing import Iterable
 
@@ -44,9 +45,16 @@ def canonical(value: object) -> str:
 
 def safe_write(path: Path, contents: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_suffix(path.suffix + ".tmp")
-    temp.write_text(contents, encoding="utf-8", newline="\n")
-    os.replace(temp, path)
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent, text=True)
+    temp = Path(temp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(contents)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 @dataclass(frozen=True)
@@ -313,11 +321,18 @@ def build(root: Path, out: Path, *, near_limit: int = 2000, near_threshold: floa
     return summary
 
 
-def query(out: Path, text: str, *, max_bytes: int = 8_000) -> dict[str, object]:
+def query(out: Path, text: str, *, max_bytes: int = 8_000, expected_commit: str | None = None) -> dict[str, object]:
     """A context-budgeted navigation result; never return full source content."""
     if not text.strip() or max_bytes < 1024 or max_bytes > 60_000:
         raise InventoryError("invalid query or context budget")
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    if summary.get("schema") != VERSION or (expected_commit and expected_commit != summary.get("commit")):
+        raise InventoryError("stale or incompatible navigation index")
+    for name, digest in summary.get("artifact_digests", {}).items():
+        if not isinstance(name, str) or not isinstance(digest, str) or len(digest) != 64:
+            raise InventoryError("invalid artifact digest")
+        if sha256((out / name).read_bytes()).hexdigest() != digest:
+            raise InventoryError(f"corrupt navigation shard: {name}")
     terms = text.lower().split()
     hits = []
     with (out / "files.jsonl").open(encoding="utf-8") as source:
@@ -349,7 +364,9 @@ def main() -> int:
     if not out.is_absolute():
         out = root / out
     try:
-        payload = query(out, args.query, max_bytes=args.context_bytes) if args.query else build(root, out, near_limit=args.near_limit, near_threshold=args.near_threshold)
+        if not out.resolve().is_relative_to(root):
+            raise InventoryError("output must be inside the repository workspace")
+        payload = query(out, args.query, max_bytes=args.context_bytes, expected_commit=git(root, "rev-parse", "--verify", "HEAD").decode("ascii").strip()) if args.query else build(root, out, near_limit=args.near_limit, near_threshold=args.near_threshold)
     except (InventoryError, OSError, ValueError, tomllib.TOMLDecodeError, subprocess.SubprocessError) as exc:
         print(f"repository navigation indexing failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
