@@ -76,7 +76,7 @@ class DeathmarchWorkpacksTests(unittest.TestCase):
         self.assertFalse(pack["tasks"][0]["ready_to_modify_source"])
 
     def test_empty_context_is_explicit_not_false_feature_completion(self):
-        packet = self.director.workpack(task_ids=["AI-CAP-assistant.text"])
+        packet = self.director.workpack(task_ids=["AI-ENTERPRISE-421"])
         self.assertFalse(packet["tasks"][0]["source_context_found"])
         self.assertTrue(packet["tasks"][0][
             "unlinked_or_missing_context_requires_human_selection"])
