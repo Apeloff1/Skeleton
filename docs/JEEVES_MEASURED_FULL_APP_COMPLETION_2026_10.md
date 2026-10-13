@@ -159,3 +159,50 @@ Do not commit the downloaded CI artifacts or tokens. Output reports are run-iden
 2. For the **25 pytest-backed discovery families**, build a separate reviewed pytest execution lane with pinned dependencies and real nonzero-test counts. Never let unittest report 0 tests as progress.
 3. Independently verify any CI outputs, then advance from *targeted regressions* to real runtime integration, story/world/game/Dragon/AI user journeys, installed Windows app smoke, model-quality holdouts, rollback and performance.
 4. Keep enterprise acceptance, the 26 required gates, 421 masterplan volumes and 9 AI capability labels in distinct denominators until individually verified.
+
+
+## DX-61–DX-75 — real pytest game and Dragon acceptance (2026-10-13)
+
+The new `Jeeves App Pytest Acceptance` workflow runs curated, source-pinned **pytest** modules independently from the existing unittest matrix. The matrix now has **17 unittest families, 8 pytest families, and 17 discovery-only families**, for 42 total. The 8 pytest families cover:
+
+| Family | Review-only pytest regression subset |
+| --- | --- |
+| F17 | Crawler admission, bounded URLs and robots conditional refresh |
+| F18 | Dragon companion consent, hatching, distillation and lifecycle |
+| F20 | Original game-builder runtime test contracts |
+| F29 | Native game compiler adapters, toolchain absence and source fingerprints |
+| F30 | Cross-platform game-target/source emitter matrix accuracy |
+| F31 | Game rights, approval, originality and governance |
+| F32 | Dragon game-forge source/output invariants |
+| F33 | Game-builder experience evaluation |
+
+These are tests of individual subsystems. They do not prove device deployment, complete playable games, trained-model quality, legal compliance, user interface wiring, platform port success or end-to-end installed product acceptance.
+
+**Nonzero-test execution gate:** `scripts/run_app_pytest_acceptance.py` starts each reviewed module in a bounded subprocess, disables nonessential plugin autoload, and obtains authoritative executed-case counts from pytest's generated JUnit XML. Exit code 0 is insufficient. No JUnit artifact, fewer than one actual test, malformed XML, DTD/entity declarations, mismatch between suite count and testcase elements, failed/skipped/error cases, unexpected module, timeout or missing exact-head metadata all fail the selected subset. JUnit XML stays in ephemeral runner scratch space. Portable artifacts contain only SHA256 of output and XML, byte counts and actual case counts, never captured stdout/stderr (which might contain secrets).
+
+**Independent run verification:** `jeeves_pytest_acceptance_verifier.py` and the `--mode pytest` path of `scripts/verify_app_acceptance_ci.py` require a read-only authenticated GitHub REST fetch of the `Jeeves App Pytest Acceptance` run, exact commit and run attempt, **both Windows/Ubuntu successful jobs**, required execution steps, exact artifacts and selected module/source digests. They refuse forged or stale results even when the JSON claims success. The verifier calculates only `pytest_targeted_family_subset_pct` (8/42 = 19.05% if independently proven). This is **not 19.05% overall app completion**. The prior unittest subset would represent 17/42 = 40.48% if independently proven, and the two groups are disjoint in the current reviewed matrix. **Both remain pending until real exact-head runs complete and are externally verified.**
+
+Both stages use a fixed 42-family denominator. As a result, the theoretical selected targeted-test **coverage** is now 25/42 = 59.52%, with 17/42 still discovery-only. This is scheduling coverage, not execution evidence. Authentic test-pass rates are calculated separately after jobs finish, never from these source-controlled flags.
+
+### CI operation
+
+The new workflow `.github/workflows/jeeves-app-pytest-acceptance.yml` performs exact PR-head checkout without persisted git credentials, pins Python 3.11, installs the reviewed pytest test runner version, compiles source, runs adverse unit tests, performs actual test subprocesses for each selected module, and retains bounded source/case artifacts. The separate action has no permissions to merge, update the repository, sign product capabilities or authorize shell use.
+
+When a complete run is available and the reviewed source checkout matches exactly:
+
+```bash
+GITHUB_TOKEN="<read-only-token-from-secure-environment>" \
+  python scripts/verify_app_acceptance_ci.py \
+  --mode pytest --run-id <completed-run-id> \
+  --attempt 1 --head <exact-40-char-commit-sha>
+```
+
+Do not give secrets or privileged app tokens to PR code. Verification is an operator-side follow-up on a separately reviewed exact-head checkout.
+
+### Next test and functional milestones
+
+1. Confirm actual Windows/Linux failures/successes for **both** exact-head acceptance workflows; fix only concrete reproducible failures rather than downgrading tests.
+2. Identify and classify the remaining 17 discovery-only families by runner type and dependencies. Move only genuinely portable, bounded tests into either tier.
+3. Admit source-bound independent CI observations for each accepted targeted regression, with separate quality and runtime acceptance.
+4. Build a separate installed-app run matrix for each of the 42 feature families, with real user outcome evidence and failure recovery.
+5. Preserve the 26 terminal release gates, 421 volume qualifications, 9 AI product capability statuses and 12 enterprise end-to-end journeys as independent release obligations.
