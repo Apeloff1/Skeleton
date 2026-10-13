@@ -353,6 +353,8 @@ OPERATIONS = {
     "ai.product.tests.page":("read", "paged unmapped app family acceptance test gaps",False),
     "ai.product.journeys":("read", "canonical 12-journey independent end-to-end release frontier",False),
     "ai.product.journeys.page":("read", "paged unreleased journeys and 84 independent acceptance obligations",False),
+    "ai.product.release.queue":("read", "source-grounded independent leaf acceptance tasks for 100 percent app readiness",False),
+    "ai.product.release.queue.page":("read", "bounded priority queue of 729 evidence requirements",False),
     "ai.deathmarch":("read", "prioritized evidence-gated cross-app completion backlog",False),
     "ai.graph":("read", "source-pinned cross-plane feature and release evidence graph",False),
     "ai.graph.neighbors":("read", "bounded graph ownership and dependency traversal",False),
@@ -482,6 +484,12 @@ class JeevesAppwideRuntime:
         elif action=="ai.product.journeys.page":
             from .jeeves_enterprise_journey_frontier import JeevesEnterpriseJourneyFrontier
             result=JeevesEnterpriseJourneyFrontier(inv).page(**params)
+        elif action=="ai.product.release.queue":
+            from .jeeves_release_execution_queue import JeevesReleaseExecutionQueue
+            result=JeevesReleaseExecutionQueue(inv).overview(**params)
+        elif action=="ai.product.release.queue.page":
+            from .jeeves_release_execution_queue import JeevesReleaseExecutionQueue
+            result=JeevesReleaseExecutionQueue(inv).page(**params)
         elif action=="ai.deathmarch":
             from .jeeves_completion_census import JeevesCompletionCensus
             result=JeevesCompletionCensus(inv).backlog(**params)
