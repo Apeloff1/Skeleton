@@ -88,6 +88,24 @@ class SourceAttestation:
         return digest_json(self.as_dict())
 
 
+def independent_evidence_roots(sources: Sequence[SourceAttestation]) -> frozenset[str]:
+    """Count distinct origins only when their *content* is independently rooted.
+
+    A syndicated article with distinct site IDs but identical source bytes is
+    one unverified origin, not three corroborating witnesses. Roots can be
+    accepted through their other unique observations, but shared verbatim
+    material never increases independent corroboration.
+    """
+    origins_by_content: dict[str, set[str]] = {}
+    for source in sources:
+        origins_by_content.setdefault(source.content_digest, set()).add(source.root_id)
+    independent: set[str] = set()
+    for roots in origins_by_content.values():
+        if len(roots) == 1:
+            independent.update(roots)
+    return frozenset(independent)
+
+
 @dataclass(frozen=True, slots=True)
 class ShadowWeightPolicy:
     """Conservative bounds applied before independent sandbox evaluation."""
@@ -206,7 +224,7 @@ class ShadowWeightBatch:
         credible = [source for source in rights if (
             source.quality_ppm >= policy.minimum_quality_ppm and not source.contradiction
         )]
-        independent_roots = len({source.root_id for source in credible})
+        independent_roots = len(independent_evidence_roots(credible))
         if independent_roots < policy.minimum_independent_roots:
             reasons.add("insufficient-independent-evidence")
         if len(credible) != len(self.sources):
@@ -322,5 +340,5 @@ def authorize_shadow_promotion(
 __all__ = [
     "ShadowWeightError", "SourceAttestation", "ShadowWeightPolicy",
     "ShadowAssessment", "ShadowWeightBatch", "ShadowPromotionPermit",
-    "authorize_shadow_promotion",
+    "authorize_shadow_promotion", "independent_evidence_roots",
 ]
