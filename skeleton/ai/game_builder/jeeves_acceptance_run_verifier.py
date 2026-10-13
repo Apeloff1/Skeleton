@@ -103,6 +103,28 @@ def verify(
              "invalid expected acceptance source receipts")
     _require(expected_matrix.get("scheduled_test_module_count") == len(selected),
              "source matrix scheduled module count drift")
+    family_ids = expected_matrix.get("smoke_families")
+    denominator = expected_matrix.get("family_denominator")
+    _require(type(denominator) is int and denominator == 42 and
+             type(family_ids) is list and
+             0 < len(family_ids) <= denominator,
+             "invalid stable product-family evidence denominator")
+    reviewed_family_ids = set()
+    for family in family_ids:
+        _require(type(family) is dict and
+                 set(family) == {"family_id", "modules"} and
+                 type(family["family_id"]) is str and
+                 re.fullmatch(r"F[0-9]{2}", family["family_id"]) is not None and
+                 1 <= int(family["family_id"][1:]) <= denominator and
+                 family["family_id"] not in reviewed_family_ids and
+                 type(family["modules"]) is list and
+                 bool(family["modules"]) and
+                 all(type(m) is str and m in selected
+                     for m in family["modules"]),
+                 "unreviewed product family or smoke tests not in run")
+        reviewed_family_ids.add(family["family_id"])
+    _require(len(reviewed_family_ids) > 0,
+             "no product-family source test obligations selected")
     allowed_receipts = {p["path"]: p["sha256"] for p in receipts
                         if type(p) is dict and type(p.get("path")) is str and
                         _valid_sha(p.get("sha256"), 64)}
@@ -217,6 +239,13 @@ def verify(
         "run_attempt": expected_attempt,
         "verified_os": verified_os,
         "scheduled_test_modules_independently_confirmed": len(selected),
+        "targeted_regression_subsets_verified_for_families": sorted(reviewed_family_ids),
+        "targeted_family_subset_count": len(reviewed_family_ids),
+        "family_denominator": denominator,
+        "targeted_family_subset_verified_percent":
+            round(100.0 * len(reviewed_family_ids) / denominator, 2),
+        "targeted_subset_is_not_full_feature_implementation_test_acceptance": True,
+        "complete_family_stage_qualifications_admitted": 0,
         "independent_ci_execution_verified": True,
         "targeted_test_evidence_verifiable": True,
         "source_only_not_complete_app": True,
