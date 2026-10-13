@@ -103,6 +103,7 @@ class ShadowWeightLedger:
                     revision INTEGER NOT NULL,
                     assessment_json TEXT,
                     permit_json TEXT,
+                    prior_candidate_id TEXT,
                     updated_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS shadow_events (
@@ -125,6 +126,7 @@ class ShadowWeightLedger:
                 db.execute("INSERT INTO shadow_meta(key,value) VALUES('schema_version',?)", (str(_SCHEMA_VERSION),))
                 db.execute("INSERT INTO shadow_meta(key,value) VALUES('root_model_digest',?)", (initial_model_digest,))
                 db.execute("INSERT INTO shadow_meta(key,value) VALUES('active_model_digest',?)", (initial_model_digest,))
+                db.execute("INSERT INTO shadow_meta(key,value) VALUES('active_candidate_id','')")
             elif row[0] != str(_SCHEMA_VERSION):
                 raise ShadowWeightError("unsupported shadow ledger schema")
 
@@ -364,19 +366,37 @@ class ShadowWeightLedger:
                 raise ShadowWeightError("actual runtime weights do not match candidate")
             revision = row["revision"] + 1
             now = _utc_now()
+            prior_active = db.execute(
+                "SELECT candidate_id,revision FROM shadow_candidates WHERE state='active'"
+            ).fetchall()
+            if len(prior_active) > 1:
+                raise ShadowWeightError("multiple active candidate records")
+            prior_id = prior_active[0]["candidate_id"] if prior_active else ""
             db.execute(
                 "UPDATE shadow_meta SET value=? WHERE key='active_model_digest'",
                 (admitted_model_digest,),
             )
             db.execute(
-                """UPDATE shadow_candidates SET state='retired',revision=revision+1,
-                   updated_at=? WHERE state='active' AND candidate_id!=?""",
-                (now, candidate_id),
+                "INSERT OR REPLACE INTO shadow_meta(key,value) VALUES('active_candidate_id',?)",
+                (candidate_id,),
             )
+            if prior_active:
+                prior = prior_active[0]
+                db.execute(
+                    """UPDATE shadow_candidates SET state='retired',revision=revision+1,
+                       updated_at=? WHERE candidate_id=?""",
+                    (now, prior_id),
+                )
+                self._record_event(
+                    db, candidate_id=prior_id, action="superseded-by-native-activation",
+                    revision=prior["revision"] + 1, previous_state="active",
+                    state="retired", payload_digest=activation_receipt_digest,
+                    occurred_at=now,
+                )
             db.execute(
-                """UPDATE shadow_candidates SET state='active',revision=?,updated_at=?
-                   WHERE candidate_id=?""",
-                (revision, now, candidate_id),
+                """UPDATE shadow_candidates SET state='active',revision=?,updated_at=?,
+                   prior_candidate_id=? WHERE candidate_id=?""",
+                (revision, now, prior_id or None, candidate_id),
             )
             self._record_event(
                 db, candidate_id=candidate_id, action="native-activation",
@@ -404,15 +424,37 @@ class ShadowWeightLedger:
                 raise ShadowWeightError("rollback must restore the exact previous model")
             revision = row["revision"] + 1
             now = _utc_now()
+            prior_id = row["prior_candidate_id"]
+            if prior_id:
+                prior = self._row(db, prior_id)
+                prior_batch = _decode_batch(prior["batch_json"])
+                if prior["state"] != "retired" or prior_batch.candidate.weights_digest != restored_model_digest:
+                    raise ShadowWeightError("previous active candidate no longer matches rollback")
+                db.execute(
+                    """UPDATE shadow_candidates SET state='active',revision=revision+1,
+                       updated_at=? WHERE candidate_id=?""",
+                    (now, prior_id),
+                )
             db.execute(
                 "UPDATE shadow_meta SET value=? WHERE key='active_model_digest'",
                 (restored_model_digest,),
+            )
+            db.execute(
+                "INSERT OR REPLACE INTO shadow_meta(key,value) VALUES('active_candidate_id',?)",
+                (prior_id or "",),
             )
             db.execute(
                 """UPDATE shadow_candidates SET state='retired',revision=?,updated_at=?
                     WHERE candidate_id=?""",
                 (revision, now, candidate_id),
             )
+            if prior_id:
+                self._record_event(
+                    db, candidate_id=prior_id, action="restored-by-native-rollback",
+                    revision=prior["revision"] + 1, previous_state="retired",
+                    state="active", payload_digest=rollback_receipt_digest,
+                    occurred_at=now,
+                )
             self._record_event(
                 db, candidate_id=candidate_id, action="native-rollback",
                 revision=revision, previous_state="active", state="retired",
