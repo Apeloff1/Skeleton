@@ -112,7 +112,7 @@ class OfflineAISession:
             runtime = self.backend.runtime
             return min(32, runtime.limits.max_new_tokens,
                        max(1, runtime.limits.max_context // 4))
-        return min(32, max(1, (self.backend.config.context_size or 4096) // 4))
+        return min(512, max(1, (self.backend.config.context_size or 4096) // 4))
 
     def _request(self, prompt: str, max_output_tokens: int) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
@@ -152,7 +152,7 @@ class OfflineAISession:
             if observed <= available:
                 return request, history
             if not history:
-                raise OfflineAIError("message exceeds native model context; shorten it or reduce the output budget")
+                raise OfflineAIError("message exceeds the selected model context; shorten it or reduce the output budget")
             history = history[2:]
 
     async def ask(self, prompt: str, *, max_output_tokens: int = 32,
@@ -383,7 +383,7 @@ class DurableOfflineAISession(OfflineAISession):
             text_digest = sha256(answer.text.encode("utf-8")).hexdigest()
             # GenerationConfig matches the actual local request's seed and
             # bounded output budget; random IDs avoid accidental replay.
-            self.store.commit(
+            committed = self.store.commit(
                 session=saved,
                 request_id=rid,
                 request_digest=request_digest,
@@ -394,6 +394,11 @@ class DurableOfflineAISession(OfflineAISession):
                 generated_tokens=answer.output_tokens,
                 evidence_manifest=evidence_manifest,
             )
+            if committed.replayed:
+                # Another process won this request ID while our model ran.
+                # Its saved text is authoritative; this new execution receipt
+                # cannot be attached to that different historical execution.
+                raise OfflineAIError("request completed in another process; retry original to recover its saved answer")
             # Keep the full durable state available to the desktop while the
             # inference adapter independently limits prompt context per turn.
             self.history = tuple((item.role, item.content) for item in
@@ -412,6 +417,33 @@ class DurableOfflineAISession(OfflineAISession):
         if self._busy:
             raise OfflineAIError("cannot close active local generation")
         self.store.close()
+
+
+def export_offline_markdown(store: OfflineChatStore, session_id: str,
+                            model_digest: str, tokenizer_digest: str) -> bytes:
+    """Readable private export from a single canonical conversation snapshot."""
+    from skeleton.app.offline_grounding import audit_answer_citations
+    with store.read_snapshot():
+        saved = store.load(session_id, model_digest, tokenizer_digest)
+        evidence = store.turn_evidence(session_id, model_digest, tokenizer_digest)
+    lines = ["# Local model conversation", "", "Session: " + saved.session_id,
+             "Model: " + saved.model_digest, "", f"Saved turns: {saved.revision}", ""]
+    turn = 0
+    for message in saved.transcript.messages:
+        speaker = {"system": "Instructions", "user": "You", "assistant": "Local model"}[message.role]
+        lines.extend(["## " + speaker, "", message.content, ""])
+        if message.role == "assistant":
+            supplied = evidence[turn]
+            turn += 1
+            if supplied is not None:
+                audit = audit_answer_citations(message.content, supplied)
+                lines.extend(["### Sources supplied to model", "",
+                              "Source provision does not establish factual accuracy.",
+                              "Citation ID audit: " + audit["status"], ""])
+                for source in supplied["citations"]:
+                    lines.extend([source["title"] + " · " + source["citation"], "",
+                                  source["passage"], ""])
+    return "\n".join(lines).encode("utf-8")
 
 
 def private_desktop_database(model_digest: str) -> Path:
@@ -442,7 +474,7 @@ class OfflineAIWindow:
         self.window = tk.Toplevel(parent)
         self.window.title("Skeleton · Local AI")
         self.window.geometry("850x660")
-        self.window.minsize(600, 440)
+        self.window.minsize(720, 600)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
         self.session: OfflineAISession | None = None
         self.events: Queue[tuple[str, object]] = Queue()
@@ -453,13 +485,15 @@ class OfflineAIWindow:
         self.worker_task: asyncio.Task[OfflineAnswer] | None = None
         self.worker_lock = threading.Lock()
         self.pending_prompt: str | None = None
+        self.pending_request: tuple[str, str, int, bool, str] | None = None
+        self.cancel_requested = False
 
         frame = ttk.Frame(self.window, padding=14)
         frame.pack(fill="both", expand=True)
         ttk.Label(frame, text="Local AI · no Docker / no hosted provider", font=("Segoe UI", 13, "bold")).pack(anchor="w")
         ttk.Label(
             frame,
-            text="Runs an explicitly selected native checkpoint offline. No trained model is supplied; quality depends on your checkpoint.",
+            text="Runs your selected native or GGUF model offline. Responses depend on the trained weights you supply.",
             wraplength=790,
         ).pack(anchor="w", pady=(4, 10))
         toolbar = ttk.Frame(frame)
@@ -472,82 +506,177 @@ class OfflineAIWindow:
             command=lambda: self.choose_model("gguf")
         )
         self.load_gguf_button.pack(side="left", padx=5)
-        self.clear_button = ttk.Button(toolbar, text="New conversation", command=self.clear)
+        self.prepare_gguf_button = ttk.Button(toolbar, text="Set up GGUF…",
+                                              command=lambda: self.choose_model("prepare_gguf"))
+        self.prepare_gguf_button.pack(side="left", padx=3)
+        actionbar = ttk.Frame(frame)
+        actionbar.pack(fill="x", pady=(6, 0))
+        self.clear_button = ttk.Button(actionbar, text="New conversation", command=self.clear)
         self.clear_button.pack(side="left", padx=8)
-        self.cancel_button = ttk.Button(toolbar, text="Cancel generation", command=self.cancel)
+        self.cancel_button = ttk.Button(actionbar, text="Cancel generation", command=self.cancel)
         self.cancel_button.pack(side="left")
+        self.instructions_button = ttk.Button(actionbar, text="New with instructions…", command=self.new_with_instructions)
+        self.instructions_button.pack(side="left", padx=5)
         sessions = ttk.Frame(frame)
         sessions.pack(fill="x", pady=(8, 0))
         ttk.Label(sessions, text="Saved conversation").pack(side="left")
         self.session_choices: dict[str, str] = {}
+        self.session_query = ""
         self.session_picker = ttk.Combobox(sessions, state="readonly", width=33)
         self.session_picker.pack(side="left", padx=6)
         self.resume_button = ttk.Button(
             sessions, text="Resume", command=self.resume_selected
         )
         self.resume_button.pack(side="left")
+        self.find_session_button = ttk.Button(sessions, text="Find…", command=self.find_session)
+        self.find_session_button.pack(side="left", padx=4)
+        session_actions = ttk.Frame(frame)
+        session_actions.pack(fill="x", pady=(5, 0))
         self.delete_button = ttk.Button(
-            sessions, text="Delete", command=self.delete_selected
+            session_actions, text="Delete", command=self.delete_selected
         )
         self.delete_button.pack(side="left", padx=6)
         self.fork_button = ttk.Button(
-            sessions, text="Fork", command=self.fork_selected
+            session_actions, text="Fork", command=self.fork_selected
         )
         self.fork_button.pack(side="left", padx=3)
         self.export_button = ttk.Button(
-            sessions, text="Export…", command=self.export_selected
+            session_actions, text="Export…", command=self.export_selected
         )
         self.export_button.pack(side="left", padx=3)
         self.import_button = ttk.Button(
-            sessions, text="Import…", command=self.import_selected
+            session_actions, text="Import…", command=self.import_selected
         )
         self.import_button.pack(side="left", padx=3)
-        self.status = tk.StringVar(value="Choose a local native model checkpoint to begin.")
+        self.copy_button = ttk.Button(session_actions, text="Copy text", command=self.copy_transcript)
+        self.copy_button.pack(side="left", padx=3)
+        self.text_export_button = ttk.Button(session_actions, text="Save text…", command=self.export_text)
+        self.text_export_button.pack(side="left", padx=3)
+        self.status = tk.StringVar(value="Choose a native checkpoint or set up a local GGUF model to begin.")
         ttk.Label(frame, textvariable=self.status, wraplength=790).pack(anchor="w", pady=8)
         self.transcript = scrolledtext.ScrolledText(frame, state="disabled", wrap="word", height=18, font=("Segoe UI", 10))
         self.transcript.pack(fill="both", expand=True)
         ttk.Label(frame, text="Message").pack(anchor="w", pady=(10, 0))
         self.composer = tk.Text(frame, height=4, wrap="word", font=("Segoe UI", 10))
         self.composer.pack(fill="x")
-        self.send_button = ttk.Button(frame, text="Send to local model", command=self.send)
-        self.send_button.pack(anchor="e", pady=(8, 0))
+        controls = ttk.Frame(frame)
+        controls.pack(fill="x", pady=(8, 0))
+        self.grounded = tk.BooleanVar(value=False)
+        self.grounded_button = ttk.Checkbutton(controls, text="Include local evidence", variable=self.grounded)
+        self.grounded_button.pack(side="left")
+        ttk.Label(controls, text="Output tokens").pack(side="left", padx=(12, 4))
+        self.output_budget = tk.StringVar(value="32")
+        self.budget_input = ttk.Spinbox(controls, from_=1, to=8192, width=6,
+                                       textvariable=self.output_budget)
+        self.budget_input.pack(side="left")
+        self.retry_button = ttk.Button(controls, text="Retry original", command=lambda: self.send(retry=True))
+        self.retry_button.pack(side="right", padx=5)
+        self.send_button = ttk.Button(controls, text="Send to local model", command=self.send)
+        self.send_button.pack(side="right")
+        references = ttk.Frame(frame)
+        references.pack(fill="x", pady=(6, 0))
+        self.add_reference_button = ttk.Button(references, text="Add references…", command=self.add_references)
+        self.add_reference_button.pack(side="left")
+        self.search_reference_button = ttk.Button(references, text="Search references…", command=self.search_references)
+        self.search_reference_button.pack(side="left", padx=5)
+        self.composer.bind("<Control-Return>", self._send_shortcut)
         self._refresh()
         self.window.after(100, self._drain)
 
     def _refresh(self) -> None:
         self.load_button.configure(state="disabled" if self.active else "normal")
         self.load_gguf_button.configure(state="disabled" if self.active else "normal")
+        self.prepare_gguf_button.configure(state="disabled" if self.active else "normal")
         self.send_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
         self.clear_button.configure(state="normal" if self.session is not None and not self.active else "disabled")
-        self.cancel_button.configure(state="normal" if self.active else "disabled")
+        self.cancel_button.configure(state="normal" if self.active and not self.loading_model and not self.cancel_requested else "disabled")
         can_switch = isinstance(self.session, DurableOfflineAISession) and not self.active
         self.resume_button.configure(state="normal" if can_switch else "disabled")
+        self.find_session_button.configure(state="normal" if can_switch else "disabled")
         self.delete_button.configure(state="normal" if can_switch else "disabled")
         self.fork_button.configure(state="normal" if can_switch else "disabled")
         self.export_button.configure(state="normal" if can_switch else "disabled")
         self.import_button.configure(state="normal" if can_switch else "disabled")
+        for control in (self.copy_button, self.text_export_button, self.instructions_button):
+            control.configure(state="normal" if can_switch else "disabled")
+        self.session_picker.configure(state="readonly" if can_switch else "disabled")
+        for control in (self.budget_input, self.grounded_button, self.add_reference_button,
+                        self.search_reference_button):
+            control.configure(state="normal" if can_switch else "disabled")
+        can_retry = (can_switch and self.pending_request is not None
+                     and self.pending_request[0] == self.session.session_id)
+        self.retry_button.configure(state="normal" if can_retry else "disabled")
 
     def _update_sessions(self) -> None:
         if not isinstance(self.session, DurableOfflineAISession):
             return
         choices = {}
         selected = ""
-        for sid, revision in self.session.list_conversations():
-            label = f"{sid[:18]}…  ·  {revision} turns"
+        page = self.session.store.session_summaries(
+            self.session.model_digest, self.session.tokenizer_digest,
+            query=self.session_query, limit=100,
+        )
+        for item in page["sessions"]:
+            sid, revision = item["session_id"], item["revision"]
+            label = f"{item['title'][:35]} · {revision} turns · {sid}"
             choices[label] = sid
             if sid == self.session.session_id:
                 selected = label
+        # Keep the selected session reachable even when it is older than the page.
+        if not selected:
+            sid = self.session.session_id
+            selected = f"Current conversation · {sid}"
+            choices[selected] = sid
         self.session_choices = choices
         self.session_picker.configure(values=tuple(choices))
         self.session_picker.set(selected)
+
+    def find_session(self) -> None:
+        if self.active or not isinstance(self.session, DurableOfflineAISession):
+            return
+        from tkinter import simpledialog
+        query = simpledialog.askstring("Find conversations", "Search saved text (empty shows recent chats):",
+                                       initialvalue=self.session_query, parent=self.window)
+        if query is None:
+            return
+        previous = self.session_query
+        self.session_query = query.strip()
+        try:
+            self._update_sessions()
+            self.status.set("Choose a matching conversation and press Resume. Narrow the search for older results.")
+        except Exception as exc:
+            self.session_query = previous
+            self.status.set("Conversation search failed: " + str(exc))
 
     def _display_history(self) -> None:
         self.transcript.configure(state="normal")
         self.transcript.delete("1.0", "end")
         self.transcript.configure(state="disabled")
         if self.session is not None:
+            evidence = []
+            if isinstance(self.session, DurableOfflineAISession):
+                with self.session.store.read_snapshot():
+                    self.session.resume(self.session.session_id)
+                    evidence = self.session.store.turn_evidence(
+                        self.session.session_id, self.session.model_digest, self.session.tokenizer_digest,
+                    )
+            if self.session.instructions:
+                self._append("Conversation instructions", self.session.instructions)
+            turn = 0
             for role, content in self.session.history:
                 self._append("You" if role == "user" else "Skeleton · Local", content)
+                if role == "assistant":
+                    supplied = evidence[turn] if turn < len(evidence) else None
+                    turn += 1
+                    if supplied is not None:
+                        from skeleton.app.offline_grounding import audit_answer_citations
+                        audit = audit_answer_citations(content, supplied)
+                        sources = ["Source provision does not establish factual accuracy.",
+                                   "Citation ID audit: " + audit["status"]]
+                        for source in supplied["citations"]:
+                            sources.extend([source["title"] + " · " + source["citation"],
+                                            source["passage"], ""])
+                        self._append("Sources supplied to model", "\n".join(sources))
 
     def resume_selected(self) -> None:
         if self.active or not isinstance(self.session, DurableOfflineAISession):
@@ -557,6 +686,7 @@ class OfflineAIWindow:
             return
         try:
             self.session.resume(sid)
+            self.pending_request = None
             self._display_history()
             self._update_sessions()
             self.status.set("Restored saved conversation: " + sid[:18] + "…")
@@ -572,6 +702,7 @@ class OfflineAIWindow:
             return
         try:
             forked = self.session.fork_conversation(sid)
+            self.pending_request = None
             self._display_history()
             self._update_sessions()
             self.status.set("Forked saved conversation: " + forked[:18] + "…")
@@ -594,6 +725,7 @@ class OfflineAIWindow:
             return
         try:
             self.session.delete_conversation(sid)
+            self.pending_request = None
             self._display_history()
             self._update_sessions()
             self.status.set("Local conversation deleted.")
@@ -631,6 +763,7 @@ class OfflineAIWindow:
             return
         try:
             sid = self.session.import_conversation(load_private_bundle(selected))
+            self.pending_request = None
             self._display_history()
             self._update_sessions()
             self.status.set("Imported conversation: " + sid[:18] + "…")
@@ -638,22 +771,122 @@ class OfflineAIWindow:
             self.status.set("Conversation import failed: " + str(exc))
         self._refresh()
 
+    def copy_transcript(self) -> None:
+        if self.active or self.session is None:
+            return
+        try:
+            self._display_history()
+            text = self.transcript.get("1.0", "end-1c")
+            self.window.clipboard_clear()
+            self.window.clipboard_append(text)
+            self.status.set("Conversation text and supplied-source excerpts copied.")
+        except Exception as exc:
+            self.status.set("Clipboard unavailable: " + str(exc))
+
+    def export_text(self) -> None:
+        if self.active or not isinstance(self.session, DurableOfflineAISession):
+            return
+        destination = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Save conversation text to a NEW file",
+            defaultextension=".txt", filetypes=[("Text transcript", "*.txt")],
+        )
+        if not destination:
+            return
+        try:
+            self._display_history()
+            header = ("Skeleton local conversation\nSession: " + self.session.session_id
+                      + "\nModel: " + self.session.model_digest + "\n\n")
+            payload = (header + self.transcript.get("1.0", "end-1c")).encode("utf-8")
+            save_private_bundle(destination, payload)
+            self.status.set("Readable transcript saved. Use Export for a restorable JSON backup.")
+        except Exception as exc:
+            self.status.set("Text export failed: " + str(exc))
+
+    def new_with_instructions(self) -> None:
+        if self.active or not isinstance(self.session, DurableOfflineAISession):
+            return
+        from tkinter import ttk
+        dialog = self.tk.Toplevel(self.window)
+        dialog.title("New conversation instructions")
+        dialog.geometry("600x300")
+        dialog.transient(self.window)
+        ttk.Label(dialog, text="Optional instructions apply to a new conversation only.",
+                  wraplength=550).pack(anchor="w", padx=15, pady=12)
+        editor = self.tk.Text(dialog, height=6, wrap="word")
+        editor.pack(fill="both", expand=True, padx=15)
+        notice = self.tk.StringVar(value="Up to 4096 UTF-8 bytes.")
+        ttk.Label(dialog, textvariable=notice).pack(anchor="w", padx=15, pady=5)
+        actions = ttk.Frame(dialog)
+        actions.pack(fill="x", padx=15, pady=10)
+
+        def create() -> None:
+            instructions = editor.get("1.0", "end-1c").strip()
+            if len(instructions.encode("utf-8")) > 4096:
+                notice.set("Instructions exceed 4096 UTF-8 bytes.")
+                return
+            try:
+                sid = self.session.store.create(self.session.model_digest,
+                                                self.session.tokenizer_digest,
+                                                system=instructions or None)
+                self.session.resume(sid)
+                self.pending_request = None
+                self.session_query = ""
+                self._display_history()
+                self._update_sessions()
+                self._refresh()
+                self.status.set("New conversation created with your instructions.")
+                dialog.destroy()
+            except Exception as exc:
+                notice.set(str(exc))
+
+        ttk.Button(actions, text="Create conversation", command=create).pack(side="right")
+        ttk.Button(actions, text="Cancel", command=dialog.destroy).pack(side="right", padx=8)
+        dialog.grab_set()
+        editor.focus_set()
+
     def _append(self, speaker: str, text: str) -> None:
         self.transcript.configure(state="normal")
         self.transcript.insert("end", speaker + "\n" + text + "\n\n")
         self.transcript.see("end")
         self.transcript.configure(state="disabled")
 
+    def _choose_gguf_files(self) -> tuple[str, str, str] | None:
+        executable = self.filedialog.askopenfilename(
+            parent=self.window, title="Select your installed llama.cpp CLI executable",
+            filetypes=[("All files", "*.*")],
+        )
+        if not executable:
+            return None
+        model = self.filedialog.askopenfilename(
+            parent=self.window, title="Select your installed GGUF model weights",
+            filetypes=[("GGUF model", "*.gguf"), ("All files", "*.*")],
+        )
+        if not model:
+            return None
+        destination = self.filedialog.asksaveasfilename(
+            parent=self.window, title="Save a NEW pinned model manifest (existing files are preserved)",
+            defaultextension=".json", initialfile="local-model.json",
+            filetypes=[("Model deployment", "*.json")],
+        )
+        return (executable, model, destination) if destination else None
+
     def choose_model(self, kind: str = "native") -> None:
         if self.active:
             return
-        is_gguf = kind == "gguf"
-        selected = self.filedialog.askopenfilename(
-            parent=self.window,
-            title=("Select digest-pinned local GGUF deployment manifest"
-                   if is_gguf else "Select a Skeleton native model checkpoint"),
-            filetypes=[("JSON manifest/checkpoint", "*.json"), ("All files", "*.*")],
-        )
+        is_gguf = kind in {"gguf", "prepare_gguf"}
+        preparation = None
+        if kind == "prepare_gguf":
+            preparation = self._choose_gguf_files()
+            if preparation is None:
+                return
+            selected = preparation[2]
+        else:
+            selected = self.filedialog.askopenfilename(
+                parent=self.window,
+                title=("Select digest-pinned local GGUF deployment manifest"
+                       if is_gguf else "Select a Skeleton native model checkpoint"),
+                filetypes=[("JSON manifest/checkpoint", "*.json"), ("All files", "*.*")],
+            )
         if not selected:
             return
         self.active = True
@@ -664,20 +897,26 @@ class OfflineAIWindow:
 
         def work() -> None:
             try:
+                if preparation is not None:
+                    from skeleton.ai.runtime.inference.deployment import create_local_model_deployment
+                    executable, model, destination = preparation
+                    create_local_model_deployment(destination, executable_path=executable,
+                                                  model_path=model)
                 backend = (load_gguf_deployment(selected)
                            if is_gguf else load_native_checkpoint(selected))
                 session = DurableOfflineAISession(
                     backend, database=private_desktop_database(backend.model_digest)
                 )
-                if self.closed:
-                    session.close()
-                    return
-                self.events.put(("loaded", session))
+                with self.worker_lock:
+                    if self.closed:
+                        session.close()
+                        return
+                    self.events.put(("loaded", session))
             except Exception as exc:
                 if not self.closed:
                     self.events.put(("error", str(exc)))
 
-        threading.Thread(target=work, name="skeleton-local-model-load", daemon=True).start()
+        threading.Thread(target=work, name="skeleton-local-model-load", daemon=False).start()
 
     def clear(self) -> None:
         if self.active or self.session is None:
@@ -685,6 +924,7 @@ class OfflineAIWindow:
         if isinstance(self.session, DurableOfflineAISession):
             try:
                 self.session.create_conversation()
+                self.pending_request = None
                 self._display_history()
                 self._update_sessions()
                 self.status.set("New persistent conversation created.")
@@ -695,40 +935,147 @@ class OfflineAIWindow:
             self._display_history()
             self.status.set("Conversation reset in memory.")
 
-    def send(self) -> None:
+    def _send_shortcut(self, _event: Any) -> str:
+        self.send()
+        return "break"
+
+    def add_references(self) -> None:
+        if self.active or not isinstance(self.session, DurableOfflineAISession):
+            return
+        from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, read_reference_file
+        paths = self.filedialog.askopenfilenames(
+            parent=self.window, title="Add local text references (64 KiB per file)",
+            filetypes=[("Text and code", "*.txt *.md *.py *.js *.ts *.json *.yaml *.toml"),
+                       ("All files", "*.*")],
+        )
+        if not paths:
+            return
+        if len(paths) > 16:
+            self.status.set("Select at most 16 references at a time.")
+            return
+        library = OfflineKnowledgeLibrary(self.session.store, self.session.model_digest,
+                                          self.session.tokenizer_digest)
+        failures = []
+        imported = 0
+        for value in paths:
+            path = Path(value)
+            try:
+                library.add_text(path.name, read_reference_file(path))
+                imported += 1
+            except Exception as exc:
+                failures.append(path.name + ": " + str(exc))
+        self.status.set(f"{imported} reference(s) imported/reused. " + "; ".join(failures))
+
+    def search_references(self) -> None:
+        if self.active or not isinstance(self.session, DurableOfflineAISession):
+            return
+        from tkinter import simpledialog, scrolledtext
+        from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
+        query = simpledialog.askstring("Local references", "Search text or code passages:", parent=self.window)
+        if not query:
+            return
+        try:
+            library = OfflineKnowledgeLibrary(self.session.store, self.session.model_digest,
+                                              self.session.tokenizer_digest)
+            hits = library.search(query, limit=6)
+            viewer = self.tk.Toplevel(self.window)
+            viewer.title("Local source passages · review factual support")
+            viewer.geometry("720x460")
+            text = scrolledtext.ScrolledText(viewer, wrap="word", padx=12, pady=12)
+            text.pack(fill="both", expand=True)
+            for hit in hits:
+                text.insert("end", hit["title"] + "\n" + hit["citation"] + "\n" + hit["passage"] + "\n\n")
+            if not hits:
+                text.insert("end", "No matching passages. Add local text references first.")
+            text.configure(state="disabled")
+        except Exception as exc:
+            self.status.set("Reference search failed: " + str(exc))
+
+    def send(self, *, retry: bool = False) -> None:
         if self.active or self.session is None:
             return
-        prompt = self.composer.get("1.0", "end-1c").strip()
-        if not prompt:
-            return
-        # A submitted prompt is only shown as an accepted conversation turn
-        # *after* native execution AND durable SQLite commit succeed.
-        self.composer.delete("1.0", "end")
-        self.pending_prompt = prompt
-        self.active = True
-        self.status.set("Generating locally…")
-        self._refresh()
         session = self.session
+        sid = session.session_id if isinstance(session, DurableOfflineAISession) else "ephemeral"
+        try:
+            if retry:
+                if self.pending_request is None or self.pending_request[0] != sid:
+                    raise OfflineAIError("No original request is available in this conversation.")
+                request = self.pending_request
+            else:
+                prompt = self.composer.get("1.0", "end-1c").strip()
+                if not prompt:
+                    return
+                grounded = self.grounded.get()
+                budget = int(self.output_budget.get())
+                limit = 1024 if grounded else 4096
+                if len(prompt.encode("utf-8")) > limit:
+                    raise OfflineAIError(f"Message exceeds {limit} UTF-8 bytes.")
+                model_limit = (session.backend.runtime.limits.max_new_tokens
+                               if isinstance(session.backend, NativeRuntimeLocalModel) else 8192)
+                context = (session.backend.runtime.limits.max_context
+                           if isinstance(session.backend, NativeRuntimeLocalModel)
+                           else session.backend.config.context_size or 4096)
+                if not 1 <= budget <= min(model_limit, context - 1):
+                    raise OfflineAIError("Output budget exceeds the selected model's limits.")
+                request = (sid, prompt, budget, grounded, secrets.token_urlsafe(18))
+                if self.pending_request is not None and self.pending_request[:4] == request[:4]:
+                    request = self.pending_request
+            _, prompt, budget, grounded, rid = request
+            self.pending_request = request
+        except (ValueError, TypeError) as exc:
+            self.status.set(str(exc))
+            return
+        # Keep any unrelated draft typed after an interrupted request.
+        if self.composer.get("1.0", "end-1c").strip() == prompt:
+            self.composer.delete("1.0", "end")
+        self.pending_prompt = prompt
+        self.cancel_requested = False
+        self.active = True
+        self.status.set("Generating locally… Request " + rid)
+        self._refresh()
 
         def work() -> None:
-            if self.closed:
-                return
-            async def generate() -> OfflineAnswer:
-                if self.closed:
-                    raise asyncio.CancelledError()
-                task = asyncio.create_task(session.ask(
-                    prompt, max_output_tokens=session.preferred_output_tokens
-                ))
-                with self.worker_lock:
-                    self.worker_loop = asyncio.get_running_loop()
-                    self.worker_task = task
-                return await task
-
             try:
+                if self.closed:
+                    return
+                evidence = None
+                if isinstance(session, DurableOfflineAISession):
+                    session.resume(sid)
+                    digest = _digest_request(prompt, GenerationConfig(max_new_tokens=budget))
+                    if grounded:
+                        from skeleton.app.offline_grounding import grounded_request_digest, prepare_evidence
+                        digest = grounded_request_digest(digest)
+                    replay = session.store.replay(sid, rid, digest)
+                    if replay is not None:
+                        self.events.put(("recovered", replay))
+                        return
+                    if grounded:
+                        from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
+                        library = OfflineKnowledgeLibrary(session.store, session.model_digest,
+                                                          session.tokenizer_digest)
+                        hits = library.search(prompt, limit=2)
+                        if not hits:
+                            raise OfflineAIError("No local references match this question.")
+                        evidence = prepare_evidence(prompt, digest, hits, session.model_digest,
+                                                    session.tokenizer_digest)
+                elif grounded:
+                    raise OfflineAIError("Grounding requires a durable local conversation.")
+
+                async def generate() -> OfflineAnswer:
+                    with self.worker_lock:
+                        if self.closed or self.cancel_requested:
+                            raise asyncio.CancelledError()
+                        self.worker_loop = asyncio.get_running_loop()
+                        self.worker_task = asyncio.current_task()
+                    if isinstance(session, DurableOfflineAISession):
+                        return await session.ask(prompt, max_output_tokens=budget,
+                                                 request_id=rid, evidence_manifest=evidence)
+                    return await session.ask(prompt, max_output_tokens=budget)
+
                 answer = asyncio.run(generate())
                 self.events.put(("answer", answer))
             except asyncio.CancelledError:
-                self.events.put(("error", "Generation cancelled; no conversation state committed."))
+                self.events.put(("error", "Generation interrupted. Retry original checks saved receipts first."))
             except Exception as exc:
                 self.events.put(("error", str(exc)))
             finally:
@@ -736,22 +1083,26 @@ class OfflineAIWindow:
                     self.worker_loop = None
                     self.worker_task = None
                 if self.closed and isinstance(session, DurableOfflineAISession):
-                    # GUI lifetime may end during a long subprocess inference.
-                    # Always close the model-specific SQLite authority once
-                    # the worker really finished and cancellation settled.
                     try:
                         session.close()
                     except Exception:
                         pass
 
-        threading.Thread(target=work, name="skeleton-native-inference", daemon=True).start()
+        threading.Thread(target=work, name="skeleton-native-inference", daemon=False).start()
 
     def cancel(self) -> None:
+        if not self.active or self.loading_model:
+            return
         with self.worker_lock:
+            self.cancel_requested = True
             loop, task = self.worker_loop, self.worker_task
             if loop is not None and task is not None and not task.done():
-                loop.call_soon_threadsafe(task.cancel)
-                self.status.set("Cancellation requested…")
+                try:
+                    loop.call_soon_threadsafe(task.cancel)
+                except RuntimeError:
+                    pass  # Finalization is already settling.
+        self.status.set("Cancellation requested; waiting for model and storage to settle…")
+        self._refresh()
 
     def _drain(self) -> None:
         if self.closed:
@@ -766,6 +1117,9 @@ class OfflineAIWindow:
                     if isinstance(self.session, DurableOfflineAISession):
                         self.session.close()
                     self.session = value  # type: ignore[assignment]
+                    self.pending_request = None
+                    self.session_query = ""
+                    self.output_budget.set(str(self.session.preferred_output_tokens))
                     self._display_history()
                     self._update_sessions()
                     kind = ("GGUF / llama.cpp" if isinstance(self.session.backend, LlamaCppModel)
@@ -774,37 +1128,48 @@ class OfflineAIWindow:
                         kind + " loaded offline: "
                         + self.session.model_digest[:16] + "… · saved locally"
                     )
+                elif kind == "recovered":
+                    self.pending_prompt = None
+                    self.pending_request = None
+                    self._display_history()
+                    self._update_sessions()
+                    self.status.set("Recovered saved turn " + str(value.revision) + " without new generation.")
                 elif kind == "answer":
                     answer = value
                     self.pending_prompt = None
+                    self.pending_request = None
                     self._display_history()
                     self._update_sessions()
                     self.status.set(
                         "Completed · " + str(answer.input_tokens) + " input / " + str(answer.output_tokens) + " output tokens · receipt " + answer.execution_receipt_digest[:12]  # type: ignore[attr-defined]
                     )
                 else:
-                    # An inference or persistence failure did not commit the
-                    # turn. Restore the unsaved prompt to the composer instead
-                    # of presenting it as durable conversational history.
+                    # An uncertain failure is not presented as a saved reply.
+                    # Preserve the request ID so retry can inspect the durable
+                    # receipt before generating, even if commit had succeeded.
                     if self.pending_prompt:
                         previous_draft = self.composer.get("1.0", "end-1c")
-                        self.composer.delete("1.0", "end")
-                        self.composer.insert(
-                            "1.0", self.pending_prompt +
-                            ("\n" + previous_draft if previous_draft.strip() else "")
-                        )
+                        if not previous_draft.strip():
+                            self.composer.insert("1.0", self.pending_prompt)
                         self.pending_prompt = None
-                    self.status.set("Local turn not committed: " + str(value))
+                    self.status.set("Local request interrupted or rejected: " + str(value))
                 self._refresh()
         except Empty:
             pass
-        self.window.after(100, self._drain)
+        except Exception as exc:
+            self.active = False
+            self.loading_model = False
+            self.status.set("Saved state could not be refreshed: " + str(exc))
+            self._refresh()
+        if not self.closed:
+            self.window.after(100, self._drain)
 
     def close(self) -> None:
         if self.closed:
             return
         self.cancel()
-        self.closed = True
+        with self.worker_lock:
+            self.closed = True
         # A checkpoint loader can finish before the closed window drains
         # its event queue. Release these orphan session handles explicitly.
         try:

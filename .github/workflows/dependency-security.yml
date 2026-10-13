@@ -17,6 +17,8 @@ on:
       - "frontend/scripts/verify-no-release-npm-security.js"
       - "frontend/scripts/enforce-yarn-audit.js"
       - "frontend/scripts/test-enforce-yarn-audit.js"
+      - "frontend/scripts/check-expo-native-compat.cjs"
+      - "frontend/scripts/test-expo-native-compat.cjs"
       - ".github/workflows/dependency-security.yml"
   pull_request:
     types: [opened, synchronize, reopened, closed]
@@ -34,6 +36,8 @@ on:
       - "frontend/scripts/verify-no-release-npm-security.js"
       - "frontend/scripts/enforce-yarn-audit.js"
       - "frontend/scripts/test-enforce-yarn-audit.js"
+      - "frontend/scripts/check-expo-native-compat.cjs"
+      - "frontend/scripts/test-expo-native-compat.cjs"
       - ".github/workflows/dependency-security.yml"
   schedule:
     - cron: "17 6 * * 1"
@@ -114,6 +118,12 @@ jobs:
       - name: Syntax-check local node_modules patcher
         working-directory: frontend
         run: node --check scripts/patch-node-modules.js
+
+      - name: Verify Expo 54 native compatibility and lockfile pinning
+        working-directory: frontend
+        run: |
+          node scripts/check-expo-native-compat.cjs
+          node --test scripts/test-expo-native-compat.cjs
 
       - name: Install frozen frontend dependency graph without lifecycle scripts
         working-directory: frontend

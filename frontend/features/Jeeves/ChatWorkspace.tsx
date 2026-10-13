@@ -13,6 +13,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import api from '../../src/utils/apiClient';
 import { WorkspaceController } from './WorkspaceController';
 import MessageContent from './MessageContent';
+import JeevesRuntimeStatus from './JeevesRuntimeStatus';
 import ChatTaskActions from './workbench/ChatTaskActions';
 import ChatSceneActions from './ChatSceneActions';
 import ChatStoryActions from './ChatStoryActions';
@@ -160,6 +161,7 @@ export default function ChatWorkspace() {
           : result.status === 408 ? 'Jeeves took too long to answer. Try again.'
             : result.status >= 500 ? 'Jeeves is temporarily unavailable on the server.'
               : result.status === 413 ? 'This attachment is too large.'
+                : result.status === 409 ? 'This turn conflicts with the saved request. Retry with the original file and message, or start a new conversation.'
                 : result.status === 422 ? 'Jeeves could not accept this message. Check its length and attachments.'
                   : 'The connection to Jeeves was interrupted. Check your connection and retry.';
         throw new Error(message);
@@ -259,7 +261,11 @@ export default function ChatWorkspace() {
     const pending = controller.send(attachment);
     // A full conversation is rejected before its draft is cleared.
     if (!controller.active.draft) setAttachment(undefined);
-    void pending;
+    void pending.then(() => {
+      if (controller.active.id === conversation.id && !controller.active.draft) {
+        setAttachment(current => current === attachment ? undefined : current);
+      }
+    });
   };
 
   return <SafeAreaView style={s.safe}>
@@ -278,6 +284,7 @@ export default function ChatWorkspace() {
         <Button icon={conversation.pinned ? 'star' : 'star-outline'} label="Pin" selected={conversation.pinned} onPress={() => controller.edit({ pinned: !conversation.pinned })} />
         <Button icon="options-outline" label="Details" onPress={() => { setTitle(conversation.title); setContext(conversation.context); setSettings(true); }} />
       </View>
+      <JeevesRuntimeStatus />
       {(snapshot.notice || snapshot.saveState === 'error') && <View style={s.notice} accessibilityRole="alert">
         <Text style={[s.small, s.flex]}>{snapshot.notice || 'Changes could not be saved to this device.'}</Text>
         {snapshot.saveState === 'error' ? <Button icon="refresh-outline" label="Save again" onPress={controller.retrySave} /> : <TouchableOpacity accessibilityLabel="Dismiss notice" onPress={controller.dismissNotice}><Ionicons name="close" size={20} color={C.text} /></TouchableOpacity>}

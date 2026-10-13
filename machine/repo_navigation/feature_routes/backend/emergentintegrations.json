@@ -1,0 +1,1 @@
+{"features":[{"file_shards":["backend"],"files":1,"name":"backend/emergentintegrations","zones":{"backend":1}},{"file_shards":["backend"],"files":2,"name":"backend/emergentintegrations/llm","zones":{"backend":2}}],"schema":"skeleton.repository-navigation.v1"}

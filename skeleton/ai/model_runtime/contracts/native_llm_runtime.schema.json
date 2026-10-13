@@ -36,7 +36,7 @@
       "maxItems": 1000000,
       "items": {"type": "integer", "minimum": 0, "maximum": 2147483647}
     },
-    "finish_reason": {"enum": ["completed", "length", "stop_token"]},
+    "finish_reason": {"enum": ["completed", "length", "stop_token", "stop_string"]},
     "usage": {
       "type": "object",
       "additionalProperties": false,
@@ -58,5 +58,29 @@
       }
     },
     "checkpoint_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "generation_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_new_tokens", "seed", "temperature", "top_k", "top_p", "use_cache", "stop_token_ids"],
+      "properties": {
+        "max_new_tokens": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "min_new_tokens": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "seed": {"type": "integer"},
+        "temperature": {"type": "number", "minimum": 0, "maximum": 100},
+        "top_k": {"type": "integer", "minimum": 0},
+        "top_p": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "use_cache": {"type": "boolean"},
+        "stop_token_ids": {"type": "array", "uniqueItems": true, "items": {"type": "integer", "minimum": 0}},
+        "suppress_token_ids": {"type": "array", "uniqueItems": true, "items": {"type": "integer", "minimum": 0}},
+        "stop_strings": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 256}},
+        "include_stop_tokens": {"type": "boolean"},
+        "repetition_penalty": {"type": "number", "minimum": 0.01, "maximum": 100},
+        "presence_penalty": {"type": "number", "minimum": -2, "maximum": 2},
+        "frequency_penalty": {"type": "number", "minimum": -2, "maximum": 2},
+        "penalty_window": {"type": "integer", "minimum": 1, "maximum": 2000000}
+      }
+    }
   }
 }

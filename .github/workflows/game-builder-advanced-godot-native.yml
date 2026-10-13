@@ -1,0 +1,190 @@
+name: Advanced Godot Native Puzzle Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_godot_export.py"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/advanced_genre_engines.py"
+      - "skeleton/ai/game_builder/advanced_puzzle_solver.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_godot.py"
+      - ".github/workflows/game-builder-advanced-godot-native.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: advanced-native-puzzle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  independently-execute-puzzle:
+    name: Python/Godot puzzle parity on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 23
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact PR head with safe source scope
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_godot.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Godot 4.4.1 native runtime and export templates
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Validate exact source and Python proof contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+          python -m py_compile skeleton/ai/game_builder/advanced_godot_export.py
+          python -m unittest tests.test_game_builder_advanced_godot -v
+      - name: Build five original native puzzle games from independently proved actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+          from skeleton.ai.game_builder.advanced_puzzle_solver import solve_advanced_puzzle
+          from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session
+          from skeleton.ai.game_builder.advanced_godot_export import (
+              render_advanced_godot_package,write_advanced_godot_package,
+          )
+          root=Path(os.environ["RUNNER_TEMP"])/"advanced-native-puzzles"
+          root.mkdir()
+          for mode in ("switches","push_blocks","circuits","time","non_euclidean"):
+              settings={"logic":mode,"board_width":4,"board_height":4}
+              authored=make_advanced_scene("puzzle",settings,seed=7)
+              solved=solve_advanced_puzzle(authored,settings)
+              assert solved["status"]=="solved" and solved["verified_by_authoritative_replay"],mode
+              gameplay=run_advanced_session("puzzle",settings,
+                           solved["commands"],seed=7,scene=authored)
+              assert gameplay["state"]["finished"] and gameplay["terminal"],mode
+              pkg=render_advanced_godot_package(gameplay,settings,authorized=True)
+              write_advanced_godot_package(pkg,root/mode,authorized=True)
+              print("NATIVE_ADVANCED_SOURCE_GENERATED",mode,
+                    "commands",len(gameplay["actions"]),
+                    "python_digest",gameplay["digest"])
+          PY
+      - name: Compile and independently replay all five real native Godot games
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/advanced-native-puzzles"
+          for mode in switches push_blocks circuits time non_euclidean; do
+            project="$root/$mode/godot"
+            echo "Native puzzle mode $mode"
+            godot --headless --path "$project" --import
+            godot --headless --path "$project" -- --verify-advanced | tee "$root/$mode/native-replay.log"
+            grep -q "NATIVE_ADVANCED_PUZZLE_OK" "$root/$mode/native-replay.log"
+          done
+      - name: Export Linux desktop puzzle executable and execute the actual binary
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/advanced-native-puzzles/switches/godot"
+          executable="$RUNNER_TEMP/advanced-native-puzzles/original-advanced-puzzle.x86_64"
+          godot --headless --path "$project" --export-release Linux "$executable"
+          test -s "$executable"
+          chmod +x "$executable"
+          "$executable" --headless -- --verify-advanced | tee "$RUNNER_TEMP/advanced-native-puzzles/linux-export-replay.log"
+          grep -q "NATIVE_ADVANCED_PUZZLE_OK" "$RUNNER_TEMP/advanced-native-puzzles/linux-export-replay.log"
+      - name: Export actual Windows game and verify native console executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'advanced-native-puzzles'
+          $project = Join-Path $root 'switches/godot'
+          $binary = Join-Path $root 'original-advanced-puzzle.exe'
+          # The setup-godot Windows GUI editor can detach without a reliable
+          # synchronous exit code. Use the same pinned official console engine
+          # already required by the repository's Windows native integration.
+          $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
+          $engineDir = Join-Path $root 'pinned-godot-console'
+          if (-not (Test-Path $archive)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
+            Invoke-WebRequest -Uri 'https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip' -OutFile $archive -MaximumRedirection 5
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          $nativeEditor = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $nativeEditor) {
+            throw "Version-pinned official Godot Windows console editor unavailable"
+          }
+          & $nativeEditor.FullName --version
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows console startup failed" }
+          & $nativeEditor.FullName --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Advanced puzzle Windows resource import failed" }
+          & $nativeEditor.FullName --headless --path $project --export-release 'Windows Desktop' $binary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $binary)) {
+            throw "Advanced Godot Windows console game executable export failed"
+          }
+          if ((Get-Item $binary).Length -le 1024) {
+            throw "Advanced Godot Windows game executable is empty"
+          }
+          $console = Join-Path $root 'original-advanced-puzzle.console.exe'
+          if (-not (Test-Path $console)) {
+            throw "Exported original puzzle lacks an observable Windows console binary"
+          }
+          $python = @'
+          import subprocess,sys
+          result=subprocess.run(
+              [sys.argv[1],"--headless","--","--verify-advanced"],
+              capture_output=True,text=True,timeout=90)
+          print(result.stdout)
+          print(result.stderr)
+          sys.exit(0 if result.returncode==0 and
+              "NATIVE_ADVANCED_PUZZLE_OK" in result.stdout+result.stderr else 1)
+          '@
+          $proofScript = Join-Path $root 'verify_windows_native.py'
+          [IO.File]::WriteAllText($proofScript, $python)
+          & python $proofScript $console
+          if ($LASTEXITCODE -ne 0) {
+            throw "Exported Windows homebrew puzzle gameplay diverged from reviewed Python"
+          }
+          Write-Host "Native Windows executable SHA256:"
+          Get-FileHash -Algorithm SHA256 $binary | Format-List
+          Get-FileHash -Algorithm SHA256 $console | Format-List
+      - name: Upload native gameplay proof logs and source release manifests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-advanced-puzzle-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/advanced-native-puzzles/*/native-replay.log
+            ${{ runner.temp }}/advanced-native-puzzles/*/release.json
+            ${{ runner.temp }}/advanced-native-puzzles/linux-export-replay.log
+            ${{ runner.temp }}/advanced-native-puzzles/original-advanced-puzzle.exe
+            ${{ runner.temp }}/advanced-native-puzzles/original-advanced-puzzle.console.exe
+            ${{ runner.temp }}/advanced-native-puzzles/original-advanced-puzzle.x86_64
+          if-no-files-found: warn
+          retention-days: 7

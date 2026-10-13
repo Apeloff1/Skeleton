@@ -185,7 +185,10 @@ class ChatTurnLifecycle:
                 reason_code=reason_code,
                 provider_receipt_ref=(
                     provider_receipt_ref
-                    if state is TurnState.FINALIZING
+                    # Finalization can resume from VERIFYING after a crash.
+                    # Bind the accepted receipt at the commit boundary too,
+                    # even when this advance does not visit VERIFYING again.
+                    if state in (TurnState.VERIFYING, TurnState.FINALIZING)
                     else None
                 ),
             )

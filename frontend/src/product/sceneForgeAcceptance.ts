@@ -40,8 +40,6 @@ export function acceptSceneForgeResponse(
   if (result.mounted !== true || result.clamped !== true && result.clamped !== false) {
     return reject('Asset mounting was not confirmed by Scene Forge.');
   }
-  // Capture the narrowed array locally: a mutable record property cannot
-  // retain its TypeScript narrowing inside nested callbacks.
   const composed = result.composed;
   if (!Array.isArray(requested) || !requested.length || requested.length > 100 ||
       !Array.isArray(composed) || composed.length > requested.length) {

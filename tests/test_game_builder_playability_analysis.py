@@ -47,10 +47,13 @@ class GameExperienceTests(unittest.TestCase):
         self.assertEqual(len(report.to_payload()["report_digest"]), 64)
 
     def test_wall_contacts_trigger_specific_actionable_advice(self):
-        trace = play_actions(self.world, ("up",) * 20, authorized=True)
+        # Incomplete-objective feedback needs at least one reference route's
+        # worth of attempts; twenty inputs is not enough for every seed.
+        attempts = max(20, len(self.world.levels[0].safe_solution))
+        trace = play_actions(self.world, ("up",) * attempts, authorized=True)
         report = analyze_replay(self.world, trace, authorized=True)
         level = report.levels[0]
-        self.assertEqual(level.wall_contacts, 20)
+        self.assertEqual(level.wall_contacts, attempts)
         self.assertEqual(level.wall_friction_ppm, 1_000_000)
         self.assertEqual(level.unique_tiles_visited, 1)
         self.assertFalse(report.completed_game)

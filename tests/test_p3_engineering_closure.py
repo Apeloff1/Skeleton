@@ -14,9 +14,9 @@ def test_current_candidate_is_valid():
 def test_rejects_false_full_completion(tmp_path:Path):
     root=_fixture(tmp_path); path=root/"machine/ai_p3_engineering_closure.json"; p=json.loads(path.read_text()); p["deferred_scope"]["queued_volume_count"]=0; path.write_text(json.dumps(p))
     with pytest.raises(P3EngineeringClosureError,match="preserve 197"): validate(root)
-def test_rejects_self_signoff(tmp_path:Path):
-    root=_fixture(tmp_path); path=root/"machine/ai_p3_engineering_task_backlog.json"; p=json.loads(path.read_text()); p["tasks"][0]["verification_signed"]=True; path.write_text(json.dumps(p))
-    with pytest.raises(P3EngineeringClosureError,match="self-complete or self-sign"): validate(root)
+def test_rejects_missing_closed_verification_signoff(tmp_path:Path):
+    root=_fixture(tmp_path); path=root/"machine/ai_p3_engineering_task_backlog.json"; p=json.loads(path.read_text()); p["tasks"][0]["verification_signed"]=False; path.write_text(json.dumps(p))
+    with pytest.raises(P3EngineeringClosureError,match="closed task has incomplete signoffs"): validate(root)
 def test_closed_requires_closure_evidence(tmp_path:Path):
     root=_fixture(tmp_path); path=root/"machine/ai_p3_engineering_closure.json"; p=json.loads(path.read_text()); p["status"]="closed"; p["closure_evidence"]=["github:pr#2348"]; path.write_text(json.dumps(p))
     with pytest.raises(P3EngineeringClosureError,match="exact-head closure evidence"): validate(root)

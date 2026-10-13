@@ -267,6 +267,35 @@ def test_ai_file_tree_overlay_children_are_separately_governed() -> None:
     assert overlay_count >= 12
 
 
+def test_training_native_additions_are_explicitly_owned_not_mirrored() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    training = next(item for item in manifest["mappings"] if item["id"] == "AIFT-TRAINING")
+    native = {item["path"]: item for item in manifest["native_ai_owners"]}
+    added = {
+        "capability_ledger.py",
+        "datasets/offline_foundations_v1/manifest.json",
+        "datasets/offline_foundations_v1/test.jsonl",
+        "datasets/offline_foundations_v1/train.jsonl",
+        "datasets/offline_foundations_v1/train_corpus.txt",
+        "datasets/offline_foundations_v1/validation.jsonl",
+        "offline_foundations.py",
+        "resource_admission.py",
+        "sparse_capability.py",
+    }
+    assert added <= set(training["overlay_children"])
+    for relative in added:
+        native_path = f"skeleton/ai/training/{relative}"
+        owner = native[native_path]
+        assert owner["kind"] == "file"
+        assert owner["ownership_mode"] == "canonical_native"
+        assert owner["residual_only"] is False
+        assert (ROOT / native_path).is_file()
+        # An AI-native file must not be silently fabricated as a legacy copy.
+        assert not (ROOT / "skeleton/training" / relative).exists()
+
+
 def test_ai_file_tree_preserves_remaining_acquired_lineage() -> None:
     import json
 

@@ -224,6 +224,7 @@ export class WorkspaceController {
       );
       if (
         !latest
+        || latest !== current
         || (latest.sessionId || latest.id) !== sessionId
         || this.running?.conversationId === conversationId
       ) {
@@ -356,6 +357,19 @@ export class WorkspaceController {
     const conversation = this.active;
     const tail = conversation.messages[conversation.messages.length - 1];
     if (tail?.role === 'user' && tail.status !== 'complete') {
+      if (attachment && tail.attachmentName
+          && ['failed', 'cancelled'].includes(tail.status)
+          && conversation.draft.trim() === tail.text) {
+        await this.retry(tail.id, attachment);
+        // Reconciliation may recover the answer without running the model.
+        // Preserve any draft edited while that check or generation was in flight.
+        this.change(updateConversation(this.snapshot.workspace, conversation.id, c => (
+          c.draft.trim() === tail.text
+          && c.messages.some(m => m.id === tail.id && m.status === 'complete')
+            ? { ...c, draft: '' } : c
+        )));
+        return;
+      }
       this.notify('Resolve the interrupted turn with Retry or Check server before sending another message. Your draft is preserved.');
       return;
     }
@@ -378,6 +392,11 @@ export class WorkspaceController {
       Date.now(),
       message.id,
     );
+    message.retryRequest = {
+      session_id: body.session_id,
+      context: body.context,
+      force_all_forms: body.force_all_forms,
+    };
     this.change(updateConversation(this.snapshot.workspace, conversation.id, c => ({
       ...c, title: c.messages.length === 0 && c.title === 'New conversation' ? content.slice(0, 70) : c.title,
       draft: '', updatedAt: Date.now(), messages: [...c.messages, message],
@@ -385,7 +404,7 @@ export class WorkspaceController {
     await this.execute(conversation.id, message.id, body);
   }
 
-  async retry(messageId: string): Promise<void> {
+  async retry(messageId: string, replacementAttachment?: Attachment): Promise<void> {
     if (!this.snapshot.ready || this.running || this.retrying.has(messageId)) return;
     const conversation = this.active;
     const index = conversation.messages.findIndex(m => m.id === messageId && m.role === 'user');
@@ -414,10 +433,10 @@ export class WorkspaceController {
       // A successful reconciliation is terminal. Do not generate a duplicate.
       if (!last || last.id !== messageId || last.status === 'complete'
           || !['failed', 'cancelled'].includes(last.status)) return;
-      const attachment = this.attachments.get(messageId);
+      const attachment = replacementAttachment || this.attachments.get(messageId);
       if (last.attachmentName && !attachment) {
         this.edit({ draft: last.text });
-        this.notify('Attachments are not saved on this device. Reattach the file and send your restored draft.');
+        this.notify('Attachments are not saved on this device. Reattach the same file and send your restored draft to retry the original turn.');
         return;
       }
       const body = buildChatBody(
@@ -427,6 +446,8 @@ export class WorkspaceController {
         Date.now(),
         last.id,
       );
+      if (last.retryRequest) Object.assign(body, last.retryRequest);
+      if (attachment) this.attachments.set(messageId, attachment);
       this.setMessage(conversation.id, messageId, { status: 'pending', error: undefined });
       await this.execute(conversation.id, messageId, body);
     } finally {
@@ -468,6 +489,7 @@ export class WorkspaceController {
             ...m,
             status: 'complete' as const,
             error: undefined,
+            retryRequest: undefined,
           } : m),
           reply,
         ],

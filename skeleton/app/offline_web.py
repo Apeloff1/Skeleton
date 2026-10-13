@@ -13,10 +13,12 @@ HTML = r"""<!doctype html>
 <title>Skeleton · Offline AI</title>
 <link rel="stylesheet" href="/app.css">
 </head><body>
-<div class="shell">
-  <aside class="sidebar">
+<div class="shell library-open" id="shell">
+  <button id="sidebar-scrim" class="sidebar-scrim" aria-label="Close library and connection panel" tabindex="-1"></button>
+  <aside class="sidebar" id="sidebar" aria-label="Connection, conversations and references">
     <div class="brand"><span class="brand-mark">◈</span>
       <div><strong>Skeleton</strong><small>Offline AI Workspace</small></div>
+      <button id="sidebar-close" class="small mobile-only" aria-label="Close library and connection panel">Close</button>
     </div>
     <section class="connect">
       <label for="secret">Local access token</label>
@@ -29,12 +31,20 @@ HTML = r"""<!doctype html>
       <p class="hint">Read the token from the private file provided when the local server starts. It stays in this tab's memory only.</p>
     </section>
     <div class="heading"><span>Conversations</span><button id="new" class="small">+ New</button></div>
+    <label class="hint" for="session-query">Search saved conversation text</label>
+    <div class="inline"><input id="session-query" type="search" maxlength="256" placeholder="Search your conversations">
+      <button id="session-search" class="small">Search</button></div>
     <div id="sessions" class="sessions" aria-label="Saved local conversations"></div>
+    <button id="sessions-more" class="small" hidden>Load more conversations</button>
+    <details class="instructions"><summary>New conversation instructions</summary>
+      <label class="hint" for="system-prompt">Optional instructions for the next conversation</label>
+      <textarea id="system-prompt" rows="4" maxlength="4096" placeholder="For example: help me build small, complete games."></textarea>
+    </details>
     <section class="knowledge-section" aria-label="Private local knowledge">
       <div class="heading"><span>Local reference library</span></div>
       <p class="hint">Search operator-supplied text offline. Passages are evidence, not AI-generated claims.</p>
       <label class="import-label" for="knowledge-file">Add a text / Markdown file</label>
-      <input type="file" id="knowledge-file" accept=".txt,.md,text/plain,text/markdown">
+      <input type="file" id="knowledge-file" multiple accept=".txt,.md,.py,.js,.ts,.json,.toml,.yaml,.yml,.csv,text/plain,text/markdown">
       <div id="knowledge-documents" class="knowledge-documents" aria-label="Imported references"></div>
       <label for="knowledge-query">Search reference passages</label>
       <input id="knowledge-query" type="search" autocomplete="off"
@@ -45,6 +55,7 @@ HTML = r"""<!doctype html>
     <div class="sidebar-footer">
       <button id="fork" class="secondary">Fork conversation</button>
       <button id="export" class="secondary">Export backup</button>
+      <button id="export-text" class="secondary">Export Markdown</button>
       <label class="import-label" for="import">Import backup</label>
       <input id="import" type="file" accept=".json,application/json">
       <button id="delete" class="danger">Delete selected</button>
@@ -52,15 +63,23 @@ HTML = r"""<!doctype html>
   </aside>
   <main class="main">
     <header class="topbar">
+      <button id="sidebar-toggle" class="small mobile-only" aria-controls="sidebar" aria-expanded="true">Library &amp; connection</button>
       <div><h1>Local model conversation</h1><p id="model">Not connected</p></div>
       <div id="indicator" class="indicator">LOCKED</div>
     </header>
+    <div id="turn-progress" class="turn-progress" role="status" hidden>
+      <span id="turn-label">Ready</span><span id="turn-elapsed"></span>
+      <button id="check-turn" class="small">Check status</button>
+      <button id="cancel-turn" class="danger small">Cancel generation</button>
+    </div>
     <div class="intro" id="intro">
       <div class="glow">✧</div><h2>Your model. Your machine.</h2>
       <p>No hosted AI provider, account sign-in, remote retrieval or Docker required. Choose a locally installed model when starting the server.</p>
       <p class="minor">An untrained native checkpoint will not produce useful assistant responses. For useful chat, use a qualified GGUF model with the local llama.cpp backend.</p>
     </div>
     <div id="messages" class="messages" role="log" aria-live="polite" aria-label="Conversation"></div>
+    <div class="transcript-tools"><button id="copy-transcript" class="small">Copy conversation</button>
+      <button id="refresh-session" class="small">Refresh saved history</button></div>
     <div class="composer">
       <label for="prompt">Message to local model</label>
       <textarea id="prompt" rows="3" placeholder="Enter a message..." maxlength="4096"></textarea>
@@ -69,9 +88,16 @@ HTML = r"""<!doctype html>
         <label for="budget">Output tokens <input id="budget" type="number" min="1" max="8192" value="32"></label>
         <span id="revision">No conversation selected</span>
         <button id="send" class="primary">Generate locally ↗</button>
+        <button id="retry-turn" class="secondary" hidden>Retry original turn</button>
       </div>
     </div>
     <div id="status" class="status" role="status">Paste the local access token to connect.</div>
+    <dialog id="reference-dialog" aria-labelledby="reference-title">
+      <h2 id="reference-title">Local reference</h2><p id="reference-digest" class="hint"></p>
+      <pre id="reference-text"></pre><div class="inline">
+        <button id="reference-save" class="secondary">Save original text</button>
+        <button id="reference-close" class="primary">Close</button></div>
+    </dialog>
   </main>
 </div>
 <script src="/app.js" defer></script>
@@ -86,273 +112,501 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 
 .source-custody-label{display:block;margin-top:12px;color:#adc2e8;font-size:10px;font-weight:700}
 .source-custody-item{white-space:pre-wrap;font-size:11px;margin-top:7px;color:#d0d9ed;background:#1e2d42;border:1px solid #344a68;border-radius:7px;padding:9px;max-height:180px;overflow:auto}
+[hidden]{display:none!important}.turn-progress{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#1c2943;border-bottom:1px solid #35466b;padding:12px 24px;font-size:12px}.turn-progress #turn-label{flex:1}.transcript-tools{display:flex;gap:8px;justify-content:center;margin:8px}.message-actions{display:flex;gap:7px;margin-top:12px;white-space:normal}.instructions{margin:12px 0;color:#b8c9e9;font-size:12px}.instructions textarea{width:100%;margin-top:9px;color:#eff2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:8px}.sidebar input[type=search]{min-width:0;flex:1;width:100%;color:#eef2fa;background:#101521;border:1px solid #35425c;border-radius:8px;padding:9px}.reference-name{text-align:left;padding:4px;border:0;background:transparent;font-size:11px;overflow-wrap:anywhere}.session small:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}dialog{width:min(850px,94vw);max-height:86vh;overflow:auto;background:#131d2d;color:#ebf1ff;border:1px solid #526a95;border-radius:14px;padding:22px}dialog::backdrop{background:#000a}dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto;background:#0b1321;padding:15px;border-radius:9px}dialog .hint{overflow-wrap:anywhere}:focus-visible{outline:2px solid #a1c1ff;outline-offset:3px}
+
+.shell{height:100vh;height:100dvh;overflow:hidden}.sidebar{min-height:0;height:100%;overflow-y:auto}.main{height:100%;min-height:0}.messages{overscroll-behavior:contain}.intro{flex-shrink:1;overflow:auto}.mobile-only,.sidebar-scrim{display:none}.bottom input[type=checkbox]{width:auto}.turn-progress #turn-elapsed{font-variant-numeric:tabular-nums}.knowledge-record .reference-name{min-width:0;flex-shrink:1;flex:1}.brand #sidebar-close{margin-left:auto}
+@media(max-width:720px){.shell{display:block;min-height:0}.sidebar{display:none}.main{height:100%}.topbar{flex-wrap:wrap;gap:8px}.topbar>div:first-of-type{flex:1;min-width:150px}.topbar h1{font-size:15px}.topbar p{overflow-wrap:anywhere}.mobile-only{display:inline-block}.library-open .sidebar{display:flex;position:fixed;top:0;bottom:0;left:0;width:min(350px,90vw);z-index:20;min-height:0;max-height:100dvh;overflow-y:auto;box-shadow:10px 0 40px #0007}.library-open .sidebar-scrim{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:19;background:#0009;border:0;border-radius:0}.sidebar .sessions{flex:none;max-height:25vh}.sidebar .knowledge-section{flex:none;max-height:35vh}.sidebar .sidebar-footer{display:grid}.composer{flex-shrink:0;margin:0 auto;padding:10px}.composer textarea{min-height:50px;max-height:24vh}.composer .bottom{gap:6px}.turn-progress{padding:8px 12px}.status{padding:9px 12px}.messages{padding:12px;gap:10px}.message{max-width:97%}.intro h2{font-size:23px}.intro .glow{font-size:30px}.intro .minor{font-size:11px}.intro{padding:12px}.transcript-tools{margin:5px}}
+
 """
 
 
 JAVASCRIPT = r"""'use strict';
 (() => {
   const get = id => document.getElementById(id);
-  const state = {token: '', session: '', revision: 0, busy: false, connected: false,
-                 pending: null};
-  const status = message => {get('status').textContent = message;};
-  const setBusy = busy => {
-    state.busy = busy;
-    ['send','new','fork','export','delete','connect','disconnect'].forEach(id => {
-      get(id).disabled = busy;
-    });
+  const bytes = value => new TextEncoder().encode(value).byteLength;
+  const state = {
+    token: '', connected: false, busy: false, epoch: 0,
+    session: '', revision: 0, messages: [], evidence: [], audits: [],
+    sessions: [], cursor: null, query: '', drafts: new Map(),
+    pending: null, turn: null, timer: null, polling: false,
+    pollStarted: 0, pollErrors: 0, health: null, reference: null,
+    network: new AbortController(),
   };
-  const showMessages = (messages, evidence = [], audits = []) => {
-    const list = get('messages');
-    list.replaceChildren();
-    get('intro').hidden = messages.length > 0;
-    let completedTurn = 0;
-    messages.forEach(message => {
-      const card = document.createElement('article');
-      card.className = 'message ' + (message.role === 'user' ? 'user' : 'assistant');
-      const header = document.createElement('header');
-      header.textContent = message.role === 'user' ? 'YOU' :
-        message.role === 'system' ? 'SYSTEM INSTRUCTION' : 'LOCAL MODEL';
-      const content = document.createElement('div');
-      content.textContent = message.content;
-      card.append(header, content);
-      if (message.role === 'assistant') {
-        const turn = completedTurn++;
-        const supplied = evidence[turn];
-        const audit = audits[turn];
-        if (supplied && Array.isArray(supplied.citations)) {
-          const label = document.createElement('small');
-          label.textContent = 'Evidence supplied; factual correctness not verified' +
-            (audit ? ' · Citation identifiers: ' +
-              (audit.status === 'no_identifiers' ? 'none in model output' :
-               audit.status === 'unknown_identifiers' ? 'unknown IDs detected' :
-               'recognized IDs only (not factual support)') : '');
-          label.className = 'source-custody-label';
-          card.appendChild(label);
-          supplied.citations.forEach(item => {
-            const note = document.createElement('div');
-            note.className = 'source-custody-item';
-            note.textContent = item.title + ' · ' + item.citation +
-              '\nSource excerpt: ' + item.passage;
-            card.appendChild(note);
-          });
-        }
-      }
-      list.appendChild(card);
+  const terminal = turn => !!turn && ['complete', 'failed', 'cancelled'].includes(turn.state);
+  const unresolved = () => !!state.turn && !terminal(state.turn);
+  const status = value => { get('status').textContent = value; };
+  function sidebar(open, restoreFocus = false) {
+    get('shell').classList.toggle('library-open', open);
+    get('sidebar-toggle').setAttribute('aria-expanded', String(open));
+    if (restoreFocus && window.matchMedia('(max-width:720px)').matches) get('sidebar-toggle').focus();
+  }
+  function clearSearch() {state.query = ''; get('session-query').value = '';}
+
+  function updateControls() {
+    const locked = !state.connected;
+    const working = state.busy || state.polling || unresolved();
+    ['new', 'fork', 'delete', 'import', 'system-prompt', 'session-search', 'sessions-more'].forEach(id => {
+      get(id).disabled = locked || working;
     });
-    list.scrollTop = list.scrollHeight;
-  };
-  async function api(method, path, data, exportBytes) {
+    ['knowledge-file', 'knowledge-search', 'knowledge-query'].forEach(id => {
+      get(id).disabled = locked || state.busy;
+    });
+    ['export', 'export-text', 'copy-transcript', 'refresh-session'].forEach(id => {
+      get(id).disabled = locked || state.busy || !state.session;
+    });
+    ['prompt', 'budget', 'grounded'].forEach(id => {get(id).disabled = locked || working;});
+    get('send').disabled = locked || working || !state.session;
+    get('connect').disabled = state.busy || state.connected;
+    get('disconnect').disabled = !state.connected && !state.token;
+    const progress = !!state.turn;
+    get('turn-progress').hidden = !progress;
+    get('cancel-turn').disabled = !unresolved() || state.turn?.cancel_requested || locked;
+    get('check-turn').disabled = !state.turn || state.polling || locked;
+    get('retry-turn').hidden = !state.pending || !terminal(state.turn) || state.turn.state === 'complete';
+    get('retry-turn').disabled = locked || working;
+    document.querySelectorAll('[data-session], [data-fork]').forEach(button => {
+      button.disabled = locked || working;
+    });
+    if (state.turn) {
+      const labels = {
+        queued: 'Waiting for the local model', running: 'Generating on this device',
+        cancelling: 'Cancellation requested — waiting for the model',
+        unknown: 'Delivery uncertain — check or recover the original request',
+        complete: 'Reply committed to local history', cancelled: 'Generation cancelled',
+        failed: 'Generation failed',
+      };
+      get('turn-label').textContent = labels[state.turn.state] || state.turn.state;
+    }
+    get('indicator').textContent = locked ? 'LOCKED' : unresolved() ? 'LOCAL • RUNNING' : 'OFFLINE • CONNECTED';
+  }
+  function stopPolling() {
+    if (state.timer !== null) clearTimeout(state.timer);
+    state.timer = null;
+  }
+  function lock() {
+    const hadWork = unresolved();
+    stopPolling();
+    state.epoch++;
+    state.network.abort();
+    state.network = new AbortController();
+    Object.assign(state, {token: '', connected: false, busy: false, session: '', revision: 0,
+      messages: [], evidence: [], audits: [], sessions: [], cursor: null, query: '',
+      pending: null, turn: null, polling: false, reference: null, health: null});
+    state.drafts.clear();
+    ['secret', 'prompt', 'system-prompt', 'session-query', 'knowledge-query', 'import', 'knowledge-file'].forEach(id => {get(id).value = '';});
+    ['sessions', 'messages', 'knowledge-documents', 'knowledge-hits'].forEach(id => get(id).replaceChildren());
+    get('reference-text').textContent = '';
+    get('reference-dialog').close();
+    get('model').textContent = 'Not connected';
+    get('intro').hidden = false;
+    get('revision').textContent = 'No conversation selected';
+    get('sessions-more').hidden = true;
+    updateControls();
+    sidebar(true);
+    status(hadWork ? 'Locked. The model may still be running. Reconnect to recover its status.' :
+      'Locked. Token, drafts and visible conversation content were cleared from this tab.');
+  }
+  async function api(method, path, data, rawJSON = false) {
     if (!state.token) throw new Error('Provide the local bearer token first.');
-    const headers = {'Authorization': 'Bearer ' + state.token};
+    const epoch = state.epoch;
+    const network = state.network;
+    const headers = {Authorization: 'Bearer ' + state.token};
     if (data !== undefined) headers['Content-Type'] = 'application/json';
-    const response = await fetch(path, {
-      method, headers, cache: 'no-store', credentials: 'omit',
-      body: data === undefined ? undefined : JSON.stringify(data)
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Local model request failed.');
-    return result;
-  }
-  async function loadSessions() {
-    const result = await api('GET', '/v1/sessions');
-    const view = get('sessions');
-    view.replaceChildren();
-    result.sessions.forEach(item => {
-      const button = document.createElement('button');
-      button.className = 'session' + (item.session_id === state.session ? ' active' : '');
-      const headline = document.createElement('span');
-      headline.textContent = item.session_id.slice(0, 24);
-      const small = document.createElement('small');
-      small.textContent = item.revision + ' committed turns';
-      button.append(headline, small);
-      button.addEventListener('click', () => run(() => selectSession(item.session_id)));
-      view.appendChild(button);
-    });
-  }
-  async function selectSession(id) {
-    const result = await api('GET', '/v1/sessions/' + encodeURIComponent(id));
-    if (state.session !== result.session_id) state.pending = null;
-    state.session = result.session_id;
-    state.revision = result.revision;
-    get('revision').textContent = 'Saved turns: ' + result.revision;
-    showMessages(result.messages, result.evidence || [],
-                 result.citation_audits || []);
-    await loadSessions();
-    status('Loaded session ' + id.slice(0, 18) + '…');
+    const timeout = new AbortController();
+    const cancel = () => timeout.abort();
+    network.signal.addEventListener('abort', cancel, {once: true});
+    const timer = setTimeout(cancel, 15000);
+    let response;
+    try {
+      response = await fetch(path, {
+        method, headers, cache: 'no-store', credentials: 'omit', signal: timeout.signal,
+        body: data === undefined ? undefined : rawJSON ? data : JSON.stringify(data),
+      });
+      const result = await response.json();
+      if (epoch !== state.epoch) throw new Error('Workspace locked.');
+      if (!response.ok) {
+        const error = new Error(result.error || 'Local operation failed.');
+        error.status = response.status;
+        throw error;
+      }
+      return result;
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('The connection timed out. The server may still be working.');
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      network.signal.removeEventListener('abort', cancel);
+    }
   }
   async function run(work) {
     if (state.busy) return;
-    setBusy(true);
-    try {await work();} catch(error) {status(error.message || 'Local operation failed.');}
-    finally {setBusy(false);}
+    const epoch = state.epoch;
+    state.busy = true; updateControls();
+    try {await work();}
+    catch (error) {if (epoch === state.epoch) status(error.message || 'Local operation failed.');}
+    finally {if (epoch === state.epoch) {state.busy = false; updateControls();}}
+  }
+  function download(content, filename, type) {
+    const url = URL.createObjectURL(new Blob([content], {type}));
+    const link = document.createElement('a');
+    link.href = url; link.download = filename.replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 160);
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function copy(content) {
+    try {
+      await navigator.clipboard.writeText(content); status('Copied to clipboard.');
+    } catch {
+      status('Clipboard is unavailable. Select and copy the visible text, or export it.');
+    }
+  }
+  function transcript() {
+    const lines = ['# Local model conversation', '', 'Session: ' + state.session,
+      'Model: ' + (state.health?.model_digest || ''), '', 'Exported: ' + new Date().toISOString(), ''];
+    let turn = 0;
+    state.messages.forEach(message => {
+      lines.push('## ' + (message.role === 'user' ? 'You' : message.role === 'system' ? 'Instructions' : 'Local model'), '', message.content, '');
+      if (message.role === 'assistant') {
+        const evidence = state.evidence[turn++];
+        if (evidence?.citations?.length) {
+          lines.push('### Supplied evidence (not factual verification)', '');
+          if (state.audits[turn - 1]) lines.push('Citation ID audit: ' + state.audits[turn - 1].status, '');
+          evidence.citations.forEach(source => lines.push(source.title + ' — ' + source.citation, '', source.passage, ''));
+        }
+      }
+    });
+    return lines.join('\n');
+  }
+  function showMessages() {
+    const list = get('messages'); list.replaceChildren();
+    get('intro').hidden = state.messages.length > 0;
+    let completed = 0;
+    state.messages.forEach(message => {
+      const card = document.createElement('article');
+      card.className = 'message ' + (message.role === 'user' ? 'user' : 'assistant');
+      const header = document.createElement('header');
+      header.textContent = message.role === 'user' ? 'YOU' : message.role === 'system' ? 'CONVERSATION INSTRUCTIONS' : 'LOCAL MODEL';
+      const content = document.createElement('div'); content.textContent = message.content;
+      card.append(header, content);
+      const actions = document.createElement('div'); actions.className = 'message-actions';
+      const copyButton = document.createElement('button'); copyButton.className = 'small'; copyButton.textContent = 'Copy';
+      copyButton.addEventListener('click', () => void copy(message.content)); actions.append(copyButton);
+      if (message.role === 'assistant') {
+        const index = completed++;
+        const fork = document.createElement('button'); fork.className = 'small';
+        fork.textContent = 'Branch from here'; fork.dataset.fork = String(completed);
+        const afterTurn = completed;
+        fork.addEventListener('click', () => run(async () => {
+          const item = await api('POST', '/v1/sessions/' + state.session + '/fork', {after_turn: afterTurn});
+          await selectSession(item.session_id);
+          status('Created a separate branch through turn ' + afterTurn + '. The original is preserved.');
+        }));
+        actions.append(fork);
+        const supplied = state.evidence[index];
+        const audit = state.audits[index];
+        if (supplied?.citations?.length) {
+          const label = document.createElement('small'); label.className = 'source-custody-label';
+          label.textContent = 'Sources supplied to model; factual accuracy not verified' +
+            (audit ? ' · citation IDs: ' + audit.status : '');
+          card.append(label);
+          supplied.citations.forEach(source => {
+            const note = document.createElement('details'); note.className = 'source-custody-item';
+            const heading = document.createElement('summary'); heading.textContent = source.title + ' · ' + source.citation;
+            const passage = document.createElement('p'); passage.textContent = source.passage;
+            note.append(heading, passage); card.append(note);
+          });
+        }
+      }
+      card.append(actions); list.append(card);
+    });
+    list.scrollTop = list.scrollHeight;
+    updateControls();
+  }
+  function renderSessions() {
+    const view = get('sessions'); view.replaceChildren();
+    state.sessions.forEach(item => {
+      const button = document.createElement('button'); button.dataset.session = item.session_id;
+      button.className = 'session' + (item.session_id === state.session ? ' active' : '');
+      const title = document.createElement('span'); title.textContent = item.title || 'New conversation';
+      const detail = document.createElement('small');
+      detail.textContent = item.revision + ' saved turns · ' + new Date(item.updated_at_ms).toLocaleString();
+      const preview = document.createElement('small'); preview.textContent = item.preview || 'No messages yet';
+      button.append(title, detail, preview);
+      button.addEventListener('click', () => run(async () => {await selectSession(item.session_id); sidebar(false);}));
+      view.append(button);
+    });
+    if (!state.sessions.length) {const empty = document.createElement('p'); empty.className = 'hint'; empty.textContent = state.query ? 'No matching conversations.' : 'Create your first local conversation.'; view.append(empty);}
+    get('sessions-more').hidden = !state.cursor;
+    updateControls();
+  }
+  async function loadSessions(more = false) {
+    const result = await api('POST', '/v1/sessions/search', {
+      query: state.query, limit: 30, cursor: more ? state.cursor : null,
+    });
+    const byId = new Map((more ? state.sessions : []).map(item => [item.session_id, item]));
+    result.sessions.forEach(item => byId.set(item.session_id, item));
+    state.sessions = Array.from(byId.values()); state.cursor = result.next_cursor;
+    renderSessions();
+  }
+  async function selectSession(id) {
+    const current = state.session;
+    if (current) state.drafts.set(current, get('prompt').value);
+    const result = await api('GET', '/v1/sessions/' + id);
+    if (current !== id) {state.turn = null; state.pending = null; stopPolling();}
+    state.session = result.session_id; state.revision = result.revision;
+    state.messages = result.messages; state.evidence = result.evidence || []; state.audits = result.citation_audits || [];
+    if (current !== id) get('prompt').value = state.drafts.get(id) || '';
+    get('revision').textContent = result.revision + ' saved turns';
+    showMessages(); await loadSessions(); updateControls();
+  }
+  function schedulePoll(delay = 1200) {
+    stopPolling();
+    if (state.connected && unresolved()) state.timer = setTimeout(() => void pollTurn(), delay);
+  }
+  async function pollTurn() {
+    if (!state.turn || state.polling || !state.connected) return;
+    const observed = state.turn;
+    const epoch = state.epoch;
+    let superseded = false;
+    state.polling = true; updateControls();
+    try {
+      const ticket = await api('GET', '/v1/sessions/' + observed.session_id + '/turns/' + observed.request_id);
+      if (state.epoch !== epoch) return;
+      if (state.turn !== observed) {superseded = true; return;}
+      state.turn = ticket; state.pollErrors = 0;
+      if (terminal(ticket)) {
+        stopPolling();
+        if (ticket.state === 'complete') {
+          if (state.pending && get('prompt').value.trim() === state.pending.message) {
+            get('prompt').value = ''; state.drafts.delete(ticket.session_id);
+          }
+          state.pending = null;
+          await selectSession(ticket.session_id);
+          const result = ticket.result;
+          status('Reply saved' + (result?.replayed ? ' · recovered saved answer' : '') +
+            (result ? ' · ' + result.output_tokens + ' output tokens' : '') + '.');
+        } else {
+          status(ticket.error || 'Cancelled without a completed reply. Retry original turn or edit your next request.');
+        }
+      } else {
+        const seconds = Math.max(0, Math.floor((Date.now() - ticket.created_at * 1000) / 1000));
+        get('turn-elapsed').textContent = seconds + 's elapsed';
+        if (performance.now() - state.pollStarted > 10 * 60 * 1000) {
+          status('Automatic status polling paused after 10 minutes. Check status or request cancellation.');
+        } else schedulePoll();
+      }
+    } catch (error) {
+      if (epoch !== state.epoch) return;
+      state.pollErrors++;
+      status(error.status === 404 ? (state.pending ? 'Execution ticket is unavailable. Retry the original request to recover its durable receipt.' : 'Execution ticket is unavailable. Refresh saved history to see committed replies.') :
+        'Status unavailable. No new generation was requested. ' + error.message);
+      if (error.status === 404) {
+        state.turn = {...observed, state: 'failed', terminal: true, error: 'ticket unavailable'};
+      } else if (state.pollErrors < 8) schedulePoll(Math.min(8000, 1000 * 2 ** state.pollErrors));
+    } finally {
+      if (epoch === state.epoch) {
+        state.polling = false; updateControls();
+        if (superseded && state.turn) {stopPolling(); state.timer = setTimeout(() => void pollTurn(), 100);}
+      }
+    }
+  }
+  async function submit(retry = false) {
+    const epoch = state.epoch;
+    if (!state.session) throw new Error('Create or select a conversation first.');
+    if (unresolved()) throw new Error('Resolve the current request before starting another.');
+    let request;
+    if (retry) {
+      if (!state.pending) throw new Error('The original request is not available in this tab. Refresh saved history.');
+      request = state.pending;
+    } else {
+      const message = get('prompt').value.trim();
+      const grounded = get('grounded').checked;
+      const max_output_tokens = Number(get('budget').value);
+      if (!message || bytes(message) > (grounded ? 1024 : 4096)) throw new Error(grounded ? 'Evidence questions must be 1–1024 UTF-8 bytes.' : 'Messages must be 1–4096 UTF-8 bytes.');
+      if (!Number.isInteger(max_output_tokens) || max_output_tokens < 1 || max_output_tokens > state.health.max_output_tokens) throw new Error('Output budget exceeds the selected model limit.');
+      request = {session_id: state.session, message, grounded, max_output_tokens,
+        request_id: crypto.randomUUID().replace(/-/g, '')};
+      const original = state.pending;
+      if (original && original.session_id === request.session_id && original.message === message
+          && original.grounded === grounded && original.max_output_tokens === max_output_tokens) {
+        request = original; retry = true;
+      }
+      state.pending = request;
+    }
+    state.turn = {session_id: request.session_id, request_id: request.request_id, state: 'unknown'};
+    state.pollStarted = performance.now(); state.pollErrors = 0; updateControls();
+    const {session_id, ...body} = request;
+    try {
+      state.turn = await api('POST', '/v1/sessions/' + session_id + '/turns', {...body, retry});
+      status('Local request admitted. You can cancel while the model runs.');
+      // Poll even an immediately replayed result through the same finalization UI.
+      void pollTurn();
+    } catch (error) {
+      if (epoch !== state.epoch) return;
+      if (error.status && error.status < 500) {
+        state.turn = {...state.turn, state: 'failed', terminal: true, error: error.message};
+      } else schedulePoll();
+      throw error;
+    } finally {if (epoch === state.epoch) updateControls();}
   }
   async function loadDocuments() {
     const payload = await api('GET', '/v1/knowledge/documents');
-    const view = get('knowledge-documents');
-    view.replaceChildren();
+    const view = get('knowledge-documents'); view.replaceChildren();
     payload.documents.forEach(doc => {
-      const row = document.createElement('div');
-      row.className = 'knowledge-record';
-      const label = document.createElement('span');
-      label.textContent = doc.title + ' · ' + doc.sha256.slice(0, 9);
-      const del = document.createElement('button');
-      del.className = 'danger';
-      del.textContent = 'Remove';
-      del.addEventListener('click', () => run(async () => {
-        if (!window.confirm('Delete this model-local reference?')) return;
-        await api('DELETE', '/v1/knowledge/documents/' + doc.document_id);
-        await loadDocuments();
-        get('knowledge-hits').replaceChildren();
-        status('Local reference deleted.');
+      const row = document.createElement('div'); row.className = 'knowledge-record';
+      const open = document.createElement('button'); open.className = 'reference-name';
+      open.textContent = doc.title + ' · ' + doc.character_count + ' characters';
+      open.addEventListener('click', () => run(async () => {
+        state.reference = await api('GET', '/v1/knowledge/documents/' + doc.document_id);
+        get('reference-title').textContent = state.reference.title;
+        get('reference-digest').textContent = 'SHA-256: ' + state.reference.sha256;
+        get('reference-text').textContent = state.reference.text;
+        get('reference-dialog').showModal();
       }));
-      row.append(label, del);
-      view.appendChild(row);
+      const remove = document.createElement('button'); remove.className = 'danger'; remove.textContent = 'Remove';
+      remove.addEventListener('click', () => run(async () => {
+        if (!window.confirm('Remove this reference from the local library? Existing conversation evidence is preserved.')) return;
+        await api('DELETE', '/v1/knowledge/documents/' + doc.document_id);
+        await loadDocuments(); get('knowledge-hits').replaceChildren(); status('Reference removed.');
+      }));
+      row.append(open, remove); view.append(row);
     });
   }
-  get('knowledge-file').addEventListener('change', () => run(async () => {
-    const control = get('knowledge-file');
-    const file = control.files[0];
-    if (!file) return;
-    if (file.size > 65536 || file.size === 0) throw new Error('Text reference must be 1–65536 bytes.');
-    const source = await file.text();
-    if (new TextEncoder().encode(source).byteLength > 65536) {
-      throw new Error('Text reference exceeds the 64 KiB upload limit.');
-    }
-    const result = await api('POST', '/v1/knowledge/documents', {
-      title: file.name, text: source
-    });
-    control.value = '';
-    await loadDocuments();
-    status(result.reused ? 'Existing exact-byte reference reused.' :
-      'New private reference indexed offline: ' + result.sha256.slice(0, 12));
-  }));
-  get('knowledge-search').addEventListener('click', () => run(async () => {
-    const query = get('knowledge-query').value.trim();
-    if (!query) throw new Error('Enter a reference search query.');
-    const result = await api('POST', '/v1/knowledge/search', {query, limit: 6});
-    const panel = get('knowledge-hits');
-    panel.replaceChildren();
-    result.hits.forEach(hit => {
-      const card = document.createElement('article');
-      card.className = 'knowledge-hit';
-      const source = document.createElement('strong');
-      source.textContent = hit.title;
-      const passage = document.createElement('p');
-      passage.textContent = hit.passage;
-      const citation = document.createElement('small');
-      citation.textContent = hit.citation;
-      card.append(source, passage, citation);
-      panel.appendChild(card);
-    });
-    status('Found ' + result.hits.length +
-      ' locally indexed passage(s). Search is lexical; verify relevance.');
-  }));
-  get('knowledge-query').addEventListener('keydown', event => {
-    if (event.key === 'Enter') {
-      event.preventDefault(); get('knowledge-search').click();
-    }
+  get('sidebar-toggle').addEventListener('click', () => sidebar(!get('shell').classList.contains('library-open')));
+  get('sidebar-close').addEventListener('click', () => sidebar(false, true));
+  get('sidebar-scrim').addEventListener('click', () => sidebar(false, true));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !get('reference-dialog').open) sidebar(false, true);
   });
   get('connect').addEventListener('click', () => run(async () => {
-    state.token = get('secret').value.trim();
-    if (state.token.length < 32) throw new Error('The local token is missing or invalid.');
-    const health = await api('GET', '/v1/status');
-    state.connected = true;
-    get('secret').value = '';
-    get('indicator').textContent = 'OFFLINE • CONNECTED';
-    get('model').textContent = health.runtime_kind + ' · ' + health.model_digest.slice(0, 20) + '…';
-    get('budget').value = String(health.default_output_tokens);
-    await loadSessions();
-    await loadDocuments();
-    status('Authenticated locally. No remote provider is involved.');
+    const token = get('secret').value.trim();
+    if (token.length < 32) throw new Error('The local token is missing or invalid.');
+    state.token = token;
+    try {state.health = await api('GET', '/v1/status');}
+    catch (error) {state.token = ''; throw error;}
+    state.connected = true; get('secret').value = '';
+    sidebar(false);
+    get('model').textContent = state.health.runtime_kind + ' · ' + state.health.context_tokens + ' context tokens · ' + state.health.model_digest.slice(0, 16) + '…';
+    get('budget').value = String(state.health.default_output_tokens);
+    get('budget').max = String(state.health.max_output_tokens);
+    await loadSessions(); await loadDocuments();
+    if (state.health.active_turn) {
+      const activeTurn = state.health.active_turn;
+      await selectSession(activeTurn.session_id);
+      state.turn = activeTurn; state.pollStarted = performance.now(); schedulePoll(100);
+      status('Reconnected to a local generation already in progress.');
+    } else status('Connected locally. Choose a conversation or create a new one.');
   }));
-  get('disconnect').addEventListener('click', () => {
-    if (state.busy) return;
-    state.token = ''; state.connected = false; state.session = '';
-    state.pending = null;
-    get('indicator').textContent = 'LOCKED';
-    get('model').textContent = 'Not connected';
-    get('secret').value = ''; get('sessions').replaceChildren(); showMessages([]);
-    get('knowledge-documents').replaceChildren(); get('knowledge-hits').replaceChildren();
-    status('Locked. The token and conversation data have not been stored in this browser.');
-  });
+  get('disconnect').addEventListener('click', lock);
   get('new').addEventListener('click', () => run(async () => {
-    const item = await api('POST', '/v1/sessions', {});
-    await selectSession(item.session_id);
+    const system = get('system-prompt').value.trim();
+    if (bytes(system) > 4096) throw new Error('Instructions exceed 4096 UTF-8 bytes.');
+    const result = await api('POST', '/v1/sessions', system ? {system} : {});
+    state.turn = null; state.pending = null; clearSearch();
+    await selectSession(result.session_id); sidebar(false); get('prompt').focus(); status('New conversation ready.');
   }));
-  get('send').addEventListener('click', () => run(async () => {
-    if (!state.session) throw new Error('Create or select a conversation first.');
-    const prompt = get('prompt').value.trim();
-    if (!prompt) throw new Error('Enter a message.');
-    const budget = Number(get('budget').value);
-    if (!Number.isInteger(budget) || budget < 1 || budget > 8192) {
-      throw new Error('Output tokens must be 1–8192.');
-    }
-    // Preserve the EXACT request identity across an ambiguous network loss.
-    // A response may have committed even when fetch() reports failure.
-    // Changing the prompt, budget or session intentionally creates a new turn.
-    const grounded = get('grounded').checked;
-    const same = state.pending &&
-      state.pending.session === state.session &&
-      state.pending.prompt === prompt &&
-      state.pending.budget === budget &&
-      state.pending.grounded === grounded;
-    if (!same) state.pending = {
-      session: state.session, prompt, budget, grounded,
-      id: crypto.randomUUID().replace(/-/g, '')
-    };
-    const attempted = state.pending;
-    status('Running locally; repeat an unchanged prompt to safely recover a lost response…');
+  get('send').addEventListener('click', () => run(() => submit(false)));
+  get('retry-turn').addEventListener('click', () => run(() => submit(true)));
+  get('check-turn').addEventListener('click', () => {state.pollStarted = performance.now(); state.pollErrors = 0; void pollTurn();});
+  get('cancel-turn').addEventListener('click', async () => {
+    const current = state.turn; if (!current || terminal(current)) return;
+    const epoch = state.epoch;
+    get('cancel-turn').disabled = true;
     try {
-      await api('POST', '/v1/sessions/' + attempted.session + '/turn', {
-        message: attempted.prompt, max_output_tokens: attempted.budget,
-        request_id: attempted.id, grounded: attempted.grounded
-      });
-      state.pending = null;
-      get('prompt').value = '';
-      await selectSession(attempted.session);
-    } catch (error) {
-      status('Not confirmed. Retrying this unchanged prompt uses the same request ID.');
-      throw error;
-    }
+      const ticket = await api('POST', '/v1/sessions/' + current.session_id + '/turns/' + current.request_id + '/cancel', {});
+      if (epoch !== state.epoch || state.turn?.request_id !== current.request_id) return;
+      state.turn = ticket; state.pollStarted = performance.now();
+      status('Cancellation requested. Waiting for a confirmed terminal state.');
+      schedulePoll(100); if (terminal(ticket)) void pollTurn();
+    } catch (error) {if (epoch === state.epoch) status('Cancellation is not confirmed. ' + error.message);}
+    finally {if (epoch === state.epoch) updateControls();}
+  });
+  get('session-search').addEventListener('click', () => run(async () => {
+    const query = get('session-query').value.trim();
+    if (bytes(query) > 256) throw new Error('Search text exceeds 256 UTF-8 bytes.');
+    state.query = query; await loadSessions();
   }));
+  get('session-query').addEventListener('keydown', event => {if (event.key === 'Enter') {event.preventDefault(); get('session-search').click();}});
+  get('sessions-more').addEventListener('click', () => run(() => loadSessions(true)));
+  get('refresh-session').addEventListener('click', () => run(() => selectSession(state.session)));
   get('fork').addEventListener('click', () => run(async () => {
-    if (!state.session) throw new Error('Select a conversation.');
     const item = await api('POST', '/v1/sessions/' + state.session + '/fork', {});
-    await selectSession(item.session_id);
+    state.turn = null; state.pending = null; clearSearch(); await selectSession(item.session_id); sidebar(false);
+    status('Created a separate conversation branch.');
   }));
   get('delete').addEventListener('click', () => run(async () => {
-    if (!state.session) throw new Error('Select a conversation.');
-    if (!window.confirm('Permanently delete the selected conversation and receipts?')) return;
+    if (!window.confirm('Permanently delete this conversation and its receipts? Export a backup first if needed.')) return;
     await api('DELETE', '/v1/sessions/' + state.session);
-    state.session = ''; get('revision').textContent = 'No conversation selected';
-    showMessages([]); await loadSessions();
-    status('Conversation deleted from the local database.');
+    state.drafts.delete(state.session); state.session = ''; state.revision = 0;
+    state.messages = []; state.evidence = []; state.audits = []; state.pending = null; state.turn = null;
+    get('prompt').value = ''; get('revision').textContent = 'No conversation selected';
+    showMessages(); await loadSessions(); status('Conversation deleted.');
   }));
   get('export').addEventListener('click', () => run(async () => {
-    if (!state.session) throw new Error('Select a conversation.');
-    const data = await api('GET', '/v1/sessions/' + state.session + '/export');
-    const object = new Blob([JSON.stringify(data)], {type: 'application/json'});
-    const url = URL.createObjectURL(object);
-    const a = document.createElement('a'); a.href = url;
-    a.download = 'skeleton-chat-' + state.session.slice(0, 12) + '.json';
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    status('Backup exported. It contains private plaintext conversation content.');
+    const payload = await api('GET', '/v1/sessions/' + state.session + '/export');
+    download(JSON.stringify(payload), 'skeleton-chat-' + state.session.slice(0, 16) + '.json', 'application/json');
+    status('Private conversation backup exported.');
   }));
+  get('export-text').addEventListener('click', () => download(transcript(), 'skeleton-conversation.md', 'text/markdown;charset=utf-8'));
+  get('copy-transcript').addEventListener('click', () => void copy(transcript()));
   get('import').addEventListener('change', () => run(async () => {
-    const file = get('import').files[0];
-    if (!file) return;
-    if (file.size > 16 * 1024 * 1024) throw new Error('Backup exceeds 16MB.');
-    const payload = JSON.parse(await file.text());
-    const item = await api('POST', '/v1/sessions/import', payload);
-    get('import').value = ''; await selectSession(item.session_id);
-    status('Imported model-compatible conversation into a new local session.');
+    const epoch = state.epoch;
+    const control = get('import'); const file = control.files[0]; if (!file) return;
+    if (!file.size || file.size > 16 * 1024 * 1024) throw new Error('Backup must be 1 byte–16 MiB.');
+    // Preserve raw JSON so duplicate-key rejection stays at the server boundary.
+    const payload = new TextDecoder('utf-8', {fatal: true}).decode(await file.arrayBuffer());
+    if (epoch !== state.epoch) return;
+    const item = await api('POST', '/v1/sessions/import', payload, true);
+    control.value = ''; state.turn = null; state.pending = null; clearSearch(); await selectSession(item.session_id); sidebar(false);
+    status('Imported a model-compatible conversation into a new session.');
   }));
-  get('prompt').addEventListener('keydown', event => {
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-      event.preventDefault(); get('send').click();
+  get('knowledge-file').addEventListener('change', () => run(async () => {
+    const epoch = state.epoch;
+    const control = get('knowledge-file'); const files = Array.from(control.files || []);
+    if (files.length > 16) throw new Error('Import at most 16 reference files at a time.');
+    const failures = []; let imported = 0;
+    for (let index = 0; index < files.length; index++) {
+      if (epoch !== state.epoch) return;
+      const file = files[index]; status('Importing reference ' + (index + 1) + ' of ' + files.length + '…');
+      try {
+        if (!file.size || file.size > 65536) throw new Error('file must be 1–65536 bytes');
+        if (bytes(file.name) > 200) throw new Error('filename exceeds 200 UTF-8 bytes');
+        const text = new TextDecoder('utf-8', {fatal: true}).decode(await file.arrayBuffer());
+        if (epoch !== state.epoch) return;
+        await api('POST', '/v1/knowledge/documents', {title: file.name, text}); imported++;
+      } catch (error) {failures.push(file.name + ': ' + error.message);}
     }
+    if (epoch !== state.epoch) return;
+    control.value = ''; await loadDocuments();
+    status(imported + ' reference(s) imported or reused.' + (failures.length ? ' Unchanged files: ' + failures.join('; ') : ''));
+  }));
+  get('knowledge-search').addEventListener('click', () => run(async () => {
+    const query = get('knowledge-query').value.trim(); if (!query) throw new Error('Enter a reference search query.');
+    const result = await api('POST', '/v1/knowledge/search', {query, limit: 6});
+    const panel = get('knowledge-hits'); panel.replaceChildren();
+    result.hits.forEach(hit => {
+      const card = document.createElement('article'); card.className = 'knowledge-hit';
+      const title = document.createElement('strong'); title.textContent = hit.title;
+      const passage = document.createElement('p'); passage.textContent = hit.passage;
+      const citation = document.createElement('small'); citation.textContent = hit.citation;
+      card.append(title, passage, citation); panel.append(card);
+    });
+    status(result.hits.length + ' matching passage(s). Relevance and factual support require review.');
+  }));
+  get('knowledge-query').addEventListener('keydown', event => {if (event.key === 'Enter') {event.preventDefault(); get('knowledge-search').click();}});
+  get('reference-close').addEventListener('click', () => {get('reference-dialog').close(); state.reference = null; get('reference-text').textContent = '';});
+  get('reference-save').addEventListener('click', () => {
+    if (state.reference) download(state.reference.text, state.reference.title, 'text/plain;charset=utf-8');
   });
-})();"""
+  get('prompt').addEventListener('input', () => {if (state.session) state.drafts.set(state.session, get('prompt').value);});
+  get('prompt').addEventListener('keydown', event => {
+    if (!event.isComposing && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {event.preventDefault(); get('send').click();}
+  });
+  window.addEventListener('pageshow', event => {if (event.persisted) lock();});
+  window.addEventListener('pagehide', () => {stopPolling(); state.network.abort(); state.token = '';});
+  updateControls();
+})();
+"""
 
 
 __all__ = ["HTML", "CSS", "JAVASCRIPT"]
