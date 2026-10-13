@@ -1,0 +1,81 @@
+name: Jeeves App Acceptance Matrix
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/app_completion_scope.json"
+      - "machine/app_acceptance_test_matrix.json"
+      - "skeleton/ai/game_builder/jeeves_acceptance_matrix.py"
+      - "skeleton/ai/game_builder/jeeves_measured_completion.py"
+      - "skeleton/ai/game_builder/jeeves_appwide_fabric.py"
+      - "scripts/run_app_acceptance_matrix.py"
+      - "tests/test_game_builder_jeeves_acceptance_matrix.py"
+      - ".github/workflows/jeeves-app-acceptance-matrix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-app-acceptance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    name: Selected real product regressions (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 24
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Exact PR head checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/
+            skeleton/kernel/
+            skeleton/jeeves/
+            skeleton/forge/
+            skeleton/organism/
+            backend/
+            frontend/
+            machine/
+            tests/
+            scripts/run_app_acceptance_matrix.py
+            .github/workflows/
+      - name: Compile audited implementation and acceptance reader
+        shell: bash
+        run: |
+          python -m py_compile \
+            skeleton/ai/game_builder/jeeves_acceptance_matrix.py \
+            skeleton/ai/game_builder/jeeves_measured_completion.py \
+            scripts/run_app_acceptance_matrix.py \
+            tests/test_game_builder_jeeves_acceptance_matrix.py
+      - name: Adversarial candidate-binding validation
+        shell: bash
+        run: |
+          python -m unittest tests.test_game_builder_jeeves_acceptance_matrix -v
+      - name: Execute actual curated family regression suite
+        shell: bash
+        run: |
+          python scripts/run_app_acceptance_matrix.py \
+            --output build/app_acceptance_run_evidence.json
+      - name: Upload exact-head candidate evidence (not release signoff)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: app-acceptance-candidates-${{ matrix.os }}-${{ github.run_id }}
+          path: build/app_acceptance_run_evidence.json
+          if-no-files-found: warn
+          retention-days: 7
