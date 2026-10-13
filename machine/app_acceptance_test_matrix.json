@@ -1,6 +1,6 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13.v10",
+  "version": "2026-10-13.v11",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
   "scope_note": "All 42 source-linked families selected for actual target regressions: 17 unittest +25 pytest; independent full family, device, quality and enterprise release acceptance remains open",
@@ -152,10 +152,11 @@
     {
       "family_id": "F13",
       "scope": "targeted_regression_subset",
-      "independent_acceptance_question": "Measurable completion UI and product authority",
+      "independent_acceptance_question": "Real authenticated Studio measurement/test-page journey with bounded cursors, provenance and no unintended source mutations",
       "unittest_modules": [
         "tests.test_game_builder_jeeves_measured_completion",
-        "tests.test_game_builder_jeeves_completion_census"
+        "tests.test_game_builder_jeeves_completion_census",
+        "tests.test_game_builder_jeeves_product_studio_journey"
       ],
       "workflow_hint": "Jeeves Story Canon Production",
       "product_release_qualified": false,
