@@ -41,6 +41,13 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_historical_spatial_lens import (
+    analyze_original_spatial_epochs, verify_original_spatial_epochs,
+)
+from .advanced_chunk_residency_index import (
+    build_original_chunk_index, verify_original_chunk_index,
+    query_original_chunk_index, verify_original_chunk_query,
+)
 from .advanced_npc_provenance_index import (
     analyze_original_npc_histories, verify_original_npc_histories,
 )
@@ -497,6 +504,50 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":validated,
                                    "original_source_mutated":False})
+        if path=="/api/original-spatial-history":
+            history=analyze_original_spatial_epochs(
+                values["record"],values["turns"],query=values.get("query"))
+            return self._json(200,{
+                "record":history,
+                "verified":verify_original_spatial_epochs(history),
+                "source_files_mutated":False,
+                "ai_model_weights_promoted":False,
+            })
+        if path=="/api/verify-original-spatial-history":
+            return self._json(200,{
+                "verified":verify_original_spatial_epochs(values["record"]),
+                "source_files_mutated":False,
+                "ai_model_weights_promoted":False,
+            })
+        if path=="/api/index-original-npc-chunks":
+            index=build_original_chunk_index(values["record"])
+            return self._json(200,{
+                "index":index,
+                "verified":verify_original_chunk_index(index),
+                "source_files_mutated":False,
+                "model_weights_promoted":False,
+            })
+        if path=="/api/verify-original-npc-chunks":
+            return self._json(200,{
+                "verified":verify_original_chunk_index(values["record"]),
+                "source_files_mutated":False,
+                "model_weights_promoted":False,
+            })
+        if path=="/api/query-original-npc-chunks":
+            query=query_original_chunk_index(
+                values["index"],query=values.get("query"))
+            return self._json(200,{
+                "query":query,
+                "verified":verify_original_chunk_query(query),
+                "source_files_mutated":False,
+                "model_weights_promoted":False,
+            })
+        if path=="/api/verify-original-npc-chunk-query":
+            return self._json(200,{
+                "verified":verify_original_chunk_query(values["record"]),
+                "source_files_mutated":False,
+                "model_weights_promoted":False,
+            })
         if path=="/api/indexed-npc-histories":
             record=analyze_original_npc_histories(
                 values["checkpoint"],values["variants"],

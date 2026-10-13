@@ -38,6 +38,13 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_historical_spatial_lens import (
+    analyze_original_spatial_epochs, verify_original_spatial_epochs,
+)
+from .advanced_chunk_residency_index import (
+    build_original_chunk_index, verify_original_chunk_index,
+    query_original_chunk_index, verify_original_chunk_query,
+)
 from .advanced_npc_provenance_index import (
     analyze_original_npc_histories, verify_original_npc_histories,
 )
@@ -206,6 +213,27 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    history=commands.add_parser("original-spatial-history",
+        help="Reconstruct original NPC physical chunk occupancy at source-verified past ticks")
+    history.add_argument("--record",required=True)
+    history.add_argument("--turns",required=True)
+    history.add_argument("--query")
+    history_verify=commands.add_parser("verify-original-spatial-history",
+        help="Independently reproduce original world past actor cells from source")
+    history_verify.add_argument("--record",required=True)
+    residency=commands.add_parser("index-original-npc-chunks",
+        help="Build content-bound real original NPC body index for every physical chunk")
+    residency.add_argument("--record",required=True)
+    residency_verify=commands.add_parser("verify-original-npc-chunks",
+        help="Independently reexecute original source and check all indexed residency")
+    residency_verify.add_argument("--record",required=True)
+    residence_query=commands.add_parser("query-original-npc-chunks",
+        help="Retrieve source-proven actual resident tiles in selected chunks")
+    residence_query.add_argument("--index",required=True)
+    residence_query.add_argument("--query")
+    query_verify=commands.add_parser("verify-original-npc-chunk-query",
+        help="Independently verify exact source and bounded neighborhood record")
+    query_verify.add_argument("--record",required=True)
     index_cmd=commands.add_parser("indexed-npc-histories",
         help="Compare original physical NPC timelines and query source event/action/actor receipts")
     index_cmd.add_argument("--checkpoint",required=True)
@@ -492,6 +520,21 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "original-spatial-history":
+            output=analyze_original_spatial_epochs(
+                _load(args.record),_load(args.turns),
+                query=_load(args.query) if args.query else None)
+        elif args.operation == "verify-original-spatial-history":
+            output={"verified":verify_original_spatial_epochs(_load(args.record))}
+        elif args.operation == "index-original-npc-chunks":
+            output=build_original_chunk_index(_load(args.record))
+        elif args.operation == "verify-original-npc-chunks":
+            output={"verified":verify_original_chunk_index(_load(args.record))}
+        elif args.operation == "query-original-npc-chunks":
+            output=query_original_chunk_index(
+                _load(args.index),query=_load(args.query) if args.query else None)
+        elif args.operation == "verify-original-npc-chunk-query":
+            output={"verified":verify_original_chunk_query(_load(args.record))}
         elif args.operation == "indexed-npc-histories":
             output=analyze_original_npc_histories(
                 _load(args.checkpoint),_load(args.variants),

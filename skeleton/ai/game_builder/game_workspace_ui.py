@@ -2089,6 +2089,229 @@ function renderAdvancedActions(actions){
     }
   });
   target.append(indexRun);target.append(indexNext);target.append(indexOutput);
+  const spatialTitle=document.createElement("h4");
+  spatialTitle.textContent="Chunk Residency Index · source-authenticated physical body map";
+  target.append(spatialTitle);
+  const buildSpatial=document.createElement("button");
+  buildSpatial.type="button";
+  buildSpatial.textContent="Index original verified NPC bodies and source movement";
+  const chunkX=document.createElement("select");
+  const chunkY=document.createElement("select");
+  chunkX.id="original-spatial-chunk-x";chunkY.id="original-spatial-chunk-y";
+  for(const element of [chunkX,chunkY]){
+    element.setAttribute("aria-label","Original world chunk coordinate");
+  }
+  const spatialRadius=document.createElement("select");
+  spatialRadius.id="original-spatial-radius";
+  for(const [value,name] of [
+    ["0","Only this actual chunk"],["1","This chunk and immediate neighbors"]
+  ]){
+    const option=document.createElement("option");
+    option.value=value;option.textContent=name;spatialRadius.append(option);
+  }
+  const spatialMode=document.createElement("select");
+  spatialMode.id="original-spatial-lod-mode";
+  for(const [value,name] of [
+    ["all","All physically present NPC identities"],
+    ["detailed_this_turn","Actually detailed in the last world tick"],
+    ["deferred_this_turn","Not detailed in the last world tick"]
+  ]){
+    const option=document.createElement("option");
+    option.value=value;option.textContent=name;spatialMode.append(option);
+  }
+  const querySpatial=document.createElement("button");
+  querySpatial.type="button";
+  querySpatial.textContent="Query independently verified physical NPC chunk";
+  const spatialNext=document.createElement("button");
+  spatialNext.type="button";
+  spatialNext.textContent="Next source-verified residents";
+  spatialNext.disabled=true;
+  const spatialOutput=document.createElement("pre");
+  spatialOutput.id="original-chunk-residency-proof";
+  spatialOutput.setAttribute("role","status");
+  spatialOutput.setAttribute("aria-live","polite");
+  let indexedWorld=null;
+  let spatialNextOffset=null;
+  const populateChunks=(count)=>{
+    for(const target of [chunkX,chunkY]){
+      target.replaceChildren();
+      for(let i=0;i<count;i++){
+        const option=document.createElement("option");
+        option.value=String(i);option.textContent="Chunk "+i;target.append(option);
+      }
+      target.value=String(Math.floor(count/2));
+    }
+  };
+  buildSpatial.addEventListener("click",async()=>{
+    try{
+      if(!latestStreamRecord)
+        throw Error("Run and source-verify the real streamed NPC world first");
+      const outcome=await api("/api/index-original-npc-chunks",{
+        record:latestStreamRecord
+      });
+      if(!outcome.verified||outcome.source_files_mutated||
+         outcome.index.model_weights_promoted)
+        throw Error("NPC residency source authentication failed");
+      const check=await api("/api/verify-original-npc-chunks",{
+        record:outcome.index
+      });
+      if(!check.verified)throw Error("Original physical bodies failed full replay");
+      indexedWorld=outcome.index;
+      spatialNextOffset=null;spatialNext.disabled=true;
+      populateChunks(indexedWorld.chunks_per_side);
+      spatialOutput.textContent=JSON.stringify({
+        source_game_digest:indexedWorld.source_game_digest,
+        source_head:indexedWorld.source_head,
+        world_tick:indexedWorld.tick,
+        physical_people:indexedWorld.physical_actor_count,
+        indexed_chunk_count:Object.keys(indexedWorld.buckets).length,
+        exact_physical_move_count:indexedWorld.physical_movements_total,
+        true_detailed_updates:indexedWorld.detailed_updates_total,
+        true_deferred_actor_turns:indexedWorld.deferred_actor_turns_total,
+        original_cross_chunk_movements:indexedWorld.chunk_transfers,
+        complete_source_verification:true,
+        native_hardware_benchmark_certified:false,
+        weights_promoted:false
+      },null,2);
+      status("Every physically instantiated original citizen has been indexed and independently replayed.");
+    }catch(error){
+      indexedWorld=null;spatialNext.disabled=true;spatialOutput.textContent="";
+      status("Chunk Residency Index rejected: "+error.message);
+    }
+  });
+  async function spatialPage(offset){
+    if(!indexedWorld)throw Error("Build the source-authenticated original resident index");
+    const query={
+      center_chunk:[Number(chunkX.value),Number(chunkY.value)],
+      radius:Number(spatialRadius.value),mode:spatialMode.value,
+      offset,limit:16
+    };
+    const response=await api("/api/query-original-npc-chunks",{
+      index:indexedWorld,query
+    });
+    if(!response.verified||response.query.model_weights_promoted)
+      throw Error("Original body query failed independent source reconstruction");
+    const verified=await api("/api/verify-original-npc-chunk-query",{
+      record:response.query
+    });
+    if(!verified.verified)
+      throw Error("NPC body positions were not certified by replay");
+    const result=response.query;
+    spatialNextOffset=result.next_offset;
+    spatialNext.disabled=spatialNextOffset===null;
+    spatialOutput.textContent=JSON.stringify({
+      exact_game_source:indexedWorld.source_game_digest,
+      inspected_chunks:result.candidate_chunk_keys,
+      total_game_population:result.physical_actor_population,
+      actual_citizens_examined_in_chunks:result.candidate_actor_entries_examined,
+      matched_actual_residents:result.matching_actors,
+      original_residents_on_this_page:result.residents,
+      next_offset:result.next_offset,
+      no_fabricated_witnesses:true,no_project_mutation:true
+    },null,2);
+    status("Chunk neighborhood retrieved from actual original actor positions and independently replayed.");
+  }
+  querySpatial.addEventListener("click",async()=>{
+    try{await spatialPage(0);}
+    catch(error){
+      spatialOutput.textContent="";spatialNext.disabled=true;
+      status("Chunk Residency Index query denied: "+error.message);
+    }
+  });
+  spatialNext.addEventListener("click",async()=>{
+    try{
+      if(spatialNextOffset===null)throw Error("No further source-backed residents");
+      await spatialPage(spatialNextOffset);
+    }catch(error){
+      spatialOutput.textContent="";spatialNext.disabled=true;
+      status("Chunk Residency Index page denied: "+error.message);
+    }
+  });
+  target.append(buildSpatial);target.append(chunkX);target.append(chunkY);
+  target.append(spatialRadius);target.append(spatialMode);
+  target.append(querySpatial);target.append(spatialNext);target.append(spatialOutput);
+  const lensTitle=document.createElement("h4");
+  lensTitle.textContent="Historical Spatial Lens · real NPC chunk playback by source turn";
+  target.append(lensTitle);
+  const turnsInput=document.createElement("textarea");
+  turnsInput.rows=2;
+  turnsInput.id="original-spatial-history-epochs";
+  turnsInput.setAttribute("aria-label","One to twelve increasing original source-game turns");
+  turnsInput.value=JSON.stringify([0,2,4],null,1);
+  target.append(turnsInput);
+  const epochPreset=document.createElement("button");
+  epochPreset.type="button";
+  epochPreset.textContent="Use actual genesis, midpoint and current game turn";
+  epochPreset.addEventListener("click",()=>{
+    if(!latestStreamRecord){
+      status("Run the source-backed NPC world first");
+      return;
+    }
+    const end=latestStreamRecord.state.tick;
+    turnsInput.value=JSON.stringify(
+      [...new Set([0,Math.floor(end/2),end])].sort((a,b)=>a-b),
+      null,1
+    );
+  });
+  const analyzeEpochs=document.createElement("button");
+  analyzeEpochs.type="button";
+  analyzeEpochs.textContent="Replay independently verified physical NPC history";
+  const epochOutput=document.createElement("pre");
+  epochOutput.id="original-historical-spatial-proof";
+  epochOutput.setAttribute("role","status");
+  epochOutput.setAttribute("aria-live","polite");
+  analyzeEpochs.addEventListener("click",async()=>{
+    try{
+      if(!latestStreamRecord||!indexedWorld)
+        throw Error("Play the original game and build the verified chunk index first");
+      const turns=JSON.parse(turnsInput.value);
+      if(!Array.isArray(turns)||turns.length<1||turns.length>12||
+         !turns.every(t=>Number.isSafeInteger(t)&&t>=0&&
+                            t<=latestStreamRecord.state.tick)||
+         turns.some((t,i)=>i>0&&t<=turns[i-1]))
+        throw Error("Only increasing genuine source turns in the original game are allowed");
+      const result=await api("/api/original-spatial-history",{
+        record:latestStreamRecord,turns,query:{
+          center_chunk:[Number(chunkX.value),Number(chunkY.value)],
+          radius:Number(spatialRadius.value),
+          mode:spatialMode.value,limit:16
+        }
+      });
+      if(!result.verified||result.source_files_mutated||
+         result.record.model_weights_promoted)
+        throw Error("Original source epochs did not independently replay");
+      const proof=await api("/api/verify-original-spatial-history",{
+        record:result.record
+      });
+      if(!proof.verified)
+        throw Error("Historical source actions diverged from physical NPC proof");
+      epochOutput.textContent=JSON.stringify({
+        original_world_digest:result.record.source_game_digest,
+        actual_source_turns:result.record.queried_original_turns,
+        historical_epochs:result.record.epochs.map(e=>({
+          turn:e.turn,original_source_head:e.actual_source_head,
+          player_tile:e.player_position,
+          physical_people:e.physical_actor_count,
+          original_chunk_residency:e.chunk_occupancy,
+          physically_changed_actors:e.changed_body_ids_since_previous_epoch,
+          actual_movement_steps_since_last_epoch:e.real_one_tile_moves_in_interval,
+          true_detailed_updates:e.detailed_update_count,
+          true_deferred_actor_turns:e.deferred_actor_turns,
+          inspected_source_chunks:e.query.candidate_chunk_keys,
+          original_residents:e.query.residents,
+          candidate_bodies_examined:e.query.candidate_actor_entries_examined
+        })),
+        positions_are_real_not_interpolated:true,
+        source_history_independently_verified:true,
+        project_mutated:false,weights_promoted:false
+      },null,2);
+      status("Original NPC historical world positions independently reconstructed and verified.");
+    }catch(error){
+      epochOutput.textContent="";
+      status("Historical Spatial Lens denied: "+error.message);
+    }
+  });
+  target.append(epochPreset);target.append(analyzeEpochs);target.append(epochOutput);
   return;
  }
  if(advancedSession?.editor==="economy"){
