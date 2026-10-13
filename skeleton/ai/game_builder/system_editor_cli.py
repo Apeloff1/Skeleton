@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_chunked_npc_world import (
+    run_chunked_npc_world, verify_chunked_npc_world,
+)
 from .advanced_unified_npc_world import (
     run_unified_npc_world, verify_unified_npc_world,
 )
@@ -193,6 +196,16 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    streamed=commands.add_parser("chunked-npc-world",
+        help="Play bounded original 21x21/35x35 resident world with recorded active simulation LOD")
+    streamed.add_argument("--actions",required=True)
+    streamed.add_argument("--settings")
+    streamed.add_argument("--scenes")
+    streamed.add_argument("--options",help="Registered bounded chunk dimensions and LOD budgets")
+    streamed.add_argument("--seed",type=int,default=0)
+    streamed_verify=commands.add_parser("verify-chunked-npc-world",
+        help="Independently reproduce every active/deferred actor and world-state receipt")
+    streamed_verify.add_argument("--record",required=True)
     unified=commands.add_parser("unified-npc-world",
         help="Run one physically authoritative original NPC dialogue/quest world")
     unified.add_argument("--actions",required=True)
@@ -437,6 +450,15 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "chunked-npc-world":
+            output=run_chunked_npc_world(
+                _load(args.actions),
+                _load(args.settings) if args.settings else None,
+                scenes=_load(args.scenes) if args.scenes else None,
+                seed=args.seed,
+                options=_load(args.options) if args.options else None)
+        elif args.operation == "verify-chunked-npc-world":
+            output={"verified":verify_chunked_npc_world(_load(args.record))}
         elif args.operation == "unified-npc-world":
             output=run_unified_npc_world(
                 _load(args.actions),

@@ -1,0 +1,88 @@
+name: Original Chunked NPC World Streaming
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_chunked_npc_world.py"
+      - "skeleton/ai/game_builder/advanced_unified_npc_world.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_chunked_npc_world.py"
+      - ".github/workflows/game-builder-chunked-npc-world.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: original-chunked-npc-world-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  streamed-residents:
+    name: Bounded 21x21 and 35x35 physical worlds (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 19
+    env:
+      PYTHONUTF8: "1"
+      PYTHONPATH: "."
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact PR head without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_chunked_npc_world.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Check exact source and compile new authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python -m py_compile \
+            skeleton/ai/game_builder/advanced_chunked_npc_world.py \
+            skeleton/ai/game_builder/advanced_unified_npc_world.py \
+            skeleton/ai/game_builder/system_editor_cli.py \
+            skeleton/ai/game_builder/game_workspace_server.py \
+            skeleton/ai/game_builder/game_workspace_ui.py \
+            tests/test_game_builder_chunked_npc_world.py
+      - name: Execute finite physical source worlds and forged-receipt regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_game_builder_chunked_npc_world -v
+      - name: Eight independent original scene and detail-budget proofs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from skeleton.ai.game_builder.advanced_chunked_npc_world import (
+              run_chunked_npc_world,verify_chunked_npc_world,
+          )
+          for seed in (0,1,5,12):
+              for chunks in (3,5):
+                  options={"chunks_per_side":chunks,"citizens":32,"active_limit":8,
+                           "chunk_radius":1,"max_turns":96}
+                  steps=["wait","move:west","move:east","wait"]
+                  report=run_chunked_npc_world(steps,seed=seed,options=options)
+                  assert verify_chunked_npc_world(report)
+                  assert report["physical_actor_count"]==32
+                  assert report["state"]["side"]==7*chunks
+                  assert report["state"]["scheduler"]["detailed_updates"]<=len(steps)*8
+                  assert report["state"]["scheduler"]["forged_offscreen_events"]==0
+                  print("SOURCE_BOUND_CHUNKED_WORLD_OK",seed,chunks,report["digest"])
+          PY
