@@ -94,6 +94,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.game_mechanics_nexus",             "router"),
     ("routes.game_factory_quantum_core",        "router"),
     ("routes.jeeves_game_builder",              "router"),
+    ("routes.dragon_academy",                  "router"),
     ("routes.conversations",                    "router"),
     ("routes.game_deployment_pipeline",         "router"),
     ("routes.game_domains_mega_expansion",      "router"),
@@ -299,6 +300,8 @@ KNOWN_ROUTES: List[RouteEntry] = [
 # the original lines 7980-8170 of server.py.
 # ───────────────────────────────────────────────────────────────────────
 KNOWN_ROUTES_WITH_PREFIX: List[RouteEntry] = [
+    # Project-scoped Jeeves story index; writes remain creator-authenticated.
+    ("routes.story_index",                 "router", "/api/playable"),
     ("routes.health",                       "router", "/api"),
     ("routes.feature_flags",                "router", "/api"),
     ("routes.observability_v2",             "router", "/api"),
