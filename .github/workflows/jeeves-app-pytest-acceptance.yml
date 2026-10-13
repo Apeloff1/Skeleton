@@ -11,6 +11,7 @@ on:
       - "tests/**"
       - "scripts/**"
       - "pyproject.toml"
+      - "machine/app_release_journey_contract.json"
       - ".github/workflows/jeeves-app-pytest-acceptance.yml"
   workflow_dispatch:
 
@@ -69,6 +70,8 @@ jobs:
             skeleton/ai/game_builder/jeeves_acceptance_matrix.py \
             skeleton/ai/game_builder/jeeves_acceptance_rollup.py \
             skeleton/ai/game_builder/jeeves_enterprise_journey_frontier.py \
+            skeleton/ai/game_builder/jeeves_release_execution_queue.py \
+            tests/test_game_builder_jeeves_release_execution_queue.py \
             tests/test_game_builder_jeeves_enterprise_journey_frontier.py \
             tests/test_game_builder_jeeves_acceptance_rollup.py \
             scripts/run_app_pytest_acceptance.py \
@@ -83,7 +86,8 @@ jobs:
             tests.test_run_app_pytest_acceptance \
             tests.test_game_builder_jeeves_pytest_acceptance_verifier \
             tests.test_game_builder_jeeves_acceptance_rollup \
-            tests.test_game_builder_jeeves_enterprise_journey_frontier -v
+            tests.test_game_builder_jeeves_enterprise_journey_frontier \
+            tests.test_game_builder_jeeves_release_execution_queue -v
       - name: Execute actual reviewed pytest family regressions
         shell: bash
         run: |
