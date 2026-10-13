@@ -227,6 +227,7 @@ HostAuthorize = Callable[[SourceEditPlan, Any], bool]
 def register_source_edit_tools(
     registry: Any, *, atlas: JeevesRepositoryFileAtlas,
     authorize: HostAuthorize, edit: HostEdit,
+    read_authorize: Callable[[str, str, Any], bool] | None = None,
 ) -> tuple[str, ...]:
     """Explicitly register a high-impact, host-committed source editor."""
     from skeleton.jeeves.agent.tools import (
@@ -237,6 +238,8 @@ def register_source_edit_tools(
         raise TypeError("host registry and atlas required")
     if not callable(authorize) or not callable(edit):
         raise TypeError("independent host edit authorization and handler required")
+    if read_authorize is not None and not callable(read_authorize):
+        raise TypeError("read_authorize must be a host callback")
 
     def _parse(args: Mapping[str, Any]) -> SourceEditPlan:
         raw = args["replacements"]
@@ -255,6 +258,9 @@ def register_source_edit_tools(
         )
 
     def _perform(args: Mapping[str, Any], context: Any) -> dict[str, object]:
+        at_ns = context.metadata.get("observed_at_ns")
+        if type(at_ns) is not int or at_ns < 0:
+            raise JeevesSourceEditError("host observation timestamp required before edit")
         plan = _parse(args)
         if authorize(plan, context) is not True:
             raise ToolDenied("host denied exact source edit proposal")
@@ -272,13 +278,49 @@ def register_source_edit_tools(
         # Resample the actual edited file through the host atlas owner.
         atlas.apply_changes(
             [plan.path],
-            observed_at_ns=context.metadata["observed_at_ns"],
+            observed_at_ns=at_ns,
             hash_contents=True,
         )
         actual = atlas.lookup(plan.path)
         if actual is None or actual.content_sha256 != plan.after_sha256:
             raise JeevesSourceEditError("host reported commit but source bytes do not match")
         return receipt.to_dict()
+
+    if read_authorize is not None:
+        def _preview(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
+            request = {
+                "project_id": args["project_id"],
+                "path": args["path"],
+                "expected_index_sha256": args["expected_index_sha256"],
+                "expected_source_sha256": args["expected_source_sha256"],
+                "replacements": args["replacements"],
+            }
+            request_digest = _hash(_canonical(request))
+            if read_authorize("app.prepare_source_edit", request_digest, context) is not True:
+                raise ToolDenied("host denied scoped edit planning")
+            plan = _parse(args)
+            return {
+                "schema": "jeeves.source_edit_preview.v1",
+                "plan": plan.to_dict(),
+                "plan_digest": plan.digest,
+                "change_count": len(plan.replacements),
+                "dispatch_performed": False,
+                "execution_authority": "none",
+            }
+
+        preview_spec = ToolSpec(
+            name="app.prepare_source_edit",
+            description="Prepare exact-hash bounded source replacements without committing.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("project_id", "string", max_length=192),
+                ArgumentRule("path", "string", max_length=2048),
+                ArgumentRule("expected_index_sha256", "string", max_length=64),
+                ArgumentRule("expected_source_sha256", "string", max_length=64),
+                ArgumentRule("replacements", "array", max_length=MAX_EDIT_PATCHES),
+            ),
+        )
+        registry.register(preview_spec, _preview)
 
     spec = ToolSpec(
         name="app.patch_source_authorized",
@@ -294,7 +336,7 @@ def register_source_edit_tools(
         ),
     )
     registry.register(spec, _perform)
-    return (spec.name,)
+    return ("app.prepare_source_edit", spec.name) if read_authorize is not None else (spec.name,)
 
 
 __all__ = [
