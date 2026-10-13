@@ -270,6 +270,7 @@ class JeevesWorkbench:
                 registry, atlas=self.atlas,
                 authorize=self._scoped_source_edit,
                 edit=self._host_source_edit,
+                read_authorize=self._scoped_read,
             )
         return registry
 
