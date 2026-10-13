@@ -20,12 +20,10 @@ python -m skeleton walk --era extraction_now -n 3 --mode thermal --json
 python -m skeleton walk --all-eras -n 2 --json
 python -m skeleton cockpit BIND ERA cozy_wholesome
 python -m skeleton run "an original cozy village" --out ./out/village
-python -m skeleton creator --help
 
 # Further dispatched surfaces
 python -m skeleton app plan --json
 python -m skeleton app smoke --json
-python -m skeleton dev --help
 python -m skeleton help
 ```
 
