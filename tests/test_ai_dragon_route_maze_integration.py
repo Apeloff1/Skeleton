@@ -9,9 +9,8 @@ import pytest
 from skeleton.ai.webcrawler.dragon_native_targets import STYLES,target_catalog
 from skeleton.ai.webcrawler.dragon_native_production import (
     ProductionRequest,PortableGameDesign,plan_production,
-    _render,make_source_release,verify_source_release,
+    _render,make_source_release,verify_source_release,validate_native_source,
 )
-from skeleton.ai.webcrawler.dragon_native_projects import validate_native_source
 from skeleton.ai.webcrawler.dragon_route_maze import MazeRequest,build_maze,verify_maze
 
 
