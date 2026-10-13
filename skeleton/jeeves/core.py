@@ -166,6 +166,14 @@ class Jeeves:
             query=query, limit=limit, offset=offset, root=root,
         )
 
+    def app_runtime_planes(self, *, query: str = "", limit: int = 20,
+                           offset: int = 0, root=None):
+        """Discover declared owners, dependencies and consumers across app planes."""
+        from skeleton.jeeves.app_capability_bridge import plane_capability_catalog
+        return plane_capability_catalog(
+            query=query, limit=limit, offset=offset, root=root,
+        )
+
     def app_interface_catalog(self, *, query: str = "", limit: int = 20,
                               offset: int = 0, root=None):
         """Discover owning planes, dependency contracts and failure semantics."""
