@@ -185,3 +185,6 @@ chronicle/persistkv.json
 
 # WORM vault audit chain (runtime durable ledger)
 data/vault/
+
+# Generated pre-E2E diagnostic evidence stays in runner artifacts.
+/.e2e-evidence/
