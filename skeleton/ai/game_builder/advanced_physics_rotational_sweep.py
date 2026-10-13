@@ -8,6 +8,8 @@ than the finite sample interval remain an explicit reference-engine limit.
 """
 from __future__ import annotations
 
+from .advanced_physics_contact_custody import record_fixture_contact
+
 from math import isqrt
 
 from .advanced_physics_oriented import (
@@ -183,6 +185,7 @@ def swept_fixtures(body,state,config,old_position,old_angle,indices,events):
             state["rotating_swept_contacts"]+=1
             _record(state,"rotating_swept_fixture",
                     hit["normal"],hit["depth"],hit["point"],events)
+            record_fixture_contact(state,body,index,"rotating_swept_fixture")
             oriented_world(body,state,config,events)
             return True
     return False
