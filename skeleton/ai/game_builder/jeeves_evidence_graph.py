@@ -322,3 +322,77 @@ class JeevesEvidenceGraph:
             "runtime_verification_performed": False,
         }
         return {**result, "digest": digest(result)}
+
+    def impact(self, paths, *, expected_snapshot=None,
+               expected_graph_digest=None, max_results=80):
+        """Reverse source-to-volume-to-enterprise evidence impact.
+
+        This is deliberately *declared impact*, not a complete call graph or a
+        proof that the targeted codepath is executed by the runtime. Scope is
+        bounded before any potentially expensive graph traversal.
+        """
+        if type(paths) is not list or not 1 <= len(paths) <= 32 or any(
+            type(path) is not str for path in paths
+        ):
+            raise JeevesAppwideError("bounded list of impact source paths required")
+        if type(max_results) is not int or not 1 <= max_results <= 200:
+            raise JeevesAppwideError("bounded impact evidence page required")
+        nodes, edges, overview = self._build(expected_snapshot)
+        if expected_graph_digest is not None and (
+            expected_graph_digest != overview["digest"]
+        ):
+            raise JeevesAppwideError("stale source-to-volume impact graph")
+        normalized = []
+        for source in paths:
+            try:
+                path = _relative(source)
+            except JeevesAppwideError as exc:
+                raise JeevesAppwideError("invalid impact target") from exc
+            if PRIVATE.search(path) or "path:" + path not in nodes:
+                raise JeevesAppwideError("impact target not visible in graph")
+            if path in normalized:
+                raise JeevesAppwideError("duplicate impact source rejected")
+            normalized.append(path)
+
+        dependents = defaultdict(list)
+        downstream_volumes = defaultdict(list)
+        source_edges = []
+        for edge in edges.values():
+            if edge["to"].startswith("path:"):
+                dependents[edge["to"]].append((edge["from"], edge["relation"]))
+            if edge["relation"] == "requires_volume_evidence":
+                downstream_volumes[edge["to"]].append(edge["from"])
+        hit_map = {}
+        for source in sorted(normalized):
+            path_id = "path:" + source
+            related = []
+            for child_id, relation in sorted(dependents[path_id]):
+                if child_id.startswith("vol:"):
+                    related.extend((node, "enterprise_ai_journey")
+                                   for node in downstream_volumes[child_id])
+                related.append((child_id, nodes[child_id]["kind"]))
+            targets = sorted(set(related))
+            hit_map[source] = {
+                "path": source,
+                "direct_relations": sorted(set(relation for _, relation in
+                                               dependents[path_id])),
+                "dependent_count": len(targets),
+                "dependent_nodes": [
+                    {"id": key, "kind": kind, "maturity": nodes[key]["maturity"]}
+                    for key, kind in targets[:max_results]
+                ],
+                "truncated": len(targets) > max_results,
+                "source_content_not_loaded": True,
+            }
+        report = {
+            "schema": SCHEMA + ".impact",
+            "graph_digest": overview["digest"],
+            "inventory_snapshot": overview["inventory_snapshot"],
+            "sources": [hit_map[k] for k in sorted(hit_map)],
+            "targeted_paths": len(normalized),
+            "max_dependents_per_source": max_results,
+            "whole_repo_dependency_graph_not_claimed": True,
+            "no_changes_or_tests_run": True,
+            "declared_impact_is_not_execution_authority": True,
+        }
+        return {**report, "digest": digest(report)}
