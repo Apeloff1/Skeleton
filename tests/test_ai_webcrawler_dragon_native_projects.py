@@ -33,7 +33,7 @@ def test_platform_matrix_covers_actual_console_and_computer_history():
               "xbox_series","dos_8086","dos_vga","pc_linux","pc_windows",
               "pc_macos","steam_deck")
     assert all(target in CATALOG for target in required)
-    assert all(t.status in ("native_source","toolchain_adapter","licensed_sdk")
+    assert all(t.status in ("native_source","toolchain_adapter","licensed_sdk","historical_reference")
                for t in TARGETS)
     assert CATALOG["xbox_series"].status=="licensed_sdk"
     assert CATALOG["ps5"].status=="licensed_sdk"
@@ -43,13 +43,30 @@ def test_platform_matrix_covers_actual_console_and_computer_history():
 def test_native_emitters_make_platform_specific_source_not_html(target):
     p=make(target)
     assert p.status=="source_generated" and p.output in (
-        "gb","gbc","nes","prg","sms","gg","sfc","z64","nds","pbp","exe","elf","app","bin","gba","xbe")
+        "gb","gbc","nes","tap","prg","xex","a78","dol","3dsx","sms","gg","sfc","z64","nds","pbp","exe","elf","app","bin","gba","xbe","hex","pdx","rom","com","p","py","lnx","iso","vpk","nro","rpx","tos","hunk","x")
     assert len(p.files)>=3 and p.target_id==target
     assert p.digest==sha(p.files)
     assert p==make(target)
     assert all(not name.endswith(".html") for name in p.files)
-    assert "Makefile" in p.files or "CMakeLists.txt" in p.files
-    assert "src/main.c" in p.files or "src/main.asm" in p.files or "src/main.s" in p.files
+    # Arduboy is a genuine AVR C++ PlatformIO project; it must not be
+    # incorrectly forced into a C/Makefile contract for unrelated targets.
+    if target=="arduboy":
+        assert "platformio.ini" in p.files
+        assert "src/main.cpp" in p.files
+        assert "board = arduboy" in p.files["platformio.ini"]
+        assert "#include <Arduboy2.h>" in p.files["src/main.cpp"]
+    elif target=="thumby":
+        # TinyCircuits Thumby executes an on-device MicroPython application;
+        # requiring C or assembly would falsely reject a real hardware port.
+        assert "Games/DragonMicroQuest/DragonMicroQuest.py" in p.files
+        assert "Makefile" in p.files
+        assert "thumby.buttonU.pressed()" in p.files[
+            "Games/DragonMicroQuest/DragonMicroQuest.py"]
+    else:
+        assert "Makefile" in p.files or "CMakeLists.txt" in p.files
+        assert ("src/main.c" in p.files or "src/main.asm" in p.files
+                or "src/main.s" in p.files or "src/main.bas" in p.files
+                or "source/main.c" in p.files)
     assert "source_generated" in p.files["dragon-native-manifest.json"]
     assert "physics" in p.deferred_mechanics if target in ("game_boy","nes","dos_vga") else True
 
@@ -112,7 +129,7 @@ def test_locked_console_targets_fail_instead_of_pretending(tmp_path):
     with pytest.raises(PermissionError):
         make("xbox_series")
     with pytest.raises(ValueError):
-        make("ps2")
+        make("rca_studio_ii")
     with pytest.raises(PermissionError):
         render_native_project(title="Good Game",target_id="game_boy",
             style="racing",candidate_id=CANDIDATE,

@@ -216,14 +216,24 @@ class PlayableWorldTests(unittest.TestCase):
         route = route_to(game, goal)
         self.assertIsNotNone(route)
         state = initial_state(game, authorized=True)
+        transitioned = False
         for direction in route:
+            previous = state
             state = advance(game, state, direction, authorized=True)
-        if len(state.collected) != game.intent.collectibles_per_level:
+            if previous.level_index == 0 and state.level_index == 1:
+                # Reaching the exit after collecting all crystals is valid.
+                # advance() clears collection on entry to the next level,
+                # so checking only the terminal state's collection count
+                # would misclassify a legitimate transition as premature.
+                self.assertEqual(
+                    len(previous.collected), game.intent.collectibles_per_level)
+                transitioned = True
+                break
+        if not transitioned:
             self.assertEqual(state.level_index, 0)
             self.assertEqual(state.status, "playing")
-        else:
-            # A maze may place every collectible on the unique path to exit.
-            self.assertGreaterEqual(state.level_index, 1)
+            self.assertLess(
+                len(state.collected), game.intent.collectibles_per_level)
 
     def test_corrupted_generated_level_proof_is_rejected(self):
         game = generate_playable_world(intent(), authorized=True)

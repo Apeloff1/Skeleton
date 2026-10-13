@@ -428,7 +428,7 @@ class ReviewedKnowledgeStore:
             note = ReviewedNote.from_mapping(entry["note"])
             quote = _text(entry["exact_quote"], "exact_quote", self.policy.max_evidence_chars)
             if len(quote) != note.end - note.start:
-                raise KnowledgeError("stored source span mismatch")
+                raise KnowledgeError("integrity: stored source span mismatch")
             if note.note_id in seen:
                 raise KnowledgeError("duplicate stored note id")
             seen.add(note.note_id)
