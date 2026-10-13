@@ -1204,6 +1204,34 @@ $("jeeves-volume-next").addEventListener("click",()=>dmGuard(
  }
 ));
 
+
+/* The installed non-provider Cognitive Core executes bounded real decisions. */
+async function cognitiveExecute(action,params){
+ if(!jeevesAppSnapshot)
+  throw Error("Scan application sources before using canonical reasoning gates");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action,params:{...params,expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false
+ });
+ $("jeeves-cognitive-output").textContent=JSON.stringify(receipt.result,null,2);
+ status("Canonical installed cognition invoked: "+action+
+  ". This computes a decision, not a trained-model quality verification.");
+}
+$("jeeves-cognitive-uncertainty").addEventListener("click",()=>dmGuard(async()=>{
+ const candidates=JSON.parse($("jeeves-uncertainty-candidates").value);
+ await cognitiveExecute("ai.cognition.uncertainty",{candidates});
+}));
+$("jeeves-cognitive-strategy").addEventListener("click",()=>dmGuard(async()=>{
+ const candidates=JSON.parse($("jeeves-reasoning-candidates").value);
+ const risk=$("jeeves-reasoning-risk").value;
+ await cognitiveExecute("ai.cognition.strategy",{candidates,risk});
+}));
+$("jeeves-cognitive-stop").addEventListener("click",()=>dmGuard(async()=>{
+ const history=JSON.parse($("jeeves-reasoning-history").value);
+ const risk=$("jeeves-reasoning-risk").value;
+ await cognitiveExecute("ai.cognition.stop",{history,risk});
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5340,6 +5368,44 @@ Show only source volumes NOT marked verified (currently seven)</label>
 <button id="jeeves-verify-blockers" type="button">List independent verification blockers</button>
 <button id="jeeves-verify-next" type="button" disabled>Next verification blocker page</button>
 <pre id="jeeves-verify-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Installed Cognitive Core Reasoning</legend>
+<p><small>Real source-backed uncertainty, strategy selection and stopping
+policy. These are deterministic cognitive gates, not an LLM/provider
+inference. Self-reported confidence is not proven calibrated probability.</small></p>
+<label>Candidate answers and uncalibrated confidence JSON
+<textarea id="jeeves-uncertainty-candidates" rows="5" spellcheck="false">[
+ {"text":"An original playable maze can be compiled with bounded walls.","confidence":0.75},
+ {"text":"An original playable maze can be compiled with bounded walls.","confidence":0.81}
+]</textarea></label>
+<button id="jeeves-cognitive-uncertainty" type="button">Execute installed uncertainty / abstention gate</button>
+<label>Reasoning risk level<select id="jeeves-reasoning-risk">
+<option value="low">Low</option>
+<option value="medium" selected>Medium</option>
+<option value="high">High</option>
+<option value="critical">Critical</option>
+</select></label>
+<label>Canonical resource-costed strategy candidates
+<textarea id="jeeves-reasoning-candidates" rows="7" spellcheck="false">[
+ {"strategy":"direct","expected_quality":0.6,
+  "expected_uncertainty_reduction":0.1,"expected_cost_units":1.0,
+  "expected_tokens":200,"expected_wall_time_s":1.0,"verification_capable":false},
+ {"strategy":"verify","expected_quality":0.85,
+  "expected_uncertainty_reduction":0.65,"expected_cost_units":2.0,
+  "expected_tokens":450,"expected_wall_time_s":2.0,"verification_capable":true}
+]</textarea></label>
+<button id="jeeves-cognitive-strategy" type="button">Select actual canonical reasoning strategy</button>
+<label>Finite historical reasoning step measurements
+<textarea id="jeeves-reasoning-history" rows="5" spellcheck="false">[
+ {"step_index":1,"cumulative_tokens":600,"cumulative_cost_units":1.0,
+  "elapsed_s":2.0,"confidence":0.6,"uncertainty":0.4,
+  "value_of_information":0.3,
+  "progress_digest":"0000000000000000000000000000000000000000000000000000000000000000",
+  "verification_passed":false,"explicit_stop":false}
+]</textarea></label>
+<button id="jeeves-cognitive-stop" type="button">Execute actual bounded stop/continue policy</button>
+<pre id="jeeves-cognitive-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
