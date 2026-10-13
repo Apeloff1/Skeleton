@@ -20,6 +20,9 @@ from .game_training_flow import (
     train_isolated_review_ranker,materialize_training_flow,
 )
 from .game_reviewer_v2 import train_robust_game_reviewer
+from .game_reviewer_optimizer import OptimizerSchedule,optimize_review_weights
+from .game_post_weight_forensics import analyze_post_weight_change
+from .game_learning_feedback import feedback_from_evaluation
 from .game_model_promotion import (
     PromotionError,PromotionStandard,evaluate_candidate,
 )
@@ -47,16 +50,22 @@ def parser():
     )
     commands=cmd.add_subparsers(dest="action",required=True)
     for name in ("evaluate","stage","approve","usage","idle-pass",
-                 "activate","status","rollback","recover","predict"):
+                 "activate","status","rollback","recover","predict","next-standard","optimize","optimize-stage","optimize-audit"):
         p=commands.add_parser(name)
         p.add_argument("--root",required=True)
         if name!="status":
             p.add_argument("--trusted-local-operator",action="store_true")
-        if name in {"evaluate","stage"}:
-            p.add_argument("--epochs",type=int,default=75)
-            p.add_argument("--feature-version",
-                           choices=("robust_v2","baseline_v1"),default="robust_v2",
-                           help="V2 normalized, adversarially augmented model by default")
+        if name in {"evaluate","stage","optimize","optimize-stage","optimize-audit"}:
+            if name in {"evaluate","stage"}:
+                p.add_argument("--epochs",type=int,default=75)
+                p.add_argument("--feature-version",
+                               choices=("robust_v2","baseline_v1"),default="robust_v2",
+                               help="V2 normalized, adversarially augmented model by default")
+            else:
+                p.add_argument("--learning-rates",nargs="+",type=float,
+                               default=[0.08,0.16,0.28])
+                p.add_argument("--epoch-candidates",nargs="+",type=int,
+                               default=[30,60])
             p.add_argument("--per-project-cap",type=int,default=256)
             p.add_argument("--minimum-balanced-accuracy",type=float,default=0.94)
             p.add_argument("--minimum-evidence-per-class",type=int,default=8)
@@ -94,15 +103,10 @@ def main(argv=None):
                         review_roles=[row["role"] for row in state["attestations"]],
                         no_remote_llm_deployment=True,
                         no_hidden_hardware_activation=True)
-        elif args.action in {"evaluate","stage"}:
+        elif args.action in {"evaluate","stage","optimize","optimize-stage","optimize-audit"}:
             batches=load_quarantined_batches(studio.root,authorized=True)
             plan=plan_training_flow(
                 batches,per_project_cap=args.per_project_cap,authorized=True)
-            fit=(train_robust_game_reviewer(
-                plan,epochs=args.epochs,authorized=True)
-                if args.feature_version=="robust_v2" else
-                train_isolated_review_ranker(
-                    plan,epochs=args.epochs,authorized=True))
             standard=PromotionStandard(
                 min_balanced_accuracy=args.minimum_balanced_accuracy,
                 min_per_class=args.minimum_evidence_per_class,
@@ -110,17 +114,58 @@ def main(argv=None):
             active=registry.read_state()["active"]
             champion=(registry._candidate(active)["policy"]
                       if active is not None else None)
-            if args.action=="evaluate":
-                evaluation=evaluate_candidate(
+            if args.action in {"optimize","optimize-stage","optimize-audit"}:
+                schedule=OptimizerSchedule(
+                    learning_rates=tuple(args.learning_rates),
+                    epochs=tuple(args.epoch_candidates))
+                trial=optimize_review_weights(
+                    plan,schedule=schedule,standard=standard,
+                    champion=champion,authorized=True)
+                result=trial.payload()
+                if args.action=="optimize-audit":
+                    evidence=analyze_post_weight_change(
+                        plan,trial,standard=standard,champion=champion,
+                        authorized=True)
+                    result=dict(schema="skeleton.game_builder.post_weight_audit_cli.v1",
+                                optimizer=result,post_weight_forensics=evidence.payload(),
+                                archived_or_activated=False,
+                                next_step="rights_reviewed_dragon_research_then_fresh_original_gameplay")
+                if args.action=="optimize-stage":
+                    # Deploying the selected fit is still disallowed. This
+                    # only enters the existing independently reviewed
+                    # staged/shadow/usage/idle operator control plane.
+                    if trial.ready_for_stage:
+                        stage=registry.stage(
+                            plan,trial.selected_fit,standard=standard,
+                            champion=champion,authorized=True)
+                        result=dict(result,stage=stage)
+                    else:
+                        blockers=list(trial.promotion_evaluation.blockers)
+                        if (trial.champion_digest is not None and
+                                not trial.candidate_improved):
+                            blockers.append("protected_test:no_measurable_champion_uplift")
+                        result=dict(result,stage={"status":"blocked",
+                           "blockers":sorted(set(blockers)),
+                           "model_installed":False})
+            else:
+                fit=(train_robust_game_reviewer(
+                    plan,epochs=args.epochs,authorized=True)
+                    if args.feature_version=="robust_v2" else
+                    train_isolated_review_ranker(
+                        plan,epochs=args.epochs,authorized=True))
+                if args.action=="evaluate":
+                    evaluation=evaluate_candidate(
                     plan,fit,standard=standard,champion=champion,
                     authorized=True)
-                result=dict(schema="skeleton.game_builder.review_evaluation_cli.v1",
-                            evaluation=evaluation.payload(),
-                            fit_executed=fit["training_performed"],
-                            core_ai_model_changed=False)
-            else:
-                result=registry.stage(plan,fit,standard=standard,
-                                      champion=champion,authorized=True)
+                    result=dict(schema="skeleton.game_builder.review_evaluation_cli.v1",
+                                evaluation=evaluation.payload(),
+                                improvement_ledger=feedback_from_evaluation(
+                                    evaluation,authorized=True).payload(),
+                                fit_executed=fit["training_performed"],
+                                core_ai_model_changed=False)
+                else:
+                    result=registry.stage(plan,fit,standard=standard,
+                                          champion=champion,authorized=True)
         elif args.action=="approve":
             data=_structured_file(args.reviewers_file)
             if type(data) is not list or len(data)!=6:
@@ -143,6 +188,8 @@ def main(argv=None):
                 evidence,game_digest=args.game_digest,authorized=True)
         elif args.action=="activate":
             result=registry.activate(authorized=True)
+        elif args.action=="next-standard":
+            result=registry.propose_next_standard(authorized=True)
         elif args.action=="rollback":
             result=registry.abort(args.reason,authorized=True)
         elif args.action=="recover":
