@@ -22,6 +22,8 @@ indexed. No files are imported, executed, followed, moved or deleted.
 | --- | --- |
 | `manifest.json` | Pinned commit and tree, complete inventory digest, zone and feature counts |
 | `files.jsonl` | Every tracked file, blob ID, mode, size, owner, feature and lifecycle |
+| `features.jsonl` | Group totals and representative paths for every known or provisional feature ID |
+| `directories.jsonl` | Entire hierarchical file tree with recursive file/byte totals |
 | `exact_duplicates.jsonl` | Same-Git-blob content groups; no deletion inference |
 | `near_duplicates.json` | Bounded same-stem token-shingle comparisons; **not exhaustive** |
 
