@@ -109,6 +109,9 @@ class JeevesAcceptanceTestMatrix:
                 raise JeevesAppwideError("unreviewed targeted product acceptance record")
             if len(set(selected)) != len(selected):
                 raise JeevesAppwideError("duplicate test module within family")
+            tier = entry.get("execution_tier", "ci_smoke")
+            if tier not in ("ci_smoke", "discovery_only") or type(tier) is not str:
+                raise JeevesAppwideError("unknown acceptance execution tier")
             ids.add(family)
             for module in selected:
                 if type(module) is not str or not MODULE.fullmatch(module):
@@ -125,11 +128,15 @@ class JeevesAcceptanceTestMatrix:
                         "declared_test_cases": cases,
                         "executed": False,
                         "passed_at_exact_head": None,
+                        "scheduled_in_matrix": False,
                     }
+                if tier == "ci_smoke":
+                    modules[module]["scheduled_in_matrix"] = True
             rows.append({
                 "family_id": family,
                 "independent_acceptance_question": entry["independent_acceptance_question"],
                 "workflow_hint": entry.get("workflow_hint"),
+                "execution_tier": tier,
                 "modules": sorted(selected),
                 "test_file_count": len(selected),
                 "targeted_cases_declared": sum(modules[m]["declared_test_case_count"]
@@ -153,7 +160,10 @@ class JeevesAcceptanceTestMatrix:
             "unique_test_module_count": len(modules),
             "unique_static_test_case_count": sum(m["declared_test_case_count"]
                                                  for m in modules),
-            "selected_modules": [m["module"] for m in modules],
+            "ci_smoke_family_count": sum(int(row["execution_tier"] == "ci_smoke") for row in rows),
+            "discovery_only_family_count": sum(int(row["execution_tier"] == "discovery_only") for row in rows),
+            "scheduled_test_module_count": sum(int(m["scheduled_in_matrix"]) for m in modules),
+            "selected_modules": [m["module"] for m in modules if m["scheduled_in_matrix"]],
             "module_source_receipts": [
                 {"path": m["path"], "sha256": m["sha256"],
                  "declared_test_case_count": m["declared_test_case_count"]}
