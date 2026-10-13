@@ -110,7 +110,7 @@ class GitHubEvidenceSource:
     def json(self, path: str):
         return _read_json(self._request(path))
 
-    def artifact(self, artifact_id: int):
+    def artifact(self, artifact_id: int, *, filename="app_acceptance_run_evidence.json"):
         if type(artifact_id) is not int or artifact_id <= 0:
             raise JeevesAppwideError("invalid signed artifact identifier")
         binary = self._request(
@@ -121,7 +121,7 @@ class GitHubEvidenceSource:
             with zipfile.ZipFile(io.BytesIO(binary)) as archive:
                 rows = archive.infolist()
                 if (len(rows) != 1 or rows[0].is_dir() or
-                    rows[0].filename != "app_acceptance_run_evidence.json" or
+                    rows[0].filename != filename or
                     rows[0].file_size > MAX_JSON_BYTES or
                     rows[0].compress_size > MAX_ZIP_BYTES):
                     raise JeevesAppwideError("untrusted CI artifact ZIP structure")
@@ -146,16 +146,19 @@ class GitHubEvidenceSource:
                 return result
         raise JeevesAppwideError("GitHub Actions pagination exceeds safety budget")
 
-    def load(self, run_id: int):
+    def load(self, run_id: int, *, mode="unittest"):
         if type(run_id) is not int or not 0 < run_id < 2**63:
             raise JeevesAppwideError("valid exact-head CI run ID required")
+        if mode not in ("unittest", "pytest") or type(mode) is not str:
+            raise JeevesAppwideError("unreviewed GitHub CI evidence mode")
         prefix = f"/repos/{REPOSITORY}/actions/runs/{run_id}"
         run = self.json(prefix)
         jobs = self._page(prefix + "/jobs", "jobs")
         artifacts = self._page(prefix + "/artifacts", "artifacts")
         data = {}
         for os_label, job in JOB_NAMES.items():
-            name = ("app-acceptance-candidates-" +
+            name = (("app-pytest-candidates-" if mode == "pytest"
+                    else "app-acceptance-candidates-") +
                     ("ubuntu-24.04" if os_label == "Linux"
                      else "windows-2022") + "-" + str(run_id))
             matched = [a for a in artifacts
@@ -173,7 +176,9 @@ class GitHubEvidenceSource:
             artifact_id = item.get("id")
             if type(artifact_id) is not int or artifact_id <= 0:
                 raise JeevesAppwideError("invalid exact-run artifact identity")
-            data[os_label] = self.artifact(artifact_id)
+            file = ("app_pytest_acceptance_run_evidence.json" if mode == "pytest"
+                    else "app_acceptance_run_evidence.json")
+            data[os_label] = self.artifact(artifact_id, filename=file)
         return run, jobs, data
 
 
