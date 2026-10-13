@@ -348,6 +348,19 @@ $("jeeves-dm-waves").addEventListener("click",()=>dmGuard(async()=>{
  status(result.total_waves+" dependency-ordered workwaves, "+result.total_tasks+
   " tasks; no worker reservations or approvals have been issued.");
 }));
+
+$("jeeves-dm-critical").addEventListener("click",()=>dmGuard(async()=>{
+ const result=await dmInvoke("ai.milestones.critical",{limit:30});
+ deathmarchPlanDigest=result.plan_digest;
+ status(result.longest_structural_chain_steps+" declared prerequisite steps in a longest "+
+  "dependency chain. No implementation durations or release claims are inferred.");
+}));
+$("jeeves-dm-owners").addEventListener("click",()=>dmGuard(async()=>{
+ const result=await dmInvoke("ai.milestones.owners",{offset:0,limit:40});
+ deathmarchPlanDigest=result.plan_digest;
+ status(result.total_tasks+" registered milestone tasks across "+result.total_owners+
+  " canonical owners; worker capacity remains unverified.");
+}));
 $("jeeves-dm-workpack").addEventListener("click",()=>dmGuard(async()=>{
  const ids=$("jeeves-dm-task-ids").value.split(",")
   .map(x=>x.trim()).filter(Boolean);
@@ -4394,6 +4407,8 @@ model promotion and release still require independent approval and evidence.</sm
 <button id="jeeves-dm-tasks" type="button">Index next 30 milestone tasks</button>
 <label>Parallel per wave (1–24)<input id="jeeves-dm-parallel" type="number" min="1" max="24" value="8"></label>
 <button id="jeeves-dm-waves" type="button">Build dependency-safe workwaves</button>
+<button id="jeeves-dm-critical" type="button">Show structural critical chain and bottlenecks</button>
+<button id="jeeves-dm-owners" type="button">Show canonical owner task loads</button>
 <label>Exact milestone IDs (comma separated, up to 24)
 <textarea id="jeeves-dm-task-ids" spellcheck="false" rows="2" placeholder="AI-CAP-assistant.text, APP-SERVICE-backend"></textarea></label>
 <button id="jeeves-dm-workpack" type="button">Assemble source-hashed workpack</button>
