@@ -128,8 +128,10 @@ class ShadowAssessment:
             require_digest(getattr(self, field), field)
         _count("independent_roots", self.independent_roots)
         _count("accepted_sources", self.accepted_sources)
-        if tuple(sorted(set(self.reason_codes))) != self.reason_codes:
+        canonical = tuple(self.reason_codes)
+        if tuple(sorted(set(canonical))) != canonical:
             raise ShadowWeightError("reason codes must be canonical")
+        object.__setattr__(self, "reason_codes", canonical)
         for reason in self.reason_codes:
             require_id(reason, "reason_code")
 
