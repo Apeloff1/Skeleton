@@ -160,7 +160,11 @@ def compare_crawl_revisions(
         def stable_provenance(source: CapturedSource) -> dict[str, object]:
             return {
                 key: value for key, value in source.document.provenance.items()
-                if key != "fetched_at"
+                # Content identity is evaluated separately as changed_text;
+                # including its digest in quality metadata would classify
+                # every text revision as QUALITY_CHANGED before quote
+                # relocation can detect missing or ambiguous evidence.
+                if key not in {"fetched_at", "content_hash"}
             }
         changed_quality = bool(prior and current and (
             prior.document.source_score != current.document.source_score
