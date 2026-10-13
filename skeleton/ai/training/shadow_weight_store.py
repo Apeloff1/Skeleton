@@ -71,7 +71,7 @@ def _decode_record(data: str) -> ShadowRecord:
     raw = _parse_json(data)
     if set(raw) != {
         "intake", "state", "version", "review_digest",
-        "training_manifest_digest", "last_event_digest",
+        "training_manifest_digest", "consumed_candidate_digest", "last_event_digest",
     }:
         raise ShadowWeightError("shadow record has unsupported fields")
     intake = raw["intake"]
@@ -99,7 +99,7 @@ def _decode_record(data: str) -> ShadowRecord:
     version = raw["version"]
     if type(version) is not int or version < 0:
         raise ShadowWeightError("invalid persisted shadow version")
-    for key in ("review_digest", "training_manifest_digest", "last_event_digest"):
+    for key in ("review_digest", "training_manifest_digest", "consumed_candidate_digest", "last_event_digest"):
         val = raw[key]
         if val is not None and (not isinstance(val, str) or len(val) != 64 or
                                 any(c not in "0123456789abcdef" for c in val)):
@@ -108,6 +108,7 @@ def _decode_record(data: str) -> ShadowRecord:
         intake=shadow_intake, state=state, version=version,
         review_digest=raw["review_digest"],
         training_manifest_digest=raw["training_manifest_digest"],
+        consumed_candidate_digest=raw["consumed_candidate_digest"],
         last_event_digest=raw["last_event_digest"],
     )
 
