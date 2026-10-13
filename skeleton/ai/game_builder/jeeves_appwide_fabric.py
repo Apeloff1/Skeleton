@@ -691,8 +691,14 @@ class JeevesAppwideRuntime:
                 raise PermissionError("reviewed production operation requires approval")
             # The existing typed dispatcher remains the single actual
             # compiler/forge/companion executor; no substitute stack.
+            # Project is an outer scoped authority selector, NOT one of the
+            # canonical action's exact typed arguments. Passing it through
+            # would break every underlying _exact() dispatcher contract
+            # (forge, game compiler, crawler, Dragon, tool fabric, etc.).
+            action_args={key:value for key,value in params.items()
+                         if key!="project"}
             underlying=dispatch_app_action(
-                ws,project,action,params,authorized=authorized)
+                ws,project,action,action_args,authorized=authorized)
             result={
                 "canonical_adapter":action,
                 "canonical_receipt_digest":underlying["digest"],
