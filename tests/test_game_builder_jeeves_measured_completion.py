@@ -164,7 +164,6 @@ class MeasuredCompletionTests(unittest.TestCase):
         self.refresh()
         with self.assertRaises(JeevesAppwideError):
             self.survey.overview()
-        self.scope["families"] = deepcopy(MeasuredCompletionTests.setUp.__defaults__ or [])
         # Rebuild in a new fixture on subsequent tests: this instance stays fail-closed.
 
     def test_duplicate_family_private_root_and_automatic_runtime_proof_rejected(self):
