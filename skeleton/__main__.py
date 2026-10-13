@@ -371,7 +371,7 @@ def _cmd_plan(rest: List[str]) -> int:
 def _cmd_cockpit(rest: List[str]) -> int:
     """Execute an operator command against durable, bounded creator steering."""
     from pathlib import Path
-    from skeleton.context.cockpit import Cockpit
+    from skeleton.context.cockpit import Cockpit, CockpitError
     from skeleton.context.operator_state import (
         capture_steering, read_steering, restore_cockpit, write_steering,
     )
@@ -395,6 +395,8 @@ def _cmd_cockpit(rest: List[str]) -> int:
             )
             out = {"ok": True, "verb": "SNAPSHOT", "path": str(location),
                    "result": cockpit.snapshot()}
+        elif rest and rest[0].upper() == "SNAPSHOT" and len(rest) != 1:
+            raise ValueError("usage: cockpit SNAPSHOT [--out snapshot.json]")
         else:
             out = cockpit.apply(" ".join(rest).strip())
             verb = out["verb"]
@@ -407,7 +409,7 @@ def _cmd_cockpit(rest: List[str]) -> int:
                 elif verb == "BLEND":
                     era_bound = False
                 write_steering(capture_steering(cockpit, era_bound=era_bound))
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, CockpitError) as exc:
         print(f"cockpit error: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(out, indent=2, default=str))
