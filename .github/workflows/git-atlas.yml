@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/build_git_atlas.py"
       - "scripts/build_git_atlas_near.py"
+      - "scripts/query_git_atlas.py"
       - "tests/test_git_atlas.py"
       - "tests/test_git_atlas_near.py"
       - ".machine/repository.toml"
@@ -88,6 +89,22 @@ jobs:
           if actual_count != summary["tracked_entries"]:
               raise SystemExit("file inventory is incomplete")
           print(f"verified {actual_count} tracked entries at {commit}")
+          PY
+
+      - name: Prove bounded source navigation
+        run: |
+          python scripts/query_git_atlas.py \
+            --root . --atlas .machine/git-atlas \
+            --query "jeeves game editor" --budget-bytes 5000 \
+            > .machine/git-atlas/query-smoke.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          response = json.loads(Path(".machine/git-atlas/query-smoke.json").read_text())
+          if not response["hits"]:
+              raise SystemExit("bounded Jeeves navigation returned zero feature hits")
+          if Path(".machine/git-atlas/query-smoke.json").stat().st_size > 5001:
+              raise SystemExit("bounded navigation exceeded byte budget")
           PY
 
       - name: Publish atlas as immutable workflow artifact
