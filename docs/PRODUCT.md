@@ -1,62 +1,52 @@
 # Product surface
 
-Operator JSON. No dashboard required.
+Canonical operator commands. This page lists only CLI entry points that are dispatched by `skeleton.__main__.main`. The HTTP organism API is separate from the CLI; a route existing does not make a same-named terminal command available.
 
-```
-python -m skeleton ready --fix --walk -n 2
-python -m skeleton product
-python -m skeleton health
+```sh
+# Canonical assembly and runtime inspection
+python -m skeleton app status --json
+python -m skeleton app check --json
+python -m skeleton app status --live
+python -m skeleton status
+python -m skeleton config
+python -m skeleton contracts
+python -m skeleton capabilities
+
+# GameForge creator loop
+python -m skeleton eras
+python -m skeleton generations
 python -m skeleton doctor
-python -m skeleton next
-python -m skeleton seed
-python -m skeleton caps
-python -m skeleton lattice
-python -m skeleton wiki 'SELECT * WHERE kind=principle'
-python -m skeleton pulse
-python -m skeleton orch
-python -m skeleton season -n 2
-python -m skeleton scoreboard
-python -m skeleton hot
-python -m skeleton coverage
-python -m skeleton decade
-python -m skeleton bank --reset
-python -m skeleton switch mobile
-python -m skeleton witness
-python -m skeleton gov
-python -m skeleton cage
-python -m skeleton rot
-python -m skeleton fieldcov
-python -m skeleton enact
-python -m skeleton day -n 2
-python -m skeleton week --days 2
-python -m skeleton calendar
-python -m skeleton conductor
-python -m skeleton conductor --run
-python -m skeleton conductor --commit
-python -m skeleton ctx "plan tensor ttk"
-python -m skeleton ctx "plan tensor ttk" --replay
-python -m skeleton ctx "plan tensor ttk" --refine
-python -m skeleton live "plan tensor ttk"
-python -m skeleton observe
-python -m skeleton stacks
-python -m skeleton mix
-python -m skeleton doctor
-python -m skeleton satellites
-python -m skeleton path
-python -m skeleton bound
-python -m skeleton fieldwalk -n 2
-python -m skeleton day -n 1
-python -m skeleton dump --hot
-python -m skeleton walk -n 3
-python -m skeleton sleep --force
-python -m skeleton forget "old trace"
-python -m skeleton helix
-python -m skeleton recall mem0
-python -m skeleton satellites
+python -m skeleton walk --era extraction_now -n 3 --mode thermal --json
+python -m skeleton walk --all-eras -n 2 --json
+python -m skeleton cockpit BIND ERA cozy_wholesome
+python -m skeleton run "an original cozy village" --out ./out/village
+
+# Further dispatched surfaces
+python -m skeleton app plan --json
+python -m skeleton app smoke --json
+python -m skeleton help
 ```
 
-HTTP: `GET /cortex/{product,health,next,ready,caps,lattice,banks,wiki}`  
-`POST /cortex/{organismer,galaxy,social,seed,contact,pulse,walk}`
+## Legacy organism HTTP API
+
+The `/cortex/*` endpoints remain HTTP interfaces and require their
+normal server/security setup. They are **not** synonyms for root-level
+`python -m skeleton <verb>` commands.
+
+The older operator command catalog advertised commands that were never
+dispatched. Those speculative CLI examples have been removed here rather
+than presenting `Unknown command` as a completed product. Reintroduce
+individual commands only with working dispatch, proper authorization,
+documented failures, and evidence. Track that work in issue #3614.
+
+## Repeated playable walkthrough contract
+
+`walk -n N` and `walk --repeat N` perform 1 to 100 bounded actual
+walkthrough attempts. Multi-run invocations use per-attempt deterministic
+seeds (`walk:000`, `walk:001`, ... or `<seed>:000`, ...). A single
+failure makes the entire command fail. `--all-eras -n N` runs every era
+N times; `--json` includes each attempt and the aggregate result. One
+walk without `-n` retains its prior output and seed behavior.
 
 Version stamp lives on the product card (`version`).
 
