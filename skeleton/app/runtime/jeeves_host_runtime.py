@@ -78,6 +78,10 @@ class JeevesApplicationRuntime:
         shadow_admission_verify: Callable[..., bool] | None = None,
         shadow_consume_verify: Callable[..., bool] | None = None,
         release_verify_external: Callable[..., bool] | None = None,
+        idle_handlers: Mapping[Any, Callable[..., Any]] | None = None,
+        idle_authorize: Callable[..., bool] | None = None,
+        idle_verify_result: Callable[..., bool] | None = None,
+        idle_policy: Any = None,
     ) -> None:
         if not isinstance(scope, JeevesHostContext):
             raise JeevesHostRuntimeError("authenticated JeevesHostContext required")
@@ -101,6 +105,10 @@ class JeevesApplicationRuntime:
             shadow_admission_verify=shadow_admission_verify,
             shadow_consume_verify=shadow_consume_verify,
             release_verify_external=release_verify_external,
+            idle_handlers=idle_handlers,
+            idle_authorize=idle_authorize,
+            idle_verify_result=idle_verify_result,
+            idle_policy=idle_policy,
         )
 
     def _require_live(self) -> None:
@@ -193,9 +201,72 @@ class JeevesApplicationRuntime:
                     "count_capped_at": 1000,
                     "production_status": "external_model_serving_plane_only",
                 },
+                "idle_learning": {
+                    "worker_enabled": self.workbench.idle_executor is not None,
+                    "status": "host-invoked only; interactive requests take priority",
+                },
                 "runtime_availability": "requires host readiness and execution grants",
                 "weights_loaded_by_jeeves": False,
             }
+
+    def propose_idle_shadow_work(
+        self, *, context: JeevesHostContext,
+        telemetry, host_now_ns: int,
+        active_work_ids: tuple[str, ...] = (),
+    ):
+        """Host-only scheduling proposal based on live machine telemetry."""
+        with self._lock:
+            self._require_live()
+            self._context(context)
+            return self.workbench.propose_idle_shadow_work(
+                telemetry, host_now_ns=host_now_ns,
+                active_work_ids=active_work_ids,
+            )
+
+    def invoke_idle_shadow_work(
+        self, *, context: JeevesHostContext,
+        intake_id: str, plan, assignment, telemetry, host_now_ns: int,
+    ):
+        """Dispatch exactly one externally permitted idle job with durable custody."""
+        with self._lock:
+            self._require_live()
+            live = self._context(context)
+            return self.workbench.invoke_idle_shadow_work(
+                intake_id=intake_id, plan=plan,
+                assignment=assignment, telemetry=telemetry,
+                host_now_ns=host_now_ns, context=live,
+            )
+
+    def pending_idle_effects(self, *, context: JeevesHostContext,
+                             limit: int = 100):
+        """Observe uncertain idle effects without retriggering them."""
+        with self._lock:
+            self._require_live()
+            self._context(context)
+            return self.workbench.pending_idle_effects(limit=limit)
+
+    def reconcile_idle_effect(
+        self, *, context: JeevesHostContext,
+        intent_digest: str, external_event_digest: str,
+        confirmed_completed: bool,
+        verify_external: Callable[[str, str, JeevesHostContext], bool],
+    ):
+        """Host-only external reconciliation for an interrupted idle worker."""
+        if not callable(verify_external):
+            raise JeevesHostRuntimeError("independent host recovery verifier required")
+        with self._lock:
+            self._require_live()
+            self._context(context)
+            if self.workbench.idle_executor is None:
+                raise JeevesHostRuntimeError("idle worker has not been enabled")
+            return self.workbench.idle_executor.reconcile(
+                intent_digest,
+                external_event_digest=external_event_digest,
+                confirmed_completed=confirmed_completed,
+                verify_external=lambda intent, proof: (
+                    verify_external(intent, proof, context) is True
+                ),
+            )
 
     def pending_source_edits(self, *, context: JeevesHostContext,
                              limit: int = 100):
