@@ -65,7 +65,9 @@ def _checked_spec(spec):
                     a not in ACTION_HELP[node["editor"]]
                     for a in node["actions"])):
             raise JeevesAppwideError("bad game node, action or reused source identity")
-        if node["ending"] is not None and node["ending"] not in ENDINGS:
+        if node["ending"] is not None and (
+                type(node["ending"]) is not str or
+                node["ending"] not in ENDINGS):
             raise JeevesAppwideError("unsupported authored original ending category")
         commands+=len(node["actions"])
         ids.add(node["id"])
@@ -79,6 +81,9 @@ def _checked_spec(spec):
     for e in spec["edges"]:
         if (type(e) is not dict or
                 set(e)!={"source","target","priority","predicate","threshold"}
+                or type(e["source"]) is not str
+                or type(e["target"]) is not str
+                or type(e["predicate"]) is not str
                 or e["source"] not in ids or e["target"] not in ids
                 or e["source"]==e["target"]
                 or type(e["priority"]) is not int
@@ -129,6 +134,8 @@ def _checked_spec(spec):
         raise JeevesAppwideError("original campaign contains disconnected scene")
     if len(end_nodes)<2:
         raise JeevesAppwideError("at least two different authored endings required")
+    if len({n["ending"] for n in spec["nodes"] if n["ending"] is not None})<2:
+        raise JeevesAppwideError("multiple authored ending categories required")
     return sorted(spec["nodes"],key=lambda n:n["id"]),outgoing,order
 
 
