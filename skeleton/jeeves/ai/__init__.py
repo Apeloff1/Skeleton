@@ -7,6 +7,7 @@ from .creator_runbook_runtime import (
     CreatorRunbookStep, RunbookState, RunbookStepStatus,
 )
 from .creator_runbook_store import CreatorRunbookStore
+from .orchestration_store import DurableOrchestrLedger, OrchestrationStoreError
 
 __all__ = [
     "Authority",
@@ -26,4 +27,6 @@ __all__ = [
     "RunbookState",
     "RunbookStepStatus",
     "CreatorRunbookStore",
+    "DurableOrchestrLedger",
+    "OrchestrationStoreError",
 ]
