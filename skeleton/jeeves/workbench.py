@@ -348,6 +348,29 @@ class JeevesWorkbench:
             raise JeevesWorkbenchError("host denied source edit scope")
         return self._source_edit_handler(plan, context)
 
+    def pending_source_edits(self, *, limit: int = 100):
+        """List unresolved local editing effects for host/operator recovery."""
+        with self._lock:
+            self._ensure_open()
+            if self._local_source_editor is None:
+                raise JeevesWorkbenchError("local editor was not explicitly enabled")
+            return self._local_source_editor.pending_edits(limit=limit)
+
+    def reconcile_source_edit(self, plan_digest: str, *, observed_at_ns: int):
+        """Reconcile a crash without replaying any file mutation."""
+        with self._lock:
+            self._ensure_open()
+            if self._local_source_editor is None:
+                raise JeevesWorkbenchError("local editor was not explicitly enabled")
+            outcome = self._local_source_editor.reconcile_pending(
+                plan_digest, observed_at_ns=observed_at_ns,
+            )
+            return {
+                "schema": "jeeves.source_edit_reconciliation.v1",
+                "plan_digest": plan_digest, "outcome": outcome,
+                "external_effect_replayed": False,
+            }
+
     def refresh_source_atlas(self, *, observed_at_ns: int,
                              hash_contents: bool = False):
         """Host-invoked full source observation; never model-triggered."""
