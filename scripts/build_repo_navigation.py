@@ -72,14 +72,14 @@ def feature_of(path: str) -> str:
     if parts[0] == "satellites" and len(parts) >= 3:
         return "/".join(parts[:3])
     if parts[0] == "skeleton" and len(parts) >= 4 and parts[1] == "ai":
-        return "/".join(parts[:4])
+        return "/".join(parts[:4] if len(parts) >= 5 else parts[:3])
     if parts[0] == "frontend" and len(parts) >= 4 and parts[1] in ("features", "app", "src"):
         return "/".join(parts[:3])
     if parts[0] == "backend" and len(parts) >= 3:
-        return "/".join(parts[:3])
+        return "/".join(parts[:3] if len(parts) >= 4 else parts[:2])
     if parts[0] == "skeleton" and len(parts) >= 3:
-        return "/".join(parts[:3])
-    return "/".join(parts[:2])
+        return "/".join(parts[:3] if len(parts) >= 4 else parts[:2])
+    return "/".join(parts[:2] if len(parts) >= 3 else parts[:1])
 
 
 def shard_of(path: str) -> str:
