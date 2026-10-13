@@ -678,13 +678,33 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Do not spend the exhausted installation API budget trying to
+          # launch additional recovery runs. A rate-limited observation has
+          # unknown state, so it must never authorize a dispatch.
+          api_json() {
+            local path="$1" output="$2" error_file="$RUNNER_TEMP/housekeeping-api-error.txt"
+            if gh api "/repos/${REPO}/${path}" > "$output" 2>"$error_file"; then
+              return 0
+            fi
+            if grep -Eqi '(rate.limit|abuse detection)' "$error_file"; then
+              {
+                echo '## Housekeeping wake'
+                echo '- Dispatch: no'
+                echo '- Reason: GitHub installation API capacity exhausted; deferred without mutation'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo '::error::Housekeeping API observation failed; fail closed.'
+            exit 1
+          }
+
           cutoff=$(date -u -d "${HOUSEKEEPING_WAKE_STALE_MINUTES} minutes ago" +%s)
           stale_candidate=''
           scan_complete=false
 
           for page in $(seq 1 10); do
             page_json="$RUNNER_TEMP/housekeeping-wake-queued-${page}.json"
-            gh api "/repos/${REPO}/actions/runs?status=queued&per_page=100&page=${page}" > "$page_json"
+            api_json "actions/runs?status=queued&per_page=100&page=${page}" "$page_json"
             count=$(jq -r '.workflow_runs | length' "$page_json")
             [[ "$count" =~ ^[0-9]+$ ]] || {
               echo '::error::Housekeeping wake received malformed queued-run inventory.'
@@ -733,7 +753,9 @@ jobs:
           housekeeping_live=0
           housekeeping_status=''
           for status_name in requested waiting pending queued in_progress; do
-            status_count=$(gh api "/repos/${REPO}/actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=${status_name}&per_page=1" --jq '.total_count')
+            status_file="$RUNNER_TEMP/housekeeping-${status_name}.json"
+            api_json "actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=${status_name}&per_page=1" "$status_file"
+            status_count=$(jq -r '.total_count // "invalid"' "$status_file")
             if ! [[ "$status_count" =~ ^[0-9]+$ ]]; then
               echo "::error::Housekeeping wake received invalid ${status_name} run count."
               exit 1
@@ -755,9 +777,9 @@ jobs:
             exit 0
           fi
 
-          recent_success=$(gh api \
-            "/repos/${REPO}/actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=completed&per_page=20" \
-            --jq '[.workflow_runs[] | select(.conclusion == "success") | .updated_at][0] // ""')
+          history_file="$RUNNER_TEMP/housekeeping-recent-completed.json"
+          api_json "actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=completed&per_page=20" "$history_file"
+          recent_success=$(jq -r '[.workflow_runs[] | select(.conclusion == "success") | .updated_at][0] // ""' "$history_file")
           if [[ -n "$recent_success" ]]; then
             recent_epoch=$(date -u -d "$recent_success" +%s)
             cooldown_cutoff=$(date -u -d "${HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES} minutes ago" +%s)
