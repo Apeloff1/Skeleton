@@ -138,6 +138,11 @@ class Jeeves:
         from skeleton.jeeves.app_capability_bridge import capability_catalog
         return capability_catalog(query=query, limit=limit, offset=offset, root=root)
 
+    def app_capability_concepts(self, *, query: str = "", limit: int = 20, offset: int = 0, root=None):
+        """Search the declared capability taxonomy without claiming execution."""
+        from skeleton.jeeves.app_capability_bridge import capability_concepts
+        return capability_concepts(query=query, limit=limit, offset=offset, root=root)
+
     def creator_proposal(self, operation: str, project_id: str, payload):
         """Compile a validated creator proposal, without dispatch authority."""
         from skeleton.jeeves.app_capability_bridge import creator_proposal

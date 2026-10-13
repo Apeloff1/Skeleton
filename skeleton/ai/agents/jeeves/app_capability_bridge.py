@@ -127,6 +127,61 @@ def capability_catalog(*, query: str = "", limit: int = 20, offset: int = 0,
     }
 
 
+def capability_concepts(*, query: str = "", limit: int = 20, offset: int = 0,
+                        root: Path | str | None = None) -> dict[str, Any]:
+    """Paged declared-knowledge concepts, never represented as executable tools."""
+    needle, limit, offset = _page(query, limit, offset)
+    home = _root(root)
+    taxonomy = _manifest(home / "machine" / "capability_taxonomy.json")
+    concepts = taxonomy.get("concepts")
+    if not isinstance(concepts, list) or len(concepts) > MAX_ROWS:
+        raise AppCapabilityBridgeError("capability taxonomy lacks bounded concepts")
+    rows: list[dict[str, Any]] = []
+    for concept in concepts:
+        if not isinstance(concept, dict):
+            raise AppCapabilityBridgeError("capability concept must be an object")
+        identity = concept.get("concept_id")
+        name = concept.get("canonical_name")
+        forms = concept.get("declared_forms")
+        volume_refs = concept.get("volume_refs")
+        if (not isinstance(identity, str) or not identity or len(identity) > 160
+                or not isinstance(name, str) or not name or len(name) > 512
+                or not isinstance(forms, list) or not isinstance(volume_refs, list)
+                or any(not isinstance(f, str) for f in forms + volume_refs)):
+            raise AppCapabilityBridgeError("invalid capability concept identity")
+        rows.append({
+            "concept_id": identity,
+            "name": name,
+            "declared_forms": forms[:8],
+            "volume_refs": volume_refs[:16],
+            "authority": "declaration-only",
+            "implementation_verified": False,
+        })
+    rows.sort(key=lambda item: item["concept_id"])
+    if len({x["concept_id"] for x in rows}) != len(rows):
+        raise AppCapabilityBridgeError("capability taxonomy duplicates concept IDs")
+    digest = sha256(json.dumps(rows, sort_keys=True, separators=(",", ":"),
+                               ensure_ascii=True).encode("utf-8")).hexdigest()
+    filtered = [item for item in rows if not needle or needle in
+                (item["concept_id"] + " " + item["name"] + " "
+                 + " ".join(item["declared_forms"] + item["volume_refs"])).casefold()]
+    page = filtered[offset: offset + limit]
+    return {
+        "schema": SCHEMA,
+        "index": "capability-taxonomy",
+        "query": query,
+        "total_declared": len(rows),
+        "total_matched": len(filtered),
+        "index_sha256": digest,
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + len(page) < len(filtered),
+        "concepts": page,
+        "execution_authority": "none",
+        "validation": "taxonomy declaration; runtime proof required",
+    }
+
+
 def creator_operation_catalog() -> dict[str, Any]:
     from skeleton.forge.creator.command_surface import surface_manifest
     surface = surface_manifest("api")
@@ -175,6 +230,18 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
                 ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
             ),
         ), lambda args, _ctx: capability_catalog(
+            query=args.get("query", ""), limit=args.get("limit", 20),
+            offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="app.concepts",
+            description="Read declared capability concepts with explicit unverified status.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("query", "string", required=False, max_length=MAX_QUERY),
+                ArgumentRule("limit", "integer", required=False, minimum=1, maximum=MAX_PAGE),
+                ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
+            ),
+        ), lambda args, _ctx: capability_concepts(
             query=args.get("query", ""), limit=args.get("limit", 20),
             offset=args.get("offset", 0), root=home)),
         (ToolSpec(

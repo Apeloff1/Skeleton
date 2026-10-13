@@ -63,7 +63,7 @@ def test_jeeves_host_registry_exposes_only_read_only_tools():
     jeeves = Jeeves()
     registry = jeeves.app_tool_registry()
     names = {s.name for s in registry.specs()}
-    assert names == {"app.capabilities", "creator.operations", "creator.propose"}
+    assert names == {"app.capabilities", "app.concepts", "creator.operations", "creator.propose"}
     assert all(s.risk is RiskTier.READ_ONLY for s in registry.specs())
     assert jeeves.app_capability_catalog(limit=1)["capabilities"]
     assert jeeves.creator_proposal("preview", "quest-studio", {
@@ -171,3 +171,33 @@ def test_authorized_tool_requires_explicit_host_handlers():
     with pytest.raises(TypeError):
         register_authorized_creator_tool(
             Jeeves().app_tool_registry(), handlers={}, authorize=lambda *_: True)
+
+
+def test_capability_taxonomy_is_paged_and_never_claims_runtime_verification():
+    from skeleton.jeeves.app_capability_bridge import capability_concepts
+    first = capability_concepts(limit=12)
+    again = capability_concepts(limit=12)
+    assert first == again
+    assert first["total_declared"] >= 1000
+    assert first["execution_authority"] == "none"
+    assert all(item["implementation_verified"] is False for item in first["concepts"])
+    other = capability_concepts(limit=12, offset=12)
+    assert not {x["concept_id"] for x in first["concepts"]} & {
+        x["concept_id"] for x in other["concepts"]}
+    assert Jeeves().app_capability_concepts(limit=1)["concepts"]
+    for bad in ({"limit": False}, {"limit": 0}, {"limit": 65}, {"query": "q"*161}):
+        with pytest.raises(AppCapabilityBridgeError):
+            capability_concepts(**bad)
+
+
+def test_capability_concept_tool_is_host_granted_and_nonexecuting():
+    registry = Jeeves().app_tool_registry()
+    executor = ToolExecutor(registry)
+    ctx = ToolExecutionContext(run_id="concept-001", user_id="user-003", trace_id="trace-003")
+    call = ToolCall(call_id="concept-call", name="app.concepts", arguments={"limit": 3})
+    with pytest.raises(ToolDenied):
+        executor.execute(call, ctx, grants=[])
+    result = executor.execute(call, ctx, grants=[ToolGrant(tool_name="app.concepts")])
+    assert result.ok is True
+    assert len(result.payload["concepts"]) == 3
+    assert result.payload["validation"].startswith("taxonomy declaration")
