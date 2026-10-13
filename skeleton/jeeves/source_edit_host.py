@@ -288,6 +288,79 @@ class JeevesAtomicSourceEditor:
             )
             return outcome
 
+    def pending_edits(self, *, limit: int = 100) -> tuple[dict[str, Any], ...]:
+        """List unresolved intents without reading or exposing edited source."""
+        if type(limit) is not int or not 1 <= limit <= 1000:
+            raise JeevesSourceEditError("pending edit list limit out of range")
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT plan_digest,project_id,path,before_sha256,after_sha256,"
+                "observed_at_ns FROM jeeves_source_edit WHERE state='pending' "
+                "ORDER BY observed_at_ns,plan_digest LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return tuple({
+                "plan_digest": plan_digest, "project_id": project_id,
+                "path": path, "before_sha256": before,
+                "after_sha256": after, "observed_at_ns": timestamp,
+                "state": "in_doubt", "execution_authority": "none",
+            } for plan_digest, project_id, path, before, after, timestamp in rows)
+
+    def reconcile_pending(self, plan_digest: str, *,
+                          observed_at_ns: int) -> str:
+        """Recover by durable intent identity alone after a process restart.
+
+        No replacement body or original in-memory plan is required. The host
+        compares actual bytes against the journaled BEFORE/AFTER fingerprints
+        and never replays the edit.
+        """
+        if (not isinstance(plan_digest, str) or len(plan_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in plan_digest)):
+            raise JeevesSourceEditError("pending edit id must be SHA-256")
+        if type(observed_at_ns) is not int or observed_at_ns < 0:
+            raise JeevesSourceEditError("recovery requires trusted host timestamp")
+        with self._lock:
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                row = self._db.execute(
+                    "SELECT project_id,path,before_sha256,after_sha256,state "
+                    "FROM jeeves_source_edit WHERE plan_digest=?",
+                    (plan_digest,),
+                ).fetchone()
+                if row is None:
+                    raise JeevesSourceEditError("unknown source edit intent")
+                project_id, relative, before, after, prior_state = row
+                if prior_state != "pending":
+                    self._db.execute("COMMIT")
+                    return prior_state
+                full = self._full_path(relative)
+                current, _ = self._read_exact(full)
+                digest = sha256(current).hexdigest()
+                outcome = (
+                    "committed" if digest == after
+                    else "aborted" if digest == before
+                    else "conflict"
+                )
+                event = _digest({
+                    "schema": "jeeves.source_edit_event.v1",
+                    "plan_digest": plan_digest, "project_id": project_id,
+                    "path": relative, "before_sha256": before,
+                    "after_sha256": after,
+                    "state": outcome, "observed_at_ns": observed_at_ns,
+                })
+                self._db.execute(
+                    "UPDATE jeeves_source_edit "
+                    "SET state=?,event_digest=?,observed_at_ns=? "
+                    "WHERE plan_digest=? AND state='pending'",
+                    (outcome, event, observed_at_ns, plan_digest),
+                )
+                self._db.execute("COMMIT")
+                return outcome
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                raise
+
     def close(self) -> None:
         with self._lock:
             self._db.close()
