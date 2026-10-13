@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -179,6 +180,16 @@ class GitHubEvidenceSource:
 def measure(repo_root: Path, *, run_id: int, attempt: int, head: str,
             github_token: str):
     repo_root = repo_root.resolve()
+    if not (repo_root / ".git").exists():
+        raise JeevesAppwideError("independent CI verification requires a Git checkout")
+    try:
+        observed = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--verify", "HEAD"],
+            check=True, capture_output=True, text=True, timeout=15).stdout.strip()
+    except (subprocess.SubprocessError, OSError) as exc:
+        raise JeevesAppwideError("unable to verify local checkout commit") from exc
+    if observed != head:
+        raise JeevesAppwideError("trusted verifier checkout is not exact CI head")
     inventory = AppwideInventory(repo_root)
     inventory.scan()
     matrix = JeevesAcceptanceTestMatrix(inventory).overview()
