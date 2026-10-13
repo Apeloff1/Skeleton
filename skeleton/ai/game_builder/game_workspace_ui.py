@@ -2230,6 +2230,88 @@ function renderAdvancedActions(actions){
   target.append(buildSpatial);target.append(chunkX);target.append(chunkY);
   target.append(spatialRadius);target.append(spatialMode);
   target.append(querySpatial);target.append(spatialNext);target.append(spatialOutput);
+  const lensTitle=document.createElement("h4");
+  lensTitle.textContent="Historical Spatial Lens · real NPC chunk playback by source turn";
+  target.append(lensTitle);
+  const turnsInput=document.createElement("textarea");
+  turnsInput.rows=2;
+  turnsInput.id="original-spatial-history-epochs";
+  turnsInput.setAttribute("aria-label","One to twelve increasing original source-game turns");
+  turnsInput.value=JSON.stringify([0,2,4],null,1);
+  target.append(turnsInput);
+  const epochPreset=document.createElement("button");
+  epochPreset.type="button";
+  epochPreset.textContent="Use actual genesis, midpoint and current game turn";
+  epochPreset.addEventListener("click",()=>{
+    if(!latestStreamRecord){
+      status("Run the source-backed NPC world first");
+      return;
+    }
+    const end=latestStreamRecord.state.tick;
+    turnsInput.value=JSON.stringify(
+      [...new Set([0,Math.floor(end/2),end])].sort((a,b)=>a-b),
+      null,1
+    );
+  });
+  const analyzeEpochs=document.createElement("button");
+  analyzeEpochs.type="button";
+  analyzeEpochs.textContent="Replay independently verified physical NPC history";
+  const epochOutput=document.createElement("pre");
+  epochOutput.id="original-historical-spatial-proof";
+  epochOutput.setAttribute("role","status");
+  epochOutput.setAttribute("aria-live","polite");
+  analyzeEpochs.addEventListener("click",async()=>{
+    try{
+      if(!latestStreamRecord||!indexedWorld)
+        throw Error("Play the original game and build the verified chunk index first");
+      const turns=JSON.parse(turnsInput.value);
+      if(!Array.isArray(turns)||turns.length<1||turns.length>12||
+         !turns.every(t=>Number.isSafeInteger(t)&&t>=0&&
+                            t<=latestStreamRecord.state.tick)||
+         turns.some((t,i)=>i>0&&t<=turns[i-1]))
+        throw Error("Only increasing genuine source turns in the original game are allowed");
+      const result=await api("/api/original-spatial-history",{
+        record:latestStreamRecord,turns,query:{
+          center_chunk:[Number(chunkX.value),Number(chunkY.value)],
+          radius:Number(spatialRadius.value),
+          mode:spatialMode.value,limit:16
+        }
+      });
+      if(!result.verified||result.source_files_mutated||
+         result.record.model_weights_promoted)
+        throw Error("Original source epochs did not independently replay");
+      const proof=await api("/api/verify-original-spatial-history",{
+        record:result.record
+      });
+      if(!proof.verified)
+        throw Error("Historical source actions diverged from physical NPC proof");
+      epochOutput.textContent=JSON.stringify({
+        original_world_digest:result.record.source_game_digest,
+        actual_source_turns:result.record.queried_original_turns,
+        historical_epochs:result.record.epochs.map(e=>({
+          turn:e.turn,original_source_head:e.actual_source_head,
+          player_tile:e.player_position,
+          physical_people:e.physical_actor_count,
+          original_chunk_residency:e.chunk_occupancy,
+          physically_changed_actors:e.changed_body_ids_since_previous_epoch,
+          actual_movement_steps_since_last_epoch:e.real_one_tile_moves_in_interval,
+          true_detailed_updates:e.detailed_update_count,
+          true_deferred_actor_turns:e.deferred_actor_turns,
+          inspected_source_chunks:e.query.candidate_chunk_keys,
+          original_residents:e.query.residents,
+          candidate_bodies_examined:e.query.candidate_actor_entries_examined
+        })),
+        positions_are_real_not_interpolated:true,
+        source_history_independently_verified:true,
+        project_mutated:false,weights_promoted:false
+      },null,2);
+      status("Original NPC historical world positions independently reconstructed and verified.");
+    }catch(error){
+      epochOutput.textContent="";
+      status("Historical Spatial Lens denied: "+error.message);
+    }
+  });
+  target.append(epochPreset);target.append(analyzeEpochs);target.append(epochOutput);
   return;
  }
  if(advancedSession?.editor==="economy"){
