@@ -70,3 +70,43 @@ def test_allows_local_actions_and_digest_pinned_container_actions(tmp_path: Path
         f"name: test\non: [push]\npermissions: {{}}\njobs:\n  test:\n    steps:\n      - uses: ./.github/actions/local\n      - uses: docker://alpine@sha256:{DOCKER_DIGEST}\n",
     )
     assert findings == []
+
+
+GODOT_PIN = "f166999204a4f2722c6fe042fbaa3b3ea0d9c789"
+
+
+def test_accepts_only_reviewed_godot_exact_release(tmp_path: Path) -> None:
+    source = (
+        "name: godot\non: [push]\npermissions: {}\njobs:\n"
+        "  build:\n    steps:\n"
+        f"      - uses: chickensoft-games/setup-godot@{GODOT_PIN}\n"
+    )
+    assert _scan(tmp_path, source) == []
+
+
+def test_godot_different_sha_still_requires_review(tmp_path: Path) -> None:
+    source = (
+        "jobs:\n  build:\n    steps:\n"
+        f"      - uses: chickensoft-games/setup-godot@{PIN}\n"
+    )
+    assert any("not allowlisted" in problem for problem in _scan(tmp_path, source))
+
+
+def test_godot_mutable_release_tag_is_not_approved(tmp_path: Path) -> None:
+    source = (
+        "jobs:\n  build:\n    steps:\n"
+        "      - uses: chickensoft-games/setup-godot@v2.4.1\n"
+    )
+    assert any("not allowlisted" in problem for problem in _scan(tmp_path, source))
+
+
+def test_godot_approval_does_not_extend_to_sibling_or_reusable_workflow(
+    tmp_path: Path,
+) -> None:
+    for reference in (
+        f"chickensoft-games/other-action@{GODOT_PIN}",
+        f"chickensoft-games/setup-godot/.github/workflows/run.yml@{GODOT_PIN}",
+        f"chickensoft-games/setup-godot/another@{GODOT_PIN}",
+    ):
+        source = f"jobs:\n  job:\n    uses: {reference}\n"
+        assert any("not allowlisted" in problem for problem in _scan(tmp_path, source))
