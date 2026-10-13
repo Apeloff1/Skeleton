@@ -11,10 +11,6 @@ SCHEMA="skeleton.ai.dragon.original_native_save_v1"
 SOURCE='''/* Bounded local puzzle save slot: never loads code or remote data.
    This state fingerprint detects accidents/foreign saves; not authentication.
    The game itself does not grant AI memory or learning XP. */
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
 #define DRAGON_SAVE_NAME "dragon-save-v1.dat"
 #define DRAGON_TEMP_NAME "dragon-save-v1.tmp"
 static uint32_t game_map_fingerprint(void){
@@ -163,6 +159,18 @@ def enable_native_save(source:str)->str:
         raise ValueError("original C99 save insertion points missing")
     if "static uint32_t trace_word" not in source:
         raise ValueError("original C99 state trace is required for saved-game identity")
+    # Parse Windows SDK headers before the generated LEVEL_W/LEVEL_H macros.
+    # Including windows.h after dragon_puzzle.h causes MinGW's declarations
+    # to be rewritten by those game macros and breaks actual Win64 builds.
+    header='#include "dragon_puzzle.h"'
+    if source.count(header)!=1:
+        raise ValueError("original C99 puzzle include insertion point missing")
+    windows_headers=(
+        "#ifdef _WIN32\\n"
+        "#ifndef WIN32_LEAN_AND_MEAN\\n#define WIN32_LEAN_AND_MEAN\\n#endif\\n"
+        "#include <windows.h>\\n#endif\\n"
+    )
+    source=source.replace(header,windows_headers+header,1)
     result=source.replace(ENTRY,SOURCE+"\n"+ENTRY,1)
     result=result.replace(CONTROL,CONTROL_ACTION+CONTROL,1)
     result=result.replace(
