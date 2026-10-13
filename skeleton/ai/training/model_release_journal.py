@@ -179,13 +179,114 @@ class ModelReleaseJournal:
         try:
             self._db.execute("PRAGMA busy_timeout=10000")
             self._db.executescript(_SCHEMA)
-            self._db.execute(
-                "INSERT OR IGNORE INTO model_release_meta VALUES(1, ?, 0)",
-                (GENESIS,),
-            )
+            existing = self._db.execute(
+                "SELECT head,event_count FROM model_release_meta WHERE singleton=1"
+            ).fetchone()
+            if existing is None:
+                if self._db.execute(
+                    "SELECT COUNT(*) FROM model_release_events"
+                ).fetchone()[0]:
+                    raise ReleaseJournalError("orphaned release events without authority head")
+                self._db.execute(
+                    "INSERT INTO model_release_meta VALUES(1, ?, 0)",
+                    (GENESIS,),
+                )
+            self._verify_chain()
         except BaseException:
             self._db.close()
             raise
+
+    def _verify_chain(self) -> None:
+        """Replay bounded release custody before accepting any more events."""
+        head = GENESIS
+        count = 0
+        last: dict[str, tuple[ReleaseState, int, str, str | None]] = {}
+        rows = self._db.execute(
+            "SELECT sequence,proposal_digest,prior_event_digest,event_digest,"
+            "event_json FROM model_release_events ORDER BY sequence"
+        )
+        for sequence, p_digest, prior, recorded, event_json in rows:
+            if count >= 200_000 or sequence != count or prior != head:
+                raise ReleaseJournalError("release evidence chain sequence is broken")
+            if not isinstance(event_json, str) or len(event_json) > 32_768:
+                raise ReleaseJournalError("release event exceeds canonical bound")
+            try:
+                event = json.loads(event_json)
+            except (ValueError, TypeError) as exc:
+                raise ReleaseJournalError("release custody event is malformed") from exc
+            if (not isinstance(event, dict)
+                    or set(event) != {
+                        "schema", "sequence", "prior_event_digest",
+                        "proposal_digest", "state", "version",
+                        "receipt_digest", "at_ns",
+                    }
+                    or event.get("schema") != "skeleton.model_release_event.v1"
+                    or event.get("sequence") != count
+                    or event.get("prior_event_digest") != head
+                    or event.get("proposal_digest") != p_digest
+                    or _digest(event) != recorded):
+                raise ReleaseJournalError("release event digest or schema mismatch")
+            try:
+                state = ReleaseState(event["state"])
+            except (ValueError, TypeError) as exc:
+                raise ReleaseJournalError("unsupported release event state") from exc
+            old = last.get(p_digest)
+            if old is None:
+                if state is not ReleaseState.PROPOSED or event["version"] != 0:
+                    raise ReleaseJournalError("release candidate lacks genesis proposal")
+            else:
+                allowed = {
+                    ReleaseState.PROPOSED: {
+                        ReleaseState.APPROVED, ReleaseState.REJECTED,
+                        ReleaseState.QUARANTINED,
+                    },
+                    ReleaseState.APPROVED: {
+                        ReleaseState.ACTIVE_EXTERNAL, ReleaseState.REJECTED,
+                        ReleaseState.QUARANTINED,
+                    },
+                    ReleaseState.ACTIVE_EXTERNAL: {
+                        ReleaseState.ROLLED_BACK_EXTERNAL, ReleaseState.QUARANTINED,
+                    },
+                    ReleaseState.QUARANTINED: {ReleaseState.REJECTED},
+                    ReleaseState.REJECTED: set(),
+                    ReleaseState.ROLLED_BACK_EXTERNAL: set(),
+                }
+                if (event["version"] != old[1] + 1
+                        or state not in allowed[old[0]]):
+                    raise ReleaseJournalError("release candidate transition is noncanonical")
+            _sha(event["receipt_digest"], "receipt_digest")
+            if type(event["at_ns"]) is not int or event["at_ns"] < 0:
+                raise ReleaseJournalError("release custody event timestamp invalid")
+            last[p_digest] = (state, event["version"], recorded, event["receipt_digest"])
+            head = recorded
+            count += 1
+        meta = self._db.execute(
+            "SELECT head,event_count FROM model_release_meta WHERE singleton=1"
+        ).fetchone()
+        if meta != (head, count):
+            raise ReleaseJournalError("release authority head diverges from journal")
+        durable = self._db.execute(
+            "SELECT proposal_digest,proposal_json,state,version,last_event_digest "
+            "FROM model_release_proposals"
+        ).fetchall()
+        if len(durable) != len(last):
+            raise ReleaseJournalError("release proposal index diverges from evidence chain")
+        for key, raw, state, version, event_digest in durable:
+            candidate = self._proposal(raw)
+            prior = last.get(key)
+            if (candidate.digest != key or prior is None
+                    or prior[:3] != (ReleaseState(state), version, event_digest)):
+                raise ReleaseJournalError("materialized model release status is inconsistent")
+            if state in (
+                ReleaseState.ACTIVE_EXTERNAL.value,
+                ReleaseState.ROLLED_BACK_EXTERNAL.value,
+            ):
+                bound = self._db.execute(
+                    "SELECT admission_digest FROM model_release_admissions "
+                    "WHERE proposal_digest=?", (key,),
+                ).fetchone()
+                if bound is None:
+                    raise ReleaseJournalError("active release lacks external admission binding")
 
     @staticmethod
     def _proposal(row: str) -> CandidateReleaseProposal:
