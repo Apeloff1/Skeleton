@@ -202,6 +202,39 @@ class IndependentlyVerifiedPytestTests(unittest.TestCase):
             self.verify()
         self.artifacts["Windows"]=old
 
+    def test_live_GitHub_reader_uses_same_run_and_specific_pytest_artifact(self):
+        from scripts.verify_app_acceptance_ci import GitHubEvidenceSource
+        reader=GitHubEvidenceSource("read-only-test-token")
+        reader.json=lambda path:self.run
+        reader._page=lambda route,key:self.jobs if key=="jobs" else [
+            {"id":11 if osname=="Linux" else 12,
+             "name":"app-pytest-candidates-"+
+                    ("ubuntu-24.04" if osname=="Linux" else "windows-2022")
+                    +"-"+str(self.run_id),
+             "expired":False,
+             "workflow_run":{"id":self.run_id}}
+            for osname in ("Linux","Windows")
+        ]
+        calls=[]
+        def artifact(artifact_id, *, filename):
+            calls.append((artifact_id,filename))
+            return self.artifacts["Linux" if artifact_id==11 else "Windows"]
+        reader.artifact=artifact
+        run,jobs,evidence=reader.load(self.run_id,mode="pytest")
+        self.assertEqual(run,self.run)
+        self.assertEqual(jobs,self.jobs)
+        self.assertEqual(len(evidence),2)
+        self.assertEqual(
+            calls,[(11,"app_pytest_acceptance_run_evidence.json"),
+                   (12,"app_pytest_acceptance_run_evidence.json")])
+        self.assertEqual(self.verify()["pytest_targeted_family_count"],2)
+
+    def test_unsupported_artifact_mode_refused_before_any_network(self):
+        from scripts.verify_app_acceptance_ci import GitHubEvidenceSource
+        reader=GitHubEvidenceSource("read-only-test-token")
+        with self.assertRaises(JeevesAppwideError):
+            reader.load(self.run_id,mode="arbitrary-system-command")
+
     def test_missing_OS_artifact_fails_closed(self):
         self.artifacts.pop("Windows")
         with self.assertRaises(JeevesAppwideError):
