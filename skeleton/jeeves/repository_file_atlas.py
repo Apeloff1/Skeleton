@@ -385,7 +385,72 @@ class JeevesRepositoryFileAtlas:
         self.close()
 
 
+
+def register_repository_atlas_tools(
+    registry: Any, *, atlas: JeevesRepositoryFileAtlas,
+    read_authorize: Any,
+) -> tuple[str, ...]:
+    """Add two READ_ONLY, tenant-scoped tools to the existing Jeeves registry."""
+    from skeleton.jeeves.agent.tools import (
+        ArgumentRule, ToolDenied, ToolRegistry, ToolSpec,
+    )
+    from skeleton.jeeves.agent.types import RiskTier
+    if not isinstance(registry, ToolRegistry) or not isinstance(atlas, JeevesRepositoryFileAtlas):
+        raise TypeError("host registry and repository atlas required")
+    if not callable(read_authorize):
+        raise TypeError("host read authorizer required for repository atlas")
+
+    def _permit(name: str, args: dict[str, Any], context: Any) -> None:
+        payload = {"tool": name, "arguments": args}
+        intent = sha256(json.dumps(
+            payload, sort_keys=True, separators=(",", ":"),
+            allow_nan=False, ensure_ascii=True,
+        ).encode("utf-8")).hexdigest()
+        if read_authorize(name, intent, context) is not True:
+            raise ToolDenied("host denied source atlas access")
+
+    def _search(args: dict[str, Any], context: Any) -> dict[str, Any]:
+        _permit("app.files", args, context)
+        return atlas.search(
+            query=args.get("query", ""),
+            limit=args.get("limit", 30),
+            offset=args.get("offset", 0),
+            owner_root=args.get("owner_root"),
+            feature=args.get("feature"),
+        )
+
+    def _duplicates(args: dict[str, Any], context: Any) -> dict[str, Any]:
+        _permit("app.exact_duplicates", args, context)
+        return atlas.exact_duplicate_groups(limit=args.get("limit", 20))
+
+    entries = (
+        (ToolSpec(
+            name="app.files",
+            description="Query bounded indexed source paths, owners and feature families.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("query", "string", required=False, max_length=MAX_QUERY),
+                ArgumentRule("limit", "integer", required=False, minimum=1, maximum=MAX_PAGE),
+                ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_FILES),
+                ArgumentRule("owner_root", "string", required=False, max_length=192),
+                ArgumentRule("feature", "string", required=False, max_length=192),
+            ),
+        ), _search),
+        (ToolSpec(
+            name="app.exact_duplicates",
+            description="Find fingerprint-identical indexed source files; no file reads.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(ArgumentRule(
+                "limit", "integer", required=False, minimum=1, maximum=MAX_PAGE,
+            ),),
+        ), _duplicates),
+    )
+    for spec, handler in entries:
+        registry.register(spec, handler)
+    return tuple(spec.name for spec, _ in entries)
+
+
 __all__ = [
     "RepositoryAtlasError", "IndexedFile", "AtlasRefresh",
-    "JeevesRepositoryFileAtlas",
+    "JeevesRepositoryFileAtlas", "register_repository_atlas_tools",
 ]
