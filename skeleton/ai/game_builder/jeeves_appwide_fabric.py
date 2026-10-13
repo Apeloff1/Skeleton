@@ -359,6 +359,7 @@ OPERATIONS = {
     "ai.cognition.uncertainty":("compute", "installed real uncertainty answer-abstain-escalate gate",False),
     "ai.cognition.strategy":("compute", "actual canonical resource-budgeted reasoning selection",False),
     "ai.cognition.stop":("compute", "actual guarded bounded cognitive stopping policy",False),
+    "ai.cognition.build_plan":("compute", "actual installed original-game plan quality evaluation",False),
     "ai.release.gates":("read", "required exact-head release-gate authority census",False),
     "ai.release.gates.page":("read", "paged static CI gate provenance and missing workflows",False),
     "ai.adapter.audit":("read", "static registered tool-to-dispatch binding coverage",False),
@@ -512,13 +513,15 @@ class JeevesAppwideRuntime:
             from .jeeves_verification_progress import JeevesVerificationProgress
             result=JeevesVerificationProgress(inv).volumes(**params)
         elif action in ("ai.cognition.uncertainty", "ai.cognition.strategy",
-                        "ai.cognition.stop"):
+                        "ai.cognition.stop", "ai.cognition.build_plan"):
             from .jeeves_cognitive_studio import JeevesCognitiveStudio
             cognitive=JeevesCognitiveStudio(inv)
             if action=="ai.cognition.uncertainty":
                 result=cognitive.uncertainty(**params)
             elif action=="ai.cognition.strategy":
                 result=cognitive.strategy(**params)
+            elif action=="ai.cognition.build_plan":
+                result=cognitive.build_plan(**params)
             else:
                 result=cognitive.stopping(**params)
         elif action=="ai.release.gates":
