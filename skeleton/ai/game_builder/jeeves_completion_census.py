@@ -155,7 +155,9 @@ class JeevesCompletionCensus:
                 defects.append({"kind": "missing_capability_plane",
                                 "capability": cap["capability_id"],
                                 "planes": missing})
-        gap_ids = {g["id"] for g in gaps}
+        # The closure evidence ledger explicitly covers P0; P1 construction
+        # gaps are separate, and must not be mislabeled as missing P0 evidence.
+        gap_ids = {g["id"] for g in gaps if g.get("priority") == "P0"}
         closure_ids = {e["gap"] for e in closure}
         if gap_ids != closure_ids:
             defects.append({"kind": "construction_closure_ledger_mismatch",
@@ -237,6 +239,7 @@ class JeevesCompletionCensus:
             "construction": {
                 "plane_total": len(planes),
                 "gap_total": len(gaps),
+                "p0_evidence_gap_total": len(gap_ids),
                 "declared_closed_gaps": closed,
                 "closure_ledger_records": len(closure),
                 "missing_plane_owners": missing_owners,
