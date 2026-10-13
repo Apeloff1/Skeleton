@@ -464,11 +464,32 @@ class JeevesIdleWorkExecutor:
                 if self._db.in_transaction:
                     self._db.execute("ROLLBACK")
                 raise
-            # Never wrap external effects in a retry loop. Any process crash
-            # leaves the durable row in-flight and prevents blind duplicate work.
-            result = handler(assignment, context, checkpoint)
-            # The handler has completed; a newly active user prevents fresh
-            # work, not durable recording of already-observed external output.
+            # Never replay external effects. The handler checks resource
+            # pressure cooperatively, and interrupted/failed effects remain
+            # in doubt until an independent host observes their outcome.
+            try:
+                result = handler(assignment, context, checkpoint)
+            except BaseException:
+                try:
+                    self._db.execute("BEGIN IMMEDIATE")
+                    updated = self._db.execute(
+                        "UPDATE jeeves_idle_effect SET state=? "
+                        "WHERE intent_digest=? AND state=?",
+                        (IdleExecutionState.IN_DOUBT.value, intent,
+                         IdleExecutionState.IN_FLIGHT.value),
+                    )
+                    if updated.rowcount == 1:
+                        self._append_event(
+                            intent, "worker_interrupted", at_ns=host_now_ns,
+                        )
+                    self._db.execute("COMMIT")
+                except BaseException:
+                    if self._db.in_transaction:
+                        self._db.execute("ROLLBACK")
+                    # The earlier durable IN_FLIGHT claim already blocks replay.
+                raise
+            # The handler has completed; renewed interactive demand prevents
+            # confirmation of idle compliance, not custody of its receipt.
             completed_while_idle = checkpoint.permitted()
             if not isinstance(result, HostIdleWorkReceipt):
                 raise IdleRuntimeError("host idle handler returned untyped receipt")
