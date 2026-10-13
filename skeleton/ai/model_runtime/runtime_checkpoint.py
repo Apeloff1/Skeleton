@@ -201,7 +201,10 @@ def checkpoint_json(checkpoint: Mapping[str, Any], *, max_bytes: int) -> str:
 
 def parse_checkpoint_json(payload: str | bytes) -> Mapping[str, Any]:
     if isinstance(payload, str):
-        raw = payload.encode("utf-8")
+        try:
+            raw = payload.encode("utf-8", errors="strict")
+        except UnicodeEncodeError as exc:
+            raise RuntimeContractError("checkpoint JSON is not valid Unicode") from exc
     elif isinstance(payload, bytes):
         raw = payload
     else:

@@ -79,7 +79,9 @@ class LocalToolCall:
         encoded = _stable_json(dict(self.arguments))
         if len(encoded.encode("utf-8")) > 512 * 1024:
             raise ValueError("local tool call arguments exceed size limit")
-        object.__setattr__(self, "arguments", dict(self.arguments))
+        # Own nested JSON as well as the outer mapping. A model/caller must
+        # not be able to change a previously admitted tool call by aliasing.
+        object.__setattr__(self, "arguments", json.loads(encoded))
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,7 +213,10 @@ class LocalInferenceResult:
             "deadline",
         }:
             raise ValueError("invalid local finish_reason")
-        calls=tuple(self.tool_calls)
+        supplied_calls = tuple(self.tool_calls)
+        if any(not isinstance(call, LocalToolCall) for call in supplied_calls):
+            raise TypeError("tool_calls must contain LocalToolCall values")
+        calls=tuple(replace(call) for call in supplied_calls)
         call_ids=[call.call_id for call in calls]
         if len(call_ids)!=len(set(call_ids)):
             raise ValueError("local tool call ids must be unique")
@@ -223,7 +228,8 @@ class LocalInferenceResult:
             raise ValueError("local inference result must contain output")
         object.__setattr__(self,"tool_calls",calls)
         if self.structured_output is not None:
-            object.__setattr__(self, "structured_output", dict(self.structured_output))
+            object.__setattr__(self, "structured_output",
+                               json.loads(_stable_json(dict(self.structured_output))))
         if self.latency_ms is not None:
             latency=float(self.latency_ms)
             if not math.isfinite(latency) or latency<0:
@@ -641,7 +647,7 @@ class LocalInferenceEngine:
         worker = asyncio.create_task(asyncio.to_thread(self._infer_admitted, request, cancel))
         result = await self._await_worker(worker, cancel)
 
-        if result.model_digest != self.model.model_digest:
+        if result.model_id != self.model.model_id or result.model_digest != self.model.model_digest:
             raise ValueError("local inference result model identity drift")
         if self._key(request) != key:
             raise ValueError("local runtime identity changed during inference")
@@ -689,11 +695,13 @@ class LocalInferenceEngine:
                     f"local structured output violates request schema: {exc}"
                 ) from exc
 
-        if self.cache_size:
+        if self.cache_size and result.finish_reason not in {"cancelled", "deadline"}:
             async with self._cache_lock:
                 if self._key(request) != key:
                     raise ValueError("local runtime identity changed before caching")
-                self._cache[key] = result
+                # The cached copy owns all nested structured/tool output;
+                # application edits to the returned object cannot rewrite it.
+                self._cache[key] = replace(result)
                 self._cache.move_to_end(key)
                 while len(self._cache) > self.cache_size:
                     self._cache.popitem(last=False)
@@ -709,7 +717,16 @@ class LocalInferenceEngine:
             raise ValueError("local inference batch exceeds configured capacity")
         if any(not isinstance(item, LocalInferenceRequest) for item in requests):
             raise TypeError("batch requires LocalInferenceRequest values")
-        return tuple(await asyncio.gather(*(self.generate(item) for item in requests)))
+        # A failed member must not release batch ownership while sibling
+        # threads/processes still run. Collect every terminal outcome before
+        # surfacing the first error; cancellation drains each owned worker.
+        outcomes = await asyncio.gather(
+            *(self.generate(item) for item in requests), return_exceptions=True,
+        )
+        for outcome in outcomes:
+            if isinstance(outcome, BaseException):
+                raise outcome
+        return tuple(outcomes)
 
 
 @dataclass(slots=True)

@@ -41,6 +41,10 @@ compiler, benchmark, runtime probe or architecture gate was run for this pass.
   checkpoint restoration. Checkpoint JSON rejects duplicate keys and non-finite
   constants, and layer activation/normalization must match the declared graph.
 - Local inference has configurable concurrency and batch admission limits.
+  A failing batch drains sibling workers before returning; cancelled/deadline
+  results are not cached, and returned model IDs must match the selected backend.
+  Cached tool/structured results own their nested JSON, so caller mutation cannot
+  rewrite later cache hits.
   Scheduler cancellation reaches its individual inference task; queue overflow
   rejects admission, and shutdown cannot leave producers behind a sentinel.
 - GGUF requests have bounded prompt and output materialization, cleanup on all

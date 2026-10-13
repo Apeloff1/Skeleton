@@ -22,6 +22,22 @@ create a second model implementation. The numerical engine remains
 
 ## Authority and completion status
 
+For local backend execution, `LocalInferenceEngine(model, max_concurrency=1,
+max_batch_size=256)` bounds active model calls and direct batches. Concurrency
+can be explicitly raised up to 32; batch size up to 4096. Raising concurrency
+can multiply GGUF process/model memory, so the default remains one. Queued
+calls can cancel before acquiring execution capacity. Failed batches drain
+their siblings before returning an error.
+
+`LocalInferenceScheduler` rejects a full queue rather than allowing blocked
+submissions to outlive shutdown. Cancelling a submitted future cancels that
+item's inference task. `close()` drains admitted work and can be awaited again
+if an earlier shutdown waiter was cancelled. There is no automatic model retry.
+
+Local cache hits retain isolated copies of structured/tool JSON and bind the
+backend's execution profile when available. Cancellation and deadline results
+are not cached. GGUF artifacts are readmitted before a cached answer is reused.
+
 This is implementation evidence only. FLGB-02 stays `implemented-pending-verification`
 until exact-head CI, dependency closure and independent verification succeed. No
 masterplan completion signature is asserted by file existence or by this document.
