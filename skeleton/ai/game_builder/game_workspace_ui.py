@@ -1029,6 +1029,83 @@ $("jeeves-story-stage").addEventListener("click",()=>dmGuard(async()=>{
   result.source_path+". Review exact historical continuity and commit explicitly.");
 }));
 
+
+/* Installed Universal Forge -> actual editor-owned source proposal -> human commit. */
+let jeevesForgePlan=null,jeevesForgeInputs=null;
+function forgeProductionArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active original project and scan application inventory");
+ const blueprint_id=$("jeeves-forge-id").value.trim();
+ const name=$("jeeves-forge-name").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(blueprint_id))
+  throw Error("Safe original Forge blueprint ID required");
+ if(!name||name.length>120)
+  throw Error("Bounded original component graph title required");
+ const components=JSON.parse($("jeeves-forge-components").value);
+ const wires=JSON.parse($("jeeves-forge-wires").value);
+ if(!Array.isArray(components)||components.length<1||components.length>64||
+    !Array.isArray(wires)||wires.length>128)
+  throw Error("Forge needs 1–64 installed components and 0–128 typed wires");
+ return {project:model.active,blueprint_id,name,components,wires,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-forge-kinds").addEventListener("click",()=>dmGuard(async()=>{
+ if(!model||!model.active||selectedProject!==model.active)
+  throw Error("Current original project must be selected");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"forge.kinds",params:{project:model.active},operator_authorized:false,
+ });
+ $("jeeves-forge-output").textContent=JSON.stringify(receipt.result,null,2);
+ status("Installed real Forge component kinds displayed; source tool bindings "+
+  "do not execute arbitrary plugin code.");
+}));
+$("jeeves-forge-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const args=forgeProductionArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.forge.plan",params:args,operator_authorized:false,
+ });
+ const plan=receipt.result;
+ jeevesForgePlan=plan.digest;
+ jeevesForgeInputs=JSON.stringify(args);
+ $("jeeves-forge-output").textContent=JSON.stringify(plan,null,2).slice(0,95000);
+ status(plan.canonical_installed_forge_graph_review.component_count+
+  " actual installed typed components validated for original project source.");
+}));
+$("jeeves-forge-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-forge-approval").checked)
+  throw Error("Approve original Forge graph source proposal explicitly");
+ const args=forgeProductionArgs();
+ if(!jeevesForgePlan||jeevesForgeInputs!==JSON.stringify(args))
+  throw Error("Forge graph changed; prepare a fresh exact-source plan");
+ const reason=$("jeeves-forge-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Concrete reviewed Forge source rationale required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.forge.stage",
+  params:{...args,expected_plan_digest:jeevesForgePlan,reason},
+  operator_authorized:true,
+ });
+ const staged=receipt.result;
+ $("jeeves-forge-output").textContent=JSON.stringify(staged,null,2);
+ $("jeeves-publish-ids").value=staged.proposal_id;
+ jeevesForgePlan=null;
+ status("Real typed original Forge blueprint staged into "+
+  staged.path+" for independent human review. No unreviewed asset execution.");
+}));
+$("jeeves-forge-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=forgeProductionArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.forge.verify",
+  params:{project:args.project,blueprint_id:args.blueprint_id,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false,
+ });
+ $("jeeves-forge-output").textContent=JSON.stringify(receipt.result,null,2);
+ status("Committed original Forge blueprint revalidated against installed "+
+  "component kinds, ports and source identity.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5123,6 +5200,31 @@ content; generated templates are not mistaken for completed chapters.</small></p
 <label><input id="jeeves-story-approval" type="checkbox"> Authorize real signed original story source proposal</label>
 <button id="jeeves-story-stage" type="button">Stage signed canon for exact source review</button>
 <pre id="jeeves-story-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Real Universal Forge Source Authoring</legend>
+<p><small>Compose installed Forge components and typed wire connections,
+validate actual component-port registry and stage original source into
+the current game project. Invalid graphs cannot be human-committed.</small></p>
+<button id="jeeves-forge-kinds" type="button">Discover installed Forge component kinds</button>
+<label>Original Forge blueprint ID
+<input id="jeeves-forge-id" value="original_graph"></label>
+<label>Forge blueprint display name
+<input id="jeeves-forge-name" value="My Original Game Asset Graph"></label>
+<label>Installed Forge component instances JSON (1–64)
+<textarea id="jeeves-forge-components" rows="5" spellcheck="false">[
+ {"id":"my_component","kind":"choose_installed_kind","config":{}}
+]</textarea></label>
+<label>Typed connections JSON (0–128)
+<textarea id="jeeves-forge-wires" rows="3" spellcheck="false">[]</textarea></label>
+<button id="jeeves-forge-plan" type="button">Validate real Forge graph and prepare source</button>
+<label>Design/source review justification
+<textarea id="jeeves-forge-reason" rows="2" spellcheck="false">Author the original installed Forge blueprint for my currently selected game project.</textarea></label>
+<label><input id="jeeves-forge-approval" type="checkbox">
+Approve original Forge source proposal</label>
+<button id="jeeves-forge-stage" type="button">Stage validated Forge source into Game Studio</button>
+<button id="jeeves-forge-verify" type="button">Verify committed source against installed Forge</button>
+<pre id="jeeves-forge-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
