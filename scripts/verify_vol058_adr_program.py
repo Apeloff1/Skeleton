@@ -20,16 +20,13 @@ from typing import Any, Mapping, Sequence
 ROOT = Path(__file__).resolve().parents[1]
 MASTER = Path("machine/ai_master_plan.json")
 INDEX = Path("machine/adr_index.json")
+ACCOUNTABILITY = Path("machine/ai_build_accountability.json")
 REGISTRY = Path("machine/architecture_rule_registry.json")
 VALIDATOR = Path("scripts/check_architecture_adr_index.py")
 TESTS = Path("tests/test_architecture_adr_index.py")
 ADR_DIR = Path("docs/adr")
 VOLUME = "VOL-058"
 TITLE = "ADR Program"
-REQUIRED_GAPS = {
-    "create canonical ADR index schema",
-    "bind cross-cutting changes to ADR check",
-}
 ADR_ID = re.compile(r"^ADR-[0-9]{4,}$")
 
 
@@ -84,18 +81,66 @@ def _find_volume(master: Mapping[str, Any]) -> Mapping[str, Any]:
     raise VerificationError(f"masterplan missing {VOLUME}")
 
 
-def _verify_volume(master: Mapping[str, Any], errors: list[str]) -> dict[str, Any]:
+def _verify_volume(
+    master: Mapping[str, Any], ledger: Mapping[str, Any], errors: list[str],
+) -> dict[str, Any]:
     volume = _find_volume(master)
     if volume.get("title") != TITLE:
         errors.append(f"{VOLUME} title drift")
     if volume.get("scope") != "canonical-plan":
         errors.append(f"{VOLUME} scope drift")
-    if volume.get("completion_checkbox") is True:
-        errors.append(f"{VOLUME} cannot self-sign from implementation evidence")
-    gaps = set(volume.get("gaps") or [])
-    missing = sorted(REQUIRED_GAPS - gaps)
-    if missing:
-        errors.append(f"{VOLUME} gap binding drift: {missing}")
+    # Signed completion must derive from the separate accountability ledger,
+    # not from this verifier's own implementation/evidence receipts.
+    checked = volume.get("completion_checkbox") is True
+    records = ledger.get("records")
+    record = next(
+        (item for item in records
+         if isinstance(item, dict) and item.get("id") == "ACC-VOL-058"),
+        None,
+    ) if isinstance(records, list) else None
+    if not isinstance(record, dict):
+        errors.append(f"{VOLUME} signed accountability record missing")
+        record = {}
+    if checked:
+        if volume.get("completion_checkbox_mark") != "[x]" or not volume.get("signing_required"):
+            errors.append(f"{VOLUME} masterplan closure marks/signing policy drift")
+        if not (record.get("checkbox") is True
+                and record.get("status") == "verified"
+                and record.get("checkbox_mark") == "[x]"):
+            errors.append(f"{VOLUME} checkbox not backed by verified accountability")
+        implementation = record.get("implementation_signoff")
+        verification = record.get("verification_signoff")
+        if not isinstance(implementation, dict) or not isinstance(verification, dict):
+            errors.append(f"{VOLUME} independent signoffs missing")
+        else:
+            if not (implementation.get("signed") is True and verification.get("signed") is True):
+                errors.append(f"{VOLUME} independent signoffs not recorded")
+            if not implementation.get("signer_id") or not verification.get("signer_id"):
+                errors.append(f"{VOLUME} signer identity missing")
+            if implementation.get("signer_id") == verification.get("signer_id"):
+                errors.append(f"{VOLUME} implementation and verification signer collision")
+            if implementation.get("role") != "implementation-agent" or verification.get("role") != "independent-verifier":
+                errors.append(f"{VOLUME} signer role independence drift")
+            for signoff in (implementation, verification):
+                sha = signoff.get("git_sha")
+                if (not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha)
+                        or not signoff.get("signed_at_utc")
+                        or not isinstance(signoff.get("evidence_refs"), list)
+                        or "scripts/verify_vol058_adr_program.py" not in signoff["evidence_refs"]
+                        or signoff.get("signature_method") != "github_identity"
+                        or signoff.get("signature_ref") != f"https://github.com/Apeloff1/Skeleton/commit/{sha}"):
+                    errors.append(f"{VOLUME} recorded signoff evidence/commit identity invalid")
+        if record.get("completed_at_utc") != (
+            verification.get("signed_at_utc") if isinstance(verification, dict) else None
+        ):
+            errors.append(f"{VOLUME} completed timestamp does not match independent signoff")
+    elif record.get("checkbox") is True:
+        errors.append(f"{VOLUME} masterplan/ledger closure mismatch")
+    raw_gaps = volume.get("gaps")
+    if not isinstance(raw_gaps, list) or any(not isinstance(gap, str) for gap in raw_gaps):
+        errors.append(f"{VOLUME} invalid canonical gap list")
+        raw_gaps = []
+    gaps = set(raw_gaps)
     requirements = tuple(str(item) for item in volume.get("requirements") or [])
     for phrase in (
         "Use stable ADR IDs and immutable decision history",
@@ -130,7 +175,11 @@ def _verify_index(
     else:
         if binding.get("volume_ref") != VOLUME or binding.get("title") != TITLE:
             errors.append("ADR index volume/title binding drift")
-        if set(binding.get("required_gap_texts") or []) != REQUIRED_GAPS:
+        canonical_gaps = _find_volume(master).get("gaps", [])
+        bound_gaps = binding.get("required_gap_texts")
+        if (not isinstance(bound_gaps, list)
+                or bound_gaps != canonical_gaps
+                or len(bound_gaps) != len(set(bound_gaps))):
             errors.append("ADR index gap binding drift")
 
     policy = index.get("policy")
@@ -367,8 +416,9 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     master = _load(root / MASTER)
     index = _load(root / INDEX)
     registry = _load(root / REGISTRY)
+    ledger = _load(root / ACCOUNTABILITY)
 
-    volume_binding = _verify_volume(master, errors)
+    volume_binding = _verify_volume(master, ledger, errors)
     index_binding = _verify_index(index, master, root, errors)
     registry_binding = _verify_registry(registry, errors)
     source_digests = _verify_source_contract(root, errors)
@@ -388,6 +438,7 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         "source_digests": source_digests,
         "index_digest": _sha256(root / INDEX),
         "registry_digest": _sha256(root / REGISTRY),
+        "accountability_digest": _sha256(root / ACCOUNTABILITY),
         "errors": sorted(set(errors)),
         "valid": not errors,
     }

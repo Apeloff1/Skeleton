@@ -9,24 +9,6 @@ import pytest
 from skeleton.ai.game_builder.native_game_cli import build_game
 
 
-@pytest.mark.parametrize("target,files", [
-    ("commodore_64", {"game.c", "Makefile", "manifest.json"}),
-    ("apple_ii", {"game.c", "Makefile", "manifest.json"}),
-    ("sinclair_zx_spectrum", {"game.asm", "Makefile", "README.txt", "manifest.json", "make_tap.py"}),
-    ("msx1", {"game.asm", "Makefile", "README.txt", "manifest.json", "make_rom.py"}),
-    ("colecovision", {"game.asm", "Makefile", "manifest.json", "make_col.py"}),
-    ("vectrex", {"game.asm", "Makefile", "manifest.json"}),
-    ("sega_master_system", {"game.asm", "Makefile", "README.txt", "manifest.json", "make_sms.py"}),
-    ("sega_game_gear", {"game.c", "Makefile", "manifest.json"}),
-    ("atari_400_800", {"game.c", "Makefile", "manifest.json"}),
-    ("dos_vga", {"game.asm", "Makefile", "manifest.json"}),
-    ("nintendo_game_boy", {"main.asm", "Makefile", "manifest.json"}),
-    ("nintendo_game_boy_color", {"main.asm", "Makefile", "manifest.json"}),
-    ("nintendo_famicom", {"main.s", "nes.cfg", "Makefile", "manifest.json"}),
-    ("windows_modern", {"game.c", "CMakeLists.txt", "manifest.json"}),
-    ("linux_desktop", {"game.c", "CMakeLists.txt", "manifest.json"}),
-    ("macos_modern", {"game.c", "CMakeLists.txt", "manifest.json"}),
-])
 def test_native_game_rejects_symlink_rights_source_before_any_binary_or_directory(tmp_path):
     from skeleton.ai.game_builder.native_game_cli import build_game
 
@@ -50,6 +32,24 @@ def test_native_game_rejects_symlink_rights_source_before_any_binary_or_director
     assert not result_folder.exists()
 
 
+@pytest.mark.parametrize("target,files", [
+    ("commodore_64", {"game.c", "Makefile", "manifest.json"}),
+    ("apple_ii", {"game.c", "Makefile", "manifest.json"}),
+    ("sinclair_zx_spectrum", {"game.asm", "Makefile", "README.txt", "manifest.json", "make_tap.py"}),
+    ("msx1", {"game.asm", "Makefile", "README.txt", "manifest.json", "make_rom.py"}),
+    ("colecovision", {"game.asm", "Makefile", "manifest.json", "make_col.py"}),
+    ("vectrex", {"game.asm", "Makefile", "manifest.json"}),
+    ("sega_master_system", {"game.asm", "Makefile", "README.txt", "manifest.json", "make_sms.py"}),
+    ("sega_game_gear", {"game.c", "Makefile", "manifest.json"}),
+    ("atari_400_800", {"game.c", "Makefile", "manifest.json"}),
+    ("dos_vga", {"game.asm", "Makefile", "manifest.json"}),
+    ("nintendo_game_boy", {"main.asm", "Makefile", "manifest.json"}),
+    ("nintendo_game_boy_color", {"main.asm", "Makefile", "manifest.json"}),
+    ("nintendo_famicom", {"main.s", "nes.cfg", "Makefile", "manifest.json"}),
+    ("windows_modern", {"game.c", "CMakeLists.txt", "manifest.json"}),
+    ("linux_desktop", {"game.c", "CMakeLists.txt", "manifest.json"}),
+    ("macos_modern", {"game.c", "CMakeLists.txt", "manifest.json"}),
+])
 def test_native_game_cli_produces_real_source_for_target_without_shell(tmp_path, target, files):
     receipt = tmp_path / "my-original-authorship.txt"
     receipt.write_text("Original game authored by the current user. No inherited ROMs.", encoding="utf-8")

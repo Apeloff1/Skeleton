@@ -80,6 +80,72 @@ def _digest(value: object) -> str:
     ).hexdigest()
 
 
+def _verify_functional_task_signoff(
+    task_id: str,
+    task: dict[str, Any],
+    errors: list[str],
+) -> None:
+    """Accept either genuinely pending work or a separately evidenced closure.
+
+    The terminal P2 phase claim and the atomic task ledger have distinct
+    authorities. The task may close after pinned, successful functional-AI
+    acceptance; a boolean checkbox alone cannot promote the task.
+    """
+    status = task.get("status")
+    if status == "landed_unpromoted":
+        for field in ("completion_checkbox", "implementation_signed", "verification_signed"):
+            if task.get(field) is not False:
+                errors.append(f"{task_id} unpromoted task must keep {field} false")
+        if task.get("completion_checkbox_mark") not in (None, "[ ]"):
+            errors.append(f"{task_id} unpromoted task must not have a checked marker")
+        return
+
+    if status != "closed":
+        errors.append(f"{task_id} must be landed_unpromoted or evidence-closed")
+        return
+
+    if (task.get("completion_checkbox") is not True
+            or task.get("completion_checkbox_mark") != "[x]"
+            or task.get("implementation_signed") is not True
+            or task.get("verification_signed") is not True):
+        errors.append(f"{task_id} closed task requires completed, signed evidence")
+        return
+
+    refs = task.get("evidence_refs")
+    if (not isinstance(refs, list) or not refs
+            or any(not isinstance(ref, str) or not ref.strip() for ref in refs)
+            or len(set(refs)) != len(refs)):
+        errors.append(f"{task_id} evidence references must be unique non-empty text")
+        return
+
+    # A closure is not established by self-asserted checkboxes. An immutable
+    # Git-head and a successful independent functional-acceptance workflow
+    # must point at the same evidence commit, with a traceable action run.
+    heads = {
+        ref.removeprefix("git-head:")
+        for ref in refs
+        if ref.startswith("git-head:")
+        and len(ref) == len("git-head:") + 40
+        and all(ch in "0123456789abcdef" for ch in ref[len("git-head:"):])
+    }
+    pinned_acceptance = any(
+        ref == f"workflow:P2 Functional AI Acceptance@{head}:success"
+        for head in heads
+        for ref in refs
+    )
+    has_run = any(
+        ref.startswith("github-actions-run:")
+        and ref[len("github-actions-run:"):].isdigit()
+        and len(ref) > len("github-actions-run:")
+        for ref in refs
+    )
+    if (not heads or not pinned_acceptance or not has_run
+            or "github:pr#2346" not in refs
+            or "skeleton/masterplan/closure.py" not in refs
+            or "tests/flgb/test_masterplan_closure.py" not in refs):
+        errors.append(f"{task_id} lacks pinned independent acceptance evidence")
+
+
 def verify(root: Path = ROOT, *, head_sha: str | None = None) -> dict[str, Any]:
     construction = _load(root, "machine/ai_app_construction.json")
     closure = _load(root, "machine/ai_closure_evidence.json")
@@ -203,15 +269,7 @@ def verify(root: Path = ROOT, *, head_sha: str | None = None) -> dict[str, Any]:
     if missing_tasks:
         errors.append("P2 functional task inventory missing: " + ", ".join(missing_tasks))
     for task_id in sorted(P2_FUNCTIONAL_TASKS):
-        task = tasks.get(task_id, {})
-        if task.get("status") != "landed_unpromoted":
-            errors.append(f"{task_id} must remain landed_unpromoted until signoff")
-        if task.get("completion_checkbox") is not False:
-            errors.append(f"{task_id} must not self-promote completion")
-        if task.get("implementation_signed") is not False:
-            errors.append(f"{task_id} must not self-sign implementation")
-        if task.get("verification_signed") is not False:
-            errors.append(f"{task_id} must not self-sign verification")
+        _verify_functional_task_signoff(task_id, tasks.get(task_id, {}), errors)
 
     queue_tasks = build_queue.get("tasks", [])
     queue_states: dict[str, int] = {}
