@@ -176,7 +176,14 @@ def measure(repo_root: Path, *, run_id: int, attempt: int, head: str,
     inventory = AppwideInventory(repo_root)
     inventory.scan()
     matrix = JeevesAcceptanceTestMatrix(inventory).overview()
+    family_rows = JeevesAcceptanceTestMatrix(inventory).page(limit=42)["families"]
+    verified_candidates = [
+        {"family_id": row["family_id"], "modules": row["modules"]}
+        for row in family_rows if row["execution_tier"] == "ci_smoke"
+    ]
     expected = {
+        "smoke_families": verified_candidates,
+        "family_denominator": matrix["family_denominator"],
         "selected_modules": matrix["selected_modules"],
         "module_source_receipts": matrix["module_source_receipts"],
         "scheduled_test_module_count": matrix["scheduled_test_module_count"],
