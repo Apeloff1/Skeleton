@@ -1,5 +1,5 @@
-{"p":"skeleton/video/__init__.py","g":"7bc6a6a0e41d7b36ad065e8eac74151c4e892285","b":63,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/video/__init__.py"}
-{"p":"skeleton/video/pipeline.py","g":"90c8c9f05f3772c4a64c2956fa73ea86fcd00c45","b":1982,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/video/pipeline.py"}
+{"p":"skeleton/video/__init__.py","g":"7bc6a6a0e41d7b36ad065e8eac74151c4e892285","b":63,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/video"}
+{"p":"skeleton/video/pipeline.py","g":"90c8c9f05f3772c4a64c2956fa73ea86fcd00c45","b":1982,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/video"}
 {"p":"skeleton/video/vol158/__init__.py","g":"62a7b298a80bc2d4997237aa263609dc0f922970","b":385,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/video/vol158"}
 {"p":"skeleton/video/vol158/caps/__init__.py","g":"87406353db492df005a9342cd32584296c07d585","b":36757,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/video/vol158"}
 {"p":"skeleton/video/vol158/caps/c001_asset_01.py","g":"23c9302e49d2d7d3664d11c52c4095ee750eb888","b":9654,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/video/vol158"}

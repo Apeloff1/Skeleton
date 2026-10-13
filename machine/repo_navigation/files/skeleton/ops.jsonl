@@ -1,4 +1,4 @@
-{"p":"skeleton/ops/__init__.py","g":"1c575dac28816448c6b9affef9e8b3cbd7d66ee7","b":82,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/ops/__init__.py"}
+{"p":"skeleton/ops/__init__.py","g":"1c575dac28816448c6b9affef9e8b3cbd7d66ee7","b":82,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/ops"}
 {"p":"skeleton/ops/cockpit/__init__.py","g":"32e68c7fcea7fce41995d31123764b83b53a5bb2","b":1907,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/ops/cockpit"}
 {"p":"skeleton/ops/cockpit/__main__.py","g":"7327490e21b94c4c60de8a5fa6fda338b3d90b32","b":3852,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/ops/cockpit"}
 {"p":"skeleton/ops/cockpit/app_env.py","g":"f646cb667a4ca3a714ed8b2baa2a73f9b9287881","b":2511,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/ops/cockpit"}

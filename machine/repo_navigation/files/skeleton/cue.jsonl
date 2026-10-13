@@ -1,7 +1,7 @@
-{"p":"skeleton/cue/__init__.py","g":"51724da99dbffadfae3cf8379923097e89caf671","b":368,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/__init__.py"}
-{"p":"skeleton/cue/capabilities.py","g":"2df0034c185b6890dc45398fc1b3eb8cac2d034d","b":731,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/capabilities.py"}
-{"p":"skeleton/cue/compose.py","g":"d8aed9c89c4cf7f782b9f7998733f22066414ab4","b":1109,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/compose.py"}
-{"p":"skeleton/cue/fold.py","g":"903f328afd4b479b4d3e79fc4f68058810cef48d","b":405,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/fold.py"}
+{"p":"skeleton/cue/__init__.py","g":"51724da99dbffadfae3cf8379923097e89caf671","b":368,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue"}
+{"p":"skeleton/cue/capabilities.py","g":"2df0034c185b6890dc45398fc1b3eb8cac2d034d","b":731,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue"}
+{"p":"skeleton/cue/compose.py","g":"d8aed9c89c4cf7f782b9f7998733f22066414ab4","b":1109,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue"}
+{"p":"skeleton/cue/fold.py","g":"903f328afd4b479b4d3e79fc4f68058810cef48d","b":405,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue"}
 {"p":"skeleton/cue/gb46/__init__.py","g":"24815d558e0555dc19d5445de43ddd97e2a46bdf","b":314,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/gb46"}
 {"p":"skeleton/cue/gb46/caps/INDEX.csv","g":"182d8618cd109a006566586d471dc5d8e2fa51b0","b":90577,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/gb46"}
 {"p":"skeleton/cue/gb46/caps/__init__.py","g":"d1a60b214e87d06b9d657de09618196437793bbd","b":403,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/gb46"}
@@ -2569,4 +2569,4 @@
 {"p":"skeleton/cue/gb46/conductor.py","g":"adff3aa35de85ecdef1f14315d385cf6349ad08d","b":1646,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/gb46"}
 {"p":"skeleton/cue/gb46/law.py","g":"e22bb0da07825741b7456349a48147b5c9cb3762","b":649,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/gb46"}
 {"p":"skeleton/cue/gb46/registry.py","g":"0404bb927cb8cf5d0eab44a9afac190ea42accd9","b":808,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/gb46"}
-{"p":"skeleton/cue/law.py","g":"530f7a7e60ae4e2e1c54f54b95270742c54072f6","b":652,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue/law.py"}
+{"p":"skeleton/cue/law.py","g":"530f7a7e60ae4e2e1c54f54b95270742c54072f6","b":652,"m":"100644","t":"blob","z":"specialized-runtime","f":"skeleton/cue"}

@@ -1,6 +1,6 @@
-{"p":"skeleton/telemetry/__init__.py","g":"bea1fd99c9346ae05bc44c9e2884614522cf31f6","b":395,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/__init__.py"}
-{"p":"skeleton/telemetry/capabilities.py","g":"d8512561fc8880223c6a8dec8c6f38accc70a077","b":800,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/capabilities.py"}
-{"p":"skeleton/telemetry/law.py","g":"fc74a89b224fc1453d3e89b2456ef2c1b0a89e74","b":270,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/law.py"}
+{"p":"skeleton/telemetry/__init__.py","g":"bea1fd99c9346ae05bc44c9e2884614522cf31f6","b":395,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry"}
+{"p":"skeleton/telemetry/capabilities.py","g":"d8512561fc8880223c6a8dec8c6f38accc70a077","b":800,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry"}
+{"p":"skeleton/telemetry/law.py","g":"fc74a89b224fc1453d3e89b2456ef2c1b0a89e74","b":270,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry"}
 {"p":"skeleton/telemetry/scatter10240/__init__.py","g":"b8c56b30d310d6f9352e32e8405d61e0ebb16ee1","b":185,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/scatter10240"}
 {"p":"skeleton/telemetry/scatter10240/caps/INDEX.csv","g":"f84156bf6d4bc0521a0bfefb772b8e903c0766d5","b":13450,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/scatter10240"}
 {"p":"skeleton/telemetry/scatter10240/caps/__init__.py","g":"3ec58d5e203bbef8f9f130c11d000f132cd994bc","b":228,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/scatter10240"}
@@ -645,5 +645,5 @@
 {"p":"skeleton/telemetry/scatter10240/caps/c0639.py","g":"a0b24ceb50703fc97b423011b1d081f14534a7d8","b":4282,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/scatter10240"}
 {"p":"skeleton/telemetry/scatter10240/caps/c0640.py","g":"25a2426c8a95dbddf85ac49da3080659ccb440c7","b":4283,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/scatter10240"}
 {"p":"skeleton/telemetry/scatter10240/law.py","g":"7c96c05eed0bcdb7d37383dd9e3761d9fc2e4e7e","b":171,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/scatter10240"}
-{"p":"skeleton/telemetry/sse.py","g":"ff7e171639f869765b0542f810acf5aedf8c1a38","b":940,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/sse.py"}
-{"p":"skeleton/telemetry/store.py","g":"b4b71cb6a4419d29a2b8752236253bc8848588d2","b":359,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry/store.py"}
+{"p":"skeleton/telemetry/sse.py","g":"ff7e171639f869765b0542f810acf5aedf8c1a38","b":940,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry"}
+{"p":"skeleton/telemetry/store.py","g":"b4b71cb6a4419d29a2b8752236253bc8848588d2","b":359,"m":"100644","t":"blob","z":"platform","f":"skeleton/telemetry"}

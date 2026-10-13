@@ -1,5 +1,5 @@
-{"p":"skeleton/document_vision/__init__.py","g":"001797e91bc7a9b07e54d96a0d673d4b889a198f","b":71,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/document_vision/__init__.py"}
-{"p":"skeleton/document_vision/fusion.py","g":"a4de31810694f7425430fc166481d3fd8942df15","b":1805,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/document_vision/fusion.py"}
+{"p":"skeleton/document_vision/__init__.py","g":"001797e91bc7a9b07e54d96a0d673d4b889a198f","b":71,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/document_vision"}
+{"p":"skeleton/document_vision/fusion.py","g":"a4de31810694f7425430fc166481d3fd8942df15","b":1805,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/document_vision"}
 {"p":"skeleton/document_vision/vol155/__init__.py","g":"71719cde56bb78d969f97fe469db78e5a5b429f3","b":423,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/document_vision/vol155"}
 {"p":"skeleton/document_vision/vol155/caps/__init__.py","g":"1ab5c9771d3d57ff81c2e57746f64b3886acc44a","b":79154,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/document_vision/vol155"}
 {"p":"skeleton/document_vision/vol155/caps/c001_page_01.py","g":"075ede84dd9bdab005d202f7ae5a5ac5ed2af7bd","b":9295,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/document_vision/vol155"}

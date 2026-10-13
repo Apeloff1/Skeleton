@@ -1,4 +1,4 @@
-{"p":"skeleton/provenance/__init__.py","g":"6f1eae73d89bd5c069712b2c9d5f021a89f72e01","b":61,"m":"100644","t":"blob","z":"provenance","f":"skeleton/provenance/__init__.py"}
+{"p":"skeleton/provenance/__init__.py","g":"6f1eae73d89bd5c069712b2c9d5f021a89f72e01","b":61,"m":"100644","t":"blob","z":"provenance","f":"skeleton/provenance"}
 {"p":"skeleton/provenance/chronicle/__init__.py","g":"c303d78ffc6cb53337dc56a438d63faf980f7a14","b":522,"m":"100644","t":"blob","z":"provenance","f":"skeleton/provenance/chronicle"}
 {"p":"skeleton/provenance/chronicle/capabilities.py","g":"23786eb045a7f4465973702debc7409a45a7c8f1","b":873,"m":"100644","t":"blob","z":"provenance","f":"skeleton/provenance/chronicle"}
 {"p":"skeleton/provenance/chronicle/cards.py","g":"0ac5ca61e8111109cc5698fb03c49c1e8b347911","b":759,"m":"100644","t":"blob","z":"provenance","f":"skeleton/provenance/chronicle"}

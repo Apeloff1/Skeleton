@@ -1,11 +1,11 @@
-{"p":"skeleton/release/__init__.py","g":"b21c13ab15d17a1e88b6844555a57a7bfa88bf5f","b":5340,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/__init__.py"}
-{"p":"skeleton/release/attribution.py","g":"640abec19afb3a1f112764480c173eb61e450959","b":14463,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/attribution.py"}
-{"p":"skeleton/release/disaster_recovery.py","g":"6e44772308d1801e85341d6aff57c920e4cd1536","b":23249,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/disaster_recovery.py"}
-{"p":"skeleton/release/evidence.py","g":"b0bd482a73918478b730ee57965ad2ef9194947d","b":44174,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/evidence.py"}
-{"p":"skeleton/release/lifecycle.py","g":"1e137e2c442d07e8fe9db3ea2be3f0609a6450d8","b":21573,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/lifecycle.py"}
-{"p":"skeleton/release/migration.py","g":"d90d4b54012a13c5a47430fe3d870c2f467f2df0","b":24472,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/migration.py"}
-{"p":"skeleton/release/qualification.py","g":"5bdc6515af3222c95c310e8ed01ffc0ab7c0afbf","b":19590,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/qualification.py"}
-{"p":"skeleton/release/restore.py","g":"ace6636f4ea066403275d43b6211bd561ce02b09","b":24832,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/restore.py"}
+{"p":"skeleton/release/__init__.py","g":"b21c13ab15d17a1e88b6844555a57a7bfa88bf5f","b":5340,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release"}
+{"p":"skeleton/release/attribution.py","g":"640abec19afb3a1f112764480c173eb61e450959","b":14463,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release"}
+{"p":"skeleton/release/disaster_recovery.py","g":"6e44772308d1801e85341d6aff57c920e4cd1536","b":23249,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release"}
+{"p":"skeleton/release/evidence.py","g":"b0bd482a73918478b730ee57965ad2ef9194947d","b":44174,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release"}
+{"p":"skeleton/release/lifecycle.py","g":"1e137e2c442d07e8fe9db3ea2be3f0609a6450d8","b":21573,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release"}
+{"p":"skeleton/release/migration.py","g":"d90d4b54012a13c5a47430fe3d870c2f467f2df0","b":24472,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release"}
+{"p":"skeleton/release/qualification.py","g":"5bdc6515af3222c95c310e8ed01ffc0ab7c0afbf","b":19590,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release"}
+{"p":"skeleton/release/restore.py","g":"ace6636f4ea066403275d43b6211bd561ce02b09","b":24832,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release"}
 {"p":"skeleton/release/scatter10240/__init__.py","g":"45c54094eec442778ac95a128663c01313af1450","b":181,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/scatter10240"}
 {"p":"skeleton/release/scatter10240/caps/INDEX.csv","g":"1e990e4af0cdd20f6bb42364c6ba1f22a1c82653","b":13450,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/scatter10240"}
 {"p":"skeleton/release/scatter10240/caps/__init__.py","g":"63f350d481f3acc1cebf38127d903d0646b75bb9","b":226,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/scatter10240"}
@@ -650,4 +650,4 @@
 {"p":"skeleton/release/scatter10240/caps/c0639.py","g":"50bee1852fb573ea48b46d90c804cc6345042099","b":4277,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/scatter10240"}
 {"p":"skeleton/release/scatter10240/caps/c0640.py","g":"85b26dbfb7103c7a41ac778fcae2de4b29f689ae","b":4277,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/scatter10240"}
 {"p":"skeleton/release/scatter10240/law.py","g":"636e7a8706f37e7fe8b1044ba005611d96a977b2","b":167,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/scatter10240"}
-{"p":"skeleton/release/slo_promotion.py","g":"1c62b0a01e04247db7128c60c8dd865dee290a56","b":13601,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release/slo_promotion.py"}
+{"p":"skeleton/release/slo_promotion.py","g":"1c62b0a01e04247db7128c60c8dd865dee290a56","b":13601,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/release"}

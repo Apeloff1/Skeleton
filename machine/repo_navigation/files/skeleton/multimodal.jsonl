@@ -1,5 +1,5 @@
-{"p":"skeleton/multimodal/__init__.py","g":"e984ccf444c60e4cf951edc628ccd44a1c2e62ba","b":889,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/multimodal/__init__.py"}
-{"p":"skeleton/multimodal/contracts.py","g":"634c52c0ae935dac9ba25a0920effaedeeec0800","b":5080,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/multimodal/contracts.py"}
-{"p":"skeleton/multimodal/ingest.py","g":"fd96fc47292160199b7a939229a4d4bdc39f8921","b":1889,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/multimodal/ingest.py"}
-{"p":"skeleton/multimodal/intake.py","g":"29133761075da67b18f8350b8a8d6e6999a154fb","b":9137,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/multimodal/intake.py"}
-{"p":"skeleton/multimodal/sanitize.py","g":"929126d0724ab61493607fbacca537ff21f91ede","b":2142,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/multimodal/sanitize.py"}
+{"p":"skeleton/multimodal/__init__.py","g":"e984ccf444c60e4cf951edc628ccd44a1c2e62ba","b":889,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/multimodal"}
+{"p":"skeleton/multimodal/contracts.py","g":"634c52c0ae935dac9ba25a0920effaedeeec0800","b":5080,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/multimodal"}
+{"p":"skeleton/multimodal/ingest.py","g":"fd96fc47292160199b7a939229a4d4bdc39f8921","b":1889,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/multimodal"}
+{"p":"skeleton/multimodal/intake.py","g":"29133761075da67b18f8350b8a8d6e6999a154fb","b":9137,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/multimodal"}
+{"p":"skeleton/multimodal/sanitize.py","g":"929126d0724ab61493607fbacca537ff21f91ede","b":2142,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/multimodal"}

@@ -1,4 +1,4 @@
-{"p":"skeleton/knowledge/__init__.py","g":"fbe2fbc5650abeac7be0d6c314dc8355a426dc5a","b":319,"m":"100644","t":"blob","z":"knowledge","f":"skeleton/knowledge/__init__.py"}
+{"p":"skeleton/knowledge/__init__.py","g":"fbe2fbc5650abeac7be0d6c314dc8355a426dc5a","b":319,"m":"100644","t":"blob","z":"knowledge","f":"skeleton/knowledge"}
 {"p":"skeleton/knowledge/graphs/__init__.py","g":"b65a283dfe85998608280061519d1ff9b4ed1cd1","b":1049,"m":"100644","t":"blob","z":"knowledge","f":"skeleton/knowledge/graphs"}
 {"p":"skeleton/knowledge/graphs/capabilities.py","g":"b8f05dbabe0e1db349f5507b7013d8e5274872bd","b":1002,"m":"100644","t":"blob","z":"knowledge","f":"skeleton/knowledge/graphs"}
 {"p":"skeleton/knowledge/graphs/cards.py","g":"db210e5dc109df8d56ec036e723fbf2b70f42692","b":751,"m":"100644","t":"blob","z":"knowledge","f":"skeleton/knowledge/graphs"}
@@ -12,4 +12,4 @@
 {"p":"skeleton/knowledge/graphs/motifs.py","g":"d3957946b84c9528d14c82cd6bbdd753a4f8a541","b":1044,"m":"100644","t":"blob","z":"knowledge","f":"skeleton/knowledge/graphs"}
 {"p":"skeleton/knowledge/graphs/spectral.py","g":"411195af65f03fdcb0dbcc0b9bd1ff3c81bee9db","b":1270,"m":"100644","t":"blob","z":"knowledge","f":"skeleton/knowledge/graphs"}
 {"p":"skeleton/knowledge/graphs/verify.py","g":"6810de660b3209ae428ba8a0d87f392b2f45b39f","b":1864,"m":"100644","t":"blob","z":"knowledge","f":"skeleton/knowledge/graphs"}
-{"p":"skeleton/knowledge/store.py","g":"9ad4dd0889348aec23be470c51a5a9f1256938bb","b":8563,"m":"100644","t":"blob","z":"knowledge","f":"skeleton/knowledge/store.py"}
+{"p":"skeleton/knowledge/store.py","g":"9ad4dd0889348aec23be470c51a5a9f1256938bb","b":8563,"m":"100644","t":"blob","z":"knowledge","f":"skeleton/knowledge"}

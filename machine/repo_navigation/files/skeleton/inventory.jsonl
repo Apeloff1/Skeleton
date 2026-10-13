@@ -1,5 +1,5 @@
-{"p":"skeleton/inventory/__init__.py","g":"4cb674487138d084c5b0eaf2f015ff52d5248370","b":888,"m":"100644","t":"blob","z":"repository-automation","f":"skeleton/inventory/__init__.py"}
-{"p":"skeleton/inventory/capabilities.py","g":"35580b76d76b1f5e3114f42e057e9da20533b1c6","b":40821,"m":"100644","t":"blob","z":"repository-automation","f":"skeleton/inventory/capabilities.py"}
+{"p":"skeleton/inventory/__init__.py","g":"4cb674487138d084c5b0eaf2f015ff52d5248370","b":888,"m":"100644","t":"blob","z":"repository-automation","f":"skeleton/inventory"}
+{"p":"skeleton/inventory/capabilities.py","g":"35580b76d76b1f5e3114f42e057e9da20533b1c6","b":40821,"m":"100644","t":"blob","z":"repository-automation","f":"skeleton/inventory"}
 {"p":"skeleton/inventory/scatter10240/__init__.py","g":"addcbdc9250ff1dc9ed07f2decdee574f1d20662","b":185,"m":"100644","t":"blob","z":"repository-automation","f":"skeleton/inventory/scatter10240"}
 {"p":"skeleton/inventory/scatter10240/caps/INDEX.csv","g":"2a779e7456d628b7973b91181a40a1463434a73a","b":13450,"m":"100644","t":"blob","z":"repository-automation","f":"skeleton/inventory/scatter10240"}
 {"p":"skeleton/inventory/scatter10240/caps/__init__.py","g":"41e412cd7a71924294cb68b043fc7431e23305a2","b":228,"m":"100644","t":"blob","z":"repository-automation","f":"skeleton/inventory/scatter10240"}

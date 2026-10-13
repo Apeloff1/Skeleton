@@ -1,5 +1,5 @@
-{"p":"skeleton/economy/__init__.py","g":"877c3ec66c1234ac1d1d9ba6d95fc2def40f4bab","b":127,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/__init__.py"}
-{"p":"skeleton/economy/capabilities.py","g":"0f458ce6ac153349a8390ce4576d7aafa749e72a","b":153,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/capabilities.py"}
+{"p":"skeleton/economy/__init__.py","g":"877c3ec66c1234ac1d1d9ba6d95fc2def40f4bab","b":127,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy"}
+{"p":"skeleton/economy/capabilities.py","g":"0f458ce6ac153349a8390ce4576d7aafa749e72a","b":153,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy"}
 {"p":"skeleton/economy/facet10240/__init__.py","g":"321f02af2e45c9326d7845843d87e8f5057e7782","b":193,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/facet10240"}
 {"p":"skeleton/economy/facet10240/caps/INDEX.csv","g":"0df0bf0f6c866e01c736841fdad66bb06c53ec25","b":17296,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/facet10240"}
 {"p":"skeleton/economy/facet10240/caps/__init__.py","g":"88723da9f579e7e748a94b08c40712718bf7cde0","b":226,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/facet10240"}
@@ -644,7 +644,7 @@
 {"p":"skeleton/economy/facet10240/caps/c0639.py","g":"e73fb9ff05ba14603ec704276c8c4e15954c9a55","b":4306,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/facet10240"}
 {"p":"skeleton/economy/facet10240/caps/c0640.py","g":"312e989b61f26c80acbf033607b75a0b3b21ba8d","b":4306,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/facet10240"}
 {"p":"skeleton/economy/facet10240/law.py","g":"cc256946e72bd0bb332e7fa575253883334d315e","b":197,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/facet10240"}
-{"p":"skeleton/economy/harbor.py","g":"e576d76f96e2e0a89205b7fccfc943c901e70574","b":141,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/harbor.py"}
-{"p":"skeleton/economy/law.py","g":"d2ad4b2fab0bf9b718fdd5dd70175f35759d1013","b":135,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/law.py"}
-{"p":"skeleton/economy/quota.py","g":"b449720d6133ecad8fe1aaa75f56adb76980ba82","b":139,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/quota.py"}
-{"p":"skeleton/economy/treasury.py","g":"38c1843e0933e044d1bc593486a3cb592b6283b8","b":145,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy/treasury.py"}
+{"p":"skeleton/economy/harbor.py","g":"e576d76f96e2e0a89205b7fccfc943c901e70574","b":141,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy"}
+{"p":"skeleton/economy/law.py","g":"d2ad4b2fab0bf9b718fdd5dd70175f35759d1013","b":135,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy"}
+{"p":"skeleton/economy/quota.py","g":"b449720d6133ecad8fe1aaa75f56adb76980ba82","b":139,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy"}
+{"p":"skeleton/economy/treasury.py","g":"38c1843e0933e044d1bc593486a3cb592b6283b8","b":145,"m":"100644","t":"blob","z":"economy-compat","f":"skeleton/economy"}

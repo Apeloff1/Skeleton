@@ -1,2 +1,2 @@
-{"p":"skeleton/platform/__init__.py","g":"bafbd9bdee330b3be9c39f977a6694badcba557b","b":129,"m":"100644","t":"blob","z":"platform-compat","f":"skeleton/platform/__init__.py"}
-{"p":"skeleton/platform/godot_adapter.py","g":"4e36ea0adfab1ac452317e04fc0438e610c13a9d","b":157,"m":"100644","t":"blob","z":"platform-compat","f":"skeleton/platform/godot_adapter.py"}
+{"p":"skeleton/platform/__init__.py","g":"bafbd9bdee330b3be9c39f977a6694badcba557b","b":129,"m":"100644","t":"blob","z":"platform-compat","f":"skeleton/platform"}
+{"p":"skeleton/platform/godot_adapter.py","g":"4e36ea0adfab1ac452317e04fc0438e610c13a9d","b":157,"m":"100644","t":"blob","z":"platform-compat","f":"skeleton/platform"}

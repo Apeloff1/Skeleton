@@ -1,5 +1,5 @@
-{"p":"skeleton/game/__init__.py","g":"f88b1bdb6fc884b825ec4e268ab9e9740c9a82c2","b":121,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/__init__.py"}
-{"p":"skeleton/game/asset_references.py","g":"bec29e95bd7217235f6f305497bceb79606410e2","b":112,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/asset_references.py"}
+{"p":"skeleton/game/__init__.py","g":"f88b1bdb6fc884b825ec4e268ab9e9740c9a82c2","b":121,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
+{"p":"skeleton/game/asset_references.py","g":"bec29e95bd7217235f6f305497bceb79606410e2","b":112,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
 {"p":"skeleton/game/build/asset_import.py","g":"3bb191a348050deb36d6a1b9cc3c677404718cec","b":123,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/build"}
 {"p":"skeleton/game/build/asset_normalization.py","g":"4a5b4f739d1baabc16a78be293dc443974aa929d","b":117,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/build"}
 {"p":"skeleton/game/build/automated_playtest.py","g":"01985b039d6d9c3c87b93511091b2d002f26a055","b":115,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/build"}
@@ -25,8 +25,8 @@
 {"p":"skeleton/game/build/platform_export.py","g":"9c3b8d8061597c5f539eee635ecd5deb972dd183","b":115,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/build"}
 {"p":"skeleton/game/build/release_artifact_verification.py","g":"a75b5d838fbf4d318e5d1188a354870e1d16c576","b":168,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/build"}
 {"p":"skeleton/game/build/shader_bake.py","g":"bd1f441cca2919accdfe934e883dcd98f2e06a6c","b":121,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/build"}
-{"p":"skeleton/game/component_schema.py","g":"cf8279ed1a66cd85451594d0996aacbe3da3f1e6","b":147,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/component_schema.py"}
-{"p":"skeleton/game/composition.py","g":"eae174708426e221c1af45385437575577e4cfba","b":145,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/composition.py"}
+{"p":"skeleton/game/component_schema.py","g":"cf8279ed1a66cd85451594d0996aacbe3da3f1e6","b":147,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
+{"p":"skeleton/game/composition.py","g":"eae174708426e221c1af45385437575577e4cfba","b":145,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
 {"p":"skeleton/game/contracts/asset_references.schema.json","g":"ccd81afe3daad30d02b72ffd77c444972e6ccb86","b":800,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/contracts"}
 {"p":"skeleton/game/contracts/component_schema.schema.json","g":"d8c16b3ffa199aa214fb6f2511b216bdc70b0ed1","b":556,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/contracts"}
 {"p":"skeleton/game/contracts/editor_recovery.schema.json","g":"221c82790636302621116e36e3d32e8e3d5fa462","b":928,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/contracts"}
@@ -39,10 +39,10 @@
 {"p":"skeleton/game/contracts/undo_redo.schema.json","g":"d2bd4d296cbcee80cfadec1f5f9a11938476449c","b":552,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/contracts"}
 {"p":"skeleton/game/contracts/world_identity.schema.json","g":"4819d9ee00961275c5a7c690222db5b188f4b647","b":672,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/contracts"}
 {"p":"skeleton/game/contracts/world_partition.schema.json","g":"055263fc2826fbb2e3d47b1631a9069ec46fa981","b":705,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/contracts"}
-{"p":"skeleton/game/editor_recovery.py","g":"0cc259955fccd601a0fd542dda3b718baf919793","b":126,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/editor_recovery.py"}
-{"p":"skeleton/game/editor_transaction.py","g":"e4bdd5e9e824dccfebbb5d96f904b3c05d28295e","b":235,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/editor_transaction.py"}
-{"p":"skeleton/game/entity_identity.py","g":"e8b73ff16d5f6137daaf2acea3df1e9d9adfa441","b":112,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/entity_identity.py"}
-{"p":"skeleton/game/flgb_editor_runtime.py","g":"f79b36d13b2585cd3df8fa86e95013900c88471f","b":17047,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/flgb_editor_runtime.py"}
+{"p":"skeleton/game/editor_recovery.py","g":"0cc259955fccd601a0fd542dda3b718baf919793","b":126,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
+{"p":"skeleton/game/editor_transaction.py","g":"e4bdd5e9e824dccfebbb5d96f904b3c05d28295e","b":235,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
+{"p":"skeleton/game/entity_identity.py","g":"e8b73ff16d5f6137daaf2acea3df1e9d9adfa441","b":112,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
+{"p":"skeleton/game/flgb_editor_runtime.py","g":"f79b36d13b2585cd3df8fa86e95013900c88471f","b":17047,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
 {"p":"skeleton/game/gameplay/behavior_tree.py","g":"743817ec505e553848226a4c230c7497876c90b8","b":169,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/gameplay"}
 {"p":"skeleton/game/gameplay/combat_logic.py","g":"5321b2a60ef4b5e2a0858ea6d8d75cf652e4098d","b":157,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/gameplay"}
 {"p":"skeleton/game/gameplay/contracts/behavior_tree.schema.json","g":"e130a434cb19d7be8f3ab80a00c35f64c5ab81dd","b":679,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/gameplay"}
@@ -94,7 +94,7 @@
 {"p":"skeleton/game/generation/style_bible.py","g":"bae025d7499493f95d32009cc0f1effabc28c28c","b":142,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/generation"}
 {"p":"skeleton/game/generation/terrain_generation.py","g":"5f7aa0747c667e7cf7c97de4345200577b77f185","b":180,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/generation"}
 {"p":"skeleton/game/generation/timeline_consistency.py","g":"0ef55a703819fe999afda8b898ac1c8d426e2e75","b":164,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/generation"}
-{"p":"skeleton/game/mechanics.py","g":"22210143d5afad6daf269e2a90909a5df3d5088d","b":141,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/mechanics.py"}
+{"p":"skeleton/game/mechanics.py","g":"22210143d5afad6daf269e2a90909a5df3d5088d","b":141,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
 {"p":"skeleton/game/mechanics_depth/__init__.py","g":"8c0b6f6ff382a36bd3eac5ea8907ec17d027303b","b":153,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/mechanics_depth"}
 {"p":"skeleton/game/mechanics_depth/ai_fsm.py","g":"ea7c1d34a91651a3b9ed0cac2fbf01cc03669f45","b":167,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/mechanics_depth"}
 {"p":"skeleton/game/mechanics_depth/combat_engine.py","g":"bd8b7b2585307fe45dd614d011546be1f56ddd86","b":181,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/mechanics_depth"}
@@ -126,7 +126,7 @@
 {"p":"skeleton/game/platform/replication.py","g":"2c47eb6edcf801de243660afbb369c266b5938a8","b":165,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/platform"}
 {"p":"skeleton/game/platform/rollback_netcode.py","g":"b9ee870ec2d0d91843575afc9cc5cd4762be0aa1","b":173,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/platform"}
 {"p":"skeleton/game/platform/save_schema.py","g":"a2245a5f5a373bcab86146868102a205379380b3","b":116,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/platform"}
-{"p":"skeleton/game/prefab_inheritance.py","g":"a835c810ed3cb2f6c5fcc8ef7d66df7412c7671e","b":141,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/prefab_inheritance.py"}
+{"p":"skeleton/game/prefab_inheritance.py","g":"a835c810ed3cb2f6c5fcc8ef7d66df7412c7671e","b":141,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
 {"p":"skeleton/game/presentation/accessibility_semantics.py","g":"a4fb0c2124c11a8f6cab282a91d58b00cb1c2f7c","b":197,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/presentation"}
 {"p":"skeleton/game/presentation/animation_graph.py","g":"33c7954a64549eafb8882df1d68ea319d06cbdcf","b":212,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/presentation"}
 {"p":"skeleton/game/presentation/audio_graph.py","g":"b996d837fb205147afeb297b3b75b165ef569795","b":151,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/presentation"}
@@ -152,8 +152,8 @@
 {"p":"skeleton/game/presentation/skeletal_animation.py","g":"a120c926015c591527db8172e5b4b4eb15bb650e","b":150,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/presentation"}
 {"p":"skeleton/game/presentation/spatial_audio.py","g":"f814528a965a65e7b3834b483d5dd7796bdf52dc","b":134,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/presentation"}
 {"p":"skeleton/game/presentation/ui_layout.py","g":"9b9ac08c247e9face30baff2b4a78b395fab692d","b":141,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/presentation"}
-{"p":"skeleton/game/project_manifest.py","g":"c3c543059e5d1902f4ad03df7084d5d997d8f466","b":114,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/project_manifest.py"}
-{"p":"skeleton/game/project_migration.py","g":"6d40c5112138eb39549e39c9af8c5600cbc1dbe8","b":143,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/project_migration.py"}
+{"p":"skeleton/game/project_manifest.py","g":"c3c543059e5d1902f4ad03df7084d5d997d8f466","b":114,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
+{"p":"skeleton/game/project_migration.py","g":"6d40c5112138eb39549e39c9af8c5600cbc1dbe8","b":143,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
 {"p":"skeleton/game/render/camera_rig.py","g":"53c09c06a0201585b950b22defa722165228c6da","b":108,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/render"}
 {"p":"skeleton/game/render/contracts/camera_rig.schema.json","g":"6c1701429a0946795d474407c7e0cf6180d8330a","b":1000,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/render"}
 {"p":"skeleton/game/render/contracts/lighting_model.schema.json","g":"38b4faf399afe889a2b64f71f03e7e67ec4b262c","b":849,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/render"}
@@ -179,11 +179,11 @@
 {"p":"skeleton/game/render/shader_compilation.py","g":"6edd701d48146318ad4f625cc8378233359ce5f7","b":175,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/render"}
 {"p":"skeleton/game/render/shadow_system.py","g":"a048505a10f5b47a41044e753a2159e838c64d00","b":145,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/render"}
 {"p":"skeleton/game/render/texture_streaming.py","g":"3f68259e787e603f93d40103631eae5a62db4f2b","b":167,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/render"}
-{"p":"skeleton/game/replay.py","g":"afb18cbeb73880c6d3307cfef3c43a570aad48b4","b":135,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/replay.py"}
+{"p":"skeleton/game/replay.py","g":"afb18cbeb73880c6d3307cfef3c43a570aad48b4","b":135,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
 {"p":"skeleton/game/replay_depth/__init__.py","g":"155560f9f4499a03408bd3cbde323201f5fccefe","b":147,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/replay_depth"}
 {"p":"skeleton/game/replay_depth/batch_replay.py","g":"d5e1b4067ae73de50b9aecfc72cbec36ff705cc8","b":173,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/replay_depth"}
 {"p":"skeleton/game/replay_depth/evidence.py","g":"5882f3d18489f61ea1a9435878247a370a7d48fb","b":165,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/replay_depth"}
-{"p":"skeleton/game/scene_graph.py","g":"6c17bde695550bec8ddcfd968de4201b4ca292c0","b":127,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/scene_graph.py"}
+{"p":"skeleton/game/scene_graph.py","g":"6c17bde695550bec8ddcfd968de4201b4ca292c0","b":127,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
 {"p":"skeleton/game/simulation/__init__.py","g":"8946573293d63050b26ff19869dfb01a2e63dd13","b":779,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/simulation"}
 {"p":"skeleton/game/simulation/character_controller.py","g":"e666813249dd888f6ce9a66d113eff40f1de995e","b":140,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/simulation"}
 {"p":"skeleton/game/simulation/collision_broadphase.py","g":"3ddd6f550ca5534d9581a6acc4206fc5e6a6e399","b":147,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/simulation"}
@@ -210,6 +210,6 @@
 {"p":"skeleton/game/simulation/rollback_simulation.py","g":"0a9b84f106cf6303a2ae108627bb058ec0624dc4","b":177,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/simulation"}
 {"p":"skeleton/game/simulation/simulation_snapshot.py","g":"98a3c484b0857a241d4b2884d469828f76997952","b":138,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/simulation"}
 {"p":"skeleton/game/simulation/transform_hierarchy.py","g":"57445902c294404495d424b71f1255292b18f50e","b":169,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/simulation"}
-{"p":"skeleton/game/undo_redo.py","g":"c8a8a02defdc59298f9723cb721376232590f911","b":135,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/undo_redo.py"}
-{"p":"skeleton/game/world_identity.py","g":"51772ed73799d855daef0bf3a7ac67e1fc869a82","b":110,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/world_identity.py"}
-{"p":"skeleton/game/world_partition.py","g":"cc3981e764058fca2aab98587211372bbe796d83","b":145,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game/world_partition.py"}
+{"p":"skeleton/game/undo_redo.py","g":"c8a8a02defdc59298f9723cb721376232590f911","b":135,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
+{"p":"skeleton/game/world_identity.py","g":"51772ed73799d855daef0bf3a7ac67e1fc869a82","b":110,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}
+{"p":"skeleton/game/world_partition.py","g":"cc3981e764058fca2aab98587211372bbe796d83","b":145,"m":"100644","t":"blob","z":"game-compat","f":"skeleton/game"}

@@ -1,10 +1,10 @@
-{"p":".github/GROK_AUTH_SETUP.md","g":"06985442e204570470c2ca3ae994eec87e8bb9c5","b":1366,"m":"100644","t":"blob","z":"github","f":".github/GROK_AUTH_SETUP.md"}
+{"p":".github/GROK_AUTH_SETUP.md","g":"06985442e204570470c2ca3ae994eec87e8bb9c5","b":1366,"m":"100644","t":"blob","z":"github","f":".github"}
 {"p":".github/ci/flaky-quarantine.json","g":"df0e369abda4b765533e0af3921c54a5cb164787","b":43,"m":"100644","t":"blob","z":"github","f":".github/ci"}
 {"p":".github/ci/required-checks.json","g":"b8f0eddf16cb6b2151f5a0f1f26e7260ee9c3acc","b":2128,"m":"100644","t":"blob","z":"github","f":".github/ci"}
 {"p":".github/ci/security-exceptions.json","g":"df0e369abda4b765533e0af3921c54a5cb164787","b":43,"m":"100644","t":"blob","z":"github","f":".github/ci"}
 {"p":".github/codeql/codeql-config.yml","g":"ee6b70e2d62e0ca852acce05c45688fd28abef72","b":567,"m":"100644","t":"blob","z":"github","f":".github/codeql"}
-{"p":".github/copilot-instructions.md","g":"6f4f2349d2f3e5e7c89b875d52fef3d9740a6be2","b":2113,"m":"100644","t":"blob","z":"github","f":".github/copilot-instructions.md"}
-{"p":".github/dependabot.yml","g":"f44e6cc6bc186e4f9aff582c4c64968af24a1cba","b":4629,"m":"100644","t":"blob","z":"github","f":".github/dependabot.yml"}
+{"p":".github/copilot-instructions.md","g":"6f4f2349d2f3e5e7c89b875d52fef3d9740a6be2","b":2113,"m":"100644","t":"blob","z":"github","f":".github"}
+{"p":".github/dependabot.yml","g":"f44e6cc6bc186e4f9aff582c4c64968af24a1cba","b":4629,"m":"100644","t":"blob","z":"github","f":".github"}
 {"p":".github/workflows/actions-housekeeping-cli.yml","g":"b2d7de7b1c4b2622b1f55ecab2363d309733896f","b":28703,"m":"100644","t":"blob","z":"github","f":".github/workflows"}
 {"p":".github/workflows/advanced-ai-structure.yml","g":"db7cd49c0e36d0038da7eaf42f268547c137ef9c","b":5500,"m":"100644","t":"blob","z":"github","f":".github/workflows"}
 {"p":".github/workflows/agent-runtime-closure.yml","g":"c12dbba6f10cd9106f530056aae9431b7f1ff182","b":4213,"m":"100644","t":"blob","z":"github","f":".github/workflows"}
@@ -341,7 +341,7 @@
 {"p":".github/workflows/repair-intake.yml","g":"b78080e156125ea195c2e26d2ed3f624395c1278","b":12677,"m":"100644","t":"blob","z":"github","f":".github/workflows"}
 {"p":".github/workflows/repo-attention.yml","g":"0c21b648f8737f8b02cbfb52b5698265e9894ca8","b":17672,"m":"100644","t":"blob","z":"github","f":".github/workflows"}
 {"p":".github/workflows/repo-bots.yml","g":"5e84b0cee03429f545c06577a198c908360fd338","b":2362,"m":"100644","t":"blob","z":"github","f":".github/workflows"}
-{"p":".github/workflows/repo-machine-index.yml","g":"23a598daa2c3512ada290c2d9270c759515b9d66","b":3694,"m":"100644","t":"blob","z":"github","f":".github/workflows"}
+{"p":".github/workflows/repo-machine-index.yml","g":"4233c64cf791c7f9d3383ca46d5228b141ce161f","b":3849,"m":"100644","t":"blob","z":"github","f":".github/workflows"}
 {"p":".github/workflows/repo-navigation-index.yml","g":"4cdb69b8b04da8ff0edd0ffdb9ae9fb01617c6d4","b":3531,"m":"100644","t":"blob","z":"github","f":".github/workflows"}
 {"p":".github/workflows/repository-hygiene-gate.yml","g":"35e939c54e37a3eb1ab4b0b0433b942d401c8d7f","b":5015,"m":"100644","t":"blob","z":"github","f":".github/workflows"}
 {"p":".github/workflows/repository-intelligence-closure.yml","g":"ab649515567d9b8913b9d9ef3f44fad93b524071","b":5913,"m":"100644","t":"blob","z":"github","f":".github/workflows"}

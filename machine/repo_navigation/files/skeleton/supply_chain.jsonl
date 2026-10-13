@@ -1,6 +1,6 @@
-{"p":"skeleton/supply_chain/__init__.py","g":"98e19a6e200915f64aec258b7c792f39b0a81ffb","b":84,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/supply_chain/__init__.py"}
-{"p":"skeleton/supply_chain/model_bom.py","g":"ce904d73d9b39881418bce66d324a042e8b70ce9","b":7067,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/supply_chain/model_bom.py"}
-{"p":"skeleton/supply_chain/sbom.py","g":"bf29c7cbddcc1c945d2877fadf866990b25dcefd","b":6192,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/supply_chain/sbom.py"}
+{"p":"skeleton/supply_chain/__init__.py","g":"98e19a6e200915f64aec258b7c792f39b0a81ffb","b":84,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/supply_chain"}
+{"p":"skeleton/supply_chain/model_bom.py","g":"ce904d73d9b39881418bce66d324a042e8b70ce9","b":7067,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/supply_chain"}
+{"p":"skeleton/supply_chain/sbom.py","g":"bf29c7cbddcc1c945d2877fadf866990b25dcefd","b":6192,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/supply_chain"}
 {"p":"skeleton/supply_chain/vol178/__init__.py","g":"1d2e20cb4c7dc8994365e22a4b7ee37b13581e7d","b":409,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/supply_chain/vol178"}
 {"p":"skeleton/supply_chain/vol178/caps/__init__.py","g":"cea17daa80e378b0732bfc49e79a8b104fcba2d8","b":20628,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/supply_chain/vol178"}
 {"p":"skeleton/supply_chain/vol178/caps/c001_component_id_grammar.py","g":"ced28be99b7ab45345550eedb36dcbb5fdbc5d99","b":10292,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/supply_chain/vol178"}

@@ -1,4 +1,4 @@
-{"p":"skeleton/distributed/__init__.py","g":"722f4b66c04e30feca2b05bed803251f5a361c6f","b":82,"m":"100644","t":"blob","z":"distributed","f":"skeleton/distributed/__init__.py"}
+{"p":"skeleton/distributed/__init__.py","g":"722f4b66c04e30feca2b05bed803251f5a361c6f","b":82,"m":"100644","t":"blob","z":"distributed","f":"skeleton/distributed"}
 {"p":"skeleton/distributed/galaxy/__init__.py","g":"13a946e807675006bcc9a7a9dab45006b1be02eb","b":912,"m":"100644","t":"blob","z":"distributed","f":"skeleton/distributed/galaxy"}
 {"p":"skeleton/distributed/galaxy/atoms.py","g":"85dbcfc0ad48729cbebffffcccf00d8ea63cc3ac","b":5289,"m":"100644","t":"blob","z":"distributed","f":"skeleton/distributed/galaxy"}
 {"p":"skeleton/distributed/galaxy/banks.py","g":"21cb80d50d1c77d031deb648fc0c628f8472c844","b":2031,"m":"100644","t":"blob","z":"distributed","f":"skeleton/distributed/galaxy"}

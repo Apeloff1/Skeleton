@@ -1,4 +1,4 @@
-{"p":"skeleton/acquired/__init__.py","g":"aa01a7d2368fc6d7fb41a707670497691e9f1d01","b":1210,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/__init__.py"}
+{"p":"skeleton/acquired/__init__.py","g":"aa01a7d2368fc6d7fb41a707670497691e9f1d01","b":1210,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired"}
 {"p":"skeleton/acquired/gaming/__init__.py","g":"cbc8c69147136ebdaf690890da501094a14d77a8","b":635,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/gaming"}
 {"p":"skeleton/acquired/gaming/course_runtime.py","g":"991d2f569898a37dc038d7ba1a4c9f319b31d36f","b":8344,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/gaming"}
 {"p":"skeleton/acquired/gaming/knowledge.py","g":"baf01adb64212b0ce019327c9aa171278d992c53","b":8685,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/gaming"}
@@ -8,7 +8,7 @@
 {"p":"skeleton/acquired/gates/catalog.json","g":"3f172f2aae332a9cda1d6a066d68bee4e252ab75","b":8102,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/gates"}
 {"p":"skeleton/acquired/genos/pulse.json","g":"2b8f4a43af336df87941d1a2c8e4946ab4778b64","b":1065,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/genos"}
 {"p":"skeleton/acquired/genos/spree_pulse.json","g":"33c8bd679dd4c70d7d18ccc51e41fb6eff7b47ff","b":1114,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/genos"}
-{"p":"skeleton/acquired/ingest.py","g":"7bf23a4d35d5cf3e61c07d8ca1c2c31ee77190f4","b":6523,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/ingest.py"}
-{"p":"skeleton/acquired/learning.py","g":"cfcf021de5b7ff3cfe9a9d5bdd2dc144b4dc6a7f","b":12857,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/learning.py"}
-{"p":"skeleton/acquired/resilient_cache.py","g":"6022e05f00457ebfc76ae5affe5dddfb07767bdd","b":5888,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/resilient_cache.py"}
-{"p":"skeleton/acquired/runtime_guard.py","g":"4f4eca085d595d4be2192d9ae162dc9d9032e104","b":9392,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired/runtime_guard.py"}
+{"p":"skeleton/acquired/ingest.py","g":"7bf23a4d35d5cf3e61c07d8ca1c2c31ee77190f4","b":6523,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired"}
+{"p":"skeleton/acquired/learning.py","g":"cfcf021de5b7ff3cfe9a9d5bdd2dc144b4dc6a7f","b":12857,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired"}
+{"p":"skeleton/acquired/resilient_cache.py","g":"6022e05f00457ebfc76ae5affe5dddfb07767bdd","b":5888,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired"}
+{"p":"skeleton/acquired/runtime_guard.py","g":"4f4eca085d595d4be2192d9ae162dc9d9032e104","b":9392,"m":"100644","t":"blob","z":"external-sources","f":"skeleton/acquired"}

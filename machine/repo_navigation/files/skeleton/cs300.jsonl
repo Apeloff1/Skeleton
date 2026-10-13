@@ -1,6 +1,6 @@
-{"p":"skeleton/cs300/__init__.py","g":"0497dc9629eac0890a8896d6494fb9dccc16cae4","b":40,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/__init__.py"}
-{"p":"skeleton/cs300/contract.py","g":"823d0db442d3d74c87b979306fb29d7efcd89e5f","b":2066,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/contract.py"}
-{"p":"skeleton/cs300/layer_runner.py","g":"5cb258191d92b367d4d9660a7ef923e0c5e20842","b":5774,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/layer_runner.py"}
+{"p":"skeleton/cs300/__init__.py","g":"0497dc9629eac0890a8896d6494fb9dccc16cae4","b":40,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300"}
+{"p":"skeleton/cs300/contract.py","g":"823d0db442d3d74c87b979306fb29d7efcd89e5f","b":2066,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300"}
+{"p":"skeleton/cs300/layer_runner.py","g":"5cb258191d92b367d4d9660a7ef923e0c5e20842","b":5774,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300"}
 {"p":"skeleton/cs300/layers/__init__.py","g":"ede8a1e51647c21c6459e5bc5beb86eb0dcf7084","b":35,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/layers"}
 {"p":"skeleton/cs300/layers/l001.py","g":"7ae96f3b37eba2ef5471eec17856fad9f904284e","b":2006,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/layers"}
 {"p":"skeleton/cs300/layers/l002.py","g":"d74ac05b987e49537a5a9fcf5484692e451a0cd2","b":1991,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/layers"}
@@ -302,7 +302,7 @@
 {"p":"skeleton/cs300/layers/l298.py","g":"6ba976fd96457030cbc824f95c49a3048f531dfe","b":2014,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/layers"}
 {"p":"skeleton/cs300/layers/l299.py","g":"36bfc379ae20a9114439e88957f125c0815814b4","b":2004,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/layers"}
 {"p":"skeleton/cs300/layers/l300.py","g":"4ec226433379505e7235ea391a201e67439be9b4","b":1984,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/layers"}
-{"p":"skeleton/cs300/registry.py","g":"9c03e685db6facb15426e342710f60ab5b36fac5","b":399,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/registry.py"}
+{"p":"skeleton/cs300/registry.py","g":"9c03e685db6facb15426e342710f60ab5b36fac5","b":399,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300"}
 {"p":"skeleton/cs300/strata/__init__.py","g":"ad5ae4b667e28386e5274ae0e24a264833cfa1c9","b":37,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/strata"}
 {"p":"skeleton/cs300/strata/s01.py","g":"bd1041acab257c2b1753c7e53e0e6c2ef21836f5","b":1858,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/strata"}
 {"p":"skeleton/cs300/strata/s02.py","g":"56e107b67d9a6ee1f968d650dffb6953bbe60971","b":1837,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/cs300/strata"}

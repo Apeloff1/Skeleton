@@ -1,6 +1,6 @@
-{"p":"skeleton/verification/__init__.py","g":"75a6cd103b971faac3b7988354f54a86557a67ee","b":667,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/verification/__init__.py"}
-{"p":"skeleton/verification/citation_integrity.py","g":"c52cf7f91905129b5223f2f7212fee590d051f97","b":6551,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/verification/citation_integrity.py"}
-{"p":"skeleton/verification/claim_identity.py","g":"a956288acb5ec1a9e7464849fd83b0016cec25da","b":7822,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/verification/claim_identity.py"}
+{"p":"skeleton/verification/__init__.py","g":"75a6cd103b971faac3b7988354f54a86557a67ee","b":667,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/verification"}
+{"p":"skeleton/verification/citation_integrity.py","g":"c52cf7f91905129b5223f2f7212fee590d051f97","b":6551,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/verification"}
+{"p":"skeleton/verification/claim_identity.py","g":"a956288acb5ec1a9e7464849fd83b0016cec25da","b":7822,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/verification"}
 {"p":"skeleton/verification/scatter10240/__init__.py","g":"8d499ebf338c3ec15629af6fe6ae638621440793","b":191,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/verification/scatter10240"}
 {"p":"skeleton/verification/scatter10240/caps/INDEX.csv","g":"7405a3ae63ecd353f8e7ed12a142783f1c6af3fa","b":13450,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/verification/scatter10240"}
 {"p":"skeleton/verification/scatter10240/caps/__init__.py","g":"aa4b10dbbe20ec5d7cf7e370b826e3a9336cf383","b":231,"m":"100644","t":"blob","z":"unclassified","f":"skeleton/verification/scatter10240"}

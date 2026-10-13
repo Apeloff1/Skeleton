@@ -1,7 +1,7 @@
-{"p":"skeleton/chronicle/__init__.py","g":"601b64e66defa3d90b636828506a493453edfaf7","b":63,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/__init__.py"}
-{"p":"skeleton/chronicle/capabilities.py","g":"dd98911e614143eb48b9a1e62e1cf81417d96bb9","b":76,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/capabilities.py"}
-{"p":"skeleton/chronicle/cards.py","g":"fdd3e0948db386673dd9f45385092dbe1d8cf96a","b":69,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/cards.py"}
-{"p":"skeleton/chronicle/engine.py","g":"d67a25c2f36b36f1b050a3efc6c9aa1ec885a450","b":70,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/engine.py"}
+{"p":"skeleton/chronicle/__init__.py","g":"601b64e66defa3d90b636828506a493453edfaf7","b":63,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle"}
+{"p":"skeleton/chronicle/capabilities.py","g":"dd98911e614143eb48b9a1e62e1cf81417d96bb9","b":76,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle"}
+{"p":"skeleton/chronicle/cards.py","g":"fdd3e0948db386673dd9f45385092dbe1d8cf96a","b":69,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle"}
+{"p":"skeleton/chronicle/engine.py","g":"d67a25c2f36b36f1b050a3efc6c9aa1ec885a450","b":70,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle"}
 {"p":"skeleton/chronicle/facet10240/__init__.py","g":"4f2ea567c01ddb2b519957554951949c8cbad460","b":197,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/facet10240"}
 {"p":"skeleton/chronicle/facet10240/caps/INDEX.csv","g":"64bc24ba6f5aa12144afd3bd73a63a7f79a9ee52","b":17296,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/facet10240"}
 {"p":"skeleton/chronicle/facet10240/caps/__init__.py","g":"5b40fb6afa8576dba698c3f3513d3cf61862a809","b":228,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/facet10240"}
@@ -646,6 +646,6 @@
 {"p":"skeleton/chronicle/facet10240/caps/c0639.py","g":"0221e82f7fc7aaa4048742b7b9af62c10092a800","b":4312,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/facet10240"}
 {"p":"skeleton/chronicle/facet10240/caps/c0640.py","g":"2575954d4d948f880813422bc58860acb61cd4f8","b":4312,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/facet10240"}
 {"p":"skeleton/chronicle/facet10240/law.py","g":"9080982719a2db1b737b22b84d7e26b342c676f8","b":201,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/facet10240"}
-{"p":"skeleton/chronicle/helix.py","g":"a0786e41df8ac27e7d8d3f5c5a77f31ae2943ecf","b":69,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/helix.py"}
-{"p":"skeleton/chronicle/law.py","g":"7ba19eacd72984b143bbb1523e4b4ddd4607529b","b":67,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/law.py"}
-{"p":"skeleton/chronicle/verify.py","g":"d3f28b7fbbd7533b22caeb259147d853dd991ac5","b":70,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle/verify.py"}
+{"p":"skeleton/chronicle/helix.py","g":"a0786e41df8ac27e7d8d3f5c5a77f31ae2943ecf","b":69,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle"}
+{"p":"skeleton/chronicle/law.py","g":"7ba19eacd72984b143bbb1523e4b4ddd4607529b","b":67,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle"}
+{"p":"skeleton/chronicle/verify.py","g":"d3f28b7fbbd7533b22caeb259147d853dd991ac5","b":70,"m":"100644","t":"blob","z":"chronicle-compat","f":"skeleton/chronicle"}
