@@ -284,11 +284,16 @@ class DurableShadowWeightPipeline:
             return next_record
 
     def submit(self, intake: ShadowWeightIntake) -> ShadowRecord:
-        if self._pipeline.get(intake.intake_id) is not None:
+        if not isinstance(intake, ShadowWeightIntake):
+            raise ShadowWeightError("intake must be ShadowWeightIntake")
+        with self._lock:
+            self._refresh_if_changed()
             prior = self._pipeline.get(intake.intake_id)
-            if prior is not None and prior.intake.digest == intake.digest:
-                return prior
-        return self._commit(lambda queue: queue.submit(intake))
+            if prior is not None:
+                if prior.intake.digest == intake.digest:
+                    return prior
+                raise ShadowWeightError("intake ID already bound to different content")
+            return self._commit(lambda queue: queue.submit(intake))
 
     def review(self, intake_id: str, review: ShadowReview, *, expected_version: int) -> ShadowRecord:
         return self._commit(
