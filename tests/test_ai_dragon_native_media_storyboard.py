@@ -87,4 +87,5 @@ def test_verifier_refuses_painted_fake_storyboard_even_with_valid_zip(tmp_path):
 def test_storyboard_publication_requires_rights_authorization(tmp_path):
     with pytest.raises(PermissionError):
         publish_original_storyboard(b"not a native capture",tmp_path,authorized=False)
-    assert not tmp_path.exists()
+    # pytest creates tmp_path in advance; denial must leave it empty.
+    assert list(tmp_path.iterdir())==[]
