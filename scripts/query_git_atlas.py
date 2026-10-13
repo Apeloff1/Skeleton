@@ -14,7 +14,11 @@ import re
 import sys
 from typing import Any
 
-from scripts.build_git_atlas import git, SCHEMA
+# Support `python scripts/query_git_atlas.py` and `python -m scripts.query_git_atlas`.
+if __package__:
+    from .build_git_atlas import git, SCHEMA
+else:
+    from build_git_atlas import git, SCHEMA
 
 TERMS = re.compile(r"[a-z][a-z0-9]{1,}")
 
