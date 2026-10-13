@@ -8,7 +8,7 @@ All output is derived from one immutable HEAD tree and is safe to rebuild.
 from __future__ import annotations
 
 import argparse
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from hashlib import blake2b, sha256
 import json
@@ -260,12 +260,18 @@ def read_git_blobs(root: Path, shas: Iterable[str]) -> dict[str, bytes]:
     return result
 
 
-def token_fingerprint(blob: bytes) -> frozenset[bytes]:
-    """Hashed token 4-grams reduce identifier-order/whitespace noise."""
+def token_fingerprint(blob: bytes) -> Counter[bytes]:
+    """Frequency-aware hashed token 4-grams for review-only similarity.
+
+    Repeated shared code must contribute proportionally to resemblance:
+    set-based Jaccard can discard hundreds of unchanged repeated shingle
+    instances and incorrectly miss a near-copy with a single changed line.
+    """
     tokens = TOKENS.findall(blob.lower())
     if len(tokens) < 24:
-        return frozenset()
-    return frozenset(blake2b(b"\x1f".join(tokens[i:i + 4]), digest_size=8).digest() for i in range(len(tokens) - 3))
+        return Counter()
+    return Counter(blake2b(b"\x1f".join(tokens[i:i + 4]), digest_size=8).digest()
+                   for i in range(len(tokens) - 3))
 
 
 def near_duplicates(root: Path, files: list[GitFile], *, candidate_limit: int, threshold: float) -> dict[str, object]:
@@ -277,9 +283,13 @@ def near_duplicates(root: Path, files: list[GitFile], *, candidate_limit: int, t
         a, b = fingerprints[left.sha], fingerprints[right.sha]
         if len(a) < 8 or len(b) < 8:
             continue
-        score = len(a & b) / len(a | b)
+        shared = sum((a & b).values())
+        combined = sum((a | b).values())
+        if not combined:
+            continue
+        score = shared / combined
         if score >= threshold:
-            matches.append({"left": left.path, "right": right.path, "left_blob": left.sha, "right_blob": right.sha, "similarity": round(score, 4), "method": "token-4gram-jaccard", "classification": "review-required"})
+            matches.append({"left": left.path, "right": right.path, "left_blob": left.sha, "right_blob": right.sha, "similarity": round(score, 4), "method": "token-4gram-multiset-jaccard", "classification": "review-required"})
     matches.sort(key=lambda p: (-p["similarity"], p["left"], p["right"]))
     return {"method": "basename-and-size-candidates-with-token-4gram-jaccard", "threshold": threshold, "candidate_pairs_inspected": len(pairs), "candidate_pairs_deferred": skipped, "content_verified_matches": matches, "note": "Heuristic similarity never establishes equivalent behavior or authorizes deletion, import inversion, or merging."}
 
