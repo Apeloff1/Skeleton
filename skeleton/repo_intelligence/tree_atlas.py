@@ -217,17 +217,23 @@ def exact_duplicates(entries: Iterable[Entry]) -> list[dict[str, object]]:
     return sorted(result, key=lambda row: (-int(row["copies"]), str(row["blob"])))
 
 
-def _shingles(data: bytes) -> frozenset[int]:
+def _shingles(data: bytes) -> Counter[int]:
+    """Count stable token 5-grams, preserving repeated code evidence.
+
+    Set Jaccard underweights the repeated source in a long near-copy: one
+    changed statement can introduce many unique shingles while leaving most
+    source tokens unchanged. Frequency-aware Jaccard remains review-only.
+    """
     try:
         source = data.decode("utf-8")
     except UnicodeDecodeError:
-        return frozenset()
+        return Counter()
     tokens = TOKEN.findall(source)
     if len(tokens) < 25:
-        return frozenset()
-    # Stable token-shingles; no Python hash() randomness.
-    return frozenset(int.from_bytes(sha256(" ".join(tokens[i:i+5]).encode()).digest()[:8], "big")
-                     for i in range(len(tokens)-4))
+        return Counter()
+    # SHA-256 derived shingle identity, never process-randomized hash().
+    return Counter(int.from_bytes(sha256(" ".join(tokens[i:i+5]).encode()).digest()[:8], "big")
+                   for i in range(len(tokens)-4))
 
 
 def _blobs(root: Path, hashes: list[str]) -> dict[str, bytes]:
@@ -292,10 +298,15 @@ def near_duplicates(root: Path, entries: Iterable[Entry], *,
                 lhs, rhs = fingerprints[a.blob], fingerprints[b.blob]
                 if not lhs or not rhs:
                     continue
-                score = len(lhs & rhs) / len(lhs | rhs)
+                # Multiset intersection/union incorporates repeated tokens.
+                common = sum((lhs & rhs).values())
+                total = sum((lhs | rhs).values())
+                if not total:
+                    continue
+                score = common / total
                 if score >= threshold:
                     findings.append({"a": a.path, "b": b.path,
-                                     "similarity": round(score, 5), "method": "token-5gram-jaccard"})
+                                     "similarity": round(score, 5), "method": "token-5gram-multiset-jaccard"})
     findings.sort(key=lambda row: (-float(row["similarity"]), str(row["a"]), str(row["b"])))
     return {"exhaustive": False, "comparison_scope": "same-stem-and-extension-canonical-code",
             "blobs_examined": len(hashes), "candidate_buckets": len(selected),
