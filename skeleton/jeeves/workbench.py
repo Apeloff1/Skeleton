@@ -109,7 +109,7 @@ class JeevesWorkbench:
             raise JeevesWorkbenchError("creator handlers require a paired host authorizer")
         if source_edit_handler is not None and source_edit_allowlist is not None:
             raise JeevesWorkbenchError("choose injected editor or opt-in local editor, not both")
-        if (source_edit_authorize is None) != (source_edit_handler is not None or source_edit_allowlist is not None):
+        if (source_edit_authorize is None) != (source_edit_handler is None and source_edit_allowlist is None):
             raise JeevesWorkbenchError("source editing requires a host authorizer and an explicit handler or allowlist")
         if source_edit_authorize is not None and not callable(source_edit_authorize):
             raise JeevesWorkbenchError("source edit authorization must be callable")
