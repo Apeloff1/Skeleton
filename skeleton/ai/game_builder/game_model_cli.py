@@ -21,6 +21,7 @@ from .game_training_flow import (
 )
 from .game_reviewer_v2 import train_robust_game_reviewer
 from .game_reviewer_optimizer import OptimizerSchedule,optimize_review_weights
+from .game_post_weight_forensics import analyze_post_weight_change
 from .game_learning_feedback import feedback_from_evaluation
 from .game_model_promotion import (
     PromotionError,PromotionStandard,evaluate_candidate,
@@ -49,12 +50,12 @@ def parser():
     )
     commands=cmd.add_subparsers(dest="action",required=True)
     for name in ("evaluate","stage","approve","usage","idle-pass",
-                 "activate","status","rollback","recover","predict","next-standard","optimize","optimize-stage"):
+                 "activate","status","rollback","recover","predict","next-standard","optimize","optimize-stage","optimize-audit"):
         p=commands.add_parser(name)
         p.add_argument("--root",required=True)
         if name!="status":
             p.add_argument("--trusted-local-operator",action="store_true")
-        if name in {"evaluate","stage","optimize","optimize-stage"}:
+        if name in {"evaluate","stage","optimize","optimize-stage","optimize-audit"}:
             if name in {"evaluate","stage"}:
                 p.add_argument("--epochs",type=int,default=75)
                 p.add_argument("--feature-version",
@@ -102,7 +103,7 @@ def main(argv=None):
                         review_roles=[row["role"] for row in state["attestations"]],
                         no_remote_llm_deployment=True,
                         no_hidden_hardware_activation=True)
-        elif args.action in {"evaluate","stage","optimize","optimize-stage"}:
+        elif args.action in {"evaluate","stage","optimize","optimize-stage","optimize-audit"}:
             batches=load_quarantined_batches(studio.root,authorized=True)
             plan=plan_training_flow(
                 batches,per_project_cap=args.per_project_cap,authorized=True)
@@ -113,7 +114,7 @@ def main(argv=None):
             active=registry.read_state()["active"]
             champion=(registry._candidate(active)["policy"]
                       if active is not None else None)
-            if args.action in {"optimize","optimize-stage"}:
+            if args.action in {"optimize","optimize-stage","optimize-audit"}:
                 schedule=OptimizerSchedule(
                     learning_rates=tuple(args.learning_rates),
                     epochs=tuple(args.epoch_candidates))
@@ -121,6 +122,14 @@ def main(argv=None):
                     plan,schedule=schedule,standard=standard,
                     champion=champion,authorized=True)
                 result=trial.payload()
+                if args.action=="optimize-audit":
+                    evidence=analyze_post_weight_change(
+                        plan,trial,standard=standard,champion=champion,
+                        authorized=True)
+                    result=dict(schema="skeleton.game_builder.post_weight_audit_cli.v1",
+                                optimizer=result,post_weight_forensics=evidence.payload(),
+                                archived_or_activated=False,
+                                next_step="rights_reviewed_dragon_research_then_fresh_original_gameplay")
                 if args.action=="optimize-stage":
                     # Deploying the selected fit is still disallowed. This
                     # only enters the existing independently reviewed
