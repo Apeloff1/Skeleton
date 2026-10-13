@@ -484,6 +484,54 @@ $("jeeves-code-dependencies").addEventListener("click",()=>dmGuard(async()=>{
   " incompleteness categories. No imported code was executed.");
 });
 
+
+/* Installed game editors and authored scene production into real Studio proposals. */
+let jeevesProductionDigest=null,jeevesProductionContext=null;
+function productionParams(){
+ if(!model||selectedTree!=="current"||!model.active||
+    selectedProject!==model.active)
+  throw Error("Select a current writable original project first");
+ const phase=$("jeeves-production-phase").value;
+ const items=JSON.parse($("jeeves-production-items").value);
+ if(!Array.isArray(items)||items.length<1||items.length>24)
+  throw Error("Production wave needs 1–24 typed engine or scene items");
+ return {project:model.active,phase,items,expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-production-plan").addEventListener("click",()=>dmGuard(async()=>{
+ if(!jeevesAppSnapshot)throw Error("Scan whole application first");
+ const params=productionParams();
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.plan",params,operator_authorized:false});
+ const plan=response.result;
+ jeevesProductionDigest=plan.digest;
+ jeevesProductionContext=JSON.stringify(params);
+ $("jeeves-production-output").textContent=JSON.stringify(plan,null,2).slice(0,75000);
+ status(plan.requested_items+" actual game sources generated and source-digested; "+
+  plan.changed_items+" require review proposals before human publication.");
+}));
+$("jeeves-production-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if($("jeeves-production-approval").checked!==true)
+  throw Error("Explicitly approve staging the chosen reviewed source candidates");
+ const params=productionParams();
+ if(!jeevesProductionDigest||jeevesProductionContext!==JSON.stringify(params))
+  throw Error("Regenerate exact production plan after configuration changes");
+ const reason=$("jeeves-production-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Detailed original production review reason required");
+ const response=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.production.stage",
+  params:{...params,expected_plan_digest:jeevesProductionDigest,reason},
+  operator_authorized:true,
+ });
+ const staged=response.result;
+ $("jeeves-production-output").textContent=JSON.stringify(staged,null,2).slice(0,75000);
+ if(staged.proposals.length)
+  $("proposal").textContent=staged.proposals[0].proposal_id;
+ jeevesProductionDigest=null;
+ status(staged.proposal_count+" real source proposals staged in existing Studio. "+
+  "Review exact diffs and commit each proposal explicitly.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -4424,6 +4472,29 @@ model promotion and release still require independent approval and evidence.</sm
 <pre id="jeeves-dm-output" role="status" aria-live="polite"></pre>
 </fieldset>
 
+
+<fieldset><legend>Jeeves · Multi-Engine Game Production</legend>
+<p><small>Author real normalized engine settings and original playable scenes
+in the selected project. Reviewable source proposals enter existing Studio;
+nothing is secretly accepted or deployed.</small></p>
+<label>Source production phase<select id="jeeves-production-phase">
+<option value="systems">Installed game engine configuration sources</option>
+<option value="scenes">Authored playable scenes (requires approved systems)</option>
+</select></label>
+<label>Engine or scene specifications JSON (1–24)
+<textarea id="jeeves-production-items" rows="7" spellcheck="false">[
+ {"editor":"rpg","settings":{"quest_depth":24}},
+ {"editor":"maze","settings":{"topology":"moving"}},
+ {"editor":"npc_society","settings":{}}
+]</textarea></label>
+<button id="jeeves-production-plan" type="button">Build actual engine/scene source plan</button>
+<label>Reason for staged production edits
+<textarea id="jeeves-production-reason" rows="2" spellcheck="false">Create original, reviewed game engine configurations for my selected project.</textarea></label>
+<label><input id="jeeves-production-approval" type="checkbox">
+Explicitly authorize reviewed original project source proposals</label>
+<button id="jeeves-production-stage" type="button">Stage source proposals in real Studio workspace</button>
+<pre id="jeeves-production-output" role="status" aria-live="polite"></pre>
+</fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
 operator-reviewed multi-file diffs; never executes files or silently writes code.</small></p>
