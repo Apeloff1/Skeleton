@@ -395,6 +395,8 @@ OPERATIONS = {
     "studio.release.catalog":("read", "source-custodied original browser/Godot release identities",False),
     "studio.release.verify":("read", "approved source hash and canonical package proof verification",False),
     "studio.release.download":("compute", "designer-authorized deterministic accepted source ZIP",True),
+    "studio.release.replay":("compute", "actual Python winning replay and byte-identical package rebuild",True),
+    "studio.release.compare":("read", "source-hashed actual approved original game variant differences",False),
     "studio.tree":("read", "active project files",False),
     "studio.file":("read", "active project source",False),
     "studio.propose":("proposal", "targeted human-reviewed project edit",True),
@@ -583,13 +585,18 @@ class JeevesAppwideRuntime:
             from .jeeves_proposal_queue import JeevesProposalQueue
             result=JeevesProposalQueue(inv, ws).page(**params)
         elif action in ("studio.release.catalog", "studio.release.verify",
-                        "studio.release.download"):
+                        "studio.release.download", "studio.release.replay",
+                        "studio.release.compare"):
             from .jeeves_release_custody import JeevesReleaseCustody
             release=JeevesReleaseCustody(inv, ws)
             if action=="studio.release.catalog":
                 result=release.catalog(**params)
             elif action=="studio.release.verify":
                 result=release.verify(**params)
+            elif action=="studio.release.compare":
+                result=release.compare(**params)
+            elif action=="studio.release.replay":
+                result=release.replay(**params, operator_authorized=authorized)
             else:
                 result=release.download(**params, operator_authorized=authorized)
         elif action=="source.inspect":
