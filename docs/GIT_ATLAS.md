@@ -8,6 +8,7 @@ feature/runtime owners.
 
     python scripts/build_git_atlas.py --root . --output .machine/git-atlas --revision HEAD
     python scripts/build_git_atlas_near.py --root . --atlas .machine/git-atlas --output .machine/git-atlas
+    python scripts/query_git_atlas.py --root . --atlas .machine/git-atlas --query "Jeeves game editor" --budget-bytes 5000
     python -m unittest discover -s tests -p 'test_git_atlas*.py' -v
 
 The scanner uses NUL-separated git ls-tree --full-tree -r -z -l at one
@@ -58,12 +59,26 @@ contracts. Unknown zones remain visibly unclassified.
 - Check filesystem case collisions, snapshot policy, and runtime contracts
   before proposing file moves. Preserve imports, resources and test references.
 
+## Context-budgeted Jeeves navigation
+
+Run scripts/query_git_atlas.py with a natural-language query, max hits, and an
+explicit UTF-8 output byte budget. The retrieval process loads indexes locally,
+returns only a bounded group/owner/path/blob-hash projection, and fails closed
+if the checkout no longer matches the index commit or its integrity receipts.
+This is an **index query**, not implicit authorization to edit or move files.
+Expansion into symbol-level source spans belongs to the existing code-search,
+repository-intelligence and runtime permission contracts.
+
+Generated feature shards use the existing AI-tree mapping IDs first. Other
+directories receive bounded-depth navigational labels. New feature labels
+do not become new canonical runtime owners.
+
 ## Follow-on milestones
 
 1. Add incremental commit-diff reconciliation with exact-head freshness gates.
 2. Broaden source-language AST parsing and independently verify near-duplicate
    behavioral equivalence (current detection is bounded and advisory).
 3. Link the full inventory to existing runtime symbol, dependency, API, UI and
-   test graphs; expose Jeeves context-budgeted retrieval of source spans.
+   test graphs; extend the new bounded metadata queries to validated source spans.
 4. Produce reviewed, reversible path migration proposals. Never automatically
    consolidate files on mere hash or similarity matches.
