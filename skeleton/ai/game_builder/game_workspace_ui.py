@@ -365,9 +365,12 @@ $("jeeves-dm-test-matrix").addEventListener("click",()=>dmGuard(async()=>{
  const result=await dmInvoke("ai.product.tests",{});
  acceptanceTestMatrixDigest=result.digest;
  const mapped=result.curated_test_family_count;
- status(mapped+"/"+result.family_denominator+" feature families have curated test candidates; "+
-  result.unique_test_module_count+" existing source-linked modules, "+
-  result.unique_static_test_case_count+" declared test functions. None counted as passed.");
+ status(mapped+"/"+result.family_denominator+" feature families have candidate test links. "+
+  result.ci_smoke_family_count+" selected for exact-head CI across "+
+  result.scheduled_test_module_count+" unittest modules; "+
+  result.discovery_only_family_count+" remain discovery-only. "+
+  result.unique_static_test_case_count+" declared test functions. "+
+  "No CI result is admitted from source presence alone.");
 }));
 $("jeeves-dm-unmapped-tests").addEventListener("click",()=>dmGuard(async()=>{
  const params={limit:30,offset:0,only_unmapped:true};
