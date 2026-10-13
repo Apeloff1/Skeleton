@@ -160,6 +160,7 @@ export default function ChatWorkspace() {
           : result.status === 408 ? 'Jeeves took too long to answer. Try again.'
             : result.status >= 500 ? 'Jeeves is temporarily unavailable on the server.'
               : result.status === 413 ? 'This attachment is too large.'
+                : result.status === 409 ? 'This turn conflicts with the saved request. Retry with the original file and message, or start a new conversation.'
                 : result.status === 422 ? 'Jeeves could not accept this message. Check its length and attachments.'
                   : 'The connection to Jeeves was interrupted. Check your connection and retry.';
         throw new Error(message);
@@ -259,7 +260,11 @@ export default function ChatWorkspace() {
     const pending = controller.send(attachment);
     // A full conversation is rejected before its draft is cleared.
     if (!controller.active.draft) setAttachment(undefined);
-    void pending;
+    void pending.then(() => {
+      if (controller.active.id === conversation.id && !controller.active.draft) {
+        setAttachment(current => current === attachment ? undefined : current);
+      }
+    });
   };
 
   return <SafeAreaView style={s.safe}>

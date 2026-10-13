@@ -263,3 +263,46 @@ async def test_retryable_and_cancelled_failures_are_terminal():
         cancelled=True,
     )
     assert cancelled.snapshot.state is TurnState.CANCELLED
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("resume_state", [TurnState.MODEL_RUNNING, TurnState.VERIFYING])
+async def test_finalization_binds_provider_evidence_after_resume(resume_state):
+    authority = AsyncAuthority()
+    lifecycle = ChatTurnLifecycle(authority)
+    thread, user = _thread_and_user()
+    operation_id = str(uuid4())
+    turn = await lifecycle.begin(
+        thread=thread, user_message=user, operation_id=operation_id,
+        request_digest="e" * 64, tenant_id=TENANT, owner_id=OWNER,
+    )
+    await lifecycle.advance(
+        turn, resume_state, tenant_id=TENANT, owner_id=OWNER,
+        reason_code="before-restart",
+    )
+    # Rebuild from the durable journal, as a deferred terminal finalizer does.
+    turn = authority.repo.reconstruct(operation_id, tenant_id=TENANT, owner_id=OWNER)
+    receipt = "provider-set-sha256:" + "f" * 64
+    turn = await lifecycle.advance(
+        turn, TurnState.FINALIZING, tenant_id=TENANT, owner_id=OWNER,
+        reason_code="response-accepted", provider_receipt_ref=receipt,
+    )
+    events = authority.repo.list_events(operation_id, tenant_id=TENANT, owner_id=OWNER)
+    assert events[-1].to_state is TurnState.FINALIZING
+    assert events[-1].provider_receipt_ref == receipt
+    assert turn.snapshot.provider_receipt_ref == receipt
+    count = len(events)
+    await lifecycle.advance(
+        turn, TurnState.FINALIZING, tenant_id=TENANT, owner_id=OWNER,
+        reason_code="response-accepted", provider_receipt_ref=receipt,
+    )
+    assert len(authority.repo.list_events(
+        operation_id, tenant_id=TENANT, owner_id=OWNER,
+    )) == count
+    await lifecycle.advance(
+        turn, TurnState.COMPLETE, tenant_id=TENANT, owner_id=OWNER,
+        reason_code="assistant-committed",
+    )
+    restored = authority.repo.reconstruct(operation_id, tenant_id=TENANT, owner_id=OWNER)
+    assert restored.snapshot.provider_receipt_ref == receipt
+    assert restored.snapshot.state is TurnState.COMPLETE

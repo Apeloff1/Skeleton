@@ -680,3 +680,145 @@ test('manual Retry cannot overtake an in-flight automatic reconciliation', async
   assert.equal(executions, 1);
   assert.equal(store.active.messages.at(-1).text, 'Recovered while checking');
 });
+
+test('retry preserves submitted context and form preference after edits and reload', async () => {
+  const disk = storage();
+  let original;
+  const first = await controller(async body => {
+    original = body;
+    throw new Error('response lost');
+  }, disk);
+  first.edit({ draft: 'Build the scene', context: 'Original project', allForms: true });
+  await first.send();
+  first.edit({ context: 'Changed project', allForms: false });
+  await first.whenSaved();
+  let retried;
+  const restored = await controller(async body => {
+    retried = body;
+    return { reply: 'Recovered', session_id: body.session_id };
+  }, disk);
+  await restored.retry(restored.active.messages[0].id);
+  assert.deepEqual(retried, original);
+  assert.equal(restored.active.context, 'Changed project');
+  assert.equal(restored.active.allForms, false);
+  assert.equal(restored.active.messages[0].retryRequest, undefined);
+});
+
+test('reattachment after reload retries the original turn without duplicating it', async () => {
+  const disk = storage();
+  let original;
+  const first = await controller(async body => {
+    original = body;
+    throw new Error('response lost');
+  }, disk);
+  first.edit({ draft: 'Read this report', context: 'Original project', allForms: true });
+  const attachment = { modality: 'pdf', base64: 'ORIGINAL_PRIVATE_BYTES', name: 'report.pdf' };
+  await first.send(attachment);
+  first.edit({ context: 'New project', allForms: false });
+  await first.whenSaved();
+  assert.ok(!disk.data.get(W.WORKSPACE_KEY).includes(attachment.base64));
+  let calls = 0;
+  const restored = await controller(async body => {
+    calls++;
+    assert.deepEqual(body, original);
+    return { reply: 'Report read', session_id: body.session_id };
+  }, disk, async sessionId => ({ ok: true, available: true, session_id: sessionId, turns: [] }));
+  const id = restored.active.messages[0].id;
+  await restored.retry(id);
+  assert.equal(calls, 0);
+  assert.equal(restored.active.draft, 'Read this report');
+  await restored.send(attachment);
+  assert.equal(calls, 1);
+  assert.equal(restored.active.messages.length, 2);
+  assert.equal(restored.active.messages[0].id, id);
+  assert.equal(restored.active.messages[0].status, 'complete');
+  assert.equal(restored.active.draft, '');
+});
+
+test('reattachment does not overwrite a new draft or bypass canonical history', async () => {
+  const workspace = W.createWorkspace();
+  workspace.conversations[0].messages = [message({ status: 'failed', attachmentName: 'report.pdf' })];
+  let calls = 0;
+  const store = await controller(async () => { calls++; return { reply: 'wrong' }; },
+    storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) }),
+    async () => { throw new Error('offline'); });
+  const attachment = { modality: 'pdf', base64: 'PRIVATE', name: 'report.pdf' };
+  store.edit({ draft: 'different question' });
+  await store.send(attachment);
+  assert.equal(calls, 0);
+  assert.equal(store.active.draft, 'different question');
+  store.edit({ draft: 'question' });
+  await store.send(attachment);
+  assert.equal(calls, 0);
+  assert.equal(store.active.draft, 'question');
+  assert.equal(store.active.messages[0].status, 'failed');
+});
+
+test('reattachment conflict preserves the failed turn, restored draft, and retry bytes', async () => {
+  const workspace = W.createWorkspace();
+  workspace.conversations[0].messages = [message({ status: 'failed', attachmentName: 'report.pdf' })];
+  let calls = 0;
+  const store = await controller(async body => {
+    calls++;
+    assert.equal(body.pdf_base64, 'REATTACHED_BYTES');
+    if (calls === 1) throw new Error('Saved request conflicts');
+    return { reply: 'Recovered' };
+  }, storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) }));
+  await store.retry(store.active.messages[0].id);
+  await store.send({ modality: 'pdf', base64: 'REATTACHED_BYTES', name: 'report.pdf' });
+  assert.equal(store.active.draft, 'question');
+  assert.equal(store.active.messages.length, 1);
+  assert.equal(store.active.messages[0].status, 'failed');
+  await store.retry(store.active.messages[0].id);
+  assert.equal(calls, 2);
+});
+
+test('late canonical refresh cannot erase a newer completed exchange', async () => {
+  const history = deferred();
+  const store = await controller(async body => ({ reply: 'Answer', session_id: body.session_id }),
+    storage(), async () => history.promise);
+  store.edit({ draft: 'First question' });
+  await store.send();
+  const refresh = store.refreshCanonical();
+  store.edit({ draft: 'Second question' });
+  await store.send();
+  history.resolve({ ok: true, available: true, session_id: store.active.sessionId, turns: [] });
+  assert.equal(await refresh, false);
+  assert.equal(store.active.messages.length, 4);
+  assert.equal(store.active.messages[2].text, 'Second question');
+});
+
+test('retry metadata persists only bounded allowlisted fields and no binary payload', () => {
+  const workspace = W.createWorkspace();
+  workspace.conversations[0].messages = [message({ status: 'failed', retryRequest: {
+    session_id: 'original-session', context: 'Original context', force_all_forms: true,
+    pdf_base64: 'SECRET', image_base64: 'SECRET', history: 'SECRET',
+  } })];
+  const raw = W.encodeWorkspace(workspace);
+  assert.ok(!raw.includes('SECRET'));
+  assert.deepEqual(W.decodeWorkspace(raw).conversations[0].messages[0].retryRequest, {
+    session_id: 'original-session', context: 'Original context', force_all_forms: true,
+  });
+  workspace.conversations[0].messages[0].retryRequest.context = 'x'.repeat(W.MAX_CONTEXT + 1);
+  assert.equal(W.decodeWorkspace(W.encodeWorkspace(workspace)).conversations[0].messages[0].retryRequest, undefined);
+});
+
+test('reattachment recovers a committed answer without a second generation', async () => {
+  const workspace = W.createWorkspace();
+  const pending = message({ status: 'failed', attachmentName: 'report.pdf' });
+  workspace.conversations[0].messages = [pending];
+  workspace.conversations[0].draft = pending.text;
+  let calls = 0;
+  const store = await controller(async () => { calls++; return { reply: 'duplicate' }; },
+    storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) }),
+    async sessionId => ({
+      ok: true, available: true, session_id: sessionId,
+      turns: [{ session_id: sessionId, client_message_id: pending.id, role_user: pending.text,
+        role_jeeves: 'Already committed', status: 'complete', ts: 1 }],
+    }));
+  await store.send({ modality: 'pdf', base64: 'PRIVATE', name: 'report.pdf' });
+  assert.equal(calls, 0);
+  assert.equal(store.active.messages.length, 2);
+  assert.equal(store.active.messages[1].text, 'Already committed');
+  assert.equal(store.active.draft, '');
+});

@@ -308,7 +308,9 @@ async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
         holder_id="retry-worker",
         ttl_seconds=30,
     )
-    assert retry_lease.epoch == 2
+    # The successful second HTTP request already took over at epoch 2.
+    # A later worker must be fenced beyond both prior request holders.
+    assert retry_lease.epoch == 3
     ownership = ai_chat_turn_test_authority.repo.list_ownership_receipts(
         operation_id,
         tenant_id="tenant-a",
@@ -318,7 +320,14 @@ async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
         "acquire",
         "release",
         "takeover",
+        "renew",
+        "renew",
+        "release",
+        "takeover",
     ]
+    assert [receipt["epoch"] for receipt in ownership] == [1, 1, 2, 2, 2, 2, 3]
+    for previous, current in zip(ownership, ownership[1:]):
+        assert current["previous_receipt_digest"] == previous["digest"]
     ai_chat_turn_test_authority.repo.release_lease(retry_lease)
 
 
