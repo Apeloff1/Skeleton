@@ -25,6 +25,8 @@ from skeleton.ai.game_builder.jeeves_appwide_fabric import AppwideInventory, Jee
 from skeleton.ai.game_builder.jeeves_acceptance_run_verifier import (
     REPOSITORY, WORKFLOW, JOB_NAMES, verify,
 )
+from skeleton.ai.game_builder.jeeves_pytest_acceptance_verifier import verify_pytest
+
 
 API = "https://api.github.com"
 MAX_JSON_BYTES = 4 * 1024 * 1024
@@ -183,7 +185,7 @@ class GitHubEvidenceSource:
 
 
 def measure(repo_root: Path, *, run_id: int, attempt: int, head: str,
-            github_token: str):
+            github_token: str, mode="unittest"):
     repo_root = repo_root.resolve()
     if not (repo_root / ".git").exists():
         raise JeevesAppwideError("independent CI verification requires a Git checkout")
@@ -213,16 +215,30 @@ def measure(repo_root: Path, *, run_id: int, attempt: int, head: str,
         "matrix_sha256": matrix["matrix_sha256"],
         "scope_sha256": matrix["scope_sha256"],
     }
+    if mode == "pytest":
+        projected = JeevesAcceptanceTestMatrix(inventory).page(limit=42)["families"]
+        expected["pytest_smoke_families"] = [
+            {"family_id": row["family_id"], "modules": row["modules"]}
+            for row in projected if row["execution_tier"] == "pytest_smoke"
+        ]
+        expected["pytest_selected_modules"] = matrix["pytest_selected_modules"]
+        expected["scheduled_pytest_module_count"] = (
+            matrix["scheduled_pytest_module_count"])
+    elif mode != "unittest":
+        raise JeevesAppwideError("unknown independent CI test-runner mode")
     source = GitHubEvidenceSource(github_token)
-    run, jobs, by_os = source.load(run_id)
-    return verify(head=head, run=run, jobs=jobs, evidence_by_os=by_os,
-                  expected_matrix=expected, expected_run_id=run_id,
-                  expected_attempt=attempt)
+    run, jobs, by_os = source.load(run_id, mode=mode)
+    verifier = verify_pytest if mode == "pytest" else verify
+    return verifier(head=head, run=run, jobs=jobs, evidence_by_os=by_os,
+                    expected_matrix=expected, expected_run_id=run_id,
+                    expected_attempt=attempt)
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Independently verify source-bound product test candidate CI")
+    parser.add_argument("--mode", choices=("unittest", "pytest"),
+                        default="unittest")
     parser.add_argument("--run-id", type=int, required=True)
     parser.add_argument("--attempt", type=int, default=1)
     parser.add_argument("--head", required=True)
@@ -233,7 +249,7 @@ def main(argv=None):
         parser.error("--head must be an exact lowercase Git commit SHA")
     root = Path(__file__).resolve().parent.parent
     result = measure(root, run_id=args.run_id, attempt=args.attempt,
-                     head=args.head, github_token=token)
+                     head=args.head, github_token=token, mode=args.mode)
     destination = (root / args.output).resolve()
     if not destination.is_relative_to(root):
         raise JeevesAppwideError("verified result must remain within workspace")
@@ -242,8 +258,10 @@ def main(argv=None):
                            encoding="utf-8")
     print("Verified independently:", result["independent_ci_execution_verified"])
     print("Exact head:", result["verified_git_head"])
-    print("Passed selected modules per OS:",
-          result["scheduled_test_modules_independently_confirmed"])
+    print("Verified acceptance execution mode:", args.mode)
+    print("Verified targeted subset families:",
+          result.get("targeted_family_subset_count",
+                     result.get("pytest_targeted_family_count")))
     print("Full app completion still:", result["full_app_completion_percent"])
     return 0
 
