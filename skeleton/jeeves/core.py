@@ -313,6 +313,19 @@ class Jeeves:
         from skeleton.jeeves.repository_file_atlas import JeevesRepositoryFileAtlas
         return JeevesRepositoryFileAtlas(root, store_path)
 
+    def app_source_context(self, objective: str, *, atlas,
+                           max_references: int = 32,
+                           token_budget: int = 2048,
+                           include_tests: bool = False,
+                           preferred_feature: str | None = None):
+        """Plan bounded source bookmarks without reading file contents."""
+        from skeleton.jeeves.agent.file_atlas_context import JeevesFileContextPlanner
+        return JeevesFileContextPlanner(atlas).compile(
+            objective, max_references=max_references,
+            token_budget=token_budget, include_tests=include_tests,
+            preferred_feature=preferred_feature,
+        )
+
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
         if not isinstance(mode, SessionMode):
