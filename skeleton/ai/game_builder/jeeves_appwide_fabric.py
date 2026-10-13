@@ -355,6 +355,9 @@ OPERATIONS = {
     "ai.coverage.page":("read", "bounded volume gap inventory",False),
     "ai.milestones":("read", "dependency-ordered application milestone readiness",False),
     "ai.milestones.page":("read", "bounded source-pinned milestone page",False),
+    "ai.workwaves":("read", "dependency-safe milestone parallelization with owner leases",False),
+    "ai.workpack":("read", "source-hashed bounded implementation context for selected milestone IDs",False),
+    "ai.change_frontier":("read", "declared downstream change impact from exact repository paths",False),
     "source.inspect":("read", "UTF-8 source",False),
     "source.propose":("proposal", "exact-file reviewed code edit",True),
     "editor.catalog":("read", "typed original-game editors",False),
@@ -463,6 +466,15 @@ class JeevesAppwideRuntime:
         elif action=="ai.milestones.page":
             from .jeeves_milestone_planner import JeevesMilestonePlanner
             result=JeevesMilestonePlanner(inv).page(**params)
+        elif action in ("ai.workwaves", "ai.workpack", "ai.change_frontier"):
+            from .jeeves_deathmarch_workpacks import JeevesWorkpackDirector
+            director=JeevesWorkpackDirector(inv)
+            if action=="ai.workwaves":
+                result=director.waves(**params)
+            elif action=="ai.workpack":
+                result=director.workpack(**params)
+            else:
+                result=director.change_frontier(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
