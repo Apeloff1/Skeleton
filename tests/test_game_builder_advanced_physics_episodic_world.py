@@ -77,6 +77,18 @@ class EpisodicPhysicalWorldTests(unittest.TestCase):
         self.assertEqual(proof["episodes"][1]["applied_incidents"],[])
         self.assertEqual(len(proof["world_state"]["events_log"]),1)
 
+    def test_world_commands_must_be_an_array_not_a_mapping_or_string(self):
+        cfg,world=self.world()
+        base=self.episode(self.source())
+        for invalid in ({"wait":True}, "wait", 4, None):
+            with self.subTest(actions=invalid):
+                episode=deepcopy(base)
+                episode["world_actions"]=invalid
+                with self.assertRaises(EpisodicWorldError):
+                    run_episodic_physics_world([episode],world,cfg)
+        self.assertTrue(verify_episodic_physics_world(
+            run_episodic_physics_world([base],world,cfg),[base],world,cfg))
+
     def test_same_original_scene_must_strictly_extend_source_transcript(self):
         cfg,world=self.world()
         initial=self.source()
