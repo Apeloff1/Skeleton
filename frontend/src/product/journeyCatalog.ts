@@ -88,7 +88,7 @@ export const PRODUCT_JOURNEYS: readonly ProductJourney[] = [
       { id: 'mission', title: 'Inspect the mission', description: 'Review current work and its execution status.', href: '/mission-control' },
       { id: 'tools', title: 'Open the builder hub', description: 'Choose the tool relevant to your task.', href: '/build-hub' },
       { id: 'studio', title: 'Continue in Studio', description: 'Work on an existing or new game.', href: '/studio', acceptsBuild: true },
-      { id: 'review', title: 'Review the design', description: 'Compile a game-scoped design review with explicit control.', href: '/design-review', requiresBuild: true },
+      { id: 'design-review', title: 'Review the design', description: 'Compile a game-scoped design review with explicit control.', href: '/design-review', requiresBuild: true },
     ],
   },
   {
