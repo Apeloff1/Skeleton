@@ -276,6 +276,15 @@ class Jeeves:
         from skeleton.jeeves.ai.orchestration_store import DurableOrchestrLedger
         return DurableOrchestrLedger(path, authorize=authorize)
 
+    def orchestrated_capability_runtime(self, *, ledger, dispatcher, verify_result):
+        """Connect durable delegated plans to host-permitted app capabilities."""
+        from skeleton.jeeves.agent.orchestrated_capability_runtime import (
+            JeevesOrchestratedCapabilityRuntime,
+        )
+        return JeevesOrchestratedCapabilityRuntime(
+            ledger=ledger, dispatcher=dispatcher, verify_result=verify_result,
+        )
+
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
         if not isinstance(mode, SessionMode):
