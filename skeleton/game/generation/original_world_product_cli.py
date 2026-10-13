@@ -1,0 +1,446 @@
+"""One-player product entry point: original world + living rules + 2D landscape.
+
+Offline game with deterministic actor turns, construction, physical movement,
+scripted or human controls, source-derived SVG and native PPM render output,
+persisted saves and an optional real Tk desktop window.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import shlex
+from typing import Sequence
+
+from .original_foundation_compiler import FoundationError
+from .original_world_living_10x_compiler import (
+    living_at, living_for, living_inventory,
+)
+from .original_world_product_session import (
+    ProductAction, ProductSession, create_product, product_restore,
+    product_save, step_product, validate_product,
+)
+from .original_world_product_render import (
+    ascii_render, ppm_render, svg_render,
+)
+from .original_world_product_missions import mission_report
+from .original_world_npc_cognition_v2 import cognition_report, npc_profile
+from .original_world_npc_platform_profiles import (
+    platform_inventory, plan_population, PC_GENERATIONS,
+)
+from .world_styling import HARDWARE_TARGETS
+from .original_world_npc_era_population import (
+    era_budget, population_report, fidelity_report,
+    FIDELITY_MODES, ERA_LEVELS,
+)
+
+MAX_SCRIPT = 131072
+
+
+def parse_script(text: str) -> tuple[ProductAction, ...]:
+    if not isinstance(text, str) or len(text.encode()) > MAX_SCRIPT:
+        raise FoundationError("product action script too long")
+    try:
+        entries = json.loads(text)
+    except (ValueError, TypeError) as exc:
+        raise FoundationError("invalid game script") from exc
+    if not isinstance(entries, list) or len(entries) > 2048:
+        raise FoundationError("product script requires a bounded action list")
+    output = []
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) - {
+            "layer", "verb", "amount", "x", "y", "target", "option",
+        }:
+            raise FoundationError("unrecognized product action fields")
+        try:
+            output.append(ProductAction(**entry))
+        except (TypeError, ValueError) as exc:
+            raise FoundationError("malformed product command") from exc
+    return tuple(output)
+
+
+def parse_command(command: str, player: tuple[int, int]) -> ProductAction:
+    try:
+        parts = shlex.split(command)
+    except ValueError as exc:
+        raise FoundationError("invalid input quotation") from exc
+    if not 2 <= len(parts) <= 5:
+        raise FoundationError("expected LAYER VERB [AMOUNT|TARGET|CHOICE]")
+    layer, verb = parts[:2]
+    if layer == "terrain":
+        if verb in ("walk", "jump", "bridge", "dig"):
+            direction = parts[2] if len(parts) >= 3 else ""
+            offsets = {"north": (0, -1), "south": (0, 1),
+                       "east": (1, 0), "west": (-1, 0)}
+            if direction not in offsets:
+                raise FoundationError("terrain movement requires north, south, east or west")
+            dx, dy = offsets[direction]
+            return ProductAction(layer, verb, x=player[0] + dx, y=player[1] + dy)
+        if len(parts) > 3:
+            raise FoundationError("terrain action takes one quantity")
+        try:
+            count = int(parts[2]) if len(parts) == 3 else 1
+        except ValueError as exc:
+            raise FoundationError("invalid terrain amount") from exc
+        return ProductAction(layer, verb, amount=count, x=player[0], y=player[1])
+    if layer == "population" and verb == "recruit":
+        if len(parts) != 3:
+            raise FoundationError("usage: population recruit DISTRICT (when at its physical site)")
+        try:
+            return ProductAction(layer, "recruit", target=int(parts[2]))
+        except ValueError as exc:
+            raise FoundationError("invalid regional census identity") from exc
+    if layer == "population" and verb == "set_detail":
+        if len(parts) != 3:
+            raise FoundationError("usage: population set_detail economy|balanced|vivid|unrestricted")
+        return ProductAction(layer, "set_detail", option=parts[2])
+    if layer == "population" and verb == "dispatch_food":
+        if len(parts) not in (4, 5):
+            raise FoundationError("usage: population dispatch_food DISTRICT to-region|to-player [1..3]")
+        try:
+            return ProductAction(layer, verb,
+                                 target=int(parts[2]), option=parts[3],
+                                 amount=int(parts[4]) if len(parts) == 5 else 1)
+        except ValueError as exc:
+            raise FoundationError("invalid regional food district or quantity") from exc
+    if layer == "npc" and verb == "household":
+        if len(parts) != 4:
+            raise FoundationError("usage: npc household CAREGIVER_A CAREGIVER_B")
+        try:
+            return ProductAction("npc", "household",
+                                 target=int(parts[2]), option=str(int(parts[3])))
+        except ValueError as exc:
+            raise FoundationError("household requires two known resident IDs") from exc
+    if layer == "npc" and verb == "cancel_household":
+        if len(parts) != 3:
+            raise FoundationError("usage: npc cancel_household FAMILY_ID")
+        try:
+            return ProductAction("npc", "cancel_household", target=int(parts[2]))
+        except ValueError as exc:
+            raise FoundationError("invalid family contract identity") from exc
+    if layer == "npc" and verb == "mentor":
+        if len(parts) != 4:
+            raise FoundationError("usage: npc mentor MASTER APPRENTICE")
+        try:
+            return ProductAction("npc", "mentor", target=int(parts[2]), option=parts[3])
+        except ValueError as exc:
+            raise FoundationError("mentor must be a recognized existing citizen") from exc
+    if layer == "npc" and verb == "cancel_mentorship":
+        if len(parts) != 3:
+            raise FoundationError("usage: npc cancel_mentorship TRAINING_ID")
+        try:
+            return ProductAction("npc", "cancel_mentorship", target=int(parts[2]))
+        except ValueError as exc:
+            raise FoundationError("invalid training identifier") from exc
+    if layer == "npc" and verb == "propose":
+        if len(parts) != 4:
+            raise FoundationError("usage: npc propose RESIDENT POLICY")
+        try:
+            return ProductAction("npc", "propose", target=int(parts[2]), option=parts[3])
+        except ValueError as exc:
+            raise FoundationError("resident ID must be an integer") from exc
+    if layer == "npc" and verb == "project":
+        if len(parts) != 5:
+            raise FoundationError("new project: npc project hearth|mill|beacon X Y")
+        try:
+            return ProductAction("npc", "project", option=parts[2],
+                                 x=int(parts[3]), y=int(parts[4]))
+        except ValueError as exc:
+            raise FoundationError("civic project coordinates must be integers") from exc
+    if layer == "npc" and verb == "cancel_project":
+        if len(parts) != 3:
+            raise FoundationError("project cancellation requires a physical project ID")
+        try:
+            return ProductAction("npc", "cancel_project", target=int(parts[2]))
+        except ValueError as exc:
+            raise FoundationError("bad project identity") from exc
+    if layer == "npc" and verb == "interview":
+        if len(parts) not in (3, 4):
+            raise FoundationError("interview command: npc interview CITIZEN [food|wood|stone|water]")
+        try:
+            return ProductAction("npc", "interview", target=int(parts[2]),
+                                 option=parts[3] if len(parts) == 4 else "")
+        except ValueError as exc:
+            raise FoundationError("interview requires existing citizen ID") from exc
+    if layer == "npc" and verb == "commission":
+        if len(parts) not in (4, 5):
+            raise FoundationError("NPC contract: npc commission CITIZEN food|wood|stone|water [1..3]")
+        try:
+            return ProductAction("npc", "commission",
+                                 amount=int(parts[4]) if len(parts) == 5 else 1,
+                                 target=int(parts[2]), option=parts[3])
+        except ValueError as exc:
+            raise FoundationError("invalid NPC order quantity/citizen") from exc
+    if layer == "npc" and verb == "cancel":
+        if len(parts) != 3:
+            raise FoundationError("NPC contract cancellation requires order ID")
+        try:
+            return ProductAction("npc", "cancel", target=int(parts[2]))
+        except ValueError as exc:
+            raise FoundationError("invalid NPC order identity") from exc
+    if verb == "choose" or (layer == "studio" and verb == "assign"):
+        if len(parts) not in (3, 4):
+            raise FoundationError("choice requires option; assignment needs citizen id")
+        if verb == "choose":
+            return ProductAction(layer, verb, option=parts[2])
+        try:
+            return ProductAction(layer, verb, target=int(parts[2]), option=parts[3])
+        except ValueError as exc:
+            raise FoundationError("resident identity is not an integer") from exc
+    if verb in ("travel", "toggle", "tap", "move") or (
+        layer == "studio" and verb == "gift"
+    ):
+        if len(parts) != 3:
+            raise FoundationError("command requires numeric target")
+        try:
+            return ProductAction(layer, verb, target=int(parts[2]))
+        except ValueError as exc:
+            raise FoundationError("invalid action target") from exc
+    try:
+        return ProductAction(layer, verb, amount=int(parts[2]) if len(parts) == 3 else 1)
+    except ValueError as exc:
+        raise FoundationError("invalid action amount") from exc
+
+
+def _interactive(state: ProductSession) -> ProductSession:
+    print("Original World Product Studio — actual 2D tiles, citizens and systemic play.")
+    print("Commands: terrain walk north; terrain forage; studio share_food;")
+    print("living VERB; spatial VERB; mode VERB; causal end_turn; status; help; quit")
+    while True:
+        try:
+            line = input("world> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGame session ended.")
+            return state
+        if line in ("quit", "exit"):
+            return state
+        if line in ("", "status", "map"):
+            print(ascii_render(state.terrain, state.society))
+            print(f"Actions remaining: {state.living.spatial.game.causal.action_points}; "
+                  f"World turn: {state.living.living_turns}; local energy: {state.terrain.energy}")
+            continue
+        if line in ("missions", "quests"):
+            print(json.dumps(mission_report(state), sort_keys=True, indent=2))
+            continue
+        if line.startswith("person ") or line.startswith("citizen "):
+            try:
+                citizen = int(line.split()[1])
+                print(json.dumps(npc_profile(
+                    state.cognition, state.society, state.terrain, citizen
+                ), sort_keys=True, indent=2))
+            except (ValueError, IndexError, FoundationError) as exc:
+                print("Unknown citizen:", exc)
+            continue
+        if line in ("districts", "region", "census"):
+            print(json.dumps(
+                population_report(state.population, len(state.society.inhabitants))
+                if state.population else {"status": "select --era to instantiate actual regions"},
+                sort_keys=True, indent=2,
+            ))
+            continue
+        if line in ("npc", "people", "minds"):
+            print(json.dumps(cognition_report(state.cognition, state.society,
+                                              state.terrain), sort_keys=True, indent=2))
+            continue
+        if line == "help":
+            law = validate_product(state)
+            print("Living world commands:", ", ".join(law.foundation.system.commands))
+            print("Genre controls:", ", ".join(law.source.advanced.mode.form.mechanics))
+            print("Local verbs: walk, jump, chop, mine, forage, draw, bridge, dig,")
+            print("build_hearth, build_mill, build_beacon, rest, eat")
+            print("World: causal end_turn; studio: deposit_wood, deposit_stone, share_food")
+            print("Social: studio gift ID or studio assign ID PROFESSION")
+            print("NPC cognition: npc commission ID food|wood|stone|water [1..3];")
+            print("npc cancel ORDER_ID; npc project hearth|mill|beacon X Y;")
+            print("npc cancel_project PROJECT_ID; npc interview CITIZEN [SUBJECT];")
+            print("npc council; minds (inspect actual plans and sworn statements)")
+            print("districts (see distinct offscreen census and finite food)")
+            print("population dispatch_food DISTRICT to-region|to-player [1..3]")
+            print("population recruit DISTRICT (physically visit district)")
+            print("population set_detail economy|balanced|vivid|unrestricted")
+            continue
+        try:
+            action = parse_command(line, state.terrain.position)
+            state, receipt = step_product(state, action)
+            print(" | ".join(receipt.changes))
+        except FoundationError as exc:
+            print("Action rejected:", exc)
+
+
+def _save(path: Path, state: ProductSession) -> None:
+    if not path.parent.is_dir() or path.is_dir():
+        raise FoundationError("save parent must exist and filename be writable")
+    temp = path.with_name(path.name + ".tmp")
+    temp.write_text(product_save(state), encoding="utf-8")
+    temp.replace(path)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Real original-game product pilot with physical terrain, "
+                    "nonvisual world laws, twelve NPC jobs and native graphical option."
+    )
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--index", type=int)
+    selection.add_argument("--load", type=Path)
+    selection.add_argument("--base", type=int)
+    parser.add_argument("--form")
+    parser.add_argument("--architecture")
+    parser.add_argument("--system")
+    parser.add_argument("--arc")
+    parser.add_argument("--inhabitants", type=int, default=None)
+    parser.add_argument("--npc-fidelity", choices=FIDELITY_MODES,
+                        default="balanced",
+                        help="Limit expensive per-person thinking to 3, 7, 16 or 32 slots per world turn")
+    parser.add_argument("--era", choices=tuple(ERA_LEVELS),
+                        help="World history stage (one of 40 original-era policies)")
+    parser.add_argument("--hardware-target", choices=HARDWARE_TARGETS,
+                        default=None,
+                        help="Select any of 41 original homebrew, console, PC and portable targets")
+    parser.add_argument("--pc-generation", choices=PC_GENERATIONS,
+                        help="Actual PC hardware period/tier, supported on pc-* only")
+    parser.add_argument("--population-report", action="store_true",
+                        help="Inspect era fidelity budgets, remote census and actual supply/caravan ledger")
+    parser.add_argument("--actions-json", default="[]")
+    parser.add_argument("--inventory", action="store_true")
+    parser.add_argument("--npc-profile", type=int,
+                        help="Inspect an individual persistent NPC's goal, memories and contracts")
+    parser.add_argument("--npc-report", action="store_true",
+                        help="Expose each physical resident's real plans, memory and work contracts")
+    parser.add_argument("--missions", action="store_true",
+                        help="Evidence-based missions for the selected authored original root")
+    parser.add_argument("--interactive", action="store_true")
+    parser.add_argument("--desktop", action="store_true",
+                        help="Launch actual native tkinter GUI if available")
+    parser.add_argument("--show-map", action="store_true")
+    parser.add_argument("--radius", type=int, default=8)
+    parser.add_argument("--svg", type=Path)
+    parser.add_argument("--ppm", type=Path)
+    parser.add_argument("--save", type=Path)
+    args = parser.parse_args(argv)
+    try:
+        if args.inventory:
+            print(json.dumps({
+                "living": living_inventory(),
+                "era_npc_hardware_presets": {
+                    "economy": 3, "balanced": 7,
+                    "vivid": 16, "unrestricted": 32,
+                    "note": "Only per-frame requested max; actual genre/platform ceilings are lower",
+                },
+                "realistic_npc_platform_profiles": platform_inventory(),
+                "default_npc_policy": plan_population(
+                    "digital-network", "pc-windows", "exploration"
+                ).as_dict(),
+                "era_population_capabilities": {
+                    era: plan_population(era, "pc-windows", "exploration").as_dict()
+                    for era in ERA_LEVELS
+                },
+                "product": {
+                    "local_terrain_chunk_size": 32,
+                    "persistent_sparse_tile_edits": 2048,
+                    "physical_citizen_professions": 12,
+                    "native_gui": "Python tkinter desktop display required",
+                    "renderers": ["SVG", "P6-PPM", "ASCII"],
+                    "portable_build": "Python zipapp supported",
+                    "native_console_packages": 0,
+                    "individually_completed_games": 0,
+                    "status": "integrated single-instance real-playable pilot",
+                },
+            }, indent=2, sort_keys=True))
+            return 0
+        if args.load is not None:
+            if (args.era is not None or args.npc_fidelity != "balanced"
+                    or args.hardware_target is not None
+                    or args.pc_generation is not None):
+                raise FoundationError("saved game hardware, genre, era and fidelity cannot be overwritten")
+            if not args.load.is_file() or args.load.stat().st_size > 4194304:
+                raise FoundationError("missing or oversized saved game")
+            state = product_restore(args.load.read_text(encoding="utf-8"))
+        elif args.base is not None:
+            if not all((args.form, args.architecture, args.system, args.arc)):
+                raise FoundationError("--base requires form, architecture, system and arc")
+            law = living_for(args.base, args.form, args.architecture,
+                             args.system, args.arc)
+            state = create_product(
+                law.index, inhabitants=args.inhabitants, era=args.era,
+                npc_fidelity=args.npc_fidelity,
+                hardware_target=args.hardware_target or "pc-windows",
+                pc_generation=args.pc_generation,
+            )
+        else:
+            if any((args.form, args.architecture, args.system, args.arc)):
+                raise FoundationError("specify --base to select game dimensions")
+            state = create_product(
+                args.index if args.index is not None else 0,
+                inhabitants=args.inhabitants, era=args.era,
+                npc_fidelity=args.npc_fidelity,
+                hardware_target=args.hardware_target or "pc-windows",
+                pc_generation=args.pc_generation,
+            )
+        for action in parse_script(args.actions_json):
+            state, _ = step_product(state, action)
+        if args.interactive:
+            state = _interactive(state)
+        if args.desktop:
+            from .original_world_product_desktop import launch_desktop
+            launch_desktop(state, save_path=str(args.save) if args.save else None)
+            if args.save:
+                # A GUI save must be explicit; do not overwrite a newer GUI
+                # session with the stale CLI snapshot after window dismissal.
+                print("Native GUI controls its own save workflow.")
+                return 0
+        if args.save:
+            _save(args.save, state)
+        if args.svg:
+            if not args.svg.parent.is_dir():
+                raise FoundationError("SVG output directory does not exist")
+            args.svg.write_text(svg_render(state.terrain, state.society,
+                                           radius=args.radius, population=state.population), encoding="utf-8")
+        if args.ppm:
+            if not args.ppm.parent.is_dir():
+                raise FoundationError("PPM output directory does not exist")
+            args.ppm.write_bytes(ppm_render(state.terrain, state.society,
+                                            radius=args.radius, population=state.population))
+        if args.show_map:
+            print(ascii_render(state.terrain, state.society, radius=args.radius,
+                               population=state.population))
+        elif not args.desktop:
+            law = validate_product(state)
+            print(json.dumps({
+                "world": law.as_dict(),
+                "product": {
+                    "position": state.terrain.position,
+                    "local_energy": state.terrain.energy,
+                    "physical_edits": len(state.terrain.edits),
+                    "local_residents": len(state.society.inhabitants),
+                    "regional_population": ({
+                        **population_report(
+                            state.population, len(state.society.inhabitants)),
+                        "hardware_fidelity": fidelity_report(
+                            state.population, state.society, state.terrain,
+                            preset=state.population.fidelity),
+                    } if args.population_report and state.population else None),
+                    "npc_cognition": cognition_report(state.cognition, state.society,
+                                                     state.terrain)
+                                     if args.npc_report else None,
+                    "npc_profile": npc_profile(state.cognition, state.society,
+                                               state.terrain, args.npc_profile)
+                                   if args.npc_profile is not None else None,
+                    "world_turn": state.living.living_turns,
+                    "player_events": state.events,
+                    "real_gameplay_not_native_release": True,
+                    "missions": mission_report(state) if args.missions else None,
+                },
+                "saved": str(args.save) if args.save else None,
+                "renders": {
+                    "svg": str(args.svg) if args.svg else None,
+                    "ppm": str(args.ppm) if args.ppm else None,
+                },
+            }, sort_keys=True, indent=2))
+    except (FoundationError, OSError, ValueError) as exc:
+        parser.error(str(exc))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
