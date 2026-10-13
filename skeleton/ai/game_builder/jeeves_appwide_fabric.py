@@ -364,6 +364,7 @@ OPERATIONS = {
     "ai.workpack":("read", "source-hashed bounded implementation context for selected milestone IDs",False),
     "ai.code.search":("read", "bounded source-content lookup over inventoried files",False),
     "ai.code.snippet":("read", "line-paged verified UTF-8 source excerpt",False),
+    "ai.code.dependencies":("read", "bounded real source import dependency graph",False),
     "ai.change_frontier":("read", "declared downstream change impact from exact repository paths",False),
     "studio.batch_preview":("compute", "bounded approved adapter previews across game/edit/forge planes",False),
     "source.inspect":("read", "UTF-8 source",False),
@@ -506,6 +507,9 @@ class JeevesAppwideRuntime:
                 result=navigator.search(**params)
             else:
                 result=navigator.snippet(**params)
+        elif action=="ai.code.dependencies":
+            from .jeeves_dependency_navigation import JeevesSourceDependencyGraph
+            result=JeevesSourceDependencyGraph(inv).walk(**params)
         elif action=="studio.batch_preview":
             from .jeeves_batch_workbench import run_batch_preview
             result=run_batch_preview(self, params)
