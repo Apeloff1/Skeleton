@@ -355,6 +355,8 @@ OPERATIONS = {
     "ai.coverage.page":("read", "bounded volume gap inventory",False),
     "ai.release.gates":("read", "required exact-head release-gate authority census",False),
     "ai.release.gates.page":("read", "paged static CI gate provenance and missing workflows",False),
+    "ai.adapter.audit":("read", "static registered tool-to-dispatch binding coverage",False),
+    "ai.adapter.audit.page":("read", "bounded missing-dispatch audit records",False),
     "ai.milestones":("read", "dependency-ordered application milestone readiness",False),
     "ai.milestones.page":("read", "bounded source-pinned milestone page",False),
     "ai.workwaves":("read", "dependency-safe milestone parallelization with owner leases",False),
@@ -469,6 +471,12 @@ class JeevesAppwideRuntime:
         elif action=="ai.release.gates.page":
             from .jeeves_release_gate_inventory import JeevesReleaseGateInventory
             result=JeevesReleaseGateInventory(inv).page(**params)
+        elif action=="ai.adapter.audit":
+            from .jeeves_adapter_dispatch_audit import JeevesAdapterDispatchAudit
+            result=JeevesAdapterDispatchAudit(inv).overview(**params)
+        elif action=="ai.adapter.audit.page":
+            from .jeeves_adapter_dispatch_audit import JeevesAdapterDispatchAudit
+            result=JeevesAdapterDispatchAudit(inv).page(**params)
         elif action=="ai.milestones":
             from .jeeves_milestone_planner import JeevesMilestonePlanner
             result=JeevesMilestonePlanner(inv).overview(**params)
