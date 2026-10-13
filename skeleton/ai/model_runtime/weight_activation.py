@@ -231,6 +231,49 @@ class NativeWeightDeployment:
             self._runtime = loaded_runtime
             return receipt
 
+    def activate_from_checkpoint(
+        self,
+        candidate_id: str,
+        checkpoint_path: str | Path,
+        *,
+        admission: RuntimeAdmission,
+        rollback: RollbackProof,
+        expected_revision: int,
+    ) -> NativeActivationReceipt:
+        """Load real tensor state from native checkpoint, then activate atomically.
+
+        Rejects symbolic/manifests-only candidates: NativeLLMRuntime.restore_json
+        reconstructs TinyTransformer weights and tokenizer before the permit is
+        consumed. The source file itself is never treated as authorization.
+        """
+        from .native_llm_runtime import NativeLLMRuntime
+
+        path = Path(checkpoint_path)
+        if path.is_symlink() or not path.is_file():
+            raise ShadowWeightError("candidate checkpoint must be a regular file")
+        maximum = self.runtime.limits.max_checkpoint_bytes
+        if path.stat().st_size > maximum:
+            raise ShadowWeightError("candidate checkpoint exceeds serving memory policy")
+        with path.open("rb") as handle:
+            payload = handle.read(maximum + 1)
+        if len(payload) > maximum:
+            raise ShadowWeightError("candidate checkpoint exceeds serving memory policy")
+        loaded = NativeLLMRuntime.restore_json(payload)
+        return self.activate(
+            candidate_id, loaded, admission=admission,
+            rollback=rollback, expected_revision=expected_revision,
+        )
+
+    def new_model_service(self, **options: object):
+        """Bind a fresh inference service to the currently promoted model."""
+        from .runtime_service import NativeModelService
+        return NativeModelService(self.runtime, **options)
+
+    def new_conversation_service(self, **options: object):
+        """Start fresh sessions on current weights; existing sessions stay pinned."""
+        from .conversation_service import NativeConversationService
+        return NativeConversationService(self.runtime, **options)
+
     def rollback(
         self,
         candidate_id: str,
