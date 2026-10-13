@@ -412,6 +412,9 @@ OPERATIONS = {
     "studio.campaign.outcomes.plan":("compute", "run real player action variants across original authored campaign branches",True),
     "studio.campaign.outcomes.stage":("proposal", "stage observed multi-ending gameplay source and uncovered routes",True),
     "studio.campaign.outcomes.verify":("read", "reexecute committed game outcome portfolio and source identities",False),
+    "studio.campaign.consequences.plan":("read", "historically signed NPC, faction and causal plot differences along real game outcomes",False),
+    "studio.campaign.consequences.stage":("proposal", "original scene/event-to-game consequence source for human review",True),
+    "studio.campaign.consequences.verify":("read", "rebuild full original narrative and real scenario consequences",False),
     "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
     "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
@@ -708,6 +711,18 @@ class JeevesAppwideRuntime:
                 result=outcomes.stage(**params,operator_authorized=authorized)
             else:
                 result=outcomes.verify(**params)
+        elif action in ("studio.campaign.consequences.plan",
+                        "studio.campaign.consequences.stage",
+                        "studio.campaign.consequences.verify"):
+            from .jeeves_narrative_consequences import JeevesNarrativeConsequences
+            consequences=JeevesNarrativeConsequences(inv,ws)
+            if action=="studio.campaign.consequences.plan":
+                result=consequences.plan(**params)
+            elif action=="studio.campaign.consequences.stage":
+                result=consequences.stage(
+                    **params,operator_authorized=authorized)
+            else:
+                result=consequences.verify(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":

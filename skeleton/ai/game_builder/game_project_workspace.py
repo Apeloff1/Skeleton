@@ -318,6 +318,24 @@ class GameWorkspace:
         config=validate_editor_document(_json(_read(config_path)))
         validate_advanced_scene(document,config["settings"])
 
+    def _validate_narrative_consequences_source(self, project, relative, document):
+        """Reconstruct actual alternate route NPC event consequences before commit."""
+        from .jeeves_narrative_consequences import rebuild_narrative_consequences
+        if type(document) is not dict:
+            raise WorkspaceError("typed approved real-game consequence source required")
+        rebuilt=rebuild_narrative_consequences(self,project,document)
+        if rebuilt!=document or relative!=(
+                "game/campaigns/"+document["campaign_id"]+"_consequences.json"):
+            raise WorkspaceError("actual game/story consequence evidence source changed")
+        return {
+            "schema":document["schema"],
+            "game_campaign":document["campaign_id"],
+            "real_game_scenarios":document["real_player_scenarios_run"],
+            "original_character_source_attested":True,
+            "original_signed_causality_attested":True,
+            "mechanically_applied_faction_or_karma_game_state":False,
+        }
+
     def _validate_campaign_outcomes_source(self, project, relative, document):
         """Re-execute real portfolio scenes before publication, with source CAS."""
         from .jeeves_campaign_outcomes import rebuild_outcome_portfolio
@@ -523,6 +541,8 @@ class GameWorkspace:
                     self._validate_campaign_lore_source(project,relative,parsed)
                 elif relative.endswith("_outcomes.json"):
                     self._validate_campaign_outcomes_source(project,relative,parsed)
+                elif relative.endswith("_consequences.json"):
+                    self._validate_narrative_consequences_source(project,relative,parsed)
                 else:
                     self._validate_advanced_campaign_source(project,relative,parsed)
             if (relative in ("game/story_bible.json","game/continuity_contract.json")
@@ -591,6 +611,8 @@ class GameWorkspace:
                     self._validate_campaign_lore_source(project,proposal["path"],parsed)
                 elif proposal["path"].endswith("_outcomes.json"):
                     self._validate_campaign_outcomes_source(project,proposal["path"],parsed)
+                elif proposal["path"].endswith("_consequences.json"):
+                    self._validate_narrative_consequences_source(project,proposal["path"],parsed)
                 else:
                     self._validate_advanced_campaign_source(project,proposal["path"],parsed)
             if (proposal["path"] in ("game/story_bible.json",
