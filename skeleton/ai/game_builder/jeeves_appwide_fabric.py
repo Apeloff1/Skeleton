@@ -389,6 +389,9 @@ OPERATIONS = {
     "studio.production.variants_stage":("proposal", "stage independently built original game source variants",True),
     "studio.story.source_plan":("read", "full-story canonical 100-chapter source and continuity context",False),
     "studio.story.source_stage":("proposal", "signed full-history reviewed story source proposals",True),
+    "studio.forge.plan":("compute", "actual installed typed Forge blueprint source validation",False),
+    "studio.forge.stage":("proposal", "canonical reviewed Universal Forge game asset source",True),
+    "studio.forge.verify":("read", "real project Forge source revalidation",False),
     "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
     "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
@@ -608,6 +611,16 @@ class JeevesAppwideRuntime:
                 result=story_author.plan(**params)
             else:
                 result=story_author.stage(**params, operator_authorized=authorized)
+        elif action in ("studio.forge.plan", "studio.forge.stage",
+                        "studio.forge.verify"):
+            from .jeeves_forge_production import JeevesForgeProduction
+            forge_author=JeevesForgeProduction(inv, ws)
+            if action=="studio.forge.plan":
+                result=forge_author.plan(**params)
+            elif action=="studio.forge.stage":
+                result=forge_author.stage(**params, operator_authorized=authorized)
+            else:
+                result=forge_author.verify(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
