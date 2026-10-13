@@ -97,6 +97,7 @@ class JeevesWorkbench:
         source_edit_authorize: Callable[..., bool] | None = None,
         source_edit_handler: Callable[..., Any] | None = None,
         source_edit_allowlist: Sequence[str] | None = None,
+        release_verify_external: Callable[..., bool] | None = None,
     ) -> None:
         from skeleton.jeeves.app_capability_bridge import _root
         self.root = _root(root)
@@ -148,10 +149,14 @@ class JeevesWorkbench:
         self._source_edit_handler = source_edit_handler
         self._local_source_editor = None
         self._source_edit_allowlist = source_edit_allowlist
+        if release_verify_external is not None and not callable(release_verify_external):
+            raise JeevesWorkbenchError("model release verification requires host callback")
+        self._release_verify_external = release_verify_external
         self._open_runbooks: list[CreatorRunbookStore] = []
         self.atlas: JeevesRepositoryFileAtlas | None = None
         self.shadow: DurableShadowWeightPipeline | None = None
         self.orchestration: DurableOrchestrLedger | None = None
+        self.model_releases = None
         try:
             if self._source_edit_allowlist is not None:
                 from skeleton.jeeves.source_edit_host import JeevesAtomicSourceEditor
@@ -171,6 +176,12 @@ class JeevesWorkbench:
                 self._scope / "orchestration.sqlite",
                 authorize=self._authorize_orchestration,
             )
+            if self._release_verify_external is not None:
+                from skeleton.ai.training.model_release_journal import ModelReleaseJournal
+                self.model_releases = ModelReleaseJournal(
+                    self._scope / "model_release_evidence.sqlite",
+                    verify_external=self._scoped_release_verify,
+                )
             self.tools = self._build_tools()
             self.executor = ToolExecutor(self.tools)
         except BaseException:
@@ -247,6 +258,43 @@ class JeevesWorkbench:
             and self._shadow_consume_verify is not None
             and self._shadow_consume_verify(record, candidate, context) is True
         )
+
+    def _scoped_release_verify(self, proposal: Any, receipt: Any) -> bool:
+        return (
+            self._release_verify_external is not None
+            and self._release_verify_external(
+                self.tenant_id, self.project_id, self.principal_id,
+                proposal, receipt,
+            ) is True
+        )
+
+    def stage_model_release(self, proposal: Any, *,
+                            actor_id: str, at_ns: int):
+        """Stage a qualified release proposal; never deploy model weights."""
+        from skeleton.ai.training.shadow_candidate_gate import CandidateReleaseProposal
+        with self._lock:
+            self._ensure_open()
+            if self.model_releases is None:
+                raise JeevesWorkbenchError("model release owner was not enabled by host")
+            if not isinstance(proposal, CandidateReleaseProposal):
+                raise JeevesWorkbenchError("only independently qualified release proposals allowed")
+            return self.model_releases.propose(
+                proposal, actor_id=actor_id, at_ns=at_ns,
+            )
+
+    def observe_model_release(self, proposal_digest: str, receipt: Any, *,
+                              expected_version: int,
+                              runtime_admission=None, rollback_proof=None):
+        """Record external model-serving admission/rollback evidence."""
+        with self._lock:
+            self._ensure_open()
+            if self.model_releases is None:
+                raise JeevesWorkbenchError("model release owner was not enabled by host")
+            return self.model_releases.transition(
+                proposal_digest, receipt, expected_version=expected_version,
+                runtime_admission=runtime_admission,
+                rollback_proof=rollback_proof,
+            )
 
     def _scoped_creator(self, command: Any, context: Any) -> bool:
         if not self._context_scoped(context) or self._creator_authorize is None:
@@ -458,6 +506,7 @@ class JeevesWorkbench:
                 store.close()
             for owner in (
                 getattr(self, "_local_source_editor", None),
+                getattr(self, "model_releases", None),
                 getattr(self, "orchestration", None),
                 getattr(self, "shadow", None),
                 getattr(self, "atlas", None),
