@@ -89,6 +89,8 @@ def shard_of(path: str) -> str:
     if parts[0] == "skeleton":
         return "skeleton/" + (parts[1] if len(parts) > 2 else "_root")
     if parts[0] == "satellites":
+        if len(parts) > 4 and parts[1] == "branch-snapshots":
+            return "/".join(parts[:3])
         return "satellites/" + (parts[1] if len(parts) > 2 else "_root")
     return parts[0]
 
