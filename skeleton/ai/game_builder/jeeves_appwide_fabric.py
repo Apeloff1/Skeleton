@@ -391,6 +391,7 @@ OPERATIONS = {
     "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
     "studio.production.commit_bundle":("external_effect", "explicit human-approved original source commit group",True),
+    "studio.production.queue":("read", "paged pending and accepted original source proposals",False),
     "studio.tree":("read", "active project files",False),
     "studio.file":("read", "active project source",False),
     "studio.propose":("proposal", "targeted human-reviewed project edit",True),
@@ -575,6 +576,9 @@ class JeevesAppwideRuntime:
                 result=variants.plan(**params, operator_authorized=authorized)
             else:
                 result=variants.stage(**params, operator_authorized=authorized)
+        elif action=="studio.production.queue":
+            from .jeeves_proposal_queue import JeevesProposalQueue
+            result=JeevesProposalQueue(inv, ws).page(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
