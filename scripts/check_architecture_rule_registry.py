@@ -129,14 +129,22 @@ def validate(root: Path = ROOT, *, as_of: datetime | None = None, execute: bool 
         if binding.get("title") != volume.get("title"):
             raise ArchitectureRuleRegistryError(f"masterplan title drift for {ref}")
         gap_texts = binding.get("required_gap_texts")
-        if not isinstance(gap_texts, list) or not gap_texts:
-            raise ArchitectureRuleRegistryError(f"{ref} required_gap_texts must be non-empty")
-        canonical_gaps = volume.get("gaps", [])
-        for gap in gap_texts:
-            if gap not in canonical_gaps:
-                raise ArchitectureRuleRegistryError(
-                    f"registry no longer matches canonical masterplan gap {ref}: {gap!r}"
-                )
+        canonical_gaps = volume.get("gaps")
+        if not isinstance(gap_texts, list) or not isinstance(canonical_gaps, list):
+            raise ArchitectureRuleRegistryError(f"{ref} gaps must be arrays")
+        if (
+            any(not isinstance(gap, str) or not gap.strip() for gap in gap_texts + canonical_gaps)
+            or len(set(gap_texts)) != len(gap_texts)
+            or len(set(canonical_gaps)) != len(canonical_gaps)
+        ):
+            raise ArchitectureRuleRegistryError(f"{ref} gaps must be unique non-empty text")
+        # A canonical volume may legitimately have no outstanding gap.
+        # Continue to fail closed on drift in either direction; no matching gaps
+        # grants no waiver or maturity, and all registered checks still execute.
+        if set(gap_texts) != set(canonical_gaps):
+            raise ArchitectureRuleRegistryError(
+                f"registry no longer matches canonical masterplan gap {ref}"
+            )
     if binding_refs != {"VOL-055", "VOL-116"}:
         raise ArchitectureRuleRegistryError(
             "architecture rule registry must remain bound to VOL-055 and VOL-116"
