@@ -1,9 +1,9 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13.v2",
+  "version": "2026-10-13.v3",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
-  "scope_note": "12 CI smoke mapped families, 23 discovery-only candidate families; all 42 still independently unqualified until evidence verifies real outcomes",
+  "scope_note": "12 CI smoke families and 28 discovery-only candidate families; missing F07 offline native and F37 shells require genuine source-linked tests",
   "runner_mode": "unittest_module_exact_head",
   "default_max_seconds": 480,
   "policies": {
@@ -16,6 +16,39 @@
     "unmapped_families_remain_unknown": true
   },
   "bindings": [
+    {
+      "family_id": "F01",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Workspace ownership and taxonomy are checked, not real user navigation",
+      "unittest_modules": [
+        "tests.test_app_workspace_taxonomy"
+      ],
+      "workflow_hint": "Separate dedicated independent target gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F02",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "API gateway payload reliability contract subset, not all routes",
+      "unittest_modules": [
+        "tests.test_api_gateway_payload_reliability"
+      ],
+      "workflow_hint": "Separate dedicated independent target gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F03",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Engine API health and kernel interface response subset",
+      "unittest_modules": [
+        "tests.test_api"
+      ],
+      "workflow_hint": "Separate dedicated independent target gate required",
+      "product_release_qualified": false
+    },
     {
       "family_id": "F04",
       "scope": "targeted_regression_subset",
@@ -361,6 +394,17 @@
       "product_release_qualified": false
     },
     {
+      "family_id": "F38",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Repository atlas canonical owner and source placement subset",
+      "unittest_modules": [
+        "tests.test_repo_machine_atlas"
+      ],
+      "workflow_hint": "Separate dedicated independent target gate required",
+      "product_release_qualified": false
+    },
+    {
       "family_id": "F39",
       "scope": "targeted_regression_subset",
       "execution_tier": "discovery_only",
@@ -391,6 +435,17 @@
         "tests.test_ai_game_builder_resilience"
       ],
       "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F42",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Enterprise architecture/source contract checks, not full deployed journeys",
+      "unittest_modules": [
+        "tests.test_enterprise_system_architecture"
+      ],
+      "workflow_hint": "Separate dedicated independent target gate required",
       "product_release_qualified": false
     }
   ]
