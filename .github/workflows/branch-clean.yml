@@ -205,6 +205,9 @@ jobs:
             late_open_pr_count=0
             late_open_pr_base_count=0
             : > ../preserved-branches.txt
+            # All deletion paths, including mature merged PRs without CreateEvents,
+            # require a defined current epoch for the tip-age grace check.
+            now_epoch=$(date -u +%s) || exit 1
 
             if ! load_open_pr_refs; then
               {
@@ -235,8 +238,8 @@ jobs:
               [[ -n "$tip" && -n "$branch" ]] || continue
 
               # Preserve explicit coordination, deployment, publication, and
-              # backup refs. Everything else may be removed only when all of its
-              # commits are already reachable from main.
+              # backup refs. Other refs are eligible only with fresh PR/age checks
+              # and established ancestry, identical tree, or exact merged-PR proof.
               case "$branch" in
                 main|master|develop|development|staging|production|prod|gh-pages|release/*|keep/*|backup/*|archive/*)
                   protected_count=$((protected_count + 1))
