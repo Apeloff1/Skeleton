@@ -746,6 +746,11 @@ from .world_model import (
     reliability_to_likelihood_ratio,
 )
 
+from .orchestrated_capability_runtime import (
+    OrchestratedDispatchError,
+    OrchestratedDispatchReceipt,
+    JeevesOrchestratedCapabilityRuntime,
+)
 from .capability_dispatch import (
     AppDispatchError,
     HostCapabilityBinding,
