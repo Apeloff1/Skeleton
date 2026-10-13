@@ -131,7 +131,13 @@ jobs:
           inventory.scan()
           report = JeevesCompletionCensus(inventory).report()
           assert report["plan"]["volume_total"] == 421
-          assert report["plan"]["parse_index_masterplan_git_blob_matches"]
+          # Stale signatures are a reported completion blocker, not a
+          # reason to break source reconciliation or forge a fresh signature.
+          fresh = report["plan"]["parse_index_masterplan_git_blob_matches"]
+          stale = any(d["kind"] == "masterplan_parse_index_source_stale"
+                      for d in report["authority_defects"])
+          assert fresh != stale
+          assert not report["readiness"]["release_qualified"]
           assert report["ai_product"]["capability_total"] == 9
           assert report["construction"]["plane_total"] == 27
           assert report["enterprise"]["domain_count"] == 11
