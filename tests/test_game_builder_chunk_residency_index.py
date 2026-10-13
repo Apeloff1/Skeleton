@@ -82,6 +82,26 @@ class SourceChunkIndexTests(unittest.TestCase):
         self.assertTrue(q["query_does_not_move_npcs_or_mint_witnesses"])
         self.assertFalse(q["hardware_speed_benchmark_claimed"])
 
+    def test_genesis_cannot_claim_deferred_this_turn_without_a_turn(self):
+        game=source(people=64,chunks=3,commands=[])
+        self.assertEqual(game["state"]["tick"],0)
+        self.assertEqual(game["state"]["scheduler"]["deferred_actor_turns"],0)
+        index=build_original_chunk_index(game)
+        for mode in ("detailed_this_turn","deferred_this_turn"):
+            with self.subTest(mode=mode):
+                result=query_original_chunk_index(index,query={
+                    "center_chunk":[1,1],"radius":1,"mode":mode,"limit":32,
+                })
+                self.assertEqual(result["matching_actors"],0)
+                self.assertEqual(result["returned_count"],0)
+                self.assertEqual(result["residents"],[])
+                self.assertTrue(verify_original_chunk_query(result))
+        all_residents=query_original_chunk_index(index,query={
+            "center_chunk":[1,1],"radius":1,"mode":"all","limit":32,
+        })
+        self.assertEqual(all_residents["matching_actors"],64)
+        self.assertTrue(verify_original_chunk_query(all_residents))
+
     def test_only_exactly_scheduled_residents_are_detailed_this_turn(self):
         report=build_original_chunk_index(source(people=64,chunks=3))
         detailed=query_original_chunk_index(report,query={
