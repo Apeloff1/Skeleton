@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 from skeleton.repo_intelligence.tree_atlas import (
-    AtlasError, _canonical, build, exact_duplicates, query, scan, write_index,
+    AtlasError, _canonical, build, directory_index, exact_duplicates, feature_index, query, scan, write_index,
 )
 
 
@@ -64,6 +64,11 @@ class RepositoryTreeAtlasTests(unittest.TestCase):
                          "historical-snapshot")
         twins = exact_duplicates(records)
         self.assertTrue(any(len(group["paths"]) == 3 for group in twins))
+        features = {row["id"]: row for row in feature_index(records)}
+        self.assertEqual(features["AIFT-QUEST"]["files"], 2)
+        directories = {row["path"]: row for row in directory_index(records)}
+        self.assertEqual(directories["skeleton/ai"]["files"], 2)
+        self.assertEqual(directories["skeleton/ai/quest"]["immediate_files"], 1)
 
     def test_more_files_than_policy_limit_are_never_truncated(self) -> None:
         for i in range(90):
