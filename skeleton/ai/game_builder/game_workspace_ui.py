@@ -360,6 +360,22 @@ $("jeeves-dm-missing").addEventListener("click",()=>dmGuard(async()=>{
  const result=await dmInvoke("ai.product.measure.page",params);
  status(result.total_matches+" source owner gaps located. These are not all functional blockers.");
 }));
+let acceptanceTestMatrixDigest=null;
+$("jeeves-dm-test-matrix").addEventListener("click",()=>dmGuard(async()=>{
+ const result=await dmInvoke("ai.product.tests",{});
+ acceptanceTestMatrixDigest=result.digest;
+ const mapped=result.curated_test_family_count;
+ status(mapped+"/"+result.family_denominator+" feature families have curated test candidates; "+
+  result.unique_test_module_count+" existing source-linked modules, "+
+  result.unique_static_test_case_count+" declared test functions. None counted as passed.");
+}));
+$("jeeves-dm-unmapped-tests").addEventListener("click",()=>dmGuard(async()=>{
+ const params={limit:30,offset:0,only_unmapped:true};
+ if(acceptanceTestMatrixDigest)
+  params.expected_matrix_digest=acceptanceTestMatrixDigest;
+ const result=await dmInvoke("ai.product.tests.page",params);
+ status(result.total_matches+" families remain without curated test acceptance links.");
+}));
 $("jeeves-dm-tasks").addEventListener("click",()=>dmGuard(async()=>{
  const result=await dmInvoke("ai.milestones.page",{offset:0,limit:30});
  deathmarchPlanDigest=result.plan_digest;
@@ -4431,6 +4447,8 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 and reviewed multi-adapter previews. All previews are non-mutating; source edits,
 model promotion and release still require independent approval and evidence.</small></p>
 <button id="jeeves-dm-measure" type="button">Measure full-app acceptance scope</button>
+<button id="jeeves-dm-test-matrix" type="button">Measure test-linked feature families</button>
+<button id="jeeves-dm-unmapped-tests" type="button">List unbound feature tests</button>
 <button id="jeeves-dm-missing" type="button">Inspect missing source owners</button>
 <button id="jeeves-dm-tasks" type="button">Index next 30 milestone tasks</button>
 <label>Parallel per wave (1–24)<input id="jeeves-dm-parallel" type="number" min="1" max="24" value="8"></label>
