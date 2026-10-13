@@ -396,6 +396,80 @@ class ShadowKnowledgeQueue:
             raise ShadowWeightError("lease assessment is not current")
         return row
 
+    def renew(
+        self, lease: ShadowIntakeLease, *, idle: bool,
+        duration_seconds: int = 900,
+    ) -> ShadowIntakeLease:
+        """Extend a worker's fenced lease while background capacity remains idle.
+
+        The new revision invalidates the previous lease token. A worker must
+        hand the returned lease into any subsequent acknowledgement or release.
+        An expired lease is never revived by a heartbeat.
+        """
+        if not isinstance(idle, bool) or not idle:
+            raise ShadowWeightError("shadow lease renewal requires idle capacity")
+        _count("duration_seconds", duration_seconds, lower=15, upper=86_400)
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = self._bound_lease(db, lease)
+            now = _now()
+            now_text = now.isoformat(timespec="microseconds").replace("+00:00", "Z")
+            expiry = (now + timedelta(seconds=duration_seconds)).isoformat(
+                timespec="microseconds"
+            ).replace("+00:00", "Z")
+            revision = row["revision"] + 1
+            db.execute(
+                """UPDATE shadow_intake SET lease_until=?,revision=?,updated_at=?
+                    WHERE knowledge_id=?""",
+                (expiry, revision, now_text, lease.knowledge.knowledge_id),
+            )
+            self._event(
+                db, lease.knowledge.knowledge_id, "renew-lease",
+                revision, lease.assessment_digest,
+            )
+            return ShadowIntakeLease(
+                knowledge=lease.knowledge, lease_owner=lease.lease_owner,
+                lease_until=expiry, revision=revision,
+                assessment_digest=lease.assessment_digest,
+            )
+
+    def quarantine_lease(
+        self, lease: ShadowIntakeLease, *, reason_code: str,
+    ) -> ShadowIntakeAssessment:
+        """Fence out irrecoverably rejected work without discarding provenance.
+
+        Only the lease owner can quarantine its current revision. A later
+        append-only evidence revision can requalify it under the same policy.
+        """
+        require_id(reason_code, "quarantine reason_code")
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = self._bound_lease(db, lease)
+            previous = ShadowIntakeAssessment(**json.loads(row["assessment"]))
+            assessment = ShadowIntakeAssessment(
+                knowledge_digest=lease.knowledge.digest,
+                policy_digest=previous.policy_digest,
+                independent_roots=previous.independent_roots,
+                reason_codes=tuple(sorted(set(previous.reason_codes) | {reason_code})),
+                disposition="quarantined",
+            )
+            revision = row["revision"] + 1
+            db.execute(
+                """UPDATE shadow_intake SET state='quarantined',
+                    assessment=?,lease_owner=NULL,lease_until=NULL,
+                    revision=?,updated_at=? WHERE knowledge_id=?""",
+                (
+                    _encode(asdict(assessment)), revision,
+                    _now().isoformat(timespec="microseconds").replace("+00:00", "Z"),
+                    lease.knowledge.knowledge_id,
+                ),
+            )
+            self._event(
+                db, lease.knowledge.knowledge_id, "worker-quarantine",
+                revision, assessment.digest,
+            )
+            return assessment
+
     def acknowledge(self, lease: ShadowIntakeLease, candidate: CandidateWeights) -> str:
         """Record resulting *candidate* weights, not unreviewed production weights."""
         if not isinstance(candidate, CandidateWeights) or candidate.status != "candidate":
