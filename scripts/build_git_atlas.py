@@ -83,8 +83,10 @@ def feature_identity(path: str, mappings: list[dict[str, Any]], zone: str) -> st
         return "unclassified"
     if parts[0] == "satellites" and len(parts) >= 3:
         return "satellites/branch-snapshots" if parts[1] == "branch-snapshots" else "/".join(parts[:2])
-    if parts[0] == "skeleton" and len(parts) >= 3:
-        return "/".join(parts[:3])
+    if len(parts) >= 3:
+        # Fine-grained folder identities avoid one enormous AI/runtime shard.
+        depth = 5 if parts[0] == "skeleton" else 4
+        return "/".join(parts[:min(len(parts) - 1, depth)])
     if len(parts) >= 2:
         return "/".join(parts[:2])
     return zone + "/" + parts[0]
