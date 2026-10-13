@@ -409,6 +409,9 @@ OPERATIONS = {
     "studio.campaign.lore.plan":("read", "bind real character/region/plot story history to a committed game campaign",False),
     "studio.campaign.lore.stage":("proposal", "stage canonical full-story game campaign links for human review",True),
     "studio.campaign.lore.verify":("read", "reverify source-committed story/game causal binding",False),
+    "studio.campaign.outcomes.plan":("compute", "run real player action variants across original authored campaign branches",True),
+    "studio.campaign.outcomes.stage":("proposal", "stage observed multi-ending gameplay source and uncovered routes",True),
+    "studio.campaign.outcomes.verify":("read", "reexecute committed game outcome portfolio and source identities",False),
     "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
     "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
@@ -694,6 +697,17 @@ class JeevesAppwideRuntime:
                 result=lore.stage(**params,operator_authorized=authorized)
             else:
                 result=lore.verify(**params)
+        elif action in ("studio.campaign.outcomes.plan",
+                        "studio.campaign.outcomes.stage",
+                        "studio.campaign.outcomes.verify"):
+            from .jeeves_campaign_outcomes import JeevesCampaignOutcomes
+            outcomes=JeevesCampaignOutcomes(inv,ws)
+            if action=="studio.campaign.outcomes.plan":
+                result=outcomes.plan(**params,operator_authorized=authorized)
+            elif action=="studio.campaign.outcomes.stage":
+                result=outcomes.stage(**params,operator_authorized=authorized)
+            else:
+                result=outcomes.verify(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":

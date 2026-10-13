@@ -318,6 +318,25 @@ class GameWorkspace:
         config=validate_editor_document(_json(_read(config_path)))
         validate_advanced_scene(document,config["settings"])
 
+    def _validate_campaign_outcomes_source(self, project, relative, document):
+        """Re-execute real portfolio scenes before publication, with source CAS."""
+        from .jeeves_campaign_outcomes import rebuild_outcome_portfolio
+        if type(document) is not dict:
+            raise WorkspaceError("original game outcome portfolio must be a typed document")
+        rebuilt=rebuild_outcome_portfolio(self,project,document)
+        if rebuilt!=document or relative!=(
+                "game/campaigns/"+document["campaign_id"]+"_outcomes.json"):
+            raise WorkspaceError("observed original game outcomes or source have changed")
+        return {
+            "schema":document["schema"],
+            "campaign_id":document["campaign_id"],
+            "verified_real_game_scenarios":len(document["executed_scenarios"]),
+            "observed_ending_nodes":document["observed_ending_node_count"],
+            "unobserved_endings":document["unobserved_authored_ending_node_ids"],
+            "original_game_reference_reexecuted":True,
+            "all_possible_player_decisions_verified":False,
+        }
+
     def _validate_campaign_lore_source(self, project, relative, document):
         """Reject uncommitted narrative links and invalid full-history evidence."""
         from .jeeves_campaign_lore import rebuild_campaign_lore_document
@@ -502,6 +521,8 @@ class GameWorkspace:
             if relative.startswith("game/campaigns/"):
                 if relative.endswith("_lore.json"):
                     self._validate_campaign_lore_source(project,relative,parsed)
+                elif relative.endswith("_outcomes.json"):
+                    self._validate_campaign_outcomes_source(project,relative,parsed)
                 else:
                     self._validate_advanced_campaign_source(project,relative,parsed)
             if (relative in ("game/story_bible.json","game/continuity_contract.json")
@@ -568,6 +589,8 @@ class GameWorkspace:
             if proposal["path"].startswith("game/campaigns/"):
                 if proposal["path"].endswith("_lore.json"):
                     self._validate_campaign_lore_source(project,proposal["path"],parsed)
+                elif proposal["path"].endswith("_outcomes.json"):
+                    self._validate_campaign_outcomes_source(project,proposal["path"],parsed)
                 else:
                     self._validate_advanced_campaign_source(project,proposal["path"],parsed)
             if (proposal["path"] in ("game/story_bible.json",

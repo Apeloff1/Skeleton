@@ -18,7 +18,7 @@ from .contracts import canonical_json,canonical_digest
 from .game_project_workspace import GameWorkspace,_json
 from .jeeves_appwide_fabric import AppwideInventory,JeevesAppwideError,digest
 from .jeeves_campaign_graph import (
-    rebuild_campaign_document,compile_campaign,
+    rebuild_campaign_document,compile_campaign,_condition,
 )
 from .advanced_gameplay_runtime import ACTION_HELP
 
@@ -120,13 +120,18 @@ def compile_outcome_portfolio(workspace,project,campaign_id,scenarios):
         for step in path:
             nxt=step["chosen_next"]
             if nxt is not None:
+                actual=executed["reference_sessions"][step["node"]]
                 choices=[
                     (edge["source"],edge["target"],edge["priority"])
-                    for edge in original["edges"]
-                    if edge["source"]==step["node"] and edge["target"]==nxt
+                    for edge in sorted(original["edges"],key=lambda e:e["priority"])
+                    if edge["source"]==step["node"] and _condition(
+                        edge["predicate"],edge["threshold"],{
+                            "state":actual["state"],
+                            "validated_turn_count":actual["turns_executed"],
+                        })
                 ]
-                if len(choices)!=1:
-                    raise JeevesAppwideError("ambiguous branch outcome receipt")
+                if not choices or choices[0][1]!=nxt:
+                    raise JeevesAppwideError("actual branch priority differs from real session")
                 witnessed_edges.add(choices[0])
         observed_nodes.add(reached)
         observed_categories.add(endings[reached])
