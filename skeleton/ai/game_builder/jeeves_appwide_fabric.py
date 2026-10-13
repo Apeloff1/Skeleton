@@ -347,6 +347,7 @@ OPERATIONS = {
     "ai.context":("read", "budgeted source-linked metadata context for Jeeves",False),
     "ai.duplicates":("read", "exact and heuristic near-duplicate review candidates",False),
     "ai.completion":("read", "full-app canonical readiness and evidence-gap census",False),
+    "ai.deathmarch":("read", "prioritized evidence-gated cross-app completion backlog",False),
     "source.inspect":("read", "UTF-8 source",False),
     "source.propose":("proposal", "exact-file reviewed code edit",True),
     "editor.catalog":("read", "typed original-game editors",False),
@@ -431,6 +432,9 @@ class JeevesAppwideRuntime:
         elif action=="ai.completion":
             from .jeeves_completion_census import JeevesCompletionCensus
             result=JeevesCompletionCensus(inv).report(**params)
+        elif action=="ai.deathmarch":
+            from .jeeves_completion_census import JeevesCompletionCensus
+            result=JeevesCompletionCensus(inv).backlog(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
