@@ -110,7 +110,7 @@ class JeevesAcceptanceTestMatrix:
             if len(set(selected)) != len(selected):
                 raise JeevesAppwideError("duplicate test module within family")
             tier = entry.get("execution_tier", "ci_smoke")
-            if tier not in ("ci_smoke", "discovery_only") or type(tier) is not str:
+            if tier not in ("ci_smoke", "pytest_smoke", "discovery_only") or type(tier) is not str:
                 raise JeevesAppwideError("unknown acceptance execution tier")
             ids.add(family)
             for module in selected:
@@ -129,9 +129,12 @@ class JeevesAcceptanceTestMatrix:
                         "executed": False,
                         "passed_at_exact_head": None,
                         "scheduled_in_matrix": False,
+                        "scheduled_in_pytest": False,
                     }
                 if tier == "ci_smoke":
                     modules[module]["scheduled_in_matrix"] = True
+                elif tier == "pytest_smoke":
+                    modules[module]["scheduled_in_pytest"] = True
             rows.append({
                 "family_id": family,
                 "independent_acceptance_question": entry["independent_acceptance_question"],
@@ -162,8 +165,11 @@ class JeevesAcceptanceTestMatrix:
                                                  for m in modules),
             "ci_smoke_family_count": sum(int(row["execution_tier"] == "ci_smoke") for row in rows),
             "discovery_only_family_count": sum(int(row["execution_tier"] == "discovery_only") for row in rows),
+            "pytest_smoke_family_count": sum(int(row["execution_tier"] == "pytest_smoke") for row in rows),
             "scheduled_test_module_count": sum(int(m["scheduled_in_matrix"]) for m in modules),
             "selected_modules": [m["module"] for m in modules if m["scheduled_in_matrix"]],
+            "scheduled_pytest_module_count": sum(int(m["scheduled_in_pytest"]) for m in modules),
+            "pytest_selected_modules": [m["module"] for m in modules if m["scheduled_in_pytest"]],
             "module_source_receipts": [
                 {"path": m["path"], "sha256": m["sha256"],
                  "declared_test_case_count": m["declared_test_case_count"]}
