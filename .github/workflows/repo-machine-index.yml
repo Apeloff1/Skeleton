@@ -21,7 +21,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout triggering revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
@@ -54,6 +54,8 @@ jobs:
           code_index_path = Path(".machine/code-search-index.json")
           manifest = load_manifest(manifest_path)
           validate_manifest(manifest)
+          if manifest["state"].get("truncated"):
+              raise RuntimeError("repository machine inventory truncated; increase or shard scan budget")
           code_index = load_code_search_index(
               code_index_path,
               expected_fingerprint=manifest["fingerprint"],
