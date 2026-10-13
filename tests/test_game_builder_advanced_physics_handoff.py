@@ -160,6 +160,16 @@ class AdvancedCrossEnginePhysicsTests(unittest.TestCase):
         with self.assertRaises(PhysicsHandoffError):
             run_physics_handoff(origin,physics_options={"air_drag":False})
 
+    def test_untrusted_settings_container_fails_with_typed_handoff_error(self):
+        original=run_physics_handoff(self.source("racing"))
+        for invalid in (None,[],False,"not-a-mapping",42):
+            with self.subTest(settings=invalid):
+                tampered=deepcopy(original)
+                tampered["physics_settings"]=invalid
+                with self.assertRaises(PhysicsHandoffError):
+                    verify_physics_handoff(tampered)
+        self.assertTrue(verify_physics_handoff(original))
+
     def test_cross_engine_evidence_is_not_forgeable_into_weight_promotion(self):
         record=run_physics_handoff(self.source("racing"))
         changes=[
