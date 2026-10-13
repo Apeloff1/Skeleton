@@ -15,7 +15,7 @@ import re
 import subprocess
 import os
 import tomllib
-from typing import Iterable
+from typing import Any, Iterable
 
 FORMAT = "skeleton.repository-atlas.v1"
 CODE_EXTENSIONS = frozenset({".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".go", ".rs", ".c", ".cc", ".cpp", ".h", ".hpp"})
@@ -310,6 +310,7 @@ def build(root: Path, *, near_limit: int = 0) -> tuple[dict[str, object], tuple[
         "gitlinks": modes["160000"], "symlinks": modes["120000"],
         "zones": dict(sorted(zones.items())),
         "feature_count": len(feature_counts),
+        "directory_count": len(directory_index(entries)),
         "features": dict(sorted(feature_counts.items())),
         "exact_duplicate_groups": len(duplicates),
         "exact_duplicate_excess": sum(int(g["excess"]) for g in duplicates),
@@ -325,7 +326,7 @@ def _json(value: object) -> str:
 
 def feature_index(entries: Iterable[Entry]) -> list[dict[str, object]]:
     """Compact feature pages without storing source or enormous path lists."""
-    groups: dict[str, dict[str, object]] = {}
+    groups: dict[str, dict[str, Any]] = {}
     for e in entries:
         row = groups.setdefault(e.feature, {
             "id": e.feature, "files": 0, "bytes": 0,
