@@ -22,6 +22,17 @@ const EXPECTED = Object.freeze({
   "react-native-webview": "13.15.0",
   "react-native-worklets": "0.5.1"
 });
+function lockVersionAllowed(actual, selector) {
+  if (typeof actual !== "string") return false;
+  if (!selector.startsWith("~")) return actual === selector;
+  // The reviewed SDK matrix uses exact versions or tilde patch ranges only.
+  const floor = /^(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(selector.slice(1));
+  const resolved = /^(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(actual);
+  return Boolean(floor && resolved &&
+    Number(resolved[1]) === Number(floor[1]) &&
+    Number(resolved[2]) === Number(floor[2]) &&
+    Number(resolved[3]) >= Number(floor[3]));
+}
 function validate(manifest, lockText) {
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
     throw new Error("A valid frontend package manifest is required");
@@ -39,11 +50,19 @@ function validate(manifest, lockText) {
     for (const [name, version] of Object.entries(EXPECTED)) {
       // Yarn classic groups aliases on a line; accept a quoted or bare selector.
       const selector = name + "@" + version;
-      const found = lockText.split("\n").some(line =>
+      const lines = lockText.split("\n");
+      const position = lines.findIndex(line =>
         !/^\s/.test(line) && line.endsWith(":") &&
         line.slice(0, -1).split(", ").some(part =>
           part.replace(/^"|"$/g, "") === selector));
-      if (!found) errors.push("yarn.lock missing selector " + selector);
+      if (position < 0) {
+        errors.push("yarn.lock missing selector " + selector);
+        continue;
+      }
+      const resolvedLine = /^  version "([^"]+)"$/.exec(lines[position + 1] || "");
+      if (!resolvedLine || !lockVersionAllowed(resolvedLine[1], version)) {
+        errors.push("yarn.lock resolved version is outside reviewed range for " + selector);
+      }
     }
   }
   return errors;
