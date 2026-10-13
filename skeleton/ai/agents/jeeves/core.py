@@ -121,6 +121,28 @@ class Jeeves:
     def laws(self) -> tuple[str, ...]:
         return SYSTEM_LAWS
 
+    def app_tool_registry(self, *, root=None):
+        """Expose approved *read-only* app/creator tools to a host tool gate.
+
+        The returned registry does not confer any grant or execute actions.
+        Host ToolExecutor / PermitBoundToolExecutor remains authoritative.
+        """
+        from skeleton.jeeves.app_capability_bridge import register_app_tools
+        from skeleton.jeeves.agent.tools import ToolRegistry
+        registry = ToolRegistry()
+        register_app_tools(registry, root=root)
+        return registry
+
+    def app_capability_catalog(self, *, query: str = "", limit: int = 20, offset: int = 0, root=None):
+        """Small, evidence-bound slice of indexed app features and owners."""
+        from skeleton.jeeves.app_capability_bridge import capability_catalog
+        return capability_catalog(query=query, limit=limit, offset=offset, root=root)
+
+    def creator_proposal(self, operation: str, project_id: str, payload):
+        """Compile a validated creator proposal, without dispatch authority."""
+        from skeleton.jeeves.app_capability_bridge import creator_proposal
+        return creator_proposal(operation, project_id, payload)
+
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
         if not isinstance(mode, SessionMode):
