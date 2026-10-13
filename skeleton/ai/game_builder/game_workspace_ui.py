@@ -482,7 +482,7 @@ $("jeeves-code-dependencies").addEventListener("click",()=>dmGuard(async()=>{
  status(result.node_count+" source modules and "+result.edge_count+
   " declared import edges indexed, with "+Object.keys(result.unresolved_or_bounded).length+
   " incompleteness categories. No imported code was executed.");
-});
+}));
 
 
 /* Installed game editors and authored scene production into real Studio proposals. */
