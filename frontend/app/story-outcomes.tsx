@@ -11,11 +11,11 @@ import { authHeaders, checkMe } from '../src/auth/gameforgeAuth';
 import { validProjectId } from '../src/product/worldWorkspace';
 import { HANDOFF_KEY } from '../features/Jeeves/workbench/types';
 import {
-  acceptSimulation, acceptOutcomeAudit, chooseOption, compactPlayerContext,
+  acceptSimulation, acceptOutcomeAudit, acceptDialogueProjection, chooseOption, compactPlayerContext,
   exampleThreeEndingPlan, parsePlanDraft,
 } from '../features/Jeeves/outcomeStudio';
 import type {
-  StorySimulation, OutcomeAudit, PlanCatalog,
+  StorySimulation, OutcomeAudit, PlanCatalog, DialogueProjection,
 } from '../features/Jeeves/outcomeStudio';
 import { Action, Field, Section, Choice, styles, palette } from '../features/Jeeves/workbench/ui';
 
@@ -41,6 +41,7 @@ export default function StoryOutcomesStudio() {
   const [authorKey, setAuthorKey] = useState('');
   const [choices, setChoices] = useState<string[]>([]);
   const [simulation, setSimulation] = useState<StorySimulation | null>(null);
+  const [dialogueView, setDialogueView] = useState<DialogueProjection | null>(null);
   const [audit, setAudit] = useState<OutcomeAudit | null>(null);
   const [chapterWeave, setChapterWeave] = useState<any>(null);
   const [page, setPage] = useState<Page>('author');
@@ -63,7 +64,7 @@ export default function StoryOutcomesStudio() {
   const resetScope = (nextGame: string, nextBranch: string) => {
     setGameId(nextGame); setBranch(nextBranch);
     setRevision(0); setPlanDigest(''); setAuthorKey('');
-    setDoc(null); setSimulation(null); setChoices([]); setAudit(null);
+    setDoc(null); setSimulation(null); setDialogueView(null); setChoices([]); setAudit(null);
     setChapterWeave(null);
     setMatrixItems([]); setEndingCoverage(null); setNotice('');
   };
@@ -104,7 +105,7 @@ export default function StoryOutcomesStudio() {
     }
     setRevision(response.data.revision); setPlanDigest(response.data.plan_digest);
     setAuthorKey(gameId.trim() + ':' + branch);
-    setDoc(content); setChoices([]); setSimulation(null); setAudit(null);
+    setDoc(content); setChoices([]); setSimulation(null); setDialogueView(null); setAudit(null);
     setNotice('Branch revision ' + response.data.revision +
       ' saved with immutable graph receipt ' + response.data.plan_digest.slice(0, 20) + '.');
   };
@@ -125,7 +126,7 @@ export default function StoryOutcomesStudio() {
     setRaw(encoded); setDoc(parsed); setRevision(response.data.revision);
     setPlanDigest(response.data.plan_digest);
     setAuthorKey(gameId.trim() + ':' + branch);
-    setSimulation(null); setChoices([]); setAudit(null);
+    setSimulation(null); setDialogueView(null); setChoices([]); setAudit(null);
     setNotice('Loaded authoritative graph at revision ' + response.data.revision + '.');
   };
   const simulate = async (path: string[]) => {
@@ -142,13 +143,35 @@ export default function StoryOutcomesStudio() {
       throw new Error('Choice replay was not confirmed by the original plan.');
     }
     const result = acceptSimulation(response.data.simulation, planDigest, path);
-    setChoices(path); setSimulation(result);
+    setChoices(path); setSimulation(result); setDialogueView(null);
     setPage('playthrough');
     setNotice(result.ending_id
       ? (result.ending_accepted
         ? 'An evidence-closed ending was reached. This is simulation, not playable-game deployment.'
         : 'Ending reached but unresolved plot, companion, quest or place obligations remain.')
       : 'Real state-dependent dialogue choices are unlocked below.');
+  };
+  const previewDialogue = async (creator: boolean) => {
+    confirmCurrent();
+    if (!simulation) throw new Error('Replay actual choices before inspecting dialogue.');
+    const response = await api.post<any>(
+      base() + (creator ? '/dialogue/diagnostics' : '/dialogue'),
+      { branch_id: branch, choices },
+      { headers: authHeaders(), retries: 0, timeoutMs: 30000 },
+    );
+    if (!response.ok || !response.data?.ok ||
+        response.data.game_id !== gameId.trim() ||
+        response.data.branch_id !== branch ||
+        response.data.revision !== revision) {
+      throw new Error('Dialogue projection is stale or you lack authoring access.');
+    }
+    const checked = acceptDialogueProjection(
+      response.data.dialogue, simulation, branch, creator,
+    );
+    setDialogueView(checked);
+    setNotice(creator
+      ? 'Creator-only guard diagnostics verified against this playthrough.'
+      : 'Player-visible dialogue has no locked choices or unreached endings.');
   };
   const advance = async (choiceId: string) => {
     if (!simulation) throw new Error('Start a player-history replay.');
@@ -374,7 +397,7 @@ export default function StoryOutcomesStudio() {
               const example = exampleThreeEndingPlan();
               example.branch_id = branch;
               setRaw(JSON.stringify(example, null, 2)); setDoc(null);
-              setPlanDigest(''); setSimulation(null); setChoices([]);
+              setPlanDigest(''); setSimulation(null); setDialogueView(null); setChoices([]);
               setNotice('Example staged only. Review and save to your game to test it.');
               setPage('author');
             }} />
@@ -428,6 +451,35 @@ export default function StoryOutcomesStudio() {
           icon="arrow-undo-outline" disabled={busy}
           onPress={() => { void withOperation(() => simulate(choices.slice(0, -1))); }} />}
         {simulation && <>
+          <View style={styles.wrap}>
+            <Action label="Preview spoiler-safe player dialogue" icon="eye-outline"
+              disabled={busy}
+              onPress={() => { void withOperation(() => previewDialogue(false)); }} />
+            <Action label="Explain locked options (creator only)" icon="shield-checkmark-outline"
+              disabled={busy}
+              onPress={() => { void withOperation(() => previewDialogue(true)); }} />
+          </View>
+          {dialogueView && <View style={styles.card}>
+            <Text style={styles.label}>
+              {dialogueView.creator_diagnostics_only ? 'Creator diagnostic' : 'Player-visible scene'}:
+              {dialogueView.scene ?? 'ending'}
+            </Text>
+            <Text style={styles.text}>{dialogueView.scene_text ||
+              dialogueView.ending?.epilogue || 'No further dialogue'}</Text>
+            {dialogueView.scene_text_truncated &&
+              <Text style={styles.error}>Scene excerpt truncated to 5,000 characters.</Text>}
+            <Text style={styles.muted}>
+              Public replies: {dialogueView.available_replies.map(x => x.dialogue).join(' | ') || 'none'}
+            </Text>
+            {dialogueView.creator_diagnostics_only && dialogueView.locked_choices?.map(item =>
+              <Text key={item.id} style={styles.small}>
+                Locked {item.id}: {JSON.stringify(item.unmet).slice(0, 1500)}
+              </Text>)}
+            <Text style={styles.small}>
+              Witness: {dialogueView.playthrough_receipt.slice(0, 20)} ·
+              Projection: {dialogueView.projection_digest.slice(0, 20)}
+            </Text>
+          </View>}
           <Text style={styles.label}>
             {simulation.ending_id ? 'Ending: ' + simulation.ending_id
               : 'Current decision: ' + simulation.position}
@@ -453,8 +505,7 @@ export default function StoryOutcomesStudio() {
             <Text style={styles.small}>Evidence: {item.receipt_digest.slice(0, 28)}</Text>
           </View>)}
           {simulation.available_options.map(option =>
-            <Action key={option.id} label={option.dialogue + ' → ' +
-              (option.ending || option.next_node || '')}
+            <Action key={option.id} label={option.dialogue}
               disabled={busy || !!simulation.ending_id}
               onPress={() => { void withOperation(() => advance(option.id)); }} />)}
           {simulation.ending && <>
