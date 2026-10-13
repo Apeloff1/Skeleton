@@ -172,7 +172,7 @@ def start(config,seed):
         "npc_events_generated":0,"next_npc_actor":0,
         "npc_walks":0,"forensic_edges":[],
         "quests_completed":0,"quests_exploited":0,
-        "rumor_edges":[],"milestones":[],
+        "rumor_edges":[],"milestones":[],"relief_deliveries":[],
         "finished":False,"failed":False,"victory":False,"reason":"",
         "events":[],
     }
@@ -268,9 +268,12 @@ def _emit(state,config,kind,site,events,*,actor="player",physical_source=None):
     for quest in state["quests"]:
         if quest["status"]!="active" or quest["site_id"]!=site["id"]:
             continue
-        wanted=("harm" if quest["choice"]=="exploit" else
-                "repair" if quest["trigger"]=="harm" else "help")
-        if kind==wanted and actor=="player":
+        # A real harmed site can be physically repaired just once and then
+        # receive finite aid/relief shipments. Either form is a legitimate
+        # material recovery action, but both must have actually occurred.
+        wanted=(("harm",) if quest["choice"]=="exploit" else
+                ("repair","help") if quest["trigger"]=="harm" else ("help",))
+        if kind in wanted and actor=="player":
             quest["material_actions"]+=1
             events.append("existing_original_quest_advanced_by_real_followup")
     if (len(state["quests"])<min(config["active_quests"],12)
@@ -531,9 +534,28 @@ def step(state,config,action):
         if not _adjacent(state,site["cell"]):
             raise QuestDirectorError("quest event needs player physically near real world site")
         if kind=="help":
+            old_integrity=site["integrity"]
+            if config["help_supplies"]==0 and old_integrity>=config["site_integrity"]:
+                raise QuestDirectorError("material help requires real supplies or damaged original site")
+            if len(state["events_log"])>=config["event_budget"]:
+                raise QuestDirectorError("no capacity for audited original relief event")
+            # Original-world actions are mutable; preflight both finite
+            # resources together so a failed stamina gate cannot consume
+            # supplies before the rejection reaches the caller.
+            if (state["supplies"]<config["help_supplies"] or
+                state["stamina"]<config["action_stamina"]):
+                raise QuestDirectorError("material relief requires actual finite supplies and stamina")
             _spend(state,"supplies",config["help_supplies"])
             _spend(state,"stamina",config["action_stamina"])
-            site["integrity"]=min(config["site_integrity"],site["integrity"]+config["help_power"])
+            site["integrity"]=min(config["site_integrity"],
+                                  old_integrity+config["help_power"])
+            state["relief_deliveries"].append({
+                "tick":state["tick"],"site_id":site["id"],
+                "finite_supplies_distributed":config["help_supplies"],
+                "integrity_restored":site["integrity"]-old_integrity,
+                "original_source":"real_player_world_aid",
+            })
+            events.append("finite_source_supplies_delivered_as_actual_world_relief")
             _emit(state,config,"help",site,events)
         elif kind=="harm":
             _spend(state,"stamina",config["action_stamina"])

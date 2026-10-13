@@ -3296,6 +3296,7 @@ $("advanced-npc-route-apply").addEventListener("click",()=>{
   if(!realMoves.length)throw Error("No earned world actions to apply");
   if(verifiedInvestigationRoute.outcome!=="firsthand_testimony_recorded" &&
      verifiedInvestigationRoute.outcome!=="real_site_repair_enacted" &&
+     verifiedInvestigationRoute.outcome!=="finite_original_community_aid_delivered" &&
      verifiedInvestigationRoute.outcome!=="original_quest_resolved")
    throw Error("Route has not earned an original world objective");
   const latest=verifiedSourceEpisodes[verifiedSourceEpisodes.length-1];
@@ -3416,6 +3417,7 @@ $("advanced-episodic-play").addEventListener("click",async()=>{
     id:n.id,cell:n.cell,eyewitness:n.memories,rumors:n.heard
    })),
    sites:proof.world_state.sites,
+   original_relief_deliveries:proof.world_state.relief_deliveries,
    causal_quests:proof.world_state.quests,
    original_quests_completed:proof.world_state.quests_completed,
    rumor_edges:proof.world_state.rumor_edges,
@@ -3723,6 +3725,7 @@ local until typed revalidation and an explicit human-approved file commit.</smal
    <label>Original gameplay objective<select id="advanced-npc-route-objective">
     <option value="testimony">Reach and interview a real eyewitness</option>
     <option value="repair">Walk to and repair actual damage</option>
+    <option value="aid">Deliver finite relief supplies for recovery quests</option>
     <option value="resolve">Resolve proven material quest outcome</option>
    </select></label>
    <button id="advanced-npc-route" type="button">Compute and replay investigation route</button>

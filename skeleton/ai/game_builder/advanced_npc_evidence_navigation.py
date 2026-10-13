@@ -22,7 +22,7 @@ from .advanced_quest_director_runtime import (
 from .system_editors import make_editor_document
 
 SCHEMA="skeleton.game_builder.npc_evidence_navigation.v1"
-OBJECTIVES=("testimony","repair","resolve")
+OBJECTIVES=("testimony","repair","aid","resolve")
 MAX_MOVES=24
 
 class EvidenceNavigationError(ValueError):
@@ -113,6 +113,10 @@ def navigate_verified_investigation(campaign,episodes,scene,
                      else "no_credible_firsthand_witness")
         elif objective=="repair" and target_site["integrity"]>=cfg["site_integrity"]:
             outcome="site_already_restored"
+        elif objective=="aid" and (state["supplies"]<cfg["help_supplies"] or
+              (cfg["help_supplies"]==0 and
+               target_site["integrity"]>=cfg["site_integrity"])):
+            outcome="real_material_relief_requires_finite_source_resources"
         elif objective=="resolve" and (quest["choice"] is None or
             len(quest["testimonies"])<cfg["evidence_min"] or
             quest["material_actions"]<cfg["consequence_depth"]):
@@ -153,13 +157,19 @@ def navigate_verified_investigation(campaign,episodes,scene,
             else:
                 target=target_site["cell"]
                 final=("repair:"+str(quest["site_id"]) if objective=="repair"
+                       else "help:"+str(quest["site_id"]) if objective=="aid"
                        else "resolve:"+str(quest_id))
-                cost=cfg["action_stamina"] if objective=="repair" else 0
+                cost=cfg["action_stamina"] if objective in ("repair","aid") else 0
                 if objective=="repair" and state["supplies"]<cfg["repair_supplies"]:
                     outcome="real_material_supplies_required"
                     break
                 if objective=="repair" and target_site["integrity"]>=cfg["site_integrity"]:
                     outcome="site_already_restored"
+                    break
+                if objective=="aid" and (state["supplies"]<cfg["help_supplies"] or
+                    (cfg["help_supplies"]==0 and
+                     target_site["integrity"]>=cfg["site_integrity"])):
+                    outcome="real_material_relief_requires_finite_source_resources"
                     break
             path=_route(state,target)
             if path is None:
@@ -185,6 +195,8 @@ def navigate_verified_investigation(campaign,episodes,scene,
                          "no_firsthand_testimony_was_earned")
                 elif objective=="repair":
                     outcome="real_site_repair_enacted"
+                elif objective=="aid":
+                    outcome="finite_original_community_aid_delivered"
                 else:
                     outcome=("original_quest_resolved" if
                              updated["status"]=="resolved" else
