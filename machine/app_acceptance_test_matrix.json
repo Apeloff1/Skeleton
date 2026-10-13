@@ -1,9 +1,9 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13.v4",
+  "version": "2026-10-13.v5",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
-  "scope_note": "All 42 feature families now have literal test-module links; 14 CI smoke, 28 discovery-only. Even passing subsets do NOT independently qualify complete features, models, or app devices.",
+  "scope_note": "42 source-linked families, 17 approved CI smoke families (19 unique unittest modules), 25 discovery-only candidate families; no source link or passing subset proves full installed-app release",
   "runner_mode": "unittest_module_exact_head",
   "default_max_seconds": 480,
   "policies": {
@@ -418,34 +418,34 @@
     {
       "family_id": "F38",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "ci_smoke",
       "independent_acceptance_question": "Repository atlas canonical owner and source placement subset",
       "unittest_modules": [
         "tests.test_repo_machine_atlas"
       ],
-      "workflow_hint": "Separate dedicated independent target gate required",
+      "workflow_hint": "Jeeves App Acceptance Matrix (Windows/Ubuntu)",
       "product_release_qualified": false
     },
     {
       "family_id": "F39",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "ci_smoke",
       "independent_acceptance_question": "Native build and bounded application assembly authority subset",
       "unittest_modules": [
         "tests.test_build_plane"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Acceptance Matrix (Windows/Ubuntu)",
       "product_release_qualified": false
     },
     {
       "family_id": "F40",
       "scope": "targeted_regression_subset",
-      "execution_tier": "discovery_only",
+      "execution_tier": "ci_smoke",
       "independent_acceptance_question": "Model serving capacity and operation cost envelope subset",
       "unittest_modules": [
         "tests.test_model_serving_capacity"
       ],
-      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "workflow_hint": "Jeeves App Acceptance Matrix (Windows/Ubuntu)",
       "product_release_qualified": false
     },
     {
