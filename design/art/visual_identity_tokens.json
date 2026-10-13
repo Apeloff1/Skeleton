@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "source": "design_guidelines.json",
+  "personality": "glass_luxe_dark_utility",
+  "colors": {
+    "surface": "#0A0A0A",
+    "onSurface": "#E5E5E5",
+    "surfaceSecondary": "#141414",
+    "surfaceTertiary": "#1F1F1F",
+    "brand": "#8B5CF6",
+    "brandSecondary": "#A78BFA",
+    "brandTertiary": "#2E1B5B",
+    "success": "#10B981",
+    "warning": "#F59E0B",
+    "error": "#EF4444",
+    "info": "#3B82F6",
+    "border": "#262626",
+    "borderStrong": "#404040"
+  },
+  "lighting": {
+    "key": {
+      "type": "DirectionalLight2D",
+      "energy": 1.15,
+      "color": "#E5E5E5",
+      "rotation_deg": -35
+    },
+    "fill": {
+      "type": "DirectionalLight2D",
+      "energy": 0.45,
+      "color": "#A78BFA",
+      "rotation_deg": 140
+    },
+    "rim": {
+      "type": "PointLight2D",
+      "energy": 0.85,
+      "color": "#8B5CF6",
+      "texture_scale": 2.4
+    }
+  },
+  "materials": {
+    "body": {
+      "albedo": "#1F1F1F",
+      "metallic": 0.15,
+      "roughness": 0.55
+    },
+    "accent": {
+      "albedo": "#8B5CF6",
+      "emission": "#8B5CF6",
+      "emission_energy": 0.6
+    },
+    "ground": {
+      "albedo": "#141414",
+      "metallic": 0.05,
+      "roughness": 0.8
+    },
+    "player": {
+      "albedo": "#2E1B5B",
+      "emission": "#A78BFA",
+      "emission_energy": 0.35
+    }
+  },
+  "silhouette": {
+    "required_nodes": ["Player", "Ground", "Camera2D"],
+    "min_collision_extents": [8, 8],
+    "reject_bare_node2d_only": true
+  },
+  "critique": {
+    "silhouette_ok": "Player+Ground present with collision",
+    "readable": "key or rim light present",
+    "consistent": "albedo/emission only from token palette"
+  }
+}

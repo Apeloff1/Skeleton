@@ -44,6 +44,9 @@ APPROVED_THIRD_PARTY_ACTIONS = frozenset(
         "docker/setup-qemu-action",
         "gacts/gitleaks",
         "gitleaks/gitleaks-action",
+        # Reviewed MSYS2 UCRT64 compiler installer for native Windows homebrew;
+        # workflow pins one exact 40-hex action commit, not a mutable v2 tag.
+        "msys2/setup-msys2",
     }
 )
 

@@ -116,6 +116,13 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/settings/offline', title: 'Offline Settings', category: 'settings' },
   { path: '/settings/feature-flags', title: 'Feature Flags', category: 'settings' },
 
+  { path: '/design-review', title: 'Design Review', category: 'build' },
+  { path: '/forge-operator/cockpit', title: 'Forge Operator · Cockpit', category: 'build' },
+  { path: '/forge-operator/intake', title: 'Forge Operator · Intake', category: 'build' },
+  { path: '/journeys', title: 'Journeys', category: 'progress' },
+  { path: '/story-index', title: 'Story Index', category: 'ai' },
+  { path: '/world-workbench', title: 'World Workbench', category: 'build' },
+
   // Filesystem-discovered routes kept in the same canonical registry so
   // route coverage fails closed when screens are added or removed.
   { path: '/agent-memory', title: 'Agent Memory', category: 'ai' },

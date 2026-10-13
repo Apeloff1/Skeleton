@@ -1,6 +1,8 @@
 """scenes.py — .tscn scene text generation for scaffolded projects.
 
 Pure functions: spec in, scene file text out. No I/O.
+Art identity: every rendered scene runs through art_identity.apply_art_pass
+so materialise ships lighting + readable materials, not a bare Node2D.
 """
 from __future__ import annotations
 
@@ -11,11 +13,24 @@ def _ext_resource(idx: int, path: str) -> str:
     return f'[ext_resource type="Script" path="{path}" id="{idx}"]'
 
 
+def _combat_vfx_nodes(parent: str = ".") -> list[str]:
+    """CombatVfx node block shared by combat-capable scene builders."""
+    return [
+        f'[node name="CombatVfx" type="Node2D" parent="{parent}"]',
+        'script = preload("res://scripts/combat_vfx.gd")',
+        'metadata/era = "modern"',
+        'metadata/severity = "moderate"',
+        'metadata/shape = "cone"',
+        "",
+    ]
+
+
 def platformer_scene(script: str = "res://scripts/player.gd") -> str:
     return "\n".join([
-        HEADER.format(steps=2, uid="tutolage_platformer"),
+        HEADER.format(steps=3, uid="tutolage_platformer"),
         "",
         _ext_resource(1, script),
+        _ext_resource(2, "res://scripts/combat_vfx.gd"),
         "",
         '[node name="Main" type="Node2D"]',
         "",
@@ -32,14 +47,16 @@ def platformer_scene(script: str = "res://scripts/player.gd") -> str:
         "",
         '[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]',
         "",
+        *_combat_vfx_nodes("."),
     ]) + "\n"
 
 
 def topdown_scene(script: str = "res://scripts/player.gd") -> str:
     return "\n".join([
-        HEADER.format(steps=2, uid="tutolage_topdown"),
+        HEADER.format(steps=3, uid="tutolage_topdown"),
         "",
         _ext_resource(1, script),
+        _ext_resource(2, "res://scripts/combat_vfx.gd"),
         "",
         '[node name="Main" type="Node2D"]',
         "",
@@ -51,6 +68,7 @@ def topdown_scene(script: str = "res://scripts/player.gd") -> str:
         '[node name="Camera2D" type="Camera2D" parent="Player"]',
         "zoom = Vector2(1.2, 1.2)",
         "",
+        *_combat_vfx_nodes("."),
     ]) + "\n"
 
 
@@ -76,5 +94,17 @@ SCENE_BUILDERS = {
 
 
 def render_scene(template: str, script: str | None = None) -> str:
+    """Build a scaffold scene and apply the Art Director identity pass."""
     builder = SCENE_BUILDERS.get(template, empty_scene)
-    return builder(script) if script else builder()
+    raw = builder(script) if script else builder()
+    try:
+        from core.art_identity import apply_art_pass, critique
+    except ImportError:  # pragma: no cover — package layout fallback
+        try:
+            from backend.core.art_identity import apply_art_pass, critique  # type: ignore
+        except ImportError:
+            return raw
+    lit = apply_art_pass(raw, template=template)
+    # Soft assert in debug: critique should pass after the pass.
+    _ = critique(lit)
+    return lit

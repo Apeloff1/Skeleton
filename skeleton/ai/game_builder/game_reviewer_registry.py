@@ -23,14 +23,19 @@ from .game_project_workspace import GameWorkspace
 from .game_model_promotion import (
     PromotionError,PromotionStandard,PromotionEvaluation,
     evaluate_candidate,evaluate_fresh_cohort,validate_policy,require_stronger_standard,
-    predict_review,
+    predict_review,propose_progressive_standard,
 )
 from .game_training_flow import FlowPlan
+from .game_learning_feedback import feedback_from_evaluation,feedback_from_cohort
 from .game_tester_almanac import test_game_personas,TEST_FAMILIES
 from .game_learning_almanac import build_game_tester_curriculum
 from .quest_scene_engine import DirectorWorld
 
 ROLES=("wiki","hoag","mirror","human","rights","device")
+
+
+class ReviewPreempted(PromotionError):
+    """Idle qualification halted before any model-state transition."""
 
 
 @dataclass(frozen=True,slots=True)
@@ -215,6 +220,52 @@ class ReviewerRegistry:
         validate_policy(doc["policy"])
         return doc
 
+    def _historic_source_roles(self,*,excluding_candidate: str|None=None):
+        """Recover a cross-generation source firewall from the sealed ledger.
+
+        An observation must NEVER become a future fit/evaluation project,
+        even if newer usage/idle runs overwrote the two current display slots.
+        Previously frozen validation/test sets remain protected for subsequent
+        generations. Prior TRAIN project data can remain reusable as TRAIN,
+        but cannot be reclassified into a sealed evaluation cohort.
+        Legacy candidate files without explicit split provenance are treated
+        entirely as protected, not optimistically guessed as TRAIN.
+        """
+        self.read_state()  # Verifies the complete numbered digest chain.
+        protected=set()
+        trained=set()
+        for file in sorted((self.root/"ledger").iterdir()):
+            entry=_strict_read(file)
+            snapshot=entry.get("state")
+            if type(snapshot) is not dict:
+                raise PromotionError("incomplete historical reviewer source custody")
+            if entry.get("event")=="stage":
+                digest=snapshot.get("candidate")
+                if digest==excluding_candidate:
+                    continue
+                candidate=self._candidate(digest)
+                splits=candidate.get("split_projects")
+                if splits is None:
+                    protected.update(candidate["projects"])
+                elif (type(splits) is not dict or
+                      set(splits)!={"train","validation","test"}):
+                    raise PromotionError("historical model lacks a complete split ledger")
+                else:
+                    grouped={key:set(values) for key,values in splits.items()}
+                    if (sum(len(values) for values in splits.values())
+                            !=len(candidate["projects"])
+                            or set.union(*grouped.values())!=set(candidate["projects"])):
+                        raise PromotionError("historic sealed evaluation projects were relabeled")
+                    protected.update(grouped["validation"])
+                    protected.update(grouped["test"])
+                    trained.update(grouped["train"])
+            for observed in snapshot.get("observations",{}).values():
+                if (type(observed) is not dict
+                        or type(observed.get("source_project_ids")) is not list):
+                    raise PromotionError("historical game observation lacks source receipt")
+                protected.update(observed["source_project_ids"])
+        return trained,protected
+
     def stage(self,plan: FlowPlan,fit: dict,*,authorized: bool,
               standard: PromotionStandard=PromotionStandard(),champion: dict|None=None):
         if not authorized:
@@ -226,8 +277,21 @@ class ReviewerRegistry:
             require_stronger_standard(former,standard)
         evaluation=evaluate_candidate(plan,fit,standard=standard,
                                       champion=champion,authorized=True)
+        feedback=feedback_from_evaluation(evaluation,authorized=True)
         if not evaluation.passed:
-            return dict(status="blocked",evaluation=evaluation.payload())
+            return dict(status="blocked",evaluation=evaluation.payload(),
+                        improvement_ledger=feedback.payload())
+        if (previous["active"] is not None and
+                evaluation.candidate_digest==previous["active"]):
+            raise PromotionError("active reviewer cannot be restaged as a new model")
+        historic_train,historic_protected=self._historic_source_roles(
+            excluding_candidate=evaluation.candidate_digest)
+        incoming={key:set(ids) for key,ids in plan.split_projects}
+        if set(incoming["train"]) & historic_protected:
+            raise PromotionError("historical sealed or gameplay cohort cannot become training data")
+        if (set(incoming["validation"])|set(incoming["test"])) & (
+                historic_protected|historic_train):
+            raise PromotionError("new frozen validation/test must use fresh original projects")
         with _mutex(self.root):
             state=self.read_state()
             if state["phase"] not in {"idle","active","rolled_back"}:
@@ -244,6 +308,7 @@ class ReviewerRegistry:
                      evaluation=evaluation.payload(),
                      standard=standard.payload(),
                      projects=list(plan.source_projects),
+                     split_projects={k:list(v) for k,v in plan.split_projects},
                      advisory_only=True,
                      jeeves_dragon_core_weights_changed=False)
             loc=self.root/"candidates"/(evaluation.candidate_digest+".json")
@@ -260,7 +325,9 @@ class ReviewerRegistry:
                          last_incident=None)
             changed=self._transition(state,updated,"stage")
             return dict(status="staged",candidate=changed["candidate"],
-                        evaluation=evaluation.payload(),revision=changed["revision"])
+                        evaluation=evaluation.payload(),
+                        improvement_ledger=feedback.payload(),
+                        revision=changed["revision"])
 
     def authorize_shadow(self,attestations: tuple[PromotionAttestation,...],*,
                          authorized: bool):
@@ -290,11 +357,24 @@ class ReviewerRegistry:
                         advisory_only=True)
 
     def observe(self,worlds: tuple[DirectorWorld,...],*,mode: str,
-                authorized: bool,quest_key: str="quest_00"):
+                authorized: bool,quest_key: str="quest_00",
+                preempt_check=None):
         if not authorized:
             raise PermissionError("new independent game replay evidence requires operator authority")
         if mode not in {"usage","idle"} or type(worlds) is not tuple or not 2<=len(worlds)<=8:
             raise PromotionError("new usage or idle cohort of 2..8 original games required")
+        if preempt_check is not None and (
+                mode!="idle" or not callable(preempt_check)):
+            raise PromotionError("only bounded idle tests can receive a host preemption probe")
+        def _check_preemption():
+            if preempt_check is None:
+                return
+            stopped=preempt_check()
+            if type(stopped) is not bool:
+                raise PromotionError("host idle activity/thermal probe must be boolean")
+            if stopped:
+                raise ReviewPreempted("idle evaluation was preempted before state publication")
+        _check_preemption()
         ids=[w.digest for w in worlds if isinstance(w,DirectorWorld)]
         if len(ids)!=len(worlds) or len(set(ids))!=len(ids):
             raise PromotionError("real distinct authored test worlds required")
@@ -303,7 +383,8 @@ class ReviewerRegistry:
             raise PromotionError("only independently approved model can receive real gameplay observations")
         if mode in state["observations"] and state["phase"]=="shadow":
             raise PromotionError("independent evidence mode already recorded for shadow promotion")
-        prior=set(state["source_projects"])
+        _,historic=self._historic_source_roles()
+        prior=set(state["source_projects"])|historic
         for event in state["observations"].values():
             prior.update(event["source_project_ids"])
         if any(key in prior for key in ids):
@@ -314,10 +395,13 @@ class ReviewerRegistry:
         cases=[]
         receipts=[]
         for world in worlds:
+            _check_preemption()
             game=test_game_personas(world,quest_key,
                                     max_personas=5,
                                     mutation_families=TEST_FAMILIES,
+                                    interrupt_check=(_check_preemption if mode=="idle" else None),
                                     authorized=True)
+            _check_preemption()
             if not game.passed:
                 raise PromotionError("playtested source is not a successful independent game replay")
             curriculum=build_game_tester_curriculum(game,authorized=True)
@@ -330,14 +414,22 @@ class ReviewerRegistry:
         standard=PromotionStandard(**{
             k:v for k,v in state["standard"].items() if k!="schema"
         })
+        champion_digest=(state["active"] if state["phase"]=="shadow"
+                         else state["previous"])
+        champion=(self._candidate(champion_digest)["policy"]
+                  if champion_digest is not None else None)
+        _check_preemption()
         result=evaluate_fresh_cohort(
             tuple(cases),policy,standard=standard,
-            source_projects=tuple(prior),authorized=True)
+            source_projects=tuple(prior),authorized=True,champion=champion)
         result["replay_receipts"]=receipts
+        result["improvement_ledger"]=feedback_from_cohort(
+            result,mode=mode,authorized=True).payload()
         with _mutex(self.root):
             current=self.read_state()
             if current["revision"]!=state["revision"]:
                 raise PromotionError("cohort evaluated against stale active reviewer")
+            _check_preemption()
             observations=dict(current["observations"])
             observations[mode]=result
             phase=current["phase"]
@@ -380,11 +472,63 @@ class ReviewerRegistry:
                          candidate=None,candidate_source_digest=None,phase="active",
                          observations=dict(state["observations"]))
             new=self._transition(state,updated,"activate_local_advisory_model")
+            qualification_digest=canonical_digest({
+                "candidate":state["candidate"],
+                "evaluation":self._candidate(state["candidate"])["evaluation"],
+                "standard":state["standard"],
+                "independent_review":state["attestations"],
+                "usage":state["observations"]["usage"],
+                "idle":state["observations"]["idle"],
+            })
             return dict(status="active",active=new["active"],
                         rollback_pointer=new["previous"],
                         revision=new["revision"],
+                        qualification_digest=qualification_digest,
                         jeeves_dragon_core_weights_changed=False,
                         gameplay_authority_transferred=False)
+
+    def propose_next_standard(self,*,authorized: bool)->dict:
+        """Advance the bar only *after* confirmed usage AND idle qualification.
+
+        This is an advisory next-generation standard, not model deployment or
+        a silent update of the currently installed qualification requirements.
+        The subsequent new candidate must acquire fresh original game evidence.
+        """
+        if not authorized:
+            raise PermissionError("progressive model quality ratchet needs operator")
+        state=self.read_state()
+        if (state["phase"]!="active" or state["active"] is None
+                or set(state["observations"])!={"usage","idle"}
+                or len(state["attestations"])!=len(ROLES)
+                or {r["role"] for r in state["attestations"]}!=set(ROLES)
+                or any(not c["passed"] for c in state["observations"].values())):
+            raise PromotionError("complete confirmed human and two-cohort promotion required")
+        model=self._candidate(state["active"])
+        if model["evaluation"]["passed"] is not True:
+            raise PromotionError("cannot ratchet from unqualified candidate")
+        former=PromotionStandard(**{k:v for k,v in state["standard"].items()
+                                    if k!="schema"})
+        next_standard=propose_progressive_standard(former,authorized=True)
+        evidence=canonical_digest({
+            "active_model":state["active"],
+            "source_evaluation":model["evaluation"],
+            "roles":state["attestations"],
+            "usage":state["observations"]["usage"],
+            "idle":state["observations"]["idle"],
+            "current_standard":state["standard"],
+        })
+        return dict(
+            schema="skeleton.game_builder.next_reviewer_standard.v1",
+            promoted_model=state["active"],
+            qualifying_evidence_digest=evidence,
+            current_standard_digest=former.digest,
+            next_standard=next_standard.payload(),
+            proposed_standard_digest=next_standard.digest,
+            new_independent_project_cohorts_required=True,
+            approval_and_separate_stage_required=True,
+            active_standard_unchanged=True,
+            promoted_model_weights_unchanged=True,
+        )
 
     def score_active_game(self, evidence: dict, *, game_digest: str,
                           authorized: bool)->dict:
@@ -446,5 +590,5 @@ class ReviewerRegistry:
                         last_incident=new["last_incident"])
 
 __all__=[
-    "ROLES","PromotionAttestation","ReviewerRegistry",
+    "ROLES","PromotionAttestation","ReviewerRegistry","ReviewPreempted",
 ]

@@ -34,6 +34,19 @@ from .advanced_roguelike_longrun import (replay_long_roguelike,
     continue_long_roguelike,verify_long_roguelike)
 from .advanced_world_planner import plan_original_world
 from .advanced_stealth_planner import plan_stealth_route
+from .advanced_parkour_planner import plan_parkour_route, verify_parkour_plan
+from .advanced_sports_coach import plan_original_sports_match, verify_original_sports_plan
+from .advanced_maze_planner import plan_original_maze, verify_original_maze_plan
+from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg_plan
+from .advanced_npc_society_planner import (
+    plan_original_civic_milestone, verify_original_civic_plan,
+)
+from .advanced_ecosystem_planner import (
+    plan_original_ecology, verify_original_ecology_plan,
+)
+from .advanced_procedural_world_planner import (
+    plan_original_frontier,verify_original_frontier_plan,
+)
 from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
@@ -246,7 +259,7 @@ class _StudioHandler(BaseHTTPRequestHandler):
         if path=="/api/advanced-puzzle-solve":
             proof=solve_advanced_puzzle(
                 values["scene"],values.get("settings"),
-                max_states=values.get("max_states",12000),
+                max_states=values.get("max_states",20000),
                 max_depth=values.get("max_depth",96))
             return self._json(200,{"proof":proof,"source_mutated":False,
                                    "native_release_verified":False})
@@ -363,6 +376,96 @@ class _StudioHandler(BaseHTTPRequestHandler):
             return self._json(200,{"plan":result,
                                   "original_source_mutated":False,
                                   "live_security_evasion_certified":False})
+        if path=="/api/parkour-plan":
+            result=plan_parkour_route(
+                values["scene"],values.get("settings"),
+                max_states=values.get("max_states",12000),
+                max_depth=values.get("max_depth",96),
+                beam_width=values.get("beam_width",64))
+            return self._json(200,{"plan":result,
+                                   "original_source_mutated":False,
+                                   "native_execution_certified":False})
+        if path=="/api/parkour-plan-verify":
+            valid=verify_parkour_plan(values["record"],values["scene"],
+                                      values.get("settings"))
+            return self._json(200,{"verified":valid,"original_source_mutated":False})
+        if path=="/api/sports-coach":
+            plan=plan_original_sports_match(
+                values["scene"],values.get("settings"),
+                max_states=values.get("max_states",16000),
+                max_depth=values.get("max_depth",64),
+                beam_width=values.get("beam_width",48))
+            return self._json(200,{"plan":plan,
+                                   "original_source_mutated":False,
+                                   "native_hardware_certified":False})
+        if path=="/api/sports-coach-verify":
+            verified=verify_original_sports_plan(
+                values["record"],values["scene"],values.get("settings"))
+            return self._json(200,{"verified":verified,
+                                   "original_source_mutated":False})
+        if path=="/api/maze-plan":
+            plan=plan_original_maze(
+                values["scene"],values.get("settings"),
+                max_states=values.get("max_states",12000),
+                max_depth=values.get("max_depth",96),
+                beam_width=values.get("beam_width",96))
+            return self._json(200,{"plan":plan,
+                                   "original_source_mutated":False,
+                                   "native_hardware_certified":False})
+        if path=="/api/maze-plan-verify":
+            verified=verify_original_maze_plan(
+                values["record"],values["scene"],values.get("settings"))
+            return self._json(200,{"verified":verified,
+                                   "original_source_mutated":False})
+        if path=="/api/rpg-story-plan":
+            plan=plan_original_rpg_chapter(
+                values["scene"],values.get("settings"),
+                max_nodes=values.get("max_nodes",8000),
+                max_actions=values.get("max_actions",128),
+                social_choice=values.get("social_choice","choose:trust"))
+            return self._json(200,{"plan":plan,"original_source_mutated":False,
+                                   "native_hardware_verified":False})
+        if path=="/api/rpg-story-plan-verify":
+            valid=verify_original_rpg_plan(
+                values["record"],values["scene"],values.get("settings"))
+            return self._json(200,{"verified":valid,"original_source_mutated":False})
+        if path=="/api/frontier-expedition-plan":
+            plan=plan_original_frontier(
+                values["scene"],values.get("settings"),
+                max_actions=values.get("max_actions",100),
+                retire=values.get("retire",False))
+            return self._json(200,{"plan":plan,"original_source_mutated":False,
+                                   "native_hardware_verified":False})
+        if path=="/api/frontier-expedition-plan-verify":
+            valid=verify_original_frontier_plan(
+                values["record"],values["scene"],values.get("settings"))
+            return self._json(200,{"verified":valid,"original_source_mutated":False})
+        if path=="/api/civic-plan":
+            plan=plan_original_civic_milestone(
+                values["scene"],values.get("settings"),
+                max_actions=values.get("max_actions",100),
+                retire=values.get("retire",False))
+            return self._json(200,{"plan":plan,
+                                   "original_source_mutated":False,
+                                   "native_hardware_verified":False})
+        if path=="/api/civic-plan-verify":
+            validated=verify_original_civic_plan(
+                values["record"],values["scene"],values.get("settings"))
+            return self._json(200,{"verified":validated,
+                                   "original_source_mutated":False})
+        if path=="/api/ecology-plan":
+            plan=plan_original_ecology(
+                values["scene"],values.get("settings"),
+                max_actions=values.get("max_actions",100),
+                retire=values.get("retire",False))
+            return self._json(200,{"plan":plan,
+                                   "original_source_mutated":False,
+                                   "native_hardware_verified":False})
+        if path=="/api/ecology-plan-verify":
+            validated=verify_original_ecology_plan(
+                values["record"],values["scene"],values.get("settings"))
+            return self._json(200,{"verified":validated,
+                                   "original_source_mutated":False})
         if path=="/api/advanced-play":
             result=run_advanced_session(
                 values["editor"], values.get("settings"),
