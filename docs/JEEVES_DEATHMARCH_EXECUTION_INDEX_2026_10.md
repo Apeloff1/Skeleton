@@ -1,3 +1,23 @@
+## DX-76–DX-88 — exact-head product execution hardening and Studio game journey (2026-10-13)
+
+| Milestone | Change committed on feature branch | Independent evidence boundary |
+| --- | --- | --- |
+| DX-76 | Fixed unittest workflow to install actual editable project dependencies | Native AI/Studio/game imports can run before acceptance; not a passed test |
+| DX-77 | Unittest CI timeout increased to bounded 45 minutes | Explicit large-suite budget, no invented throughput |
+| DX-78 | `test_game_builder_jeeves_product_studio_journey.py` | Local authenticated Studio HTTP path with real operator-token denial |
+| DX-79 | 42-family measurement and test-candidate page lifecycle | Monotonic digest cursor; no code or model writes |
+| DX-80 | Real Studio game prompt plan to playable tower-defense commands | Actual HTTP runtime, deterministic engine receipts |
+| DX-81 | Real authoritative portable gameplay save/reload and replay | Savegame importer replays action log; tampered replay denied |
+| DX-82 | Bounded Studio project-source integrity | Planning/playing/observing must not mutate project files |
+| DX-83 | F13 CI matrix binds real Studio integrated journey | Curated unit/integration coverage, not installed app certification |
+| DX-84 | Windows/Linux CI compiles the Studio journey module | No CI success inferred until actual job completes |
+| DX-85 | Both independent CI verifier receipts now record reviewed matrix SHA256 | Must source-bind to exact selected suite |
+| DX-86 | Both independent CI verifier receipts now record fixed 42-family scope SHA256 | Must source-bind to identical acceptance denominator |
+| DX-87 | Combined CI rollup refuses mismatched source-contract receipts | Different green runs or green HEAD alone are insufficient |
+| DX-88 | Adversarial unit tests reject differing source hashes in combined proof | Full-app release, model quality and installed hardware remain unclaimed |
+
+**Measured current branch position:** 42/42 family test candidates linked; all 42 families selected for actual testing (17 `unittest`, 25 `pytest`), with 20 distinct `unittest` modules including the new Studio user journey. Selection **is not CI success**. Exact-head CI and trusted external GitHub run/ZIP validation still must complete on Windows and Ubuntu. The source scanner still reports no defensible whole-app completion percentage. Draft stacked PR order stays #3718 → #3729 → #3730 → #3738 → #3747; no mainline merge asserted.
+
 ## DX-61–DX-75 — separated pytest acceptance and exact-head evidence custody (2026-10-13)
 
 | Milestone | Real committed feature | Verification boundary |
