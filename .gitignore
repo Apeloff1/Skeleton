@@ -137,6 +137,7 @@ backend/.git_workspaces/
 /.machine/repository-machine.json
 /.machine/code-search-index.json
 /.machine/index-artifact-manifest.json
+/.machine/tracked-inventory/
 
 # Generated build / vault artifacts — never commit (large binaries)
 backend/artifacts/
