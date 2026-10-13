@@ -309,6 +309,17 @@ class JeevesWorkbench:
                 raise JeevesWorkbenchError("model release owner was not enabled by host")
             if not isinstance(proposal, CandidateReleaseProposal):
                 raise JeevesWorkbenchError("only independently qualified release proposals allowed")
+            from skeleton.ai.training.shadow_weight_pipeline import ShadowState
+            intake = self.shadow.get(proposal.intake_id)
+            if (intake is None or intake.state is not ShadowState.CONSUMED
+                    or intake.intake.digest != proposal.intake_digest
+                    or intake.review_digest != proposal.shadow_review_digest
+                    or intake.training_manifest_digest != proposal.training_manifest_digest
+                    or intake.last_event_digest != proposal.source_event_digest
+                    or intake.consumed_candidate_digest != proposal.candidate_digest):
+                raise JeevesWorkbenchError(
+                    "model release requires currently consumed shadow custody with exact lineage"
+                )
             return self.model_releases.propose(
                 proposal, actor_id=actor_id, at_ns=at_ns,
             )
