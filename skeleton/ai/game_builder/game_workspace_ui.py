@@ -1106,6 +1106,76 @@ $("jeeves-forge-verify").addEventListener("click",()=>dmGuard(async()=>{
   "component kinds, ports and source identity.");
 }));
 
+
+/* Verification has separate denominators: source status != runtime qualification. */
+let jeevesVerificationDigest=null,jeevesVerificationCursor=0;
+async function verificationInvoke(action,extra={}){
+ if(!jeevesAppSnapshot)throw Error("Scan exact application sources to establish a valid census");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action,params:{expected_snapshot:jeevesAppSnapshot,...extra},
+  operator_authorized:false
+ });
+ return receipt.result;
+}
+function verificationFacetLine(title,item){
+ if(!item||item.denominator===0)
+  return title+": denominator unavailable";
+ return title+": "+item.verified_or_declared_count+"/"+item.denominator+
+  " ("+item.percent_complete+"%) · "+item.remaining+
+  " remaining ("+item.percent_remaining+"%) · "+item.semantic_layer;
+}
+$("jeeves-verify-percent").addEventListener("click",()=>dmGuard(async()=>{
+ const result=await verificationInvoke("ai.verification.progress");
+ jeevesVerificationDigest=result.digest;
+ jeevesVerificationCursor=0;
+ const facets=result.facets;
+ $("jeeves-verify-numbers").textContent=[
+  verificationFacetLine("Implementation source metadata",facets.volume_implementation_metadata),
+  verificationFacetLine("Independent enterprise qualification",facets.enterprise_volume_qualification),
+  verificationFacetLine("Product AI registry complete",facets.ai_capability_registry),
+  verificationFacetLine("Declared P0 construction gap closure",facets.construction_gap_register),
+  verificationFacetLine("Required source paths present",facets.required_paths),
+  verificationFacetLine("Mandatory CI workflow sources present",facets.release_workflow_sources),
+  verificationFacetLine("CI results verified by this source-only scan",
+                         facets.verified_exact_head_ci_from_source_scan),
+  "Overall app completion: NOT MEASURABLE FROM STATIC SOURCE ALONE",
+  "Live exact-head CI: "+result.actual_external_ci_status,
+  "Installed device/service acceptance: "+result.actual_device_and_service_acceptance,
+  "Model quality: "+result.actual_model_quality_status,
+  "Product release verified: "+result.live_product_ready,
+ ].join("\n");
+ $("jeeves-verify-output").textContent=JSON.stringify({
+  digest:result.digest,inventory_snapshot:result.inventory_snapshot,
+  census_digest:result.census_digest,
+  blockers:result.known_blocking_categories,
+ },null,2);
+ status("Verification percentages computed from 8 canonical machine authorities "+
+  "and mandatory CI workflow source registry; external tests are not claimed passed.");
+}));
+async function verificationPage(offset){
+ if(!jeevesVerificationDigest)
+  throw Error("Calculate source-pinned verification progress first");
+ const result=await verificationInvoke("ai.verification.backlog",{
+  expected_progress_digest:jeevesVerificationDigest,
+  offset,limit:50,
+ });
+ jeevesVerificationCursor=result.next_offset;
+ $("jeeves-verify-next").disabled=jeevesVerificationCursor===null;
+ $("jeeves-verify-output").textContent=JSON.stringify(result,null,2);
+ status(result.tasks.length+" source-backed verification work groups of "+
+  result.total_work_item_groups+"; none is automatically signed or accepted.");
+}
+$("jeeves-verify-blockers").addEventListener("click",()=>dmGuard(
+ async()=>{await verificationPage(0);}
+));
+$("jeeves-verify-next").addEventListener("click",()=>dmGuard(
+ async()=>{
+  if(jeevesVerificationCursor===null)
+   throw Error("No more verification blocker pages");
+  await verificationPage(jeevesVerificationCursor);
+ }
+));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5225,6 +5295,17 @@ Approve original Forge source proposal</label>
 <button id="jeeves-forge-stage" type="button">Stage validated Forge source into Game Studio</button>
 <button id="jeeves-forge-verify" type="button">Verify committed source against installed Forge</button>
 <pre id="jeeves-forge-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Measured Verification and Completion %</legend>
+<p><small>Real canonical source-ledger numerators and denominators, separated
+from independent product execution. No guessed overall application percentage,
+automatic source signoff, invented successful CI or fictional model training.</small></p>
+<button id="jeeves-verify-percent" type="button">Calculate live source-anchored completion %</button>
+<pre id="jeeves-verify-numbers" role="status" aria-live="polite"></pre>
+<button id="jeeves-verify-blockers" type="button">List independent verification blockers</button>
+<button id="jeeves-verify-next" type="button" disabled>Next verification blocker page</button>
+<pre id="jeeves-verify-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
