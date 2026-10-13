@@ -267,7 +267,13 @@ def test_all_launcher_paths_converge_on_product_shell():
     assert "router.replace('/product')" in launch
     assert "router.replace('/product')" in welcome
     assert "router.replace('/product')" in safe_mode
-    assert "Enter Product" in launch
+    # The launcher uses translated strings, not a hardcoded English label.
+    assert "t('launcher.enter_product')" in launch
+    assert "t('launcher.open')" in launch
+    en = (root / "frontend/src/i18n/catalogs/en.ts").read_text(encoding="utf-8")
+    nb = (root / "frontend/src/i18n/catalogs/nb.ts").read_text(encoding="utf-8")
+    assert "'launcher.enter_product': 'Enter Product'" in en
+    assert "'launcher.enter_product': 'Gå inn i produktet'" in nb
     assert "Enter Product" in welcome
 
 
