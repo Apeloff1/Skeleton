@@ -186,7 +186,7 @@ def test_robots_longest_specific_path_wins_without_crossing_agent_groups():
     # Site-wide wildcard directives must not override a specific user agent.
     e.install_robots(
         "https://example.net",
-        "User-agent: SkeletonResearchBot\n"
+        "User-agent: SkeletonAI-Crawler\n"
         "Disallow: /sensitive\n"
         "User-agent: *\n"
         "Allow: /\n",
