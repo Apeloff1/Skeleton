@@ -6,6 +6,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { extractConversationInterests, proposeResearchMission } from './conversationInterests';
 import { Ionicons } from '@expo/vector-icons';
 import DragonCompanion from './DragonCompanion';
+import DragonFamilyNest from './DragonFamilyNest';
+import type { DragonFamilyProjection } from './dragonFamilyProjection';
 import DragonQuestBoard from './DragonQuestBoard';
 import DragonDeliveryWorkbench from './DragonDeliveryWorkbench';
 import DragonWisdomSquares from './DragonWisdomSquares';
@@ -28,6 +30,7 @@ export interface CompanionTelemetry {
 }
 
 export interface CompanionAcademyInput {
+  family?: DragonFamilyProjection | null;
   wisdomReview?: DragonWisdomReview | null;
   knowledgeView?: DragonKnowledgeView | null;
   nest?: DragonNestSnapshot | null;
@@ -87,6 +90,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
     </View>}
     <DragonCompanion state={state} motion={motion} reducedMotion={systemReducedMotion}
       level={verifiedProgress?.level} unlocked={verifiedProgress?.unlocked} />
+    <DragonFamilyNest family={academy?.family} />
     <View style={s.motionRow}><Text style={s.label}>Animation · 120 tiny moments</Text>{(['full','gentle','off'] as const).map(choice => <Pressable key={choice} accessibilityRole="button" accessibilityState={{selected:motion===choice}} onPress={() => setMotion(choice)} style={[s.motionButton,motion===choice && s.motionSelected]}><Text style={s.value}>{choice}</Text></Pressable>)}</View>
     <View style={s.stats}>
       <Metric icon="chatbubble-ellipses-outline" label="Interest" value={interest ? interest.split(/\s+/).slice(0, 5).join(' ') : 'Listening'} />
