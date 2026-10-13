@@ -1,0 +1,5 @@
+{"p":"complete/.gitignore","g":"47b804d1d9888ec259612e66acaeea15b70fec3a","b":68,"m":"100644","t":"blob","z":"external-sources","f":"complete"}
+{"p":"complete/README.md","g":"307f6e51a8f95ca2eccb25cbf96932ae0629b889","b":282,"m":"100644","t":"blob","z":"external-sources","f":"complete"}
+{"p":"complete/cbm26-agent/package.json","g":"5ca15e40b6a91a579c5fc52d3d9a101e7335f487","b":130,"m":"100644","t":"blob","z":"external-sources","f":"complete/cbm26-agent"}
+{"p":"complete/cbm26-ai/package.json","g":"8f9b7f62cb297fd585f54b21ae5370f8d8db318d","b":134,"m":"100644","t":"blob","z":"external-sources","f":"complete/cbm26-ai"}
+{"p":"complete/docs/MANIFEST.md","g":"85fd36a95b12b1c84e5cca0b2ebad529a9430f85","b":198,"m":"100644","t":"blob","z":"external-sources","f":"complete/docs"}
