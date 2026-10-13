@@ -1,0 +1,91 @@
+{
+  "schema_version": "skeleton.ai.chat_model_catalog.v1",
+  "status": "implementation_candidate",
+  "claim_scope": "governed_runtime_chat_model_readiness_and_selection",
+  "canonical_owner": "skeleton/provider_runtime.py:ProviderRegistry",
+  "projection_owner": "backend/core/model_catalog.py",
+  "inventory_owner": "skeleton/api/engine_routes.py:provider_inventory",
+  "public_route_owner": "backend/routes/ai.py",
+  "interface": {
+    "method": "GET",
+    "path": "/api/ai/models",
+    "authentication": "existing authenticated backend user; engine inventory uses existing sealed service token, principal, engine:read scope and tenant grant",
+    "source": "only current canonical engine ProviderRegistry inventory; application code never constructs a provider or reads provider credentials",
+    "response_fields": [
+      "schema_version",
+      "engine",
+      "available",
+      "automatic_available",
+      "active",
+      "models",
+      "providers",
+      "readiness",
+      "local_activation"
+    ],
+    "model_fields": [
+      "id",
+      "provider_id",
+      "model_id",
+      "label",
+      "available",
+      "selectable",
+      "active",
+      "credential_free",
+      "execution_mode",
+      "context_window",
+      "max_output_tokens",
+      "default_output_tokens",
+      "limits_source",
+      "tokenizer",
+      "capabilities",
+      "supports_temperature",
+      "readiness",
+      "activation"
+    ],
+    "selection": "optional exact provider_id/model_id pair from current runtime inventory; both omitted selects current active ready model; unknown, unavailable or unsupported selection fails before conversation/model dispatch",
+    "failure": "typed stable readiness code/message/action; no raw exception, credential, service URL, transport URL, filesystem path, prompt or weight data",
+    "availability": "available means at least one exact model pair is selectable; automatic_available preserves current active+declared-fallback routing readiness"
+  },
+  "runtime_limits": {
+    "source": "conservative engine chat policy limits, not advertised vendor context capacities",
+    "hosted": {
+      "context_window": 128000,
+      "max_output_tokens": 16384,
+      "default_output_tokens": 4096,
+      "tokenizer": "approximate_text"
+    },
+    "local": {
+      "context_window": 16384,
+      "max_output_tokens": 8192,
+      "default_output_tokens": 256,
+      "tokenizer": "artifact_schema_specific"
+    },
+    "admission": "selection context/output ceilings compile into existing ContextBudget and ResourceBudget; canonical provider admission and actual usage remain authoritative",
+    "temperature": "optional sampling temperature only for known OpenAI gpt-4o/gpt-4.1 model families; local, unknown or reasoning-model families remain unsupported; automatic routing requires every eligible route to support it"
+  },
+  "local_readiness": {
+    "credential_free": true,
+    "startup_diagnostics": "optional engine-only retain_unavailable registry construction preserves a non-dispatchable canonical local descriptor when activation is missing or invalid; default from_env construction remains fail-closed",
+    "no_model_fabrication": "an unloaded local artifact has no model_id and contributes provider readiness only, never a selectable synthetic model",
+    "activation_identity": "existing validated content-only artifact schema/model/digest/byte receipt; no artifact path or weight exposure",
+    "handoff": "operator configures existing AI_PROVIDER=local and AI_LOCAL_MODEL_PATH from governed training output and restarts engine; public chat catalog does not accept paths, change provider configuration, hot-load weights or grant production promotion",
+    "neural_conditioning": "bounded full rendered instructions, conversation history, user prompt and assistant role framing prime the native recurrent model; canonical admission counts exact UTF-8 bytes plus BOS"
+  },
+  "bounds": {
+    "providers": 16,
+    "models": 16,
+    "model_id_characters": 256,
+    "provider_id_characters": 128,
+    "public_readiness_message_characters": 512
+  },
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "validation": "source review and formatting only in this wave; user explicitly requested no test creation or execution",
+  "scope_limitations": [
+    "read-only runtime configuration readiness; no external provider health probe or generation during discovery",
+    "actual models registered by engine only",
+    "conservative chat ceilings may be smaller than vendor model capacities",
+    "no credential values, new provider transport, new runtime owner or remote activation authority",
+    "no masterplan closure, production promotion or verified-quality claim"
+  ]
+}
