@@ -185,7 +185,9 @@ def _ecological_turn(state,config):
         state["background_batches"]+=1
         need=max(1,state["dormant_population"]//config["cohort_food_divisor"])
         available=sum(h["food"] for h in state["habitats"])
-        # Reserve a bounded quarter of physically available food for dormant\n        # cohorts before active species draw down the rest. Never mint food.\n        consumed=min(need,available//4)
+        # Reserve a bounded quarter of physically available food for dormant
+        # cohorts before active species draw down the rest. Never mint food.
+        consumed=min(need,available//4)
         balance=consumed
         for h in state["habitats"]:
             take=min(balance,h["food"])
