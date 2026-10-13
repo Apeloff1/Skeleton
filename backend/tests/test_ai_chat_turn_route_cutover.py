@@ -308,17 +308,23 @@ async def test_live_chat_engine_outage_resumes_same_operation_to_completion(
         holder_id="retry-worker",
         ttl_seconds=30,
     )
-    assert retry_lease.epoch == 2
+    # Initial attempt acquires epoch 1 and releases it on engine outage;
+    # resumed attempt takes epoch 2 and releases after committing the reply.
+    # Independent subsequent worker therefore owns monotonically fenced 3.
+    assert retry_lease.epoch == 3
     ownership = ai_chat_turn_test_authority.repo.list_ownership_receipts(
         operation_id,
         tenant_id="tenant-a",
         owner_id="owner-a",
     )
     assert [receipt["action"] for receipt in ownership] == [
-        "acquire",
-        "release",
-        "takeover",
+        "acquire", "release", "takeover", "release", "takeover",
     ]
+    assert [receipt["epoch"] for receipt in ownership] == [1, 1, 2, 2, 3]
+    assert all(
+        ownership[i]["previous_receipt_digest"] == ownership[i - 1]["digest"]
+        for i in range(1, len(ownership))
+    )
     ai_chat_turn_test_authority.repo.release_lease(retry_lease)
 
 

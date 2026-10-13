@@ -185,7 +185,7 @@ class ChatTurnLifecycle:
                 reason_code=reason_code,
                 provider_receipt_ref=(
                     provider_receipt_ref
-                    if state is TurnState.VERIFYING
+                    if state is TurnState.FINALIZING
                     else None
                 ),
             )
