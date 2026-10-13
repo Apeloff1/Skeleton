@@ -9,6 +9,7 @@ import tempfile
 import unittest
 
 from scripts.build_git_atlas import build, write
+from scripts.query_git_atlas import query
 
 
 POLICY = """
@@ -165,6 +166,33 @@ class GitAtlasTests(unittest.TestCase):
             output.symlink_to(root / "machine", target_is_directory=True)
             with self.assertRaisesRegex(ValueError, "symbolic link"):
                 write(root, output)
+
+    def test_context_query_is_budgeted_and_sha_pinned(self) -> None:
+        temp, root = self.make_repository()
+        with temp:
+            index = root / "atlas"
+            write(root, index)
+            result = query(root, index, "app", budget_bytes=1100, max_hits=2)
+            self.assertTrue(result["hits"])
+            self.assertEqual(result["commit"], command(root, "rev-parse", "HEAD"))
+            self.assertLessEqual(len(json.dumps(result, sort_keys=True).encode()), 1100)
+            self.assertEqual(result["retrieval"], "metadata_only_review_source_before_editing")
+
+    def test_context_rejects_dirty_index_and_stale_commit(self) -> None:
+        temp, root = self.make_repository()
+        with temp:
+            index = root / "atlas"
+            write(root, index)
+            navigation = index / "navigation.json"
+            navigation.write_text("{}\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "integrity"):
+                query(root, index, "app")
+            write(root, index)
+            (root / "app/new.py").write_text("VALUE = 5\n", encoding="utf-8")
+            command(root, "add", "app/new.py")
+            command(root, "commit", "-qm", "change checkout head")
+            with self.assertRaisesRegex(ValueError, "stale atlas"):
+                query(root, index, "app")
 
     def test_missing_canonical_authority_fails_closed(self) -> None:
         temp, root = self.make_repository()
