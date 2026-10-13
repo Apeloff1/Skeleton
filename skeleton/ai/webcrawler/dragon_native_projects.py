@@ -497,8 +497,20 @@ endif()
 
 def render_native_project(*,title:str,target_id:str,style:str,
                           candidate_id:str,mechanics:tuple[Mechanic,...],
-                          authorized:bool,design=None)->NativeProject:
+                          authorized:bool,design=None,
+                          procedural_puzzles:bool=False,
+                          authored_puzzles:tuple[tuple[str,...],...]|None=None,
+                          campaign_mode:str="branching",
+                          challenge_profile:str="balanced")->NativeProject:
     if not authorized:raise PermissionError("native game build requires authorization")
+    if type(procedural_puzzles) is not bool:
+        raise ValueError("procedural puzzle control must be strict boolean")
+    if procedural_puzzles and style!="fixed_screen_puzzle":
+        raise ValueError("procedural puzzles require original fixed-screen gameplay")
+    if authored_puzzles is not None and style!="fixed_screen_puzzle":
+        raise ValueError("authored native levels require fixed-screen puzzle gameplay")
+    if authored_puzzles is not None and procedural_puzzles:
+        raise ValueError("user-authored and generated procedural levels cannot be combined")
     if target_id in COMPATIBILITY:
         from .dragon_compatible_revisions import revision_project
         return revision_project(
@@ -619,13 +631,66 @@ def render_native_project(*,title:str,target_id:str,style:str,
         from .dragon_game_blueprints import GENRES, campaign_dict
         from .dragon_game_fitness import choose_campaign,selection_report
         from .dragon_native_arcade_runtime import render_sdl_campaign
-        if style not in GENRES and style not in ("rhythm_game","fixed_screen_puzzle"):
+        if style not in GENRES and style not in (
+                "rhythm_game","fixed_screen_puzzle","world_route_adventure","maze_route_adventure"):
             raise ValueError("gameplay genre does not yet have an implemented native mode")
-        if style=="fixed_screen_puzzle":
+        if style=="maze_route_adventure":
+            from .dragon_route_maze import MazeRequest,build_maze
+            from .dragon_route_native_game import emit_route_game
+            creation=build_maze(MazeRequest(
+                seed=seed,width=6,height=6,
+                scenic_density=65,detour_density=70,
+                secret_count=2,challenge=challenge_profile,
+                weather="clear",
+            ))
+            files=emit_route_game(
+                creation.world,creation.traveller,authorized=True,
+                maze_creation=creation,
+            )
+            if design is not None:
+                from .dragon_game_design import design_manifest
+                files["dragon-game-design.json"]=json.dumps(
+                    design_manifest(design),sort_keys=True,indent=2)+"\n"
+            files["README.routes.md"]=(
+                "# Constructively complete original multi-path maze adventure\n\n"
+                "A complete C99 original playable game whose source includes "
+                "proof of a winning path from every room and for every supported "
+                "climate. Optional scenic cycles, long doublebacks, key-bearing "
+                "dead ends, hidden secret shortcuts and conditional travel "
+                "are real graph actions, not copied game content. A restart "
+                "is available after deliberate exhaustion of time/actions.\n"
+            )
+        elif style=="world_route_adventure":
+            from .dragon_route_world_factory import make_frontier
+            from .dragon_route_native_game import emit_route_game
+            world,visitor=make_frontier(seed=seed,weather="clear",hour=8)
+            files=emit_route_game(world,visitor,authorized=True)
+            files["README.routes.md"]=(
+                "# Original World Routes — Native Adventure\n\n"
+                "This C99 world is a real playable routing game with clues, "
+                "public transport, maritime, flight, magic, space, cycles, "
+                "dead ends, weather, money and stamina. Its original "
+                "state transitions are source-emitted and locally testable. "
+                "Build with make, or CMake; run dragon_route_game interactively "
+                "or --selftest. 3D vehicles, genre-specific physics, "
+                "hardware execution and human enjoyment remain unverified.\n"
+            )
+            if design is not None:
+                from .dragon_game_design import design_manifest
+                files["dragon-game-design.json"]=json.dumps(
+                    design_manifest(design),sort_keys=True,indent=2)+"\n"
+        elif style=="fixed_screen_puzzle":
             from .dragon_native_puzzle import emit_native_puzzle
             files=emit_native_puzzle(
                 seed=seed,stages=design.stages if design is not None else 4,
-                difficulty=design.difficulty if design is not None else 4)
+                difficulty=design.difficulty if design is not None else 4,
+                procedural=procedural_puzzles,
+                authored_levels=authored_puzzles,
+                hero=design.hero if design is not None else "hatchling",
+                theme=design.quest_theme if design is not None else "ancient_ruins",
+                palette=design.palette if design is not None else "dmg_green",
+                campaign_mode=campaign_mode,
+                challenge_profile=challenge_profile)
             if design is not None:
                 from .dragon_game_design import design_manifest
                 files["dragon-game-design.json"]=json.dumps(
@@ -748,6 +813,16 @@ def render_native_project(*,title:str,target_id:str,style:str,
         files["src/main.asm"]=enrich_native_gb_sound(
             files["src/main.asm"],
             scrolling=(target_id=="game_boy" and style=="side_scrolling_platformer"))
+    # Physically install original 2bpp actor/theme sprite tiles into the
+    # ROM source before canonical hardware budgeting. Existing frame/tile
+    # IDs and game logic remain stable; no proprietary assets are involved.
+    if design is not None and target_id in ("game_boy", "game_boy_color", "nes"):
+        from .dragon_native_artforge import make_art, apply_original_art
+        art, tiles = make_art(
+            hero=design.hero, theme=design.quest_theme,
+            palette=design.palette, seed=design.seed, target=target_id,
+        )
+        files = apply_original_art(files, art=art, tiles=tiles, style=style)
     # RGBDS 1.0 reserves OAM/VRAM as lexer keywords.  Rename only the
     # assembler's user-defined constants after sprite/APU enrichment, so
     # existing semantic instruction matching still targets canonical source.
@@ -767,8 +842,12 @@ def render_native_project(*,title:str,target_id:str,style:str,
         files["src/main.asm"]=asm
     if any(PurePosixPath(p).is_absolute() or ".." in PurePosixPath(p).parts for p in files):
         raise ValueError("unsafe generated path")
-    if any(len(v.encode())>120_000 for v in files.values()):
-        raise ValueError("native project source exceeds budget")
+    source_file_cap=(300_000 if style in (
+        "world_route_adventure","maze_route_adventure") and
+        target_id in ("pc_linux","pc_windows","pc_macos","steam_deck")
+        else 120_000)
+    if any(len(v.encode())>source_file_cap for v in files.values()):
+        raise ValueError("native project source exceeds platform-specific budget")
     from .dragon_hardware_budget import analyze_project_budget
     from dataclasses import asdict as _asdict
     hardware=_asdict(analyze_project_budget(target_id,files))
@@ -798,6 +877,7 @@ def render_native_project(*,title:str,target_id:str,style:str,
               "runtime_gameplay_mode": (
                   ("native_dda_first_person" if style in ("first_person_shooter","immersive_sim")
                    else "native_turn_based_rpg" if style=="turn_based_rpg"
+                   else "native_original_world_routes" if style in ("world_route_adventure","maze_route_adventure")
                    else "native_original_sokoban" if style=="fixed_screen_puzzle"
                    else "native_timing_rhythm" if style=="rhythm_game"
                    else GENRES[style]) if target_id in DESKTOP_NATIVE
@@ -805,7 +885,8 @@ def render_native_project(*,title:str,target_id:str,style:str,
                   else "nes_horizontal_scroll_platformer" if target_id=="nes" and style=="side_scrolling_platformer"
                   else "original_collectible_chase"
               ),"campaign_stages": (
-                  (design.stages if design is not None else 4)
+                  (1 if style in ("world_route_adventure","maze_route_adventure") else
+                   design.stages if design is not None else 4)
                   if target_id in DESKTOP_NATIVE or (target_id=="nes" and style=="side_scrolling_platformer")
                   else 1
               )}
