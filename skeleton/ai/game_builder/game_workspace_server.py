@@ -41,6 +41,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_npc_waypoint_mission import (
+    run_original_npc_waypoint_mission, verify_original_npc_waypoint_mission,
+)
 from .advanced_npc_dynamic_route_planner import (
     plan_original_dynamic_route, verify_original_dynamic_route,
 )
@@ -507,6 +510,23 @@ class _StudioHandler(BaseHTTPRequestHandler):
                 values["record"],values["scene"],values.get("settings"))
             return self._json(200,{"verified":validated,
                                    "original_source_mutated":False})
+        if path=="/api/plan-original-npc-mission":
+            report=run_original_npc_waypoint_mission(
+                values["record"],values["waypoints"],
+                max_steps_per_leg=values.get("max_steps_per_leg",24))
+            return self._json(200,{
+                "record":report,
+                "verified":verify_original_npc_waypoint_mission(report),
+                "source_files_mutated":False,
+                "model_weights_promoted":False,
+                "native_hardware_certified":False,
+            })
+        if path=="/api/verify-original-npc-mission":
+            return self._json(200,{
+                "verified":verify_original_npc_waypoint_mission(values["record"]),
+                "source_files_mutated":False,
+                "model_weights_promoted":False,
+            })
         if path=="/api/plan-original-npc-route":
             route=plan_original_dynamic_route(
                 values["record"],values["objective"],

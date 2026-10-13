@@ -38,6 +38,9 @@ from .advanced_rpg_planner import plan_original_rpg_chapter, verify_original_rpg
 from .advanced_npc_society_planner import (
     plan_original_civic_milestone, verify_original_civic_plan,
 )
+from .advanced_npc_waypoint_mission import (
+    run_original_npc_waypoint_mission, verify_original_npc_waypoint_mission,
+)
 from .advanced_npc_dynamic_route_planner import (
     plan_original_dynamic_route, verify_original_dynamic_route,
 )
@@ -216,6 +219,14 @@ def parser() -> argparse.ArgumentParser:
     ecology_verify.add_argument("--record",required=True)
     ecology_verify.add_argument("--scene",required=True)
     ecology_verify.add_argument("--settings")
+    mission=commands.add_parser("plan-original-npc-mission",
+        help="Earn material original quest milestones through multiple physical NPC world objectives")
+    mission.add_argument("--record",required=True)
+    mission.add_argument("--waypoints",required=True)
+    mission.add_argument("--max-steps-per-leg",type=int,default=24)
+    mission_verify=commands.add_parser("verify-original-npc-mission",
+        help="Full-source reexecute every original waypoint and physical quest consequence")
+    mission_verify.add_argument("--record",required=True)
     npc_route=commands.add_parser("plan-original-npc-route",
         help="Execute real stamina-bound route search around actually moving NPCs")
     npc_route.add_argument("--record",required=True)
@@ -531,6 +542,12 @@ def main(argv=None) -> int:
             output={"verified":verify_original_ecology_plan(
                 _load(args.record),_load(args.scene),
                 _load(args.settings) if args.settings else None)}
+        elif args.operation == "plan-original-npc-mission":
+            output=run_original_npc_waypoint_mission(
+                _load(args.record),_load(args.waypoints),
+                max_steps_per_leg=args.max_steps_per_leg)
+        elif args.operation == "verify-original-npc-mission":
+            output={"verified":verify_original_npc_waypoint_mission(_load(args.record))}
         elif args.operation == "plan-original-npc-route":
             output=plan_original_dynamic_route(
                 _load(args.record),_load(args.objective),max_steps=args.max_steps)
