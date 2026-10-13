@@ -349,6 +349,14 @@ class CodeSearchIndex:
             and language_for_path(record.path) is not None
         ]
         candidates.sort(key=lambda item: item.path)
+        # Size reference posting admission to the full document cohort.
+        # Reserve at least half the posting budget for definitions and
+        # unexpectedly dense symbol inventories, preserving deterministic
+        # fail-closed behavior without excluding later alphabetic paths.
+        reference_limit = min(
+            MAX_REFERENCE_TERMS_PER_DOCUMENT,
+            MAX_POSTINGS // max(1, 2 * len(candidates)),
+        )
 
         documents: list[IndexedDocument] = []
         postings: dict[str, list[CodePosting]] = {}
@@ -429,7 +437,7 @@ class CodeSearchIndex:
                 )
             )
             selected_terms = protected_terms | set(
-                ranked_references[:MAX_REFERENCE_TERMS_PER_DOCUMENT]
+                ranked_references[:reference_limit]
             )
 
             for term in sorted(selected_terms):
