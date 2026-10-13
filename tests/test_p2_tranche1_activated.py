@@ -55,7 +55,7 @@ def test_rejects_native_evidence_regression(tmp_path: Path) -> None:
     task = next(x for x in payload["tasks"] if x["task_id"] == "P2-NATIVE-01")
     task["evidence_refs"] = ["github:pr#2332"]
     path.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(Exception, match="requires at least three evidence refs|missing evidence prefix"):
+    with pytest.raises(Exception, match="lacks an Actions acceptance run"):
         validate(root)
 
 
