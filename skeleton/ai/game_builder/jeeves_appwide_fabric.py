@@ -347,6 +347,14 @@ OPERATIONS = {
     "ai.context":("read", "budgeted source-linked metadata context for Jeeves",False),
     "ai.duplicates":("read", "exact and heuristic near-duplicate review candidates",False),
     "ai.completion":("read", "full-app canonical readiness and evidence-gap census",False),
+    "ai.product.measure":("read", "42-family source and independent-acceptance measurements",False),
+    "ai.product.measure.page":("read", "bounded family readiness and missing-evidence census",False),
+    "ai.product.tests":("read", "selected exact-source test candidates for completion families",False),
+    "ai.product.tests.page":("read", "paged unmapped app family acceptance test gaps",False),
+    "ai.product.journeys":("read", "canonical 12-journey independent end-to-end release frontier",False),
+    "ai.product.journeys.page":("read", "paged unreleased journeys and 84 independent acceptance obligations",False),
+    "ai.product.release.queue":("read", "source-grounded independent leaf acceptance tasks for 100 percent app readiness",False),
+    "ai.product.release.queue.page":("read", "bounded priority queue of 729 evidence requirements",False),
     "ai.deathmarch":("read", "prioritized evidence-gated cross-app completion backlog",False),
     "ai.graph":("read", "source-pinned cross-plane feature and release evidence graph",False),
     "ai.graph.neighbors":("read", "bounded graph ownership and dependency traversal",False),
@@ -504,6 +512,30 @@ class JeevesAppwideRuntime:
         elif action=="ai.completion":
             from .jeeves_completion_census import JeevesCompletionCensus
             result=JeevesCompletionCensus(inv).report(**params)
+        elif action=="ai.product.measure":
+            from .jeeves_measured_completion import JeevesMeasuredCompletion
+            result=JeevesMeasuredCompletion(inv).overview(**params)
+        elif action=="ai.product.measure.page":
+            from .jeeves_measured_completion import JeevesMeasuredCompletion
+            result=JeevesMeasuredCompletion(inv).page(**params)
+        elif action=="ai.product.tests":
+            from .jeeves_acceptance_matrix import JeevesAcceptanceTestMatrix
+            result=JeevesAcceptanceTestMatrix(inv).overview(**params)
+        elif action=="ai.product.tests.page":
+            from .jeeves_acceptance_matrix import JeevesAcceptanceTestMatrix
+            result=JeevesAcceptanceTestMatrix(inv).page(**params)
+        elif action=="ai.product.journeys":
+            from .jeeves_enterprise_journey_frontier import JeevesEnterpriseJourneyFrontier
+            result=JeevesEnterpriseJourneyFrontier(inv).overview(**params)
+        elif action=="ai.product.journeys.page":
+            from .jeeves_enterprise_journey_frontier import JeevesEnterpriseJourneyFrontier
+            result=JeevesEnterpriseJourneyFrontier(inv).page(**params)
+        elif action=="ai.product.release.queue":
+            from .jeeves_release_execution_queue import JeevesReleaseExecutionQueue
+            result=JeevesReleaseExecutionQueue(inv).overview(**params)
+        elif action=="ai.product.release.queue.page":
+            from .jeeves_release_execution_queue import JeevesReleaseExecutionQueue
+            result=JeevesReleaseExecutionQueue(inv).page(**params)
         elif action=="ai.deathmarch":
             from .jeeves_completion_census import JeevesCompletionCensus
             result=JeevesCompletionCensus(inv).backlog(**params)

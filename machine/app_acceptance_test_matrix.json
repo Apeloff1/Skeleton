@@ -1,0 +1,488 @@
+{
+  "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
+  "version": "2026-10-13.v12",
+  "parent_scope": "machine/app_completion_scope.json",
+  "stage": "implementation_test",
+  "scope_note": "All 42 family test subsets scheduled; F07 now includes real multi-turn CPU chat session, stream cancellation and checkpointed recovery. Tests still require exact-head CI.",
+  "runner_mode": "unittest_module_exact_head",
+  "default_max_seconds": 480,
+  "policies": {
+    "requires_real_test_execution": true,
+    "exact_commit_required": true,
+    "source_test_sha_receipts_required": true,
+    "no_success_inference_from_file_presence": true,
+    "matrix_does_not_verify_end_to_end_user_journey": true,
+    "automated_model_or_source_promotion_forbidden": true,
+    "unmapped_families_remain_unknown": true
+  },
+  "bindings": [
+    {
+      "family_id": "F01",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Workspace ownership and taxonomy are checked, not real user navigation",
+      "unittest_modules": [
+        "tests.test_app_workspace_taxonomy"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F02",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "API gateway payload reliability contract subset, not all routes",
+      "unittest_modules": [
+        "tests.test_api_gateway_payload_reliability"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F03",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Engine API health and kernel interface response subset",
+      "unittest_modules": [
+        "tests.test_api"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance; exact SHA; source hash and real test case count",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F04",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Security and governance boundary adversarial subset",
+      "unittest_modules": [
+        "tests.test_ai_security_governance_gapfill"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F05",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Durable memory ordering and store invariants subset",
+      "unittest_modules": [
+        "tests.test_memory_store_invariants"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F06",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Assistant context and prompt conductor subset",
+      "unittest_modules": [
+        "tests.test_ai_context_conductor"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F07",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "ci_smoke",
+      "independent_acceptance_question": "Local CPU native transformer actually runs and replays, without claiming trained-model quality",
+      "unittest_modules": [
+        "tests.test_ai_offline_native_functional_boundary",
+        "tests.test_ai_native_session_recovery_journey"
+      ],
+      "workflow_hint": "Jeeves App Acceptance Matrix",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F08",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Provider route and failure isolation contract subset",
+      "unittest_modules": [
+        "tests.test_provider_runtime_boundary"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance; exact SHA; source hash and real test case count",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F09",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Retrieval correctness and source-backed lookup subset",
+      "unittest_modules": [
+        "tests.test_retrieval"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F10",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Model-sourced tool execution independent verifier subset",
+      "unittest_modules": [
+        "tests.test_tool_runtime_independent_verifier"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance; exact SHA; source hash and real test case count",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F11",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Jeeves whole-app inventory, auth and source-action boundary",
+      "unittest_modules": [
+        "tests.test_game_builder_jeeves_appwide_fabric"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F12",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Source/graph intelligence custody and stale identity",
+      "unittest_modules": [
+        "tests.test_game_builder_jeeves_evidence_graph",
+        "tests.test_game_builder_jeeves_capability_intelligence"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F13",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Real authenticated Studio measurement/test-page journey with bounded cursors, provenance and no unintended source mutations",
+      "unittest_modules": [
+        "tests.test_game_builder_jeeves_measured_completion",
+        "tests.test_game_builder_jeeves_completion_census",
+        "tests.test_game_builder_jeeves_product_studio_journey"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F14",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Supervisor and delegated agent authority regression subset",
+      "unittest_modules": [
+        "tests.test_agent_runtime_independent_verifier"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance; exact SHA; source hash and real test case count",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F15",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Training program policy and validation governance subset",
+      "unittest_modules": [
+        "tests.test_ai_training_program_governance"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F16",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Shadow promotion requires human governance and source custody subset",
+      "unittest_modules": [
+        "tests.test_ai_dragon_human_promotion_boundary"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F17",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Crawler acquisition admission and source safety subset",
+      "unittest_modules": [
+        "tests.test_ai_webcrawler_advanced_admission"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance (Ubuntu 24.04 / Windows 2022)",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F18",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Idle Dragon companion lifecycle and state transitions subset",
+      "unittest_modules": [
+        "tests.test_ai_webcrawler_dragon_companion_runtime"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance (Ubuntu 24.04 / Windows 2022)",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F19",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Dragon video frame source cognition and ingestion subset",
+      "unittest_modules": [
+        "tests.test_ai_dragon_visual_runtime_ingest"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F20",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Original game prompting and runtime pipeline subset",
+      "unittest_modules": [
+        "tests.test_ai_game_builder_runtime"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance, both OS, real nonzero JUnit cases",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F21",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Advanced authored world/engine session invariants",
+      "unittest_modules": [
+        "tests.test_game_builder_advanced_runtime"
+      ],
+      "workflow_hint": "Game Builder Advanced System Engines",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F22",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Observed NPC quest causality and state transfer",
+      "unittest_modules": [
+        "tests.test_game_builder_advanced_quest_director"
+      ],
+      "workflow_hint": "Game Builder Advanced System Engines",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F23",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Story continuity and recoverable branching source",
+      "unittest_modules": [
+        "tests.test_game_builder_story_continuity_assurance"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F24",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Chapter-act-scene canon and story replay",
+      "unittest_modules": [
+        "tests.test_game_builder_story_canon_fabric",
+        "tests.test_game_builder_story_chapter_context"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F25",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Spoiler-safe witnessed chat chapter handoff",
+      "unittest_modules": [
+        "tests.test_game_builder_jeeves_chapter_chat"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F26",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Advanced game editor contract normalization",
+      "unittest_modules": [
+        "tests.test_game_builder_advanced_runtime"
+      ],
+      "workflow_hint": "Game Builder Advanced System Engines",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F27",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Maze, RPG and advanced game execution/replay",
+      "unittest_modules": [
+        "tests.test_game_builder_advanced_runtime"
+      ],
+      "workflow_hint": "Game Builder Advanced System Engines",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F28",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Combat guard, parry, stamina and collision",
+      "unittest_modules": [
+        "tests.test_game_builder_advanced_fighting",
+        "tests.test_game_builder_advanced_ecosystem"
+      ],
+      "workflow_hint": "Game Builder Advanced System Engines",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F29",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Native Dragon game compiler target subset, not every console",
+      "unittest_modules": [
+        "tests.test_ai_webcrawler_dragon_native_compile"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance (Ubuntu 24.04 / Windows 2022)",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F30",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Legacy Dragon platform portfolio matrix subset",
+      "unittest_modules": [
+        "tests.test_ai_webcrawler_dragon_platform_matrix"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance (Ubuntu 24.04 / Windows 2022)",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F31",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Game generation governance and originality policy subset",
+      "unittest_modules": [
+        "tests.test_ai_game_builder_governance"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance, both OS, real nonzero JUnit cases",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F32",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Dragon asset and game forge pipeline subset",
+      "unittest_modules": [
+        "tests.test_ai_webcrawler_dragon_game_forge"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance, both OS, real nonzero JUnit cases",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F33",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Game authoring experience evaluation and adversarial feedback subset",
+      "unittest_modules": [
+        "tests.test_ai_game_builder_experience_eval"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance, both OS, real nonzero JUnit cases",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F34",
+      "scope": "targeted_regression_subset",
+      "independent_acceptance_question": "Forge graph and appwide runtime permissions",
+      "unittest_modules": [
+        "tests.test_game_builder_jeeves_app_runtime"
+      ],
+      "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false,
+      "execution_tier": "ci_smoke"
+    },
+    {
+      "family_id": "F35",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Experimental multimodal feature candidate subset",
+      "unittest_modules": [
+        "tests.test_p3t2_multimodal_candidate"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F36",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "External tools and connector namespace parity subset",
+      "unittest_modules": [
+        "tests.test_tools_integrations_namespace_migration"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance; exact SHA; source hash and real test case count",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F37",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "ci_smoke",
+      "independent_acceptance_question": "Shell approvals validate immutable fingerprints, identity, expiry and single consumption",
+      "unittest_modules": [
+        "tests.test_ai_shell_approval_contract"
+      ],
+      "workflow_hint": "Jeeves App Acceptance Matrix",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F38",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "ci_smoke",
+      "independent_acceptance_question": "Repository atlas canonical owner and source placement subset",
+      "unittest_modules": [
+        "tests.test_repo_machine_atlas"
+      ],
+      "workflow_hint": "Jeeves App Acceptance Matrix (Windows/Ubuntu)",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F39",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "ci_smoke",
+      "independent_acceptance_question": "Native build and bounded application assembly authority subset",
+      "unittest_modules": [
+        "tests.test_build_plane"
+      ],
+      "workflow_hint": "Jeeves App Acceptance Matrix (Windows/Ubuntu)",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F40",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "ci_smoke",
+      "independent_acceptance_question": "Model serving capacity and operation cost envelope subset",
+      "unittest_modules": [
+        "tests.test_model_serving_capacity"
+      ],
+      "workflow_hint": "Jeeves App Acceptance Matrix (Windows/Ubuntu)",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F41",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Game builder incident and interrupted execution resilience subset",
+      "unittest_modules": [
+        "tests.test_ai_game_builder_resilience"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F42",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "pytest_smoke",
+      "independent_acceptance_question": "Enterprise architecture/source contract checks, not full deployed journeys",
+      "unittest_modules": [
+        "tests.test_enterprise_system_architecture"
+      ],
+      "workflow_hint": "Jeeves App Pytest Acceptance exact-head Windows/Linux",
+      "product_release_qualified": false
+    }
+  ]
+}

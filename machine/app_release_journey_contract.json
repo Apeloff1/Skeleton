@@ -1,0 +1,352 @@
+{
+  "schema": "skeleton.ai.enterprise_journey_acceptance.v1",
+  "source_authority": "machine/enterprise_system_architecture.json",
+  "scope_authority": "machine/app_completion_scope.json",
+  "version": "2026-10-13.v2",
+  "policy": {
+    "canonical_journey_denominator_frozen": true,
+    "no_source_file_proves_runtime_execution": true,
+    "no_test_candidate_counts_as_pass": true,
+    "release_requires_independent_operator_evidence": true,
+    "failed_skipped_cancelled_queued_are_not_success": true,
+    "all_requirement_axes_mandatory": true,
+    "default_all_states_unknown": true,
+    "never_automatically_signoff": true
+  },
+  "required_acceptance_axes": [
+    "real_executable_target",
+    "user_outcome",
+    "durable_state",
+    "negative_and_security_path",
+    "restart_or_failure_recovery",
+    "observability_and_trace",
+    "device_and_release_qualification"
+  ],
+  "journeys": [
+    {
+      "id": "J01",
+      "canonical_journey": "authenticate -> create conversation -> multi-turn AI response -> durable reconstruction",
+      "family_ids": [
+        "F01",
+        "F02",
+        "F06",
+        "F07",
+        "F08"
+      ],
+      "acceptance_target": "A real multi-turn model response must survive service restart and restore conversation identity; synthetic or untrained token generation alone is insufficient",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_app_workspace_taxonomy.py",
+        "tests/test_ai_offline_native_functional_boundary.py",
+        "tests/test_provider_runtime_boundary.py",
+        "tests/test_ai_native_session_recovery_journey.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J02",
+      "canonical_journey": "retrieval-backed answer -> evidence/citation verification -> accepted response",
+      "family_ids": [
+        "F06",
+        "F09",
+        "F11"
+      ],
+      "acceptance_target": "A grounded user answer must cite independently fetched document identities and demonstrate rejection of a conflicting unsupported answer",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_retrieval.py",
+        "tests/test_memory_store_invariants.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J03",
+      "canonical_journey": "tool proposal -> approval when required -> exactly-once side effect -> durable receipt",
+      "family_ids": [
+        "F04",
+        "F10",
+        "F14",
+        "F37"
+      ],
+      "acceptance_target": "A privileged tool action must bind the same principal, intent, approved receipt and committed side effect with exactly-once replay protection",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_ai_shell_approval_contract.py",
+        "tests/test_tool_runtime_independent_verifier.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J04",
+      "canonical_journey": "artifact upload -> scan -> parse/use -> lifecycle -> export/delete",
+      "family_ids": [
+        "F02",
+        "F04",
+        "F05",
+        "F35",
+        "F39"
+      ],
+      "acceptance_target": "Uploaded artifacts must be scanned, used, exported and physically deleted under the same tenant and auditable file lifecycle",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_ai_security_governance_gapfill.py",
+        "tests/test_memory_store_invariants.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J05",
+      "canonical_journey": "provider outage -> compliant failover or explicit degraded response",
+      "family_ids": [
+        "F08",
+        "F40",
+        "F41"
+      ],
+      "acceptance_target": "A forced provider outage must fail over only to an authorized model or explicitly degrade with bounded retry and no lost conversation",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_provider_runtime_boundary.py",
+        "tests/test_model_serving_capacity.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J06",
+      "canonical_journey": "engine restart -> durable operation resume -> canonical completion",
+      "family_ids": [
+        "F05",
+        "F14",
+        "F41"
+      ],
+      "acceptance_target": "A durable accepted operation must resume after a hard process kill without duplicate side effects or unauthorized replay",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_memory_store_invariants.py",
+        "tests/test_agent_runtime_independent_verifier.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J07",
+      "canonical_journey": "client disconnect -> stream/poll resume without duplicate completion",
+      "family_ids": [
+        "F01",
+        "F02",
+        "F14"
+      ],
+      "acceptance_target": "Disconnect a streaming client mid-response and prove cursor resumption yields one committed answer and no duplicate execution",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_app_workspace_taxonomy.py",
+        "tests/test_agent_runtime_independent_verifier.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J08",
+      "canonical_journey": "tenant export/delete -> cross-plane propagation -> physical lifecycle acknowledgement",
+      "family_ids": [
+        "F04",
+        "F05",
+        "F42"
+      ],
+      "acceptance_target": "Cross-plane tenant export and physical delete must show durable propagation and zero cross-tenant information exposure",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_ai_security_governance_gapfill.py",
+        "tests/test_memory_store_invariants.py",
+        "tests/test_enterprise_system_architecture.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J09",
+      "canonical_journey": "overload -> fair shedding/defer -> preserved canonical writes",
+      "family_ids": [
+        "F03",
+        "F14",
+        "F40"
+      ],
+      "acceptance_target": "An overload test must preserve fair admission and exactly-once canonical writes with traceable shedding budgets",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_model_serving_capacity.py",
+        "tests/test_agent_runtime_independent_verifier.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J10",
+      "canonical_journey": "bad release -> canary SLO breach -> automatic rollback -> preserved data compatibility",
+      "family_ids": [
+        "F39",
+        "F40",
+        "F41"
+      ],
+      "acceptance_target": "An intentionally broken canary release must roll back, preserve existing data, and restore measured service SLO",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_build_plane.py",
+        "tests/test_model_serving_capacity.py",
+        "tests/test_ai_game_builder_resilience.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J11",
+      "canonical_journey": "backup restore -> isolated validation -> service reconstruction -> derived index rebuild",
+      "family_ids": [
+        "F05",
+        "F38",
+        "F41"
+      ],
+      "acceptance_target": "Restore backup into an isolated environment and verify recovered services and rebuilt indexes against original persisted state",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_memory_store_invariants.py",
+        "tests/test_repo_machine_atlas.py",
+        "tests/test_ai_game_builder_resilience.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    },
+    {
+      "id": "J12",
+      "canonical_journey": "privileged operator action -> JIT authority -> immutable audit -> expiry",
+      "family_ids": [
+        "F04",
+        "F10",
+        "F14",
+        "F37",
+        "F42"
+      ],
+      "acceptance_target": "Grant JIT privileges, execute one approved action, record immutable audit receipt, then prove authorization expiry and replay denial",
+      "acceptance_axes": [
+        "real_executable_target",
+        "user_outcome",
+        "durable_state",
+        "negative_and_security_path",
+        "restart_or_failure_recovery",
+        "observability_and_trace",
+        "device_and_release_qualification"
+      ],
+      "source_test_candidates": [
+        "tests/test_ai_shell_approval_contract.py",
+        "tests/test_agent_runtime_independent_verifier.py",
+        "tests/test_enterprise_system_architecture.py"
+      ],
+      "acceptance_receipts": [],
+      "release_qualified": false,
+      "operator_review_required": true
+    }
+  ]
+}

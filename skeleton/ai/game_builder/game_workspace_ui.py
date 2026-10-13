@@ -307,8 +307,10 @@ async function dmInvoke(action,params){
  if(!jeevesAppSnapshot)
   throw Error("Scan the application before preparing source-pinned milestones");
  const request={...params,expected_snapshot:jeevesAppSnapshot};
- if(deathmarchPlanDigest && action!=="ai.milestones.page" &&
-    action!=="ai.milestones")
+ if(deathmarchPlanDigest && (
+    action==="ai.workwaves" || action==="ai.workpack" ||
+    action==="ai.change_frontier" || action==="ai.milestones.critical" ||
+    action==="ai.milestones.owners"))
   request.expected_plan_digest=deathmarchPlanDigest;
  if(deathmarchGraphDigest && (
     action==="ai.workwaves" || action==="ai.workpack" ||
@@ -334,6 +336,96 @@ function dmPositive(id,min,max){
   throw Error("Expected a whole number between "+min+" and "+max);
  return number;
 }
+let jeevesReleaseQueueDigest=null;
+$("jeeves-dm-release-queue").addEventListener("click",()=>dmGuard(async()=>{
+ const report=await dmInvoke("ai.product.release.queue",{});
+ jeevesReleaseQueueDigest=report.digest;
+ const lines=[
+  "Independent release-proof obligations: "+report.leaf_evidence_denominator,
+  "Unverified in this source-only scan: "+report.leaf_proofs_unverified_by_this_reader,
+  "Breakdown: "+JSON.stringify(report.category_leaf_breakdown),
+  "Full-app completion: UNKNOWN pending authenticated CI, device, user and AI evidence.",
+ ].join("\n");
+ $("jeeves-dm-output").textContent=lines+"\n\n"+JSON.stringify(report,null,2).slice(0,60000);
+ status("Release work queue indexed; no automatic execution or signoff.");
+}));
+$("jeeves-dm-release-first").addEventListener("click",()=>dmGuard(async()=>{
+ const params={offset:0,limit:30};
+ if(jeevesReleaseQueueDigest)
+  params.expected_queue_digest=jeevesReleaseQueueDigest;
+ const report=await dmInvoke("ai.product.release.queue.page",params);
+ $("jeeves-dm-output").textContent=JSON.stringify(report,null,2).slice(0,60000);
+ status(report.total_matches+" exact-source release obligations; first 30 ordered by proof priority.");
+}));
+let jeevesReleaseJourneyDigest=null;
+$("jeeves-dm-journeys").addEventListener("click",()=>dmGuard(async()=>{
+ const receipt=await dmInvoke("ai.product.journeys",{});
+ jeevesReleaseJourneyDigest=receipt.digest;
+ const summary=[
+  "Enterprise release journeys: "+receipt.canonical_journey_count,
+  "Independent journey acceptance axes: "+receipt.total_journey_acceptance_axes,
+  "Unverified acceptance axes: "+receipt.unknown_journey_acceptance_axes,
+  "Required terminal release gates: "+receipt.required_terminal_gates,
+  "AI product capabilities requiring real proof: "+receipt.AI_capability_contract_total,
+  "Enterprise workstreams: "+receipt.enterprise_workstreams,
+  "Confirmed installed-app release: NO — no independent evidence has been admitted.",
+ ].join("\n");
+ $("jeeves-dm-output").textContent=summary+"\n\n"+JSON.stringify(receipt,null,2).slice(0,60000);
+ status("Release frontier indexed: declarations and candidate tests are not independent acceptance.");
+}));
+$("jeeves-dm-journey-gaps").addEventListener("click",()=>dmGuard(async()=>{
+ const params={offset:0,limit:6};
+ if(jeevesReleaseJourneyDigest)
+  params.expected_report_digest=jeevesReleaseJourneyDigest;
+ const receipt=await dmInvoke("ai.product.journeys.page",params);
+ $("jeeves-dm-output").textContent=JSON.stringify(receipt,null,2).slice(0,60000);
+ status(receipt.total_matches+" enterprise journeys require independent end-to-end evidence.");
+}));
+let deathmarchMeasurementDigest=null;
+$("jeeves-dm-measure").addEventListener("click",()=>dmGuard(async()=>{
+ const result=await dmInvoke("ai.product.measure",{});
+ deathmarchMeasurementDigest=result.digest;
+ const headline=[
+  "Measured scoped product families: "+result.family_count,
+  "Located implementation roots: "+result.family_static_source_located+
+   "/"+result.family_count+" ("+result.source_presence_percent+"% SOURCE PRESENCE ONLY)",
+  "Atomic canonical acceptance obligations: "+result.atomic_product_contract_obligations,
+  "Independent acceptance stages not yet verified by this scan: "+
+   result.unknown_independent_acceptance_stages,
+  "Release-qualified families verified by this source scan: 0",
+  "Full installed-application completion: UNKNOWN — no justified single percentage.",
+ ].join("\n");
+ $("jeeves-dm-output").textContent=headline+"\n\n"+JSON.stringify(result,null,2).slice(0,60000);
+ status("Product measurement complete. Source presence is not functional completeness.");
+}));
+$("jeeves-dm-missing").addEventListener("click",()=>dmGuard(async()=>{
+ const params={offset:0,limit:25,only_missing:true};
+ if(deathmarchMeasurementDigest)
+  params.expected_measurement_digest=deathmarchMeasurementDigest;
+ const result=await dmInvoke("ai.product.measure.page",params);
+ status(result.total_matches+" source owner gaps located. These are not all functional blockers.");
+}));
+let acceptanceTestMatrixDigest=null;
+$("jeeves-dm-test-matrix").addEventListener("click",()=>dmGuard(async()=>{
+ const result=await dmInvoke("ai.product.tests",{});
+ acceptanceTestMatrixDigest=result.digest;
+ const mapped=result.curated_test_family_count;
+ status(mapped+"/"+result.family_denominator+" feature families have candidate test links. "+
+  result.ci_smoke_family_count+" selected for exact-head unittest across "+
+  result.scheduled_test_module_count+" modules; "+
+  result.pytest_smoke_family_count+" selected for independent pytest across "+
+  result.scheduled_pytest_module_count+" modules; "+
+  result.discovery_only_family_count+" remain discovery-only. "+
+  result.unique_static_test_case_count+" declared test functions. "+
+  "No CI result is admitted from source presence alone.");
+}));
+$("jeeves-dm-unmapped-tests").addEventListener("click",()=>dmGuard(async()=>{
+ const params={limit:30,offset:0,only_unmapped:true};
+ if(acceptanceTestMatrixDigest)
+  params.expected_matrix_digest=acceptanceTestMatrixDigest;
+ const result=await dmInvoke("ai.product.tests.page",params);
+ status(result.total_matches+" families remain without curated test acceptance links.");
+}));
 $("jeeves-dm-tasks").addEventListener("click",()=>dmGuard(async()=>{
  const result=await dmInvoke("ai.milestones.page",{offset:0,limit:30});
  deathmarchPlanDigest=result.plan_digest;
@@ -5641,6 +5733,14 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <p><small>Source-pinned tasks, parallel workwaves, real file context, impact trace,
 and reviewed multi-adapter previews. All previews are non-mutating; source edits,
 model promotion and release still require independent approval and evidence.</small></p>
+<button id="jeeves-dm-measure" type="button">Measure full-app acceptance scope</button>
+<button id="jeeves-dm-journeys" type="button">Audit 12 enterprise user journeys</button>
+<button id="jeeves-dm-release-queue" type="button">Measure all independent release blockers</button>
+<button id="jeeves-dm-release-first" type="button">Inspect highest-priority 30 release obligations</button>
+<button id="jeeves-dm-journey-gaps" type="button">Inspect first 6 release-blocked journeys</button>
+<button id="jeeves-dm-test-matrix" type="button">Measure test-linked feature families</button>
+<button id="jeeves-dm-unmapped-tests" type="button">List unbound feature tests</button>
+<button id="jeeves-dm-missing" type="button">Inspect missing source owners</button>
 <button id="jeeves-dm-tasks" type="button">Index next 30 milestone tasks</button>
 <label>Parallel per wave (1–24)<input id="jeeves-dm-parallel" type="number" min="1" max="24" value="8"></label>
 <button id="jeeves-dm-waves" type="button">Build dependency-safe workwaves</button>

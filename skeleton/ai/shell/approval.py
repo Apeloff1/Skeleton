@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import math
+import re
 import threading
 import time
 from typing import Callable
@@ -34,8 +36,8 @@ class AIApprovalRegistry:
         max_approvals: int = 10000,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        if max_approvals <= 0:
-            raise ValueError("max_approvals must be positive")
+        if type(max_approvals) is not int or max_approvals <= 0:
+            raise ValueError("max_approvals must be a positive integer")
         self.max_approvals = max_approvals
         self._clock = clock
         self._serial = 0
@@ -44,6 +46,8 @@ class AIApprovalRegistry:
 
     def _prune(self) -> None:
         now = self._clock()
+        if type(now) not in (int, float) or not math.isfinite(float(now)):
+            raise AIApprovalError("non-finite or invalid approval clock")
         for key in [
             key
             for key, item in self._items.items()
@@ -60,8 +64,8 @@ class AIApprovalRegistry:
         approved_by: str,
         ttl_seconds: float = 300.0,
     ) -> AIPlanApproval:
-        if ttl_seconds <= 0:
-            raise ValueError("ttl_seconds must be positive")
+        if type(ttl_seconds) not in (int, float) or not math.isfinite(float(ttl_seconds)) or ttl_seconds <= 0:
+            raise ValueError("ttl_seconds must be finite and positive")
         if not principal or not approved_by:
             raise ValueError("principal and approver are required")
         principal = require_authority_identifier(
@@ -74,8 +78,9 @@ class AIApprovalRegistry:
             field="approval actor",
             max_length=256,
         )
-        if len(intent_fingerprint) != 64 or len(proposal_fingerprint) != 64:
-            raise ValueError("approval fingerprints must be SHA-256 hex")
+        if not all(type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value)
+                   for value in (intent_fingerprint, proposal_fingerprint)):
+            raise ValueError("approval fingerprints must be lowercase SHA-256 hex")
         with self._lock:
             self._prune()
             if len(self._items) >= self.max_approvals:
