@@ -245,6 +245,30 @@ class CodeSearchIndexTests(unittest.TestCase):
             self.assertEqual(hits[0].path, "alpha/definitions.py")
             self.assertEqual(hits[0].match_kind, "definition")
 
+    def test_large_cohort_balances_reference_postings(self) -> None:
+        from unittest.mock import patch
+
+        temp, root = self.fixture()
+        with temp:
+            for number in range(30):
+                (root / "alpha" / f"unit_{number:02d}.py").write_text(
+                    f"def stable_symbol_{number:02d}():\n"
+                    "    return alpha_beta_gamma + delta_epsilon_zeta\n",
+                    encoding="utf-8",
+                )
+            model = RepositoryModelBuilder(root).build()
+            with patch("skeleton.repo_machine.code_search.MAX_POSTINGS", 85):
+                first = CodeSearchIndex.build(root, model)
+                second = CodeSearchIndex.build(root, model)
+            self.assertEqual(first.summary(), second.summary())
+            self.assertLessEqual(first.posting_count, 85)
+            self.assertEqual(len(first.documents), 33)
+            for number in range(30):
+                symbol = f"stable_symbol_{number:02d}"
+                hits = first.search(symbol)
+                self.assertTrue(hits, symbol)
+                self.assertEqual(hits[0].match_kind, "definition")
+
     def test_oversized_source_is_explicitly_skipped(self) -> None:
         temp, root = self.fixture()
         with temp:
