@@ -164,9 +164,15 @@ class GitHubEvidenceSource:
                 raise JeevesAppwideError(
                     "required exact-run OS artifact missing or duplicate")
             item = matched[0]
-            if item.get("workflow_run", {}).get("id") not in (None, run_id):
+            origin = item.get("workflow_run")
+            if origin is not None and (
+                type(origin) is not dict or origin.get("id") != run_id
+            ):
                 raise JeevesAppwideError("artifact belongs to different CI run")
-            data[os_label] = self.artifact(item.get("id"))
+            artifact_id = item.get("id")
+            if type(artifact_id) is not int or artifact_id <= 0:
+                raise JeevesAppwideError("invalid exact-run artifact identity")
+            data[os_label] = self.artifact(artifact_id)
         return run, jobs, data
 
 
