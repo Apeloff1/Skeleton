@@ -177,6 +177,8 @@ _GOVERNANCE_EXPORTS = {
     "ShadowWorkReceipt": ".shadow_idle_training",
     "ShadowLeaseSession": ".shadow_idle_training",
     "ShadowIdleTrainingWorker": ".shadow_idle_training",
+    "ShadowNativeTrainingPolicy": ".shadow_native_trainer",
+    "ShadowNativeTrainer": ".shadow_native_trainer",
     "require_temporal_compatibility": ".temporal_intervals",
 }
 
