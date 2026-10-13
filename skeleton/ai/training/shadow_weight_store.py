@@ -333,6 +333,13 @@ class DurableShadowWeightPipeline:
             self._refresh_if_changed()
             return self._pipeline.snapshot()
 
+    def entries(self, *, state: ShadowState | None = None,
+                limit: int = 100) -> tuple[ShadowRecord, ...]:
+        """Read bounded up-to-date shadow candidates without exposing internals."""
+        with self._lock:
+            self._refresh_if_changed()
+            return self._pipeline.entries(state=state, limit=limit)
+
     def get(self, intake_id: str) -> ShadowRecord | None:
         with self._lock:
             self._refresh_if_changed()
