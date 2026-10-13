@@ -130,11 +130,11 @@ jobs:
             local branch tip merged_file merged_cutoff
             merged_file="$RUNNER_TEMP/merged-pr-heads.tsv"
             merged_pr_head_tips=()
-            # A historical squash-merge is sufficient only after the same
+            # Only main-targeted historical squash merges qualify after the same
             # grace interval that applies to branch creation and tip age.
             merged_cutoff=$(date -u -d "${BRANCH_CLEAN_GRACE_SECONDS} seconds ago" '+%Y-%m-%dT%H:%M:%SZ') || return 1
             if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
-              --jq ".[] | select(.merged_at != null and .merged_at <= \"$merged_cutoff\" and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha] | @tsv" \
+              --jq ".[] | select(.merged_at != null and .merged_at <= \"$merged_cutoff\" and .base.ref == \"main\" and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha] | @tsv" \
               > "$merged_file"; then
               echo '::warning::Branch cleanup could not load merged pull-request heads; no refs will be deleted.'
               return 1
@@ -260,7 +260,7 @@ jobs:
 
               # GitHub repository CreateEvents are bounded and eventually fall
               # out of history. An immutable, mature merged-PR exact head is
-              # still safe evidence of redundant work, provided the branch
+              # still safe evidence of work landed on main, provided the branch
               # cannot be an open PR head/base and its tip is old.
               merged_key="${branch}:${tip}"
               if [[ -z "${branch_creation_epochs[$branch]+x}" ]]; then
@@ -443,7 +443,7 @@ jobs:
               echo '- main is never modified by this workflow.'
               echo '- Exact-current-main branches are preserved so new work branches can receive their first commit safely.'
               echo '- A deletion candidate needs either known old creation age or a mature exact merged-PR head, plus an old tip and redundant content proof.'
-              echo '- Unknown creation history preserves refs unless the exact branch/tip appears on a merged PR older than the grace interval.'
+              echo '- Unknown creation history preserves refs unless the exact branch/tip belongs to a PR merged into main before the grace interval.'
               echo '- A DeleteEvent at or after the latest CreateEvent preserves the live ref as a delayed recreation.'
               echo '- Open PR heads and non-main open PR base branches are never cleanup candidates.'
               echo '- Failure to load PR refs, merged-PR evidence, or branch-event history produces zero deletions.'
