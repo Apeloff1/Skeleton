@@ -1,9 +1,9 @@
 {
   "schema": "skeleton.ai.app_acceptance_test_matrix.v1",
-  "version": "2026-10-13",
+  "version": "2026-10-13.v2",
   "parent_scope": "machine/app_completion_scope.json",
   "stage": "implementation_test",
-  "scope_note": "Curated unit/integration-test candidates; running them does not qualify all features or installed app",
+  "scope_note": "12 CI smoke mapped families, 23 discovery-only candidate families; all 42 still independently unqualified until evidence verifies real outcomes",
   "runner_mode": "unittest_module_exact_head",
   "default_max_seconds": 480,
   "policies": {
@@ -16,6 +16,72 @@
     "unmapped_families_remain_unknown": true
   },
   "bindings": [
+    {
+      "family_id": "F04",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Security and governance boundary adversarial subset",
+      "unittest_modules": [
+        "tests.test_ai_security_governance_gapfill"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F05",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Durable memory ordering and store invariants subset",
+      "unittest_modules": [
+        "tests.test_memory_store_invariants"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F06",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Assistant context and prompt conductor subset",
+      "unittest_modules": [
+        "tests.test_ai_context_conductor"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F08",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Provider route and failure isolation contract subset",
+      "unittest_modules": [
+        "tests.test_provider_runtime_boundary"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F09",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Retrieval correctness and source-backed lookup subset",
+      "unittest_modules": [
+        "tests.test_retrieval"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F10",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Model-sourced tool execution independent verifier subset",
+      "unittest_modules": [
+        "tests.test_tool_runtime_independent_verifier"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
     {
       "family_id": "F11",
       "scope": "targeted_regression_subset",
@@ -46,6 +112,83 @@
         "tests.test_game_builder_jeeves_completion_census"
       ],
       "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F14",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Supervisor and delegated agent authority regression subset",
+      "unittest_modules": [
+        "tests.test_agent_runtime_independent_verifier"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F15",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Training program policy and validation governance subset",
+      "unittest_modules": [
+        "tests.test_ai_training_program_governance"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F16",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Shadow promotion requires human governance and source custody subset",
+      "unittest_modules": [
+        "tests.test_ai_dragon_human_promotion_boundary"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F17",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Crawler acquisition admission and source safety subset",
+      "unittest_modules": [
+        "tests.test_ai_webcrawler_advanced_admission"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F18",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Idle Dragon companion lifecycle and state transitions subset",
+      "unittest_modules": [
+        "tests.test_ai_webcrawler_dragon_companion_runtime"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F19",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Dragon video frame source cognition and ingestion subset",
+      "unittest_modules": [
+        "tests.test_ai_dragon_visual_runtime_ingest"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F20",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Original game prompting and runtime pipeline subset",
+      "unittest_modules": [
+        "tests.test_ai_game_builder_runtime"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
       "product_release_qualified": false
     },
     {
@@ -131,6 +274,61 @@
       "product_release_qualified": false
     },
     {
+      "family_id": "F29",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Native Dragon game compiler target subset, not every console",
+      "unittest_modules": [
+        "tests.test_ai_webcrawler_dragon_native_compile"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F30",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Legacy Dragon platform portfolio matrix subset",
+      "unittest_modules": [
+        "tests.test_ai_webcrawler_dragon_platform_matrix"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F31",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Game generation governance and originality policy subset",
+      "unittest_modules": [
+        "tests.test_ai_game_builder_governance"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F32",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Dragon asset and game forge pipeline subset",
+      "unittest_modules": [
+        "tests.test_ai_webcrawler_dragon_game_forge"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F33",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Game authoring experience evaluation and adversarial feedback subset",
+      "unittest_modules": [
+        "tests.test_ai_game_builder_experience_eval"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
       "family_id": "F34",
       "scope": "targeted_regression_subset",
       "independent_acceptance_question": "Forge graph and appwide runtime permissions",
@@ -138,6 +336,61 @@
         "tests.test_game_builder_jeeves_app_runtime"
       ],
       "workflow_hint": "Jeeves Story Canon Production",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F35",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Experimental multimodal feature candidate subset",
+      "unittest_modules": [
+        "tests.test_p3t2_multimodal_candidate"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F36",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "External tools and connector namespace parity subset",
+      "unittest_modules": [
+        "tests.test_tools_integrations_namespace_migration"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F39",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Native build and bounded application assembly authority subset",
+      "unittest_modules": [
+        "tests.test_build_plane"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F40",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Model serving capacity and operation cost envelope subset",
+      "unittest_modules": [
+        "tests.test_model_serving_capacity"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
+      "product_release_qualified": false
+    },
+    {
+      "family_id": "F41",
+      "scope": "targeted_regression_subset",
+      "execution_tier": "discovery_only",
+      "independent_acceptance_question": "Game builder incident and interrupted execution resilience subset",
+      "unittest_modules": [
+        "tests.test_ai_game_builder_resilience"
+      ],
+      "workflow_hint": "Separate independent target-specific exact-head gate required",
       "product_release_qualified": false
     }
   ]
