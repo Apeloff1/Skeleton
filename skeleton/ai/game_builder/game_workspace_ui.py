@@ -1382,6 +1382,68 @@ $("jeeves-campaign-verify").addEventListener("click",()=>dmGuard(async()=>{
   "campaign source; observed ending: "+report.actual_reached_ending);
 }));
 
+
+/* Link real original game journeys to complete historically signed story canon. */
+let lorePlanDigest=null,lorePlanInputs=null;
+function loreArgs(){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select active original game and scan source inventory");
+ const campaign_id=$("jeeves-lore-campaign").value.trim();
+ if(!/^[a-z][a-z0-9_-]{1,63}$/.test(campaign_id))
+  throw Error("Safe current project campaign ID required");
+ const bindings=JSON.parse($("jeeves-lore-bindings").value);
+ if(!Array.isArray(bindings)||bindings.length<2||bindings.length>8)
+  throw Error("Map every approved game node to a source-signed story scene");
+ return {project:model.active,campaign_id,bindings,
+  expected_snapshot:jeevesAppSnapshot};
+}
+$("jeeves-lore-plan").addEventListener("click",()=>dmGuard(async()=>{
+ const args=loreArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.lore.plan",params:args,operator_authorized:false
+ });
+ const result=receipt.result;
+ lorePlanDigest=result.digest;lorePlanInputs=JSON.stringify(args);
+ $("jeeves-lore-output").textContent=JSON.stringify(result,null,2);
+ status(result.game_nodes_with_verified_narrative_links+
+  " real game nodes linked to source-signed original story, "+
+  result.referred_causal_events+" canonical cited causal events.");
+}));
+$("jeeves-lore-stage").addEventListener("click",()=>dmGuard(async()=>{
+ if(!$("jeeves-lore-approval").checked)
+  throw Error("Original full-history narrative source signoff required");
+ const args=loreArgs();
+ if(!lorePlanDigest||lorePlanInputs!==JSON.stringify(args))
+  throw Error("Reverify original story and game campaign after mapping edits");
+ const reason=$("jeeves-lore-reason").value.trim();
+ if(reason.length<12||reason.length>1000)
+  throw Error("Concrete review reason required");
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.lore.stage",
+  params:{...args,expected_plan_digest:lorePlanDigest,reason},
+  operator_authorized:true
+ });
+ const result=receipt.result;
+ $("jeeves-lore-output").textContent=JSON.stringify(result,null,2);
+ $("jeeves-publish-ids").value=result.proposal_id;
+ lorePlanDigest=null;
+ status("Actual original campaign story/cast/region/causal sources staged "+
+  "for exact human review; no unapproved prose or lore has been created.");
+}));
+$("jeeves-lore-verify").addEventListener("click",()=>dmGuard(async()=>{
+ const args=loreArgs();
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.campaign.lore.verify",
+  params:{project:args.project,campaign_id:args.campaign_id,
+   expected_snapshot:jeevesAppSnapshot},
+  operator_authorized:false
+ });
+ $("jeeves-lore-output").textContent=JSON.stringify(receipt.result,null,2);
+ status("Committed multi-ending game campaign checked against full original "+
+  "cast, region and causal history and exact game source versions.");
+}));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -5641,6 +5703,31 @@ Authorize real multi-scene gameplay compilation and source staging</label>
 <button id="jeeves-campaign-stage" type="button">Stage real original campaign for human source approval</button>
 <button id="jeeves-campaign-verify" type="button">Verify committed campaign against current real engines</button>
 <pre id="jeeves-campaign-output" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Game Campaign, Cast & Plot Continuity</legend>
+<p><small>Connect every existing game campaign node to a genuine
+human-committed canonical story scene. Verify full chapter history, cast,
+region and causal event identity. Missing lore cannot be fabricated.</small></p>
+<label>Previously committed original game campaign ID
+<input id="jeeves-lore-campaign" value="first_original_campaign"></label>
+<label>Exact game node IDs to human-authored story source paths
+<textarea id="jeeves-lore-bindings" rows="7" spellcheck="false">[
+ {"node":"prologue",
+  "story_path":"story/chapters/chapter_001/acts/act_0001/scene_000001.json"},
+ {"node":"redemption",
+  "story_path":"story/chapters/chapter_001/acts/act_0001/scene_000002.json"},
+ {"node":"exile",
+  "story_path":"story/chapters/chapter_001/acts/act_0001/scene_000003.json"}
+]</textarea></label>
+<button id="jeeves-lore-plan" type="button">Check all original cast, region and plot sources</button>
+<label>Human-authored lore and campaign review reason
+<textarea id="jeeves-lore-reason" rows="2" spellcheck="false">Bind each original campaign outcome to a verified historical story scene, cast and region.</textarea></label>
+<label><input id="jeeves-lore-approval" type="checkbox">
+Explicitly approve reviewed game/story narrative source link</label>
+<button id="jeeves-lore-stage" type="button">Stage complete narrative/campaign source links</button>
+<button id="jeeves-lore-verify" type="button">Verify committed narrative source against entire history</button>
+<pre id="jeeves-lore-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
