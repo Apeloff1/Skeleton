@@ -26,13 +26,15 @@ from .model import FileRecord, RepositoryModel, canonical_json
 
 FORMAT = "skeleton-code-search-index"
 VERSION = 1
-MAX_INDEX_BYTES = 90 * 1024 * 1024
+MAX_INDEX_BYTES = 180 * 1024 * 1024
 MAX_RENDERED_LINE_BYTES = 1024 * 1024
 _RENDER_BREAK_DEPTH = 3
 _RENDER_FALLBACK_BREAK_DEPTH = 4
 MAX_SOURCE_BYTES = 2_000_000
 MAX_TERM_LENGTH = 128
-MAX_POSTINGS = 2_000_000
+# Complete canonical identifier coverage exceeded the former 2M cap on a 58k-file tree.
+# Preserve a bounded fail-closed cap; index compilation must prove this size fits CI.
+MAX_POSTINGS = 4_000_000
 MAX_REFERENCE_TERMS_PER_DOCUMENT = 96
 
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]{1,127}")
