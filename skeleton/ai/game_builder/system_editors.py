@@ -4228,6 +4228,73 @@ CATALOG = json.loads(r'''[
         "minimum": null,
         "maximum": null,
         "options": []
+      },
+      {
+        "key": "collision_geometry",
+        "kind": "enum",
+        "default": "aabb",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "aabb",
+          "oriented_box"
+        ]
+      },
+      {
+        "key": "contact_friction",
+        "kind": "int",
+        "default": 25,
+        "minimum": 0,
+        "maximum": 95,
+        "options": []
+      },
+      {
+        "key": "rotating_sweep_enabled",
+        "kind": "bool",
+        "default": true,
+        "minimum": null,
+        "maximum": null,
+        "options": []
+      },
+      {
+        "key": "oriented_sweep_budget",
+        "kind": "int",
+        "default": 96,
+        "minimum": 8,
+        "maximum": 128,
+        "options": []
+      },
+      {
+        "key": "broadphase_cell_size",
+        "kind": "int",
+        "default": 240,
+        "minimum": 80,
+        "maximum": 640,
+        "options": []
+      },
+      {
+        "key": "rest_speed",
+        "kind": "int",
+        "default": 4,
+        "minimum": 0,
+        "maximum": 60,
+        "options": []
+      },
+      {
+        "key": "rest_spin",
+        "kind": "int",
+        "default": 200,
+        "minimum": 0,
+        "maximum": 10000,
+        "options": []
+      },
+      {
+        "key": "sleep_frames",
+        "kind": "int",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 32,
+        "options": []
       }
     ],
     "preview": null

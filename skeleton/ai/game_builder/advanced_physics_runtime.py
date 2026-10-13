@@ -9,6 +9,12 @@ from __future__ import annotations
 
 from copy import deepcopy
 from fractions import Fraction
+from .advanced_physics_rotational_sweep import solve_oriented_sweep
+from .advanced_physics_stability import settle, is_sleeping
+from .advanced_physics_oriented import (
+    oriented_world, oriented_static, oriented_pairs,
+    sat_manifold, box_vertices,
+)
 from .advanced_physics_dynamics import (
     resolve_moving_pairs, advance_rotation, apply_torque,
     solve_radial_rope, transfer_collision_spin,
@@ -44,6 +50,7 @@ LAYOUT_KEYS = {
 }
 BODY_KEYS = {"id", "position", "velocity", "radius", "mass",
              "material", "layer", "mask", "break_threshold"}
+BODY_OPTIONAL_KEYS = {"shape_half", "initial_orientation"}
 FIXTURE_KEYS = {"position", "half_size", "layer"}
 
 
@@ -107,7 +114,9 @@ def normalize_layout(config, layout):
     seen = set()
     bodies = []
     for index, original in enumerate(layout["bodies"]):
-        if type(original) is not dict or set(original) != BODY_KEYS:
+        if (type(original) is not dict or
+            not BODY_KEYS <= set(original) or
+            not set(original) <= BODY_KEYS | BODY_OPTIONAL_KEYS):
             raise PhysicsActionError("body must have exact original rigid-body schema")
         ident = original["id"]
         if type(ident) is not str or not (1 <= len(ident) <= 24) or not all(
@@ -126,8 +135,16 @@ def normalize_layout(config, layout):
         material = original["material"]
         if type(material) is not str or material not in MATERIALS:
             raise PhysicsActionError("body uses unsupported material")
+        body_shape = original.get("shape_half", [radius, radius])
+        if (type(body_shape) is not list or len(body_shape) != 2 or
+            any(type(size) is not int or not 10 <= size <= radius
+                for size in body_shape)):
+            raise PhysicsActionError("oriented body shape requires bounded rectangle")
+        angle = _number(original.get("initial_orientation", 0),
+                        0, 359999, "initial orientation")
         bodies.append({
             "id": ident, "position": pos, "velocity": speed, "radius": radius,
+            "shape_half": list(body_shape), "initial_orientation": angle,
             "mass": _number(original["mass"], 1, 64, "mass"),
             "material": material,
             "layer": _number(original["layer"], 1, 3, "layer"),
@@ -140,16 +157,32 @@ def normalize_layout(config, layout):
            for axis in (range(3) if depth > 1 else range(2))):
         raise PhysicsActionError("goal cannot award victory on spawn without physical movement")
     for i, a in enumerate(bodies):
-        for b in bodies[i+1:]:
-            if all(abs(a["position"][axis] - b["position"][axis]) <
-                   a["radius"] + b["radius"] for axis in range(3 if depth > 1 else 2)):
+        for other in bodies[i+1:]:
+            if config["collision_geometry"]=="oriented_box":
+                shape_a={"position":a["position"],"half_size":a["shape_half"],
+                         "orientation":a["initial_orientation"]}
+                shape_b={"position":other["position"],
+                         "half_size":other["shape_half"],
+                         "orientation":other["initial_orientation"]}
+                if depth>1:
+                    shape_a["z_radius"]=a["radius"]
+                    shape_b["z_radius"]=other["radius"]
+                overlapping=sat_manifold(shape_a,shape_b) is not None
+            else:
+                overlapping=all(
+                    abs(a["position"][axis] - other["position"][axis]) <
+                    a["radius"] + other["radius"]
+                    for axis in range(3 if depth > 1 else 2))
+            if overlapping:
                 raise PhysicsActionError("dynamic rigid bodies cannot begin interpenetrating")
     fixtures = layout["fixtures"]
     if type(fixtures) is not list or len(fixtures) > 24:
         raise PhysicsActionError("too many static fixtures")
     normalized_fixtures = []
     for original in fixtures:
-        if type(original) is not dict or set(original) != FIXTURE_KEYS:
+        if (type(original) is not dict or
+            not FIXTURE_KEYS <= set(original) or
+            not set(original) <= FIXTURE_KEYS | {"orientation"}):
             raise PhysicsActionError("fixture must have exact solid geometry")
         pos = _triple(original["position"], 0, max(bound_x, bound_y, bound_z), "fixture")
         half = _triple(original["half_size"], 0, 150, "fixture half-size")
@@ -161,15 +194,36 @@ def normalize_layout(config, layout):
             raise PhysicsActionError("static fixture extends beyond the world")
         normalized_fixtures.append({
             "position": pos, "half_size": half,
+            "orientation": _number(original.get("orientation",0), 0, 359999,
+                                   "fixture orientation"),
             "layer": _number(original["layer"], 1, 3, "fixture layer"),
         })
     for body in bodies:
+        if config["collision_geometry"]=="oriented_box":
+            corners=box_vertices(body["position"],body["shape_half"],
+                                 body["initial_orientation"])
+            if any(not 0<=vertex[0]<=bound_x or
+                   not 0<=vertex[1]<=floor*SCALE for vertex in corners):
+                raise PhysicsActionError("rotated body corners exceed original playable map")
         for fixture in normalized_fixtures:
-            if body["mask"] & fixture["layer"] and all(
-                abs(body["position"][axis] - fixture["position"][axis])
-                < body["radius"] + fixture["half_size"][axis]
-                for axis in range(3 if depth > 1 else 2)
-            ):
+            if not (body["mask"] & fixture["layer"]):
+                continue
+            if config["collision_geometry"]=="oriented_box":
+                shape_a={"position":body["position"],"half_size":body["shape_half"],
+                         "orientation":body["initial_orientation"]}
+                shape_b={"position":fixture["position"],
+                         "half_size":fixture["half_size"],
+                         "orientation":fixture["orientation"]}
+                if depth>1:
+                    shape_a["z_radius"]=body["radius"]
+                    shape_b["z_radius"]=fixture["half_size"][2]
+                overlapping=sat_manifold(shape_a,shape_b) is not None
+            else:
+                overlapping=all(
+                    abs(body["position"][axis]-fixture["position"][axis]) <
+                    body["radius"]+fixture["half_size"][axis]
+                    for axis in range(3 if depth>1 else 2))
+            if overlapping:
                 raise PhysicsActionError("starting body overlaps a blocking solid")
     anchors = layout["anchors"]
     if type(anchors) is not list or len(anchors) != 2:
@@ -207,6 +261,12 @@ def start(config, seed):
         "battery": config["initial_battery"], "impulses_left": config["impulse_budget"],
         "motors_used": 0, "contacts": 0, "fractures": 0, "water_contacts": 0,
         "rope_breaks": 0, "max_velocity_seen": 0, "goal_frames": 0,
+        "oriented_contacts": 0, "contact_manifolds": [],
+        "geometry_mode": config["collision_geometry"],
+        "rotating_swept_contacts": 0, "oriented_sat_evaluations": 0,
+        "broadphase_pairs": 0, "broadphase_fixtures": 0,
+        "broadphase_pruned": 0, "sleeping_bodies": 0,
+        "rest_stabilizations": 0,
         "continuous_pair_contacts": 0, "max_angular_speed_seen": 0,
         "peak_cable_extension": 0,
         "milestones": [], "events": [], "finished": False, "failed": False,
@@ -221,7 +281,7 @@ def apply_scene(state, config, layout):
         state[key] = deepcopy(scene[key])
     state["bodies"] = [{
         **original, "sleep": 0, "broken": False,
-        "orientation": 0, "angular_velocity": 0
+        "orientation": original["initial_orientation"], "angular_velocity": 0
     } for original in scene["bodies"]]
 
 
@@ -239,6 +299,10 @@ def _collides(a, b, axes):
 
 
 def _world(body, state, config, events, previous=None):
+    if config["collision_geometry"]=="oriented_box":
+        oriented_world(body,state,config,events)
+        oriented_static(body,state,config,events)
+        return
     radius = body["radius"]
     pos = body["position"]
     velocity = body["velocity"]
@@ -307,6 +371,9 @@ def _world(body, state, config, events, previous=None):
 
 
 def _pair_contacts(state, config, events):
+    if config["collision_geometry"]=="oriented_box":
+        oriented_pairs(state,config,events)
+        return
     bodies = state["bodies"]
     axes = range(3) if state["depth"] > 1 else range(2)
     for i, first in enumerate(bodies):
@@ -360,8 +427,14 @@ def _advance(state, config, events):
         state["frame"] += 1
         old_positions = {body["id"]: body["position"][:]
                          for body in state["bodies"]}
+        old_angles = {body["id"]: body["orientation"]
+                      for body in state["bodies"]}
+        advance_rotation(state, config)
         for body in state["bodies"]:
             if body["broken"]:
+                continue
+            if (config["collision_geometry"]=="oriented_box" and
+                    is_sleeping(body,state,config)):
                 continue
             pos = body["position"]
             vel = body["velocity"]
@@ -396,8 +469,12 @@ def _advance(state, config, events):
                     vel[2] = vel[2] * (100-config["floor_friction"])//100
             state["max_velocity_seen"] = max(state["max_velocity_seen"], max(abs(v) for v in vel))
             _world(body, state, config, events, previous)
-        if config["continuous_pair_collision"]:
+        if (config["continuous_pair_collision"] and
+                config["collision_geometry"]=="aabb"):
             resolve_moving_pairs(state, config, old_positions, events)
+        elif (config["collision_geometry"]=="oriented_box" and
+                config["rotating_sweep_enabled"]):
+            solve_oriented_sweep(state,config,old_positions,old_angles,events)
         for _solver in range(config["solver_iterations"]):
             before = state["contacts"]
             _pair_contacts(state, config, events)
@@ -407,7 +484,8 @@ def _advance(state, config, events):
             if state["contacts"] == before:
                 break
         solve_radial_rope(state, config, events, _world)
-        advance_rotation(state, config)
+        if config["collision_geometry"]=="oriented_box":
+            settle(state,config,events)
         if (state["magnet"] or state["fan"]) and state["battery"] > 0:
             state["battery"] -= 1
             state["motors_used"] += 1
@@ -451,6 +529,7 @@ def step(state, config, action):
         if state["impulses_left"] == 0 or body["broken"]:
             raise PhysicsActionError("actuator has exhausted its finite impulse budget")
         state["impulses_left"] -= 1
+        body["sleep"]=0
         for axis in range(3):
             body["velocity"][axis] = _clamp(
                 body["velocity"][axis] + config["impulse_strength"]*direction[axis]//body["mass"],
@@ -488,6 +567,7 @@ def step(state, config, action):
         if body["broken"] or not state["impulses_left"]:
             raise PhysicsActionError("no valid finite torque impulse available")
         state["impulses_left"] -= 1
+        body["sleep"]=0
         apply_torque(body, config, clockwise=action=="torque:cw")
         events.append("finite_angular_impulse_applied")
     else:

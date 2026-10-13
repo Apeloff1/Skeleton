@@ -38,6 +38,7 @@ from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
 from .advanced_platformer_godot import render_platformer_godot_package
+from .advanced_physics_godot import render_physics_godot_package
 from .advanced_deck_godot import render_deck_godot_package
 from .advanced_shooter_godot import render_shooter_godot_package
 from .advanced_tactics_godot import render_tactics_godot_package
@@ -209,7 +210,9 @@ class _StudioHandler(BaseHTTPRequestHandler):
         if path=="/api/advanced-godot-package":
             from base64 import b64encode
             session=values["session"]
-            renderer=(render_platformer_godot_package
+            renderer=(render_physics_godot_package
+                      if type(session) is dict and session.get("editor")=="physics"
+                      else render_platformer_godot_package
                       if type(session) is dict and session.get("editor")=="platformer"
                       else render_deck_godot_package
                       if type(session) is dict and session.get("editor")=="deck_battler"
