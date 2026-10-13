@@ -293,6 +293,13 @@ class Jeeves:
             ledger=ledger, dispatcher=dispatcher, verify_result=verify_result,
         )
 
+    def shadow_learning_handoff(self, proposal, report, **evidence):
+        """Prepare evaluated Jeeves lessons for independent shadow-weight review."""
+        from skeleton.jeeves.agent.shadow_learning_adapter import (
+            prepare_shadow_learning_handoff,
+        )
+        return prepare_shadow_learning_handoff(proposal, report, **evidence)
+
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
         if not isinstance(mode, SessionMode):
