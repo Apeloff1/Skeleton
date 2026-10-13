@@ -200,6 +200,9 @@ class ShadowKnowledgeQueue:
                     knowledge_id TEXT PRIMARY KEY,
                     content_digest TEXT NOT NULL UNIQUE,
                     payload TEXT NOT NULL,
+                    priority_gain INTEGER NOT NULL,
+                    priority_relevance INTEGER NOT NULL,
+                    observed_at TEXT NOT NULL,
                     state TEXT NOT NULL,
                     revision INTEGER NOT NULL,
                     assessment TEXT NOT NULL,
@@ -209,7 +212,7 @@ class ShadowKnowledgeQueue:
                     updated_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS shadow_intake_work
-                  ON shadow_intake(state,lease_until,updated_at);
+                  ON shadow_intake(state,priority_gain DESC,priority_relevance DESC,observed_at,knowledge_id);
                 CREATE TABLE IF NOT EXISTS shadow_intake_events (
                     event_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     knowledge_id TEXT NOT NULL,
@@ -272,17 +275,71 @@ class ShadowKnowledgeQueue:
                 raise ShadowWeightError("knowledge content was previously acquired")
             db.execute(
                 """INSERT INTO shadow_intake(
-                    knowledge_id,content_digest,payload,state,revision,assessment,
-                    lease_owner,lease_until,candidate_digest,updated_at
-                ) VALUES (?,?,?,?,1,?,NULL,NULL,NULL,?)""",
+                    knowledge_id,content_digest,payload,priority_gain,priority_relevance,
+                    observed_at,state,revision,assessment,lease_owner,lease_until,
+                    candidate_digest,updated_at
+                ) VALUES (?,?,?,?,?,?,?,1,?,NULL,NULL,NULL,?)""",
                 (
                     item.knowledge_id, item.content_digest, _encode(item.as_dict()),
+                    item.predicted_gain_ppm, item.relevance_ppm, item.observed_at,
                     assessment.disposition, _encode(asdict(assessment)),
-                    _now().isoformat().replace("+00:00", "Z"),
+                    _now().isoformat(timespec="microseconds").replace("+00:00", "Z"),
                 ),
             )
             self._event(db, item.knowledge_id, "enqueue", 1, assessment.digest)
         return assessment
+
+    def append_evidence(
+        self, item: ShadowKnowledge, *, expected_revision: int,
+    ) -> ShadowIntakeAssessment:
+        """Add corroborating roots without modifying previous attestation history.
+
+        Intake may mature from pending/quarantined to training-ready. Leased
+        and trained records are immutable so queued training cannot see a
+        different source manifest from the one it acquired.
+        """
+        if not isinstance(item, ShadowKnowledge):
+            raise ShadowWeightError("shadow evidence update requires knowledge payload")
+        if isinstance(expected_revision, bool) or not isinstance(expected_revision, int) or expected_revision < 1:
+            raise ShadowWeightError("invalid intake expected revision")
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT * FROM shadow_intake WHERE knowledge_id=?",
+                (item.knowledge_id,),
+            ).fetchone()
+            if row is None or row["revision"] != expected_revision:
+                raise ShadowWeightError("unknown or stale intake candidate")
+            if row["state"] not in {"pending", "quarantined", "training-ready"}:
+                raise ShadowWeightError("leased or trained knowledge is immutable")
+            previous = ShadowKnowledge.from_dict(json.loads(row["payload"]))
+            if (
+                previous.knowledge_id != item.knowledge_id
+                or previous.content_digest != item.content_digest
+                or previous.base_model_digest != item.base_model_digest
+                or previous.topic != item.topic
+                or previous.observed_at != item.observed_at
+            ):
+                raise ShadowWeightError("intake evidence update changed knowledge identity")
+            prior = {x.source_id: x for x in previous.sources}
+            updated = {x.source_id: x for x in item.sources}
+            if any(key not in updated or updated[key] != source for key, source in prior.items()):
+                raise ShadowWeightError("shadow intake source history must be append-only")
+            assessment = assess_shadow_intake(item, self.policy)
+            revision = row["revision"] + 1
+            db.execute(
+                """UPDATE shadow_intake SET payload=?,priority_gain=?,
+                    priority_relevance=?,state=?,assessment=?,revision=?,updated_at=?
+                    WHERE knowledge_id=?""",
+                (
+                    _encode(item.as_dict()), item.predicted_gain_ppm, item.relevance_ppm,
+                    assessment.disposition, _encode(asdict(assessment)), revision,
+                    _now().isoformat(timespec="microseconds").replace("+00:00", "Z"),
+                    item.knowledge_id,
+                ),
+            )
+            self._event(db, item.knowledge_id, "append-source-evidence", revision, assessment.digest)
+            return assessment
 
     def lease(
         self, worker_id: str, *, idle: bool,
@@ -295,23 +352,19 @@ class ShadowKnowledgeQueue:
             return None
         _count("duration_seconds", duration_seconds, lower=15, upper=86_400)
         now = _now()
-        now_text = now.isoformat().replace("+00:00", "Z")
-        expiry = (now + timedelta(seconds=duration_seconds)).isoformat().replace("+00:00", "Z")
+        now_text = now.isoformat(timespec="microseconds").replace("+00:00", "Z")
+        expiry = (now + timedelta(seconds=duration_seconds)).isoformat(timespec="microseconds").replace("+00:00", "Z")
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            rows = db.execute(
+            row = db.execute(
                 """SELECT * FROM shadow_intake WHERE state='training-ready'
-                    OR (state='leased' AND lease_until<?)""", (now_text,),
-            ).fetchall()
-            if not rows:
+                    OR (state='leased' AND lease_until<?)
+                    ORDER BY priority_gain DESC, priority_relevance DESC,
+                             observed_at ASC, knowledge_id ASC LIMIT 1""",
+                (now_text,),
+            ).fetchone()
+            if row is None:
                 return None
-            # Stable priority: expected utility, relevance, age, then identity.
-            row = min(rows, key=lambda r: (
-                -json.loads(r["payload"])["predicted_gain_ppm"],
-                -json.loads(r["payload"])["relevance_ppm"],
-                json.loads(r["payload"])["observed_at"],
-                r["knowledge_id"],
-            ))
             revision = row["revision"] + 1
             db.execute(
                 """UPDATE shadow_intake SET state='leased',lease_owner=?,lease_until=?,
@@ -333,7 +386,7 @@ class ShadowKnowledgeQueue:
             raise ShadowWeightError("shadow work lease has been revoked or superseded")
         if row["lease_owner"] != lease.lease_owner or row["lease_until"] != lease.lease_until:
             raise ShadowWeightError("shadow work is leased to another worker")
-        if row["lease_until"] <= _now().isoformat().replace("+00:00", "Z"):
+        if row["lease_until"] <= _now().isoformat(timespec="microseconds").replace("+00:00", "Z"):
             raise ShadowWeightError("shadow work lease expired")
         if json.loads(row["payload"]) != lease.knowledge.as_dict():
             raise ShadowWeightError("leased shadow knowledge was changed")
