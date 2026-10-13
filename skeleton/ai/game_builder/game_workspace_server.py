@@ -38,6 +38,8 @@ from .advanced_godot_export import (
     render_advanced_godot_package, archive_advanced_godot_package,
 )
 from .advanced_platformer_godot import render_platformer_godot_package
+from .advanced_physics_interop import (rehearse_physics_encounter,
+    verify_physics_encounter)
 from .advanced_physics_godot import render_physics_godot_package
 from .advanced_deck_godot import render_deck_godot_package
 from .advanced_shooter_godot import render_shooter_godot_package
@@ -374,6 +376,18 @@ class _StudioHandler(BaseHTTPRequestHandler):
             return self._json(200, {"session":result,
                                     "available_actions":list(ACTION_HELP[result["editor"]]),
                                     "server_mutated_game_files":False})
+        if path=="/api/advanced-physics-interop":
+            proof=rehearse_physics_encounter(
+                values["session"],values.get("settings"),
+                values.get("physics_actions",["push:east"]*8))
+            if not verify_physics_encounter(proof,values["session"],
+                                            values.get("settings")):
+                raise ValueError("physical interoperability replay failed")
+            return self._json(200,{
+                "proof":proof,"source_mutated":False,
+                "native_hardware_verified":False,
+                "automatic_model_promotion_allowed":False,
+            })
         if path=="/api/advanced-verify":
             verified=verify_advanced_session(
                 values["session"],values.get("settings"))
