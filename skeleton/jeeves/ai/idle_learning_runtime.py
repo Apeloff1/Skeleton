@@ -391,6 +391,7 @@ class JeevesIdleWorkExecutor:
                      assignment.source_digest, plan.digest,
                      IdleExecutionState.IN_FLIGHT.value, None, None),
                 )
+                self._append_event(intent, "claimed", at_ns=host_now_ns)
                 self._db.execute("COMMIT")
             except BaseException:
                 if self._db.in_transaction:
@@ -410,12 +411,22 @@ class JeevesIdleWorkExecutor:
                 state = IdleExecutionState.IN_DOUBT
             else:
                 state = IdleExecutionState.VERIFIED
-            self._db.execute(
-                "UPDATE jeeves_idle_effect SET state=?,receipt_digest=?,"
-                "host_event_digest=? WHERE intent_digest=? AND state=?",
-                (state.value, result.digest, result.external_event_digest,
-                 intent, IdleExecutionState.IN_FLIGHT.value),
-            )
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                updated = self._db.execute(
+                    "UPDATE jeeves_idle_effect SET state=?,receipt_digest=?,"
+                    "host_event_digest=? WHERE intent_digest=? AND state=?",
+                    (state.value, result.digest, result.external_event_digest,
+                     intent, IdleExecutionState.IN_FLIGHT.value),
+                )
+                if updated.rowcount != 1:
+                    raise IdleRuntimeError("idle effect outcome was settled by another owner")
+                self._append_event(intent, "worker_result", at_ns=host_now_ns)
+                self._db.execute("COMMIT")
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                raise
             return state, intent
 
     def pending(self, *, limit: int = 100) -> tuple[dict[str, str], ...]:
@@ -440,12 +451,15 @@ class JeevesIdleWorkExecutor:
         external_event_digest: str,
         verify_external: Callable[[str, str], bool],
         confirmed_completed: bool,
+        observed_at_ns: int,
     ) -> IdleExecutionState:
         """Host-only reconciliation; never calls the original worker again."""
         _sha(intent_digest)
         _sha(external_event_digest)
         if type(confirmed_completed) is not bool or not callable(verify_external):
             raise IdleRuntimeError("independent recovery proof required")
+        if type(observed_at_ns) is not int or observed_at_ns < 0:
+            raise IdleRuntimeError("host recovery observation timestamp required")
         with self._lock:
             try:
                 self._db.execute("BEGIN IMMEDIATE")
@@ -462,11 +476,17 @@ class JeevesIdleWorkExecutor:
                     raise IdleRuntimeError("external idle effect was not verified")
                 state = (IdleExecutionState.VERIFIED if confirmed_completed
                          else IdleExecutionState.REJECTED)
-                self._db.execute(
+                updated = self._db.execute(
                     "UPDATE jeeves_idle_effect SET state=?,host_event_digest=? "
-                    "WHERE intent_digest=?",
-                    (state.value, external_event_digest, intent_digest),
+                    "WHERE intent_digest=? AND state IN (?,?)",
+                    (state.value, external_event_digest, intent_digest,
+                     IdleExecutionState.IN_FLIGHT.value,
+                     IdleExecutionState.IN_DOUBT.value),
                 )
+                if updated.rowcount != 1:
+                    raise IdleRuntimeError("idle effect reconciliation lost its lease")
+                self._append_event(intent_digest, "external_reconciliation",
+                                   at_ns=observed_at_ns)
                 self._db.execute("COMMIT")
                 return state
             except BaseException:
