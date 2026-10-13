@@ -207,6 +207,55 @@ class EnterpriseJourneyFrontierTests(unittest.TestCase):
         self.assertEqual(page["journeys"][0]["id"],"J01")
         self.assertTrue(page["release_qualification_not_claimed"])
 
+    def test_actual_local_studio_operator_sees_release_blockers_without_signoff(self):
+        import http.client
+        import threading
+        from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
+        from skeleton.ai.game_builder.game_workspace_server import create_workspace_server
+        root=self.fixture.fixture.root
+        workspace=GameWorkspace.create(
+            str(root/"journey_review_workspace"),authorized=True)
+        workspace.create_project("original", "rpg", authorized=True)
+        project=root/"journey_review_workspace/current/original/project.json"
+        previous=project.read_bytes()
+        server=create_workspace_server(workspace,port=0,repo_root=root)
+        thread=threading.Thread(target=server.serve_forever,daemon=True)
+        thread.start()
+        try:
+            def invoke(action,params=None,token=True):
+                connection=http.client.HTTPConnection(
+                    "127.0.0.1",server.server_port,timeout=8)
+                headers={"Host":"127.0.0.1:"+str(server.server_port),
+                         "Content-Type":"application/json"}
+                if token:
+                    headers["X-Game-Studio-Token"]=server.secret
+                try:
+                    connection.request("POST","/api/jeeves-appwide-invoke",
+                        json.dumps({"action":action,"params":params or {}}),
+                        headers)
+                    response=connection.getresponse()
+                    return response.status,json.loads(response.read())
+                finally:
+                    connection.close()
+            self.assertEqual(invoke("ai.product.journeys",token=False)[0],403)
+            status,report=invoke("ai.product.journeys")
+            self.assertEqual(status,200)
+            self.assertEqual(report["result"]["canonical_journey_count"],12)
+            self.assertEqual(report["result"]["unknown_journey_acceptance_axes"],84)
+            self.assertIsNone(report["result"]["full_app_completion_percent"])
+            status,page=invoke("ai.product.journeys.page",{
+                "limit":2,"expected_report_digest":report["result"]["digest"]})
+            self.assertEqual(status,200)
+            self.assertEqual(len(page["result"]["journeys"]),2)
+            self.assertFalse(page["result"]["journeys"][0]["journey_release_qualified"])
+            self.assertEqual(invoke("ai.product.journeys.page",{
+                "expected_report_digest":"0"*64})[0],400)
+            self.assertEqual(project.read_bytes(),previous)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=3)
+
     def test_bounded_offsets_and_boolean_pagination_fail_closed(self):
         for params in (
             {"offset":True},{"limit":False},{"limit":0},
