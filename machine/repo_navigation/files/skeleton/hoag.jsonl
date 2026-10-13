@@ -1,7 +1,7 @@
-{"p":"skeleton/hoag/__init__.py","g":"f131d41f20b3d3413b1e391394a857385502c9cd","b":534,"m":"100644","t":"blob","z":"research-lineage","f":"skeleton/hoag"}
-{"p":"skeleton/hoag/capabilities.py","g":"38fdcb5701b0a0bbb66b8e7b6401db4591d737f0","b":866,"m":"100644","t":"blob","z":"research-lineage","f":"skeleton/hoag"}
-{"p":"skeleton/hoag/cards.py","g":"ee7b01c6e128a6b9c5e1fa7f2e312447c3f1d813","b":737,"m":"100644","t":"blob","z":"research-lineage","f":"skeleton/hoag"}
-{"p":"skeleton/hoag/engine.py","g":"e35cbf28a5b575ccc70544f0840b05c2c4aabe45","b":886,"m":"100644","t":"blob","z":"research-lineage","f":"skeleton/hoag"}
-{"p":"skeleton/hoag/law.py","g":"c23cff6258fc68f72b3b1ae3f93f87c1fcd46615","b":384,"m":"100644","t":"blob","z":"research-lineage","f":"skeleton/hoag"}
-{"p":"skeleton/hoag/plane.py","g":"c5e9ff5ece3c8c73e626ef680f2b9304f6f11f61","b":1280,"m":"100644","t":"blob","z":"research-lineage","f":"skeleton/hoag"}
-{"p":"skeleton/hoag/verify.py","g":"f717295f4ab2df021c25dfa3a25db630ed4f9136","b":1345,"m":"100644","t":"blob","z":"research-lineage","f":"skeleton/hoag"}
+{"b":534,"f":"skeleton/hoag","g":"f131d41f20b3d3413b1e391394a857385502c9cd","m":"100644","p":"skeleton/hoag/__init__.py","t":"blob","z":"research-lineage"}
+{"b":866,"f":"skeleton/hoag","g":"38fdcb5701b0a0bbb66b8e7b6401db4591d737f0","m":"100644","p":"skeleton/hoag/capabilities.py","t":"blob","z":"research-lineage"}
+{"b":737,"f":"skeleton/hoag","g":"ee7b01c6e128a6b9c5e1fa7f2e312447c3f1d813","m":"100644","p":"skeleton/hoag/cards.py","t":"blob","z":"research-lineage"}
+{"b":886,"f":"skeleton/hoag","g":"e35cbf28a5b575ccc70544f0840b05c2c4aabe45","m":"100644","p":"skeleton/hoag/engine.py","t":"blob","z":"research-lineage"}
+{"b":384,"f":"skeleton/hoag","g":"c23cff6258fc68f72b3b1ae3f93f87c1fcd46615","m":"100644","p":"skeleton/hoag/law.py","t":"blob","z":"research-lineage"}
+{"b":1280,"f":"skeleton/hoag","g":"c5e9ff5ece3c8c73e626ef680f2b9304f6f11f61","m":"100644","p":"skeleton/hoag/plane.py","t":"blob","z":"research-lineage"}
+{"b":1345,"f":"skeleton/hoag","g":"f717295f4ab2df021c25dfa3a25db630ed4f9136","m":"100644","p":"skeleton/hoag/verify.py","t":"blob","z":"research-lineage"}

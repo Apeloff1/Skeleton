@@ -1,8 +1,8 @@
-{"p":"skeleton/deploy/__init__.py","g":"1695aefc3903453c37889c7742e03db793eb4c16","b":357,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/deploy"}
-{"p":"skeleton/deploy/harness.py","g":"c27d95c3e8183053d3cbc431d4447e37dca95bc4","b":6873,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/deploy"}
-{"p":"skeleton/deploy/spine_pymongo_async.py","g":"f4191d74f3d87e642b5dcad3c0b75dff3fe0b371","b":3988,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/deploy"}
-{"p":"skeleton/deploy/strategies/__init__.py","g":"3c612f9d6d8820b685eaacdbc22dc3242daa1cde","b":463,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/deploy/strategies"}
-{"p":"skeleton/deploy/strategies/blue_green.py","g":"f644a643b03f43133bd0899a416b7fccce94be4d","b":3930,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/deploy/strategies"}
-{"p":"skeleton/deploy/strategies/canary.py","g":"f30f9559f75fedde54bd7e634394bd78a45b43d7","b":4671,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/deploy/strategies"}
-{"p":"skeleton/deploy/strategies/environment_manager.py","g":"e9d6d205ad3c114f2e1ebb09ff8e5f007bf1245a","b":4616,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/deploy/strategies"}
-{"p":"skeleton/deploy/strategies/release_notes.py","g":"201fdbfd2af4dd275a739173f56633beb026141a","b":4184,"m":"100644","t":"blob","z":"build-delivery","f":"skeleton/deploy/strategies"}
+{"b":357,"f":"skeleton/deploy","g":"1695aefc3903453c37889c7742e03db793eb4c16","m":"100644","p":"skeleton/deploy/__init__.py","t":"blob","z":"build-delivery"}
+{"b":6873,"f":"skeleton/deploy","g":"c27d95c3e8183053d3cbc431d4447e37dca95bc4","m":"100644","p":"skeleton/deploy/harness.py","t":"blob","z":"build-delivery"}
+{"b":3988,"f":"skeleton/deploy","g":"f4191d74f3d87e642b5dcad3c0b75dff3fe0b371","m":"100644","p":"skeleton/deploy/spine_pymongo_async.py","t":"blob","z":"build-delivery"}
+{"b":463,"f":"skeleton/deploy/strategies","g":"3c612f9d6d8820b685eaacdbc22dc3242daa1cde","m":"100644","p":"skeleton/deploy/strategies/__init__.py","t":"blob","z":"build-delivery"}
+{"b":3930,"f":"skeleton/deploy/strategies","g":"f644a643b03f43133bd0899a416b7fccce94be4d","m":"100644","p":"skeleton/deploy/strategies/blue_green.py","t":"blob","z":"build-delivery"}
+{"b":4671,"f":"skeleton/deploy/strategies","g":"f30f9559f75fedde54bd7e634394bd78a45b43d7","m":"100644","p":"skeleton/deploy/strategies/canary.py","t":"blob","z":"build-delivery"}
+{"b":4616,"f":"skeleton/deploy/strategies","g":"e9d6d205ad3c114f2e1ebb09ff8e5f007bf1245a","m":"100644","p":"skeleton/deploy/strategies/environment_manager.py","t":"blob","z":"build-delivery"}
+{"b":4184,"f":"skeleton/deploy/strategies","g":"201fdbfd2af4dd275a739173f56633beb026141a","m":"100644","p":"skeleton/deploy/strategies/release_notes.py","t":"blob","z":"build-delivery"}
