@@ -64,6 +64,7 @@ class ShadowWorkReceipt:
     worker_id: str
     handoff_digest: str | None = None
     candidate_id: str | None = None
+    checkpoint_path: str | None = None
     ledger_revision: int | None = None
     reason_code: str | None = None
 
@@ -175,6 +176,7 @@ class ShadowIdleTrainingWorker:
                 disposition="staged", worker_id=self.worker_id,
                 handoff_digest=handoff.digest,
                 candidate_id=artifacts.candidate_id,
+                checkpoint_path=artifacts.checkpoint_path,
                 ledger_revision=snapshot.revision,
             )
         except ShadowTrainingRejected as exc:
