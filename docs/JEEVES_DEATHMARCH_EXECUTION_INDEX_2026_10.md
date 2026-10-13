@@ -23,6 +23,8 @@ templates, simulated previews or other reviewed non-mutating adapters.
 Individual \`source.propose\` and production compilers retain their own
 separate operator gates.
 
+**DX-16–17:** Existing local Game Studio serves a new interactive deathmarch deck, backed by the already authenticated `jeeves-appwide-invoke` route. The UI uses text-only JSON output, rejects invalid counts, and never requests source-write authority. Distinct action selector IDs remove an existing page-level collision between the appwide panel and capability cockpit.
+
 **Scope/status:** source implementation landed on a draft stacked branch.
 No tests were run by request. No production release, merge, model weight
 promotion, successful device build or enterprise AI completion is claimed.

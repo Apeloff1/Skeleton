@@ -253,7 +253,7 @@ $("jeeves-app-scan").addEventListener("click",async()=>{
   const result=await api("/api/jeeves-appwide-status");
   const catalog=await api("/api/jeeves-appwide-catalog");
   jeevesAppSnapshot=result.snapshot_digest;
-  setOptions("jeeves-app-action",catalog.registered_adapters.map(x=>x.name));
+  setOptions("jeeves-appwide-action",catalog.registered_adapters.map(x=>x.name));
   $("jeeves-app-report").textContent=JSON.stringify({
    scanned_regular_files:result.scanned_regular_files,
    readable_files:result.readable_files,
@@ -283,7 +283,7 @@ $("jeeves-app-search").addEventListener("click",async()=>{
 });
 $("jeeves-app-invoke").addEventListener("click",async()=>{
  try{
-  const action=$("jeeves-app-action").value;
+  const action=$("jeeves-appwide-action").value;
   if(!action)throw Error("Scan application first to discover bound action adapters");
   const params=JSON.parse($("jeeves-app-params").value);
   if(!params||typeof params!=="object"||Array.isArray(params))
@@ -298,6 +298,83 @@ $("jeeves-app-invoke").addEventListener("click",async()=>{
   status("Jeeves "+action+" completed with a typed receipt. No arbitrary code execution or unreviewed app mutation.");
  }catch(error){status("Jeeves capability invocation blocked: "+error.message);}
 });
+
+
+/* Source-grounded Jeeves production deck: reviewed, typed read/preview only. */
+let deathmarchPlanDigest=null;
+let deathmarchGraphDigest=null;
+async function dmInvoke(action,params){
+ if(!jeevesAppSnapshot)
+  throw Error("Scan the application before preparing source-pinned milestones");
+ const request={...params,expected_snapshot:jeevesAppSnapshot};
+ if(deathmarchPlanDigest && action!=="ai.milestones.page" &&
+    action!=="ai.milestones")
+  request.expected_plan_digest=deathmarchPlanDigest;
+ if(deathmarchGraphDigest && (
+    action==="ai.workwaves" || action==="ai.workpack" ||
+    action==="ai.change_frontier"))
+  request.expected_graph_digest=deathmarchGraphDigest;
+ // Batch preview has only one allowed 'jobs' key; it does not inherit
+ // milestone snapshot fields. The snapshot guard is for graph actions.
+ const finalParams=action==="studio.batch_preview"?params:request;
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action,params:finalParams,operator_authorized:false,
+ });
+ const result=receipt.result;
+ $("jeeves-dm-output").textContent=JSON.stringify(result,null,2).slice(0,75000);
+ return result;
+}
+async function dmGuard(job){
+ try{await job();}
+ catch(error){status("Jeeves deathmarch action rejected: "+error.message);}
+}
+function dmPositive(id,min,max){
+ const number=Number($(id).value);
+ if(!Number.isInteger(number)||number<min||number>max)
+  throw Error("Expected a whole number between "+min+" and "+max);
+ return number;
+}
+$("jeeves-dm-tasks").addEventListener("click",()=>dmGuard(async()=>{
+ const result=await dmInvoke("ai.milestones.page",{offset:0,limit:30});
+ deathmarchPlanDigest=result.plan_digest;
+ $("jeeves-dm-task-ids").value=result.tasks.slice(0,5).map(x=>x.id).join(", ");
+ status(result.total_tasks+" canonical evidence tasks indexed. Source execution is not automatic.");
+}));
+$("jeeves-dm-waves").addEventListener("click",()=>dmGuard(async()=>{
+ const result=await dmInvoke("ai.workwaves",{
+  max_parallel:dmPositive("jeeves-dm-parallel",1,24),offset:0,limit:16});
+ deathmarchPlanDigest=result.plan_digest;
+ deathmarchGraphDigest=result.graph_digest;
+ status(result.total_waves+" dependency-ordered workwaves, "+result.total_tasks+
+  " tasks; no worker reservations or approvals have been issued.");
+}));
+$("jeeves-dm-workpack").addEventListener("click",()=>dmGuard(async()=>{
+ const ids=$("jeeves-dm-task-ids").value.split(",")
+  .map(x=>x.trim()).filter(Boolean);
+ if(ids.length<1||ids.length>24||new Set(ids).size!==ids.length)
+  throw Error("Select 1–24 unique canonical task IDs");
+ const result=await dmInvoke("ai.workpack",{
+  task_ids:ids,source_bytes:4096,total_bytes:32768,max_sources:16});
+ status(result.source_count+" real source excerpts included in workpack; "+
+  "edits still require independent approval.");
+}));
+$("jeeves-dm-impact").addEventListener("click",()=>dmGuard(async()=>{
+ const paths=$("jeeves-dm-paths").value.split("\n")
+  .map(x=>x.trim()).filter(Boolean);
+ if(paths.length<1||paths.length>32||new Set(paths).size!==paths.length)
+  throw Error("Provide 1–32 unique source paths");
+ const result=await dmInvoke("ai.change_frontier",{paths,limit:80});
+ status(result.affected_total+" declared affected graph nodes and "+
+  result.affected_milestone_count+" milestone candidates; no runtime quality claim.");
+}));
+$("jeeves-dm-batch").addEventListener("click",()=>dmGuard(async()=>{
+ const jobs=JSON.parse($("jeeves-dm-preview-jobs").value);
+ if(!Array.isArray(jobs)||jobs.length<1||jobs.length>12)
+  throw Error("Provide 1–12 typed reviewed preview jobs");
+ const result=await dmInvoke("studio.batch_preview",{jobs});
+ status(result.job_count+" existing production adapters previewed, "+
+  result.omitted_large_results+" large responses held to digest-only receipts.");
+}));
 
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
@@ -4207,12 +4284,34 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <option value="general">Other tracked components</option>
 </select></label>
 <button id="jeeves-app-search" type="button">Search indexed source and resources</button>
-<label>Governed runtime action<select id="jeeves-app-action"></select></label>
+<label>Governed runtime action<select id="jeeves-appwide-action"></select></label>
 <label>Typed action arguments JSON<textarea id="jeeves-app-params" rows="3" spellcheck="false">{}</textarea></label>
 <label>Explicit approval for a source-change proposal (never automatic commit)
 <input id="jeeves-app-approval" type="checkbox"></label>
 <button id="jeeves-app-invoke" type="button">Invoke reviewed capability</button>
 <pre id="jeeves-app-report" role="status" aria-live="polite"></pre>
+</fieldset>
+
+<fieldset><legend>Jeeves · Deathmarch Production Deck</legend>
+<p><small>Source-pinned tasks, parallel workwaves, real file context, impact trace,
+and reviewed multi-adapter previews. All previews are non-mutating; source edits,
+model promotion and release still require independent approval and evidence.</small></p>
+<button id="jeeves-dm-tasks" type="button">Index next 30 milestone tasks</button>
+<label>Parallel per wave (1–24)<input id="jeeves-dm-parallel" type="number" min="1" max="24" value="8"></label>
+<button id="jeeves-dm-waves" type="button">Build dependency-safe workwaves</button>
+<label>Exact milestone IDs (comma separated, up to 24)
+<textarea id="jeeves-dm-task-ids" spellcheck="false" rows="2" placeholder="AI-CAP-assistant.text, APP-SERVICE-backend"></textarea></label>
+<button id="jeeves-dm-workpack" type="button">Assemble source-hashed workpack</button>
+<label>Repository paths changed (one per line, max 32)
+<textarea id="jeeves-dm-paths" spellcheck="false" rows="2" placeholder="skeleton/ai/game_builder/jeeves_appwide_fabric.py"></textarea></label>
+<button id="jeeves-dm-impact" type="button">Inspect downstream change and milestone impact</button>
+<label>Reviewed preview jobs JSON (max 12)
+<textarea id="jeeves-dm-preview-jobs" spellcheck="false" rows="4">[
+ {"action":"editor.catalog","params":{}},
+ {"action":"crawler.plan","params":{"limit":3}}
+]</textarea></label>
+<button id="jeeves-dm-batch" type="button">Run reviewed non-mutating app previews</button>
+<pre id="jeeves-dm-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Whole-App Capability Cockpit</legend>
 <p><small>Live inventory of installed app families, forges, game editors, Dragon/crawler workers, model and training planes. Source discovery is not execution authority. Only audited local adapters can act; edits create proposals needing explicit human commit. No arbitrary shell, network, AI weight promotion or provider secrets.</small></p>
