@@ -64,8 +64,13 @@ jobs:
           git switch -c automation/repo-navigation-index
           git add -A machine/repo_navigation
           git commit -m 'chore(index): refresh complete repository navigation inventory'
-          git fetch origin automation/repo-navigation-index || true
-          git push --force-with-lease origin HEAD:refs/heads/automation/repo-navigation-index
+          # Lease against the actual remote ref even on shallow checkouts.
+          remote_sha="$(git ls-remote --heads origin refs/heads/automation/repo-navigation-index | cut -f1)"
+          if [[ -n "$remote_sha" ]]; then
+            git push "--force-with-lease=refs/heads/automation/repo-navigation-index:$remote_sha" origin HEAD:refs/heads/automation/repo-navigation-index
+          else
+            git push origin HEAD:refs/heads/automation/repo-navigation-index
+          fi
           if ! gh pr view automation/repo-navigation-index --json number >/dev/null 2>&1; then
             gh pr create --base main --head automation/repo-navigation-index --title 'chore(index): refresh whole-repository navigation atlas' --body 'Non-destructive feature map, exact Git-blob duplicates and heuristic near-content candidates. Review CI before merging.'
           fi
