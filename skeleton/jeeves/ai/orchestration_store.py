@@ -147,6 +147,7 @@ class DurableOrchestrLedger:
             raise OrchestrationStoreError("independent host authorizer required")
         self._authorize = authorize
         self._lock = RLock()
+        self._cached: tuple[OrchestrLedger, str, int] | None = None
         self._db = sqlite3.connect(
             str(self.path), isolation_level=None, timeout=10,
             check_same_thread=False,
@@ -183,6 +184,8 @@ class DurableOrchestrLedger:
             ).fetchone()
             if meta is None:
                 raise OrchestrationStoreError("orchestration metadata missing")
+            if self._cached is not None and meta == (self._cached[1], self._cached[2]):
+                return self._cached
             head, count = GENESIS, 0
             ledger = OrchestrLedger()
             for rev, prior, recorded, event_json, ledger_json in self._db.execute(
@@ -228,7 +231,8 @@ class DurableOrchestrLedger:
                 count += 1
             if meta != (head, count):
                 raise OrchestrationStoreError("orchestration state head mismatch")
-            return ledger, head, count
+            self._cached = (ledger, head, count)
+            return self._cached
 
     def _commit(
         self, action: str, ledger: OrchestrLedger, *,
@@ -272,6 +276,7 @@ class DurableOrchestrLedger:
                 if self._db.in_transaction:
                     self._db.execute("ROLLBACK")
                 raise
+            self._cached = (ledger, event_sha, count + 1)
             return ledger, event_sha
 
     def append(
