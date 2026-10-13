@@ -31,6 +31,64 @@ class IdleRuntimeError(ValueError):
     """Idle-work admission, durable lease or effect proof failed."""
 
 
+class IdleWorkPreempted(IdleRuntimeError):
+    """Trusted host telemetry no longer permits background work."""
+
+
+class IdleWorkCheckpoint:
+    """Cooperative worker preemption: call before each bounded source operation.
+
+    Host worker handlers MUST use this checkpoint between external operations,
+    batch items and expensive phases. The runner additionally samples before
+    and after invoking a handler, but cannot preempt a noncooperative blocking
+    handler already inside external code.
+    """
+
+    def __init__(
+        self, *, policy: IdleLearningPolicy, candidate: IdleWorkCandidate,
+        telemetry_probe: Callable[[], tuple[HostIdleTelemetry, int]],
+    ) -> None:
+        if not callable(telemetry_probe):
+            raise IdleRuntimeError("host idle telemetry probe required")
+        self._policy = policy
+        self._candidate = candidate
+        self._probe = telemetry_probe
+        self.poll_count = 0
+
+    def permitted(self) -> bool:
+        observed = self._probe()
+        if (not isinstance(observed, tuple) or len(observed) != 2
+                or not isinstance(observed[0], HostIdleTelemetry)
+                or type(observed[1]) is not int):
+            raise IdleWorkPreempted("host telemetry probe returned invalid observation")
+        telemetry, now_ns = observed
+        self.poll_count += 1
+        if (now_ns < telemetry.observed_at_ns
+                or now_ns - telemetry.observed_at_ns > self._policy.maximum_telemetry_age_ns):
+            return False
+        if telemetry.pending_interactive_requests or telemetry.power_saving:
+            return False
+        if telemetry.quiet_ns < self._policy.minimum_idle_ns:
+            return False
+        if telemetry.serving_pressure_ppm >= self._policy.maximum_serving_pressure_ppm:
+            return False
+        if (telemetry.cpu_free_ppm < self._policy.minimum_cpu_free_ppm
+                or telemetry.memory_free_ppm < self._policy.minimum_memory_free_ppm):
+            return False
+        if self._candidate.requires_network and not telemetry.online:
+            return False
+        if (self._candidate.requires_accelerator
+                and telemetry.gpu_free_ppm < self._policy.minimum_gpu_free_ppm):
+            return False
+        # Current job counts as active during cooperative work, so do not
+        # reject it solely because total worker concurrency is saturated.
+        return True
+
+    def __call__(self) -> None:
+        if not self.permitted():
+            raise IdleWorkPreempted("interactive demand or resource pressure preempted idle work")
+
+
 class IdleExecutionState(str, Enum):
     IN_FLIGHT = "in_flight"
     VERIFIED = "verified"
@@ -127,6 +185,7 @@ class JeevesIdleWorkExecutor:
         host_authorize: Callable[[IdleWorkAssignment, str, Any], bool],
         handlers: Mapping[IdleWorkKind, Callable[..., HostIdleWorkReceipt]],
         verify_result: Callable[[IdleWorkAssignment, HostIdleWorkReceipt, Any], bool],
+        telemetry_probe: Callable[[], tuple[HostIdleTelemetry, int]],
     ) -> None:
         self.path = Path(store_path)
         if not self.path.is_absolute():
@@ -144,6 +203,9 @@ class JeevesIdleWorkExecutor:
         self._authorize = host_authorize
         self._handlers = dict(handlers)
         self._verify = verify_result
+        if not callable(telemetry_probe):
+            raise IdleRuntimeError("host polling probe required for cooperative preemption")
+        self._telemetry_probe = telemetry_probe
         self._lock = RLock()
         self._db = sqlite3.connect(
             str(self.path), timeout=10, isolation_level=None, check_same_thread=False,
@@ -374,6 +436,11 @@ class JeevesIdleWorkExecutor:
             handler = self._handlers.get(assignment.kind)
             if handler is None:
                 raise IdleRuntimeError("host has no handler for this idle work kind")
+            checkpoint = IdleWorkCheckpoint(
+                policy=self.policy, candidate=candidate,
+                telemetry_probe=self._telemetry_probe,
+            )
+            checkpoint()
             intent = self._intent(plan, assignment)
             if self._authorize(assignment, intent, context) is not True:
                 raise IdleRuntimeError("host did not authorize exact idle work")
@@ -399,14 +466,18 @@ class JeevesIdleWorkExecutor:
                 raise
             # Never wrap external effects in a retry loop. Any process crash
             # leaves the durable row in-flight and prevents blind duplicate work.
-            result = handler(assignment, context)
+            result = handler(assignment, context, checkpoint)
+            # The handler has completed; a newly active user prevents fresh
+            # work, not durable recording of already-observed external output.
+            completed_while_idle = checkpoint.permitted()
             if not isinstance(result, HostIdleWorkReceipt):
                 raise IdleRuntimeError("host idle handler returned untyped receipt")
             if (result.work_id != assignment.work_id
                     or result.scope_id != assignment.scope_id
                     or result.kind is not assignment.kind
                     or result.source_digest != assignment.source_digest
-                    or not result.completed
+                    or not result.completed or not completed_while_idle
+                    or checkpoint.poll_count < 2
                     or self._verify(assignment, result, context) is not True):
                 state = IdleExecutionState.IN_DOUBT
             else:
@@ -506,6 +577,6 @@ class JeevesIdleWorkExecutor:
 
 
 __all__ = [
-    "IdleRuntimeError", "IdleExecutionState",
+    "IdleRuntimeError", "IdleWorkPreempted", "IdleWorkCheckpoint", "IdleExecutionState",
     "HostIdleWorkReceipt", "JeevesIdleWorkExecutor",
 ]
