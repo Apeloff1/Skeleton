@@ -68,7 +68,10 @@ class _DropTokenOnRedirect(urllib.request.HTTPRedirectHandler):
             raise JeevesAppwideError("CI artifact redirect requires HTTPS")
         if original.netloc != redirected.netloc:
             result.remove_header("Authorization")
-            result.remove_unredirected_header("Authorization")
+            # urllib.request.Request.remove_header clears both ordinary and
+            # unredirected headers. There is no remove_unredirected_header().
+            if result.get_header("Authorization") is not None:
+                raise JeevesAppwideError("cross-origin CI redirect retained bearer token")
         return result
 
 
