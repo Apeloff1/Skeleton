@@ -101,6 +101,7 @@ class JeevesWorkbench:
         idle_handlers: Mapping[Any, Callable[..., Any]] | None = None,
         idle_authorize: Callable[..., bool] | None = None,
         idle_verify_result: Callable[..., bool] | None = None,
+        idle_telemetry_probe: Callable[..., Any] | None = None,
         idle_policy: Any = None,
     ) -> None:
         from skeleton.jeeves.app_capability_bridge import _root
@@ -156,7 +157,7 @@ class JeevesWorkbench:
         if release_verify_external is not None and not callable(release_verify_external):
             raise JeevesWorkbenchError("model release verification requires host callback")
         self._release_verify_external = release_verify_external
-        provided_idle = (idle_handlers, idle_authorize, idle_verify_result)
+        provided_idle = (idle_handlers, idle_authorize, idle_verify_result, idle_telemetry_probe)
         if any(value is not None for value in provided_idle) and not all(
             value is not None for value in provided_idle
         ):
@@ -166,6 +167,7 @@ class JeevesWorkbench:
         self._idle_handlers = idle_handlers
         self._idle_authorize = idle_authorize
         self._idle_verify_result = idle_verify_result
+        self._idle_telemetry_probe = idle_telemetry_probe
         self._idle_policy = idle_policy
         self._open_runbooks: list[CreatorRunbookStore] = []
         self.atlas: JeevesRepositoryFileAtlas | None = None
@@ -212,6 +214,7 @@ class JeevesWorkbench:
                         for kind, handler in self._idle_handlers.items()
                     },
                     verify_result=self._scoped_idle_verify,
+                    telemetry_probe=self._scoped_idle_probe,
                 )
             self.tools = self._build_tools()
             self.executor = ToolExecutor(self.tools)
@@ -500,6 +503,14 @@ class JeevesWorkbench:
             self._open_runbooks.append(store)
             return runner
 
+    def _scoped_idle_probe(self):
+        """Read fresh telemetry from the trusted host, not model parameters."""
+        if self._idle_telemetry_probe is None:
+            raise JeevesWorkbenchError("host telemetry probe unavailable")
+        return self._idle_telemetry_probe(
+            self.tenant_id, self.project_id, self.principal_id,
+        )
+
     def _scoped_idle_authorize(self, assignment, intent: str, context) -> bool:
         return (
             self._context_scoped(context)
@@ -511,10 +522,12 @@ class JeevesWorkbench:
         )
 
     def _scoped_idle_handler(self, handler):
-        def invoke(assignment, context):
+        def invoke(assignment, context, checkpoint):
             if not self._context_scoped(context):
                 raise JeevesWorkbenchError("idle worker crossed tenant/project scope")
-            return handler(assignment, context)
+            # Host worker implementations must invoke checkpoint() between
+            # source requests and expensive phases to yield to interactive use.
+            return handler(assignment, context, checkpoint)
         return invoke
 
     def _scoped_idle_verify(self, assignment, receipt, context) -> bool:
