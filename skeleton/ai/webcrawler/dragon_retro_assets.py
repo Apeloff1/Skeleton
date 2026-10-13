@@ -116,8 +116,11 @@ def enrich_gb_asm(source:str) -> str:
     ld [OAM+2], a
     xor a
     ld [OAM+3], a"""
-    if before not in source:raise ValueError("GB sprite update anchor unavailable")
-    source=source.replace(before,after)
+    source,n=re.subn(
+        r"(?m)^    xor a\n    ld \[OAM\+2\],\s*a\n    ld \[OAM\+3\],\s*a$",
+        lambda _:after,source,
+    )
+    if n!=1:raise ValueError("GB sprite update anchor unavailable")
     if "PlayerY: ds 1" not in source:raise ValueError("GB WRAM declaration missing")
     source=source.replace("PlayerY: ds 1","PlayerY: ds 1\nAnimFrame: ds 1")
     if "    ld a, 48\n    ld [PlayerX], a" not in source:
@@ -125,10 +128,12 @@ def enrich_gb_asm(source:str) -> str:
     source=source.replace("    ld a, 48\n    ld [PlayerX], a",
                           "    xor a\n    ld [AnimFrame], a\n    ld a, 48\n    ld [PlayerX], a")
     # Star tile moved to index 4.
-    if "    ld a, 1\n    ld [OAM+6], a" not in source:
-        raise ValueError("GB collectible sprite declaration missing")
-    return source.replace("    ld a, 1\n    ld [OAM+6], a",
-                          "    ld a, 4\n    ld [OAM+6], a")
+    source,n=re.subn(
+        r"(?m)^    ld a,\s*1\n    ld \[OAM\+6\],\s*a$",
+        lambda _:"    ld a, 4\n    ld [OAM+6], a",source,
+    )
+    if n!=1:raise ValueError("GB collectible sprite declaration missing")
+    return source
 
 def enrich_nes_asm(source:str) -> str:
     if not isinstance(source,str):raise ValueError("NES source required")
