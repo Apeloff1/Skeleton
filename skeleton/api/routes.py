@@ -1444,6 +1444,10 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
     from skeleton.forge.playtest import PLAYTEST_MODES
     from skeleton.forge.repair import REPAIR_MODES
 
+    # The remote intake is in-memory. It must not accept server-side disk
+    # destinations or overwrite controls, even when the request is attested.
+    if any(key in request for key in ("project_root", "out", "overwrite")):
+        raise HTTPException(status_code=422, detail="remote GameForge intake cannot write server project files")
     answers = _mapping_field(request, "answers", {}, optional=False) or {}
     taken = intake(answers)
     runner = _gameforge_runner(state)
@@ -1451,8 +1455,6 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
         taken.vision,
         era=taken.era,
         answers=answers,
-        project_root=_text_field(request, "project_root", None, optional=True),
-        overwrite=_bool_field(request, "overwrite", False),
         target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
         archetype=_text_field(request, "archetype", "") or None,
         playtest=_text_field(request, "playtest", "off", allowed=PLAYTEST_MODES),
