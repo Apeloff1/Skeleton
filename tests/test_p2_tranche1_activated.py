@@ -84,6 +84,8 @@ def test_pending_unsigned_t1_may_be_activated_without_completion(tmp_path: Path)
         implementation_signed=False,
         verification_signed=False,
     )
+    backlog["summary"]["closed_count"] -= 1
+    backlog["summary"]["landed_unpromoted_count"] += 1
     (root / "machine/ai_p2_task_backlog.json").write_text(json.dumps(backlog), encoding="utf-8")
     progress_path = root / "machine/ai_p2_execution_map.json"
     execution = json.loads(progress_path.read_text(encoding="utf-8"))
