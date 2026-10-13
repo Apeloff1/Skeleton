@@ -71,6 +71,13 @@ def _parser() -> argparse.ArgumentParser:
     local_ai.add_argument("--llama-executable", help="explicit local llama.cpp executable (not downloaded)")
 
     local_ai.add_argument("--inspect-model", action="store_true", help="validate model weights and report offline runtime limits")
+    local_ai.add_argument("--prepare-dataset", help="flat folder of explicit UTF-8 .txt documents")
+    local_ai.add_argument("--dataset-output", help="new directory for disjoint train/validation and identity manifest")
+    local_ai.add_argument("--improve-dataset", help="verified dataset folder for held-out checkpoint continuation")
+    local_ai.add_argument("--verify-dataset", help="check published dataset hashes, split contract and canonical manifest")
+    local_ai.add_argument("--verify-sources", help="optional original source folder for strict source-to-dataset verification")
+    local_ai.add_argument("--validation-percent", type=int, default=25, help="source-document validation split percent (10–50)")
+    local_ai.add_argument("--split-seed", type=int, default=41, help="reproducible source-document split seed")
     local_ai.add_argument("--self-check", action="store_true", help="verify bundled offline native inference, CPU training and benchmarking")
     local_ai.add_argument("--train-corpus", help="train a bounded CPU native checkpoint from a local UTF-8 text file")
     local_ai.add_argument("--improve-model", help="previous native checkpoint for independent held-out improvement")
@@ -235,6 +242,116 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if command == "local-ai":
         from skeleton.app.local_ai import OfflineAISession, inspect_local_model, load_native_checkpoint, run_offline_ai
 
+        if args.improve_dataset:
+            if (
+                not args.improve_model or not args.output_model
+                or args.prepare_dataset or args.dataset_output or args.verify_dataset
+                or args.train_corpus or args.eval_corpus
+                or args.model or args.prompt or args.inspect_model
+                or args.gguf_model or args.llama_executable or args.self_check
+                or args.compare_model or args.candidate_model or args.benchmark_suite
+                or args.exclude_train_corpus or args.replay_improvement
+                or args.load_chat or args.save_chat
+                or args.max_output_tokens is not None
+                or args.validation_percent != 25 or args.split_seed != 41
+            ):
+                print("--improve-dataset requires --improve-model and --output-model; optional --epochs, --verify-sources and --protect-suite")
+                return 2
+            from skeleton.app.local_ai_dataset import improve_native_dataset
+
+            try:
+                result = improve_native_dataset(
+                    args.improve_model, args.improve_dataset, args.output_model,
+                    epochs=args.epochs if args.epochs is not None else 1, original_sources=args.verify_sources,
+                    protected_suite=args.protect_suite,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("verified dataset improvement rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(result, sort_keys=True, ensure_ascii=False))
+            else:
+                receipt = result["improvement"]
+                print("Native candidate checkpoint written: " + str(args.output_model))
+                print("Dataset ID: " + result["dataset"]["dataset_id"])
+                print("held-out perplexity: "
+                      + f"{receipt['baseline_perplexity']:.3f} -> {receipt['accepted_perplexity']:.3f}")
+                print("Parent checkpoint retained; no independent quality certification")
+            return 0
+
+        if args.verify_dataset or args.verify_sources:
+            if (
+                not args.verify_dataset or args.prepare_dataset or args.dataset_output
+                or args.model or args.prompt or args.inspect_model
+                or args.gguf_model or args.llama_executable or args.self_check
+                or args.train_corpus or args.output_model or args.improve_model
+                or args.compare_model or args.candidate_model or args.eval_corpus
+                or args.benchmark_suite or args.exclude_train_corpus
+                or args.protect_suite or args.replay_improvement
+                or args.load_chat or args.save_chat
+                or args.epochs is not None or args.max_output_tokens is not None
+                or args.validation_percent != 25 or args.split_seed != 41
+            ):
+                print("dataset verification requires --verify-dataset and optional --verify-sources only")
+                return 2
+            from skeleton.app.local_ai_dataset import verify_native_dataset
+
+            try:
+                verification = verify_native_dataset(
+                    args.verify_dataset, original_sources=args.verify_sources,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("native dataset verification failed: "
+                      + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(verification, sort_keys=True, ensure_ascii=False))
+            else:
+                print("Verified prepared native dataset: " + verification["dataset_id"])
+                print("Original sources checked: "
+                      + ("yes" if verification["original_sources_verified"] else "no"))
+                print("No model quality certification")
+            return 0
+
+        if args.prepare_dataset or args.dataset_output:
+            if (
+                not args.prepare_dataset or not args.dataset_output
+                or args.model or args.prompt or args.inspect_model
+                or args.gguf_model or args.llama_executable or args.self_check
+                or args.train_corpus or args.output_model or args.improve_model
+                or args.compare_model or args.candidate_model or args.eval_corpus
+                or args.benchmark_suite or args.exclude_train_corpus
+                or args.protect_suite or args.replay_improvement
+                or args.load_chat or args.save_chat
+                or args.verify_dataset or args.verify_sources
+                or args.epochs is not None or args.max_output_tokens is not None
+            ):
+                print("local-ai dataset preparation requires only --prepare-dataset, --dataset-output and optional split controls")
+                return 2
+            from skeleton.app.local_ai_dataset import prepare_native_dataset
+
+            try:
+                dataset = prepare_native_dataset(
+                    args.prepare_dataset, args.dataset_output,
+                    validation_percent=args.validation_percent,
+                    seed=args.split_seed,
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                print("local-ai dataset rejected: " + type(exc).__name__ + ": " + str(exc))
+                return 1
+            if args.as_json:
+                print(json.dumps(dataset, ensure_ascii=False, sort_keys=True))
+            else:
+                print("Prepared native train/validation corpus in: " + str(dataset["output_directory"]))
+                print("Source documents: " + str(dataset["source_count"]))
+                print("Training/validation tokens: "
+                      + str(dataset["training_tokens"]) + "/" + str(dataset["validation_tokens"]))
+                print("Dataset ID: " + str(dataset["dataset_id"]))
+                print("Quality: not independently certified")
+            return 0
+        if args.validation_percent != 25 or args.split_seed != 41:
+            print("--validation-percent and --split-seed require --prepare-dataset")
+            return 2
         if args.self_check:
             if any((
                 args.model, args.gguf_model, args.llama_executable,

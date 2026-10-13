@@ -221,18 +221,21 @@ def improve_local_model(
         # epoch-selection corpus. Reject overlaps with either the training
         # or epoch-selection data before *any* SGD mutates in-memory weights.
         from skeleton.app.local_ai_benchmark import (
-            _evaluate_backend, _exclude_leaked_training_cases,
+            OfflineBenchmarkError, _evaluate_backend, _exclude_leaked_training_cases,
             load_benchmark_suite,
         )
 
-        protected_evidence = load_benchmark_suite(protected_suite, backend=original)
-        _exclude_leaked_training_cases(
-            protected_evidence, checkpoint=original, source=training_text,
-        )
-        _exclude_leaked_training_cases(
-            protected_evidence, checkpoint=original, source=validation_text,
-        )
-        protected_baseline = _evaluate_backend(protected_evidence, original)
+        try:
+            protected_evidence = load_benchmark_suite(protected_suite, backend=original)
+            _exclude_leaked_training_cases(
+                protected_evidence, checkpoint=original, source=training_text,
+            )
+            _exclude_leaked_training_cases(
+                protected_evidence, checkpoint=original, source=validation_text,
+            )
+            protected_baseline = _evaluate_backend(protected_evidence, original)
+        except OfflineBenchmarkError as exc:
+            raise OfflineImprovementError(str(exc)) from exc
 
     baseline = _token_weighted_perplexity(model, heldout_lines)
     if not math.isfinite(baseline) or baseline <= 0:

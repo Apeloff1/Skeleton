@@ -195,7 +195,7 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
             source, train, heldout, dest = self._fixture(d)
             with self.assertRaisesRegex(OfflineImprovementError, "distinct"):
                 compare_local_models(source, source, heldout)
-            heldout.write_text("outofvocabulary words unknown extra\n", encoding="utf-8")
+            heldout.write_text("outofvocabulary words unknown tokens\n", encoding="utf-8")
             native = TinyTransformer(
                 vocab=("user", "assistant", "hello", "world", "alpha", "beta"),
                 dim=8, ctx=96, seed=47, n_heads=2, n_layers=2, d_ff=16,
@@ -288,7 +288,7 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
         self.assertNotAlmostEqual(measured, math.sqrt(2.0 * 4.0))
 
     def test_protected_suite_rejects_training_overlap_before_gradient(self) -> None:
-        from skeleton.app.local_ai_benchmark import SCHEMA, OfflineBenchmarkError
+        from skeleton.app.local_ai_benchmark import SCHEMA
 
         with tempfile.TemporaryDirectory() as directory:
             source, train, heldout, dest = self._fixture(directory)
@@ -304,7 +304,7 @@ class TestEvaluatedOfflineImprovement(unittest.TestCase):
             with patch.object(
                 TinyTransformer, "fit", side_effect=AssertionError("leaked case must not train"),
             ):
-                with self.assertRaisesRegex(OfflineBenchmarkError, "overlaps"):
+                with self.assertRaisesRegex(OfflineImprovementError, "overlaps"):
                     improve_local_model(
                         source, train, heldout, dest, protected_suite=suite,
                     )

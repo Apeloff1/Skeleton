@@ -335,6 +335,13 @@ class WindowsLauncher:
 
 
 def _headless(args: argparse.Namespace, root: Path) -> int:
+    if args.local_ai_dataset_smoke:
+        from skeleton.app.local_ai_dataset import smoke_offline_native_dataset
+
+        try:
+            return 0 if smoke_offline_native_dataset() else 1
+        except Exception:
+            return 1
     if args.local_ai_benchmark_smoke:
         from skeleton.app.local_ai_benchmark import smoke_offline_native_benchmark
 
@@ -399,6 +406,7 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--local-ai-smoke", action="store_true", help="verify bundled native CPU inference without Docker")
     mode.add_argument("--local-ai-training-smoke", action="store_true", help="verify bundled CPU training, checkpoint, and inference")
     mode.add_argument("--local-ai-benchmark-smoke", action="store_true", help="verify native model category evaluation after install")
+    mode.add_argument("--local-ai-dataset-smoke", action="store_true", help="verify native multi-document split, provenance and CPU training")
     mode.add_argument("--offline-command", nargs=argparse.REMAINDER, metavar="LOCAL_AI_ARGS", help="execute native local-ai CLI inside bundled exe without Docker/Python")
     result.add_argument(
         "--development",
