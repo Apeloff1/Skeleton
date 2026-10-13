@@ -109,6 +109,10 @@ class CrossPlaneRouteScoutTests(unittest.TestCase):
         self.inv.scan()
         with self.assertRaises(JeevesAppwideError):
             self.inspect(expected_sources=expected)
+        # The inventory cursor is metadata-based: equal-length edits
+        # require the stronger selected source SHA fence above.
+        self.fixture.put(self.js, self.frontend + "// additional source\n")
+        self.inv.scan()
         with self.assertRaises(JeevesAppwideError):
             self.inspect(expected_snapshot=old["inventory_snapshot"])
 
