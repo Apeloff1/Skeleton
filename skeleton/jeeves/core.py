@@ -211,6 +211,44 @@ class Jeeves:
         from skeleton.jeeves.app_capability_bridge import creator_plan
         return creator_plan(project_id, steps)
 
+    def creator_runbook(self, compiled_plan, *, executor, persist, restored=None):
+        """Construct a host-permitted executable creator workflow.
+
+        The caller must supply its already-authorized ToolExecutor and durable
+        compare-and-swap storage. This function mints no grants or credentials.
+        """
+        from skeleton.jeeves.ai.creator_runbook_runtime import (
+            CreatorRunbook, CreatorRunbookRunner,
+        )
+        return CreatorRunbookRunner(
+            CreatorRunbook(compiled_plan),
+            executor=executor,
+            persist=persist,
+            restored=restored,
+        )
+
+    def creator_runbook_store(self, path, *, compiled_plan):
+        """Open an explicitly host-selected durable runbook state store."""
+        from skeleton.jeeves.ai.creator_runbook_runtime import CreatorRunbook
+        from skeleton.jeeves.ai.creator_runbook_store import CreatorRunbookStore
+        compiled = CreatorRunbook(compiled_plan)
+        return CreatorRunbookStore(path, plan_sha256=compiled.plan_sha256)
+
+    def shadow_training_release_proposal(self, shadow, manifest, checkpoint,
+                                         candidate, comparison, evaluation,
+                                         promotion, *, expected_head_commit):
+        """Compose a reviewed candidate-only model release proposal.
+
+        No weight is loaded or promoted; the model-serving admission owner must
+        separately verify the exact release, execute the change and retain a
+        validated rollback path.
+        """
+        from skeleton.ai.training.shadow_candidate_gate import prepare_candidate_release
+        return prepare_candidate_release(
+            shadow, manifest, checkpoint, candidate, comparison, evaluation,
+            promotion, expected_head_commit=expected_head_commit,
+        )
+
     @staticmethod
     def _require_mode(mode: SessionMode) -> SessionMode:
         if not isinstance(mode, SessionMode):
