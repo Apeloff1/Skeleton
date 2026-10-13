@@ -75,6 +75,14 @@ jobs:
             skeleton/ai/webcrawler/__init__.py
             skeleton/ai/webcrawler/
             skeleton/kernel/
+            skeleton/app/manifest.json
+            machine/ai_capabilities.json
+            machine/ai_app_construction.json
+            machine/ai_closure_evidence.json
+            machine/ai_master_plan.json
+            machine/ai_masterplan_parse_index.json
+            machine/enterprise_ai_superiority.json
+            machine/enterprise_system_architecture.json
             frontend/features/
             backend/gameforge/__init__.py
             backend/gameforge/forges/
@@ -112,3 +120,24 @@ jobs:
         shell: bash
         run: |
           python -m unittest tests.test_game_builder_story_canon_fabric tests.test_game_builder_story_workspace tests.test_game_builder_jeeves_production tests.test_game_builder_story_asset_pixels tests.test_game_builder_story_continuity_assurance tests.test_game_builder_story_chapter_context tests.test_game_builder_jeeves_chapter_chat tests.test_game_builder_jeeves_app_runtime tests.test_game_builder_jeeves_appwide_fabric tests.test_game_builder_jeeves_capability_intelligence tests.test_game_builder_jeeves_completion_census -v
+      - name: Reconcile real exact-head masterplan and product AI authority
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.game_builder.jeeves_appwide_fabric import AppwideInventory
+          from skeleton.ai.game_builder.jeeves_completion_census import JeevesCompletionCensus
+          inventory = AppwideInventory(Path.cwd())
+          inventory.scan()
+          report = JeevesCompletionCensus(inventory).report()
+          assert report["plan"]["volume_total"] == 421
+          assert report["plan"]["parse_index_masterplan_git_blob_matches"]
+          assert report["ai_product"]["capability_total"] == 9
+          assert report["construction"]["plane_total"] == 27
+          assert report["enterprise"]["domain_count"] == 11
+          assert not report["readiness"]["release_qualified"]
+          print({"source_receipts":len(report["source_receipts"]),
+                 "capabilities":report["ai_product"]["capability_states"],
+                 "volumes":report["plan"]["volume_implementation_states"],
+                 "authority_defects":report["authority_defects"]})
+          PY
