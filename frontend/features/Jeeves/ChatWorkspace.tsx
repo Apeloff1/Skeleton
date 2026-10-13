@@ -12,6 +12,13 @@ import { getAuthToken } from '../../src/auth/gameforgeAuth';
 import type { ConversationMessage, ConversationThread } from '../../src/product/conversationClient';
 import { attachmentCapabilities, CHAT_ATTACHMENT_MIMES, deleteChatAttachment, readPickedAttachment, uploadChatAttachment } from './chatFiles';
 import MessageContent from './MessageContent';
+import JeevesRuntimeStatus from './JeevesRuntimeStatus';
+import ChatTaskActions from './workbench/ChatTaskActions';
+import ChatSceneActions from './ChatSceneActions';
+import ChatStoryActions from './ChatStoryActions';
+import DragonCompanionPanel from './companion/DragonCompanionPanel';
+import DragonDemoPlayer from './companion/DragonDemoPlayer';
+import { useDragonAcademy } from './companion/useDragonAcademy';
 import ChatAttachments from './ChatAttachments';
 import { saveChatExport } from './ChatExport';
 import s, { colors as C } from './ChatWorkspace.styles';
@@ -105,6 +112,14 @@ function MessageCard({ message, busy, notify, edit, regenerate }: {
     </> : <>
       {user ? <Text selectable style={s.userText}>{text}</Text> : <MessageContent text={text} notify={notify} />}
       {!!attachmentRefs.length && <ChatAttachments references={attachmentRefs} threadId={message.thread_id} />}
+      {!user && !!text.trim() && <>
+        <ChatTaskActions text={text} conversationId={message.thread_id}
+          messageId={message.message_id} notify={notify} />
+        <ChatSceneActions text={text} conversationId={message.thread_id}
+          messageId={message.message_id} notify={notify} />
+        <ChatStoryActions text={text} conversationId={message.thread_id}
+          messageId={message.message_id} notify={notify} />
+      </>}
       <View style={s.messageActions}>
         <MiniButton icon={copied ? 'checkmark-outline' : 'copy-outline'} label={copied ? 'Copied' : 'Copy'}
           onPress={() => { void Clipboard.setStringAsync(text).then(() => setCopied(true)).catch(() => notify('Clipboard unavailable. Select the message text to copy it.')); }} />
@@ -145,6 +160,7 @@ export type ChatWorkspaceProps = { initialThreadId?: string };
 export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = {}) {
   const router = useRouter();
   const { controller, state } = useChatController({ initialThreadId });
+  const dragonAcademy = useDragonAcademy();
   const { width } = useWindowDimensions();
   const compact = width < 900;
   const narrow = width < 560;
@@ -431,6 +447,14 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
           {state.activeThread && !narrow && <IconButton icon="ellipsis-horizontal" label="Conversation options" disabled={busy}
             onPress={() => { setManage({ thread: state.activeThread!, action: 'menu' }); setDialogError(null); }} />}
         </View>
+        <JeevesRuntimeStatus />
+        <View style={[s.companionDock, compact && s.companionDockCompact]}>
+          <DragonCompanionPanel draft={draft}
+            lastUserText={messages.slice().reverse().find(message => message.author_type === 'user')?.content || undefined}
+            academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} />
+        </View>
+        <DragonDemoPlayer demo={dragonAcademy.demo} onClose={dragonAcademy.closeDemo} />
+        {!!dragonAcademy.error && <Text accessibilityRole="alert" style={s.errorText}>{dragonAcademy.error}</Text>}
         {state.error && <View style={s.alert} accessibilityRole={state.error.kind === 'cancelled' ? undefined : 'alert'}><View style={s.row}>
           <Ionicons name={state.error.kind === 'cancelled' ? 'stop-circle-outline' : 'alert-circle-outline'} size={20} color={state.error.kind === 'cancelled' ? C.textMuted : C.warning} />
           <Text style={s.alertText}>{state.error.message}</Text>
@@ -448,7 +472,7 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
         {state.notice && <View style={s.alert} accessibilityLiveRegion="polite"><View style={s.row}><Text style={s.alertText}>{state.notice}</Text>
           <IconButton icon="close-outline" label="Dismiss notice" onPress={controller.dismissNotice} /></View></View>}
         {loading ? <View style={s.loading}><ActivityIndicator color={C.primaryHover} /><Text style={s.muted}>{state.ready ? 'Opening conversation…' : 'Opening your conversations…'}</Text></View> :
-          <ScrollView ref={scroll} style={s.scroll} contentContainerStyle={[s.messagesContent, compact && s.compactContent]}
+          <ScrollView ref={scroll} style={s.scroll} contentContainerStyle={[s.messagesContent, !compact && s.messagesWithCompanion, compact && s.compactContent]}
             keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" scrollEventThrottle={100}
             onScroll={event => { const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
               nearBottom.current = layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
