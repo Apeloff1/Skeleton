@@ -381,6 +381,8 @@ OPERATIONS = {
     "director.rpg":("compute", "bounded verified RPG chapter director",False),
     "director.world":("compute", "deterministic world-route director",False),
     "studio.assembly":("compute", "approved system integration audit",False),
+    "studio.production.plan":("compute", "actual multi-engine original game production source plan",False),
+    "studio.production.stage":("proposal", "reviewed original game system or scene source proposals",True),
     "studio.tree":("read", "active project files",False),
     "studio.file":("read", "active project source",False),
     "studio.propose":("proposal", "targeted human-reviewed project edit",True),
@@ -530,6 +532,13 @@ class JeevesAppwideRuntime:
         elif action=="studio.batch_preview":
             from .jeeves_batch_workbench import run_batch_preview
             result=run_batch_preview(self, params)
+        elif action in ("studio.production.plan", "studio.production.stage"):
+            from .jeeves_production_wave import JeevesProductionWave
+            director=JeevesProductionWave(inv, ws)
+            if action=="studio.production.plan":
+                result=director.plan(**params)
+            else:
+                result=director.stage(**params, operator_authorized=authorized)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
