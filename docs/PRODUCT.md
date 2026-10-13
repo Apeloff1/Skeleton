@@ -113,8 +113,8 @@ return 2. Other documented product verbs remain to be audited and dispatched;
 
 Every command in the opening code fence now has an explicit CLI route to
 an existing runtime owner. Organism `orgwalk -n` is distinct from the
-existing GameForge `walk --steps`; the previously advertised `walk -n`
-was invalid and is intentionally replaced. `doctor` continues to invoke
+existing GameForge `walk -n N` or `walk --steps`. Both are now
+independently dispatched and tested. `doctor` continues to invoke
 the already-dispatched GameForge doctor.
 
 `dump --hot` inspects the hot-file card;
@@ -129,3 +129,14 @@ The `wiki SELECT` verb now routes directly into
 citation/topic handles, not article bodies; `--limit` is enforced in
 `1..128`, and query length is bounded to 4096 characters before organism
 initialization. No dynamic SQL or arbitrary command execution is used.
+
+## Repeated playable walkthrough contract
+
+`python -m skeleton walk -n N` and `--repeat N` perform 1–100 bounded real
+GameForge walkthrough attempts (not organism `orgwalk` cycles). Each attempt
+uses a deterministic, distinct seed (`walk:000`, `walk:001`, … or
+`<seed>:000`, …). `walk --all-eras -n N` covers each era N times.
+
+`--json` reports individual attempts and aggregates; any failed attempt makes
+the command exit unsuccessfully. A single walk without `-n` preserves its
+historical output and seed semantics. This behavior was merged in #3756.
