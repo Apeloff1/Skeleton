@@ -4,7 +4,29 @@ on:
   pull_request:
     paths:
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/model_runtime/**"
+      - "skeleton/cortex/transformer.py"
+      - "skeleton/cortex/torch_lm.py"
+      - "skeleton/cortex/device.py"
+      - "tests/test_consumer_transformer_acceleration.py"
+      - "tests/test_consumer_llama_budget.py"
+      - "scripts/benchmark_consumer_transformer.py"
       - "skeleton/app/local_ai.py"
+      - "skeleton/app/offline_chat_cli.py"
+      - "skeleton/app/offline_http.py"
+      - "skeleton/app/offline_knowledge.py"
+      - "skeleton/app/offline_grounding.py"
+      - "skeleton/app/offline_web.py"
+      - "skeleton/app/windows_launcher.py"
+      - "skeleton/ai/model_runtime/offline_chat.py"
+      - "tests/test_ai_offline_native_chat.py"
+      - "tests/test_ai_local_inference_cancellation.py"
+      - "tests/test_app_offline_chat_persistence.py"
+      - "tests/test_app_offline_chat_cli.py"
+      - "tests/test_app_offline_http.py"
+      - "tests/test_app_offline_knowledge.py"
+      - "tests/test_app_offline_grounding.py"
+      - "tests/test_app_offline_windows_browser.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_native_neural_lm.py"
@@ -22,7 +44,29 @@ on:
       - feat/p2-functional-ai-closure-atomic
     paths:
       - "skeleton/ai/runtime/inference/**"
+      - "skeleton/ai/model_runtime/**"
+      - "skeleton/cortex/transformer.py"
+      - "skeleton/cortex/torch_lm.py"
+      - "skeleton/cortex/device.py"
+      - "tests/test_consumer_transformer_acceleration.py"
+      - "tests/test_consumer_llama_budget.py"
+      - "scripts/benchmark_consumer_transformer.py"
       - "skeleton/app/local_ai.py"
+      - "skeleton/app/offline_chat_cli.py"
+      - "skeleton/app/offline_http.py"
+      - "skeleton/app/offline_knowledge.py"
+      - "skeleton/app/offline_grounding.py"
+      - "skeleton/app/offline_web.py"
+      - "skeleton/app/windows_launcher.py"
+      - "skeleton/ai/model_runtime/offline_chat.py"
+      - "tests/test_ai_offline_native_chat.py"
+      - "tests/test_ai_local_inference_cancellation.py"
+      - "tests/test_app_offline_chat_persistence.py"
+      - "tests/test_app_offline_chat_cli.py"
+      - "tests/test_app_offline_http.py"
+      - "tests/test_app_offline_knowledge.py"
+      - "tests/test_app_offline_grounding.py"
+      - "tests/test_app_offline_windows_browser.py"
       - "tests/flgb/test_desktop_offline_ai.py"
       - "skeleton/testing/test_local_inference.py"
       - "skeleton/testing/test_llama_cpp_local_inference.py"
@@ -44,7 +88,7 @@ concurrency:
 jobs:
   local-inference:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       PYTHONPATH: "."
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -82,3 +126,65 @@ jobs:
           skeleton/testing/test_llama_cpp_local_inference.py
           skeleton/testing/test_local_model_deployment.py
           tests/flgb/test_desktop_offline_ai.py
+          tests/test_ai_offline_native_chat.py
+          tests/test_ai_local_inference_cancellation.py
+          tests/test_app_offline_chat_persistence.py
+          tests/test_app_offline_chat_cli.py
+          tests/test_app_offline_http.py
+          tests/test_app_offline_knowledge.py
+          tests/test_app_offline_grounding.py
+          tests/test_app_offline_windows_browser.py
+          tests/test_consumer_transformer_acceleration.py
+          tests/test_consumer_llama_budget.py
+      - name: Benchmark deterministic CPU transformer without external models
+        run: >-
+          python scripts/benchmark_consumer_transformer.py
+          --device cpu --dim 8 --heads 2 --layers 1 --ffn 12
+          --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1
+          --assert-parity
+
+  consumer-transformer-cpu-torch:
+    # Validate numerical parity separately; hardware accelerator CI is not
+    # available on this runner and must not be claimed as verified.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      OPENAI_API_KEY: ""
+      XAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+    steps:
+      - name: Checkout exact PR or main head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install consumer CPU Torch test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8,<9" "numpy==2.4.6"
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu "torch==2.8.0"
+      - name: Verify consumer transformer parity, bounded KV and local GGUF
+        run: >-
+          python -m pytest -q
+          tests/test_consumer_transformer_acceleration.py
+          tests/test_consumer_llama_budget.py
+      - name: Verify measured Torch CPU prefill, decode, and compact KV
+        run: |
+          python scripts/benchmark_consumer_transformer.py --device torch \
+            --dim 8 --heads 2 --layers 1 --ffn 12 \
+            --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1 \
+            --assert-parity
+          python scripts/benchmark_consumer_transformer.py --device torch \
+            --kv-dtype bf16 --kv-limit-mib 1 \
+            --dim 8 --heads 2 --layers 1 --ffn 12 \
+            --context 16 --prefill 4 --decode 2 --warmup 0 --runs 1 \
+            --assert-parity
+          python scripts/benchmark_consumer_transformer.py --device torch \
+            --prefill-query-chunk 3 --dim 8 --heads 2 --layers 2 --ffn 12 \
+            --context 32 --prefill 14 --decode 3 --warmup 0 --runs 1 \
+            --assert-parity

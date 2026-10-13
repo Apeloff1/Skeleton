@@ -1,0 +1,113 @@
+name: Original World Native Builds
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/game/generation/original_world_product_*.py"
+      - "scripts/original_world_native_launcher.py"
+      - ".github/workflows/original-world-native-builds.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: original-world-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-product:
+    name: Unsigned ${{ matrix.platform }} original-world runnable build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-2025
+            python: "3.11"
+            executable: OriginalWorldStudio.exe
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            python: "3.11.16"
+            executable: OriginalWorldStudio
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: .
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Enable long Windows git paths
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.longpaths true
+      - name: Checkout only original-game source, avoiding unrelated giant paths
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            skeleton/game/generation/
+            scripts/original_world_native_launcher.py
+          sparse-checkout-cone-mode: false
+      - name: Install pinned Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install pinned native packaging tool
+        shell: bash
+        run: python -m pip install --disable-pip-version-check "pyinstaller==6.16.0"
+      - name: Build signed-hash audited game payload
+        shell: bash
+        run: |
+          mkdir -p dist
+          python -m skeleton.game.generation.original_world_product_bundle --output dist/original-world-studio.pyz
+          python dist/original-world-studio.pyz --inventory > dist/source-inventory.json
+          python -m skeleton.game.generation.original_world_product_cli --base 0 --form puzzle --architecture lattice --system trophic --arc sandbox --actions-json '[{"layer":"terrain","verb":"forage"},{"layer":"causal","verb":"end_turn"}]' --save dist/golden-save.json > /dev/null
+      - name: Freeze self-contained platform-local executable
+        shell: bash
+        run: |
+          python -m PyInstaller --onefile --clean --noconfirm --name OriginalWorldStudio \
+            --paths . \
+            --add-data "dist/original-world-studio.pyz:." \
+            --hidden-import argparse \
+            --hidden-import ast \
+            --hidden-import collections \
+            --hidden-import dataclasses \
+            --hidden-import hashlib \
+            --hidden-import html \
+            --hidden-import html.entities \
+            --hidden-import json \
+            --hidden-import pathlib \
+            --hidden-import shlex \
+            --hidden-import tkinter \
+            --hidden-import tkinter.ttk \
+            --hidden-import typing \
+            --hidden-import zipfile \
+            scripts/original_world_native_launcher.py
+      - name: Smoke actual binary without desktop display
+        shell: bash
+        run: |
+          "./dist/${{ matrix.executable }}" --inventory > dist/native-inventory.json
+          "./dist/${{ matrix.executable }}" --load dist/golden-save.json \
+            --actions-json '[{"layer":"causal","verb":"end_turn"}]' \
+            --svg dist/native-world.svg --ppm dist/native-world.ppm > dist/native-game-result.json
+          python -c "import json; p=json.load(open('dist/native-game-result.json')); assert p['product']['world_turn']==2"
+          test -s dist/native-world.svg
+          test -s dist/native-world.ppm
+          python -c "from pathlib import Path; print(Path('dist/native-world.ppm').read_bytes()[:16])"
+      - name: Upload unsigned native executable and gameplay proof
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-world-unsigned-${{ matrix.platform }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/${{ matrix.executable }}
+            dist/original-world-studio.pyz
+            dist/source-inventory.json
+            dist/native-inventory.json
+            dist/native-world.svg
+            dist/native-world.ppm
+            dist/native-game-result.json

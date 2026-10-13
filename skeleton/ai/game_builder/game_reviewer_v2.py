@@ -132,7 +132,7 @@ def _expanded_train(rows):
 
 def train_robust_game_reviewer(
     plan: FlowPlan,*,authorized: bool,epochs: int=50,
-    learning_rate: float=0.20,
+    learning_rate: float=0.20,evaluate_test: bool=True,
 )->dict:
     if not authorized:
         raise PermissionError("advanced original reviewer training requires owner approval")
@@ -140,6 +140,8 @@ def train_robust_game_reviewer(
         raise TrainingFlowError("typed source plan and bounded training schedule required")
     if type(learning_rate) is not float or not math.isfinite(learning_rate) or not 0.001<=learning_rate<=0.5:
         raise TrainingFlowError("finite original reviewer optimizer step required")
+    if type(evaluate_test) is not bool:
+        raise TrainingFlowError("protected heldout boundary must be explicit bool")
     rows=defaultdict(list)
     for case in plan.selected:
         if (case.project_digest not in plan.source_projects or
@@ -152,7 +154,7 @@ def train_robust_game_reviewer(
     for s,projects in (("train",2),("validation",1),("test",1)):
         if len(split.get(s,()))<projects:
             reasons.append("insufficient_"+s+"_projects")
-        if len({_label(case) for case in rows[s]})!=2:
+        if (s!="test" or evaluate_test) and len({_label(case) for case in rows[s]})!=2:
             reasons.append("unbalanced_"+s+"_outcomes")
     common=dict(
         schema="skeleton.game_builder.experimental_reviewer_fit.v1",
@@ -206,15 +208,19 @@ def train_robust_game_reviewer(
                 bias=round(fit_bias,8),
                 threshold=threshold,feature_spec=FEATURE_SPEC)
     # The test split is opened once after the candidate is locked.
-    heldout=_score(rows["test"],fit_weights,fit_bias,threshold)
-    heldout_challenges=_score(_expanded_train(rows["test"]),
-                             fit_weights,fit_bias,threshold)
+    heldout=(_score(rows["test"],fit_weights,fit_bias,threshold)
+             if evaluate_test else None)
+    heldout_challenges=(_score(_expanded_train(rows["test"]),
+                              fit_weights,fit_bias,threshold)
+                        if evaluate_test else None)
     return dict(
-        **common,status="experimental_fit_only",
+        **common,status=("experimental_fit_only" if evaluate_test
+                         else "validation_selection_only"),
         epochs_selected=epoch,train=_score(rows["train"],fit_weights,fit_bias,threshold),
         train_augmented_examples=len(prepared),
         validation=val,validation_metamorphic=metamo,
         test=heldout,test_metamorphic=heldout_challenges,
+        protected_test_opened=evaluate_test,
         fitted_policy_digest=canonical_digest(policy),
         symbolic_policy=policy,
         promotion_requires_independent_wiki_hoag_human_rights_review=True,

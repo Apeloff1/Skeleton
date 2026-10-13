@@ -1,0 +1,96 @@
+name: AI Chat Story Continuity Closure
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "backend/core/story_continuity.py"
+      - "backend/routes/story_index.py"
+      - "backend/routes/game_kb.py"
+      - "backend/tests/test_story_continuity.py"
+      - "backend/tests/test_story_index_routes.py"
+      - "frontend/features/Jeeves/ChatStoryActions.tsx"
+      - "frontend/features/Jeeves/storyContext.ts"
+      - "frontend/features/Jeeves/ChatWorkspace.tsx"
+      - "frontend/app/story-index.tsx"
+      - "frontend/tsconfig.jeeves.json"
+      - "frontend/src/product/worldWorkspace.ts"
+      - "frontend/scripts/test-world-workbench.mjs"
+      - "frontend/scripts/jeeves-workbench/story-context.test.cjs"
+      - ".github/workflows/ai-chat-story-continuity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-chat-story-continuity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  story-continuity-backend:
+    name: Story index persistence and causal audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check -e ".[dev]"
+          "httpx==0.28.1" "PyJWT==2.14.0" "python-dotenv==1.2.3"
+          "bcrypt==4.3.0" "email-validator==2.3.0"
+          "matplotlib==3.10.6" "networkx==3.5"
+      - name: Compile story index
+        run: >-
+          python -m compileall -q
+          backend/core/story_continuity.py
+          backend/routes/story_index.py
+          backend/routes/game_kb.py
+          backend/tests/test_story_continuity.py
+          backend/tests/test_story_index_routes.py
+      - name: Run indexed story continuity and persistence regressions
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_story_continuity.py
+          backend/tests/test_story_index_routes.py
+
+  story-continuity-frontend:
+    name: Jeeves story continuity review and recall
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install frontend without lifecycle scripts
+        working-directory: frontend
+        run: yarn install --ignore-scripts
+      - name: Typecheck complete Jeeves story integration
+        working-directory: frontend
+        run: yarn typecheck:jeeves
+      - name: Run Jeeves and story handoff contracts
+        working-directory: frontend
+        run: yarn test:jeeves
+      - name: Verify story route integration with World Workbench
+        working-directory: frontend
+        run: yarn test:world-workbench

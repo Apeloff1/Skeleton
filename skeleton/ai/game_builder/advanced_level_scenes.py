@@ -25,33 +25,9 @@ from .advanced_fighting_runtime import (default_layout as fight_layout,
 from .advanced_rhythm_runtime import (default_layout as rhythm_layout,
                                       normalize_layout as validate_rhythm_layout,
                                       RhythmActionError)
-from .advanced_npc_society_runtime import (
-    default_layout as society_layout, normalize_layout as validate_society_layout,
-    SocietyActionError,
-)
-from .advanced_ecosystem_runtime import (
-    default_layout as ecosystem_layout, normalize_layout as validate_ecosystem_layout,
-    EcosystemActionError,
-)
-from .advanced_rpg_runtime import (
-    default_layout as rpg_layout, normalize_layout as validate_rpg_layout,
-    RPGActionError,
-)
-from .advanced_procedural_world_runtime import (
-    default_layout as proc_layout, normalize_layout as validate_proc_layout,
-    ProceduralWorldActionError,
-)
-from .advanced_maze_runtime import (
-    default_layout as maze_layout, normalize_layout as validate_maze_layout,
-    MazeActionError,
-)
-from .advanced_sports_runtime import (
-    default_layout as sports_layout, normalize_layout as validate_sports_layout,
-    SportsActionError,
-)
-from .advanced_parkour_runtime import (
-    default_layout as parkour_layout, normalize_layout as validate_parkour_layout,
-    ParkourActionError,
+from .advanced_physics_runtime import (
+    default_layout as physics_layout, normalize_layout as validate_physics_layout,
+    PhysicsActionError,
 )
 from .advanced_sailing_runtime import (
     default_layout as sailing_layout, normalize_layout as validate_sailing_layout,
@@ -210,20 +186,8 @@ def _default_layout(engine, config, seed):
         return flight_layout(config,seed)
     if engine == "sailing":
         return sailing_layout(config,seed)
-    if engine == "parkour":
-        return parkour_layout(config,seed)
-    if engine == "sports":
-        return sports_layout(config,seed)
-    if engine == "maze":
-        return maze_layout(config,seed)
-    if engine == "rpg":
-        return rpg_layout(config,seed)
-    if engine == "procedural_world":
-        return proc_layout(config,seed)
-    if engine == "npc_society":
-        return society_layout(config,seed)
-    if engine == "ecosystem":
-        return ecosystem_layout(config,seed)
+    if engine == "physics":
+        return physics_layout(config,seed)
     raise SceneError("no advanced authored scene available for that engine")
 
 
@@ -240,45 +204,15 @@ def _normalize_layout(engine, config, layout):
             return validate_flight_layout(config,layout)
         except FlightActionError as exc:
             raise SceneError(str(exc)) from exc
+    if engine=="physics":
+        try:
+            return validate_physics_layout(config,layout)
+        except PhysicsActionError as exc:
+            raise SceneError(str(exc)) from exc
     if engine=="sailing":
         try:
             return validate_sailing_layout(config,layout)
         except SailingActionError as exc:
-            raise SceneError(str(exc)) from exc
-    if engine=="parkour":
-        try:
-            return validate_parkour_layout(config,layout)
-        except ParkourActionError as exc:
-            raise SceneError(str(exc)) from exc
-    if engine=="sports":
-        try:
-            return validate_sports_layout(config,layout)
-        except SportsActionError as exc:
-            raise SceneError(str(exc)) from exc
-    if engine=="maze":
-        try:
-            return validate_maze_layout(config,layout)
-        except MazeActionError as exc:
-            raise SceneError(str(exc)) from exc
-    if engine=="rpg":
-        try:
-            return validate_rpg_layout(config,layout)
-        except RPGActionError as exc:
-            raise SceneError(str(exc)) from exc
-    if engine=="procedural_world":
-        try:
-            return validate_proc_layout(config,layout)
-        except ProceduralWorldActionError as exc:
-            raise SceneError(str(exc)) from exc
-    if engine=="npc_society":
-        try:
-            return validate_society_layout(config,layout)
-        except SocietyActionError as exc:
-            raise SceneError(str(exc)) from exc
-    if engine=="ecosystem":
-        try:
-            return validate_ecosystem_layout(config,layout)
-        except EcosystemActionError as exc:
             raise SceneError(str(exc)) from exc
     if engine=="fighting":
         try:

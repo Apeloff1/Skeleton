@@ -36,3 +36,26 @@ def test_sessions_are_isolated():
     journal.append("bob","policy_rejected","https://example.org/b",at=1)
     assert [x["url"] for x in journal.page("alice")["events"]]==["https://example.org/a"]
     assert journal.verify("alice") and journal.verify("bob")
+
+
+def test_integer_timestamp_receipt_is_stable_after_sqlite_real_roundtrip():
+    db=sqlite3.connect(":memory:")
+    journal=DragonEventJournal(db)
+    event=journal.append("owner","fetch_started","https://example.org",at=17,
+                         payload={"stage":"queued"})
+    assert event.at==17.0
+    assert journal.verify("owner")
+    import hashlib,json
+    legacy_base={"session_id":"older","sequence":1,"kind":"fetch_started",
+                 "url":"https://example.org","at":17,
+                 "payload":{},"previous_digest":"0"*64}
+    digest=hashlib.sha256(json.dumps(legacy_base,sort_keys=True,
+                   separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
+    db.execute("""INSERT INTO dragon_companion_events VALUES (?,?,?,?,?,?,?,?,?)""",
+               ("older",1,digest,"fetch_started","https://example.org",17,
+                "{}","0"*64,digest))
+    db.commit()
+    assert journal.verify("older")
+    db.execute("UPDATE dragon_companion_events SET url='https://evil.org' WHERE session_id='older'")
+    db.commit()
+    assert not journal.verify("older")

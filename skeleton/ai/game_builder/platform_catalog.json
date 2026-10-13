@@ -1,0 +1,5773 @@
+{
+  "schema_version": 1,
+  "policy": "ORIGINAL_HOMEBREW_ONLY. Platform names are identification data; no commercial game content, BIOS, ROM, firmware, keys, or copied assets are provided. Cataloguing is not proof of native build capability.",
+  "presets": {
+    "fixed": {
+      "tier": 0,
+      "render": "fixed_circuit",
+      "sound": "discrete_tone",
+      "input": "dial_or_switch",
+      "artifact": "hardware_design",
+      "constraints": [
+        "fixed-function circuitry",
+        "limited display primitives",
+        "physical controller mapping"
+      ]
+    },
+    "lcd": {
+      "tier": 0,
+      "render": "segment_lcd",
+      "sound": "piezo",
+      "input": "small_button_set",
+      "artifact": "homebrew_firmware",
+      "constraints": [
+        "segment or monochrome display",
+        "low update rate",
+        "tiny input surface"
+      ]
+    },
+    "vector": {
+      "tier": 1,
+      "render": "vector",
+      "sound": "chip_audio",
+      "input": "joystick",
+      "artifact": "homebrew_binary",
+      "constraints": [
+        "stroke rendering",
+        "intensity and geometry",
+        "vector-specific compositing"
+      ]
+    },
+    "cart8": {
+      "tier": 1,
+      "render": "tile_sprite",
+      "sound": "chip_audio",
+      "input": "dpad_buttons",
+      "artifact": "homebrew_rom",
+      "constraints": [
+        "tiles and sprites",
+        "palette limits",
+        "bank switching and fixed-point timing"
+      ]
+    },
+    "bitmap8": {
+      "tier": 1,
+      "render": "bitmap",
+      "sound": "chip_audio",
+      "input": "keyboard_joystick",
+      "artifact": "homebrew_disk_or_tape",
+      "constraints": [
+        "scanline layout",
+        "limited memory",
+        "machine-specific file and input formats"
+      ]
+    },
+    "comp8": {
+      "tier": 1,
+      "render": "text_bitmap",
+      "sound": "chip_audio",
+      "input": "keyboard_joystick",
+      "artifact": "homebrew_disk_or_tape",
+      "constraints": [
+        "character graphics or bitmap mode",
+        "storage variability",
+        "machine-specific timing"
+      ]
+    },
+    "handheld8": {
+      "tier": 1,
+      "render": "monochrome_or_tile",
+      "sound": "chip_audio",
+      "input": "dpad_buttons",
+      "artifact": "homebrew_rom",
+      "constraints": [
+        "small screen",
+        "limited color or grayscale",
+        "power and latency"
+      ]
+    },
+    "enhanced8": {
+      "tier": 2,
+      "render": "tile_bitmap",
+      "sound": "chip_audio",
+      "input": "keyboard_joystick",
+      "artifact": "homebrew_rom_or_disk",
+      "constraints": [
+        "palette and sprite budgeting",
+        "VRAM layout",
+        "audio channel management"
+      ]
+    },
+    "computer16": {
+      "tier": 2,
+      "render": "bitmap_windows",
+      "sound": "sampled_or_chip",
+      "input": "keyboard_mouse_joystick",
+      "artifact": "native_executable",
+      "constraints": [
+        "disk and memory budgeting",
+        "CPU and audio scheduling",
+        "historical OS APIs"
+      ]
+    },
+    "console16": {
+      "tier": 2,
+      "render": "tile_sprite",
+      "sound": "chip_sampled",
+      "input": "gamepad",
+      "artifact": "homebrew_rom",
+      "constraints": [
+        "sprite and scroll planes",
+        "VRAM limits",
+        "sample budget"
+      ]
+    },
+    "optical2d": {
+      "tier": 2,
+      "render": "bitmap_fmv_2d",
+      "sound": "sampled_cd",
+      "input": "gamepad",
+      "artifact": "homebrew_disc_image",
+      "constraints": [
+        "optical streaming",
+        "seek latency",
+        "video encoding and memory budgeting"
+      ]
+    },
+    "polygons": {
+      "tier": 3,
+      "render": "early_3d",
+      "sound": "sampled",
+      "input": "gamepad",
+      "artifact": "homebrew_disc_or_cart",
+      "constraints": [
+        "fixed pipeline",
+        "texture and polygon budgets",
+        "historical controller semantics"
+      ]
+    },
+    "sixth": {
+      "tier": 3,
+      "render": "programmable_3d",
+      "sound": "sampled",
+      "input": "gamepad",
+      "artifact": "homebrew_executable_image",
+      "constraints": [
+        "platform graphics APIs",
+        "disk and memory budget",
+        "controller and save hardware"
+      ]
+    },
+    "arcade2d": {
+      "tier": 2,
+      "render": "tile_sprite_arcade",
+      "sound": "chip_sampled",
+      "input": "arcade_controls",
+      "artifact": "board_homebrew_image",
+      "constraints": [
+        "board ROM map",
+        "frame-accurate scanline behavior",
+        "specialized input and audio"
+      ]
+    },
+    "arcade3d": {
+      "tier": 3,
+      "render": "arcade_3d",
+      "sound": "sampled",
+      "input": "arcade_controls",
+      "artifact": "board_homebrew_image",
+      "constraints": [
+        "specialized geometry hardware",
+        "cabinet and I/O boards",
+        "board-specific boot chain"
+      ]
+    },
+    "mobile": {
+      "tier": 2,
+      "render": "mobile_2d_3d",
+      "sound": "sampled",
+      "input": "keypad_touch",
+      "artifact": "native_package",
+      "constraints": [
+        "historical runtime APIs",
+        "screen and input fragmentation",
+        "device signing and SDK availability"
+      ]
+    },
+    "micro": {
+      "tier": 1,
+      "render": "monochrome_or_small_color",
+      "sound": "beeper_or_pwm",
+      "input": "buttons_sensors",
+      "artifact": "firmware",
+      "constraints": [
+        "flash and RAM",
+        "power and I/O pinout",
+        "display wiring"
+      ]
+    },
+    "calculator": {
+      "tier": 1,
+      "render": "monochrome_graphics",
+      "sound": "beeper_optional",
+      "input": "key_matrix",
+      "artifact": "calculator_program",
+      "constraints": [
+        "calculator OS version",
+        "key scanning",
+        "storage and numeric precision"
+      ]
+    },
+    "contemporary": {
+      "tier": 4,
+      "render": "modern_2d_3d",
+      "sound": "high_fidelity",
+      "input": "multimodal",
+      "artifact": "native_app_or_game_package",
+      "constraints": [
+        "platform APIs and sandbox",
+        "accessibility",
+        "distribution and certification"
+      ]
+    },
+    "transitional": {
+      "tier": 3,
+      "render": "accelerated_2d_3d",
+      "sound": "sampled",
+      "input": "gamepad_touch",
+      "artifact": "native_homebrew_package",
+      "constraints": [
+        "legacy runtime and SDK",
+        "storage and signing",
+        "GPU API variation"
+      ]
+    },
+    "educational": {
+      "tier": 1,
+      "render": "education_2d",
+      "sound": "chip_or_sampled",
+      "input": "specialized_controls",
+      "artifact": "homebrew_rom_or_firmware",
+      "constraints": [
+        "specialized controllers",
+        "child-safe content requirements",
+        "restricted hardware interfaces"
+      ]
+    },
+    "fantasy": {
+      "tier": 2,
+      "render": "fantasy_console_api",
+      "sound": "synthesized",
+      "input": "virtual_buttons",
+      "artifact": "source_cartridge_or_module",
+      "constraints": [
+        "specified virtual-machine sandbox",
+        "palette and drawing-call budgets",
+        "runtime distribution terms"
+      ]
+    },
+    "mono_handheld": {
+      "tier": 2,
+      "render": "one_bit_bitmap",
+      "sound": "synthesized",
+      "input": "dpad_buttons_crank",
+      "artifact": "native_handheld_package",
+      "constraints": [
+        "1-bit display and refresh behavior",
+        "crank and button controls",
+        "low-power, deterministic frame budgets"
+      ]
+    },
+    "handheld32": {
+      "tier": 2,
+      "render": "handheld_tile_sprite_bitmap",
+      "sound": "sampled_chip",
+      "input": "dpad_buttons",
+      "artifact": "homebrew_rom",
+      "constraints": [
+        "small display",
+        "sprite, VRAM and palette budgets",
+        "cartridge save hardware variation"
+      ]
+    },
+    "stereoscopic": {
+      "tier": 2,
+      "render": "monochrome_stereoscopic",
+      "sound": "chip_sampled",
+      "input": "gamepad",
+      "artifact": "homebrew_rom",
+      "constraints": [
+        "stereoscopic parallax",
+        "monochrome rendering",
+        "visual comfort and input ergonomics"
+      ]
+    },
+    "browser": {
+      "tier": 4,
+      "render": "webgpu_webgl_canvas",
+      "sound": "web_audio",
+      "input": "keyboard_pointer_gamepad_touch",
+      "artifact": "webassembly_web_package",
+      "constraints": [
+        "browser sandbox",
+        "offline asset caching",
+        "accessible input and platform variance"
+      ]
+    },
+    "analog_game": {
+      "tier": 0,
+      "render": "analog_oscilloscope_or_crt",
+      "sound": "discrete_or_none",
+      "input": "analog_controllers",
+      "artifact": "original_analog_hardware_replica_design",
+      "constraints": [
+        "analog timing and voltages",
+        "physical display characteristics",
+        "operational safety",
+        "design-only unless independently qualified"
+      ]
+    },
+    "em_arcade": {
+      "tier": 0,
+      "render": "lamps_mirrors_projection_mechanisms",
+      "sound": "mechanical_discrete_audio",
+      "input": "physical_levers_buttons_wheels",
+      "artifact": "original_em_mechatronics_design",
+      "constraints": [
+        "mechanical tolerances and wear",
+        "coin and operator handling",
+        "movement and lamp synchronization",
+        "physical safety"
+      ]
+    },
+    "early_computer": {
+      "tier": 0,
+      "render": "crt_led_terminal_or_oscilloscope",
+      "sound": "beeper_or_none",
+      "input": "physical_switches_terminal_analog",
+      "artifact": "original_program_or_machine_description",
+      "constraints": [
+        "very limited memory",
+        "research-only hardware access",
+        "no direct modern SDK assumption"
+      ]
+    },
+    "pinball_em": {
+      "tier": 0,
+      "render": "ball_lamps_playfield",
+      "sound": "chimes_reels",
+      "input": "flippers_plunger",
+      "artifact": "original_playfield_simulation_or_hardware_design",
+      "constraints": [
+        "ball and flipper physics",
+        "safety",
+        "coil and actuator timing",
+        "physical playfield and play duration"
+      ]
+    }
+  },
+  "platforms": [
+    {
+      "id": "acetronic_telesport_iv",
+      "name": "Acetronic Telesport IV",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "acorn_a3000",
+      "name": "Acorn A3000",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "acorn_a5000",
+      "name": "Acorn A5000",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "acorn_archimedes",
+      "name": "Acorn Archimedes",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "acorn_bbc_micro",
+      "name": "BBC Micro",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "acorn_bbc_model_a",
+      "name": "BBC Micro Model A",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "acorn_bbc_model_b",
+      "name": "BBC Micro Model B",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "acorn_electron",
+      "name": "Acorn Electron",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "acorn_master",
+      "name": "BBC Master",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "acorn_risc_pc",
+      "name": "Acorn Risc PC",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "action_max",
+      "name": "Worlds of Wonder Action Max",
+      "kind": "educational",
+      "family": "education_and_toys",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "adam_coleco",
+      "name": "Coleco ADAM",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "agat_apple_compatible",
+      "name": "Agat PC",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "amazon_fire_tv",
+      "name": "Amazon Fire TV games",
+      "kind": "console",
+      "family": "transitional_consoles",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "amstrad_cpc_464",
+      "name": "Amstrad CPC 464",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "amstrad_cpc_464_plus",
+      "name": "Amstrad CPC 464 Plus",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "amstrad_cpc_6128",
+      "name": "Amstrad CPC 6128",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "amstrad_cpc_6128_plus",
+      "name": "Amstrad CPC 6128 Plus",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "amstrad_cpc_664",
+      "name": "Amstrad CPC 664",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "amstrad_gx4000",
+      "name": "Amstrad GX4000",
+      "kind": "console",
+      "family": "second_generation_missing",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "amstrad_pcw",
+      "name": "Amstrad PCW",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "analogue_pocket",
+      "name": "Analogue Pocket",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "render": "fpga_recreated_display_modes",
+        "artifact": "authorized_fpga_core_or_homebrew_image",
+        "constraints": [
+          "FPGA core and display compatibility",
+          "legal core provenance",
+          "device firmware compatibility"
+        ]
+      }
+    },
+    {
+      "id": "android_legacy",
+      "name": "Early Android",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "android_modern",
+      "name": "Android current",
+      "kind": "computer",
+      "family": "contemporary_desktop",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apf_imagination_machine",
+      "name": "APF Imagination Machine",
+      "kind": "console",
+      "family": "second_generation_missing",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apf_m1000",
+      "name": "APF M-1000",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apf_tv_fun",
+      "name": "APF TV Fun",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "apple_bandai_pippin",
+      "name": "Apple/Bandai Pippin",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apple_ii",
+      "name": "Apple II",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apple_iigs",
+      "name": "Apple IIGS",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apple_imac_g3",
+      "name": "Apple iMac G3",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apple_macintosh_68k",
+      "name": "Macintosh 68k",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apple_macintosh_classic",
+      "name": "Apple Macintosh Classic",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apple_macintosh_lc",
+      "name": "Apple Macintosh LC",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apple_macintosh_ppc",
+      "name": "Classic Mac OS PowerPC",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apple_macintosh_se30",
+      "name": "Apple Macintosh SE/30",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apple_power_macintosh_g3",
+      "name": "Apple Power Macintosh G3",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "apple_tv",
+      "name": "Apple TV / tvOS",
+      "kind": "console",
+      "family": "transitional_consoles",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "aquarius_mattel",
+      "name": "Mattel Aquarius",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_atari_hard_drivin",
+      "name": "Atari Hard Drivin' hardware",
+      "kind": "arcade",
+      "family": "arcade_polygon_extensions",
+      "preset": "arcade3d",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_atari_irobot",
+      "name": "Atari I, Robot arcade hardware",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_atari_system1",
+      "name": "Atari System 1 arcade",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_atari_system2",
+      "name": "Atari System 2 arcade",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_atomiswave",
+      "name": "Sammy Atomiswave",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_capcom_cps1",
+      "name": "Capcom CPS-1",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_capcom_cps1_qsound",
+      "name": "Capcom CPS-1 QSound",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_capcom_cps2",
+      "name": "Capcom CPS-2",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_capcom_cps3",
+      "name": "Capcom CPS-3",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_cave_cv1000",
+      "name": "Cave CV1000",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "render": "arcade_sprite_bitmap",
+        "constraints": [
+          "sprite and bullet density budgets",
+          "board-specific audio",
+          "boot and input hardware"
+        ]
+      }
+    },
+    {
+      "id": "arcade_chihiro",
+      "name": "Sega Chihiro",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_data_east_deco16",
+      "name": "Data East DECO16",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_exa_arcadia",
+      "name": "exA-Arcadia",
+      "kind": "arcade",
+      "family": "arcade_polygon_extensions",
+      "preset": "arcade3d",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_igs_pgm",
+      "name": "IGS PolyGame Master",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_igs_pgm2",
+      "name": "IGS PolyGame Master 2",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_irem_m62",
+      "name": "Irem M62",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_irem_m72",
+      "name": "Irem M72",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_irem_m92",
+      "name": "Irem M92",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_jaleco_megasystem1",
+      "name": "Jaleco Mega System 1",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_konami_gx",
+      "name": "Konami GX",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_konami_nemesis",
+      "name": "Konami Nemesis hardware",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_konami_system573",
+      "name": "Konami System 573",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_midway_t_unit",
+      "name": "Midway T-unit",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_midway_wolf",
+      "name": "Midway Wolf-unit arcade",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_midway_y_unit",
+      "name": "Midway Y-unit",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_es3",
+      "name": "Namco ES3",
+      "kind": "arcade",
+      "family": "arcade_polygon_extensions",
+      "preset": "arcade3d",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_galaxian",
+      "name": "Namco Galaxian arcade board",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_pacman",
+      "name": "Namco Pac-Man arcade board",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "render": "arcade_tile_sprite",
+        "constraints": [
+          "tilemap and sprite hardware",
+          "board ROM layout",
+          "arcade controls and interrupts"
+        ]
+      }
+    },
+    {
+      "id": "arcade_namco_system1",
+      "name": "Namco System 1 arcade",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_system10",
+      "name": "Namco System 10",
+      "kind": "arcade",
+      "family": "arcade_polygon_extensions",
+      "preset": "arcade3d",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_system11",
+      "name": "Namco System 11",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_system12",
+      "name": "Namco System 12",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_system2",
+      "name": "Namco System 2",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_system21",
+      "name": "Namco System 21",
+      "kind": "arcade",
+      "family": "arcade_polygon_extensions",
+      "preset": "arcade3d",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_system22",
+      "name": "Namco System 22",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_system23",
+      "name": "Namco System 23",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_system246",
+      "name": "Namco System 246",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_namco_system256",
+      "name": "Namco System 256",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_nintendo_playchoice10",
+      "name": "Nintendo PlayChoice-10",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_nintendo_super_system",
+      "name": "Nintendo Super System",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_nintendo_vs",
+      "name": "Nintendo VS. System",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_hikaru",
+      "name": "Sega Hikaru",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_lindbergh",
+      "name": "Sega Lindbergh",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_model1",
+      "name": "Sega Model 1",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_model2",
+      "name": "Sega Model 2",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_model3",
+      "name": "Sega Model 3",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_naomi",
+      "name": "Sega NAOMI",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_naomi2",
+      "name": "Sega NAOMI 2",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_nu",
+      "name": "Sega Nu",
+      "kind": "arcade",
+      "family": "arcade_polygon_extensions",
+      "preset": "arcade3d",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_ringedge",
+      "name": "Sega RingEdge",
+      "kind": "arcade",
+      "family": "arcade_polygon_extensions",
+      "preset": "arcade3d",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_ringwide",
+      "name": "Sega RingWide",
+      "kind": "arcade",
+      "family": "arcade_polygon_extensions",
+      "preset": "arcade3d",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_stv",
+      "name": "Sega ST-V",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_system_e",
+      "name": "Sega System E",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_system1",
+      "name": "Sega System 1 arcade",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_system16",
+      "name": "Sega System 16 arcade",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_system18",
+      "name": "Sega System 18 arcade",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_system2",
+      "name": "Sega System 2 arcade",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_system24",
+      "name": "Sega System 24",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_sega_system32",
+      "name": "Sega System 32",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_seta_aleck64",
+      "name": "Seta Aleck64",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_snk_mvs",
+      "name": "SNK Neo Geo MVS",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_space_invaders_8080",
+      "name": "8080 B&W arcade class",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_taito_f2",
+      "name": "Taito F2",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_taito_f3",
+      "name": "Taito F3",
+      "kind": "arcade",
+      "family": "arcade_2d",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_taito_system_z",
+      "name": "Taito System Z",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_taito_type_x",
+      "name": "Taito Type X",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_taito_type_x2",
+      "name": "Taito Type X2",
+      "kind": "arcade",
+      "family": "arcade_polygon_extensions",
+      "preset": "arcade3d",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_taito_type_x3",
+      "name": "Taito Type X3",
+      "kind": "arcade",
+      "family": "arcade_polygon_extensions",
+      "preset": "arcade3d",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_taito_x_system",
+      "name": "Taito X System",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_toaplan_v2",
+      "name": "Toaplan V2",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_triforce",
+      "name": "Triforce arcade board",
+      "kind": "arcade",
+      "family": "arcade_3d",
+      "preset": "arcade3d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arcade_williams_6809",
+      "name": "Williams 6809 arcade board family",
+      "kind": "arcade",
+      "family": "arcade_more",
+      "preset": "arcade2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "arduboy",
+      "name": "Arduboy",
+      "kind": "micro",
+      "family": "microcontrollers",
+      "preset": "micro",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "argentina_czerweny_cz1000",
+      "name": "Czerweny CZ-1000",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "argentina_drean_commodore64",
+      "name": "Drean Commodore 64",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "asus_rog_ally",
+      "name": "ASUS ROG Ally",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_1200xl",
+      "name": "Atari 1200XL",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_130xe",
+      "name": "Atari 130XE",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_2600",
+      "name": "Atari 2600",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_2600_jr",
+      "name": "Atari 2600 Jr.",
+      "kind": "console",
+      "family": "second_generation_missing",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_400_800",
+      "name": "Atari 400/800",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_5200",
+      "name": "Atari 5200",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_65xe",
+      "name": "Atari 65XE",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_7800",
+      "name": "Atari 7800",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_arcade_pong",
+      "name": "Atari Pong arcade cabinet",
+      "kind": "arcade",
+      "family": "foundational_game_technology",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1972,
+      "archive_disposition": "arcade_system"
+    },
+    {
+      "id": "atari_falcon",
+      "name": "Atari Falcon",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_home_pong",
+      "name": "Atari Home Pong",
+      "kind": "console",
+      "family": "pioneer",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_jaguar",
+      "name": "Atari Jaguar",
+      "kind": "console",
+      "family": "16_bit_and_arcades_at_home",
+      "preset": "console16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_jaguar_cd",
+      "name": "Atari Jaguar CD",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_lynx",
+      "name": "Atari Lynx",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_lynx_ii",
+      "name": "Atari Lynx II",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_st",
+      "name": "Atari ST",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_ste",
+      "name": "Atari STE",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_vector_bw",
+      "name": "Atari monochrome-vector arcade",
+      "kind": "arcade",
+      "family": "arcade_vectors",
+      "preset": "vector",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_vector_color",
+      "name": "Atari color-vector arcade",
+      "kind": "arcade",
+      "family": "arcade_vectors",
+      "preset": "vector",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_video_pinball",
+      "name": "Atari Video Pinball C-380",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "atari_xegs",
+      "name": "Atari XEGS",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "atari_xl_xe",
+      "name": "Atari XL/XE",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ayn_odin",
+      "name": "AYN Odin handheld",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "bally_astrocade",
+      "name": "Bally Astrocade",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "bandai_arcadia",
+      "name": "Bandai Arcadia",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "bandai_design_master",
+      "name": "Bandai Design Master Senshi",
+      "kind": "educational",
+      "family": "education_more",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "bandai_playdia",
+      "name": "Bandai Playdia",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "bandai_super_vision_8000",
+      "name": "Bandai Super Vision 8000",
+      "kind": "console",
+      "family": "second_generation_missing",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "bandai_swancrystal",
+      "name": "Bandai SwanCrystal",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "render": "color_tile_sprite",
+        "input": "dual_orientation_buttons"
+      }
+    },
+    {
+      "id": "bandai_tamagotchi",
+      "name": "Bandai Tamagotchi",
+      "kind": "handheld",
+      "family": "handheld_lcd",
+      "preset": "lcd",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "bandai_wonderswan",
+      "name": "Bandai WonderSwan",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "render": "monochrome_tile_sprite",
+        "input": "dual_orientation_buttons",
+        "constraints": [
+          "portrait and landscape presentation",
+          "limited sprite and tile resources",
+          "save and color hardware variation"
+        ]
+      }
+    },
+    {
+      "id": "bandai_wonderswan_color",
+      "name": "Bandai WonderSwan Color",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "render": "color_tile_sprite",
+        "input": "dual_orientation_buttons"
+      }
+    },
+    {
+      "id": "beos",
+      "name": "BeOS PC",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "binatone_colour_tv_mk6",
+      "name": "Binatone Colour TV Game MK6",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "binatone_superstar",
+      "name": "Binatone Superstar",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "binatone_tv_master",
+      "name": "Binatone TV Master",
+      "kind": "console",
+      "family": "pioneer",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "binatone_tv_master_mkiv",
+      "name": "Binatone TV Master Mk IV",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "bit_corp_gamate",
+      "name": "Bit Corp Gamate",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "blackberry_os",
+      "name": "BlackBerry OS",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "brazil_cce_mc1000",
+      "name": "CCE MC-1000",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "brazil_gradiente_expert",
+      "name": "Gradiente Expert MSX",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "brazil_microdigital_tk90x",
+      "name": "Microdigital TK90X",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "brazil_microdigital_tk95",
+      "name": "Microdigital TK95",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "brazil_prologica_cp400",
+      "name": "Prológica CP 400",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "brazil_sharp_hotbit",
+      "name": "Sharp Hotbit MSX",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "brazil_unitron_apii",
+      "name": "Unitron Apple II-compatible",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "browser_wasm",
+      "name": "WebAssembly browser target",
+      "kind": "computer",
+      "family": "contemporary_desktop",
+      "preset": "browser",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "cambridge_edsac",
+      "name": "Cambridge EDSAC (OXO computing context)",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "early_computer",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1949,
+      "archive_disposition": "historical_computer"
+    },
+    {
+      "id": "capcom_cps_changer",
+      "name": "Capcom CPS Changer",
+      "kind": "console",
+      "family": "second_generation_missing",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "casio_fp1100",
+      "name": "Casio FP-1100",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "casio_fx9860",
+      "name": "Casio fx-9860",
+      "kind": "calculator",
+      "family": "calculators",
+      "preset": "calculator",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "casio_loopy",
+      "name": "Casio Loopy",
+      "kind": "console",
+      "family": "16_bit_and_arcades_at_home",
+      "preset": "console16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "casio_prizm",
+      "name": "Casio Prizm",
+      "kind": "calculator",
+      "family": "calculators",
+      "preset": "calculator",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "casio_pv1000",
+      "name": "Casio PV-1000",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "chicago_coin_speedway_em",
+      "name": "Chicago Coin Speedway electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1969,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "chip8_virtual",
+      "name": "CHIP-8 virtual machine",
+      "kind": "fantasy",
+      "family": "fantasy_vm",
+      "preset": "fantasy",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "virtual_machine"
+    },
+    {
+      "id": "cinematronics_vector",
+      "name": "Cinematronics vector arcade",
+      "kind": "arcade",
+      "family": "arcade_vectors",
+      "preset": "vector",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "coleco_telstar",
+      "name": "Coleco Telstar",
+      "kind": "console",
+      "family": "pioneer",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "coleco_telstar_arcade",
+      "name": "Coleco Telstar Arcade",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "colecovision",
+      "name": "ColecoVision",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_128",
+      "name": "Commodore 128",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_16",
+      "name": "Commodore 16",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_64",
+      "name": "Commodore 64",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_64gs",
+      "name": "Commodore 64 Games System",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_65",
+      "name": "Commodore 65 prototype",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "prototype"
+    },
+    {
+      "id": "commodore_amiga_aga",
+      "name": "Commodore Amiga AGA",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_amiga_cd32",
+      "name": "Commodore Amiga CD32",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_amiga_ocs",
+      "name": "Commodore Amiga OCS/ECS",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_cdtv",
+      "name": "Commodore CDTV",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_educator_64",
+      "name": "Commodore Educator 64",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_max_machine",
+      "name": "Commodore MAX Machine",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_pet",
+      "name": "Commodore PET",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_plus4",
+      "name": "Commodore Plus/4",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_sx64",
+      "name": "Commodore SX-64",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "commodore_tv_game_3000h",
+      "name": "Commodore TV Game 3000H",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "commodore_vic20",
+      "name": "Commodore VIC-20",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "conic_tg621",
+      "name": "Conic TV Sports TG-621",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "crt_amusement_device_1947",
+      "name": "Cathode-ray tube amusement device (patent)",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "analog_game",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1947,
+      "archive_disposition": "patent_concept"
+    },
+    {
+      "id": "cybiko",
+      "name": "Cybiko",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "czechoslovak_didaktik_gama",
+      "name": "Didaktik Gama",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "czechoslovak_pmd85",
+      "name": "PMD 85",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "dazzla_tv_games_007",
+      "name": "Dazzla TV-Games 007",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "dec_pdp1",
+      "name": "DEC PDP-1 (Spacewar! computing context)",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "early_computer",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1960,
+      "archive_disposition": "historical_computer"
+    },
+    {
+      "id": "dec_pdp8",
+      "name": "DEC PDP-8 computer",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "early_computer",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1965,
+      "archive_disposition": "historical_computer"
+    },
+    {
+      "id": "dina_2in1",
+      "name": "Dina 2-in-1",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "dingoo_a320",
+      "name": "Dingoo A320",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "donner_model30_tennis",
+      "name": "Donner analog computer Tennis for Two apparatus",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "analog_game",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1958,
+      "archive_disposition": "demonstration_apparatus"
+    },
+    {
+      "id": "dos_ega",
+      "name": "IBM PC compatible EGA/DOS",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "dos_vga",
+      "name": "IBM PC compatible VGA/DOS",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "dragon_32",
+      "name": "Dragon 32",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "dragon_64",
+      "name": "Dragon 64",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "dragonbox_pyra",
+      "name": "DragonBox Pyra",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "electronika_bk",
+      "name": "Elektronika BK",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "emerson_arcadia_2001",
+      "name": "Emerson Arcadia 2001",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "enterprise_128",
+      "name": "Enterprise 128",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "epoch_cassette_vision",
+      "name": "Epoch Cassette Vision",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "epoch_game_pocket_computer",
+      "name": "Epoch Game Pocket Computer",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "epoch_super_cassette_vision",
+      "name": "Epoch Super Cassette Vision",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "epoch_tv_tennis",
+      "name": "Epoch TV Tennis",
+      "kind": "console",
+      "family": "pioneer",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "esp32_handheld",
+      "name": "ESP32 handheld family",
+      "kind": "micro",
+      "family": "microcontrollers",
+      "preset": "micro",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "esp32_m5stack_cardputer",
+      "name": "M5Stack Cardputer",
+      "kind": "micro",
+      "family": "micro_more",
+      "preset": "micro",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "esp32_odroid_go",
+      "name": "Hardkernel ODROID-GO",
+      "kind": "micro",
+      "family": "micro_more",
+      "preset": "micro",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "evercade_exp",
+      "name": "Evercade EXP",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "evercade_handheld",
+      "name": "Evercade Handheld",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "exelvision_exl100",
+      "name": "Exelvision EXL 100",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "fairchild_channel_f",
+      "name": "Fairchild Channel F",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ferranti_nimrod",
+      "name": "Ferranti Nimrod",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "early_computer",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1951,
+      "archive_disposition": "exhibited_hardware"
+    },
+    {
+      "id": "firefox_os",
+      "name": "Firefox OS",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "fisher_price_smart_cycle",
+      "name": "Fisher-Price Smart Cycle",
+      "kind": "educational",
+      "family": "education_more",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "freebsd_desktop",
+      "name": "FreeBSD desktop",
+      "kind": "computer",
+      "family": "contemporary_desktop",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "fujitsu_fm_towns",
+      "name": "Fujitsu FM Towns",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "fujitsu_fm_towns_marty",
+      "name": "Fujitsu FM Towns Marty",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "fujitsu_fm11",
+      "name": "Fujitsu FM-11",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "fujitsu_fm7",
+      "name": "Fujitsu FM-7",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "fujitsu_fm77",
+      "name": "Fujitsu FM77",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "fujitsu_fm8",
+      "name": "Fujitsu FM-8",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "funtech_super_acan",
+      "name": "Funtech Super A'Can",
+      "kind": "console",
+      "family": "16_bit_and_arcades_at_home",
+      "preset": "console16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "game_wave",
+      "name": "ZAPiT Game Wave",
+      "kind": "educational",
+      "family": "education_and_toys",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "gamebuino",
+      "name": "Gamebuino",
+      "kind": "micro",
+      "family": "microcontrollers",
+      "preset": "micro",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "gamepark_caanoo",
+      "name": "GamePark Caanoo",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "gamepark_gp2x",
+      "name": "GamePark GP2X",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "gamepark_gp2x_f200",
+      "name": "GamePark GP2X F-200",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "gamepark_gp2x_wiz",
+      "name": "GamePark GP2X Wiz",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "gamepark_gp32",
+      "name": "GamePark GP32",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "gcw_zero",
+      "name": "GCW Zero",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "gizmondo",
+      "name": "Tiger Telematics Gizmondo",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "gottlieb_baffle_ball",
+      "name": "Gottlieb Baffle Ball early pinball",
+      "kind": "mechanical",
+      "family": "foundational_game_technology",
+      "preset": "pinball_em",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1931,
+      "archive_disposition": "mechanical_machine"
+    },
+    {
+      "id": "gottlieb_humpty_dumpty",
+      "name": "Gottlieb Humpty Dumpty pinball",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "pinball_em",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1947,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "gpd_win",
+      "name": "GPD Win handheld PC",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "gpd_xd",
+      "name": "GPD XD",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "grundy_newbrain",
+      "name": "Grundy NewBrain",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "haiku_os",
+      "name": "Haiku OS",
+      "kind": "computer",
+      "family": "contemporary_desktop",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "hanimex_tvg_070c",
+      "name": "Hanimex TVG-070C",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "hanimex_tvg_8610",
+      "name": "Hanimex TVG-8610",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "hartung_game_master",
+      "name": "Hartung Game Master",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "henry_videosport_mk2",
+      "name": "Henry's VideoSport MK2",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "hp_48",
+      "name": "HP 48",
+      "kind": "calculator",
+      "family": "calculators",
+      "preset": "calculator",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "hp_prime",
+      "name": "HP Prime",
+      "kind": "calculator",
+      "family": "calculators",
+      "preset": "calculator",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "hungarian_ht1080z",
+      "name": "HT-1080Z",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "hungarian_primo",
+      "name": "Primo",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ibm_pc_at",
+      "name": "IBM PC AT",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ibm_pc_xt",
+      "name": "IBM PC XT",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ibm_pcjr",
+      "name": "IBM PCjr",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ibm_ps2",
+      "name": "IBM PS/2",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "intel_tv_sport_1004",
+      "name": "Intel TV Sport 1004",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "interton_vc4000",
+      "name": "Interton VC 4000",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ios_legacy",
+      "name": "Early iPhone OS",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ios_modern",
+      "name": "iOS current",
+      "kind": "computer",
+      "family": "contemporary_desktop",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "j2me_midp",
+      "name": "J2ME MIDP",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "jupiter_ace",
+      "name": "Jupiter Ace",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "kasco_indy500_em",
+      "name": "Kasco Indy 500 electro-mechanical game",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1968,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "kaypro_ii",
+      "name": "Kaypro II",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "leapfrog_didj",
+      "name": "LeapFrog Didj",
+      "kind": "educational",
+      "family": "education_more",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "leapfrog_leappad",
+      "name": "LeapFrog LeapPad",
+      "kind": "educational",
+      "family": "education_and_toys",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "leapfrog_leapster",
+      "name": "LeapFrog Leapster",
+      "kind": "educational",
+      "family": "education_and_toys",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "leapfrog_leapster_explorer",
+      "name": "Leapster Explorer",
+      "kind": "educational",
+      "family": "education_more",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "leapfrog_leapster2",
+      "name": "LeapFrog Leapster2",
+      "kind": "educational",
+      "family": "education_more",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "lenovo_legion_go",
+      "name": "Lenovo Legion Go",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "linux_desktop",
+      "name": "Linux desktop",
+      "kind": "computer",
+      "family": "contemporary_desktop",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "macos_modern",
+      "name": "macOS",
+      "kind": "computer",
+      "family": "contemporary_desktop",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "maemo",
+      "name": "Maemo",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "magnavox_odyssey",
+      "name": "Magnavox Odyssey",
+      "kind": "console",
+      "family": "pioneer",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "magnavox_odyssey_2000",
+      "name": "Magnavox Odyssey 2000",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "magnavox_odyssey_300",
+      "name": "Magnavox Odyssey 300",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "magnavox_odyssey_3000",
+      "name": "Magnavox Odyssey 3000",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "magnavox_odyssey_4000",
+      "name": "Magnavox Odyssey 4000",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "magnavox_odyssey2",
+      "name": "Magnavox Odyssey² / Videopac",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "mattel_hyperscan",
+      "name": "Mattel HyperScan",
+      "kind": "educational",
+      "family": "education_and_toys",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "mattel_intellivision",
+      "name": "Mattel Intellivision",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "meego",
+      "name": "MeeGo",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "mega_duck",
+      "name": "Mega Duck / Cougar Boy",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "memotech_mtx",
+      "name": "Memotech MTX",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "mera_elwro_tvg10",
+      "name": "Mera-Elwro TVG-10",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "microbit",
+      "name": "BBC micro:bit",
+      "kind": "micro",
+      "family": "microcontrollers",
+      "preset": "micro",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "microconsole_mojo",
+      "name": "Mad Catz M.O.J.O.",
+      "kind": "console",
+      "family": "transitional_consoles",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "microsoft_xbox",
+      "name": "Microsoft Xbox",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "microsoft_xbox_360",
+      "name": "Microsoft Xbox 360",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "microsoft_xbox_one",
+      "name": "Microsoft Xbox One",
+      "kind": "console",
+      "family": "modern_consoles",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "microsoft_xbox_series",
+      "name": "Microsoft Xbox Series",
+      "kind": "console",
+      "family": "modern_consoles",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "midway_sami_em",
+      "name": "Midway S.A.M.I. electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1970,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "midway_sea_raider_em",
+      "name": "Midway Sea Raider electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1969,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "milton_bradley_microvision",
+      "name": "Milton Bradley Microvision",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "msi_claw",
+      "name": "MSI Claw",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "msx_turbor",
+      "name": "MSX turbo R",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "msx1",
+      "name": "MSX1",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "msx2",
+      "name": "MSX2",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "msx2_plus",
+      "name": "MSX2+",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "namco_periscope_em",
+      "name": "Nakamura Periscope electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1965,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "nec_cd_rom2",
+      "name": "NEC PC Engine CD-ROM²",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc_engine",
+      "name": "NEC PC Engine / TurboGrafx-16",
+      "kind": "console",
+      "family": "16_bit_and_arcades_at_home",
+      "preset": "console16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc_engine_lt",
+      "name": "PC Engine LT",
+      "kind": "handheld",
+      "family": "portable_pc_and_transitions",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc_engine_super_cd",
+      "name": "PC Engine Super CD-ROM²",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc_fx",
+      "name": "NEC PC-FX",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc6001",
+      "name": "NEC PC-6001",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc6601",
+      "name": "NEC PC-6601",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc8001",
+      "name": "NEC PC-8001",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc8801",
+      "name": "NEC PC-8801",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc8801mk2",
+      "name": "NEC PC-8801mkII",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc8801sr",
+      "name": "NEC PC-8801mkIISR",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc9801",
+      "name": "NEC PC-9801",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_pc9821",
+      "name": "NEC PC-9821",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_supergrafx",
+      "name": "NEC SuperGrafx",
+      "kind": "console",
+      "family": "16_bit_and_arcades_at_home",
+      "preset": "console16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nec_turboexpress",
+      "name": "NEC TurboExpress / PC Engine GT",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nextcube",
+      "name": "NeXTcube",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nextstation",
+      "name": "NeXTstation",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_2ds",
+      "name": "Nintendo 2DS",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_3ds",
+      "name": "Nintendo 3DS",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_64",
+      "name": "Nintendo 64",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_64dd",
+      "name": "Nintendo 64DD",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_color_tv_game",
+      "name": "Nintendo Color TV-Game",
+      "kind": "console",
+      "family": "pioneer",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_ds",
+      "name": "Nintendo DS",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_ds_lite",
+      "name": "Nintendo DS Lite",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_dsi",
+      "name": "Nintendo DSi",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_dsi_xl",
+      "name": "Nintendo DSi XL",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_famicom",
+      "name": "Nintendo Famicom / NES",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_famicom_disk_system",
+      "name": "Famicom Disk System",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_game_boy",
+      "name": "Nintendo Game Boy",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_game_boy_advance",
+      "name": "Nintendo Game Boy Advance",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "handheld32",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_game_boy_advance_sp",
+      "name": "Nintendo Game Boy Advance SP",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_game_boy_color",
+      "name": "Nintendo Game Boy Color",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "render": "color_tile_sprite"
+      }
+    },
+    {
+      "id": "nintendo_game_boy_light",
+      "name": "Nintendo Game Boy Light",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_game_boy_micro",
+      "name": "Nintendo Game Boy Micro",
+      "kind": "handheld",
+      "family": "handheld_lcd",
+      "preset": "handheld32",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_game_boy_pocket",
+      "name": "Nintendo Game Boy Pocket",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_game_watch",
+      "name": "Nintendo Game & Watch",
+      "kind": "handheld",
+      "family": "handheld_lcd",
+      "preset": "lcd",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_gamecube",
+      "name": "Nintendo GameCube",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_new_2ds_xl",
+      "name": "New Nintendo 2DS XL",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_new_3ds",
+      "name": "New Nintendo 3DS",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_pokemon_mini",
+      "name": "Nintendo Pokémon Mini",
+      "kind": "handheld",
+      "family": "handheld_lcd",
+      "preset": "lcd",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "render": "monochrome_tile_sprite",
+        "constraints": [
+          "monochrome display",
+          "small game cartridge budget",
+          "motion and button input variation"
+        ]
+      }
+    },
+    {
+      "id": "nintendo_satellaview",
+      "name": "Nintendo Satellaview",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_snes",
+      "name": "Nintendo Super Famicom / SNES",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_switch",
+      "name": "Nintendo Switch",
+      "kind": "console",
+      "family": "modern_consoles",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_switch_2",
+      "name": "Nintendo Switch 2",
+      "kind": "console",
+      "family": "modern_consoles",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_virtual_boy",
+      "name": "Nintendo Virtual Boy",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "stereoscopic",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_wii",
+      "name": "Nintendo Wii",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nintendo_wii_u",
+      "name": "Nintendo Wii U",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nokia_n_gage",
+      "name": "Nokia N-Gage",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nokia_ngage_qd",
+      "name": "Nokia N-Gage QD",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "numworks",
+      "name": "NumWorks",
+      "kind": "calculator",
+      "family": "calculators",
+      "preset": "calculator",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nuon",
+      "name": "Nuon DVD platform",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "nutting_computer_space",
+      "name": "Nutting Associates Computer Space arcade",
+      "kind": "arcade",
+      "family": "foundational_game_technology",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1971,
+      "archive_disposition": "arcade_system"
+    },
+    {
+      "id": "nvidia_shield",
+      "name": "NVIDIA Shield",
+      "kind": "console",
+      "family": "transitional_consoles",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "openpandora",
+      "name": "OpenPandora",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "oric_1",
+      "name": "Oric-1",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "oric_atmos",
+      "name": "Oric Atmos",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "os2_warp",
+      "name": "IBM OS/2 Warp",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "osborne_1",
+      "name": "Osborne 1",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ouya",
+      "name": "OUYA",
+      "kind": "console",
+      "family": "transitional_consoles",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "palm_os",
+      "name": "Palm OS",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "panasonic_3do",
+      "name": "3DO Interactive Multiplayer",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "pebble",
+      "name": "Pebble smartwatch",
+      "kind": "micro",
+      "family": "microcontrollers",
+      "preset": "micro",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "philco_ford_telejogo",
+      "name": "Philco Ford Telejogo",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "philips_cd_i",
+      "name": "Philips CD-i",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "philips_odyssey_200",
+      "name": "Philips Odyssey 200",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "philips_odyssey_2001",
+      "name": "Philips Odyssey 2001",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "philips_odyssey_2100",
+      "name": "Philips Odyssey 2100",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "pico8_fantasy",
+      "name": "PICO-8 fantasy console",
+      "kind": "fantasy",
+      "family": "microcontrollers",
+      "preset": "fantasy",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "pioneer_laseractive",
+      "name": "Pioneer LaserActive",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "playdate",
+      "name": "Panic Playdate",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "mono_handheld",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "pokitto",
+      "name": "Pokitto",
+      "kind": "micro",
+      "family": "microcontrollers",
+      "preset": "micro",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "polish_elwro_800_junior",
+      "name": "Elwro 800 Junior",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "polish_meritum",
+      "name": "Meritum",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "polistil_video_games",
+      "name": "Polistil Video Games",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "polycon_pg7",
+      "name": "Polycon PG-7 Programmable",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "prinztronic_tournament_2000",
+      "name": "Prinztronic Tournament Programmable 2000",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "psion_epoc",
+      "name": "Psion EPOC",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "qualcomm_brew",
+      "name": "Qualcomm BREW",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "radofin_telesports_iii",
+      "name": "Radofin Tele-Sports III",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "raspberry_pi_pico",
+      "name": "Raspberry Pi Pico / RP2040",
+      "kind": "micro",
+      "family": "microcontrollers",
+      "preset": "micro",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "raspberry_pi_zero",
+      "name": "Raspberry Pi Zero bare-metal homebrew",
+      "kind": "micro",
+      "family": "micro_more",
+      "preset": "micro",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "rc2014",
+      "name": "RC2014 Z80",
+      "kind": "micro",
+      "family": "microcontrollers",
+      "preset": "micro",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "rca_studio_ii",
+      "name": "RCA Studio II",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "retroid_pocket",
+      "name": "Retroid Pocket family",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "rft_tv_spiel",
+      "name": "RFT TV-Spiel BBS 01",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "ricochet_color_tv",
+      "name": "Ricochet Color TV",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "risc_os",
+      "name": "RISC OS",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "roberts_paddle_iv",
+      "name": "Roberts Paddle IV",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "sam_coupe",
+      "name": "SAM Coupé",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sanyo_phc25",
+      "name": "Sanyo PHC-25",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_32x",
+      "name": "Sega 32X",
+      "kind": "console",
+      "family": "16_bit_and_arcades_at_home",
+      "preset": "console16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_beena",
+      "name": "Sega Advanced Pico Beena",
+      "kind": "educational",
+      "family": "education_and_toys",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_dreamcast",
+      "name": "Sega Dreamcast",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_drivemobile_em",
+      "name": "Sega Drivemobile electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1968,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "sega_g80_vector",
+      "name": "Sega G80 vector arcade",
+      "kind": "arcade",
+      "family": "arcade_vectors",
+      "preset": "vector",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_game_gear",
+      "name": "Sega Game Gear",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_jet_rocket_em",
+      "name": "Sega Jet Rocket electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1970,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "sega_mark_iii",
+      "name": "Sega Mark III",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_master_system",
+      "name": "Sega Master System",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_master_system_ii",
+      "name": "Sega Master System II",
+      "kind": "console",
+      "family": "second_generation_missing",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_mega_cd",
+      "name": "Sega Mega-CD / Sega CD",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_mega_drive",
+      "name": "Sega Mega Drive / Genesis",
+      "kind": "console",
+      "family": "16_bit_and_arcades_at_home",
+      "preset": "console16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_mega_jet",
+      "name": "Sega Mega Jet",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_nomad",
+      "name": "Sega Nomad",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_periscope_em",
+      "name": "Sega Periscope electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1966,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "sega_pico",
+      "name": "Sega Pico",
+      "kind": "console",
+      "family": "16_bit_and_arcades_at_home",
+      "preset": "console16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_rifleman_em",
+      "name": "Sega Rifleman electro-mechanical arcade",
+      "kind": "electromechanical",
+      "family": "foundational_game_technology",
+      "preset": "em_arcade",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1967,
+      "archive_disposition": "electromechanical_machine"
+    },
+    {
+      "id": "sega_saturn",
+      "name": "Sega Saturn",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_sc3000",
+      "name": "Sega SC-3000",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_sc3000h",
+      "name": "Sega SC-3000H",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_sg1000",
+      "name": "Sega SG-1000",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_teradrive",
+      "name": "Sega TeraDrive",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sega_vmu",
+      "name": "Dreamcast Visual Memory Unit",
+      "kind": "handheld",
+      "family": "handheld_lcd",
+      "preset": "lcd",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "input": "tiny_buttons",
+        "constraints": [
+          "monochrome LCD",
+          "button and storage limits",
+          "companion-device link availability"
+        ]
+      }
+    },
+    {
+      "id": "seleco_ping_o_tronic",
+      "name": "Zanussi/Sèleco Ping-o-tronic",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "seleco_play_o_tronic",
+      "name": "Zanussi/Sèleco Play-o-tronic",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "sgi_indigo2",
+      "name": "SGI Indigo2",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sgi_indy",
+      "name": "SGI Indy",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sharp_mz",
+      "name": "Sharp MZ family",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sharp_mz700",
+      "name": "Sharp MZ-700",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sharp_mz800",
+      "name": "Sharp MZ-800",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sharp_mz80k",
+      "name": "Sharp MZ-80K",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sharp_x1",
+      "name": "Sharp X1",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sharp_x1_turbo",
+      "name": "Sharp X1 Turbo",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sharp_x68000",
+      "name": "Sharp X68000",
+      "kind": "computer",
+      "family": "japanese_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sharp_x68030",
+      "name": "Sharp X68030",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sinclair_ql",
+      "name": "Sinclair QL",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sinclair_zx_spectrum",
+      "name": "Sinclair ZX Spectrum",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sinclair_zx_spectrum_128",
+      "name": "Sinclair ZX Spectrum 128",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sinclair_zx_spectrum_plus2",
+      "name": "Sinclair ZX Spectrum +2",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sinclair_zx_spectrum_plus3",
+      "name": "Sinclair ZX Spectrum +3",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sinclair_zx80",
+      "name": "Sinclair ZX80",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sinclair_zx81",
+      "name": "Sinclair ZX81",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "snk_neo_geo_aes",
+      "name": "SNK Neo Geo AES",
+      "kind": "console",
+      "family": "16_bit_and_arcades_at_home",
+      "preset": "console16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "snk_neo_geo_cd",
+      "name": "Neo Geo CD",
+      "kind": "console",
+      "family": "compact_optical",
+      "preset": "optical2d",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "snk_neo_geo_pocket",
+      "name": "SNK Neo Geo Pocket",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "snk_neo_geo_pocket_color",
+      "name": "SNK Neo Geo Pocket Color",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sony_hitbit_hb75",
+      "name": "Sony HitBit HB-75 MSX",
+      "kind": "computer",
+      "family": "japan_specific_variants",
+      "preset": "enhanced8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sony_playstation",
+      "name": "Sony PlayStation",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sony_pocketstation",
+      "name": "Sony PocketStation",
+      "kind": "handheld",
+      "family": "handheld_lcd",
+      "preset": "lcd",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "render": "monochrome_lcd",
+        "artifact": "accessory_homebrew_image",
+        "constraints": [
+          "host accessory data exchange",
+          "tiny LCD graphics",
+          "storage and buttons"
+        ]
+      }
+    },
+    {
+      "id": "sony_ps_vita",
+      "name": "Sony PS Vita",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sony_ps2",
+      "name": "Sony PlayStation 2",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sony_ps3",
+      "name": "Sony PlayStation 3",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "polygons",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sony_ps4",
+      "name": "Sony PlayStation 4",
+      "kind": "console",
+      "family": "3d_era",
+      "preset": "contemporary",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sony_ps5",
+      "name": "Sony PlayStation 5",
+      "kind": "console",
+      "family": "modern_consoles",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sony_psp",
+      "name": "Sony PSP",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sony_psp_go",
+      "name": "Sony PSP Go",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sord_m5",
+      "name": "Sord M5",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_agat_7",
+      "name": "Agat-7",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_agat_9",
+      "name": "Agat-9",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_apogey_bk01",
+      "name": "Apogey BK-01",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_bk0010",
+      "name": "Elektronika BK-0010",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_bk0011m",
+      "name": "Elektronika BK-0011M",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_korvet",
+      "name": "Korvet educational computer",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_microsha",
+      "name": "Microsha",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_orion_128",
+      "name": "Orion-128",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_radio86rk",
+      "name": "Radio-86RK",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_turnir",
+      "name": "Turnir Soviet game console",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "soviet_uknc",
+      "name": "Elektronika UKNC",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "soviet_vector_06c",
+      "name": "Vector-06C",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "spectravideo_svi318",
+      "name": "Spectravideo SVI-318",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "spectravideo_svi328",
+      "name": "Spectravideo SVI-328",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sportel",
+      "name": "Sportel",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "stanford_galaxy_game",
+      "name": "Stanford Galaxy Game arcade installation",
+      "kind": "precursor",
+      "family": "foundational_game_technology",
+      "preset": "early_computer",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "first_year_candidate": 1971,
+      "archive_disposition": "research_arcade_installation"
+    },
+    {
+      "id": "steam_deck",
+      "name": "Valve Steam Deck",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "contemporary",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "input": "handheld_gamepad_touch",
+        "artifact": "linux_native_game_package"
+      }
+    },
+    {
+      "id": "steam_os",
+      "name": "SteamOS",
+      "kind": "computer",
+      "family": "contemporary_desktop",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "sun_sparcstation",
+      "name": "Sun SPARCstation",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "superchip8_virtual",
+      "name": "SUPER-CHIP virtual machine",
+      "kind": "fantasy",
+      "family": "fantasy_vm",
+      "preset": "fantasy",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "virtual_machine"
+    },
+    {
+      "id": "symbian_s60",
+      "name": "Symbian S60",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tandy_1000",
+      "name": "Tandy 1000",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tandy_2000",
+      "name": "Tandy 2000",
+      "kind": "computer",
+      "family": "desktop_crossovers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tandy_color_computer_3",
+      "name": "Tandy Color Computer 3",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tandy_mc10",
+      "name": "Tandy MC-10",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tandy_trs80_color",
+      "name": "TRS-80 Color Computer",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tandy_trs80_model_100",
+      "name": "TRS-80 Model 100",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tandy_trs80_model_4",
+      "name": "TRS-80 Model 4",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tandy_trs80_model_i",
+      "name": "TRS-80 Model I",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tandy_trs80_model_iii",
+      "name": "TRS-80 Model III",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tapwave_zodiac",
+      "name": "Tapwave Zodiac",
+      "kind": "handheld",
+      "family": "handheld_advanced",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tatung_einstein",
+      "name": "Tatung Einstein",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "thomson_mo5",
+      "name": "Thomson MO5",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "thomson_to7",
+      "name": "Thomson TO7",
+      "kind": "computer",
+      "family": "8bit_europe",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "thumby_tiny",
+      "name": "TinyCircuits Thumby",
+      "kind": "micro",
+      "family": "micro_more",
+      "preset": "micro",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ti_83_plus",
+      "name": "TI-83 Plus",
+      "kind": "calculator",
+      "family": "calculators",
+      "preset": "calculator",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ti_84_plus",
+      "name": "TI-84 Plus",
+      "kind": "calculator",
+      "family": "calculators",
+      "preset": "calculator",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ti_89",
+      "name": "TI-89",
+      "kind": "calculator",
+      "family": "calculators",
+      "preset": "calculator",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ti_99_4a",
+      "name": "Texas Instruments TI-99/4A",
+      "kind": "computer",
+      "family": "8bit_americas",
+      "preset": "bitmap8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "ti_nspire",
+      "name": "TI-Nspire family",
+      "kind": "calculator",
+      "family": "calculators",
+      "preset": "calculator",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tic80_fantasy",
+      "name": "TIC-80 fantasy console",
+      "kind": "fantasy",
+      "family": "microcontrollers",
+      "preset": "fantasy",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tiger_game_com",
+      "name": "Tiger game.com",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tiger_handheld_lcd",
+      "name": "Tiger handheld LCD family",
+      "kind": "handheld",
+      "family": "handheld_lcd",
+      "preset": "lcd",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tiger_r_zone",
+      "name": "Tiger R-Zone",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "timetop_gameking",
+      "name": "Timetop GameKing",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "timetop_gameking_ii",
+      "name": "Timetop GameKing II",
+      "kind": "handheld",
+      "family": "handheld_variations",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "timex_computer_2048",
+      "name": "Timex Computer 2048",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "timex_sinclair_1000",
+      "name": "Timex Sinclair 1000",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "timex_sinclair_2068",
+      "name": "Timex Sinclair 2068",
+      "kind": "computer",
+      "family": "european_micro",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tomy_tutor",
+      "name": "Tomy Tutor",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "tv_multi_speil_4014",
+      "name": "TV Multi Speil 4014",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "unisonic_champion_2711",
+      "name": "Unisonic Champion 2711",
+      "kind": "console",
+      "family": "second_generation_missing",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "uzebox",
+      "name": "Uzebox",
+      "kind": "micro",
+      "family": "microcontrollers",
+      "preset": "micro",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "vectrex",
+      "name": "Vectrex (vector home console)",
+      "kind": "console",
+      "family": "arcade_vectors",
+      "preset": "vector",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "videomaster_colourscore",
+      "name": "Videomaster Colourscore",
+      "kind": "console",
+      "family": "first_generation_variants",
+      "preset": "fixed",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "model_or_product_family"
+    },
+    {
+      "id": "vtech_creativision",
+      "name": "VTech CreatiVision",
+      "kind": "console",
+      "family": "early_cartridge",
+      "preset": "cart8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "vtech_innotab",
+      "name": "VTech InnoTab",
+      "kind": "educational",
+      "family": "education_and_toys",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "vtech_socrates",
+      "name": "VTech Socrates",
+      "kind": "educational",
+      "family": "education_and_toys",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "vtech_vsmile",
+      "name": "VTech V.Smile",
+      "kind": "educational",
+      "family": "education_and_toys",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "overrides": {
+        "input": "specialized_joystick",
+        "constraints": [
+          "educational content suitability",
+          "specialized joystick",
+          "proprietary cartridge and firmware boundaries"
+        ]
+      }
+    },
+    {
+      "id": "vtech_vsmile_pocket",
+      "name": "VTech V.Smile Pocket",
+      "kind": "educational",
+      "family": "education_more",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "vtech_vsmile_pro",
+      "name": "VTech V.Smile Pro",
+      "kind": "educational",
+      "family": "education_more",
+      "preset": "educational",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "wasm4_fantasy",
+      "name": "WASM-4 fantasy console",
+      "kind": "fantasy",
+      "family": "microcontrollers",
+      "preset": "fantasy",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "watara_supervision",
+      "name": "Watara Supervision",
+      "kind": "handheld",
+      "family": "handheld_8",
+      "preset": "handheld8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "webos",
+      "name": "webOS",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "windows_3x",
+      "name": "Windows 3.x PC",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "windows_95_98",
+      "name": "Windows 95/98 PC",
+      "kind": "computer",
+      "family": "16_32bit_computers",
+      "preset": "computer16",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "windows_ce",
+      "name": "Windows CE",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "windows_mobile",
+      "name": "Windows Mobile",
+      "kind": "mobile",
+      "family": "phones_handheld_os",
+      "preset": "mobile",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "windows_modern",
+      "name": "Windows desktop",
+      "kind": "computer",
+      "family": "contemporary_desktop",
+      "preset": "contemporary",
+      "lifecycle": "current",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "xo_chip_virtual",
+      "name": "XO-CHIP virtual machine",
+      "kind": "fantasy",
+      "family": "fantasy_vm",
+      "preset": "fantasy",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified",
+      "archive_disposition": "virtual_machine"
+    },
+    {
+      "id": "yugoslav_galaksija",
+      "name": "Galaksija",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "yugoslav_orao",
+      "name": "Orao",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "yugoslav_pecom_64",
+      "name": "Pecom 64",
+      "kind": "computer",
+      "family": "region_specific_eastern",
+      "preset": "comp8",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    },
+    {
+      "id": "zeebo",
+      "name": "Zeebo",
+      "kind": "console",
+      "family": "16_bit_and_arcades_at_home",
+      "preset": "transitional",
+      "lifecycle": "legacy",
+      "research_status": "catalogued",
+      "toolchain_status": "unverified"
+    }
+  ]
+}

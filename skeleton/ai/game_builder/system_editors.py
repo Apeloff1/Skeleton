@@ -4009,6 +4009,177 @@ CATALOG = json.loads(r'''[
           "2d",
           "3d"
         ]
+      },
+      {
+        "key": "speed_limit",
+        "kind": "int",
+        "default": 90,
+        "minimum": 20,
+        "maximum": 400,
+        "options": []
+      },
+      {
+        "key": "air_drag",
+        "kind": "int",
+        "default": 7,
+        "minimum": 0,
+        "maximum": 80,
+        "options": []
+      },
+      {
+        "key": "floor_friction",
+        "kind": "int",
+        "default": 15,
+        "minimum": 0,
+        "maximum": 90,
+        "options": []
+      },
+      {
+        "key": "wall_restitution",
+        "kind": "int",
+        "default": 20,
+        "minimum": 0,
+        "maximum": 100,
+        "options": []
+      },
+      {
+        "key": "impulse_strength",
+        "kind": "int",
+        "default": 160,
+        "minimum": 1,
+        "maximum": 500,
+        "options": []
+      },
+      {
+        "key": "impulse_budget",
+        "kind": "int",
+        "default": 30,
+        "minimum": 0,
+        "maximum": 128,
+        "options": []
+      },
+      {
+        "key": "initial_battery",
+        "kind": "int",
+        "default": 40,
+        "minimum": 0,
+        "maximum": 512,
+        "options": []
+      },
+      {
+        "key": "fan_force",
+        "kind": "int",
+        "default": 16,
+        "minimum": 0,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "magnet_range",
+        "kind": "int",
+        "default": 450,
+        "minimum": 50,
+        "maximum": 3200,
+        "options": []
+      },
+      {
+        "key": "magnet_force",
+        "kind": "int",
+        "default": 40,
+        "minimum": 0,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "rope_length",
+        "kind": "int",
+        "default": 500,
+        "minimum": 100,
+        "maximum": 3000,
+        "options": []
+      },
+      {
+        "key": "rope_strength",
+        "kind": "int",
+        "default": 200,
+        "minimum": 1,
+        "maximum": 2000,
+        "options": []
+      },
+      {
+        "key": "attach_range",
+        "kind": "int",
+        "default": 600,
+        "minimum": 100,
+        "maximum": 4000,
+        "options": []
+      },
+      {
+        "key": "buoyancy",
+        "kind": "int",
+        "default": 50,
+        "minimum": 0,
+        "maximum": 1500,
+        "options": []
+      },
+      {
+        "key": "water_drag",
+        "kind": "int",
+        "default": 30,
+        "minimum": 0,
+        "maximum": 90,
+        "options": []
+      },
+      {
+        "key": "substeps",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 4,
+        "options": []
+      },
+      {
+        "key": "brake_strength",
+        "kind": "int",
+        "default": 75,
+        "minimum": 0,
+        "maximum": 99,
+        "options": []
+      },
+      {
+        "key": "goal_radius",
+        "kind": "int",
+        "default": 50,
+        "minimum": 10,
+        "maximum": 150,
+        "options": []
+      },
+      {
+        "key": "goal_speed",
+        "kind": "int",
+        "default": 30,
+        "minimum": 0,
+        "maximum": 300,
+        "options": []
+      },
+      {
+        "key": "goal_dwell_frames",
+        "kind": "int",
+        "default": 1,
+        "minimum": 1,
+        "maximum": 15,
+        "options": []
+      },
+      {
+        "key": "completion_mode",
+        "kind": "enum",
+        "default": "challenge",
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "challenge",
+          "sandbox"
+        ]
       }
     ],
     "preview": null
@@ -5939,257 +6110,8 @@ for _entry in CATALOG:
             {"key": "voyage_turn_limit", "kind": "int", "default": 128, "minimum": 30, "maximum": 128, "options": []},
             {"key": "vessel_class", "kind": "enum", "default": "sloop", "minimum": None, "maximum": None, "options": ["skiff", "sloop", "schooner"]},
         ])
-# Original traversal mechanics are separately editable but share one guarded replay core.
-for _entry in CATALOG:
-    if _entry["id"] == "parkour":
-        _entry["fields"].extend([
-            {"key":"course_length","kind":"int","default":60,"minimum":36,"maximum":128,"options":[]},
-            {"key":"max_stride","kind":"int","default":5,"minimum":2,"maximum":8,"options":[]},
-            {"key":"stride_divisor","kind":"int","default":8,"minimum":2,"maximum":30,"options":[]},
-            {"key":"sprint_gain","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
-            {"key":"sprint_cost","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
-            {"key":"jump_cost","kind":"int","default":7,"minimum":1,"maximum":25,"options":[]},
-            {"key":"vault_cost","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
-            {"key":"slide_cost","kind":"int","default":3,"minimum":1,"maximum":20,"options":[]},
-            {"key":"wall_run_cost","kind":"int","default":10,"minimum":1,"maximum":30,"options":[]},
-            {"key":"grapple_cost","kind":"int","default":12,"minimum":1,"maximum":40,"options":[]},
-            {"key":"climb_cost","kind":"int","default":7,"minimum":1,"maximum":30,"options":[]},
-            {"key":"grapple_charges","kind":"int","default":5,"minimum":0,"maximum":20,"options":[]},
-            {"key":"grip_strength","kind":"int","default":35,"minimum":10,"maximum":100,"options":[]},
-            {"key":"jump_power","kind":"int","default":4,"minimum":1,"maximum":10,"options":[]},
-            {"key":"climb_power","kind":"int","default":2,"minimum":1,"maximum":8,"options":[]},
-            {"key":"vault_clearance","kind":"int","default":3,"minimum":1,"maximum":4,"options":[]},
-            {"key":"wall_run_height","kind":"int","default":4,"minimum":1,"maximum":4,"options":[]},
-            {"key":"gravity","kind":"int","default":2,"minimum":1,"maximum":8,"options":[]},
-            {"key":"surface_friction","kind":"int","default":1,"minimum":0,"maximum":4,"options":[]},
-            {"key":"wind_period","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
-            {"key":"wind_resistance","kind":"int","default":15,"minimum":1,"maximum":100,"options":[]},
-            {"key":"momentum_decay","kind":"int","default":2,"minimum":1,"maximum":15,"options":[]},
-            {"key":"stamina_recovery","kind":"int","default":8,"minimum":1,"maximum":40,"options":[]},
-            {"key":"stamina_regen_per_turn","kind":"int","default":2,"minimum":0,"maximum":15,"options":[]},
-            {"key":"max_health","kind":"int","default":100,"minimum":20,"maximum":200,"options":[]},
-            {"key":"collision_damage","kind":"int","default":20,"minimum":1,"maximum":80,"options":[]},
-            {"key":"hardcore_damage","kind":"int","default":15,"minimum":1,"maximum":80,"options":[]},
-            {"key":"trick_reward","kind":"int","default":10,"minimum":1,"maximum":100,"options":[]},
-            {"key":"medal_bonus","kind":"int","default":30,"minimum":1,"maximum":100,"options":[]},
-            {"key":"completion_bonus","kind":"int","default":200,"minimum":20,"maximum":1000,"options":[]},
-            {"key":"medals_required","kind":"int","default":2,"minimum":1,"maximum":4,"options":[]},
-            {"key":"time_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
-            {"key":"jump_cooldown","kind":"int","default":2,"minimum":1,"maximum":8,"options":[]},
-            {"key":"double_jump","kind":"bool","default":False,"minimum":None,"maximum":None,"options":[]},
-            {"key":"difficulty","kind":"enum","default":"flow","minimum":None,"maximum":None,"options":["assisted","flow","hardcore"]},
-        ])
-# Four original sports rulesets share typed controls but not scoring authority.
-for _entry in CATALOG:
-    if _entry["id"] == "sports":
-        _entry["fields"].extend([
-            {"key":"target_score","kind":"int","default":3,"minimum":1,"maximum":12,"options":[]},
-            {"key":"match_turn_limit","kind":"int","default":128,"minimum":20,"maximum":128,"options":[]},
-            {"key":"starting_stamina","kind":"int","default":100,"minimum":20,"maximum":300,"options":[]},
-            {"key":"opponent_skill","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
-            {"key":"opponent_speed","kind":"int","default":3,"minimum":1,"maximum":10,"options":[]},
-            {"key":"defense_radius","kind":"int","default":2,"minimum":0,"maximum":6,"options":[]},
-            {"key":"interception_period","kind":"int","default":4,"minimum":2,"maximum":20,"options":[]},
-            {"key":"run_speed","kind":"int","default":6,"minimum":1,"maximum":15,"options":[]},
-            {"key":"sprint_speed","kind":"int","default":10,"minimum":2,"maximum":20,"options":[]},
-            {"key":"pass_distance","kind":"int","default":9,"minimum":1,"maximum":25,"options":[]},
-            {"key":"throw_distance","kind":"int","default":12,"minimum":1,"maximum":30,"options":[]},
-            {"key":"tackle_range","kind":"int","default":3,"minimum":1,"maximum":10,"options":[]},
-            {"key":"shot_range","kind":"int","default":18,"minimum":3,"maximum":40,"options":[]},
-            {"key":"shot_power","kind":"int","default":12,"minimum":1,"maximum":30,"options":[]},
-            {"key":"goal_lane_tolerance","kind":"int","default":1,"minimum":0,"maximum":2,"options":[]},
-            {"key":"contact_radius","kind":"int","default":2,"minimum":1,"maximum":8,"options":[]},
-            {"key":"collision_fatigue","kind":"int","default":7,"minimum":0,"maximum":30,"options":[]},
-            {"key":"recovery_per_turn","kind":"int","default":3,"minimum":0,"maximum":20,"options":[]},
-            {"key":"substitution_energy","kind":"int","default":25,"minimum":1,"maximum":100,"options":[]},
-            {"key":"fatigue_limit","kind":"int","default":70,"minimum":20,"maximum":300,"options":[]},
-            {"key":"fatigue_tax","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
-            {"key":"strike_precision","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
-            {"key":"rally_combo","kind":"int","default":3,"minimum":1,"maximum":12,"options":[]},
-            {"key":"racket_control","kind":"int","default":4,"minimum":0,"maximum":30,"options":[]},
-            {"key":"action_points","kind":"int","default":3,"minimum":1,"maximum":8,"options":[]},
-            {"key":"rain_stride_penalty","kind":"int","default":2,"minimum":0,"maximum":8,"options":[]},
-            {"key":"wind_shot_penalty","kind":"int","default":4,"minimum":0,"maximum":20,"options":[]},
-            {"key":"press_tackle_bonus","kind":"int","default":2,"minimum":0,"maximum":6,"options":[]},
-        ])
-# Spatial topology changes the actual labyrinth transition rules.
-for _entry in CATALOG:
-    if _entry["id"] == "maze":
-        _entry["fields"].extend([
-            {"key":"key_count","kind":"int","default":2,"minimum":1,"maximum":4,"options":[]},
-            {"key":"wall_budget","kind":"int","default":16,"minimum":0,"maximum":64,"options":[]},
-            {"key":"health","kind":"int","default":100,"minimum":10,"maximum":200,"options":[]},
-            {"key":"stamina","kind":"int","default":80,"minimum":5,"maximum":250,"options":[]},
-            {"key":"torches","kind":"int","default":2,"minimum":0,"maximum":16,"options":[]},
-            {"key":"torch_duration","kind":"int","default":12,"minimum":1,"maximum":40,"options":[]},
-            {"key":"move_cost","kind":"int","default":1,"minimum":1,"maximum":10,"options":[]},
-            {"key":"diagonal_cost","kind":"int","default":1,"minimum":0,"maximum":8,"options":[]},
-            {"key":"stair_cost","kind":"int","default":2,"minimum":1,"maximum":10,"options":[]},
-            {"key":"portal_cost","kind":"int","default":3,"minimum":1,"maximum":20,"options":[]},
-            {"key":"phase_period","kind":"int","default":3,"minimum":1,"maximum":16,"options":[]},
-            {"key":"hazard_damage","kind":"int","default":12,"minimum":1,"maximum":80,"options":[]},
-            {"key":"crush_damage","kind":"int","default":15,"minimum":1,"maximum":80,"options":[]},
-            {"key":"rest_recovery","kind":"int","default":9,"minimum":1,"maximum":40,"options":[]},
-            {"key":"exploration_budget","kind":"int","default":128,"minimum":8,"maximum":128,"options":[]},
-            {"key":"completion_bonus","kind":"int","default":200,"minimum":10,"maximum":1000,"options":[]},
-            {"key":"key_reward","kind":"int","default":30,"minimum":1,"maximum":100,"options":[]},
-            {"key":"turn_limit","kind":"int","default":128,"minimum":24,"maximum":128,"options":[]},
-        ])
-# Real standalone RPG and procedural world runtime configuration.
-for _entry in CATALOG:
-    if _entry["id"] in ("rpg","procedural_world"):
-        _extended={
-            "rpg":[
-                {"key":"world_width","kind":"int","default":9,"minimum":8,"maximum":24,"options":[]},
-                {"key":"world_height","kind":"int","default":9,"minimum":8,"maximum":24,"options":[]},
-                {"key":"max_obstacles","kind":"int","default":16,"minimum":0,"maximum":64,"options":[]},
-                {"key":"enemy_health","kind":"int","default":22,"minimum":1,"maximum":250,"options":[]},
-                {"key":"enemy_damage","kind":"int","default":4,"minimum":0,"maximum":30,"options":[]},
-                {"key":"hero_health","kind":"int","default":60,"minimum":10,"maximum":200,"options":[]},
-                {"key":"hero_mana","kind":"int","default":25,"minimum":0,"maximum":100,"options":[]},
-                {"key":"starting_herbs","kind":"int","default":3,"minimum":0,"maximum":20,"options":[]},
-                {"key":"starting_potions","kind":"int","default":2,"minimum":0,"maximum":20,"options":[]},
-                {"key":"camp_supplies","kind":"int","default":4,"minimum":0,"maximum":20,"options":[]},
-                {"key":"starting_gold","kind":"int","default":20,"minimum":0,"maximum":200,"options":[]},
-                {"key":"diplomacy_cost","kind":"int","default":3,"minimum":0,"maximum":30,"options":[]},
-                {"key":"quest_gold_reward","kind":"int","default":12,"minimum":1,"maximum":100,"options":[]},
-                {"key":"quest_xp","kind":"int","default":30,"minimum":1,"maximum":100,"options":[]},
-                {"key":"combat_xp","kind":"int","default":40,"minimum":1,"maximum":100,"options":[]},
-                {"key":"xp_per_level","kind":"int","default":20,"minimum":2,"maximum":100,"options":[]},
-                {"key":"level_heal","kind":"int","default":8,"minimum":0,"maximum":50,"options":[]},
-                {"key":"level_mana","kind":"int","default":4,"minimum":0,"maximum":30,"options":[]},
-                {"key":"attack_damage","kind":"int","default":8,"minimum":1,"maximum":40,"options":[]},
-                {"key":"spell_cost","kind":"int","default":4,"minimum":1,"maximum":30,"options":[]},
-                {"key":"spell_damage","kind":"int","default":12,"minimum":1,"maximum":40,"options":[]},
-                {"key":"guard_block","kind":"int","default":3,"minimum":0,"maximum":25,"options":[]},
-                {"key":"potion_healing","kind":"int","default":18,"minimum":1,"maximum":100,"options":[]},
-                {"key":"camp_healing","kind":"int","default":20,"minimum":1,"maximum":100,"options":[]},
-                {"key":"camp_mana","kind":"int","default":12,"minimum":0,"maximum":100,"options":[]},
-                {"key":"herb_capacity","kind":"int","default":20,"minimum":2,"maximum":100,"options":[]},
-                {"key":"gear_cost","kind":"int","default":8,"minimum":1,"maximum":50,"options":[]},
-                {"key":"max_gear","kind":"int","default":4,"minimum":1,"maximum":12,"options":[]},
-                {"key":"chapter_bonus","kind":"int","default":200,"minimum":10,"maximum":1000,"options":[]},
-                {"key":"turn_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
-                {"key":"guardian_strike_bonus","kind":"int","default":3,"minimum":0,"maximum":12,"options":[]},
-                {"key":"guardian_guard_bonus","kind":"int","default":3,"minimum":0,"maximum":15,"options":[]},
-                {"key":"scholar_spell_bonus","kind":"int","default":5,"minimum":0,"maximum":20,"options":[]},
-                {"key":"scout_evasion","kind":"int","default":1,"minimum":0,"maximum":10,"options":[]},
-                {"key":"mender_heal_bonus","kind":"int","default":6,"minimum":0,"maximum":30,"options":[]},
-                {"key":"ore_capacity","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
-            ],
-            "procedural_world":[
-                {"key":"world_radius_chunks","kind":"int","default":3,"minimum":1,"maximum":16,"options":[]},
-                {"key":"resource_density","kind":"int","default":3,"minimum":1,"maximum":12,"options":[]},
-                {"key":"starting_wood","kind":"int","default":8,"minimum":0,"maximum":100,"options":[]},
-                {"key":"starting_stone","kind":"int","default":8,"minimum":0,"maximum":100,"options":[]},
-                {"key":"starting_food","kind":"int","default":30,"minimum":0,"maximum":100,"options":[]},
-                {"key":"starting_water","kind":"int","default":15,"minimum":0,"maximum":100,"options":[]},
-                {"key":"starting_seeds","kind":"int","default":4,"minimum":0,"maximum":50,"options":[]},
-                {"key":"health","kind":"int","default":80,"minimum":10,"maximum":200,"options":[]},
-                {"key":"energy","kind":"int","default":120,"minimum":10,"maximum":250,"options":[]},
-                {"key":"exploration_budget","kind":"int","default":128,"minimum":8,"maximum":128,"options":[]},
-                {"key":"max_edited_tiles","kind":"int","default":64,"minimum":1,"maximum":128,"options":[]},
-                {"key":"shelter_wood","kind":"int","default":3,"minimum":1,"maximum":20,"options":[]},
-                {"key":"shelter_stone","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
-                {"key":"rest_energy","kind":"int","default":18,"minimum":1,"maximum":50,"options":[]},
-                {"key":"shelter_healing","kind":"int","default":9,"minimum":0,"maximum":40,"options":[]},
-                {"key":"hydration_gain","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
-                {"key":"tool_stone","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
-                {"key":"tool_ore","kind":"int","default":1,"minimum":0,"maximum":10,"options":[]},
-                {"key":"survey_reward","kind":"int","default":40,"minimum":1,"maximum":100,"options":[]},
-                {"key":"expedition_bonus","kind":"int","default":200,"minimum":10,"maximum":1000,"options":[]},
-                {"key":"sprint_thirst","kind":"int","default":2,"minimum":0,"maximum":10,"options":[]},
-                {"key":"thirst_period","kind":"int","default":5,"minimum":1,"maximum":20,"options":[]},
-                {"key":"thirst_limit","kind":"int","default":30,"minimum":5,"maximum":100,"options":[]},
-                {"key":"dehydration_damage","kind":"int","default":4,"minimum":1,"maximum":30,"options":[]},
-                {"key":"turn_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
-            ],
-        }[_entry["id"]]
-        _entry["fields"].extend(_extended)
-# Executable source-defined society and living ecosystem controls.
-for _entry in CATALOG:
-    if _entry["id"] in ("npc_society","ecosystem"):
-        _extension={
-            "npc_society":[
-                {"key":"initial_food","kind":"int","default":90,"minimum":0,"maximum":600,"options":[]},
-                {"key":"food_capacity","kind":"int","default":500,"minimum":10,"maximum":1000,"options":[]},
-                {"key":"initial_materials","kind":"int","default":30,"minimum":0,"maximum":500,"options":[]},
-                {"key":"material_capacity","kind":"int","default":400,"minimum":10,"maximum":1000,"options":[]},
-                {"key":"initial_gold","kind":"int","default":50,"minimum":0,"maximum":1000,"options":[]},
-                {"key":"player_energy","kind":"int","default":100,"minimum":10,"maximum":300,"options":[]},
-                {"key":"dialogue_bond","kind":"int","default":3,"minimum":1,"maximum":15,"options":[]},
-                {"key":"help_food","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
-                {"key":"help_bond","kind":"int","default":5,"minimum":1,"maximum":20,"options":[]},
-                {"key":"accusation_penalty","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
-                {"key":"trade_cost","kind":"int","default":3,"minimum":1,"maximum":30,"options":[]},
-                {"key":"trade_food","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
-                {"key":"work_energy","kind":"int","default":5,"minimum":1,"maximum":30,"options":[]},
-                {"key":"farm_yield","kind":"int","default":8,"minimum":1,"maximum":40,"options":[]},
-                {"key":"work_yield","kind":"int","default":6,"minimum":1,"maximum":40,"options":[]},
-                {"key":"donation_gold","kind":"int","default":4,"minimum":1,"maximum":30,"options":[]},
-                {"key":"donation_trust","kind":"int","default":3,"minimum":1,"maximum":15,"options":[]},
-                {"key":"mediation_trust","kind":"int","default":12,"minimum":1,"maximum":50,"options":[]},
-                {"key":"checkpoint_trust","kind":"int","default":10,"minimum":1,"maximum":100,"options":[]},
-                {"key":"checkpoint_food","kind":"int","default":10,"minimum":0,"maximum":100,"options":[]},
-                {"key":"day_length","kind":"int","default":8,"minimum":4,"maximum":32,"options":[]},
-                {"key":"coarse_period","kind":"int","default":4,"minimum":2,"maximum":16,"options":[]},
-                {"key":"background_cohort","kind":"int","default":100,"minimum":10,"maximum":1000,"options":[]},
-                {"key":"hunger_rate","kind":"int","default":1,"minimum":0,"maximum":10,"options":[]},
-                {"key":"fatigue_rate","kind":"int","default":1,"minimum":0,"maximum":10,"options":[]},
-                {"key":"meal_threshold","kind":"int","default":20,"minimum":5,"maximum":80,"options":[]},
-                {"key":"meal_relief","kind":"int","default":15,"minimum":1,"maximum":80,"options":[]},
-                {"key":"rest_relief","kind":"int","default":4,"minimum":1,"maximum":30,"options":[]},
-                {"key":"focus_radius","kind":"int","default":2,"minimum":1,"maximum":8,"options":[]},
-                {"key":"scarcity_unrest","kind":"int","default":3,"minimum":1,"maximum":30,"options":[]},
-                {"key":"rest_energy","kind":"int","default":15,"minimum":1,"maximum":60,"options":[]},
-                {"key":"turn_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
-            ],
-            "ecosystem":[
-                {"key":"initial_population","kind":"int","default":5,"minimum":1,"maximum":40,"options":[]},
-                {"key":"carrying_capacity","kind":"int","default":50,"minimum":5,"maximum":1000,"options":[]},
-                {"key":"seed_bank","kind":"int","default":25,"minimum":0,"maximum":300,"options":[]},
-                {"key":"starting_water","kind":"int","default":20,"minimum":0,"maximum":200,"options":[]},
-                {"key":"medicine","kind":"int","default":4,"minimum":0,"maximum":100,"options":[]},
-                {"key":"credits","kind":"int","default":40,"minimum":0,"maximum":1000,"options":[]},
-                {"key":"food_regrowth","kind":"int","default":5,"minimum":0,"maximum":40,"options":[]},
-                {"key":"drought_threshold","kind":"int","default":25,"minimum":2,"maximum":80,"options":[]},
-                {"key":"evaporation","kind":"int","default":1,"minimum":0,"maximum":10,"options":[]},
-                {"key":"individuals_per_food","kind":"int","default":8,"minimum":1,"maximum":100,"options":[]},
-                {"key":"reproduction_period","kind":"int","default":4,"minimum":1,"maximum":20,"options":[]},
-                {"key":"hunt_period","kind":"int","default":5,"minimum":1,"maximum":30,"options":[]},
-                {"key":"predation_rate","kind":"int","default":1,"minimum":1,"maximum":12,"options":[]},
-                {"key":"disease_resistance","kind":"int","default":10,"minimum":1,"maximum":100,"options":[]},
-                {"key":"migration_period","kind":"int","default":5,"minimum":2,"maximum":30,"options":[]},
-                {"key":"observation_budget","kind":"int","default":40,"minimum":1,"maximum":128,"options":[]},
-                {"key":"seed_cost","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
-                {"key":"plant_food","kind":"int","default":12,"minimum":1,"maximum":100,"options":[]},
-                {"key":"water_cost","kind":"int","default":1,"minimum":1,"maximum":20,"options":[]},
-                {"key":"watering_gain","kind":"int","default":15,"minimum":1,"maximum":50,"options":[]},
-                {"key":"restoration_cost","kind":"int","default":5,"minimum":1,"maximum":40,"options":[]},
-                {"key":"restoration_heal","kind":"int","default":15,"minimum":1,"maximum":60,"options":[]},
-                {"key":"protection_cost","kind":"int","default":3,"minimum":1,"maximum":30,"options":[]},
-                {"key":"protection_ticks","kind":"int","default":6,"minimum":1,"maximum":32,"options":[]},
-                {"key":"treatment_strength","kind":"int","default":10,"minimum":1,"maximum":100,"options":[]},
-                {"key":"corridor_cost","kind":"int","default":5,"minimum":1,"maximum":50,"options":[]},
-                {"key":"feed_cost","kind":"int","default":2,"minimum":1,"maximum":20,"options":[]},
-                {"key":"feed_units","kind":"int","default":10,"minimum":1,"maximum":100,"options":[]},
-                {"key":"reintroduction_food","kind":"int","default":5,"minimum":1,"maximum":40,"options":[]},
-                {"key":"reintroduction_cost","kind":"int","default":8,"minimum":1,"maximum":100,"options":[]},
-                {"key":"reintroduction_population","kind":"int","default":3,"minimum":1,"maximum":50,"options":[]},
-                {"key":"minimum_interventions","kind":"int","default":1,"minimum":1,"maximum":8,"options":[]},
-                {"key":"minimum_living_population","kind":"int","default":5,"minimum":1,"maximum":500,"options":[]},
-                {"key":"outbreak_period","kind":"int","default":12,"minimum":2,"maximum":40,"options":[]},
-                {"key":"infection_rate","kind":"int","default":8,"minimum":1,"maximum":30,"options":[]},
-                {"key":"protection_strength","kind":"int","default":1,"minimum":1,"maximum":12,"options":[]},
-                {"key":"cohort_period","kind":"int","default":8,"minimum":2,"maximum":32,"options":[]},
-                {"key":"cohort_food_divisor","kind":"int","default":80,"minimum":10,"maximum":500,"options":[]},
-                {"key":"turn_limit","kind":"int","default":128,"minimum":32,"maximum":128,"options":[]},
-                {"key":"natural_corridors","kind":"bool","default":True,"minimum":None,"maximum":None,"options":[]},
-            ],
-        }[_entry["id"]]
-        _entry["fields"].extend(_extension)
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "parkour", "sports", "maze", "rpg", "procedural_world", "npc_society", "ecosystem"})
+ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "physics"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6282,93 +6204,6 @@ def _normalized_settings(editor_id: str, values: Mapping[str, object] | None) ->
         normalized["board_width"], normalized["board_height"]
     ):
         raise SystemEditorError("tactics range exceeds available board dimensions")
-    if editor_id == "npc_society":
-        if normalized["active_npcs"]>normalized["population"]:
-            raise SystemEditorError("active NPC budget cannot exceed authored population")
-        if normalized["initial_food"]>normalized["food_capacity"]:
-            raise SystemEditorError("initial society food exceeds actual town capacity")
-        if normalized["initial_materials"]>normalized["material_capacity"]:
-            raise SystemEditorError("initial society materials exceed storage")
-        if normalized["work_energy"]>normalized["player_energy"]:
-            raise SystemEditorError("source citizen cannot perform actual labor")
-        if normalized["help_food"]>normalized["food_capacity"]:
-            raise SystemEditorError("helping must consume bounded food")
-        if normalized["checkpoint_food"]>normalized["food_capacity"]:
-            raise SystemEditorError("civic checkpoint must be physically achievable")
-        if normalized["memory_records"]==0 and normalized["relationship_factors"]>50:
-            raise SystemEditorError("complex witness scoring requires nonzero memory records")
-    if editor_id == "ecosystem":
-        if normalized["predators"]>normalized["species"]:
-            raise SystemEditorError("predator species cannot exceed authored species count")
-        if normalized["initial_population"]>normalized["carrying_capacity"]:
-            raise SystemEditorError("starting wildlife exceeds physical carrying capacity")
-        if normalized["reintroduction_population"]>normalized["carrying_capacity"]:
-            raise SystemEditorError("reintroduced wildlife cannot exceed habitat capacity")
-        if normalized["minimum_living_population"]>normalized["species"]*normalized["carrying_capacity"]:
-            raise SystemEditorError("target biodiversity exceeds aggregate species capacity")
-        if normalized["seed_cost"]>normalized["seed_bank"] and normalized["minimum_interventions"]>0 and normalized["credits"]==0:
-            raise SystemEditorError("ecosystem cannot fund an ecological intervention")
-    if editor_id == "rpg":
-        if normalized["max_obstacles"] >= normalized["world_width"]*normalized["world_height"]//3:
-            raise SystemEditorError("original RPG obstacles cannot seal most of the world")
-        if normalized["starting_herbs"] > normalized["herb_capacity"]:
-            raise SystemEditorError("initial herbs exceed real storage")
-        if normalized["spell_cost"] > normalized["hero_mana"]:
-            raise SystemEditorError("no original party spell is financeable")
-        if normalized["camp_healing"] > normalized["hero_health"]:
-            raise SystemEditorError("camp recovery exceeds actual hero capacity")
-        if normalized["level_heal"] > normalized["hero_health"]:
-            raise SystemEditorError("RPG level recovery exceeds hero capacity")
-        if normalized["quest_depth"] > normalized["turn_limit"]*2:
-            raise SystemEditorError("authoring quest depth exceeds bounded replay complexity")
-    if editor_id == "procedural_world":
-        if normalized["shelter_wood"]>normalized["starting_wood"]+normalized["resource_density"]*10:
-            raise SystemEditorError("original shelter cannot be constructed from local resources")
-        if normalized["shelter_stone"]>normalized["starting_stone"]+normalized["resource_density"]*10:
-            raise SystemEditorError("original shelter stone budget is unreachable")
-        if normalized["tool_stone"]>normalized["starting_stone"]+normalized["resource_density"]*10:
-            raise SystemEditorError("tool stone cannot be sourced from local biome")
-        if normalized["world_radius_chunks"]*normalized["chunk_size"]<12:
-            raise SystemEditorError("original world cannot fit source exploration landmarks")
-    if editor_id == "maze":
-        cells=(normalized["width"]-2)*(normalized["height"]-2)*normalized["levels"]
-        minimum_reserved=3+normalized["levels"]+(2 if normalized["topology"]=="non_euclidean" else 0)
-        if normalized["key_count"]+normalized["hazards"]+minimum_reserved>cells:
-            raise SystemEditorError("maze objective and finite hazards exceed actual cells")
-        if normalized["topology"]=="non_euclidean" and normalized["height"]<6:
-            raise SystemEditorError("non-Euclidean portals require separate spatial cells")
-        if normalized["stair_cost"]>normalized["stamina"]:
-            raise SystemEditorError("maze staircase beyond original stamina budget")
-        if normalized["portal_cost"]>normalized["stamina"]:
-            raise SystemEditorError("authored portal cannot be paid for")
-        if normalized["move_cost"]>normalized["stamina"]:
-            raise SystemEditorError("original walker cannot perform a legal move")
-    if editor_id == "sports":
-        if normalized["sprint_speed"] < normalized["run_speed"]:
-            raise SystemEditorError("sports sprint cannot be slower than normal movement")
-        if normalized["pass_distance"] >= normalized["field_length"]:
-            raise SystemEditorError("a sports pass cannot exceed original stadium width")
-        if normalized["rain_stride_penalty"] >= normalized["run_speed"]:
-            raise SystemEditorError("rain cannot eliminate all active athletic movement")
-        if normalized["shot_range"] >= normalized["field_length"]:
-            raise SystemEditorError("original sports shots cannot span the entire field")
-        if normalized["substitutions"] > normalized["team_size"]:
-            raise SystemEditorError("substitution budget cannot exceed roster")
-        if normalized["rules"]=="racket" and normalized["team_size"]>4:
-            raise SystemEditorError("racket sports require original singles or doubles roster")
-        if normalized["rules"]=="turn_based" and normalized["action_points"]>normalized["match_turn_limit"]:
-            raise SystemEditorError("tactical action budget exceeds match")
-    if editor_id == "parkour":
-        if normalized["max_stride"]>normalized["course_length"]//5:
-            raise SystemEditorError("parkour strides cannot leap the entire route")
-        if normalized["sprint_cost"]>normalized["stamina"]:
-            raise SystemEditorError("starting stamina cannot fund a sprint")
-        if normalized["jump_cost"]>normalized["stamina"]:
-            raise SystemEditorError("starting stamina cannot fund a jump")
-        if normalized["grapple_charges"]>0 and normalized["grapple_reach"]==0:
-            raise SystemEditorError("grapple ammunition requires reachable surfaces")
-        if normalized["medals_required"]>normalized["course_length"]//6:
-            raise SystemEditorError("medal schedule exceeds spatial route")
     if editor_id == "sailing":
         if normalized["cargo_contract"] > normalized["cargo_capacity"]:
             raise SystemEditorError("cargo delivery cannot exceed vessel hold capacity")

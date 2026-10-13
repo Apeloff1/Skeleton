@@ -24,6 +24,7 @@ def test_matrix_accurately_counts_source_emitters_per_style():
         assert row["coverage_claim"]=="source_supported_not_compiled"
     by_name={entry["style"]:entry for entry in rows}
     assert by_name["arcade_score_attack"]["supported_hardware_count"]==19
+    assert "nes" in by_name["arcade_score_attack"]["native_emitters"]
     assert by_name["fixed_screen_puzzle"]["supported_hardware_count"]==4
     assert by_name["first_person_shooter"]["supported_hardware_count"]==4
     assert by_name["rhythm_game"]["supported_hardware_count"]==4

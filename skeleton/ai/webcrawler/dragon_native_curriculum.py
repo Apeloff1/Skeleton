@@ -121,6 +121,11 @@ class DragonNativeCurriculum:
         successes=Counter(x.target for x in proofs)
         recommendations=[];blocked=[]
         for step in MILESTONES:
+            # Once the source-bound Game Boy ROM receipt is present, move
+            # the companion into new mechanic acquisition instead of
+            # recommending another entry-level arcade reskin.
+            if step.milestone_id=="gb_input" and "game_boy" in built:
+                continue
             unmet=tuple(x for x in step.requires if x not in built)
             if unmet:
                 blocked.append({

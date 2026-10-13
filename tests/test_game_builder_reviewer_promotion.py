@@ -21,9 +21,12 @@ from skeleton.ai.game_builder.game_model_promotion import (
 )
 from skeleton.ai.game_builder.game_project_workspace import GameWorkspace
 from skeleton.ai.game_builder.game_reviewer_registry import (
-    PromotionAttestation,ReviewerRegistry,ROLES,
+    PromotionAttestation,ReviewerRegistry,ROLES,ReviewPreempted,
 )
 from skeleton.ai.game_builder.quest_scene_forge import forge_director
+from skeleton.ai.game_builder.game_idle_review_scheduler import (
+    IdleEvaluationBudget,qualify_when_idle,
+)
 
 
 def promotion_corpus():
@@ -164,6 +167,8 @@ class ReviewerPromotionTests(unittest.TestCase):
         self.assertEqual(self.registry.read_state()["revision"],2)
         with self.assertRaises(PromotionError):
             self.registry.activate(authorized=True)
+        with self.assertRaises(PromotionError):
+            self.registry.propose_next_standard(authorized=True)
         # Source receipts are written to immutable SHA-256 linked files.
         receipt=json.loads((self.registry.root/"ledger"/"000002.json").read_text())
         self.assertEqual(receipt["previous"],json.loads(
@@ -197,9 +202,85 @@ class ReviewerPromotionTests(unittest.TestCase):
                         state["observations"]["idle"]["source_project_ids"]))
         active=ReviewerRegistry(self.workspace.root)
         self.assertEqual(active.read_state(),state)
+        preview=active.propose_next_standard(authorized=True)
+        self.assertEqual(preview["promoted_model"],staged["candidate"])
+        self.assertTrue(preview["active_standard_unchanged"])
+        self.assertTrue(preview["approval_and_separate_stage_required"])
+        self.assertGreater(preview["next_standard"]["min_per_class"],
+                           self.standards.min_per_class)
+        self.assertEqual(active.read_state(),state)
+        _,historical=active._historic_source_roles()
+        self.assertTrue(
+            set(state["observations"]["usage"]["source_project_ids"])
+            .issubset(historical))
+        self.assertTrue(
+            set(state["observations"]["idle"]["source_project_ids"])
+            .issubset(historical))
+        with self.assertRaises(PromotionError):
+            active.stage(self.plan,self.fit,authorized=True,
+                         champion=self.fit["symbolic_policy"])
+        with self.assertRaises(PermissionError):
+            active.propose_next_standard(authorized=False)
         result=active.abort("Human reviewer requests safe rollback.",authorized=True)
         self.assertEqual(result["status"],"rolled_back")
         self.assertIsNone(result["active"])
+
+    def test_historical_idle_and_usage_cohorts_cannot_be_replayed(self):
+        self._stage()
+        self.registry.authorize_shadow(self._attest(),authorized=True)
+        self.registry.observe(self._worlds("usage"),mode="usage",authorized=True)
+        self.registry.observe(self._worlds("idle"),mode="idle",authorized=True)
+        self.registry.activate(authorized=True)
+        # Active scoring may overwrite the display's "usage" slot, but its
+        # earlier sources must remain protected in the full sealed journal.
+        new=self.registry.observe(self._worlds("fresh_live"),
+                                  mode="usage",authorized=True)
+        self.assertEqual(new["status"],"active")
+        historical=self.registry._historic_source_roles()[1]
+        self.assertTrue(set(new["cohort"]["source_project_ids"]).issubset(historical))
+        self.assertTrue({w.digest for w in self._worlds("usage")}.issubset(historical))
+        with self.assertRaises(PromotionError):
+            self.registry.observe(self._worlds("usage"),mode="idle",
+                                  authorized=True)
+
+    def test_opt_in_idle_budget_and_safe_foreground_preemption(self):
+        self._stage()
+        self.registry.authorize_shadow(self._attest(),authorized=True)
+        worlds=self._worlds("idle")
+        budget=IdleEvaluationBudget(max_wall_seconds=300,max_worlds=2)
+        before=self.registry.read_state()
+        deferred=qualify_when_idle(
+            self.registry,worlds,authorized=True,consent=True,
+            host_is_idle=lambda:False,hardware_is_safe=lambda:True,
+            budget=budget)
+        self.assertEqual(deferred["status"],"deferred")
+        self.assertFalse(deferred["model_state_mutated"])
+        self.assertEqual(self.registry.read_state(),before)
+        with self.assertRaises(PermissionError):
+            qualify_when_idle(
+                self.registry,worlds,authorized=True,consent=False,
+                host_is_idle=lambda:True,hardware_is_safe=lambda:True,
+                budget=budget)
+        calls=[0]
+        def still_idle():
+            calls[0]+=1
+            return calls[0]<10
+        interrupted=qualify_when_idle(
+            self.registry,worlds,authorized=True,consent=True,
+            host_is_idle=still_idle,hardware_is_safe=lambda:True,
+            budget=budget)
+        self.assertEqual(interrupted["status"],"deferred")
+        self.assertEqual(interrupted["reason"],"preempted_before_publishing")
+        self.assertGreaterEqual(calls[0],10)
+        self.assertEqual(self.registry.read_state(),before)
+        successful=qualify_when_idle(
+            self.registry,worlds,authorized=True,consent=True,
+            host_is_idle=lambda:True,hardware_is_safe=lambda:True,
+            budget=budget)
+        self.assertEqual(successful["status"],"shadow")
+        self.assertTrue(successful["evaluation"]["cohort"]["passed"])
+        self.assertFalse(successful["automatic_promotion_performed"])
+        self.assertNotEqual(self.registry.read_state(),before)
 
     def test_abort_incomplete_candidates_leaves_canonical_review_unchanged(self):
         staged=self._stage()
