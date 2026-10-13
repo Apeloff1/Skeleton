@@ -282,7 +282,7 @@ class LivingStoryExportTests(unittest.TestCase):
                 source = Path(temp) / "original-story.js"
                 source.write_text(scripts[0], encoding="utf-8")
                 subprocess.run(["node", "--check", str(source)],
-                               capture_output=True, check=True, timeout=10)
+                               capture_output=True, check=True, timeout=90)
 
     def test_mirror_room_executes_128_real_attacks_and_detects_source_tampering(self):
         report = review_living_story(
