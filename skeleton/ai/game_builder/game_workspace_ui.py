@@ -1678,6 +1678,45 @@ $("jeeves-paged-commit").addEventListener("click",()=>dmGuard(async()=>{
    "acceptance custody before any retry.");
 }));
 
+
+/* Actual game-project content dependency index, not a fabricated app map. */
+let jeevesGameGraphDigest=null,jeevesGameGraphCursor=0;
+async function loadGameGraph(reset){
+ if(!model||!model.active||selectedTree!=="current"||
+    selectedProject!==model.active||!jeevesAppSnapshot)
+  throw Error("Select current original game and scan repository inventory");
+ if(reset){jeevesGameGraphDigest=null;jeevesGameGraphCursor=0;}
+ const args={
+  project:model.active,offset:jeevesGameGraphCursor,limit:40,
+  expected_snapshot:jeevesAppSnapshot
+ };
+ if(jeevesGameGraphDigest)
+  args.expected_graph_digest=jeevesGameGraphDigest;
+ const receipt=await api("/api/jeeves-appwide-invoke",{
+  action:"studio.source_graph",params:args,operator_authorized:false
+ });
+ const report=receipt.result;
+ jeevesGameGraphDigest=report.graph_digest;
+ jeevesGameGraphCursor=report.next_offset;
+ $("jeeves-graph-next").disabled=jeevesGameGraphCursor===null;
+ $("jeeves-graph-output").textContent=JSON.stringify(report,null,2);
+ status(report.nodes_scanned+"/"+report.total_relevant_game_source_nodes+
+  " actual project source nodes inspected; "+report.edges_missing+
+  " missing, "+report.edges_drifted+" changed and "+
+  report.edges_unknown+" uninspected source links. "+
+  (report.full_game_source_inventory_scanned?"":"Inventory scan bounded."));
+}
+$("jeeves-graph-scan").addEventListener("click",()=>dmGuard(
+ async()=>{await loadGameGraph(true);}
+));
+$("jeeves-graph-next").addEventListener("click",()=>dmGuard(
+ async()=>{
+  if(jeevesGameGraphCursor===null)
+   throw Error("No more verified original source graph pages");
+  await loadGameGraph(false);
+ }
+));
+
 function storyProject(){
  if(selectedTree!=="current"||!selectedProject||selectedProject!==model.active)
   throw Error("Jeeves story editing requires an active current project");
@@ -6025,6 +6064,16 @@ I read the entire displayed source diff page and reviewed its checksum</label>
 <label><input id="jeeves-paged-commit-approval" type="checkbox">
 Authorize final commit only after all source diff pages are acknowledged</label>
 <button id="jeeves-paged-commit" type="button">Commit exactly one completely reviewed original source</button>
+</fieldset>
+
+<fieldset><legend>Jeeves · Live Game Source Dependency Graph</legend>
+<p><small>Index actual original project system editors, playable scenes,
+approved game replays, branching campaigns, source-signed cast/plot lore,
+outcome coverage, consequence matrices and portable game packages.
+Show stale/missing SHA links and explicit scan bounds.</small></p>
+<button id="jeeves-graph-scan" type="button">Index actual current original game source dependencies</button>
+<button id="jeeves-graph-next" type="button" disabled>Next verified source dependency page</button>
+<pre id="jeeves-graph-output" role="status" aria-live="polite"></pre>
 </fieldset>
 <fieldset><legend>Jeeves · Source Explorer & Exact Refactor Proposals</legend>
 <p><small>Content-based source search, cursor paging, exact-hash line context and
