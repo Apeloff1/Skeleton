@@ -237,6 +237,8 @@ def prepare_candidate_release(
             or candidate.base_model_digest != manifest.base_model_digest
             or candidate.training_lineage_digest != checkpoint.digest):
         raise ShadowWeightError("candidate weights mismatch independently bound lineage")
+    if shadow.consumed_candidate_digest != candidate.digest:
+        raise ShadowWeightError("consumed shadow event does not bind this trained candidate")
     if candidate.status != "candidate":
         raise ShadowWeightError("handoff requires unpublished candidate-only weights")
     if (comparison.candidate_weights_digest != candidate.weights_digest
