@@ -50,12 +50,12 @@ class RepeatedWalkTests(unittest.TestCase):
         def walker(era, **kwargs):
             seen.append((era, kwargs["seed"]))
             return sample(era)
-        with patch("skeleton.forge.eras.list_eras", return_value=["soulslike", "cozy_wholesome"]):
+        with patch("skeleton.forge.eras.list_eras", return_value=["extraction_now", "cozy_wholesome"]):
             with patch("skeleton.forge.walk_cli.walk_once", side_effect=walker):
                 result = run_walk(["--all-eras", "-n", "2"], out=lambda _: None)
         self.assertEqual(result, EXIT_OK)
         self.assertEqual(seen, [
-            ("soulslike", "walk:000"), ("soulslike", "walk:001"),
+            ("extraction_now", "walk:000"), ("extraction_now", "walk:001"),
             ("cozy_wholesome", "walk:000"), ("cozy_wholesome", "walk:001"),
         ])
 
