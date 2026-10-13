@@ -112,6 +112,19 @@ def test_chapter_context_binds_citations_and_refuses_foreign_chapters():
         chapter_context(ch, [foreign])
 
 
+def test_chapter_context_rejects_boolean_and_out_of_range_identity():
+    ch=note()
+    for bad in (True,False,0,-1,101,"1",1.0):
+        altered={**ch,"chapter":bad}
+        with pytest.raises(ValueError, match="exact chapter"):
+            chapter_context(altered,[])
+    for bad in (True,False,"1",1.0):
+        invalid=script(ch,chapter=bad)
+        with pytest.raises(ValueError, match="foreign or invalid"):
+            chapter_context(ch,[invalid])
+    assert chapter_context(ch,[script(ch)])["included_scenes"]==1
+
+
 def test_context_budget_and_missing_prior_scenes_are_explicit():
     ch = note()
     scenes = [script(ch, scene=number, digest="receipt-" + str(number))
