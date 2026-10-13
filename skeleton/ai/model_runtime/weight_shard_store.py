@@ -53,8 +53,8 @@ class WeightShardStore:
         self.root = Path(directory)
         self.objects = self.root / "objects"
         self.manifests = self.root / "manifests"
-        self.objects.mkdir(parents=True, exist_ok=True)
-        self.manifests.mkdir(parents=True, exist_ok=True)
+        self.objects.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self.manifests.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.maximum_bytes = maximum_bytes
 
     def _object_path(self, digest: str) -> Path:
@@ -67,14 +67,14 @@ class WeightShardStore:
 
     @staticmethod
     def _write_once(path: Path, content: bytes) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         if path.exists():
             if path.read_bytes() != content:
                 raise WeightShardStoreError("existing content-addressed manifest is inconsistent")
             return
         tmp = path.with_name("." + path.name + "." + uuid4().hex + ".tmp")
         try:
-            with tmp.open("xb") as stream:
+            with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stream:
                 stream.write(content)
                 stream.flush()
                 os.fsync(stream.fileno())
@@ -99,7 +99,7 @@ class WeightShardStore:
         if path.is_symlink() or not path.is_file():
             raise WeightShardStoreError("weight shard input must be a regular non-symlink file")
         target = self._object_path(shard.digest)
-        target.parent.mkdir(parents=True, exist_ok=True)
+        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         if target.exists():
             observed, size = _hash_file(target, maximum=shard.bytes)
             if observed != shard.digest or size != shard.bytes:
@@ -110,7 +110,7 @@ class WeightShardStore:
         try:
             digest = sha256()
             size = 0
-            with path.open("rb") as reader, tmp.open("xb") as writer:
+            with path.open("rb") as reader, os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as writer:
                 while True:
                     block = reader.read(_CHUNK_SIZE)
                     if not block:
