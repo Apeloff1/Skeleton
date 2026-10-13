@@ -79,6 +79,30 @@ lifecycle = "historical"
         self.assertTrue(all(row["classification"] == "review-required" for row in near["content_verified_matches"]))
         self.assertTrue((self.root / "backend/game/unique.py").exists())
 
+    def test_repeated_code_near_copy_counts_token_frequencies(self) -> None:
+        # One changed line adds distinct shingles; repeated unchanged logic
+        # must still count, rather than collapsing to a misleading set.
+        common = ("def health(value, armor):\n"
+                  "    return max(0, value - armor)\n") * 60
+        changed = common.replace(
+            "return max(0, value - armor)",
+            "return max(0, value - armor) if value > 0 else 0", 1,
+        )
+        self.write("skeleton/ai/quest/health.py", common)
+        self.write("backend/quest/health.py", changed)
+        subprocess.run(["git", "-C", str(self.root), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "commit", "-qm", "near-copy"], check=True)
+        M.build(self.root, self.out, near_limit=100, near_threshold=0.82)
+        results = json.loads((self.out / "near-duplicates.json").read_text())["data"]
+        pair = next(
+            item for item in results["content_verified_matches"]
+            if {item["left"], item["right"]}
+            == {"skeleton/ai/quest/health.py", "backend/quest/health.py"}
+        )
+        self.assertGreater(pair["similarity"], 0.95)
+        self.assertEqual(pair["method"], "token-4gram-multiset-jaccard")
+        self.assertEqual(pair["classification"], "review-required")
+
     def test_query_is_bounded_and_commit_bound(self) -> None:
         summary = M.build(self.root, self.out, near_limit=0)
         result = M.query(self.out, "engine", max_bytes=1024)
