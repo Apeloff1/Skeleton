@@ -26,6 +26,7 @@ from skeleton.ai.game_builder.jeeves_acceptance_run_verifier import (
     REPOSITORY, WORKFLOW, JOB_NAMES, verify,
 )
 from skeleton.ai.game_builder.jeeves_pytest_acceptance_verifier import verify_pytest
+from skeleton.ai.game_builder.jeeves_acceptance_rollup import combine
 
 
 API = "https://api.github.com"
@@ -240,8 +241,11 @@ def measure(repo_root: Path, *, run_id: int, attempt: int, head: str,
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Independently verify source-bound product test candidate CI")
-    parser.add_argument("--mode", choices=("unittest", "pytest"),
+    parser.add_argument("--mode", choices=("unittest", "pytest", "both"),
                         default="unittest")
+    parser.add_argument("--pytest-run-id", type=int,
+                        help="completed separate pytest GitHub Actions run for --mode both")
+    parser.add_argument("--pytest-attempt", type=int, default=1)
     parser.add_argument("--run-id", type=int, required=True)
     parser.add_argument("--attempt", type=int, default=1)
     parser.add_argument("--head", required=True)
@@ -251,20 +255,44 @@ def main(argv=None):
     if not re.fullmatch("[0-9a-f]{40}", args.head):
         parser.error("--head must be an exact lowercase Git commit SHA")
     root = Path(__file__).resolve().parent.parent
-    result = measure(root, run_id=args.run_id, attempt=args.attempt,
-                     head=args.head, github_token=token, mode=args.mode)
+    if args.mode == "both":
+        if args.pytest_run_id is None or args.pytest_run_id == args.run_id:
+            parser.error("--mode both requires a distinct --pytest-run-id")
+        from skeleton.ai.game_builder.jeeves_acceptance_matrix import JeevesAcceptanceTestMatrix
+        from skeleton.ai.game_builder.jeeves_appwide_fabric import AppwideInventory
+        inv = AppwideInventory(root)
+        inv.scan()
+        scope = JeevesAcceptanceTestMatrix(inv).overview()
+        first = measure(root, run_id=args.run_id, attempt=args.attempt,
+                        head=args.head, github_token=token, mode="unittest")
+        second = measure(root, run_id=args.pytest_run_id,
+                         attempt=args.pytest_attempt,
+                         head=args.head, github_token=token, mode="pytest")
+        result = combine(
+            head=args.head,
+            expected_families=["F%02d" % n for n in range(1,43)],
+            unittest_proof=first, pytest_proof=second,
+            reviewed_matrix_sha256=scope["matrix_sha256"],
+            reviewed_scope_sha256=scope["scope_sha256"],
+        )
+    else:
+        result = measure(root, run_id=args.run_id, attempt=args.attempt,
+                         head=args.head, github_token=token, mode=args.mode)
     destination = (root / args.output).resolve()
     if not destination.is_relative_to(root):
         raise JeevesAppwideError("verified result must remain within workspace")
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n",
                            encoding="utf-8")
-    print("Verified independently:", result["independent_ci_execution_verified"])
-    print("Exact head:", result["verified_git_head"])
-    print("Verified acceptance execution mode:", args.mode)
+    print("Independent source CI verification:",
+          result.get("independent_ci_execution_verified",
+                     result.get("independent_original_GitHub_runs_verified") == 2))
+    print("Exact head:", result.get("verified_git_head", result.get("exact_head")))
+    print("Acceptance execution mode:", args.mode)
     print("Verified targeted subset families:",
-          result.get("targeted_family_subset_count",
-                     result.get("pytest_targeted_family_count")))
+          result.get("verified_targeted_regression_subset_families",
+            result.get("targeted_family_subset_count",
+                       result.get("pytest_targeted_family_count"))))
     print("Full app completion still:", result["full_app_completion_percent"])
     return 0
 
