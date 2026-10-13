@@ -5,7 +5,7 @@ exact-argument HIGH_IMPACT ToolGrant and the registered creator handler must
 also pass the host's exact CreatorCommand authorization callback.
 
 Persistence is mandatory before invoking a non-idempotent effect. An in-flight
-step recovered from a crash is IN_DOUBT, never automatically retried.
+step recovered from a crash requires explicit IN_DOUBT reconciliation and is never automatically retried.
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ class RunbookState(str, Enum):
 
 def _digest(value: Any) -> str:
     raw = json.dumps(value, sort_keys=True, separators=(",", ":"),
-                     ensure_ascii=False, allow_nan=False).encode("utf-8")
+                     ensure_ascii=True, allow_nan=False).encode("utf-8")
     if len(raw) > 256 * 1024:
         raise CreatorRunbookError("runbook payload exceeds byte budget")
     return sha256(raw).hexdigest()
@@ -295,7 +295,7 @@ class CreatorRunbookRunner:
             # Commit intent before any call that may mutate the application.
             self._persist(updated)
             call = ToolCall(
-                call_id="creator:" + _digest([
+                call_id="creator-" + _digest([
                     self.plan.plan_sha256, step_id, context.run_id,
                 ])[:32],
                 name="creator.execute_authorized",
