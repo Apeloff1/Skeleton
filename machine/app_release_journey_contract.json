@@ -2,7 +2,7 @@
   "schema": "skeleton.ai.enterprise_journey_acceptance.v1",
   "source_authority": "machine/enterprise_system_architecture.json",
   "scope_authority": "machine/app_completion_scope.json",
-  "version": "2026-10-13",
+  "version": "2026-10-13.v2",
   "policy": {
     "canonical_journey_denominator_frozen": true,
     "no_source_file_proves_runtime_execution": true,
@@ -46,7 +46,8 @@
       "source_test_candidates": [
         "tests/test_app_workspace_taxonomy.py",
         "tests/test_ai_offline_native_functional_boundary.py",
-        "tests/test_provider_runtime_boundary.py"
+        "tests/test_provider_runtime_boundary.py",
+        "tests/test_ai_native_session_recovery_journey.py"
       ],
       "acceptance_receipts": [],
       "release_qualified": false,
