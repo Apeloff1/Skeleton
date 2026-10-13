@@ -204,7 +204,20 @@ class JeevesCognitiveStudio:
             type(row) is not dict or set(row) - allowed
             or "step_id" not in row
             or type(row.get("required_capabilities", [])) not in (tuple,list)
-            or not set(row.get("required_capabilities", [])) <= known
+            or not all(
+                type(cap) is str and cap in known
+                for cap in row.get("required_capabilities", [])
+            )
+            or any(
+                key in row and (
+                    type(row[key]) not in (tuple,list)
+                    or len(row[key]) > 128
+                    or not all(type(item) is str for item in row[key])
+                )
+                for key in (
+                    "depends_on", "preconditions", "postconditions"
+                )
+            )
             for row in steps
         ):
             raise JeevesAppwideError("unknown or privileged source plan capability")
@@ -257,7 +270,9 @@ class JeevesCognitiveStudio:
             "actual_canonical_dag_analyzer_executed":True,
             "actual_canonical_fault_simulator_executed":True,
             "source_execution_or_job_dispatch_performed":False,
-            "side_effects_or_privileged_tools_allowed":False,
+            "privileged_capabilities_allowed":False,
+            "real_side_effects_or_jobs_executed":False,
+            "simulated_reversible_side_effect_steps_may_be_present":True,
             "plan_is_not_independently_product_qualified":True,
         }
         return {**body,"digest":digest(body)}
