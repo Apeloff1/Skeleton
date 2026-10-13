@@ -421,6 +421,7 @@ OPERATIONS = {
     "studio.production.review_manifest":("read", "exact full diff and bounded UTF-8 review pages",False),
     "studio.production.review_page":("read", "one content-hashed UTF-8 reviewed diff page",False),
     "studio.production.commit_pages":("external_effect", "human-approved full-page original source commit",True),
+    "studio.source_graph":("read", "paged exact-source game engine, scene, story and release dependency index",False),
     "studio.production.commit_bundle":("external_effect", "explicit human-approved original source commit group",True),
     "studio.production.queue":("read", "paged pending and accepted original source proposals",False),
     "studio.release.catalog":("read", "source-custodied original browser/Godot release identities",False),
@@ -737,6 +738,9 @@ class JeevesAppwideRuntime:
                 result=reviewer.page(**params)
             else:
                 result=reviewer.commit(**params,operator_authorized=authorized)
+        elif action=="studio.source_graph":
+            from .jeeves_game_source_graph import JeevesGameSourceGraph
+            result=JeevesGameSourceGraph(inv,ws).index(**params)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
