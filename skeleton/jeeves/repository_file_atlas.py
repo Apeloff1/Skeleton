@@ -572,6 +572,20 @@ def register_repository_atlas_tools(
         _permit("app.exact_duplicates", args, context)
         return atlas.exact_duplicate_groups(limit=args.get("limit", 20))
 
+    def _plan_context(args: dict[str, Any], context: Any) -> dict[str, Any]:
+        _permit("app.source_context", args, context)
+        from skeleton.jeeves.agent.file_atlas_context import JeevesFileContextPlanner
+        plan = JeevesFileContextPlanner(atlas).compile(
+            args["objective"],
+            max_references=args.get("max_references", 32),
+            token_budget=args.get("token_budget", 2048),
+            include_tests=args.get("include_tests", False),
+            preferred_feature=args.get("preferred_feature"),
+        )
+        result = plan.to_dict()
+        result["plan_sha256"] = plan.digest
+        return result
+
     entries = (
         (ToolSpec(
             name="app.files",
@@ -585,6 +599,21 @@ def register_repository_atlas_tools(
                 ArgumentRule("feature", "string", required=False, max_length=192),
             ),
         ), _search),
+        (ToolSpec(
+            name="app.source_context",
+            description="Compile budgeted source bookmarks relevant to a task without loading source code.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("objective", "string", max_length=8192),
+                ArgumentRule("token_budget", "integer", required=False,
+                             minimum=128, maximum=32768),
+                ArgumentRule("max_references", "integer", required=False,
+                             minimum=1, maximum=64),
+                ArgumentRule("include_tests", "boolean", required=False),
+                ArgumentRule("preferred_feature", "string", required=False,
+                             max_length=192),
+            ),
+        ), _plan_context),
         (ToolSpec(
             name="app.exact_duplicates",
             description="Find fingerprint-identical indexed source files; no file reads.",
