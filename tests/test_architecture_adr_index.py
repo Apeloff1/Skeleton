@@ -92,6 +92,26 @@ class ArchitectureADRIndexTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ADRIndexError, "unique non-empty strings"):
             MODULE.validate(root)
 
+    def test_missing_canonical_gap_field_is_not_a_closed_volume(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_master_plan.json"
+        master = json.loads(path.read_text(encoding="utf-8"))
+        volume = next(item for item in master["volumes"] if item["key"] == "VOL-058")
+        del volume["gaps"]
+        path.write_text(json.dumps(master), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ADRIndexError, "canonical masterplan gaps"):
+            MODULE.validate(root)
+
+    def test_duplicate_canonical_gaps_fail_closed(self) -> None:
+        root = self._fixture()
+        path = root / "machine/ai_master_plan.json"
+        master = json.loads(path.read_text(encoding="utf-8"))
+        volume = next(item for item in master["volumes"] if item["key"] == "VOL-058")
+        volume["gaps"] = ["open problem", "open problem"]
+        path.write_text(json.dumps(master), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.ADRIndexError, "canonical masterplan gaps"):
+            MODULE.validate(root)
+
     def test_rejects_stale_masterplan_gap_binding(self) -> None:
         root = self._fixture()
         path = root / "machine/adr_index.json"
