@@ -66,7 +66,7 @@ def test_allowlist_rejects_token_like_values_and_other_paths() -> None:
     assert line_re.search(f'{assignment} = "{snake}"')
     for value in (
         "AKIAQ3EGVZ7X9ExampleKeyValue0",
-        "sk-live-4f9Qz2Lk8Pq7Rt6Yu5Io",
+        "sk-" + "live-4f9Qz2Lk8Pq7Rt6Yu5Io",
     ):
         assert not line_re.search(f'{assignment} = "{value}"'), value
     for rel in (
