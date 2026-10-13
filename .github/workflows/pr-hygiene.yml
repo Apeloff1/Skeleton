@@ -34,9 +34,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # This workflow owns annotations, not any merge or release safety
+          # decision. A transient REST quota or read-only token must not
+          # turn an untrusted PR diff into a false-red required check.
+          annotation_unavailable() {
+            echo "::warning::PR hygiene annotations unavailable: $1; other validation gates remain required."
+            {
+              echo '## PR hygiene'
+              echo "- Label annotation status: unavailable ($1)"
+              echo '- No pull-request contents were executed.'
+              echo '- Required CI, security and merge gates were not bypassed.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          }
           files="$RUNNER_TEMP/pr-files.txt"
-          pr_json=$(gh api "/repos/${REPO}/pulls/${PR}")
-          gh api --paginate "/repos/${REPO}/pulls/${PR}/files?per_page=100" --jq '.[].filename' > "$files"
+          pr_json=$(gh api "/repos/${REPO}/pulls/${PR}") || annotation_unavailable "PR metadata API"
+          gh api --paginate "/repos/${REPO}/pulls/${PR}/files?per_page=100" --jq '.[].filename' > "$files" || annotation_unavailable "PR files API"
           additions=$(jq -r '.additions' <<<"$pr_json")
           deletions=$(jq -r '.deletions' <<<"$pr_json")
           changed=$((additions + deletions))
@@ -83,7 +96,7 @@ jobs:
           # configurations report Issues: write yet still reject repository-label
           # creation or PR label replacement with HTTP 403. Treat that as a
           # degraded annotation path instead of failing the whole PR check.
-          existing=$(gh api --paginate "/repos/${REPO}/labels?per_page=100" --jq '.[].name')
+          existing=$(gh api --paginate "/repos/${REPO}/labels?per_page=100" --jq '.[].name') || annotation_unavailable "repository label inventory API"
           create_failures=0
           for label in "${desired[@]}"; do
             if ! grep -Fxq "$label" <<<"$existing"; then
@@ -107,7 +120,7 @@ jobs:
             fi
           done
 
-          current=$(gh api "/repos/${REPO}/issues/${PR}/labels?per_page=100")
+          current=$(gh api "/repos/${REPO}/issues/${PR}/labels?per_page=100") || annotation_unavailable "PR existing labels API"
           current_names=$(jq '[.[].name]' <<<"$current")
           managed_json=$(printf '%s\n' "${managed[@]}" | jq -R . | jq -s .)
           if ((${#available_desired[@]})); then
