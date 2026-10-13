@@ -121,16 +121,31 @@ class Jeeves:
     def laws(self) -> tuple[str, ...]:
         return SYSTEM_LAWS
 
-    def app_tool_registry(self, *, root=None):
-        """Expose approved *read-only* app/creator tools to a host tool gate.
+    def app_tool_registry(self, *, root=None,
+                          creator_handlers=None, creator_authorize=None):
+        """Assemble app discovery tools and optionally host-owned creator actions.
 
-        The returned registry does not confer any grant or execute actions.
-        Host ToolExecutor / PermitBoundToolExecutor remains authoritative.
+        By default every tool is READ_ONLY. Editor dispatch is opt-in and only
+        registered if the host supplies both operation handlers and its own
+        per-command authorizer. Registration never grants permission: the
+        existing ToolExecutor / PermitBoundToolExecutor must separately approve
+        every HIGH_IMPACT call.
         """
-        from skeleton.jeeves.app_capability_bridge import register_app_tools
+        from skeleton.jeeves.app_capability_bridge import (
+            register_app_tools,
+            register_authorized_creator_tool,
+        )
         from skeleton.jeeves.agent.tools import ToolRegistry
+        if (creator_handlers is None) != (creator_authorize is None):
+            raise ValueError("host creator handlers and authorizer must be supplied together")
         registry = ToolRegistry()
         register_app_tools(registry, root=root)
+        if creator_handlers is not None:
+            register_authorized_creator_tool(
+                registry,
+                handlers=creator_handlers,
+                authorize=creator_authorize,
+            )
         return registry
 
     def app_capability_catalog(self, *, query: str = "", limit: int = 20, offset: int = 0, root=None):
