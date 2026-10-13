@@ -14,7 +14,7 @@ def response(url,status=200,body=b"ok",headers=None,when=10):
     return FetchResponse(url,status,headers or {"content-type":"text/plain"},body,when)
 
 def engine(fetcher,**policy):
-    e=CrawlEngine(fetcher,policy=CrawlPolicy(min_host_delay_seconds=100,**policy),budget=CrawlBudget(max_requests=50))
+    e=CrawlEngine(fetcher,policy=CrawlPolicy(min_host_delay_seconds=policy.pop("min_host_delay_seconds",100),**policy),budget=CrawlBudget(max_requests=50))
     e.install_robots("https://a.example","User-agent: *\nAllow: /")
     e.install_robots("https://b.example","User-agent: *\nAllow: /")
     return e
@@ -31,7 +31,8 @@ def test_delayed_host_does_not_block_ready_other_host():
 def test_retry_after_controls_429_reschedule():
     url="https://a.example/one"
     f=Fetcher({url:[response(url,429,headers={"content-type":"text/plain","retry-after":"30"}),response(url)]})
-    e=engine(f,retry_base_seconds=2)
+    e=engine(f,retry_base_seconds=2,min_host_delay_seconds=0)
+    e.enqueue(url)
     assert e.step(now=0) is None
     assert e.step(now=29) is None
     assert e.step(now=30)
@@ -40,7 +41,7 @@ def test_retry_after_controls_429_reschedule():
 def test_retry_after_is_capped():
     url="https://a.example/one"
     f=Fetcher({url:[response(url,503,headers={"content-type":"text/plain","retry-after":"99999"}),response(url)]})
-    e=engine(f,max_retry_delay_seconds=60)
+    e=engine(f,max_retry_delay_seconds=60,min_host_delay_seconds=0)
     e.enqueue(url);assert e.step(now=0) is None
     assert e.step(now=59) is None
     assert e.step(now=60)
