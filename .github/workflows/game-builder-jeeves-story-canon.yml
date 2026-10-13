@@ -15,6 +15,7 @@ on:
       - "tests/test_game_builder_jeeves_app_runtime.py"
       - "tests/test_game_builder_jeeves_appwide_fabric.py"
       - "docs/JEEVES_APP_CAPABILITY_ATLAS.md"
+      - "docs/JEEVES_WHOLE_REPO_INVENTORY_AND_GOVERNED_ACTIONS.md"
       - "skeleton/ai/game_builder/story_cinematic_review.py"
       - "skeleton/ai/game_builder/story_detail_history.py"
       - "skeleton/ai/game_builder/story_asset_pixels.py"
