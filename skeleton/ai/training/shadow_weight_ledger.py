@@ -462,6 +462,27 @@ class ShadowWeightLedger:
             )
             return self._snapshot(self._row(db, candidate_id))
 
+    def activation_receipt_digest(self, candidate_id: str) -> str:
+        """Return durable activation receipt identity for crash recovery.
+
+        Only a currently active candidate may recover native rollback custody.
+        A locally supplied receipt is not sufficient without this ledger event.
+        """
+        require_id(candidate_id, "candidate_id")
+        with self._connection() as db:
+            row = self._row(db, candidate_id)
+            if row["state"] != "active":
+                raise ShadowWeightError("rollback custody requires an active candidate")
+            event = db.execute(
+                """SELECT payload_digest FROM shadow_events
+                   WHERE candidate_id=? AND action='native-activation'
+                   ORDER BY seq DESC LIMIT 1""",
+                (candidate_id,),
+            ).fetchone()
+            if event is None:
+                raise ShadowWeightError("active candidate has no activation receipt event")
+            return require_digest(event["payload_digest"], "activation receipt digest")
+
     def events(self, *, after_sequence: int = 0, limit: int = 1000) -> tuple[dict[str, object], ...]:
         if isinstance(after_sequence, bool) or not isinstance(after_sequence, int) or after_sequence < 0:
             raise ShadowWeightError("invalid event cursor")
