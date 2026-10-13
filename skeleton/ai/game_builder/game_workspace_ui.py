@@ -3501,6 +3501,115 @@ $("advanced-interleave-save-import").addEventListener("change",async()=>{
  }catch(error){status("Untrusted interleaved original source save rejected: "+error.message);}
  finally{$("advanced-interleave-save-import").value="";}
 });
+function clearWorldCounterfactuals(){
+ lastCounterfactualReport=null;
+ $("advanced-counterfactual-choice").replaceChildren();
+ $("advanced-counterfactual-report").textContent="";
+}
+$("advanced-counterfactual-generate").addEventListener("click",()=>{
+ try{
+  if(!lastInterleavedProof || !lastInterleavedTimeline)
+   throw Error("Independently replay an original world-clock baseline first");
+  const authored=JSON.parse($("advanced-interleave-editor").value);
+  if(JSON.stringify(authored)!==JSON.stringify(lastInterleavedTimeline))
+   throw Error("Replay changed world-clock baseline before researching variants");
+  const cases=[],known=new Set([JSON.stringify(authored)]);
+  for(let i=0;i<authored.length-1 && cases.length<10;i++){
+   const left=authored[i],right=authored[i+1];
+   if(left.lane==="world" && right.lane==="world")continue;
+   if(left.lane===right.lane && left.lane!=="world" &&
+      left.source_index===right.source_index)continue;
+   const candidate=JSON.parse(JSON.stringify(authored));
+   const a=candidate[i];candidate[i]=candidate[i+1];candidate[i+1]=a;
+   candidate[i].at=i;candidate[i+1].at=i+1;
+   const key=JSON.stringify(candidate);
+   if(known.has(key))continue;
+   known.add(key);
+   cases.push({id:"adjacent_"+String(i).padStart(2,"0")+"_"+
+                    String(i+1).padStart(2,"0"),timeline:candidate});
+  }
+  if(!cases.length)throw Error("There are no reviewable adjacent alternative source orders");
+  $("advanced-counterfactual-cases").value=JSON.stringify(cases,null,2);
+  clearWorldCounterfactuals();
+  status("Authored original source event alternatives prepared; no world state changed");
+ }catch(error){status("What-if source generation blocked: "+error.message);}
+});
+$("advanced-counterfactual-run").addEventListener("click",async()=>{
+ try{
+  if(!lastInterleavedProof || !lastInterleavedTimeline ||
+     !episodicLastScene)
+   throw Error("Original interleaved baseline requires signed independent replay");
+  if(JSON.stringify(JSON.parse($("advanced-interleave-editor").value))!==
+     JSON.stringify(lastInterleavedTimeline))
+   throw Error("Original baseline changed; run the world clock again before comparison");
+  const variants=JSON.parse($("advanced-counterfactual-cases").value);
+  if(!Array.isArray(variants)||!variants.length||variants.length>10)
+   throw Error("Only one to ten bounded authored game alternatives are accepted");
+  const response=await api("/api/advanced-world-counterfactuals",{
+   physical_episodes:verifiedSourceEpisodes,
+   genre_sessions:verifiedGenreEvents,
+   world_scene:episodicLastScene,
+   timeline:lastInterleavedTimeline,
+   world_settings:interleavedWorldSettings,
+   cases:variants,
+   objective:$("advanced-counterfactual-objective").value
+  });
+  const proof=response.report;
+  if(!proof || response.original_source_projects_changed ||
+     response.automatic_scenario_accepted ||
+     response.native_hardware_certified ||
+     response.automatic_ai_weight_promotion ||
+     proof.baseline_world_digest!==lastInterleavedProof.digest ||
+     proof.candidate_count!==variants.length ||
+     proof.original_game_files_changed ||
+     proof.automatic_world_promotion_approved)
+   throw Error("Independent world what-if source and outcome proof rejected");
+  lastCounterfactualReport=proof;
+  const choice=$("advanced-counterfactual-choice");
+  choice.replaceChildren();
+  for(const trial of proof.experiments){
+   if(trial.status!=="valid")continue;
+   const opt=document.createElement("option");
+   opt.value=trial.id;
+   opt.textContent=trial.id+" · "+proof.objective+
+     "="+trial.measured_score;
+   choice.append(opt);
+  }
+  $("advanced-counterfactual-report").textContent=JSON.stringify({
+   original_baseline:proof.baseline_world,
+   author_objective:proof.objective,
+   objective_favorite:proof.objective_favorite,
+   confirmed_candidates:proof.valid_count,
+   rejected_by_original_rules:proof.rejected_count,
+   actual_world_comparisons:proof.experiments.map(e=>({
+    id:e.id,status:e.status,reason:e.reason,
+    measured_score:e.measured_score,
+    differences:e.difference_from_baseline,
+    original_world_digest:e.actual_world_digest
+   })),
+   no_automatic_selection:true,source_replay_digest:proof.digest
+  },null,2);
+  status("Actual original world outcomes compared; all rejected hypotheses remain rejected");
+ }catch(error){status("Original world counterfactual review failed: "+error.message);}
+});
+$("advanced-counterfactual-select").addEventListener("click",()=>{
+ try{
+  if(!lastCounterfactualReport || !lastInterleavedProof ||
+     lastCounterfactualReport.baseline_world_digest!==lastInterleavedProof.digest)
+   throw Error("Replay a fresh authenticated source comparison before selecting");
+  const id=$("advanced-counterfactual-choice").value;
+  const trial=lastCounterfactualReport.experiments.find(
+    e=>e.id===id && e.status==="valid" && e.actual_world_digest);
+  if(!trial)throw Error("Only an independently replayed valid original world may be selected");
+  $("advanced-interleave-editor").value=JSON.stringify(trial.timeline,null,2);
+  // Selection edits the authored plan, NOT actual NPC memories or rewards.
+  // The creator must explicitly execute the canonical world-clock replay.
+  lastInterleavedProof=null;
+  lastInterleavedTimeline=null;
+  clearWorldCounterfactuals();
+  status("Valid alternative selected as draft only; replay the original world clock to enact it");
+ }catch(error){status("Counterfactual source selection rejected: "+error.message);}
+});
 $("advanced-interleave-build").addEventListener("click",async()=>{
  try{
   if(!episodicLastScene || !verifiedSourceEpisodes.length ||
@@ -3606,6 +3715,7 @@ $("advanced-interleave-run").addEventListener("click",async()=>{
 $("advanced-genre-queue-clear").addEventListener("click",()=>{
  verifiedGenreEvents=[];lastUnifiedGenreProof=null;unifiedWorldFollowups=[];
  lastInterleavedProof=null;lastInterleavedTimeline=null;interleavedWorldSettings=null;
+ clearWorldCounterfactuals();
  $("advanced-genre-queue-list").textContent="";
  $("advanced-unified-proof").textContent="";
  status("Unpublished genre source acquisitions cleared without modifying original saves");
@@ -3762,6 +3872,7 @@ let lastUnifiedGenreProof=null;
 let unifiedWorldFollowups=[];
 let lastInterleavedProof=null;
 let lastInterleavedTimeline=null;
+let lastCounterfactualReport=null;
 let interleavedWorldSettings=null;
 let verifiedSourceEpisodes=[];
 let episodicLastProof=null,episodicLastScene=null;
@@ -4425,6 +4536,33 @@ local until typed revalidation and an explicit human-approved file commit.</smal
         Replay authored cross-engine event timeline
        </button>
        <pre id="advanced-interleave-proof" role="status" aria-live="polite"></pre>
+       <fieldset aria-label="Cross-engine adversarial what-if research">
+         <legend>Verified alternative world histories</legend>
+         <label>Compare actual game-world objective
+           <select id="advanced-counterfactual-objective">
+             <option value="preserve_sites">Preserve real site integrity</option>
+             <option value="retain_supplies">Retain actual player supplies</option>
+             <option value="maximize_earned_quests">Maximize earned quest completions</option>
+             <option value="maximize_firsthand_memories">Maximize firsthand NPC memories</option>
+           </select>
+         </label>
+         <button id="advanced-counterfactual-generate" type="button">
+           Generate alternate original source event orders
+         </button>
+         <label>Review alternate source clock timelines (JSON)
+           <textarea id="advanced-counterfactual-cases" rows="11"></textarea>
+         </label>
+         <button id="advanced-counterfactual-run" type="button">
+           Independently replay and compare real NPC worlds
+         </button>
+         <label>Verified alternative
+           <select id="advanced-counterfactual-choice"></select>
+         </label>
+         <button id="advanced-counterfactual-select" type="button">
+           Select tested alternative for explicit world-clock replay
+         </button>
+         <pre id="advanced-counterfactual-report" role="status" aria-live="polite"></pre>
+       </fieldset>
        <fieldset aria-label="Portable original multi-engine world clock">
         <legend>Save and restore authored interleaved gameplay</legend>
         <button id="advanced-interleave-save-export" type="button">
