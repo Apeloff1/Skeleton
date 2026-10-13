@@ -130,18 +130,6 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     if not isinstance(activation, dict) or activation.get("mode") != "applied":
         raise P2T1ActivationError("T1 activation mode must be applied")
 
-    canonical = _canonical_validate(root)
-    if canonical.get("status") != "valid":
-        raise P2T1ActivationError("canonical P2 execution map is not valid")
-    if canonical.get("source_volume_count") != 314:
-        raise P2T1ActivationError("P2 source scope must remain 314")
-    if canonical.get("scheduled_volume_count") != 57:
-        raise P2T1ActivationError("activated scheduled count must be 57")
-    if canonical.get("queued_volume_count") != 257:
-        raise P2T1ActivationError("activated queued count must be 257")
-    if canonical.get("task_count") != 12 or canonical.get("lane_count") != 12:
-        raise P2T1ActivationError("activated task/lane inventory must be 12/12")
-
     tasks = {
         task.get("task_id"): task
         for task in backlog.get("tasks", [])
@@ -173,6 +161,21 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         _check_task_state(
             task_id, task, pr="2346", workflow="P2 Functional AI Acceptance",
         )
+
+    # Perform precise activation/signoff checks before the comprehensive
+    # canonical consistency pass; neither validator is bypassed.
+    canonical = _canonical_validate(root)
+    if canonical.get("status") != "valid":
+        raise P2T1ActivationError("canonical P2 execution map is not valid")
+    if canonical.get("source_volume_count") != 314:
+        raise P2T1ActivationError("P2 source scope must remain 314")
+    if canonical.get("scheduled_volume_count") != 57:
+        raise P2T1ActivationError("activated scheduled count must be 57")
+    if canonical.get("queued_volume_count") != 257:
+        raise P2T1ActivationError("activated queued count must be 257")
+    if canonical.get("task_count") != 12 or canonical.get("lane_count") != 12:
+        raise P2T1ActivationError("activated task/lane inventory must be 12/12")
+
 
     return {
         "status": "valid",
