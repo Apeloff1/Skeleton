@@ -307,8 +307,10 @@ async function dmInvoke(action,params){
  if(!jeevesAppSnapshot)
   throw Error("Scan the application before preparing source-pinned milestones");
  const request={...params,expected_snapshot:jeevesAppSnapshot};
- if(deathmarchPlanDigest && action!=="ai.milestones.page" &&
-    action!=="ai.milestones")
+ if(deathmarchPlanDigest && (
+    action==="ai.workwaves" || action==="ai.workpack" ||
+    action==="ai.change_frontier" || action==="ai.milestones.critical" ||
+    action==="ai.milestones.owners"))
   request.expected_plan_digest=deathmarchPlanDigest;
  if(deathmarchGraphDigest && (
     action==="ai.workwaves" || action==="ai.workpack" ||
@@ -334,6 +336,30 @@ function dmPositive(id,min,max){
   throw Error("Expected a whole number between "+min+" and "+max);
  return number;
 }
+let deathmarchMeasurementDigest=null;
+$("jeeves-dm-measure").addEventListener("click",()=>dmGuard(async()=>{
+ const result=await dmInvoke("ai.product.measure",{});
+ deathmarchMeasurementDigest=result.digest;
+ const headline=[
+  "Measured scoped product families: "+result.family_count,
+  "Located implementation roots: "+result.family_static_source_located+
+   "/"+result.family_count+" ("+result.source_presence_percent+"% SOURCE PRESENCE ONLY)",
+  "Atomic canonical acceptance obligations: "+result.atomic_product_contract_obligations,
+  "Independent acceptance stages not yet verified by this scan: "+
+   result.unknown_independent_acceptance_stages,
+  "Release-qualified families verified by this source scan: 0",
+  "Full installed-application completion: UNKNOWN — no justified single percentage.",
+ ].join("\\n");
+ $("jeeves-dm-output").textContent=headline+"\\n\\n"+JSON.stringify(result,null,2).slice(0,60000);
+ status("Product measurement complete. Source presence is not functional completeness.");
+}));
+$("jeeves-dm-missing").addEventListener("click",()=>dmGuard(async()=>{
+ const params={offset:0,limit:25,only_missing:true};
+ if(deathmarchMeasurementDigest)
+  params.expected_measurement_digest=deathmarchMeasurementDigest;
+ const result=await dmInvoke("ai.product.measure.page",params);
+ status(result.total_matches+" source owner gaps located. These are not all functional blockers.");
+}));
 $("jeeves-dm-tasks").addEventListener("click",()=>dmGuard(async()=>{
  const result=await dmInvoke("ai.milestones.page",{offset:0,limit:30});
  deathmarchPlanDigest=result.plan_digest;
@@ -4404,6 +4430,8 @@ TEMPLATE="""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <p><small>Source-pinned tasks, parallel workwaves, real file context, impact trace,
 and reviewed multi-adapter previews. All previews are non-mutating; source edits,
 model promotion and release still require independent approval and evidence.</small></p>
+<button id="jeeves-dm-measure" type="button">Measure full-app acceptance scope</button>
+<button id="jeeves-dm-missing" type="button">Inspect missing source owners</button>
 <button id="jeeves-dm-tasks" type="button">Index next 30 milestone tasks</button>
 <label>Parallel per wave (1–24)<input id="jeeves-dm-parallel" type="number" min="1" max="24" value="8"></label>
 <button id="jeeves-dm-waves" type="button">Build dependency-safe workwaves</button>
