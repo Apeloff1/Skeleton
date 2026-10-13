@@ -1,3 +1,25 @@
+## DX-61–DX-75 — separated pytest acceptance and exact-head evidence custody (2026-10-13)
+
+| Milestone | Real committed feature | Verification boundary |
+| --- | --- | --- |
+| DX-61 | Added `pytest_smoke` as third explicit tier to `jeeves_acceptance_matrix.py` | CI unittest, CI pytest and discovery distinct |
+| DX-62 | Added reviewed pytest sources to product matrix | 8 of 42 product families selected, not complete |
+| DX-63 | Explicitly typed previously implicit unittest tiers | 17 unittest families remain independently accounted |
+| DX-64 | `scripts/run_app_pytest_acceptance.py` | Real selected `pytest -q` subprocess executions |
+| DX-65 | Real JUnit testcase cardinality | Denies exit-0/zero-tests, skips, errors or incomplete XML |
+| DX-66 | Bounded XML parsing and source custody | Reject DTD/ENTITY, traversal, test-count mismatch |
+| DX-67 | Output minimization | Raw stdout/stderr and JUnit XML omitted from CI artifact |
+| DX-68 | `tests/test_run_app_pytest_acceptance.py` | Positive subprocess results and hostile zero-test/symlink/XML tests |
+| DX-69 | `.github/workflows/jeeves-app-pytest-acceptance.yml` | Exact PR SHA, pinned Python/pytest, Windows and Ubuntu |
+| DX-70 | `jeeves_pytest_acceptance_verifier.py` | Real trusted independent exact-run, OS, step, hash and count cross-check |
+| DX-71 | `verify_app_acceptance_ci.py --mode pytest` | Operator-side read-only GitHub ZIP/artifact provenance |
+| DX-72 | `tests/test_game_builder_jeeves_pytest_acceptance_verifier.py` | Attack matrix: fake pass, missing OS, spoofed SHA and altered artifact |
+| DX-73 | `machine/app_acceptance_test_matrix.json` | 17 unittest + 8 pytest + 17 discovery-only families |
+| DX-74 | Targeted family subset progress boundary | 25/42 scheduled (59.52%); none counted passed until independently verified |
+| DX-75 | `docs/JEEVES_MEASURED_FULL_APP_COMPLETION_2026_10.md` | Concrete CLI, dependencies, measurement caveats and next acceptance work |
+
+**Completion truth:** source index 42/42, source-linked candidate tests 42/42; **25/42 scheduled for actual targeted execution** (17 unittest families and 8 pytest families). **17/42 remain discovery-only.** The two CI workflows are independent and must both complete successfully for their corresponding subset to be externally verified. No declaration in this index is a product quality/release certificate, or evidence for exact-head CI still queued. Full-app functional percentage remains unknown.
+
 ## DX-49–DX-60 — independently verifiable targeted product regressions (2026-10-13)
 
 | ID | Committed real implementation | Completion contract |
