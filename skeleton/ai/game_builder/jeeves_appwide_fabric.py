@@ -385,6 +385,8 @@ OPERATIONS = {
     "studio.production.stage":("proposal", "reviewed original game system or scene source proposals",True),
     "studio.production.release_plan":("compute", "original replay-proven browser and Godot source package",True),
     "studio.production.release_stage":("proposal", "original browser and Godot artifact review staging",True),
+    "studio.production.prompt_plan":("compute", "user prompt to real installed game editor source plan",True),
+    "studio.production.prompt_stage":("proposal", "stage prompt-selected reviewed game editors",True),
     "studio.production.review_bundle":("read", "exact-hash multi-proposal original source review",False),
     "studio.production.commit_bundle":("external_effect", "explicit human-approved original source commit group",True),
     "studio.tree":("read", "active project files",False),
@@ -557,6 +559,13 @@ class JeevesAppwideRuntime:
                 result=review.review(**params)
             else:
                 result=review.commit(**params, operator_authorized=authorized)
+        elif action in ("studio.production.prompt_plan", "studio.production.prompt_stage"):
+            from .jeeves_prompt_production import JeevesPromptProduction
+            prompt_builder=JeevesPromptProduction(inv, ws)
+            if action=="studio.production.prompt_plan":
+                result=prompt_builder.plan(**params, operator_authorized=authorized)
+            else:
+                result=prompt_builder.stage(**params, operator_authorized=authorized)
         elif action=="source.inspect":
             result=inv.source(params["path"])
         elif action=="source.propose":
