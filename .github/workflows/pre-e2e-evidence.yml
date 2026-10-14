@@ -58,6 +58,7 @@ jobs:
         with:
           name: e2e-preflight-${{ github.run_id }}-${{ github.run_attempt }}
           path: .e2e-evidence/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 90
 
@@ -125,6 +126,12 @@ jobs:
           unzip -q "$godot_archive_path" -d "$RUNNER_TEMP/skeleton-godot"
           chmod +x "$RUNNER_TEMP/skeleton-godot/Godot_v4.4.1-stable_linux.x86_64"
           echo "SKELETON_GODOT_BIN=$RUNNER_TEMP/skeleton-godot/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Install locked frontend contract dependencies
+        if: matrix.suite == 'frontend-product'
+        working-directory: frontend
+        run: |
+          corepack enable
+          yarn install --frozen-lockfile
       - name: Execute bounded offline suite, capture and classify failures
         env:
           SELECTED_SUITE: ${{ matrix.suite }}
@@ -135,6 +142,7 @@ jobs:
         with:
           name: e2e-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .e2e-evidence/
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 90
 
@@ -164,5 +172,6 @@ jobs:
         with:
           name: e2e-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
           path: .e2e-aggregate/
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 90
