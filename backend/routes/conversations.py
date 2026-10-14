@@ -530,7 +530,6 @@ async def _project_regeneration(record, *, tenant_id, owner_id, engine):
             memory_refs=tuple(getattr(result, "memory_refs", ())),
             citation_refs=tuple(getattr(result, "evidence_refs", ())),
             artifact_refs=tuple(getattr(result, "artifact_refs", ())),
-            data_class=handoff.data_class,
         )
     except ConversationConflict:
         existing = await conversation_authority.assistant_message_for_operation(
@@ -673,9 +672,8 @@ async def regenerate_assistant_message(
                 operation_id=operation_id,
                 execution_id=execution_id,
                 request_context=None,
-                context_budget=budget,
+                budget=budget,
                 attachment_segments=attachments.segments,
-                tokenizer=selection.get("context_tokenizer", selection["tokenizer"]),
             )
             started = datetime.now(timezone.utc)
             command = command_from_context(
