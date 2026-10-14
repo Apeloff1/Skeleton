@@ -10,7 +10,7 @@ on:
   schedule:
     # The PR Lifecycle Signal still wakes immediate cleanup; the staggered
     # half-hour sweep only recovers missed lifecycle observations.
-    - cron: '13,43 * * * *'
+    - cron: '13 * * * *'
   push:
     branches: [main]
     paths:
