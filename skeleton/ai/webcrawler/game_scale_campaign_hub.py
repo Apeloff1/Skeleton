@@ -29,13 +29,16 @@ def _level_with_completion(original: str, campaign_id: str,
         "type":"skeleton.game.campaign.completed.v1",
         "campaign":campaign_id,"chapter":chapter_id,
     })
-    mark="state.won=true;state.score+=250;"
+    # The canonical Canvas generator ends the goal statement without an
+    # extra semicolon before the closing brace. Bind to that exact event,
+    # without lowering the uniqueness check or firing on an unearned goal.
+    mark="state.won=true;state.score+=250"
     if original.count(mark)!=1:
         raise ValueError("playable runtime does not expose unique goal event")
     # This message fires only inside the actual player's collision with the
     # goal, after puzzle prerequisites pass. The hub checks iframe identity.
     upgraded=original.replace(
-        mark,mark+"window.parent.postMessage("+event+",'*');",1
+        mark,mark+";window.parent.postMessage("+event+",'*');",1
     )
     skill_bridge=r"""
 window.addEventListener("message",event=>{
