@@ -120,7 +120,7 @@ def register_shadow_weight_tools(
             raise ToolDenied("shadow operation denied by owning host")
 
     def _listing(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
-        _gate("shadow.list", args, context, writing=False)
+        _gate("shadow_list", args, context, writing=False)
         raw = pipeline.snapshot()
         rows = raw["records"]
         state = args.get("state")
@@ -154,7 +154,7 @@ def register_shadow_weight_tools(
         }
 
     def _get(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
-        _gate("shadow.inspect", args, context, writing=False)
+        _gate("shadow_inspect", args, context, writing=False)
         item = pipeline.get(args["intake_id"])
         return {
             "schema": "jeeves.shadow_inspect.v1",
@@ -164,7 +164,7 @@ def register_shadow_weight_tools(
 
     entries: list[tuple[Any, Any]] = [
         (ToolSpec(
-            name="shadow.list",
+            name="shadow_list",
             description="List tenant-authorized shadow evidence candidates and states.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -175,7 +175,7 @@ def register_shadow_weight_tools(
             ),
         ), _listing),
         (ToolSpec(
-            name="shadow.inspect",
+            name="shadow_inspect",
             description="Inspect one tenant-authorized shadow evidence record; no training.",
             risk=RiskTier.READ_ONLY,
             arguments=(ArgumentRule("intake_id", "string", max_length=256),),
@@ -185,12 +185,12 @@ def register_shadow_weight_tools(
     if write_authorize is not None:
         def _submit(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
             intake = _intake(args["intake"])
-            _gate("shadow.submit", args, context, writing=True)
+            _gate("shadow_submit", args, context, writing=True)
             return pipeline.submit(intake).to_dict()
 
         def _review_apply(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
             review = _review(args["review"])
-            _gate("shadow.review", args, context, writing=True)
+            _gate("shadow_review", args, context, writing=True)
             current = pipeline.get(args["intake_id"])
             if current is None or review_verify(current, review, context) is not True:
                 raise ToolDenied("independent host rejected shadow corroboration")
@@ -200,7 +200,7 @@ def register_shadow_weight_tools(
             ).to_dict()
 
         def _admit(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
-            _gate("shadow.admit_training", args, context, writing=True)
+            _gate("shadow_admit_training", args, context, writing=True)
             current = pipeline.get(args["intake_id"])
             if current is None or admission_verify(current, args["training_manifest_digest"],
                                                    args["evidence_digest"], context) is not True:
@@ -213,7 +213,7 @@ def register_shadow_weight_tools(
             ).to_dict()
 
         def _quarantine(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
-            _gate("shadow.quarantine", args, context, writing=True)
+            _gate("shadow_quarantine", args, context, writing=True)
             return pipeline.quarantine(
                 args["intake_id"], expected_version=args["expected_version"],
                 reason_digest=args["reason_digest"], authority=args["authority"],
@@ -221,7 +221,7 @@ def register_shadow_weight_tools(
             ).to_dict()
 
         def _consume(args: Mapping[str, Any], context: Any) -> dict[str, Any]:
-            _gate("shadow.consume", args, context, writing=True)
+            _gate("shadow_consume", args, context, writing=True)
             current = pipeline.get(args["intake_id"])
             if current is None or consume_verify(current, args["verified_candidate_digest"],
                                                  context) is not True:
@@ -238,19 +238,19 @@ def register_shadow_weight_tools(
         )
         entries.extend((
             (ToolSpec(
-                name="shadow.submit",
+                name="shadow_submit",
                 description="Host-authorized shadow claim intake; no model weight mutation.",
                 risk=RiskTier.HIGH_IMPACT, idempotent=False,
                 arguments=(ArgumentRule("intake", "object", max_length=12),),
             ), _submit),
             (ToolSpec(
-                name="shadow.review",
+                name="shadow_review",
                 description="Host-authorized independent source review; never self-approve.",
                 risk=RiskTier.HIGH_IMPACT, idempotent=False,
                 arguments=common + (ArgumentRule("review", "object", max_length=10),),
             ), _review_apply),
             (ToolSpec(
-                name="shadow.admit_training",
+                name="shadow_admit_training",
                 description="Host-authorized candidate-only training admission.",
                 risk=RiskTier.HIGH_IMPACT, idempotent=False,
                 arguments=common + (
@@ -261,7 +261,7 @@ def register_shadow_weight_tools(
                 ),
             ), _admit),
             (ToolSpec(
-                name="shadow.quarantine",
+                name="shadow_quarantine",
                 description="Quarantine an evidence candidate without deleting audit history.",
                 risk=RiskTier.HIGH_IMPACT, idempotent=False,
                 arguments=common + (
@@ -271,7 +271,7 @@ def register_shadow_weight_tools(
                 ),
             ), _quarantine),
             (ToolSpec(
-                name="shadow.consume",
+                name="shadow_consume",
                 description="Bind externally trained candidate digest, without deployment.",
                 risk=RiskTier.HIGH_IMPACT, idempotent=False,
                 arguments=common + (

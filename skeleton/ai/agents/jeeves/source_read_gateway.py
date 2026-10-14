@@ -78,7 +78,7 @@ class JeevesSourceReadGateway:
         }
         digest = sha256(json.dumps(intent, sort_keys=True, separators=(",", ":"),
                                    ensure_ascii=True).encode("utf-8")).hexdigest()
-        if self.authorize("app.read_source", digest, context) is not True:
+        if self.authorize("app_read_source", digest, context) is not True:
             raise JeevesSourceReadError("host denied exact source materialization")
         full = self.atlas.root / path
         parts = Path(path).parts
@@ -163,7 +163,7 @@ def register_source_read_tool(
         raise TypeError("host source gateway required")
 
     spec = ToolSpec(
-        name="app.read_source",
+        name="app_read_source",
         description="Read a host-authorized bounded UTF-8 slice of indexed app source.",
         risk=RiskTier.READ_ONLY,
         arguments=(

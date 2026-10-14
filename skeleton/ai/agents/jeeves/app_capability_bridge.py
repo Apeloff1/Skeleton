@@ -531,7 +531,7 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
     home = _root(root)
     entries = (
         (ToolSpec(
-            name="app.capabilities",
+            name="app_capabilities",
             description="Read paged, indexed app file ownership and mirror mappings; no execution.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -543,7 +543,7 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
             query=args.get("query", ""), limit=args.get("limit", 20),
             offset=args.get("offset", 0), root=home)),
         (ToolSpec(
-            name="app.concepts",
+            name="app_concepts",
             description="Read declared capability concepts with explicit unverified status.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -555,7 +555,7 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
             query=args.get("query", ""), limit=args.get("limit", 20),
             offset=args.get("offset", 0), root=home)),
         (ToolSpec(
-            name="app.features",
+            name="app_features",
             description="Read declared AI product features, owners, risks and missing readiness proof; no execution.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -567,7 +567,7 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
             query=args.get("query", ""), limit=args.get("limit", 20),
             offset=args.get("offset", 0), root=home)),
         (ToolSpec(
-            name="app.planes",
+            name="app_planes",
             description="Discover app runtime planes, declared owners, dependencies and consumers; no execution.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -579,7 +579,7 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
             query=args.get("query", ""), limit=args.get("limit", 20),
             offset=args.get("offset", 0), root=home)),
         (ToolSpec(
-            name="app.dependency_impact",
+            name="app_dependency_impact",
             description="Trace a bounded upstream or downstream app-plane dependency and ownership graph.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -593,7 +593,7 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
             args["plane"], direction=args.get("direction", "upstream"),
             max_depth=args.get("max_depth", 5), root=home)),
         (ToolSpec(
-            name="app.interfaces",
+            name="app_interfaces",
             description="Read canonical cross-plane dependency, owner and failure contracts; no execution.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -605,7 +605,7 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
             query=args.get("query", ""), limit=args.get("limit", 20),
             offset=args.get("offset", 0), root=home)),
         (ToolSpec(
-            name="creator.plan",
+            name="creator_plan",
             description="Compile ordered creator commands with explicit prior-step dependencies; never dispatch.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -614,12 +614,12 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
             ),
         ), lambda args, _ctx: creator_plan(args["project_id"], args["steps"])),
         (ToolSpec(
-            name="creator.operations",
+            name="creator_operations",
             description="Read the canonical bounded creator operation schema; no execution.",
             risk=RiskTier.READ_ONLY,
         ), lambda _args, _ctx: creator_operation_catalog()),
         (ToolSpec(
-            name="creator.propose",
+            name="creator_propose",
             description="Validate and fingerprint a typed creator proposal without executing it.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -680,7 +680,7 @@ def register_authorized_creator_tool(
         return receipt.to_dict()
 
     spec = ToolSpec(
-        name="creator.execute_authorized",
+        name="creator_execute_authorized",
         description="Host-authorized and tool-granted creator dispatch. Never autonomous.",
         risk=RiskTier.HIGH_IMPACT,
         arguments=(

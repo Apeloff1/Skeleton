@@ -782,7 +782,8 @@
       ],
       "evidence": [
         "skeleton/artifact_plane",
-        "skeleton/assets"
+        "skeleton/assets",
+        "machine/ai_game_learning.json"
       ],
       "required_interfaces": [
         "artifact id",
@@ -837,7 +838,8 @@
       "evidence": [
         "backend/server.py",
         "backend/routes",
-        "backend/core/product_control_runtime.py"
+        "backend/core/product_control_runtime.py",
+        "machine/ai_game_learning.json"
       ],
       "required_interfaces": [
         "versioned API",
@@ -937,7 +939,8 @@
       "evidence": [
         "frontend/app/product.tsx",
         "frontend/src/product",
-        "frontend/utils/apiBase.ts"
+        "frontend/utils/apiBase.ts",
+        "machine/ai_game_learning.json"
       ],
       "required_interfaces": [
         "canonical endpoint resolver",
@@ -1207,7 +1210,8 @@
       "evidence": [
         "skeleton/eval",
         "skeleton/intelligence/eval_framework.py",
-        "eval/fixtures"
+        "eval/fixtures",
+        "machine/ai_game_learning.json"
       ],
       "required_interfaces": [
         "eval case",
@@ -1256,7 +1260,8 @@
       "evidence": [
         "skeleton/learning",
         "skeleton/intelligence/adaptive.py",
-        "skeleton/intelligence/experiment_tracker.py"
+        "skeleton/intelligence/experiment_tracker.py",
+        "machine/ai_game_learning.json"
       ],
       "required_interfaces": [
         "feedback event",
@@ -9757,5 +9762,29 @@
       "canonical AI runtime mirror parity",
       "independent redundancy verifier"
     ]
+  },
+  "game_learning_source_candidate": {
+    "contract": "machine/ai_game_learning.json",
+    "existing_runtime_owner": "skeleton/jeeves/game_engine_runtime.py",
+    "existing_dragon_owner": "skeleton/ai/webcrawler",
+    "status": "implementation_candidate",
+    "authority": "No new capability plane, service, provider or production promotion authority",
+    "continuation": "Playable emulator workers, human reference, live actor observation, parallel local learning and native console build composition under the same declared owners",
+    "two_hour_continuation": {
+      "contracts": [
+        "machine/ai_game_console_editor.json",
+        "machine/ai_game_console_workspace.json",
+        "machine/ai_game_successor.json",
+        "machine/ai_game_style_analysis.json",
+        "machine/ai_game_successor_runtime.json",
+        "machine/ai_game_desktop_export.json",
+        "machine/ai_game_studio_learning.json",
+        "machine/ai_game_studio_continuation.json",
+        "machine/ai_game_studio_review.json"
+      ],
+      "existing_state_authority": "CORE_DB Mongo scoped workspace",
+      "scope": "Console editing/emulation/build augmentation and one/three-source original successor desktop export",
+      "new_service_or_provider": false
+    }
   }
 }

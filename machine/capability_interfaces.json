@@ -2722,7 +2722,11 @@
         "message ordering/idempotency tests",
         "edit/regenerate lineage tests"
       ],
-      "status": "present"
+      "status": "present",
+      "game_learning_source_candidate": {
+        "contract": "machine/ai_game_learning.json",
+        "status": "implementation_candidate"
+      }
     },
     {
       "id": "runtime_dependency:product-experience->engine-api",

@@ -1,0 +1,37 @@
+{
+  "schema_version": "skeleton.ai.game_rom_runtime.v1",
+  "status": "implementation_candidate",
+  "owner": "skeleton/jeeves/game_rom_runtime.py",
+  "existing_domain": "Jeeves game-engine runtime",
+  "scope": "Bounded local DMG Game Boy cartridge interpreter with actual LR35902 instruction execution, memory-mapped controller/timer and raster observation. Restricted to explicitly supported cartridge/header profiles.",
+  "support": {
+    "cpu": "Official LR35902 base and CB instructions; invalid instructions fail explicitly",
+    "cartridges": [
+      "ROM-only",
+      "MBC1 without RTC"
+    ],
+    "ppu": "Bounded DMG background/window/sprite raster with approximate timing; not cycle-accurate certification",
+    "input": "Eight DMG controls mapped to declared action set",
+    "audio": "Not implemented",
+    "cgb": "Color-only cartridges unavailable",
+    "arbitrary_rom_compatibility": false,
+    "other_console_rom_execution": false
+  },
+  "protocol": [
+    "spec",
+    "reset(seed)",
+    "step(action)",
+    "snapshot()",
+    "restore(snapshot)",
+    "preview()"
+  ],
+  "bounds": {
+    "rom_bytes": 2097152,
+    "cycles_per_step": 140448,
+    "episode_steps": 4096,
+    "framebuffer_pixels": 23040,
+    "state_bytes": 400000
+  },
+  "failure": "Unsupported cartridge, color-only ROM, malformed checksum/header, illegal opcode, cycle/resource overrun and altered snapshot/ROM identity raise explicit typed errors. No copyrighted BIOS, keys or downloaded games are bundled.",
+  "verification": "Source candidate only; no automated tests or live ROM execution during user-directed no-tests session. Hardware compatibility remains unverified."
+}

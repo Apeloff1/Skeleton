@@ -11,8 +11,9 @@ from __future__ import annotations
 import concurrent.futures
 import threading
 import time
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any
 
 from .types import (
     AgentContractError,
@@ -184,7 +185,9 @@ class ToolSpec:
             if rule.maximum is not None:
                 item["maximum"] = rule.maximum
             if rule.max_length is not None:
-                item["maxLength" if rule.type_name == "string" else "maxItems"] = rule.max_length
+                keyword = {"string": "maxLength", "array": "maxItems", "object": "maxProperties"}.get(rule.type_name)
+                if keyword is not None:
+                    item[keyword] = rule.max_length
             if rule.choices:
                 item["enum"] = list(rule.choices)
             properties[rule.name] = item
@@ -389,7 +392,7 @@ class ToolExecutor:
             )
         except (KeyboardInterrupt, SystemExit):
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - external tool failures become bounded observations
             observation = ToolObservation(
                 call_id=call.call_id,
                 tool_name=spec.name,

@@ -1,0 +1,103 @@
+{
+  "schema_version": "skeleton.ai.game_console_build.v1",
+  "status": "implementation_candidate",
+  "runtime_owner": "skeleton/jeeves/game_console_build.py",
+  "mirror": "skeleton/ai/agents/jeeves/game_console_build.py",
+  "application_owner": "backend/core/game_console_build.py",
+  "routes": "backend/routes/game_console_build.py",
+  "parent": "machine/ai_game_learning.json",
+  "authority": {
+    "jobs": "existing GameLearningWorkspace scoped frozen input, worker lease, cancellation and completion fences",
+    "storage": "existing CORE_DB Mongo; derived game_learning_build_artifacts records and existing game_learning_source_chunks bytes",
+    "downloads": "current source authority plus exact completed producer job and artifact result binding",
+    "commands": "fixed trusted adapter argv or re-emitted canonical Dragon SDK build recipes; no request command/environment/toolchain-path overrides"
+  },
+  "operator_sdk_configuration": {
+    "SKL_GAME_CONSOLE_SDK_ROOTS": "bounded JSON list of exact trusted absolute private installation roots; no public request field",
+    "SKL_GAME_SDL2_SDK_ROOT": "trusted private SDL2 development installation; exact headers and actual system runtime library are hashed",
+    "adapters": "RGBDS, cc65 including NES ca65/ld65, installed canonical SDK recipes and host-ABI SDL2 C99; roots readonly in compiler namespace"
+  },
+  "isolation": {
+    "worker": "bounded spawned local worker under existing Jeeves game execution owner",
+    "sandbox": "Linux bubblewrap unshared user/network/PID/IPC/UTS/cgroup namespaces, readonly trusted runtime/SDK trees, private writable project and tmp",
+    "required": true,
+    "missing_or_denied": "sandbox_unavailable, never unsandboxed fallback",
+    "python": "uploaded Python and client Makefile/CMake scripts are never executed; canonical build control files are replaced by trusted emitter recipes where used",
+    "limits": "wall and CPU deadlines, per-process address space/descriptors/files plus sampled aggregate compiler subtree memory/process/private-workspace limits. No host-UID RLIMIT_NPROC, which counts unrelated jobs; no strict cgroup resource-proof claim.",
+    "cleanup": "cancel/timeout terminates compiler process group and drains worker; no ready receipt before exact verified artifact collection"
+  },
+  "catalog": {
+    "source": "existing skeleton.ai.webcrawler.dragon_native_targets.target_catalog and NativeProject EMITTERS",
+    "coverage": "all actual declared platform profiles; unsupported or absent SDKs remain source_only",
+    "desktop": "exact target OS and CPU ABI required; no Linux executable labeled Windows/macOS/other console",
+    "readiness": "installed trusted binaries/SDK paths and implemented adapter are separate from successful compilation"
+  },
+  "receipts": [
+    "frozen source bytes digest",
+    "canonical recipe digest",
+    "target and ABI",
+    "compiler executable hashes",
+    "actual bounded log sequence",
+    "command exit status",
+    "actual artifact bytes/digests/format",
+    "cancellation or timeout outcome"
+  ],
+  "bounds": {
+    "source_files": 256,
+    "source_bytes": 16777216,
+    "source_file_bytes": 2097152,
+    "artifact_files": 8,
+    "artifact_bytes": 33554432,
+    "artifact_file_bytes": 16777216,
+    "log_bytes": 262144,
+    "log_events": 1024,
+    "wall_seconds": [
+      5,
+      120
+    ],
+    "memory_bytes": 1073741824,
+    "processes": 64,
+    "descriptors": 128
+  },
+  "claims": {
+    "hardware_execution_verified": false,
+    "cartridge_format_validation_is_gameplay_proof": false,
+    "production_promotion": false,
+    "automated_tests_requested": false
+  },
+  "artifact_execution": {
+    "status": "implementation_candidate",
+    "owner": "existing backend/core/game_console_build.py and GameLearningWorkspace source authority",
+    "routes": [
+      "GET /game-learning/projects/{project}/build-artifacts/{artifact}/playback",
+      "POST /game-learning/projects/{project}/build-artifacts/{artifact}/admit",
+      "POST /game-learning/projects/{project}/build-artifacts/{artifact}/play",
+      "POST /game-learning/projects/{project}/build-artifacts/{artifact}/train",
+      "GET existing artifact binary download"
+    ],
+    "source_kind": "build_artifact",
+    "admission": "exact current owner/tenant project, completed build issuer membership/input/target/artifact receipt, every chunk and final SHA, current operator-approved target core",
+    "rights": "inherited live owned project/producer source and teacher authority; no caller-issued consent or filesystem paths",
+    "membership": "derived source association CAS preserves current project version/input epoch so its exact producer remains current; no implicit default-source change",
+    "execution": "explicit selected compiled artifact overrides authored design simulation; unselected artifacts do not pollute producer inputs",
+    "fences": [
+      "project revision and input epoch",
+      "producer completed job/input/artifact digest",
+      "source membership/current rights/epoch",
+      "approved core registry/target/extension",
+      "recording consent and parent policy identity"
+    ],
+    "recovery": "idempotent source association and existing durable play/train owners; reauthorize producer before admission, native execution and checkpoints",
+    "bounds": {
+      "artifact_file_bytes": 16777216,
+      "workspace_sources": 64,
+      "source_dependency_depth": 8
+    },
+    "claims": {
+      "physical_hardware_execution_verified": false,
+      "successful_compilation_implies_playability": false,
+      "production_promotion": false,
+      "automated_tests_requested": false
+    }
+  }
+}

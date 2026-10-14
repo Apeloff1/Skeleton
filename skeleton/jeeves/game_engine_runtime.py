@@ -10,14 +10,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from .game_engine_3d import (
     THREE_D_ERAS,
     ThreeDEngineLab,
     build_3d_engine_tree,
+)
+from .game_engine_input import (
+    input_policy_document,
 )
 from .game_engine_lab import (
     EngineAdversary,
@@ -27,12 +31,6 @@ from .game_engine_lab import (
     SandboxSnapshot,
     VirtualFileTree,
     engine_era_profile,
-)
-from .game_engine_input import (
-    input_policy_document,
-)
-from .game_engine_timing import (
-    timing_policy_document,
 )
 from .game_engine_legacy import (
     LEGACY_ERAS,
@@ -44,6 +42,9 @@ from .game_engine_modern import (
     ModernEngineLab,
     build_modern_engine_tree,
 )
+from .game_engine_timing import (
+    timing_policy_document,
+)
 
 
 class EngineFamily(str, Enum):
@@ -53,18 +54,9 @@ class EngineFamily(str, Enum):
 
 
 ERA_FAMILY = {
-    **{
-        era: EngineFamily.LEGACY
-        for era in LEGACY_ERAS
-    },
-    **{
-        era: EngineFamily.TRANSITION_3D
-        for era in THREE_D_ERAS
-    },
-    **{
-        era: EngineFamily.MODERN
-        for era in MODERN_ERAS
-    },
+    **{era: EngineFamily.LEGACY for era in LEGACY_ERAS},
+    **{era: EngineFamily.TRANSITION_3D for era in THREE_D_ERAS},
+    **{era: EngineFamily.MODERN for era in MODERN_ERAS},
 }
 
 
@@ -72,21 +64,13 @@ def engine_family(
     era: EngineEra | str,
 ) -> EngineFamily:
     try:
-        key = (
-            era
-            if isinstance(era, EngineEra)
-            else EngineEra(str(era))
-        )
+        key = era if isinstance(era, EngineEra) else EngineEra(str(era))
     except ValueError as exc:
-        raise GameEngineLabError(
-            f"unknown engine era: {era!r}"
-        ) from exc
+        raise GameEngineLabError(f"unknown engine era: {era!r}") from exc
     try:
         return ERA_FAMILY[key]
     except KeyError as exc:
-        raise GameEngineLabError(
-            f"no executable runtime family for {key.value}"
-        ) from exc
+        raise GameEngineLabError(f"no executable runtime family for {key.value}") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +93,7 @@ class RoutedEngineSandbox:
     def with_tree(
         self,
         tree: VirtualFileTree,
-    ) -> "RoutedEngineSandbox":
+    ) -> RoutedEngineSandbox:
         native = type(self.native)(
             self.era,
             tree,
@@ -124,7 +108,7 @@ class RoutedEngineSandbox:
     def apply(
         self,
         patches: Iterable[SandboxPatch],
-    ) -> "RoutedEngineSandbox":
+    ) -> RoutedEngineSandbox:
         return RoutedEngineSandbox(
             self.era,
             self.family,
@@ -139,31 +123,20 @@ EVIDENCE_PLANE_PREFIXES = (
     "audio/compiled/",
     "animation/compiled/",
     "navigation/compiled/",
+    # Candidate original portable games are validated by the generation owner;
+    # they are not compiled asset/script/physics inventory entries.
+    "game/generated/",
 )
 
 
 FAMILY_MUTABLE_PATHS: Mapping[EngineEra, frozenset[str]] = {
-    **{
-        era: frozenset(
-            {"engine/legacy_tuning.json"}
-        )
-        for era in LEGACY_ERAS
-    },
-    **{
-        era: frozenset(
-            {"engine/3d_tuning.json"}
-        )
-        for era in THREE_D_ERAS
-    },
+    **{era: frozenset({"engine/legacy_tuning.json"}) for era in LEGACY_ERAS},
+    **{era: frozenset({"engine/3d_tuning.json"}) for era in THREE_D_ERAS},
     **{
         era: frozenset(
             {
                 "engine/modern_tuning.json",
-                *(
-                    ("engine/adaptive_policy.json",)
-                    if era is EngineEra.NEXT
-                    else ()
-                ),
+                *(("engine/adaptive_policy.json",) if era is EngineEra.NEXT else ()),
             }
         )
         for era in MODERN_ERAS
@@ -196,9 +169,7 @@ def _canonical_runtime_tree(
             SandboxPatch(
                 "engine/input_policy.json",
                 json.dumps(
-                    input_policy_document(
-                        era
-                    ),
+                    input_policy_document(era),
                     indent=2,
                     sort_keys=True,
                 )
@@ -207,9 +178,7 @@ def _canonical_runtime_tree(
             SandboxPatch(
                 "engine/timing_policy.json",
                 json.dumps(
-                    timing_policy_document(
-                        era
-                    ),
+                    timing_policy_document(era),
                     indent=2,
                     sort_keys=True,
                 )
@@ -232,35 +201,18 @@ class RuntimeQualityReport:
 
     @property
     def passed(self) -> bool:
-        return (
-            bool(self.base.passed)
-            and bool(self.family.passed)
-            and self.contract_passed
-        )
+        return bool(self.base.passed) and bool(self.family.passed) and self.contract_passed
 
     @property
     def score(self) -> float:
         return (
-            float(self.base.score)
-            + float(self.family.score)
-            + (
-                1.0
-                if self.contract_passed
-                else 0.0
-            )
+            float(self.base.score) + float(self.family.score) + (1.0 if self.contract_passed else 0.0)
         ) / 3.0
 
     @property
     def failed(self) -> tuple[str, ...]:
-        failures = (
-            tuple(
-                "base:" + name
-                for name in self.base.failed
-            )
-            + tuple(
-                "family:" + name
-                for name in self.family.failed
-            )
+        failures = tuple("base:" + name for name in self.base.failed) + tuple(
+            "family:" + name for name in self.family.failed
         )
         if self.contract_mismatches:
             failures += ("contract",)
@@ -273,13 +225,10 @@ def runtime_nonregressing(
 ) -> bool:
     return (
         after.base.score >= before.base.score
-        and len(after.base.failed)
-        <= len(before.base.failed)
+        and len(after.base.failed) <= len(before.base.failed)
         and after.family.score >= before.family.score
-        and len(after.family.failed)
-        <= len(before.family.failed)
-        and len(after.contract_mismatches)
-        <= len(before.contract_mismatches)
+        and len(after.family.failed) <= len(before.family.failed)
+        and len(after.contract_mismatches) <= len(before.contract_mismatches)
     )
 
 
@@ -287,21 +236,15 @@ def runtime_strictly_improves(
     before: RuntimeQualityReport,
     after: RuntimeQualityReport,
 ) -> bool:
-    return (
-        runtime_nonregressing(
-            before,
-            after,
-        )
-        and (
-            after.base.score > before.base.score
-            or after.family.score > before.family.score
-            or len(after.base.failed)
-            < len(before.base.failed)
-            or len(after.family.failed)
-            < len(before.family.failed)
-            or len(after.contract_mismatches)
-            < len(before.contract_mismatches)
-        )
+    return runtime_nonregressing(
+        before,
+        after,
+    ) and (
+        after.base.score > before.base.score
+        or after.family.score > before.family.score
+        or len(after.base.failed) < len(before.base.failed)
+        or len(after.family.failed) < len(before.family.failed)
+        or len(after.contract_mismatches) < len(before.contract_mismatches)
     )
 
 
@@ -331,15 +274,9 @@ class ExecutableGameEngineLab:
         Any,
     ]:
         try:
-            key = (
-                era
-                if isinstance(era, EngineEra)
-                else EngineEra(str(era))
-            )
+            key = era if isinstance(era, EngineEra) else EngineEra(str(era))
         except ValueError as exc:
-            raise GameEngineLabError(
-                f"unknown engine era: {era!r}"
-            ) from exc
+            raise GameEngineLabError(f"unknown engine era: {era!r}") from exc
         family = engine_family(key)
         if family is EngineFamily.LEGACY:
             lab = self.legacy
@@ -354,9 +291,7 @@ class ExecutableGameEngineLab:
         era: EngineEra | str,
         gameplay_dialect: str | None = None,
     ) -> RoutedEngineSandbox:
-        key, family, lab = self._lab(
-            era
-        )
+        key, family, lab = self._lab(era)
         native = lab.create(
             key,
             gameplay_dialect,
@@ -366,9 +301,7 @@ class ExecutableGameEngineLab:
                 SandboxPatch(
                     "engine/input_policy.json",
                     json.dumps(
-                        input_policy_document(
-                            key
-                        ),
+                        input_policy_document(key),
                         indent=2,
                         sort_keys=True,
                     )
@@ -377,9 +310,7 @@ class ExecutableGameEngineLab:
                 SandboxPatch(
                     "engine/timing_policy.json",
                     json.dumps(
-                        timing_policy_document(
-                            key
-                        ),
+                        timing_policy_document(key),
                         indent=2,
                         sort_keys=True,
                     )
@@ -397,73 +328,41 @@ class ExecutableGameEngineLab:
         self,
         sandbox: RoutedEngineSandbox,
     ) -> RuntimeQualityReport:
-        _, expected, lab = self._lab(
-            sandbox.era
-        )
+        _, expected, lab = self._lab(sandbox.era)
         if sandbox.family is not expected:
-            raise GameEngineLabError(
-                "sandbox family does not match era"
-            )
+            raise GameEngineLabError("sandbox family does not match era")
         base = self.base_adversary.evaluate(
-            engine_era_profile(
-                sandbox.era
-            ),
+            engine_era_profile(sandbox.era),
             sandbox.tree,
         )
-        family_report = lab.evaluate(
-            sandbox.native
-        )
+        family_report = lab.evaluate(sandbox.native)
         canonical = _canonical_runtime_tree(
             sandbox.era,
             sandbox.gameplay_dialect,
         )
-        mutable = FAMILY_MUTABLE_PATHS[
-            sandbox.era
-        ]
+        mutable = FAMILY_MUTABLE_PATHS[sandbox.era]
         mismatches: list[str] = []
-        for path in sorted(
-            canonical.files
-        ):
+        for path in sorted(canonical.files):
             if path in mutable:
                 continue
             try:
-                current = sandbox.tree.read(
-                    path
-                )
+                current = sandbox.tree.read(path)
             except GameEngineLabError:
-                mismatches.append(
-                    path
-                )
+                mismatches.append(path)
                 continue
-            if current != canonical.read(
-                path
-            ):
-                mismatches.append(
-                    path
-                )
+            if current != canonical.read(path):
+                mismatches.append(path)
         unexpected = sorted(
             path
             for path in sandbox.tree.files
-            if (
-                path
-                not in canonical.files
-                and not path.startswith(
-                    EVIDENCE_PLANE_PREFIXES
-                )
-            )
+            if (path not in canonical.files and not path.startswith(EVIDENCE_PLANE_PREFIXES))
         )
-        mismatches.extend(
-            unexpected
-        )
+        mismatches.extend(unexpected)
         return RuntimeQualityReport(
             sandbox.era,
             base,
             family_report,
-            tuple(
-                sorted(
-                    set(mismatches)
-                )
-            ),
+            tuple(sorted(set(mismatches))),
         )
 
     def adversarial_improve(
@@ -474,17 +373,12 @@ class ExecutableGameEngineLab:
         max_rounds: int = 6,
         improver=None,
     ) -> RoutedImprovementResult:
-        evolution = AdversarialEngineEvolution(
-            self
-        )
-        session = evolution.start(
-            sandbox
-        )
+        evolution = AdversarialEngineEvolution(self)
+        session = evolution.start(sandbox)
         if improver is None:
-            proposer = (
-                evolution.canonical_candidates
-            )
+            proposer = evolution.canonical_candidates
         else:
+
             def proposer(
                 current,
                 report,
@@ -495,11 +389,8 @@ class ExecutableGameEngineLab:
                         report,
                     )
                 )
-                return (
-                    (patches,)
-                    if patches
-                    else ()
-                )
+                return (patches,) if patches else ()
+
         result = evolution.evolve(
             session,
             proposer,
@@ -518,64 +409,40 @@ class ExecutableGameEngineLab:
         sandbox: RoutedEngineSandbox,
         report: RuntimeQualityReport,
     ) -> tuple[SandboxPatch, ...]:
-        _, expected, lab = self._lab(
-            sandbox.era
-        )
+        _, expected, lab = self._lab(sandbox.era)
         if sandbox.family is not expected:
-            raise GameEngineLabError(
-                "sandbox family does not match era"
-            )
+            raise GameEngineLabError("sandbox family does not match era")
         canonical = _canonical_runtime_tree(
             sandbox.era,
             sandbox.gameplay_dialect,
         )
-        mutable = FAMILY_MUTABLE_PATHS[
-            sandbox.era
-        ]
+        mutable = FAMILY_MUTABLE_PATHS[sandbox.era]
         patches: dict[
             str,
             SandboxPatch,
         ] = {}
 
-        for path in sorted(
-            canonical.files
-        ):
+        for path in sorted(canonical.files):
             if path in mutable:
                 continue
             try:
-                current = sandbox.tree.read(
-                    path
-                )
+                current = sandbox.tree.read(path)
             except GameEngineLabError:
                 current = None
-            wanted = canonical.read(
-                path
-            )
+            wanted = canonical.read(path)
             if current != wanted:
                 patches[path] = SandboxPatch(
                     path,
                     wanted,
-                    sandbox.tree.file_digest(
-                        path
-                    ),
+                    sandbox.tree.file_digest(path),
                 )
 
-        for path in sorted(
-            sandbox.tree.files
-        ):
-            if (
-                path
-                not in canonical.files
-                and not path.startswith(
-                    EVIDENCE_PLANE_PREFIXES
-                )
-            ):
+        for path in sorted(sandbox.tree.files):
+            if path not in canonical.files and not path.startswith(EVIDENCE_PLANE_PREFIXES):
                 patches[path] = SandboxPatch(
                     path,
                     None,
-                    sandbox.tree.file_digest(
-                        path
-                    ),
+                    sandbox.tree.file_digest(path),
                 )
 
         if not report.family.passed:
@@ -588,12 +455,7 @@ class ExecutableGameEngineLab:
                     patch,
                 )
 
-        return tuple(
-            patches[path]
-            for path in sorted(
-                patches
-            )
-        )
+        return tuple(patches[path] for path in sorted(patches))
 
     def allowed_mutation_paths(
         self,
@@ -603,31 +465,19 @@ class ExecutableGameEngineLab:
             sandbox.era,
             sandbox.gameplay_dialect,
         )
-        return frozenset(
-            canonical.files
-        )
+        return frozenset(canonical.files)
 
     def patch_allowed(
         self,
         sandbox: RoutedEngineSandbox,
         patch: SandboxPatch,
     ) -> bool:
-        if (
-            patch.path
-            in self.allowed_mutation_paths(
-                sandbox
-            )
-        ):
+        if patch.path in self.allowed_mutation_paths(sandbox):
             return True
         return (
             patch.content is None
-            and sandbox.tree.file_digest(
-                patch.path
-            )
-            is not None
-            and not patch.path.startswith(
-                EVIDENCE_PLANE_PREFIXES
-            )
+            and sandbox.tree.file_digest(patch.path) is not None
+            and not patch.path.startswith(EVIDENCE_PLANE_PREFIXES)
         )
 
     def build_all(
@@ -649,14 +499,9 @@ class ExecutableGameEngineLab:
         return tuple(
             (
                 sandbox.era,
-                self.evaluate(
-                    sandbox
-                ),
+                self.evaluate(sandbox),
             )
-            for sandbox
-            in self.build_all(
-                gameplay_dialect
-            )
+            for sandbox in self.build_all(gameplay_dialect)
         )
 
 
@@ -692,7 +537,7 @@ class EngineEvolutionSession:
     def start(
         cls,
         sandbox: RoutedEngineSandbox,
-    ) -> "EngineEvolutionSession":
+    ) -> EngineEvolutionSession:
         snapshot = sandbox.tree.snapshot(
             sandbox.era,
             0,
@@ -713,15 +558,11 @@ class EngineEvolutionSession:
     def checkpoint(
         self,
         sandbox: RoutedEngineSandbox,
-    ) -> "EngineEvolutionSession":
+    ) -> EngineEvolutionSession:
         if sandbox.era is not self.sandbox.era:
-            raise GameEngineLabError(
-                "cannot checkpoint a different engine era"
-            )
+            raise GameEngineLabError("cannot checkpoint a different engine era")
         if sandbox.family is not self.sandbox.family:
-            raise GameEngineLabError(
-                "cannot checkpoint a different engine family"
-            )
+            raise GameEngineLabError("cannot checkpoint a different engine family")
         parent = self.latest_checkpoint.tree_digest
         snapshot = sandbox.tree.snapshot(
             sandbox.era,
@@ -737,83 +578,44 @@ class EngineEvolutionSession:
     @property
     def lineage_digest(self) -> str:
         payload = "|".join(
-            (
-                f"{snapshot.sequence}:"
-                f"{snapshot.parent_digest or '-'}:"
-                f"{snapshot.tree_digest}"
-            )
+            (f"{snapshot.sequence}:" f"{snapshot.parent_digest or '-'}:" f"{snapshot.tree_digest}")
             for snapshot in self.checkpoints
         )
-        return hashlib.sha256(
-            payload.encode("utf-8")
-        ).hexdigest()
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def verify_lineage(self) -> bool:
         if not self.checkpoints:
-            raise GameEngineLabError(
-                "evolution session has no checkpoints"
-            )
+            raise GameEngineLabError("evolution session has no checkpoints")
         parent: str | None = None
-        expected_sequence = 0
-        for snapshot in self.checkpoints:
+        for expected_sequence, snapshot in enumerate(self.checkpoints):
             if snapshot.era is not self.sandbox.era:
-                raise GameEngineLabError(
-                    "evolution checkpoint era mismatch"
-                )
+                raise GameEngineLabError("evolution checkpoint era mismatch")
             if snapshot.sequence != expected_sequence:
-                raise GameEngineLabError(
-                    "evolution checkpoint sequence mismatch"
-                )
+                raise GameEngineLabError("evolution checkpoint sequence mismatch")
             if snapshot.parent_digest != parent:
-                raise GameEngineLabError(
-                    "evolution checkpoint parent mismatch"
-                )
-            VirtualFileTree.restore(
-                snapshot
-            )
+                raise GameEngineLabError("evolution checkpoint parent mismatch")
+            VirtualFileTree.restore(snapshot)
             parent = snapshot.tree_digest
-            expected_sequence += 1
         return True
 
     def restore(
         self,
         index: int = -1,
-    ) -> "EngineEvolutionSession":
+    ) -> EngineEvolutionSession:
         if not self.checkpoints:
-            raise GameEngineLabError(
-                "evolution session has no checkpoints"
-            )
+            raise GameEngineLabError("evolution session has no checkpoints")
         try:
-            resolved_index = (
-                index
-                if index >= 0
-                else len(self.checkpoints) + index
-            )
-            if (
-                resolved_index < 0
-                or resolved_index >= len(self.checkpoints)
-            ):
+            resolved_index = index if index >= 0 else len(self.checkpoints) + index
+            if resolved_index < 0 or resolved_index >= len(self.checkpoints):
                 raise IndexError
-            snapshot = self.checkpoints[
-                resolved_index
-            ]
+            snapshot = self.checkpoints[resolved_index]
         except IndexError as exc:
-            raise GameEngineLabError(
-                "evolution checkpoint index out of range"
-            ) from exc
+            raise GameEngineLabError("evolution checkpoint index out of range") from exc
         if snapshot.era is not self.sandbox.era:
-            raise GameEngineLabError(
-                "evolution checkpoint era mismatch"
-            )
-        tree = VirtualFileTree.restore(
-            snapshot
-        )
-        restored = self.sandbox.with_tree(
-            tree
-        )
-        retained = self.checkpoints[
-            : resolved_index + 1
-        ]
+            raise GameEngineLabError("evolution checkpoint era mismatch")
+        tree = VirtualFileTree.restore(snapshot)
+        restored = self.sandbox.with_tree(tree)
+        retained = self.checkpoints[: resolved_index + 1]
         return EngineEvolutionSession(
             restored,
             retained,
@@ -836,35 +638,25 @@ def _strictly_improves(
     before: Any,
     after: Any,
 ) -> bool:
-    if (
-        isinstance(
-            before,
-            RuntimeQualityReport,
-        )
-        and isinstance(
-            after,
-            RuntimeQualityReport,
-        )
+    if isinstance(
+        before,
+        RuntimeQualityReport,
+    ) and isinstance(
+        after,
+        RuntimeQualityReport,
     ):
         return runtime_strictly_improves(
             before,
             after,
         )
-    return (
-        after.score > before.score
-        or len(after.failed)
-        < len(before.failed)
-    )
+    return after.score > before.score or len(after.failed) < len(before.failed)
 
 
 def _meets_target(
     report: Any,
     target: float,
 ) -> bool:
-    return (
-        bool(report.passed)
-        and report.score >= target
-    )
+    return bool(report.passed) and report.score >= target
 
 
 class AdversarialEngineEvolution:
@@ -874,10 +666,7 @@ class AdversarialEngineEvolution:
         self,
         lab: ExecutableGameEngineLab | None = None,
     ) -> None:
-        self.lab = (
-            lab
-            or ExecutableGameEngineLab()
-        )
+        self.lab = lab or ExecutableGameEngineLab()
 
     def start(
         self,
@@ -885,9 +674,7 @@ class AdversarialEngineEvolution:
     ) -> EngineEvolutionSession:
         # Validate the family binding before creating lineage authority.
         self.lab.evaluate(sandbox)
-        return EngineEvolutionSession.start(
-            sandbox
-        )
+        return EngineEvolutionSession.start(sandbox)
 
     def tournament_round(
         self,
@@ -901,16 +688,9 @@ class AdversarialEngineEvolution:
         Any,
         EvolutionRound,
     ]:
-        if (
-            not isinstance(max_candidates, int)
-            or not 1 <= max_candidates <= 128
-        ):
-            raise GameEngineLabError(
-                "max_candidates must be within [1, 128]"
-            )
-        before = self.lab.evaluate(
-            session.sandbox
-        )
+        if not isinstance(max_candidates, int) or not 1 <= max_candidates <= 128:
+            raise GameEngineLabError("max_candidates must be within [1, 128]")
+        before = self.lab.evaluate(session.sandbox)
         evaluated: list[
             tuple[
                 float,
@@ -937,19 +717,10 @@ class AdversarialEngineEvolution:
                     for patch in patches
                 ):
                     continue
-                candidate = (
-                    session.sandbox.apply(
-                        patches
-                    )
-                )
-                if (
-                    candidate.tree.digest
-                    == session.sandbox.tree.digest
-                ):
+                candidate = session.sandbox.apply(patches)
+                if candidate.tree.digest == session.sandbox.tree.digest:
                     continue
-                report = self.lab.evaluate(
-                    candidate
-                )
+                report = self.lab.evaluate(candidate)
             except (
                 GameEngineLabError,
                 TypeError,
@@ -1000,9 +771,7 @@ class AdversarialEngineEvolution:
             selected,
             selected_report,
         ) = evaluated[0]
-        promoted = session.checkpoint(
-            selected
-        )
+        promoted = session.checkpoint(selected)
         round_result = EvolutionRound(
             index,
             session.sandbox.tree.digest,
@@ -1011,9 +780,7 @@ class AdversarialEngineEvolution:
             before.score,
             selected_report.score,
             True,
-            tuple(
-                selected_report.failed
-            ),
+            tuple(selected_report.failed),
         )
         return (
             promoted,
@@ -1031,23 +798,12 @@ class AdversarialEngineEvolution:
         max_candidates: int = 32,
     ) -> EvolutionResult:
         if not 0 < target <= 1:
-            raise GameEngineLabError(
-                "target must be within (0, 1]"
-            )
-        if (
-            not isinstance(max_rounds, int)
-            or not 1 <= max_rounds <= 64
-        ):
-            raise GameEngineLabError(
-                "max_rounds must be within [1, 64]"
-            )
+            raise GameEngineLabError("target must be within (0, 1]")
+        if not isinstance(max_rounds, int) or not 1 <= max_rounds <= 64:
+            raise GameEngineLabError("max_rounds must be within [1, 64]")
         current = session
-        report = self.lab.evaluate(
-            current.sandbox
-        )
-        rounds: list[
-            EvolutionRound
-        ] = []
+        report = self.lab.evaluate(current.sandbox)
+        rounds: list[EvolutionRound] = []
         if _meets_target(
             report,
             target,
@@ -1078,9 +834,7 @@ class AdversarialEngineEvolution:
                 index=index,
                 max_candidates=max_candidates,
             )
-            rounds.append(
-                round_result
-            )
+            rounds.append(round_result)
             if not round_result.accepted:
                 break
             current = next_session
@@ -1109,8 +863,4 @@ class AdversarialEngineEvolution:
             session.sandbox,
             report,
         )
-        return (
-            (repair,)
-            if repair
-            else ()
-        )
+        return (repair,) if repair else ()

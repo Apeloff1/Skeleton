@@ -1,0 +1,49 @@
+{
+  "schema_version": "skeleton.ai.game_play.v1",
+  "status": "source_implemented_unverified",
+  "parent_contract": "machine/ai_game_learning.json",
+  "authority": "Existing CORE_DB game-learning workspace. Child processes and frame caches are derived execution handles, not independent authorities.",
+  "owners": {
+    "application": "backend/core/game_play.py",
+    "frames": "backend/core/game_learning_events.py",
+    "routes": "backend/routes/game_learning.py",
+    "policy": "skeleton/jeeves/game_learning.py"
+  },
+  "contracts": {
+    "control": "Exact authenticated tenant/owner, project version/input epoch, worker token and one rotating controller token. Human and AI controllers cannot simultaneously drive an instance.",
+    "live_frames": "Only actual adapter observations create frame events. Stream incarnation UUID and monotonic sequence are retained on replay/poll; a worker restart creates a new stream. Missing/expired frames require resynchronization.",
+    "recording": "Explicit account-authored consent starts a bounded canonical demonstration of measured transitions. Authenticated controller provenance is not proof of biological human authorship. Feedback does not alter measured environment rewards. Completed recording digests and live consent are pinned in direct and inherited policy lineage. Actual environment replay mints process-local measured demonstration proof before imitation/Q updates.",
+    "recovery": "Expired worker lease is interrupted, never success. Exact durable snapshot/input identity may resume under a new worker/stream fence. Cancel releases capacity only after process quiescence.",
+    "source_withdrawal": "Project input epoch and play publication fence precede authority changes; current source rights are checked before read, replay, demonstration training and publication.",
+    "parallel_training": "One to eight bounded native process actors with frozen batch assignments, acknowledged checkpoint prefix, live actual actor observations and existing job checkpoint authority. Interactive play has reserved capacity.",
+    "media": "Operator-approved emulator IDs and registry digest are pinned in immutable input. Large source bundles and legacy cartridges above2MiB use private server materialization with exact hashes; HTTP inputs cannot select filesystem paths.",
+    "frames_storage": "Existing Mongo holds bounded latest-frame TTL projections for cross-process polling; the local broker retains bounded actual events. These caches confer no execution, checkpoint or completion authority."
+  },
+  "bounds": {
+    "live_plays_per_project": 32,
+    "active_plays_per_owner": 4,
+    "steps_per_episode": 4096,
+    "fps": 30,
+    "duration_seconds": 900,
+    "input_queue": 32,
+    "recording_bytes": 2097152,
+    "snapshot_bytes": 8388608,
+    "frame_bytes": 2097152,
+    "frame_cache_total_bytes": 67108864,
+    "training_workers": 8,
+    "live_frame_projection_ttl_seconds": 30,
+    "recordings_selected_per_job": 16,
+    "inherited_teacher_refs": 64
+  },
+  "verification": "User-directed implementation with no new or executed automated tests. Static checks do not establish emulator compatibility or production readiness.",
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "browser_audio": "Optional user-gesture Web Audio playback of measured bounded s16le native samples; exact sample cursor/channel/rate decode, gap identification and cleanup on pause, account or stream change. Sampled viewer transport is not claimed as gapless native audio; no fabricated samples or implicit native-device audio promise.",
+  "limitations": [
+    "No automated tests or source execution checks were created/run at user direction.",
+    "Account-authored controller events establish authenticated provenance, not biological human authorship.",
+    "Feedback is retained as authored ratings; measured environment rewards are not fabricated from those ratings.",
+    "Local content caches and worker processes are derived; installed cores, firmware, toolchains and content compatibility require actual operator configuration.",
+    "This candidate does not claim production, enterprise or all-console hardware compatibility."
+  ]
+}

@@ -72,6 +72,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     backendSurface: '/api/jeeves',
     actions: [
       { id: 'reason', title: 'Reason', description: 'Work through a complex product or engineering problem.', operation: 'jeeves.reason' },
+      { id: 'learn-games', title: 'Game learning studio', description: 'Edit, simulate and train original games across registered engine and console targets.', operation: 'jeeves.reason', href: '/game-learning' },
       { id: 'plan', title: 'Plan', description: 'Turn a goal into coordinated executable work.', operation: 'jeeves.plan' },
       { id: 'review', title: 'Review agents', description: 'Inspect delegated work and agent outcomes.', operation: 'agents.review', legacyHref: '/agent-review' },
     ],

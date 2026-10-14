@@ -1,0 +1,19 @@
+{
+  "schema_version": "skeleton.ai.game_parallel_learning.v1",
+  "status": "implementation_candidate",
+  "canonical_owner": "skeleton/jeeves/game_learning_parallel.py",
+  "mirror": "skeleton/ai/agents/jeeves/game_learning_parallel.py",
+  "parent_contract": "machine/ai_game_policy_learning.json",
+  "state_authority": "Existing application CORE_DB job checkpoint; actors have no database or policy-write authority",
+  "execution": "One to eight actual spawned local actor processes run isolated pinned environments against one frozen policy per batch. Parent validates bounded JSON IPC, then performs sequential actual Q updates and episode-atomic commits. No mutable Q table or thread is shared with actors.",
+  "binding": "Exact environment request/spec, full frozen policy snapshot/digest, implementation/runtime identity, actor count, fixed episode ordinals/seeds, logical actor IDs and per-actor rollout RNG. Physical actor PID/channel is checked by issuing parent.",
+  "checkpoint": "Persist pending batch before spawning; each commit atomically stores updated policy, complete trace and acknowledged prefix. Recovery pins frozen batch policy and skips acknowledged episodes, recollecting only uncommitted deterministic episodes. Central learner snapshot remains authoritative.",
+  "frames": "Bounded actual environment previews carry batch/actor/assignment/policy/environment/step identities; frames are live observations and do not imply an episode or policy commit.",
+  "bounds": {"actors": 8, "batch_episodes": 8, "ipc_message_bytes": 8388608, "batch_trace_bytes": 33554432, "frame_bytes": 524288, "actor_timeout_seconds": 300, "episode_steps": 4096},
+  "cleanup": "Cooperative cancellation, bounded wait, then terminate/kill/join every spawned actor; POSIX process groups include nested approved emulator workers. If the OS cannot reap a killed process within the bounded cleanup waits, retain its handle in execution quarantine, reject new actors, and report cleanup_not_quiescent without claiming completion. No surviving child is acknowledged as a successful return.",
+  "measured_evidence": "Actor traces are admitted only from the actual parent-created process channel with complete assignment and trace validation; uploaded issuer labels cannot grant measured-actor provenance.",
+  "limits": "Local process parallel rollout collection, not remote training, neural distributed optimization or guaranteed throughput. Frozen-batch collection differs numerically from online action selection after each Q update; resume equivalence is to the same batch algorithm.",
+  "automated_tests_authorized": false,
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false
+}
