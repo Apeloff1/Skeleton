@@ -90,6 +90,33 @@ def build_parser() -> argparse.ArgumentParser:
     root = commands.add_parser("root", help="Compute validated owner knowledge root")
     root.add_argument("--owner", required=True)
 
+    refresh = commands.add_parser("plan-recrawl", help="Prioritize source review gaps without network I/O")
+    refresh.add_argument("--owner", required=True)
+    refresh.add_argument("--as-of", required=True, help="Trusted UTC timestamp, YYYY-MM-DDTHH:MM:SSZ")
+    refresh.add_argument("--scope", default="design_reference")
+    refresh.add_argument("--max-age-seconds", type=int, default=604800)
+    refresh.add_argument("--minimum-independent-groups", type=int, default=2)
+    refresh.add_argument("--minimum-confidence-ppm", type=int, default=800000)
+    refresh.add_argument("--limit", type=int, default=20)
+
+    queue = commands.add_parser("queue-recrawls", help="Atomically queue reviewed refresh gaps, without network permission")
+    queue.add_argument("--owner", required=True)
+    queue.add_argument("--at-epoch", type=int, required=True, help="Trusted integer UTC epoch seconds")
+    queue.add_argument("--max-age-seconds", type=int, default=604800)
+    queue.add_argument("--minimum-independent-groups", type=int, default=2)
+    queue.add_argument("--minimum-confidence-ppm", type=int, default=800000)
+    queue.add_argument("--limit", type=int, default=20)
+
+    pending = commands.add_parser("pending-recrawls", help="Inspect queued non-executable refresh orders")
+    pending.add_argument("--owner", required=True)
+    pending.add_argument("--at-epoch", type=int, required=True)
+    pending.add_argument("--limit", type=int, default=32)
+
+    hoag = commands.add_parser("hoag-view", help="Display current revocable advisory memory projection")
+    hoag.add_argument("--owner", required=True)
+    hoag.add_argument("--at-epoch", type=int, required=True)
+    hoag.add_argument("--limit", type=int, default=32)
+
     erased = commands.add_parser("erase-owner", help="Permanently delete owned source excerpts")
     erased.add_argument("--owner", required=True)
     erased.add_argument("--confirm-erasure", required=True, help="Must exactly repeat the owner")
@@ -144,6 +171,37 @@ def main(argv: Sequence[str] | None = None) -> int:
                         )
                     ],
                 }
+            elif args.command == "plan-recrawl":
+                output = store.plan_recrawl(
+                    args.owner, as_of=args.as_of, scope=args.scope,
+                    max_age_seconds=args.max_age_seconds,
+                    min_independent_groups=args.minimum_independent_groups,
+                    min_confidence_ppm=args.minimum_confidence_ppm,
+                    limit=args.limit, authorized=True,
+                )
+            elif args.command == "queue-recrawls":
+                from .dragon_wisdom_pyramid import DragonWisdomPyramid
+                output = DragonWisdomPyramid(store).enqueue_canonical_refreshes(
+                    args.owner, now=args.at_epoch, authorized=True,
+                    trusted_worker=True, max_age_seconds=args.max_age_seconds,
+                    min_independent_groups=args.minimum_independent_groups,
+                    min_confidence_ppm=args.minimum_confidence_ppm, limit=args.limit,
+                )
+            elif args.command == "pending-recrawls":
+                from .dragon_wisdom_pyramid import DragonWisdomPyramid
+                output = {
+                    "owner": args.owner, "execution_authorized": False,
+                    "orders": DragonWisdomPyramid(store).recrawl_queue(
+                        args.owner, now=args.at_epoch, authorized=True,
+                        limit=args.limit,
+                    ),
+                }
+            elif args.command == "hoag-view":
+                from .dragon_wisdom_pyramid import DragonWisdomPyramid
+                output = DragonWisdomPyramid(store).hoag_view(
+                    args.owner, now=args.at_epoch, authorized=True,
+                    limit=args.limit,
+                )
             elif args.command == "root":
                 output = {
                     "schema": "skeleton.game_builder.reviewed_root.v1",
@@ -160,7 +218,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 }
             else:
                 raise KnowledgeError("unrecognized operator command")
-    except (KnowledgeError, PermissionError, OSError) as exc:
+    except (KnowledgeError, PermissionError, OSError, ValueError) as exc:
         # Do not include raw source content in error reporting.
         print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2

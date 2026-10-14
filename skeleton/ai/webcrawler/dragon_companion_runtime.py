@@ -234,3 +234,39 @@ def animation_frame(state: DragonCompanionState) -> dict:
             DragonPhase.REMEMBERING: "The dragon is saving approved knowledge.",
         }.get(state.phase, f"Dragon is {state.phase.value}."),
     }
+
+
+class DragonCognitionSession:
+    """Compose resource admission, evidence logic and bounded knowledge context.
+
+    Existing workers retain execution authority. A caller must honor the
+    returned checkpoint IDs, re-sample hardware and retry admission after stop
+    acknowledgement before initializing a model through provider_runtime.
+    """
+    def __init__(self, owner: str, graph, *, global_resources=None, tenant: str = "") -> None:
+        from .dragon_microknowledge import DragonMicroKnowledge
+        from .dragon_resource_session import DragonResourceSession
+        self.owner = new_companion(owner).owner
+        self.knowledge = DragonMicroKnowledge(graph)
+        self.resources = DragonResourceSession(global_resources=global_resources, tenant=tenant)
+
+    def prepare(self, tasks, hardware, rule, facts, bindings, query, facets,
+                *, now: float, authorized: bool, capability_gaps=()):
+        from .dragon_capability_gap_matrix import prioritize_gaps
+        from .dragon_reasoning_matrix import evaluate_matrix
+        from .dragon_resource_session import plan_resources
+        if authorized is not True:
+            raise PermissionError("companion cognition requires authorization")
+        gaps = prioritize_gaps(capability_gaps, now=now)
+        decision = evaluate_matrix(rule, facts, bindings, now=now,
+            genre=facets.get("genre", "unspecified"), era=facets.get("era", "unspecified"),
+            engine=facets.get("engine", "unspecified"))
+        # Evidence is checked before reserving any resource for a worker.
+        if not decision.eligible:
+            return {"logic": decision, "dispatch": None, "context": None, "capability_gaps": gaps}
+        foreground = any(t.lane == "user" for t in tasks)
+        plan = plan_resources(hardware, now=now, foreground=foreground)
+        context = self.knowledge.retrieve(self.owner, query, facets, plan,
+                                          now=now, authorized=True)
+        dispatch = self.resources.dispatch(tasks, hardware, now=now)
+        return {"logic": decision, "dispatch": dispatch, "context": context, "capability_gaps": gaps}

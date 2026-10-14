@@ -7,6 +7,7 @@ authorization expiry, tick count, cooldown and the Lab's daily quota.
 from __future__ import annotations
 from dataclasses import dataclass
 import sqlite3
+from typing import Callable
 from .dragon_practice_lab import DragonPracticeLab, PracticeAttempt, _owner, _time
 from .dragon_native_targets import STYLES
 from .dragon_native_projects import EMITTERS
@@ -42,6 +43,7 @@ class DragonPracticeCycles:
             native_style TEXT NOT NULL DEFAULT 'arcade_score_attack')""")
         columns={r[1] for r in db.execute("PRAGMA table_info(dragon_practice_cycles)")}
         for column,definition in (
+            ("cycle_revision","INTEGER NOT NULL DEFAULT 0"),
             ("generation_mode","TEXT NOT NULL DEFAULT 'html'"),
             ("native_target","TEXT NOT NULL DEFAULT 'game_boy'"),
             ("native_style","TEXT NOT NULL DEFAULT 'arcade_score_attack'"),
@@ -79,6 +81,7 @@ class DragonPracticeCycles:
                  demos_per_tick,generation_mode,native_target,native_style)
                 VALUES(?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(owner) DO UPDATE SET enabled=excluded.enabled,
+                cycle_revision=dragon_practice_cycles.cycle_revision+1,
                 expires_at=excluded.expires_at,next_due=excluded.next_due,
                 interval_seconds=excluded.interval_seconds,
                 remaining_ticks=excluded.remaining_ticks,
@@ -95,7 +98,7 @@ class DragonPracticeCycles:
         if not authorized:
             raise PermissionError("practice disable requires authorization")
         with self.db:
-            self.db.execute("UPDATE dragon_practice_cycles SET enabled=0 WHERE owner=?",(owner,))
+            self.db.execute("UPDATE dragon_practice_cycles SET enabled=0,cycle_revision=cycle_revision+1 WHERE owner=?",(owner,))
 
     def status(self, owner: str, *, authorized: bool) -> PracticeSubscription:
         _owner(owner)
@@ -109,12 +112,14 @@ class DragonPracticeCycles:
         return PracticeSubscription(owner,bool(row[0]),row[1],row[2],row[3],row[4],row[5],row[6],row[7],row[8])
 
     def pulse(self, owner: str, *, authorized: bool,
-              now: float) -> tuple[PracticeAttempt | NativeAttempt,...]:
+              now: float, should_yield: Callable[[], bool] | None = None) -> tuple[PracticeAttempt | NativeAttempt,...]:
         """One allowed slice of work. No catch-up loops and no hidden retries."""
         _owner(owner)
         _time(now)
         if not authorized:
             raise PermissionError("practice pulse requires authorization")
+        if should_yield is not None and should_yield():
+            return ()
         # Reserve the tick before reading it: prevent two scheduler workers
         # from starting the same practice slice concurrently.
         self.db.execute("BEGIN IMMEDIATE")
@@ -161,6 +166,8 @@ class DragonPracticeCycles:
                 course=DragonNativeCurriculum(native,evidence)
             created=[]
             for _ in range(demos):
+                if should_yield is not None and should_yield():
+                    break
                 # Every attempt changes the native exercise, never regenerates
                 # an existing lesson/target/style merely to inflate workloads.
                 # Keep the chosen genre honest; each attempt increments a
@@ -177,4 +184,57 @@ class DragonPracticeCycles:
                 except (PermissionError,ValueError):
                     break
             return tuple(created)
-        return self.lab.run_batch(owner,authorized=True,consent=True,now=now,max_demos=demos)
+        created=[]
+        for _ in range(demos):
+            if should_yield is not None and should_yield():
+                break
+            attempts=self.lab.run_batch(owner,authorized=True,consent=True,now=now,max_demos=1)
+            if not attempts:
+                break
+            created.extend(attempts)
+        return tuple(created)
+
+
+    def pulse_guarded(self, owner: str, *, authorized: bool, executor):
+        """Trusted worker boundary: defer before spending a subscription tick.
+
+        Owner-scoped executor and governor are injected by the application;
+        no private global capacity ledger is created here. One tick is one
+        bounded chunk. A partial tick remains consumed after a checkpoint:
+        replaying it could duplicate already committed practice artifacts.
+        """
+        from .dragon_chunk_executor import DragonChunkExecutor, ChunkResult
+        from .dragon_resource_session import SessionTask, plan_resources
+        from skeleton.ai.game_builder.resource_governor import ResourceDelta
+        _owner(owner)
+        if authorized is not True:
+            raise PermissionError("guarded practice requires authorization")
+        if not isinstance(executor, DragonChunkExecutor) or executor.session.tenant != owner:
+            raise PermissionError("practice executor must be bound to the authenticated owner")
+        subscription = self.status(owner, authorized=True)
+        now = executor.clock()
+        _time(now)
+        if not subscription.enabled or now >= subscription.expires_at or now < subscription.next_due:
+            return (), None
+        revision = self.db.execute("SELECT cycle_revision FROM dragon_practice_cycles WHERE owner=?", (owner,)).fetchone()[0]
+        budget = subscription.demos_per_tick * self.lab.policy.max_artifact_bytes
+        created = []
+        def callback(plan, stop):
+            def checkpoint():
+                live_now = executor.clock()
+                current = self.status(owner, authorized=True)
+                live_revision = self.db.execute("SELECT cycle_revision FROM dragon_practice_cycles WHERE owner=?", (owner,)).fetchone()
+                return (stop() or live_revision is None or live_revision[0] != revision
+                        or not current.enabled and current.remaining_ticks > 0
+                        or live_now >= current.expires_at
+                        or plan_resources(executor.hardware(), now=live_now, foreground=False).effort == "defer")
+            # The subscription is rechecked transactionally by pulse. A final
+            # tick disables itself, which must not revoke its in-flight work.
+            created.extend(self.pulse(owner, authorized=True, now=executor.clock(), should_yield=checkpoint))
+            return ChunkResult(True, "practice:" + owner + ":" + str(subscription.next_due),
+                ResourceDelta(artifact_bytes=len(created) * self.lab.policy.max_artifact_bytes))
+        run = executor.run(SessionTask("practice:" + owner, "idle", 1024 * 1024, 1,
+                                      io_tokens=1), callback,
+                           authorized=True, consent=True,
+                           reserved_usage=ResourceDelta(artifact_bytes=budget))
+        return tuple(created), run
