@@ -4,8 +4,44 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+    # Scope non-critical authority validation to owning inputs.
+    paths:
+      - "machine/*flgb*.json"
+      - "scripts/check_functional_llm_game_builder_*.py"
+      - "skeleton/inference/flgb_*.py"
+      - "skeleton/ai/model_runtime/**"
+      - "skeleton/ai/context/flgb_*.py"
+      - "skeleton/ai/agents/flgb_*.py"
+      - "skeleton/ai/assurance/flgb_*.py"
+      - "skeleton/ai/training/flgb_*.py"
+      - "skeleton/ai/multimodal/flgb_*.py"
+      - "skeleton/security/flgb_*.py"
+      - "skeleton/game/**/flgb_*.py"
+      - "skeleton/ai/forge/flgb_*.py"
+      - "skeleton/ai/product/flgb_*.py"
+      - "tests/flgb/**"
+      - "tests/test_functional_llm_game_builder_*.py"
+      - ".github/workflows/functional-llm-game-builder-masterplan.yml"
   push:
     branches: [main]
+    # Scope non-critical authority validation to owning inputs.
+    paths:
+      - "machine/*flgb*.json"
+      - "scripts/check_functional_llm_game_builder_*.py"
+      - "skeleton/inference/flgb_*.py"
+      - "skeleton/ai/model_runtime/**"
+      - "skeleton/ai/context/flgb_*.py"
+      - "skeleton/ai/agents/flgb_*.py"
+      - "skeleton/ai/assurance/flgb_*.py"
+      - "skeleton/ai/training/flgb_*.py"
+      - "skeleton/ai/multimodal/flgb_*.py"
+      - "skeleton/security/flgb_*.py"
+      - "skeleton/game/**/flgb_*.py"
+      - "skeleton/ai/forge/flgb_*.py"
+      - "skeleton/ai/product/flgb_*.py"
+      - "tests/flgb/**"
+      - "tests/test_functional_llm_game_builder_*.py"
+      - ".github/workflows/functional-llm-game-builder-masterplan.yml"
   workflow_dispatch:
 
 permissions:

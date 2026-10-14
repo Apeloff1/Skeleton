@@ -4,8 +4,30 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+    # Scope non-critical authority validation to owning inputs.
+    paths:
+      - "machine/enterprise_ai_superiority.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_app_construction.json"
+      - "scripts/check_enterprise_ai_superiority.py"
+      - "scripts/check_enterprise_ai_implementation_notes.py"
+      - "scripts/report_enterprise_ai_progress.py"
+      - "scripts/check_ai_app_construction.py"
+      - "tests/test_enterprise_ai_*.py"
+      - ".github/workflows/enterprise-ai-superiority.yml"
   push:
     branches: [main]
+    # Scope non-critical authority validation to owning inputs.
+    paths:
+      - "machine/enterprise_ai_superiority.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_app_construction.json"
+      - "scripts/check_enterprise_ai_superiority.py"
+      - "scripts/check_enterprise_ai_implementation_notes.py"
+      - "scripts/report_enterprise_ai_progress.py"
+      - "scripts/check_ai_app_construction.py"
+      - "tests/test_enterprise_ai_*.py"
+      - ".github/workflows/enterprise-ai-superiority.yml"
   workflow_dispatch:
 
 permissions:
