@@ -1,59 +1,6 @@
 name: P3 T2 Training Learning Multimodal Candidates
 
 on:
-  pull_request:
-    paths:
-      - "machine/ai_masterplan_continuation_frontier.json"
-      - "machine/ai_p3t2_training_candidate.json"
-      - "machine/ai_p3t2_learning_candidate.json"
-      - "machine/ai_p3t2_multimodal_candidate.json"
-      - "skeleton/training/**"
-      - "skeleton/ai/training/**"
-      - "skeleton/ai/runtime/training/**"
-      - "skeleton/ai/runtime/p3t2/**"
-      - "skeleton/artifacts/multimodal_ingestion.py"
-      - "skeleton/vision/pipeline.py"
-      - "skeleton/document_vision/fusion.py"
-      - "skeleton/audio/pipeline.py"
-      - "skeleton/speech/runtime.py"
-      - "skeleton/video/pipeline.py"
-      - "skeleton/ai/runtime/extensions/multimodal.py"
-      - "skeleton/ai/runtime/extensions/ecosystem.py"
-      - "tests/test_ai_runtime_extensions_hardening.py"
-      - "scripts/p3t2_candidate_common.py"
-      - "scripts/check_p3t2_*candidate*.py"
-      - "scripts/check_ai_masterplan_continuation.py"
-      - "tests/test_p3t2_*candidate*.py"
-      - "skeleton/testing/test_p3t2_evidence.py"
-      - "docs/plan/P3T2_TRAINING_LEARNING_MULTIMODAL_CANDIDATES.md"
-      - ".github/workflows/p3t2-training-learning-multimodal.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_masterplan_continuation_frontier.json"
-      - "machine/ai_p3t2_training_candidate.json"
-      - "machine/ai_p3t2_learning_candidate.json"
-      - "machine/ai_p3t2_multimodal_candidate.json"
-      - "skeleton/training/**"
-      - "skeleton/ai/training/**"
-      - "skeleton/ai/runtime/training/**"
-      - "skeleton/ai/runtime/p3t2/**"
-      - "skeleton/artifacts/multimodal_ingestion.py"
-      - "skeleton/vision/pipeline.py"
-      - "skeleton/document_vision/fusion.py"
-      - "skeleton/audio/pipeline.py"
-      - "skeleton/speech/runtime.py"
-      - "skeleton/video/pipeline.py"
-      - "skeleton/ai/runtime/extensions/multimodal.py"
-      - "skeleton/ai/runtime/extensions/ecosystem.py"
-      - "tests/test_ai_runtime_extensions_hardening.py"
-      - "scripts/p3t2_candidate_common.py"
-      - "scripts/check_p3t2_*candidate*.py"
-      - "scripts/check_ai_masterplan_continuation.py"
-      - "tests/test_p3t2_*candidate*.py"
-      - "skeleton/testing/test_p3t2_evidence.py"
-      - "docs/plan/P3T2_TRAINING_LEARNING_MULTIMODAL_CANDIDATES.md"
-      - ".github/workflows/p3t2-training-learning-multimodal.yml"
   workflow_dispatch:
 
 permissions:

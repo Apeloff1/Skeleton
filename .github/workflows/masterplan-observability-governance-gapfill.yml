@@ -1,25 +1,6 @@
 name: Masterplan Observability Governance Gapfill
 
 on:
-  pull_request:
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_file_tree.json"
-      - "machine/ai_observability_governance_gapfill_candidate.json"
-      - "skeleton/observability/**"
-      - "skeleton/ai/runtime/observability/**"
-      - "skeleton/testing/test_slo_registry.py"
-      - "skeleton/testing/test_error_budgets.py"
-      - "skeleton/testing/test_observability_cardinality.py"
-      - "skeleton/testing/test_trace_model.py"
-      - "skeleton/testing/test_profile_records.py"
-      - "skeleton/testing/test_latency_budgets.py"
-      - "skeleton/testing/test_cost_governor.py"
-      - "skeleton/testing/test_efficiency_metrics.py"
-      - "scripts/check_ai_observability_governance_gapfill.py"
-      - "tests/test_ai_observability_governance_gapfill.py"
-      - "docs/plan/OBSERVABILITY_GOVERNANCE_GAPFILL_180_187.md"
-      - ".github/workflows/masterplan-observability-governance-gapfill.yml"
   push:
     branches: [main]
     paths:

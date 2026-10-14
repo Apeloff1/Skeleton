@@ -1,30 +1,6 @@
 name: P2 Functional AI Acceptance
 
 on:
-  pull_request:
-    paths:
-      - "machine/ai_p2_functional_ai_closure.json"
-      - "machine/ai_p0_edge_case_matrix.json"
-      - "machine/ai_p1_terminal_closure.json"
-      - "machine/ai_p2_execution_map.json"
-      - "machine/ai_p2_task_backlog.json"
-      - "machine/ai_p2_tranche1_plan.json"
-      - "skeleton/ai/runtime/inference/**"
-      - "skeleton/ai/runtime/functional_ai.py"
-      - "skeleton/intelligence/execution_runtime.py"
-      - "skeleton/testing/test_local_inference.py"
-      - "skeleton/testing/test_llama_cpp_local_inference.py"
-      - "skeleton/testing/test_local_model_deployment.py"
-      - "skeleton/testing/test_vs001_functional_ai.py"
-      - "skeleton/testing/test_execution_runtime.py"
-      - "scripts/check_p1_terminal_closure_manifest.py"
-      - "scripts/check_p2_tranche1_activated.py"
-      - "scripts/check_p2_functional_ai_closure.py"
-      - "scripts/p2_functional_ai_exact_head.py"
-      - "scripts/qualify_local_model_runtime.py"
-      - "tests/test_p2_functional_ai_exact_head.py"
-      - "tests/test_p2_functional_ai_closure.py"
-      - ".github/workflows/p2-functional-ai-acceptance.yml"
   push:
     branches:
       - main
