@@ -119,3 +119,17 @@ def test_index_refuses_untyped_or_invalid_evidence_expiry(expiry):
         cache.index("alice", "combat", {}, evidence_ref="source1",
                     expires_at=expiry, authorized=True)
     assert graph.db.execute("SELECT COUNT(*) FROM dragon_microknowledge").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("retrieval_candidates", True), ("retrieval_candidates", 1.5),
+    ("retrieval_candidates", -1), ("context_bytes", False),
+    ("context_bytes", 1.5), ("chunk_bytes", True),
+    ("chunk_bytes", 0), ("chunk_bytes", 4097),
+])
+def test_type_confused_retrieval_limits_fail_closed(field, bad):
+    graph, cache, plan = context()
+    add(graph, cache)
+    with pytest.raises(ValueError, match="invalid retrieval plan"):
+        cache.retrieve("alice", "combat", {}, replace(plan, **{field: bad}),
+                       now=10, authorized=True)
