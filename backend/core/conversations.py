@@ -1755,6 +1755,202 @@ class MongoConversationAuthority:
             expected_thread_version=expected_thread_version,
         )
 
+    async def _active_lineage_page(
+        self, thread: ConversationThread, *, limit: int, before_message_id: str | None = None
+    ) -> tuple[tuple[ConversationMessage, ...], str | None, ConversationMessage | None]:
+        """Walk committed immutable parents; a page never crosses into a sibling branch."""
+        if thread.state not in {ConversationThreadState.ACTIVE, ConversationThreadState.ARCHIVED}:
+            raise ConversationConflict("conversation content is unavailable")
+        if thread.message_sequence == 0:
+            if before_message_id is not None:
+                raise ConversationNotFound(before_message_id)
+            return (), None, None
+        try:
+            doc = await self.messages.find_one(
+                {
+                    "thread_id": thread.thread_id,
+                    "branch_id": thread.active_branch_id,
+                    "sequence": {"$lte": thread.message_sequence},
+                },
+                sort=[("sequence", DESCENDING)],
+            )
+            if doc is None:
+                raise ConversationStorageUnavailable("conversation active branch tip is missing")
+            tip = _message_from_doc(doc)
+            current = tip
+            seen: set[str] = set()
+            page: list[ConversationMessage] = []
+            started = before_message_id is None
+            previous_sequence = thread.message_sequence + 1
+            content_bytes = 0
+            for _depth in range(10_000):
+                if (
+                    current.thread_id != thread.thread_id
+                    or current.message_id in seen
+                    or not 0 < current.sequence < previous_sequence
+                ):
+                    raise ConversationStorageUnavailable("conversation parent lineage is invalid")
+                seen.add(current.message_id)
+                previous_sequence = current.sequence
+                started = started or current.message_id == before_message_id
+                if started:
+                    content_bytes += _storage_bytes(current.as_dict())
+                    if content_bytes > 8 * 1024 * 1024:
+                        raise ConversationStorageUnavailable(
+                            "conversation projection exceeds its content bound"
+                        )
+                    page.append(current)
+                parent_id = current.parent_message_id
+                if parent_id is None:
+                    if not started:
+                        raise ConversationNotFound(str(before_message_id))
+                    return tuple(reversed(page)), None, tip
+                parent = await self.messages.find_one(
+                    {
+                        "_id": parent_id,
+                        "thread_id": thread.thread_id,
+                        "sequence": {"$lt": current.sequence, "$lte": thread.message_sequence},
+                    },
+                )
+                if parent is None:
+                    raise ConversationStorageUnavailable("conversation parent lineage is incomplete")
+                if started and len(page) == limit:
+                    return tuple(reversed(page)), parent_id, tip
+                current = _message_from_doc(parent)
+            raise ConversationStorageUnavailable("conversation lineage exceeds the recovery bound")
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable("conversation snapshot is unavailable") from exc
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ConversationStorageUnavailable("conversation persisted lineage is malformed") from exc
+
+
+    async def conversation_snapshot(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        limit: int = 100,
+        before_message_id: str | None = None,
+        expected_thread_version: int | None = None,
+    ) -> Mapping[str, Any]:
+        if type(limit) is not int or not 1 <= limit <= 500:
+            raise ValueError("snapshot limit must be between 1 and 500")
+        if expected_thread_version is not None and (
+            type(expected_thread_version) is not int or expected_thread_version < 1
+        ):
+            raise ValueError("expected_thread_version must be a positive integer")
+        for _attempt in range(3):
+            thread = await self._recover_prepared(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+            if expected_thread_version is not None and thread.version != expected_thread_version:
+                raise ConversationConflict("thread version conflict; reconstruct the current conversation")
+            messages, cursor, tip = await self._active_lineage_page(
+                thread,
+                limit=limit,
+                before_message_id=before_message_id,
+            )
+            current = await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+            if current.version != thread.version:
+                continue
+            pending = None
+            if tip is not None and tip.author_type is ConversationAuthorType.USER:
+                pending = {
+                    "message_id": tip.message_id,
+                    "idempotency_key": tip.idempotency_key,
+                    "sequence": tip.sequence,
+                    "attachment_refs": list(tip.attachment_refs),
+                    "can_retry": thread.writable,
+                }
+            regeneration_requests, requests_truncated = await self._regeneration_recovery_refs(thread)
+            current = await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+            if current.version != thread.version:
+                continue
+            return {
+                "thread": thread.as_dict(),
+                "messages": [message.as_dict() for message in messages],
+                "last_sequence": 0 if tip is None else tip.sequence,
+                "next_before_message_id": cursor,
+                "pending_turn": pending,
+                "projection": "active",
+                "snapshot_version": thread.version,
+                "regeneration_requests": regeneration_requests,
+                "recovery_requests_truncated": requests_truncated,
+            }
+        raise ConversationConflict("conversation changed while its snapshot was reconstructed")
+
+
+    async def _regeneration_recovery_refs(
+        self, thread: ConversationThread
+    ) -> tuple[list[dict[str, Any]], bool]:
+        """Project bounded durable request identities; only engine status can label them running."""
+        pipeline = [
+            {
+                "$match": {
+                    "thread_id": thread.thread_id,
+                    "author_type": "assistant",
+                    "sequence": {"$lte": thread.message_sequence},
+                    "_regeneration_requests": {"$exists": True},
+                }
+            },
+            {"$sort": {"sequence": -1}},
+            {"$limit": 64},
+            {
+                "$project": {
+                    "_id": 0,
+                    "requests": {
+                        "$map": {
+                            "input": {"$objectToArray": "$_regeneration_requests"},
+                            "as": "item",
+                            "in": {
+                                "message_id": "$message_id",
+                                "idempotency_key": "$item.v.idempotency_key",
+                                "initial_message_sequence": "$item.v.initial_message_sequence",
+                                "initial_active_branch_id": "$item.v.initial_active_branch_id",
+                                "operation_id": "$item.v.command.operation.operation_id",
+                                "engine_execution_id": "$item.v.command.execution_request.execution_id",
+                            },
+                        }
+                    },
+                }
+            },
+        ]
+        try:
+            rows = await self.messages.aggregate(pipeline).to_list(length=64)
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable(
+                "conversation recovery request inventory is unavailable"
+            ) from exc
+        requests: list[dict[str, Any]] = []
+        for row in rows:
+            if not isinstance(row.get("requests"), list) or len(row["requests"]) > 16:
+                raise ConversationStorageUnavailable("conversation recovery request inventory is malformed")
+            for record in row["requests"]:
+                if not isinstance(record, dict):
+                    raise ConversationStorageUnavailable(
+                        "conversation recovery request identity is malformed"
+                    )
+                if (
+                    record.get("initial_message_sequence") != thread.message_sequence
+                    or record.get("initial_active_branch_id") != thread.active_branch_id
+                ):
+                    continue
+                identity = {
+                    key: record.get(key)
+                    for key in ("message_id", "idempotency_key", "operation_id", "engine_execution_id")
+                }
+                if any(
+                    not isinstance(value, str) or not value or len(value) > 1024
+                    for value in identity.values()
+                ):
+                    raise ConversationStorageUnavailable(
+                        "conversation recovery request identity is malformed"
+                    )
+                requests.append({**identity, "state": "status_required"})
+                if len(requests) > 32:
+                    return requests[:32], True
+        return requests, len(rows) == 64
+
+
     async def set_state(
         self,
         thread_id: str,
