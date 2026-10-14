@@ -72,35 +72,38 @@ jobs:
           declare -A stacked_merged_at=()
 
           load_open_refs() {
-            local branch heads_file bases_file
-            heads_file="$RUNNER_TEMP/branch-archive-open-heads.txt"
-            bases_file="$RUNNER_TEMP/branch-archive-open-bases.txt"
+            local refs_file candidate attempt head base
+            refs_file="$RUNNER_TEMP/branch-archive-open-refs.tsv"
+            candidate="$RUNNER_TEMP/branch-archive-open-refs.candidate.tsv"
+
+            # Fetch head/base pairs together to avoid mismatched snapshots and
+            # halve GitHub API calls. Retry transient empty/truncated pages;
+            # never accept partial results after a pagination error.
+            for attempt in 1 2 3 4; do
+              if gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+                --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | [.head.ref, .base.ref] | @tsv' \
+                > "$candidate"; then
+                mv -f "$candidate" "$refs_file"
+                break
+              fi
+              rm -f "$candidate"
+              if (( attempt == 4 )); then
+                echo '::error::Open PR inventory unavailable after four attempts; refusing branch archive mutations.'
+                return 1
+              fi
+              echo "::warning::Retrying incomplete GitHub open-PR inventory (attempt $attempt/4)."
+              sleep "$(( attempt * 2 ))"
+            done
+
             open_heads=()
             open_bases=()
-
-            # A process substitution can conceal API failures from set -e.
-            # Resolve each snapshot completely before any cleanup decision.
-            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref' \
-              > "$heads_file"; then
-              echo '::error::Open PR heads unavailable; refusing branch archive mutations.'
-              return 1
-            fi
-            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .base.ref' \
-              > "$bases_file"; then
-              echo '::error::Open PR bases unavailable; refusing branch archive mutations.'
-              return 1
-            fi
-
-            while IFS= read -r branch; do
-              [[ -n "$branch" ]] || continue
-              open_heads["$branch"]=1
-            done < "$heads_file"
-            while IFS= read -r branch; do
-              [[ -n "$branch" && "$branch" != main ]] || continue
-              open_bases["$branch"]=1
-            done < "$bases_file"
+            while IFS=$'\t' read -r head base; do
+              [[ -n "$head" && -n "$base" ]] || continue
+              open_heads["$head"]=1
+              if [[ "$base" != main ]]; then
+                open_bases["$base"]=1
+              fi
+            done < "$refs_file"
           }
 
           load_archive_candidates() {
