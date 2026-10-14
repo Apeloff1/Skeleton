@@ -71,7 +71,11 @@ def mount_configured_dragon_runtime(app, conversation_authority):
     scheduler = getattr(app.state, 'global_resource_scheduler', None)
     envelope = getattr(app.state, 'dragon_resource_envelope', None)
     pool = getattr(app.state, 'dragon_execution_pool', None)
-    if scheduler is not None or envelope is not None:
+    # Do not create a partial execution pool from half-configured authority.
+    # The scheduler and envelope must come from the same trusted deployment.
+    if (scheduler is None) != (envelope is None):
+        raise ValueError('Dragon runtime requires both shared scheduler and resource envelope')
+    if scheduler is not None:
         if pool is None:
             pool = install_dragon_runtime(app, scheduler, envelope)
         elif not isinstance(pool, DragonExecutionPool) or pool.shared_resources is not scheduler or pool.envelope != envelope:

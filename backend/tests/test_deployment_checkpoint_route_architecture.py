@@ -74,5 +74,14 @@ def test_legacy_trust_advance_and_continuity_keep_direct_packet_shape():
 
 
 def test_witness_route_remains_registered_for_server_boot():
-    source = REGISTRY.read_text(encoding="utf-8")
-    assert '("routes.deployment_checkpoint_trust",      "router")' in source
+    # Parse the declared route table instead of pinning incidental whitespace.
+    tree = ast.parse(REGISTRY.read_text(encoding="utf-8"))
+    tables = [
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and node.target.id == "KNOWN_ROUTES"
+    ]
+    assert len(tables) == 1
+    assert ("routes.deployment_checkpoint_trust", "router") in ast.literal_eval(tables[0])
