@@ -564,6 +564,9 @@ def command_from_context(
     trace_id: str | None = None,
     max_model_turns: int = 4,
     max_output_tokens: int | None = None,
+    provider_id: str | None = None,
+    model_id: str | None = None,
+    temperature: float | None = None,
     max_tool_calls: int = 1,
     max_repeat_tool_batches: int = 1,
     tools: Sequence[ProviderToolDefinition] = (),
@@ -978,6 +981,26 @@ def command_from_context(
     }
     if normalized_memory_intent is not None:
         context_policy["memory_write_intent"] = normalized_memory_intent
+    if (provider_id is None) != (model_id is None):
+        raise EngineProtocolError("provider_id and model_id must be selected together")
+    if provider_id is not None:
+        selected_provider = _text(provider_id, "provider_id", maximum=128)
+        selected_model = _text(model_id, "model_id", maximum=512)
+        # The immutable execution policy binds the exact requested selection,
+        # not an implicit or mutable provider fallback.
+        context_policy["provider_selection"] = {
+            "provider_id": selected_provider, "model_id": selected_model,
+        }
+        context_policy["provider_model"] = selected_model
+    if temperature is not None:
+        if (
+            isinstance(temperature, bool)
+            or not isinstance(temperature, (int, float))
+            or not math.isfinite(temperature)
+            or not 0 <= temperature <= 2
+        ):
+            raise EngineProtocolError("temperature must be finite and within [0, 2]")
+        context_policy["provider_temperature"] = float(temperature)
 
     execution_request = AIExecutionRequest(
         operation_id=context.operation_id,
