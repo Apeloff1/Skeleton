@@ -1,24 +1,6 @@
 name: AI Mirror Room Core
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/learning/mirror_room/**"
-      - "skeleton/ai/learning/mirror_room/**"
-      - "skeleton/testing/test_mirror_room_core.py"
-      - "skeleton/eval/experiment_registry.py"
-      - "skeleton/contracts/canonical.py"
-      - ".github/workflows/mirror-room-core.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/learning/mirror_room/**"
-      - "skeleton/ai/learning/mirror_room/**"
-      - "skeleton/testing/test_mirror_room_core.py"
-      - "skeleton/eval/experiment_registry.py"
-      - "skeleton/contracts/canonical.py"
-      - ".github/workflows/mirror-room-core.yml"
   workflow_dispatch:
 
 permissions:

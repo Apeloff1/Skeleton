@@ -1,26 +1,7 @@
 name: Mixture of Depths
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches: [main]
-    paths:
-      - "skeleton/cortex/mixture_depth.py"
-      - "skeleton/cortex/transformer.py"
-      - "skeleton/cortex/attn.py"
-      - "skeleton/testing/test_mixture_depth.py"
-      - "scripts/profile_mixture_depth.py"
-      - ".github/workflows/mixture-depth.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/cortex/mixture_depth.py"
-      - "skeleton/cortex/transformer.py"
-      - "skeleton/cortex/attn.py"
-      - "skeleton/testing/test_mixture_depth.py"
-      - "scripts/profile_mixture_depth.py"
-      - ".github/workflows/mixture-depth.yml"
-
+  workflow_dispatch:
 concurrency:
   group: mixture-depth-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

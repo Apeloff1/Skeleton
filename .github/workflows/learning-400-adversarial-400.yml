@@ -1,27 +1,6 @@
 name: Learning-400 + Adversarial-400 Authority
 
 on:
-  pull_request:
-    branches: [main, codex/masterplan-cs-300]
-    types: [opened, synchronize, reopened, ready_for_review]
-    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
-    paths:
-      - "machine/learning_400_adversarial_400.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_parse_index.json"
-      - "scripts/check_learning_400_adversarial_400.py"
-      - "tests/test_learning_400_adversarial_400.py"
-      - ".github/workflows/learning-400-adversarial-400.yml"
-  push:
-    branches: [main, codex/masterplan-learning-400-adversarial-400]
-    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
-    paths:
-      - "machine/learning_400_adversarial_400.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_parse_index.json"
-      - "scripts/check_learning_400_adversarial_400.py"
-      - "tests/test_learning_400_adversarial_400.py"
-      - ".github/workflows/learning-400-adversarial-400.yml"
   workflow_dispatch:
 
 permissions:

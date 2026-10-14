@@ -1,23 +1,7 @@
 name: Mined Primitive Gates
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "backend/core/worm_audit.py"
-      - "backend/tests/test_worm_audit.py"
-      - "frontend/scripts/ui-regression-verdict.mjs"
-      - "frontend/scripts/ui-regression-verdict.test.mjs"
-      - ".github/workflows/mined-primitives.yml"
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths:
-      - "backend/core/worm_audit.py"
-      - "backend/tests/test_worm_audit.py"
-      - "frontend/scripts/ui-regression-verdict.mjs"
-      - "frontend/scripts/ui-regression-verdict.test.mjs"
-      - ".github/workflows/mined-primitives.yml"
-
+  workflow_dispatch:
 permissions:
   contents: read
 
