@@ -1,33 +1,6 @@
 name: P1 Answer Artifact Quality Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/intelligence/output_quality.py"
-      - "skeleton/ai/runtime/intelligence/output_quality.py"
-      - "skeleton/intelligence/__init__.py"
-      - "skeleton/ai/runtime/intelligence/__init__.py"
-      - "skeleton/intelligence/quality.py"
-      - "skeleton/intelligence/strategy_registry.py"
-      - "skeleton/contracts/verification.py"
-      - "skeleton/testing/test_answer_artifact_quality.py"
-      - ".github/workflows/p1-answer-artifact-quality.yml"
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/intelligence/output_quality.py"
-      - "skeleton/ai/runtime/intelligence/output_quality.py"
-      - "skeleton/intelligence/__init__.py"
-      - "skeleton/ai/runtime/intelligence/__init__.py"
-      - "skeleton/intelligence/quality.py"
-      - "skeleton/intelligence/strategy_registry.py"
-      - "skeleton/contracts/verification.py"
-      - "skeleton/testing/test_answer_artifact_quality.py"
-      - ".github/workflows/p1-answer-artifact-quality.yml"
   workflow_dispatch:
 
 permissions:

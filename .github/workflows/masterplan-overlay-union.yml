@@ -1,38 +1,6 @@
 name: Masterplan Overlay Union
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/masterplan_overlay_registry.json"
-      - "machine/*100*.json"
-      - "machine/*200*.json"
-      - "machine/*300*.json"
-      - "machine/*400*.json"
-      - "machine/*500*.json"
-      - "machine/*1000*.json"
-      - "docs/plan/MASTER_PLAN.md"
-      - "docs/plan/MASTER_INDEX.md"
-      - "scripts/check_masterplan_overlay_union.py"
-      - "tests/test_masterplan_overlay_union.py"
-      - ".github/workflows/masterplan-overlay-union.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/masterplan_overlay_registry.json"
-      - "machine/*100*.json"
-      - "machine/*200*.json"
-      - "machine/*300*.json"
-      - "machine/*400*.json"
-      - "machine/*500*.json"
-      - "machine/*1000*.json"
-      - "docs/plan/MASTER_PLAN.md"
-      - "docs/plan/MASTER_INDEX.md"
-      - "scripts/check_masterplan_overlay_union.py"
-      - "tests/test_masterplan_overlay_union.py"
-      - ".github/workflows/masterplan-overlay-union.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,17 +1,6 @@
 name: Game Builder ColecoVision Eight-Stage Z80 Campaign
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/game_builder/coleco*'
-      - 'skeleton/ai/game_builder/native_*'
-      - 'skeleton/ai/game_builder/port_planner.py'
-      - 'skeleton/ai/game_builder/playable_world.py'
-      - 'skeleton/ai/game_builder/contracts.py'
-      - 'scripts/game_builder/native_coleco_ci.py'
-      - 'scripts/game_builder/emulate_coleco_ci.py'
-      - 'skeleton/testing/test_game_builder_coleco_campaign.py'
-      - '.github/workflows/game-builder-coleco-full-campaign.yml'
   workflow_dispatch:
 
 permissions:

@@ -3,23 +3,6 @@ name: P1 Maturity Reconciliation Gate
 # Deep metadata/closure validation runs after merge or by manual dispatch;
 # canonical PR/security gates retain pre-merge coverage.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_build_accountability.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/ai_p1_terminal_closure.json"
-      - "skeleton/contracts/maturity_reconciliation.py"
-      - "skeleton/ai/runtime/contracts/maturity_reconciliation.py"
-      - "skeleton/contracts/__init__.py"
-      - "skeleton/ai/runtime/contracts/__init__.py"
-      - "scripts/reconcile_p1_maturity.py"
-      - "skeleton/testing/test_maturity_reconciliation.py"
-      - "tests/test_p1_maturity_reconciliation.py"
-      - ".github/workflows/p1-maturity-reconciliation.yml"
   workflow_dispatch:
 
 permissions:

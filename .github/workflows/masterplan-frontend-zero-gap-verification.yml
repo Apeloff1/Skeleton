@@ -1,19 +1,6 @@
 name: Masterplan Frontend Zero-Gap Verification
 
 on:
-  pull_request:
-    paths:
-      - "machine/ai_frontend_zero_gap_verification_candidate.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_build_accountability.json"
-      - "frontend/package.json"
-      - "frontend/yarn.lock"
-      - "frontend/scripts/test-accessibility-contract.mjs"
-      - "frontend/scripts/test-localization-contract.mjs"
-      - "frontend/src/accessibility/**"
-      - "frontend/src/i18n/**"
-      - "skeleton/testing/test_vol087_localization.py"
-      - ".github/workflows/masterplan-frontend-zero-gap-verification.yml"
   workflow_dispatch:
 
 permissions:

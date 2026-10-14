@@ -1,21 +1,5 @@
 name: Advanced Godot Native Colony Replay
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/ai/game_builder/advanced_colony_godot.py"
-      - "skeleton/ai/game_builder/advanced_colony_runtime.py"
-      - "skeleton/ai/game_builder/advanced_godot_export.py"
-      - "docs/GAME_BUILDER_SYSTEM_EDITOR_FABRIC.md"
-      - ".github/workflows/game-builder-advanced-system-engines.yml"
-      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
-      - "skeleton/ai/game_builder/advanced_level_scenes.py"
-      - "skeleton/ai/game_builder/advanced_genre_engines.py"
-      - "skeleton/ai/game_builder/system_editor_cli.py"
-      - "skeleton/ai/game_builder/game_workspace_server.py"
-      - "skeleton/ai/game_builder/game_workspace_ui.py"
-      - "tests/test_game_builder_advanced_colony.py"
-      - ".github/workflows/game-builder-advanced-colony-native.yml"
   workflow_dispatch:
 permissions:
   contents: read

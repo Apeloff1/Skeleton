@@ -1,20 +1,5 @@
 name: Game Builder Original Labyrinths
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/ai/game_builder/advanced_maze_runtime.py"
-      - "skeleton/ai/game_builder/advanced_maze_planner.py"
-      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
-      - "skeleton/ai/game_builder/advanced_level_scenes.py"
-      - "skeleton/ai/game_builder/system_editors.py"
-      - "skeleton/ai/game_builder/system_editor_assembly.py"
-      - "skeleton/ai/game_builder/system_editor_cli.py"
-      - "skeleton/ai/game_builder/game_workspace_server.py"
-      - "skeleton/ai/game_builder/game_workspace_ui.py"
-      - "tests/test_game_builder_advanced_maze.py"
-      - "tests/test_game_builder_advanced_maze_planner.py"
-      - ".github/workflows/game-builder-original-labyrinths.yml"
   workflow_dispatch:
 permissions:
   contents: read

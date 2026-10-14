@@ -1,47 +1,6 @@
 name: P1 Routing Context Quality Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/intelligence/routing_context_receipt.py"
-      - "skeleton/ai/runtime/intelligence/routing_context_receipt.py"
-      - "skeleton/intelligence/__init__.py"
-      - "skeleton/ai/runtime/intelligence/__init__.py"
-      - "skeleton/frontier/model_routing.py"
-      - "skeleton/frontier/runtime/model_routing.py"
-      - "skeleton/intelligence/admission.py"
-      - "skeleton/intelligence/quality.py"
-      - "skeleton/context/compiler.py"
-      - "skeleton/context/policy.py"
-      - "skeleton/testing/test_routing_context_receipt.py"
-      - "tests/test_model_routing.py"
-      - "skeleton/testing/test_context_compiler.py"
-      - "machine/ai_p1_task_backlog.json"
-      - "scripts/emit_p1_promotion_evidence.py"
-      - ".github/workflows/p1-intel-routing-context.yml"
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/intelligence/routing_context_receipt.py"
-      - "skeleton/ai/runtime/intelligence/routing_context_receipt.py"
-      - "skeleton/intelligence/__init__.py"
-      - "skeleton/ai/runtime/intelligence/__init__.py"
-      - "skeleton/frontier/model_routing.py"
-      - "skeleton/frontier/runtime/model_routing.py"
-      - "skeleton/intelligence/admission.py"
-      - "skeleton/intelligence/quality.py"
-      - "skeleton/context/compiler.py"
-      - "skeleton/context/policy.py"
-      - "skeleton/testing/test_routing_context_receipt.py"
-      - "tests/test_model_routing.py"
-      - "skeleton/testing/test_context_compiler.py"
-      - "machine/ai_p1_task_backlog.json"
-      - "scripts/emit_p1_promotion_evidence.py"
-      - ".github/workflows/p1-intel-routing-context.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,24 +1,5 @@
 name: Game Studio Witness Mirror and Visual Workspace
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/game_builder/npc_witness_quest_engine.py"
-      - "skeleton/ai/game_builder/competitive_mirror_training.py"
-      - "skeleton/ai/game_builder/game_project_workspace.py"
-      - "skeleton/ai/game_builder/game_workspace_*.py"
-      - "tests/test_game_builder_npc_witness_quests.py"
-      - "tests/test_game_builder_competitive_mirror_training.py"
-      - "tests/test_game_builder_project_workspace.py"
-      - "tests/test_game_builder_prompt_learning.py"
-      - "skeleton/ai/game_builder/game_prompt_router.py"
-      - "skeleton/ai/game_builder/game_learning_almanac.py"
-      - "skeleton/ai/game_builder/npc_event_quest_runtime.py"
-      - "tests/test_game_builder_npc_event_quest_runtime.py"
-      - "skeleton/ai/game_builder/game_tester_almanac.py"
-      - "skeleton/ai/game_builder/game_training_flow.py"
-      - "tests/test_game_builder_game_tester_almanac.py"
-      - "tests/test_game_builder_training_flow.py"
-      - ".github/workflows/game-builder-workbench-mirror.yml"
   workflow_dispatch:
 
 permissions:

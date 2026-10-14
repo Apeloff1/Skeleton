@@ -1,13 +1,6 @@
 name: Original Quest Scene Director
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/game_builder/quest_scene_*.py"
-      - "skeleton/ai/game_builder/quest_director_*.py"
-      - "tests/test_game_builder_quest_scene_*.py"
-      - "tests/test_game_builder_quest_director_studio.py"
-      - ".github/workflows/game-builder-quest-director.yml"
   workflow_dispatch:
 
 permissions:

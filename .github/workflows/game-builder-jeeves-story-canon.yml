@@ -1,44 +1,6 @@
 name: Jeeves Story Canon Production
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/ai/game_builder/story_canon_fabric.py"
-      - "skeleton/ai/game_builder/story_workspace.py"
-      - "skeleton/ai/game_builder/story_memory.py"
-      - "skeleton/ai/game_builder/story_continuity_assurance.py"
-      - "skeleton/ai/game_builder/story_chapter_context.py"
-      - "skeleton/ai/game_builder/jeeves_chapter_chat.py"
-      - "skeleton/ai/game_builder/jeeves_app_runtime.py"
-      - "skeleton/ai/game_builder/jeeves_appwide_fabric.py"
-      - "skeleton/ai/game_builder/jeeves_capability_intelligence.py"
-      - "skeleton/ai/game_builder/jeeves_completion_census.py"
-      - "tests/test_game_builder_jeeves_app_runtime.py"
-      - "tests/test_game_builder_jeeves_appwide_fabric.py"
-      - "tests/test_game_builder_jeeves_capability_intelligence.py"
-      - "tests/test_game_builder_jeeves_completion_census.py"
-      - "docs/JEEVES_APP_CAPABILITY_ATLAS.md"
-      - "docs/JEEVES_WHOLE_REPO_INVENTORY_AND_GOVERNED_ACTIONS.md"
-      - "docs/JEEVES_APP_COMPLETION_CENSUS_2026_10.md"
-      - "skeleton/ai/game_builder/story_cinematic_review.py"
-      - "skeleton/ai/game_builder/story_detail_history.py"
-      - "skeleton/ai/game_builder/story_asset_pixels.py"
-      - "tests/test_game_builder_story_asset_pixels.py"
-      - "skeleton/ai/game_builder/jeeves_production_director.py"
-      - "skeleton/ai/game_builder/game_project_workspace.py"
-      - "skeleton/ai/game_builder/game_workspace_server.py"
-      - "skeleton/ai/game_builder/game_workspace_ui.py"
-      - "skeleton/ai/game_builder/game_prompt_router.py"
-      - "tests/test_game_builder_story_canon_fabric.py"
-      - "tests/test_game_builder_story_workspace.py"
-      - "tests/test_game_builder_jeeves_production.py"
-      - "tests/test_game_builder_story_continuity_assurance.py"
-      - "tests/test_game_builder_story_chapter_context.py"
-      - "tests/test_game_builder_jeeves_chapter_chat.py"
-      - "docs/JEEVES_100_ACT_9999_SCENE_CONSISTENCY_LAW.md"
-      - "docs/JEEVES_100_CHAPTER_1000_ACT_9999_SCENE_STUDIO_STANDARD.md"
-      - ".github/workflows/game-builder-jeeves-story-canon.yml"
   workflow_dispatch:
 permissions:
   contents: read

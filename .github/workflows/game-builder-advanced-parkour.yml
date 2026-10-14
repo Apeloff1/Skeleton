@@ -1,20 +1,5 @@
 name: Game Builder Advanced Parkour Replay
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/ai/game_builder/advanced_parkour_runtime.py"
-      - "skeleton/ai/game_builder/advanced_parkour_planner.py"
-      - "skeleton/ai/game_builder/system_editor_cli.py"
-      - "skeleton/ai/game_builder/game_workspace_server.py"
-      - "tests/test_game_builder_advanced_parkour_planner.py"
-      - "skeleton/ai/game_builder/advanced_level_scenes.py"
-      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
-      - "skeleton/ai/game_builder/system_editor_assembly.py"
-      - "skeleton/ai/game_builder/system_editors.py"
-      - "skeleton/ai/game_builder/game_workspace_ui.py"
-      - "tests/test_game_builder_advanced_parkour.py"
-      - ".github/workflows/game-builder-advanced-parkour.yml"
   workflow_dispatch:
 permissions:
   contents: read

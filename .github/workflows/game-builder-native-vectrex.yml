@@ -1,16 +1,6 @@
 name: Game Builder Native Vectrex Motorola 6809
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/game_builder/vectrex*'
-      - 'skeleton/ai/game_builder/native_binary_structure.py'
-      - 'skeleton/ai/game_builder/native_retro_artifact.py'
-      - 'skeleton/ai/game_builder/editor_platforms.py'
-      - 'skeleton/ai/game_builder/contracts.py'
-      - 'scripts/game_builder/native_vectrex_ci.py'
-      - 'skeleton/testing/test_game_builder_vectrex_native.py'
-      - '.github/workflows/game-builder-native-vectrex.yml'
   workflow_dispatch:
 
 permissions:

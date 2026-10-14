@@ -1,37 +1,6 @@
 name: Game Builder Native Sega 8-bit Cartridge
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - ".github/workflows/game-builder-native-sega8.yml"
-      - "skeleton/ai/game_builder/sega_8bit_native_export.py"
-      - "skeleton/ai/game_builder/sega_8bit_rom.py"
-      - "skeleton/ai/game_builder/native_game_cli.py"
-      - "skeleton/ai/game_builder/native_portfolio_cli.py"
-      - "skeleton/ai/game_builder/playable_world.py"
-      - "skeleton/ai/game_builder/port_planner.py"
-      - "scripts/game_builder/native_sega_8bit_ci.py"
-      - "scripts/game_builder/sega8_dual_homebrew_cli.py"
-      - "skeleton/testing/test_game_builder_sega8_dual_port.py"
-      - "scripts/game_builder/sega8_source_replay.py"
-      - "scripts/game_builder/emulate_sega8_sdcc_boot.py"
-      - "scripts/game_builder/sega8_real_z80_gameplay.py"
-      - "skeleton/testing/test_game_builder_sega8_real_z80_gameplay.py"
-      - "skeleton/testing/test_game_builder_sega8_route_security.py"
-      - "scripts/game_builder/sega8_port_parity.py"
-      - "skeleton/testing/test_game_builder_sega8_port_parity.py"
-      - "skeleton/testing/test_game_builder_sega8_sdcc_cpu_boot.py"
-      - "scripts/game_builder/sega8_host_shim.h"
-      - "scripts/game_builder/sega8_host_replay.c"
-      - "skeleton/testing/test_game_builder_sega8_host_replay.py"
-      - "skeleton/testing/test_game_builder_sega8_native_attract.py"
-      - "skeleton/testing/test_game_builder_sega8_stage_palette.py"
-      - "scripts/game_builder/sega_reproducibility_ci.py"
-      - "skeleton/ai/game_builder/sega_reproducibility.py"
-      - "skeleton/testing/test_game_builder_sega_reproducibility.py"
-      - "skeleton/testing/test_game_builder_sega_8bit_native.py"
-      - "skeleton/testing/test_game_builder_sega_8bit_rom.py"
   workflow_dispatch:
 
 permissions:

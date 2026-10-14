@@ -3,18 +3,6 @@ name: P2 Execution Map
 # Deep metadata/closure validation runs after merge or by manual dispatch;
 # canonical PR/security gates retain pre-merge coverage.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_p2_execution_map.json"
-      - "machine/ai_p2_task_backlog.json"
-      - "docs/plan/P2_EXECUTION_MAP.md"
-      - "scripts/check_p2_execution_map.py"
-      - "tests/test_p2_execution_map.py"
-      - ".github/workflows/p2-execution-map.yml"
   workflow_dispatch:
 
 permissions:

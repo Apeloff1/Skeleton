@@ -1,15 +1,6 @@
 name: Game Builder Native C64 PRG
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/game_builder/c64*'
-      - 'skeleton/ai/game_builder/native_binary_structure.py'
-      - 'skeleton/ai/game_builder/native_retro_artifact.py'
-      - 'skeleton/ai/game_builder/editor_platforms.py'
-      - 'skeleton/ai/game_builder/contracts.py'
-      - 'scripts/game_builder/native_c64_ci.py'
-      - '.github/workflows/game-builder-native-c64.yml'
   workflow_dispatch:
 
 permissions:

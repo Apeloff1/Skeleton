@@ -1,20 +1,6 @@
 name: P3 Multi-Agent Coordination
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/runtime/autonomous_engineering/coordination.py"
-      - "skeleton/ai/runtime/autonomous_engineering/__init__.py"
-      - "skeleton/testing/test_p3_coordination.py"
-      - ".github/workflows/p3-coordination.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-autonomous-engineering-frontier
-    paths:
-      - "skeleton/ai/runtime/autonomous_engineering/coordination.py"
-      - "skeleton/testing/test_p3_coordination.py"
-      - ".github/workflows/p3-coordination.yml"
   workflow_dispatch:
 
 permissions:

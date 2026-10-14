@@ -1,25 +1,5 @@
 name: Adversarial Game Learning Promotion
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/game_builder/game_model_promotion.py"
-      - "skeleton/ai/game_builder/game_reviewer_registry.py"
-      - "skeleton/ai/game_builder/game_learning_feedback.py"
-      - "skeleton/ai/game_builder/game_idle_review_scheduler.py"
-      - "skeleton/ai/game_builder/game_tester_almanac.py"
-      - "skeleton/ai/game_builder/game_model_cli.py"
-      - "skeleton/ai/game_builder/game_reviewer_v2.py"
-      - "skeleton/ai/game_builder/game_reviewer_optimizer.py"
-      - "skeleton/ai/game_builder/game_dragon_peer_wisdom.py"
-      - "skeleton/ai/game_builder/game_integrated_learning.py"
-      - "skeleton/ai/game_builder/reviewed_knowledge.py"
-      - "skeleton/ai/game_builder/knowledge_rights_bridge.py"
-      - "tests/test_game_builder_reviewer_promotion.py"
-      - "tests/test_game_builder_learning_feedback.py"
-      - "tests/test_game_builder_optimizer_and_wisdom.py"
-      - "tests/test_game_builder_model_cli.py"
-      - "tests/test_game_builder_knowledge_rights_bridge.py"
-      - ".github/workflows/game-builder-learning-feedback.yml"
   workflow_dispatch:
 permissions:
   contents: read

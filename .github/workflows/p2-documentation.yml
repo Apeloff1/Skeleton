@@ -1,37 +1,6 @@
 name: P2 Documentation Engine
 
 on:
-  pull_request:
-    branches:
-      - main
-      - feat/p2-traceability-spine
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/generated_documentation.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p2_execution_map.json"
-      - "machine/ai_p2_task_backlog.json"
-      - "docs/generated/**"
-      - "docs/plan/P2_DOCUMENTATION_ENGINE.md"
-      - "scripts/generate_p2_documentation.py"
-      - "scripts/check_p2_documentation.py"
-      - "tests/test_p2_documentation.py"
-      - ".github/workflows/p2-documentation.yml"
-  push:
-    branches:
-      - main
-      - feat/p2-documentation-engine
-    paths:
-      - "machine/generated_documentation.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p2_execution_map.json"
-      - "machine/ai_p2_task_backlog.json"
-      - "docs/generated/**"
-      - "docs/plan/P2_DOCUMENTATION_ENGINE.md"
-      - "scripts/generate_p2_documentation.py"
-      - "scripts/check_p2_documentation.py"
-      - "tests/test_p2_documentation.py"
-      - ".github/workflows/p2-documentation.yml"
   workflow_dispatch:
 
 permissions:

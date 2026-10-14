@@ -1,39 +1,6 @@
 name: P1 Benchmark Registry Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/eval/benchmark_registry.py"
-      - "skeleton/ai/evaluation/benchmark_registry.py"
-      - "skeleton/eval/experiment_registry.py"
-      - "skeleton/contracts/reproducibility.py"
-      - "skeleton/eval/__init__.py"
-      - "skeleton/ai/evaluation/__init__.py"
-      - "skeleton/testing/test_benchmark_registry.py"
-      - "machine/p1_benchmark_registry.json"
-      - "scripts/check_p1_benchmark_registry.py"
-      - "tests/test_p1_benchmark_registry.py"
-      - ".github/workflows/p1-benchmark-registry.yml"
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/eval/benchmark_registry.py"
-      - "skeleton/ai/evaluation/benchmark_registry.py"
-      - "skeleton/eval/experiment_registry.py"
-      - "skeleton/contracts/reproducibility.py"
-      - "skeleton/eval/__init__.py"
-      - "skeleton/ai/evaluation/__init__.py"
-      - "skeleton/testing/test_benchmark_registry.py"
-      - "machine/p1_benchmark_registry.json"
-      - "scripts/check_p1_benchmark_registry.py"
-      - "tests/test_p1_benchmark_registry.py"
-      - ".github/workflows/p1-benchmark-registry.yml"
   workflow_dispatch:
 
 permissions:

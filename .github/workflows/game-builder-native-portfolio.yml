@@ -1,18 +1,6 @@
 name: Game Builder All-Native Homebrew Portfolio
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/game_builder/*native*'
-      - 'skeleton/ai/game_builder/*rom*'
-      - 'skeleton/ai/game_builder/*portfolio*'
-      - 'skeleton/ai/game_builder/*export*'
-      - 'skeleton/ai/game_builder/editor_platforms.py'
-      - 'skeleton/ai/game_builder/port_planner.py'
-      - 'skeleton/ai/game_builder/playable_world.py'
-      - 'skeleton/ai/game_builder/contracts.py'
-      - 'skeleton/testing/test_game_builder_native_portfolio.py'
-      - '.github/workflows/game-builder-native-portfolio.yml'
   workflow_dispatch:
 
 permissions:

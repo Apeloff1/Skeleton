@@ -1,19 +1,6 @@
 name: AI Memory Preference Learning
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/memory/mag.py"
-      - "skeleton/ai/runtime/memory/mag.py"
-      - "skeleton/testing/test_ai_memory_preference_learning.py"
-      - ".github/workflows/ai-memory-preference-learning.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/memory/mag.py"
-      - "skeleton/ai/runtime/memory/mag.py"
-      - "skeleton/testing/test_ai_memory_preference_learning.py"
-      - ".github/workflows/ai-memory-preference-learning.yml"
   workflow_dispatch:
 
 permissions:

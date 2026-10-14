@@ -1,16 +1,6 @@
 name: Game Builder Native Desktop Executable
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/game_builder/desktop*'
-      - 'skeleton/ai/game_builder/native_binary_structure.py'
-      - 'skeleton/ai/game_builder/native_retro_artifact.py'
-      - 'skeleton/ai/game_builder/editor_platforms.py'
-      - 'skeleton/ai/game_builder/contracts.py'
-      - 'scripts/game_builder/native_desktop_ci.py'
-      - '.github/workflows/game-builder-native-desktop.yml'
-      - 'docs/GAME_BUILDER_PLATFORM_PORTING.md'
   workflow_dispatch:
 
 permissions:

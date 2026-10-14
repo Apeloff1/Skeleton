@@ -1,18 +1,6 @@
 name: P1 Adversarial AC-19 Evidence Gate
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/security/operator_override.py"
-      - "skeleton/ai/runtime/security/operator_override.py"
-      - "skeleton/testing/test_operator_override.py"
-      - "scripts/build_p1_adversarial_ac19_evidence.py"
-      - "tests/test_p1_adversarial_ac19_evidence.py"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - ".github/workflows/p1-adversarial-ac19-evidence.yml"
   workflow_dispatch:
 
 permissions:

@@ -123,7 +123,8 @@ jobs:
       AUTOMERGE_DISPATCH_POST_MERGE: "true"
       AUTOMERGE_STOP_AFTER_STACK_MUTATION: "true"
       AUTOMERGE_FAIL_ON_GRAPH_ERROR: "true"
-      AUTOMERGE_POST_MERGE_WORKFLOWS: "merge-readiness.yml,queue-drain.yml"
+      # Main push already starts canonical Merge Readiness; dispatch only cleanup.
+      AUTOMERGE_POST_MERGE_WORKFLOWS: "queue-drain.yml"
       AUTOMERGE_LEDGER_PATH: ".automerge/ledger.jsonl"
       AUTOMERGE_REPORT_PATH: ".automerge/report.json"
     steps:

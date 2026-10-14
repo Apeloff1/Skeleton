@@ -1,22 +1,6 @@
 name: P1 AC-10 AC-21 Terminal Binding Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - p1/closure-ac01-ac08-511-2-20260930
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/p1_risk_evidence_bindings.json"
-      - "tests/test_p1_adversarial_ac10_ac21_binding.py"
-      - "tests/test_p1_adversarial_ac01_ac08_binding.py"
-      - "tests/test_p1_adversarial_ac19_ac23_binding.py"
-      - "tests/test_p1_adversarial_ac16_binding.py"
-      - "tests/test_p1_adversarial_ac17_binding.py"
-      - "tests/test_p1_adversarial_wave2_bindings.py"
-      - "tests/test_p1_adversarial_wave3_bindings.py"
-      - "tests/test_p1_risk_evidence_reconciliation.py"
-      - ".github/workflows/p1-ac10-ac21-binding.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,21 +1,6 @@
 name: P3 Construction Authority
 
 on:
-  pull_request:
-    paths:
-      - "machine/ai_p3_task_backlog.json"
-      - "skeleton/ai/planning/construction_authority.py"
-      - "skeleton/testing/test_p3_construction_authority.py"
-      - ".github/workflows/p3-construction-authority.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-autonomous-intelligence-expansion-atomic
-    paths:
-      - "machine/ai_p3_task_backlog.json"
-      - "skeleton/ai/planning/construction_authority.py"
-      - "skeleton/testing/test_p3_construction_authority.py"
-      - ".github/workflows/p3-construction-authority.yml"
   workflow_dispatch:
 
 permissions:

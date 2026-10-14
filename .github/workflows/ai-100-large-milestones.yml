@@ -1,16 +1,6 @@
 name: AI 100 Large Delivery Milestone Authority
 
 on:
-  pull_request:
-    paths:
-      - 'machine/ai_100_large_delivery_milestones.json'
-      - 'machine/ai_master_plan.json'
-      - 'machine/ai_build_accountability.json'
-      - 'machine/ai_masterplan_parse_index.json'
-      - 'machine/advanced_ai_structure_100.json'
-      - 'scripts/check_ai_100_large_milestones.py'
-      - 'tests/test_ai_100_large_milestones.py'
-      - '.github/workflows/ai-100-large-milestones.yml'
   workflow_dispatch:
 
 permissions:

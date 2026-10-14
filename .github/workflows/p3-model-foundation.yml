@@ -1,29 +1,6 @@
 name: P3 Model Foundation
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/learning/model_program.py"
-      - "skeleton/ai/research/source_lineage.py"
-      - "skeleton/ai/simulation/environment.py"
-      - "skeleton/ai/runtime/multimodal/**"
-      - "skeleton/testing/test_p3_model_foundation.py"
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_p3_task_backlog.json"
-      - ".github/workflows/p3-model-foundation.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-autonomous-intelligence-expansion-atomic
-    paths:
-      - "skeleton/ai/learning/model_program.py"
-      - "skeleton/ai/research/source_lineage.py"
-      - "skeleton/ai/simulation/environment.py"
-      - "skeleton/ai/runtime/multimodal/**"
-      - "skeleton/testing/test_p3_model_foundation.py"
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_p3_task_backlog.json"
-      - ".github/workflows/p3-model-foundation.yml"
   workflow_dispatch:
 
 permissions:

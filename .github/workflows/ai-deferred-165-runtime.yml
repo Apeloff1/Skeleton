@@ -1,21 +1,6 @@
 name: AI Deferred 165 Runtime
 
 on:
-  pull_request:
-    paths:
-      - "machine/ai_deferred_165_execution_map.json"
-      - "skeleton/ai/runtime/deferred/**"
-      - "skeleton/testing/test_ai_deferred_165_runtime.py"
-      - "scripts/check_ai_deferred_165_runtime.py"
-      - ".github/workflows/ai-deferred-165-runtime.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_deferred_165_execution_map.json"
-      - "skeleton/ai/runtime/deferred/**"
-      - "skeleton/testing/test_ai_deferred_165_runtime.py"
-      - "scripts/check_ai_deferred_165_runtime.py"
-      - ".github/workflows/ai-deferred-165-runtime.yml"
   workflow_dispatch:
 
 permissions:

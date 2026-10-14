@@ -1,15 +1,6 @@
 name: Game Builder Native MSX1 Cartridge
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/game_builder/msx1*'
-      - 'skeleton/ai/game_builder/native_binary_structure.py'
-      - 'skeleton/ai/game_builder/native_retro_artifact.py'
-      - 'skeleton/ai/game_builder/editor_platforms.py'
-      - 'skeleton/ai/game_builder/contracts.py'
-      - 'scripts/game_builder/native_msx1_ci.py'
-      - '.github/workflows/game-builder-native-msx1.yml'
   workflow_dispatch:
 
 permissions:

@@ -1,37 +1,6 @@
 name: P1 Core Intelligence Bundle Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/intelligence/core_intelligence.py"
-      - "skeleton/ai/runtime/intelligence/core_intelligence.py"
-      - "skeleton/intelligence/routing_context_receipt.py"
-      - "skeleton/intelligence/memory_retrieval_quality.py"
-      - "skeleton/intelligence/strategy_registry.py"
-      - "skeleton/intelligence/output_quality.py"
-      - "skeleton/intelligence/plan_verifier.py"
-      - "skeleton/intelligence/__init__.py"
-      - "skeleton/ai/runtime/intelligence/__init__.py"
-      - "skeleton/testing/test_core_intelligence_bundle.py"
-      - ".github/workflows/p1-core-intelligence-bundle.yml"
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/intelligence/core_intelligence.py"
-      - "skeleton/ai/runtime/intelligence/core_intelligence.py"
-      - "skeleton/intelligence/routing_context_receipt.py"
-      - "skeleton/intelligence/memory_retrieval_quality.py"
-      - "skeleton/intelligence/strategy_registry.py"
-      - "skeleton/intelligence/output_quality.py"
-      - "skeleton/intelligence/plan_verifier.py"
-      - "skeleton/intelligence/__init__.py"
-      - "skeleton/ai/runtime/intelligence/__init__.py"
-      - "skeleton/testing/test_core_intelligence_bundle.py"
-      - ".github/workflows/p1-core-intelligence-bundle.yml"
   workflow_dispatch:
 
 permissions:

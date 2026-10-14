@@ -1,34 +1,6 @@
 name: Masterplan Overlay Reconciliation
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_parse_index.json"
-      - "machine/ai_build_accountability.json"
-      - "machine/advanced_ai_*.json"
-      - "machine/frontier_96_ai_ladder.json"
-      - "machine/cs_300_computer_science_ladder.json"
-      - "machine/learning_400_adversarial_400.json"
-      - "machine/project_self_improvement_*.json"
-      - "machine/essentials_1000*.json"
-      - "machine/competitive_ai_*.json"
-      - "machine/ai_game_builder_*.json"
-      - "docs/plan/MASTER_PLAN.md"
-      - "docs/plan/MASTER_INDEX.md"
-      - "scripts/check_masterplan_overlay_reconciliation.py"
-      - "tests/test_masterplan_overlay_reconciliation.py"
-      - ".github/workflows/masterplan-overlay-reconciliation.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/**"
-      - "docs/plan/MASTER_PLAN.md"
-      - "docs/plan/MASTER_INDEX.md"
-      - "scripts/check_masterplan_overlay_reconciliation.py"
-      - "tests/test_masterplan_overlay_reconciliation.py"
-      - ".github/workflows/masterplan-overlay-reconciliation.yml"
   workflow_dispatch:
 
 permissions:

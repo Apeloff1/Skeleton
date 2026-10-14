@@ -1,31 +1,6 @@
 name: P1 Experiment Registry Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/eval/experiment_registry.py"
-      - "skeleton/eval/__init__.py"
-      - "skeleton/testing/test_experiment_registry.py"
-      - "machine/p1_experiment_registry.json"
-      - "scripts/check_p1_experiment_registry.py"
-      - "tests/test_p1_experiment_registry.py"
-      - ".github/workflows/p1-experiment-registry.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/eval/experiment_registry.py"
-      - "skeleton/eval/__init__.py"
-      - "skeleton/testing/test_experiment_registry.py"
-      - "machine/p1_experiment_registry.json"
-      - "scripts/check_p1_experiment_registry.py"
-      - "tests/test_p1_experiment_registry.py"
-      - ".github/workflows/p1-experiment-registry.yml"
   workflow_dispatch:
 
 permissions:

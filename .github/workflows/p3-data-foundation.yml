@@ -1,19 +1,5 @@
 name: P3 Data Foundation
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/runtime/learning_foundation/data.py"
-      - "skeleton/ai/runtime/learning_foundation/__init__.py"
-      - "skeleton/testing/test_p3_data_foundation.py"
-      - ".github/workflows/p3-data-foundation.yml"
-  push:
-    branches: [main, feat/p3-learning-multimodal-t2]
-    # Run only for this subsystem; avoid every unrelated main push.
-    paths:
-      - "skeleton/ai/runtime/learning_foundation/data.py"
-      - "skeleton/ai/runtime/learning_foundation/__init__.py"
-      - "skeleton/testing/test_p3_data_foundation.py"
-      - ".github/workflows/p3-data-foundation.yml"
   workflow_dispatch:
 permissions:
   contents: read

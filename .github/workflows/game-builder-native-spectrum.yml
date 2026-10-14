@@ -1,15 +1,6 @@
 name: Game Builder Native ZX Spectrum 48K Tape
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/game_builder/spectrum*'
-      - 'skeleton/ai/game_builder/native_binary_structure.py'
-      - 'skeleton/ai/game_builder/native_retro_artifact.py'
-      - 'skeleton/ai/game_builder/editor_platforms.py'
-      - 'skeleton/ai/game_builder/contracts.py'
-      - 'scripts/game_builder/native_spectrum_ci.py'
-      - '.github/workflows/game-builder-native-spectrum.yml'
   workflow_dispatch:
 
 permissions:

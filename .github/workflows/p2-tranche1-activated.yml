@@ -1,25 +1,6 @@
 name: P2 T1 Activated Runtime Trust
 
 on:
-  pull_request:
-    paths:
-      - "machine/ai_p2_tranche1_plan.json"
-      - "machine/ai_p2_execution_map.json"
-      - "machine/ai_p2_task_backlog.json"
-      - "scripts/check_p2_tranche1_activated.py"
-      - "tests/test_p2_tranche1_activated.py"
-      - ".github/workflows/p2-tranche1-activated.yml"
-  push:
-    branches:
-      - main
-      - feat/p2-functional-ai-closure-atomic
-    paths:
-      - "machine/ai_p2_tranche1_plan.json"
-      - "machine/ai_p2_execution_map.json"
-      - "machine/ai_p2_task_backlog.json"
-      - "scripts/check_p2_tranche1_activated.py"
-      - "tests/test_p2_tranche1_activated.py"
-      - ".github/workflows/p2-tranche1-activated.yml"
   workflow_dispatch:
 
 permissions:

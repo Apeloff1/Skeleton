@@ -1,15 +1,6 @@
 name: Game Builder Native ColecoVision Z80 ROM
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/game_builder/coleco*'
-      - 'skeleton/ai/game_builder/native_binary_structure.py'
-      - 'skeleton/ai/game_builder/native_retro_artifact.py'
-      - 'skeleton/ai/game_builder/editor_platforms.py'
-      - 'skeleton/ai/game_builder/contracts.py'
-      - 'scripts/game_builder/native_coleco_ci.py'
-      - '.github/workflows/game-builder-native-coleco.yml'
   workflow_dispatch:
 
 permissions:

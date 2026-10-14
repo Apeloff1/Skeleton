@@ -1,38 +1,6 @@
 name: AI Game Builder 500 Levels
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_game_builder_500_levels.json"
-      - "machine/ai_game_builder_dual_rival_forge.json"
-      - "machine/ai_game_builder_levels_*.json"
-      - "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md"
-      - "docs/plan/MASTER_PLAN.md"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_ai_game_builder_500_levels.py"
-      - "tests/test_ai_game_builder_500_levels.py"
-      - "tests/test_ai_game_builder_*.py"
-      - "tests/test_game_builder_system_editors.py"
-      - "tests/test_game_builder_advanced_runtime.py"
-      - "tests/test_game_builder_advanced_scenes.py"
-      - "tests/test_game_builder_advanced_genres.py"
-      - "skeleton/ai/game_builder/**"
-      - ".github/workflows/ai-game-builder-500-levels.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_game_builder_500_levels.json"
-      - "machine/ai_game_builder_dual_rival_forge.json"
-      - "machine/ai_game_builder_levels_*.json"
-      - "docs/architecture/AI_GAME_BUILDER_500_LEVELS.md"
-      - "docs/plan/MASTER_PLAN.md"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_ai_game_builder_500_levels.py"
-      - "tests/test_ai_game_builder_500_levels.py"
-      - "tests/test_ai_game_builder_*.py"
-      - "skeleton/ai/game_builder/**"
-      - ".github/workflows/ai-game-builder-500-levels.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,32 +1,6 @@
 name: Modular Director NPC and Mission Integration
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/game_builder/npc_society_runtime.py"
-      - "skeleton/ai/game_builder/modular_mission_*.py"
-      - "skeleton/ai/game_builder/modular_director_session.py"
-      - "skeleton/ai/game_builder/director_capability_graph.py"
-      - "tests/test_game_builder_npc_society.py"
-      - "tests/test_game_builder_modular_synergy.py"
-      - "tests/test_game_builder_pareto_planner.py"
-      - "tests/test_game_builder_npc_social_economy.py"
-      - "skeleton/ai/game_builder/npc_social_economy.py"
-      - "skeleton/ai/game_builder/director_evolution_product.py"
-      - "skeleton/ai/game_builder/quest_director_cli.py"
-      - "tests/test_game_builder_evolution_product.py"
-      - "tests/test_game_builder_modular_scene.py"
-      - "skeleton/ai/game_builder/modular_scene_compositor.py"
-      - "skeleton/ai/game_builder/npc_authoring.py"
-      - "skeleton/ai/game_builder/npc_blueprint_cli.py"
-      - "tests/test_game_builder_npc_authoring.py"
-      - "skeleton/ai/game_builder/npc_witness_quest_engine.py"
-      - "skeleton/ai/game_builder/competitive_mirror_training.py"
-      - "tests/test_game_builder_npc_witness_quests.py"
-      - "tests/test_game_builder_competitive_mirror_training.py"
-
-      - "skeleton/ai/game_builder/quest_pareto_planner.py"
-      - ".github/workflows/game-builder-modular-society.yml"
   workflow_dispatch:
 
 permissions:

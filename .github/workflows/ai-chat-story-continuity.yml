@@ -1,24 +1,6 @@
 name: AI Chat Story Continuity Closure
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "backend/core/story_continuity.py"
-      - "backend/routes/story_index.py"
-      - "backend/routes/game_kb.py"
-      - "backend/tests/test_story_continuity.py"
-      - "backend/tests/test_story_index_routes.py"
-      - "frontend/features/Jeeves/ChatStoryActions.tsx"
-      - "frontend/features/Jeeves/storyContext.ts"
-      - "frontend/features/Jeeves/ChatWorkspace.tsx"
-      - "frontend/app/story-index.tsx"
-      - "frontend/tsconfig.jeeves.json"
-      - "frontend/src/product/worldWorkspace.ts"
-      - "frontend/scripts/test-world-workbench.mjs"
-      - "frontend/scripts/jeeves-workbench/story-context.test.cjs"
-      - ".github/workflows/ai-chat-story-continuity.yml"
   workflow_dispatch:
 
 permissions:
