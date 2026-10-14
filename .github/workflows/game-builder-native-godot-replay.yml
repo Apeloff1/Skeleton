@@ -4,7 +4,18 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
-      - "skeleton/ai/game_builder/**"
+      - "skeleton/ai/game_builder/*godot*"
+      - "skeleton/ai/game_builder/dual_runtime*"
+      - "skeleton/ai/game_builder/studio_*"
+      - "skeleton/ai/game_builder/original_game_studio*"
+      - "skeleton/ai/game_builder/mirror_room_runtime.py"
+      - "skeleton/ai/game_builder/consumer_release_assurance.py"
+      - "skeleton/ai/game_builder/companion_curriculum.py"
+      - "skeleton/ai/game_builder/tiled_map*"
+      - "skeleton/ai/game_builder/authored_tiles.py"
+      - "skeleton/ai/game_builder/living_story*"
+      - "skeleton/ai/game_builder/quest*"
+      - "skeleton/ai/game_builder/contracts.py"
       - "tests/test_game_builder_dual_runtime.py"
       - "tests/test_game_builder_authored_tiles.py"
       - "tests/test_game_builder_tile_editor.py"
@@ -22,7 +33,18 @@ on:
   push:
     branches: [main]
     paths:
-      - "skeleton/ai/game_builder/**"
+      - "skeleton/ai/game_builder/*godot*"
+      - "skeleton/ai/game_builder/dual_runtime*"
+      - "skeleton/ai/game_builder/studio_*"
+      - "skeleton/ai/game_builder/original_game_studio*"
+      - "skeleton/ai/game_builder/mirror_room_runtime.py"
+      - "skeleton/ai/game_builder/consumer_release_assurance.py"
+      - "skeleton/ai/game_builder/companion_curriculum.py"
+      - "skeleton/ai/game_builder/tiled_map*"
+      - "skeleton/ai/game_builder/authored_tiles.py"
+      - "skeleton/ai/game_builder/living_story*"
+      - "skeleton/ai/game_builder/quest*"
+      - "skeleton/ai/game_builder/contracts.py"
       - "tests/test_game_builder_dual_runtime.py"
       - "tests/test_game_builder_authored_tiles.py"
       - "tests/test_game_builder_studio_pipeline.py"

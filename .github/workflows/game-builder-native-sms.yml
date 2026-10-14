@@ -3,7 +3,12 @@ name: Game Builder Native Sega Master System ROM
 on:
   pull_request:
     paths:
-      - 'skeleton/ai/game_builder/**'
+      - 'skeleton/ai/game_builder/sms*'
+      - 'skeleton/ai/game_builder/sega_8bit*'
+      - 'skeleton/ai/game_builder/native_*'
+      - 'skeleton/ai/game_builder/port_planner.py'
+      - 'skeleton/ai/game_builder/playable_world.py'
+      - 'skeleton/ai/game_builder/contracts.py'
       - 'scripts/game_builder/native_sms_ci.py'
       - '.github/workflows/game-builder-native-sms.yml'
   workflow_dispatch:
