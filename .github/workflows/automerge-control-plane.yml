@@ -9,6 +9,9 @@ on:
     branches:
       - "*"
       - "**"
+      # Only PR completions cause eligible automatic merges. Exclude main
+      # completions at admission instead of creating skipped consumer runs.
+      - "!main"
   schedule:
     # Merge Readiness completion remains the immediate event-driven wake;
     # the scheduled fallback catches missed events without five-minute churn.
