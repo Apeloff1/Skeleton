@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 from typing import Any, Sequence
 
@@ -142,6 +143,14 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
     if head is not None:
         if re.fullmatch(r"[0-9a-f]{40}",head) is None:
             raise StorageCandidateError("reported exact head is not a 40-character lowercase Git SHA")
+        git_head=subprocess.run(
+            ["git","-C",str(root),"rev-parse","HEAD"],
+            capture_output=True,text=True,check=False,
+        )
+        if git_head.returncode != 0:
+            raise StorageCandidateError("repository exact head unavailable")
+        if head != git_head.stdout.strip():
+            raise StorageCandidateError("reported exact head mismatch")
 
     return {
         "status":"valid",

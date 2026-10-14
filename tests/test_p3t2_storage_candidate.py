@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import shutil
+import subprocess
 
 import pytest
 
@@ -37,7 +38,8 @@ def _store(path:Path,payload:dict)->None:
     path.write_text(json.dumps(payload,indent=2)+"\n",encoding="utf-8")
 
 def test_current_storage_candidate_is_valid():
-    result=validate(ROOT,head="a"*40)
+    head=subprocess.check_output(["git","-C",str(ROOT),"rev-parse","HEAD"],text=True).strip()
+    result=validate(ROOT,head=head)
     assert result["volume_refs"]==["VOL-133","VOL-135","VOL-136"]
     assert result["executable_test_count"]==3
     assert result["completion_checkbox"] is False
@@ -105,3 +107,9 @@ def test_signed_volume_must_not_keep_unresolved_gaps(tmp_path:Path):
 def test_rejects_invalid_reported_head():
     with pytest.raises(StorageCandidateError,match="reported exact head"):
         validate(ROOT,head="not-a-sha")
+
+def test_rejects_mismatched_reported_exact_head():
+    current=subprocess.check_output(["git","-C",str(ROOT),"rev-parse","HEAD"],text=True).strip()
+    fake="a"*40 if current!="a"*40 else "b"*40
+    with pytest.raises(StorageCandidateError,match="reported exact head mismatch"):
+        validate(ROOT,head=fake)
