@@ -6,6 +6,7 @@ a factual finding, an approved model weight, or a license to use sources.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+import re
 from .contracts import canonical_digest
 from .dragon_evidence_disagreement import three_way_evidence_risks
 
@@ -26,6 +27,23 @@ class HoldoutCase:
         if (not isinstance(self.case_id,str) or not 1<=len(self.case_id)<=64
             or not all(ch.isalnum() or ch in "-_." for ch in self.case_id)):
             raise ValueError("bounded holdout case identity required")
+        for name, passage in (
+            ("article", self.article), ("video", self.video),
+            ("update", self.update),
+        ):
+            if not isinstance(passage, str) or not 1 <= len(passage) <= 2048:
+                raise ValueError(f"bounded {name} holdout passage required")
+        if (
+            not isinstance(self.shared_terms, tuple)
+            or not 1 <= len(self.shared_terms) <= _MAX_TERMS
+            or len(set(self.shared_terms)) != len(self.shared_terms)
+            or any(
+                not isinstance(term, str)
+                or re.fullmatch(r"[a-z0-9]{3,40}", term) is None
+                for term in self.shared_terms
+            )
+        ):
+            raise ValueError("bounded canonical holdout terms required")
         if type(self.expected_polarity_conflict) is not bool:
             raise ValueError("externally labeled holdout outcome required")
         if (not isinstance(self.reviewer_evidence_digest,str)
