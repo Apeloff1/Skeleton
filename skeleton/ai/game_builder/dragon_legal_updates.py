@@ -104,7 +104,7 @@ def legal_update_impact(previous: Iterable[LegalSourceObservation],
                 "custody_evidence": source.custody_evidence_digest})
     invalidated = sorted({(r.artifact_digest, r.target_id, r.jurisdiction, r.area)
         for r in review_rows if (r.jurisdiction, r.area) in affected
-        and r.checked_at < cutoffs[(r.jurisdiction, r.area)]})
+        and r.checked_at <= cutoffs[(r.jurisdiction, r.area)]})
     body = {"schema": "skeleton.dragon.legal_update_impact.v1", "checked_at": now,
         "events": events, "affected_cells": [list(cell) for cell in sorted(affected)],
         "invalidated_reviews": [list(cell) for cell in invalidated],
