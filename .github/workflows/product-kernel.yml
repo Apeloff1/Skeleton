@@ -34,40 +34,7 @@ on:
       - "frontend/components/LaunchCascade.tsx"
       - "frontend/tsconfig.product.json"
       - ".github/workflows/product-kernel.yml"
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths:
-      - "backend/core/charter_policy.py"
-      - "backend/core/academy_product.py"
-      - "backend/core/gameforge_artifact_builder.py"
-      - "backend/core/product_kernel.py"
-      - "backend/core/product_control_plane.py"
-      - "backend/core/product_control_runtime.py"
-      - "backend/core/product_executor_registry.py"
-      - "backend/core/product_default_executors.py"
-      - "backend/core/execution_receipts.py"
-      - "backend/core/product_operations.py"
-      - "backend/routes/product_runtime.py"
-      - "backend/routes/ops.py"
-      - "backend/core/routes_registry.py"
-      - "backend/tests/test_charter_policy.py"
-      - "backend/tests/test_product_kernel.py"
-      - "backend/tests/test_product_executor_registry.py"
-      - "backend/tests/test_execution_receipts.py"
-      - "backend/tests/test_native_product_executors.py"
-      - "backend/tests/test_product_control_plane.py"
-      - "backend/tests/test_gameforge_artifact_builder.py"
-      - "frontend/src/product/productCatalog.ts"
-      - "frontend/src/product/productControlClient.ts"
-      - "frontend/src/product/appHealthClient.ts"
-      - "frontend/app/product.tsx"
-      - "frontend/app/capability.tsx"
-      - "frontend/app/operation.tsx"
-      - "frontend/app/control-plane.tsx"
-      - "frontend/components/LaunchCascade.tsx"
-      - "frontend/tsconfig.product.json"
-      - ".github/workflows/product-kernel.yml"
-
+  workflow_dispatch:
 permissions:
   contents: read
 

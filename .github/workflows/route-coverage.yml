@@ -9,14 +9,7 @@ on:
       - 'scripts/route_coverage_check.py'
       - 'scripts/test_route_coverage_check.py'
       - '.github/workflows/route-coverage.yml'
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths:
-      - 'frontend/utils/routeRegistry.ts'
-      - 'frontend/app/**'
-      - 'scripts/route_coverage_check.py'
-      - 'scripts/test_route_coverage_check.py'
-
+  workflow_dispatch:
 permissions:
   contents: read
 

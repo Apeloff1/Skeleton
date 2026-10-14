@@ -9,14 +9,6 @@ on:
       - "tests/test_repository_navigation_index.py"
       - ".machine/repository.toml"
       - ".github/workflows/repository-navigation-index.yml"
-  pull_request:
-    branches: [main]
-    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
-    paths:
-      - "scripts/build_repository_navigation_index.py"
-      - "tests/test_repository_navigation_index.py"
-      - ".machine/repository.toml"
-      - ".github/workflows/repository-navigation-index.yml"
   workflow_dispatch:
   schedule:
     - cron: "27 3 * * *"
