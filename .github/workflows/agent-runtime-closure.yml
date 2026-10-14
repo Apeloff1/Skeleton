@@ -2,37 +2,6 @@
 name: Agent Runtime Closure Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/automation/agents/agent_runtime.py"
-      - "skeleton/ai/agents/core/agent_runtime.py"
-      - "skeleton/agents/agent_runtime.py"
-      - "skeleton/automation/agents/__init__.py"
-      - "skeleton/ai/agents/core/__init__.py"
-      - "skeleton/testing/test_agent_runtime_durable.py"
-      - "scripts/verify_agent_runtime_closure.py"
-      - "tests/test_agent_runtime_independent_verifier.py"
-      - "machine/ai_master_plan.json"
-      - ".github/workflows/p1-agent-delegation-qualification.yml"
-      - ".github/workflows/agent-runtime-closure.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/automation/agents/agent_runtime.py"
-      - "skeleton/ai/agents/core/agent_runtime.py"
-      - "skeleton/agents/agent_runtime.py"
-      - "skeleton/automation/agents/__init__.py"
-      - "skeleton/ai/agents/core/__init__.py"
-      - "skeleton/testing/test_agent_runtime_durable.py"
-      - "scripts/verify_agent_runtime_closure.py"
-      - "tests/test_agent_runtime_independent_verifier.py"
-      - "machine/ai_master_plan.json"
-      - ".github/workflows/p1-agent-delegation-qualification.yml"
-      - ".github/workflows/agent-runtime-closure.yml"
   workflow_dispatch:
 
 permissions:

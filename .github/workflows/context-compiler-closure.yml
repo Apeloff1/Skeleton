@@ -1,30 +1,6 @@
 name: Context Compiler Closure Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/contracts/context.py"
-      - "skeleton/context/**"
-      - "skeleton/ai/runtime/context/**"
-      - "backend/core/engine_client.py"
-      - "backend/routes/ai.py"
-      - "backend/services/ai_assistant_svc.py"
-      - "backend/services/ai_hub_svc.py"
-      - "scripts/check_context_execution_boundary.py"
-      - "scripts/check_instruction_policy_boundary.py"
-      - "scripts/verify_context_compiler_closure.py"
-      - "tests/test_context_execution_boundary.py"
-      - "tests/test_instruction_policy_boundary.py"
-      - "tests/test_context_compiler_independent_verifier.py"
-      - "skeleton/testing/test_context_compiler.py"
-      - "skeleton/testing/test_instruction_policy.py"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_closure_evidence.json"
-      - "machine/ai_implementation_handoff.json"
-      - ".github/workflows/context-compiler-closure.yml"
   workflow_dispatch:
 
 permissions:

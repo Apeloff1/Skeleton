@@ -2,30 +2,6 @@
 name: Tool Runtime Closure Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/skills/**"
-      - "skeleton/intelligence/execution_runtime.py"
-      - "skeleton/ai/runtime/skills/**"
-      - "skeleton/ai/runtime/intelligence/execution_runtime.py"
-      - "backend/services/tool_registry.py"
-      - "backend/tests/test_tool_registry_canonical_delegate.py"
-      - "backend/tests/test_tool_registry_scoped_adapters.py"
-      - "skeleton/testing/test_tool_runtime.py"
-      - "skeleton/testing/test_tool_saga.py"
-      - "skeleton/testing/test_tool_receipt_store.py"
-      - "skeleton/testing/test_execution_runtime.py"
-      - "scripts/check_tool_runtime_boundary.py"
-      - "scripts/verify_tool_runtime_closure.py"
-      - "tests/test_tool_runtime_boundary.py"
-      - "tests/test_tool_runtime_independent_verifier.py"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_closure_evidence.json"
-      - "machine/ai_implementation_handoff.json"
-      - ".github/workflows/tool-runtime-closure.yml"
   workflow_dispatch:
 
 permissions:

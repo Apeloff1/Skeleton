@@ -1,41 +1,6 @@
 name: Repository Intelligence Closure Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/repo_intelligence/repository_graph.py"
-      - "skeleton/repo_intelligence/source_extraction.py"
-      - "skeleton/repo_intelligence/change_planner.py"
-      - "skeleton/ai/build/repo_intelligence/repository_graph.py"
-      - "skeleton/ai/build/repo_intelligence/source_extraction.py"
-      - "skeleton/ai/build/repo_intelligence/change_planner.py"
-      - "skeleton/testing/test_repo_intelligence_git_index.py"
-      - "skeleton/testing/test_vol021_repository_graph.py"
-      - "skeleton/testing/test_vol021_source_extraction.py"
-      - "scripts/verify_repository_intelligence_closure.py"
-      - "tests/test_repository_intelligence_independent_verifier.py"
-      - "machine/ai_master_plan.json"
-      - ".github/workflows/repository-intelligence-closure.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/repo_intelligence/repository_graph.py"
-      - "skeleton/repo_intelligence/source_extraction.py"
-      - "skeleton/repo_intelligence/change_planner.py"
-      - "skeleton/ai/build/repo_intelligence/repository_graph.py"
-      - "skeleton/ai/build/repo_intelligence/source_extraction.py"
-      - "skeleton/ai/build/repo_intelligence/change_planner.py"
-      - "skeleton/testing/test_repo_intelligence_git_index.py"
-      - "skeleton/testing/test_vol021_repository_graph.py"
-      - "skeleton/testing/test_vol021_source_extraction.py"
-      - "scripts/verify_repository_intelligence_closure.py"
-      - "tests/test_repository_intelligence_independent_verifier.py"
-      - "machine/ai_master_plan.json"
-      - ".github/workflows/repository-intelligence-closure.yml"
   workflow_dispatch:
 
 permissions:

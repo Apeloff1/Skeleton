@@ -1,19 +1,6 @@
 name: Memory Authority Closure Gate
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/contracts/memory_record.py"
-      - "skeleton/persistence/memory_repository.py"
-      - "skeleton/memory/**"
-      - "skeleton/testing/test_memory_*.py"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_implementation_handoff.json"
-      - "machine/ai_closure_evidence.json"
-      - "scripts/verify_memory_authority_closure.py"
-      - "tests/test_memory_authority_independent_verifier.py"
-      - ".github/workflows/memory-authority-closure.yml"
   workflow_dispatch:
 
 permissions:

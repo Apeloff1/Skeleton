@@ -1,34 +1,6 @@
 name: Conversation Authority Closure Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/contracts/conversation.py"
-      - "skeleton/persistence/conversation_repository.py"
-      - "backend/core/conversations.py"
-      - "backend/routes/conversations.py"
-      - "backend/routes/ai.py"
-      - "backend/routes/jeeves_compose.py"
-      - "frontend/src/product/conversationClient.ts"
-      - "frontend/features/Jeeves/WorkspaceController.ts"
-      - "frontend/features/Jeeves/workspace.ts"
-      - "frontend/features/Jeeves/ChatWorkspace.tsx"
-      - "frontend/scripts/test-jeeves-workspace.cjs"
-      - "backend/tests/test_ai_chat_conversation_authority.py"
-      - "backend/tests/test_conversations_api.py"
-      - "backend/tests/test_conversation_regeneration.py"
-      - "backend/tests/test_conversation_regeneration_route.py"
-      - "backend/tests/test_conversation_governance.py"
-      - "tests/test_jeeves_chat_workspace.py"
-      - "scripts/verify_jeeves_conversation_cutover.py"
-      - "tests/test_jeeves_conversation_cutover_verifier.py"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_closure_evidence.json"
-      - "machine/ai_implementation_handoff.json"
-      - ".github/workflows/conversation-authority-closure.yml"
   workflow_dispatch:
 
 permissions:

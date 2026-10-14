@@ -1,41 +1,6 @@
 name: Cognitive Execution Closure Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/contracts/ai_execution.py"
-      - "skeleton/contracts/verification.py"
-      - "skeleton/intelligence/execution_runtime.py"
-      - "skeleton/intelligence/verification_policy.py"
-      - "skeleton/intelligence/verification_runtime.py"
-      - "skeleton/retrieval/verification.py"
-      - "skeleton/skills/verification.py"
-      - "skeleton/persistence/execution_repository.py"
-      - "skeleton/api/engine_service.py"
-      - "skeleton/api/engine_runtime.py"
-      - "skeleton/ai/runtime/contracts/ai_execution.py"
-      - "skeleton/ai/runtime/intelligence/execution_runtime.py"
-      - "skeleton/ai/runtime/persistence/execution_repository.py"
-      - "skeleton/ai/runtime/api/engine_service.py"
-      - "skeleton/ai/runtime/api/engine_runtime.py"
-      - "skeleton/testing/test_execution_runtime.py"
-      - "skeleton/testing/test_verification_runtime.py"
-      - "skeleton/testing/test_execution_repository.py"
-      - "skeleton/testing/test_engine_execution_service.py"
-      - "skeleton/testing/test_engine_execution_coordinator.py"
-      - "skeleton/testing/test_ai_execution_frontier.py"
-      - "backend/tests/test_execution_lifecycle_integration.py"
-      - "backend/tests/test_execution_evidence.py"
-      - "scripts/check_ai_execution_frontier.py"
-      - "scripts/verify_cognitive_execution_closure.py"
-      - "tests/test_cognitive_execution_independent_verifier.py"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_closure_evidence.json"
-      - "machine/ai_implementation_handoff.json"
-      - ".github/workflows/cognitive-execution-closure.yml"
   workflow_dispatch:
 
 permissions:

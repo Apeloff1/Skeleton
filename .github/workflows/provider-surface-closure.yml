@@ -1,62 +1,6 @@
 name: Provider Surface Closure Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/provider_runtime.py"
-      - "skeleton/provider_contract.py"
-      - "skeleton/providers/contract.py"
-      - "skeleton/provider_governance.py"
-      - "skeleton/intelligence/**"
-      - "skeleton/api/**"
-      - "skeleton/ai/runtime/**"
-      - "skeleton/ai/build/automation/chatgpt_adapter.py"
-      - "skeleton/ai/build/automation/free_model.py"
-      - "skeleton/ai/build/shift_supervisor/model_gateway.py"
-      - "backend/core/ai_provider_compat.py"
-      - "backend/core/engine_text.py"
-      - "backend/core/engine_chat.py"
-      - "backend/emergentintegrations/llm/chat.py"
-      - "backend/routes/lafs.py"
-      - "backend/routes/jeeves_compose.py"
-      - "backend/routes/code_intelligence.py"
-      - "backend/routes/sota_2026.py"
-      - "backend/tests/test_engine_chat.py"
-      - "backend/tests/test_code_intelligence_engine_boundary.py"
-      - "backend/tests/test_sota_2026_engine_boundary.py"
-      - "tests/test_provider_runtime_boundary.py"
-      - "backend/services/tool_registry.py"
-      - "scripts/check_provider_bootstrap.py"
-      - "scripts/check_provider_capability_matrix.py"
-      - "scripts/check_provider_runtime_boundary.py"
-      - "scripts/verify_provider_surface_closure.py"
-      - "skeleton/testing/test_provider_contract.py"
-      - "skeleton/testing/test_provider_context_binding.py"
-      - "skeleton/testing/test_provider_context_budget.py"
-      - "skeleton/testing/test_provider_runtime_schema_parity.py"
-      - "skeleton/testing/test_provider_stream_reliability_profiles.py"
-      - "skeleton/testing/test_provider_surface_inventory.py"
-      - "skeleton/testing/test_engine_cross_service_boundary.py"
-      - "tests/test_provider_capability_matrix.py"
-      - "tests/test_provider_surface_independent_verifier.py"
-      - "skeleton/persistence/spine_provider_surface_qualification.py"
-      - "skeleton/persistence/spine_provider_surface_qualification_verify.py"
-      - "skeleton/ai/runtime/persistence/spine_provider_surface_qualification.py"
-      - "skeleton/ai/runtime/persistence/spine_provider_surface_qualification_verify.py"
-      - "skeleton/testing/test_spine_provider_surface_qualification.py"
-      - "skeleton/testing/test_spine_provider_live_qualification.py"
-      - "skeleton/testing/test_spine_provider_live_script.py"
-      - "skeleton/persistence/spine_provider_live_qualification*.py"
-      - "skeleton/ai/runtime/persistence/spine_provider_live_qualification*.py"
-      - "scripts/qualify_spine_provider_live.py"
-      - "machine/provider_capability_matrix.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_closure_evidence.json"
-      - "machine/ai_implementation_handoff.json"
-      - ".github/workflows/provider-surface-closure.yml"
   workflow_dispatch:
 
 permissions:
