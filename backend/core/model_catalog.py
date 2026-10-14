@@ -42,6 +42,10 @@ _READINESS = {
         "The AI engine returned an incompatible model catalog.",
         "Ask an administrator to update the engine and application together.",
     ),
+    "tenant_inventory_unavailable": (
+        "This engine does not expose an authenticated tenant-scoped model inventory.",
+        "Ask an administrator to enable an engine endpoint bound to this tenant and user.",
+    ),
     "provider_architecture_unacknowledged": (
         "This model has not passed the required runtime configuration checks.",
         "Ask an administrator to restore the engine construction contracts.",
@@ -335,8 +339,15 @@ async def model_catalog(client: EngineClient | None, *, actor_id: str, tenant_id
     _text(tenant_id, maximum=512)
     if client is None:
         return unavailable_catalog("engine_not_configured")
+    # The legacy provider_status() method accepts only trace_id. Its global
+    # provider listing cannot authorize tenant-specific model selection.
+    # Require an explicitly scoped engine capability instead of exposing it.
+    scoped = getattr(client, "tenant_model_inventory", None)
+    if not callable(scoped):
+        return unavailable_catalog("tenant_inventory_unavailable")
     try:
-        return catalog_from_inventory(await client.provider_status(tenant_id=tenant_id))
+        inventory = await scoped(actor_id=actor_id, tenant_id=tenant_id)
+        return catalog_from_inventory(inventory)
     except EngineAuthorizationError:
         return unavailable_catalog("engine_access_denied")
     except EngineProtocolError:
