@@ -12,13 +12,14 @@
     "downloads": "current source authority plus exact completed producer job and artifact result binding",
     "commands": "fixed trusted adapter argv or re-emitted canonical Dragon SDK build recipes; no request command/environment/toolchain-path overrides"
   },
+  "operator_sdk_configuration": {"SKL_GAME_CONSOLE_SDK_ROOTS": "bounded JSON list of exact trusted absolute private installation roots; no public request field", "SKL_GAME_SDL2_SDK_ROOT": "trusted private SDL2 development installation; exact headers and actual system runtime library are hashed", "adapters": "RGBDS, cc65 including NES ca65/ld65, installed canonical SDK recipes and host-ABI SDL2 C99; roots readonly in compiler namespace"},
   "isolation": {
     "worker": "bounded spawned local worker under existing Jeeves game execution owner",
     "sandbox": "Linux bubblewrap unshared user/network/PID/IPC/UTS/cgroup namespaces, readonly trusted runtime/SDK trees, private writable project and tmp",
     "required": true,
     "missing_or_denied": "sandbox_unavailable, never unsandboxed fallback",
     "python": "uploaded Python and client Makefile/CMake scripts are never executed; canonical build control files are replaced by trusted emitter recipes where used",
-    "limits": "wall and CPU deadlines, memory, descriptors, per-file output, process count, source/output/log/message count",
+    "limits": "wall and CPU deadlines, per-process address space/descriptors/files plus sampled aggregate compiler subtree memory/process/private-workspace limits. No host-UID RLIMIT_NPROC, which counts unrelated jobs; no strict cgroup resource-proof claim.",
     "cleanup": "cancel/timeout terminates compiler process group and drains worker; no ready receipt before exact verified artifact collection"
   },
   "catalog": {

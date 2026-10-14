@@ -535,15 +535,24 @@ def _probe_policy(
 ) -> dict[str, Any]:
     # The runtime owner supplies the exact observed environment, not fabricated
     # observation dictionaries or caller-provided control scores.
+    from .game_console_simulation import EditorSimulationEnvironment
     from .game_learning import GamePolicyLearner
     from .game_learning_runtime import GameLearningEnvironment
+    from .game_successor_runtime import PlatformSuccessorEnvironment
+    from .game_successor_world import WorldSuccessorEnvironment
 
     snapshot = learner.snapshot()
     spec = snapshot.get("environment")
     if not isinstance(spec, Mapping):
         raise GameEngineLabError("learned policy lacks its admitted environment spec")
     if supplied_environment is not None:
-        permitted_types = (GameLearningEnvironment, GeneratedGameEnvironment)
+        permitted_types = (
+            GameLearningEnvironment,
+            GeneratedGameEnvironment,
+            EditorSimulationEnvironment,
+            PlatformSuccessorEnvironment,
+            WorldSuccessorEnvironment,
+        )
         try:
             from .game_rom_runtime import GameBoyROMEnvironment
 
@@ -572,13 +581,25 @@ def _probe_policy(
             raise GameEngineLabError("policy requires its exact admitted project environment for generation")
     # Revalidate the genuine environment and policy together before any step.
     learner = GamePolicyLearner.from_snapshot(snapshot, expected_spec=environment.spec)
-    reference_target = (
-        environment.target
-        if isinstance(environment, GeneratedGameEnvironment)
-        else resolve_console(
-            "game_boy" if spec["environment_id"].startswith("game_boy:rom:") else spec["environment_id"]
+    if isinstance(
+        environment, (EditorSimulationEnvironment, PlatformSuccessorEnvironment, WorldSuccessorEnvironment)
+    ):
+        if request.hardware_target is None:
+            raise GameEngineLabError("authored policy probe needs an explicit project target")
+        reference_target = resolve_console(request.hardware_target)
+        if isinstance(environment, EditorSimulationEnvironment):
+            from .game_console_editor import console_profile
+
+            if console_profile(reference_target.target_id).target_id != environment.project.target_id:
+                raise GameEngineLabError("console policy and declared authoring target differ")
+    else:
+        reference_target = (
+            environment.target
+            if isinstance(environment, GeneratedGameEnvironment)
+            else resolve_console(
+                "game_boy" if spec["environment_id"].startswith("game_boy:rom:") else spec["environment_id"]
+            )
         )
-    )
     if reference_target.era != request.engine_era:
         raise GameEngineLabError("learned policy engine era does not match generated project")
     observation = environment.reset(request.seed)

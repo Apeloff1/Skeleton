@@ -369,6 +369,47 @@ _CORE_TARGET_GROUPS = {
     ),
     "scummvm": ("dos_8086", "dos_vga", "pc_linux", "pc_windows", "pc_macos"),
 }
+
+# Data admission hints taken from the pinned upstream retro_system_info
+# declarations. The worker validates its actual loaded implementation again.
+# Unsafe archive containers and DSi-specific content are intentionally excluded.
+_CORE_CONTENT_EXTENSIONS = {
+    "stella2014": "a26|bin|mvc",
+    "prosystem": "a78|bin|cdf",
+    "handy": "lnx|lyx|o",
+    "mednafen_ngp": "ngp|ngc|ngpc|npc",
+    "mednafen_wswan": "ws|wsc|pc2",
+    "mednafen_vb": "vb|vboy|bin",
+    "mednafen_pce_fast": "pce|cue|chd|m3u",
+    "mednafen_supergrafx": "pce|sgx|cue|chd|m3u",
+    "vecx": "bin|vec",
+    "pokemini": "min",
+    "freeintv": "int|bin|rom",
+    "fuse": "tzx|tap|z80|rzx|scl|trd|dsk|dck|sna|szx|ipf|m3u",
+    "eightyone": "p|tzx|t81",
+    "atari800": "xfd|atr|dcm|cas|bin|a52|atx|car|rom|com|xex|m3u",
+    "cap32": "dsk|sna|tap|cdt|voc|cpr|m3u",
+    "crocods": "sna|dsk|kcr",
+    "virtualjaguar": "j64|jag|rom|abs|cof|bin|prg|cue|cdi|chd",
+    "gearcoleco": "col|cv|bin|rom|ddp|dsk|m3u",
+    "neocd": "cue|chd",
+    "opera": "iso|bin|chd|cue",
+    "melonds": "nds",
+    "picodrive": "bin|gen|smd|md|32x|cue|iso|chd|m3u|sms|gg|sg|sc|68k|sgd|pco|vgm|vgz",
+    "dosbox_pure": "zip|dosz|exe|com|bat|iso|chd|cue|ins|img|ima|vhd|jrc|tc|m3u|conf",
+    "fbneo": "zip|cue|chd",
+    "ppsspp": "elf|iso|cso|prx|pbp|chd",
+    "flycast": "chd|cdi|elf|cue|gdi|lst|bin|dat|m3u",
+}
+
+
+def emulator_content_extensions(core_id: str) -> tuple[str, ...]:
+    """Return bounded suffix hints; this never grants execution authority."""
+    if not isinstance(core_id, str) or core_id not in _CORE_TARGET_GROUPS:
+        _fail("unknown_core", "Core identity has no declared hardware mapping")
+    return tuple("." + value for value in _CORE_CONTENT_EXTENSIONS.get(core_id, "").split("|") if value)
+
+
 _TARGET_ALIASES = {
     "sms": "master_system",
     "n64": "nintendo_64",
@@ -618,14 +659,21 @@ class GameEmulatorRegistry:
                 "famicom_disk_system",
                 "sega_cd",
                 "pc_engine_cd",
-                "neo_geo_cd",
                 "pc_fx",
                 "ps2",
                 "saturn",
                 "sega_naomi",
                 "sega_atom_iswave",
+                "nintendo_dsi",
             }
-            bios_core = identity in {"swanstation", "mednafen_psx_hw", "opera", "px68k"}
+            bios_core = identity in {
+                "swanstation",
+                "mednafen_psx_hw",
+                "px68k",
+                "freeintv",
+                "gearcoleco",
+                "fbneo",
+            }
             if (bios_core or set(values) & bios_targets) and not any(item["required"] for item in firmware):
                 _fail(
                     "firmware_declaration_required",
@@ -1275,6 +1323,110 @@ def load_game_content(
     return GameContentBundle(entrypoint, files, actual)
 
 
+def load_game_content_for_core(
+    core: ApprovedEmulatorCore,
+    data: bytes,
+    filename: str,
+    *,
+    entrypoint: str | None = None,
+    expected_source_digest: str | None = None,
+    registry: GameEmulatorRegistry | None = None,
+) -> GameContentBundle:
+    """Keep native DOS/arcade ZIPs intact after bounded actual archive inspection.
+
+    The worker must also verify its actual ``block_extract`` declaration. This
+    source admission does not infer game compatibility or execute archived code.
+    """
+    (registry or GameEmulatorRegistry.from_environment()).revalidate(core)
+    if core.core_id not in {"dosbox_pure", "fbneo"}:
+        return load_game_content(
+            data, filename, entrypoint=entrypoint, expected_source_digest=expected_source_digest
+        )
+    if type(data) is not bytes or not 1 <= len(data) <= MAX_CONTENT_BYTES:
+        _fail("content_limit", "Exact game source bytes exceed their bounded upload size")
+    filename = _content_name(filename)
+    if "/" in filename:
+        _fail("unsafe_content_path", "Uploaded content filename must be a basename")
+    suffix = PurePosixPath(filename).suffix.casefold()
+    if suffix != ".zip" and not (core.core_id == "dosbox_pure" and suffix == ".dosz"):
+        return load_game_content(
+            data, filename, entrypoint=entrypoint, expected_source_digest=expected_source_digest
+        )
+    actual = _sha(data)
+    if expected_source_digest is not None and expected_source_digest != actual:
+        _fail("content_identity_changed", "Game content differs from the admitted source digest")
+    if entrypoint is not None and entrypoint != filename:
+        _fail("invalid_content", "Opaque native archive entrypoint must retain its exact filename")
+    from .game_learning_ingestion import GameIngestionError, _preflight_zip
+
+    try:
+        _preflight_zip(data)
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            members = archive.infolist()
+            if len(members) > MAX_CONTENT_FILES:
+                _fail("content_limit", "Native archive member count exceeds its bounded inventory")
+            seen, directories, files, total = set(), {}, set(), 0
+            for member in members:
+                name = _content_name(member.filename.rstrip("/"))
+                alias, mode = name.casefold(), member.external_attr >> 16
+                if (
+                    alias in seen
+                    or stat.S_IFMT(mode) not in {0, stat.S_IFREG, stat.S_IFDIR}
+                    or member.flag_bits & 1
+                ):
+                    _fail("unsafe_archive", "Native archives cannot contain aliases, symlinks or encryption")
+                seen.add(alias)
+                if len(PurePosixPath(name).parents) > 9:
+                    _fail("content_limit", "Native archive directory nesting exceeds its bounded depth")
+                for parent in PurePosixPath(name).parents:
+                    if str(parent) != ".":
+                        normalized = str(parent).casefold()
+                        if normalized in directories and directories[normalized] != str(parent):
+                            _fail("unsafe_archive", "Native archive directories contain normalized aliases")
+                        directories[normalized] = str(parent)
+                if member.is_dir():
+                    if alias in directories and directories[alias] != name:
+                        _fail("unsafe_archive", "Native archive directories contain normalized aliases")
+                    directories[alias] = name
+                    continue
+                files.add(alias)
+                if PurePosixPath(name).suffix.casefold() in {
+                    ".zip",
+                    ".7z",
+                    ".rar",
+                    ".tar",
+                    ".gz",
+                    ".bz2",
+                    ".xz",
+                }:
+                    _fail("unsafe_archive", "Nested native archives are not admitted")
+                total += member.file_size
+                if (
+                    member.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}
+                    or not 1 <= member.file_size <= MAX_CONTENT_BYTES
+                    or total > MAX_CONTENT_BYTES
+                    or member.file_size > max(1, member.compress_size) * 100
+                ):
+                    _fail("content_limit", "Native archive expansion exceeds its bounded byte budget")
+                observed = 0
+                with archive.open(member) as stream:
+                    while chunk := stream.read(min(65536, member.file_size - observed + 1)):
+                        observed += len(chunk)
+                        if observed > member.file_size:
+                            _fail("invalid_archive", "Native archive member exceeds its exact declared bytes")
+                if observed != member.file_size:
+                    _fail("invalid_archive", "Native archive member differs from its exact declared bytes")
+            if not files or files.intersection(directories) or len(directories) > 96:
+                _fail("unsafe_archive", "Native archive file/directory inventory is conflicting or exhausted")
+    except EmulatorCatalogError:
+        raise
+    except (GameIngestionError, zipfile.BadZipFile, RuntimeError, OSError) as exc:
+        raise EmulatorCatalogError(
+            "invalid_archive", "Native content requires a valid bounded classic ZIP"
+        ) from exc
+    return GameContentBundle(filename, {filename: data}, actual)
+
+
 def _write_manifest(path: Path, raw: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     _safe_path(str(path.parent))
@@ -1334,6 +1486,11 @@ def main(argv: list[str] | None = None) -> int:
     approve.add_argument("--firmware", action="append", default=[])
     approve.add_argument("--optional-firmware", action="append", default=[])
     approve.add_argument("--option", action="append", default=[])
+    approve.add_argument(
+        "--defer-approval",
+        action="store_true",
+        help="Record an inspected inactive candidate without granting execution",
+    )
     remove = commands.add_parser("remove")
     remove.add_argument("--core-id", required=True)
     args = parser.parse_args(argv)
@@ -1374,7 +1531,7 @@ def main(argv: list[str] | None = None) -> int:
                 raw["cores"].append(
                     {
                         "core_id": args.core_id,
-                        "approved": True,
+                        "approved": not args.defer_approval,
                         "library_path": inspected["library_path"],
                         "library_sha256": inspected["library_sha256"],
                         "target_ids": [_target(value) for value in args.target],
@@ -1388,7 +1545,7 @@ def main(argv: list[str] | None = None) -> int:
             temporary._raw = raw
             temporary._validate_manifest()
             temporary.registry_digest = _digest(raw)
-            if args.command == "approve":
+            if args.command == "approve" and not args.defer_approval:
                 temporary.resolve_core(args.core_id)
             _write_manifest(path, raw)
         print(

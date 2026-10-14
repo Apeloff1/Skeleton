@@ -903,7 +903,7 @@
       "id": "jeeves-game-learning-workspace",
       "owner_plane": "application-api",
       "physical_store": "mongo",
-      "logical_location": "CORE_DB_NAME.game_learning_{projects,revisions,sources,source_chunks,sessions,jobs,episodes,policies,limits,workers,plays,recordings,recording_chunks,live_frames,build_artifacts,content_uploads,content_chunks,content_limits}",
+      "logical_location": "CORE_DB_NAME.game_learning_{projects,revisions,sources,source_chunks,sessions,jobs,episodes,policies,limits,workers,plays,recordings,recording_chunks,live_frames,build_artifacts,content_uploads,content_chunks,content_limits,campaigns,rounds,lessons}",
       "authority": "authoritative",
       "source_of_truth": true,
       "status": "implementation-candidate",
@@ -912,7 +912,7 @@
         "confidential"
       ],
       "transaction_scope": "project source epoch and revision fencing; session/job/checkpoint compare-and-set; prepared immutable source chunks and scoped manifests",
-      "consistency": "Exact tenant/owner/project identity; source withdrawal and editor input epochs fence active publication; only complete episode snapshots advance learned policy cursor; receipts bind current admitted source and exact code/environment identities",
+      "consistency": "Exact tenant/owner/project identity; source withdrawal and editor input epochs fence active publication; only complete episode snapshots advance learned policy cursor; receipts bind current admitted source and exact code/environment identities Studio campaigns commit complete independently reviewed round/lesson evidence before their cursor advances; exact source/policy/code and current consent bind every resumable slice.",
       "retention": "Owner-scoped source withdrawal scrubs original chunks and blocks new admission; historical derived copies and exported artifacts are not claimed globally erased",
       "backup_restore": "Restore existing Mongo workspace records before accepting resume; expired worker leases expose interrupted status and retain committed episodes",
       "migration": "Additive existing-store collections/indexes; retain immutable project/source/operation/job/policy identifiers and original input epoch; no other domain is promoted or replaced",
@@ -927,9 +927,16 @@
         "machine/ai_game_play.json",
         "machine/ai_game_demonstrations.json",
         "machine/ai_game_content_uploads.json",
-        "machine/ai_game_console_build.json"
+        "machine/ai_game_console_build.json",
+        "machine/ai_game_console_editor.json",
+        "machine/ai_game_console_workspace.json",
+        "machine/ai_game_successor.json",
+        "machine/ai_game_style_analysis.json",
+        "machine/ai_game_successor_runtime.json",
+        "machine/ai_game_desktop_export.json",
+        "machine/ai_game_studio_learning.json"
       ],
-      "continuation": "Existing-store scoped play/controller leases, consented measured demonstrations, immutable media manifests, build-derived artifact receipts and episode-atomic parallel learner checkpoints. Runtime sockets/processes/preview frames/private content files are derived execution handles, never source or consent authority."
+      "continuation": "Existing-store scoped play/controller leases, consented measured demonstrations, immutable media manifests, build-derived artifact receipts and episode-atomic parallel learner checkpoints. Runtime sockets/processes/preview frames/private content files are derived execution handles, never source or consent authority. Console authoring documents, exact original successor candidates, cross-project source and teacher lineage, current edited-world desktop packages use the same scoped authority; editor simulation and native player save files remain derived state."
     }
   ],
   "state_flows": [

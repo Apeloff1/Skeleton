@@ -1,0 +1,121 @@
+{
+  "schema_version": "skeleton.ai.game_studio_learning.v1",
+  "status": "implementation_candidate",
+  "parent": "machine/ai_game_learning.json",
+  "owners": {
+    "runtime": "skeleton/jeeves/game_studio_learning.py",
+    "agent_tools": "skeleton/jeeves/game_studio_tools.py",
+    "application": "backend/core/game_studio_learning.py",
+    "application_tools": "backend/core/game_studio_tools.py",
+    "api": "backend/routes/game_studio_learning.py",
+    "product": "frontend/features/Jeeves/GameStudioLearningPanel.tsx",
+    "client": "frontend/src/product/gameStudioLearningClient.ts",
+    "agent_registration": "skeleton/jeeves/core.py",
+    "tool_api": "backend/routes/game_studio_tools.py"
+  },
+  "authority": "Existing current tenant/owner/project/source/teacher rights, workspace Mongo authority, existing bounded job workers and canonical agent tool grants; no new provider/service/runtime root",
+  "interfaces": [
+    "Campaign requests at most100000 rounds executed as bounded cancellable durable slices, with no synthetic completed counts",
+    "Jeeves actual game play and measured policy learning, Dragon source/frame/layout review, separate adversarial held-out and perturbed evaluation",
+    "Exact round/role/candidate/source/code/policy/report identities with atomic committed-round cursor, idempotent lesson records and interrupted recovery",
+    "Lesson retrieval and next-candidate proposals use scoped empirical outcomes including rejected experiments; failed candidates never automatically replace champions",
+    "Progressive fidelity settings affect emitted rendering/source assets where supported and preserve gameplay/timing constraints; unsupported fidelity remains explicit",
+    "Agent studio commands delegate only current scoped editor/build/play/review/learning owners, never arbitrary shell/network or fabricated consent"
+  ],
+  "bounds": {
+    "campaign_rounds": 100000,
+    "slice_rounds": 8,
+    "parallel_actors": 8,
+    "completed_round_records_paged": true,
+    "per_slice_steps": 131072,
+    "lesson_evidence_bytes": 262144
+  },
+  "state": "Existing CORE_DB game_learning campaigns/rounds/lessons plus scoped jobs/revisions/policies; runtime objects/preview pixels/saves are derived handles",
+  "failure": "Stale source or policy identity, revoked consent, expired lease, malformed evidence, exhausted budget, missing core/toolchain, blocked review and unquiesced cancellation do not advance learned cursor or publish candidate",
+  "limitations": "Large configured run budgets are not executed evidence. Automatic quality improvement, flawless execution, commercial-game superiority, full semantic ROM digestion and all-target binary compatibility are not asserted. Deterministic specialist reviews are not represented as model inference.",
+  "automated_tests_requested": false,
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "runtime_api": {
+    "config": "CampaignConfig(round_limit,slice_rounds,episodes_per_round,episode_steps,seed,min_improvement,max_slice_steps)",
+    "campaign": "StudioLearningCampaign(request,config,context,lineage,policy_snapshot=None,snapshot=None,lessons=(),proposal_priors=())",
+    "execution": "run_slice(rounds,on_checkpoint(snapshot,round_report),authorize,cancel)",
+    "snapshot": "cursor/snapshot_digest/champion request+policy/history digest/recent bounded context-scoped lessons",
+    "round": "round_index/round_digest/roles Jeeves,Dragon,adversary/measured candidate and champion decision/lessons/proposals",
+    "proposal_prior": "make_proposal_prior(lesson,origin_context=...,destination_context=...); validate_proposal_prior(prior,destination_context=...)"
+  },
+  "round_semantics": [
+    "Actual bounded tabular Q updates on candidate environments; optional supplied frozen policy is explicitly labelled evaluation transfer after exact action/bin/reward semantics checks",
+    "Jeeves training/selection seeds, adversarial held-out seeds and action-jitter seeds are deterministic and disjoint",
+    "Dragon checks actual preview receipts, analytic layout where supported, source lineage, project bytes and resource bounds; no model or subjective art critique is fabricated",
+    "A candidate only replaces champion after all hard checks and measured ordinary/perturbed comparisons meet declared gates; checkpoint failure rolls back the whole round",
+    "Supported authored successor mechanics and console-editor speed mutate through their existing typed source owners; opaque native content is played but not automatically rewritten",
+    "All-round evidence remains paged in existing application Mongo; runtime snapshots carry bounded recent lesson memory plus full history digest/cursors"
+  ],
+  "context_scope": [
+    "target_id",
+    "genre",
+    "engine",
+    "source_digest",
+    "code_digest"
+  ],
+  "runtime_bounds": {
+    "episodes_per_round": 4,
+    "episode_steps": 4096,
+    "recent_lessons": 64,
+    "imported_lessons": 128,
+    "snapshot_bytes": 8388608,
+    "round_report_bytes": 262144,
+    "proposal_priors": 128,
+    "proposal_priors_bytes": 262144
+  },
+  "dragon_visual_review": {
+    "decoder": "existing bounded console_assets.decode_png",
+    "sample_limit": 65536,
+    "metrics": [
+      "occupied_quantized_palette_bins",
+      "dominant_color_fraction",
+      "luminance_range",
+      "edge_density",
+      "opaque_fraction",
+      "flat_raster",
+      "readable_signal"
+    ],
+    "authority": "Measured raster statistics only; no subjective aesthetics, commercial quality or model-critic claim",
+    "hard_floor": "Actual supported preview, finite valid PNG, >=2 quantized colors, luminance range>=4, opaque>=2%, dominant<=99.9%, edge density>=0.01%"
+  },
+  "runtime_recovery_scope": "Current same-store issued checkpoint/report authority plus strict snapshot/config/source/code digests; hashes do not authenticate a privileged fully rewritten unsigned history. Native/reference champion content is immutable; authored candidates use existing typed source owners.",
+  "episode_budget": "Campaign episode_steps is the admitted execution bound and normalizes request.max_steps; each round charges actual Q updates plus four actual comparison/perturbation trajectories.",
+  "progressive_fidelity_trials": {
+    "schedule": "every sixth authored-successor round",
+    "profiles": [
+      "pixel",
+      "enhanced",
+      "cinematic"
+    ],
+    "execution": "Actually re-emits the supported renderer/source profile and measures its resulting pixels; remembered same-context rejection avoids blind repeat",
+    "acceptance": "Same visual signal/source/resource floor and ordinary gain plus perturbed non-regression; gameplay/policy reward gain is not an aesthetic score",
+    "unsupported": "Console-editor/native opaque targets never silently acquire successor fidelity or copied assets"
+  },
+  "proposal_transfer": {
+    "transfer_kind": "proposal_only_not_measurement",
+    "envelope_fields": [
+      "transfer_kind",
+      "lesson",
+      "origin_context",
+      "origin_context_digest",
+      "destination_context_digest",
+      "evidence_digest",
+      "prior_digest"
+    ],
+    "eligibility": [
+      "target_id",
+      "genre",
+      "engine",
+      "code_digest"
+    ],
+    "authority": "Backend retrieves only owned current-rights authorized original lessons and source/teacher records; original context and evidence remain unchanged. Digests are not signatures or rights grants.",
+    "use": "Own-context decision takes precedence; otherwise a scoped prior may propose accepted directions, reverse rejected directions, or avoid a rejected fidelity profile. Priors never import Q, champion, completed counts or empirical measurements into a different source context.",
+    "recovery": "Exact bounded prior set is pinned in immutable campaign binding and retained in snapshot; a new set requires a new campaign."
+  }
+}

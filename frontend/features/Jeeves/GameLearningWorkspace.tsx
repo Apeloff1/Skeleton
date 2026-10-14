@@ -21,12 +21,17 @@ import GameLearningFrame from './GameLearningFrame';
 import GamePlayViewport from './GamePlayViewport';
 import GameTrainingInstances from './GameTrainingInstances';
 import GameContentUpload from './GameContentUpload';
+import GameConsoleEditor from './GameConsoleEditor';
+import GameSuccessorStudio from './GameSuccessorStudio';
+import GameStudioLearningPanel from './GameStudioLearningPanel';
 import { getGameResources, listGameRecordings, type GameRecording, type GameResourceProfile } from '../../src/product/gamePlayClient';
 import s, { gameLearningColors as C } from './GameLearningWorkspace.styles';
 
 type Icon = keyof typeof Ionicons.glyphMap;
-type Tab = 'editor' | 'sources' | 'observe' | 'learn' | 'build';
+type Tab = 'console' | 'successor' | 'editor' | 'sources' | 'observe' | 'learn' | 'build';
 const TABS: { id: Tab; label: string; icon: Icon }[] = [
+  { id: 'console', label: 'Console studio', icon: 'color-palette-outline' },
+  { id: 'successor', label: 'Original successor', icon: 'sparkles-outline' },
   { id: 'editor', label: 'Editor', icon: 'code-slash-outline' },
   { id: 'sources', label: 'Sources', icon: 'file-tray-full-outline' },
   { id: 'observe', label: 'Play & observe', icon: 'game-controller-outline' },
@@ -143,7 +148,7 @@ export default function GameLearningWorkspace() {
   const [projects, setProjects] = useState<LearningProjectSummary[]>([]);
   const [project, setProject] = useState<LearningProject | null>(null);
   const [jobs, setJobs] = useState<Record<string, LearningJob>>({});
-  const [tab, setTab] = useState<Tab>('editor');
+  const [tab, setTab] = useState<Tab>('console');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +159,8 @@ export default function GameLearningWorkspace() {
   const [projectName, setProjectName] = useState('');
   const [consoleId, setConsoleId] = useState('');
   const [consoleQuery, setConsoleQuery] = useState('');
+  const [visualDirty, setVisualDirty] = useState(false);
+  const [worldDirty, setWorldDirty] = useState(false);
   const [editorFiles, setEditorFiles] = useState<LearningFile[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [selectedFile, setSelectedFile] = useState('');
@@ -199,7 +206,8 @@ export default function GameLearningWorkspace() {
   const currentProject = useRef(project);
   currentProject.current = project;
   const savedFiles = project ? projectFiles(project) : [];
-  const dirty = editorFiles.some(file => drafts[file.path] !== savedFiles.find(saved => saved.path === file.path)?.content);
+  const sourceDirty = editorFiles.some(file => drafts[file.path] !== savedFiles.find(saved => saved.path === file.path)?.content);
+  const dirty = sourceDirty || visualDirty || worldDirty;
   const dirtyRef = useRef(dirty); dirtyRef.current = dirty;
   const accountToken = getAuthToken();
   const previousAccount = useRef(accountToken);
@@ -218,7 +226,7 @@ export default function GameLearningWorkspace() {
   const allJobs = Object.values(jobs).filter(job => job.project_id === project?.project_id).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   const availableAlgorithms = catalogue?.algorithms.filter(value => value.available) || [];
   const runningJobs = allJobs.filter(job => !learningJobTerminal(job));
-  const ready = !!profile?.available;
+  const ready = !project?.execution_readiness && (!!project?.execution_descriptor || !!profile?.available);
   const editorChanged = !!project && editorVersion !== project.version && dirty;
   const resetEditor = useCallback((value: LearningProject) => {
     const files = projectFiles(value); setEditorFiles(files); setDrafts(Object.fromEntries(files.map(file => [file.path, file.content])));
@@ -234,6 +242,8 @@ export default function GameLearningWorkspace() {
     setSelectedSource(previous => value.sources.some(source => source.source_id === previous) ? previous : value.sources.at(-1)?.source_id || '');
     setSelectedSession(previous => value.sessions.some(item => item.session_id === previous) ? previous : value.sessions.at(-1)?.session_id || '');
   }, [resetEditor]);
+  const acceptVisualProject = useCallback((value: LearningProject) => { setVisualDirty(false); setWorldDirty(false); acceptProject(value, true); }, [acceptProject]);
+  const acceptStudioJob = useCallback((value: LearningJob) => { setJobs(current => Object.fromEntries(Object.values({ ...current, [value.job_id]: value }).sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || '')).slice(0, 128).map(job => [job.job_id, job]))); }, []);
   const contentBusy = useCallback((active: boolean) => setBusy(active ? 'Uploading large content' : null), []);
   const openProject = useCallback(async (id: string) => {
     if (mutation.current) return;
@@ -242,7 +252,7 @@ export default function GameLearningWorkspace() {
     try {
       const value = await getLearningProject(id, { signal: controller.signal });
       if (!mounted.current || requestEpoch !== epoch.current || token !== getAuthToken()) return;
-      acceptProject(value, true); setTrainSessions([]); setTrainDemonstrations([]); setDemonstrations([]); setObservedJob(''); setNotice(null); setTab('editor');
+      acceptProject(value, true); setTrainSessions([]); setTrainDemonstrations([]); setDemonstrations([]); setObservedJob(''); setNotice(null); setVisualDirty(false); setWorldDirty(false); setTab(value.files?.some(file => file.path === 'game/successor/spec.json') ? 'successor' : value.files?.some(file => file.path === 'game/editor/console.json') ? 'console' : 'editor');
     } catch (caught) { if (!controller.signal.aborted && mounted.current) setError(caught instanceof Error ? caught.message : 'This project could not be opened.'); }
     finally { if (mounted.current && requestEpoch === epoch.current) setLoading(false); }
   }, [acceptProject]);
@@ -276,7 +286,7 @@ export default function GameLearningWorkspace() {
   useEffect(() => {
     if (previousAccount.current === accountToken) return;
     previousAccount.current = accountToken; epoch.current++; abort.current?.abort();
-    setProject(null); setProjects([]); setJobs({}); setCatalogue(null); setDrafts({}); setEditorFiles([]); setSourceText(''); setDragonRef(''); setRights(''); setConsent(false);
+    setProject(null); setProjects([]); setJobs({}); setVisualDirty(false); setWorldDirty(false); setCatalogue(null); setDrafts({}); setEditorFiles([]); setSourceText(''); setDragonRef(''); setRights(''); setConsent(false);
     setDragonSources([]); setGenerationTitle(''); setProjectName(''); setSelectedSource(''); setSelectedSession(''); setTrainSessions([]); setDemonstrations([]); setTrainDemonstrations([]); setResourceProfiles([]); setResourceProfile(''); setObservedJob(''); setNewProject(false); setAddFile(false); setWithdrawSource(null);
     createAttempt.current = null; trainAttempt.current = null; generationAttempt.current = null; buildAttempt.current = null; setBuildTargets([]); setBuildStyle(''); setBuildCatalogueError(null);
     setConnectionRevision(value => value + 1); setError('Your account changed. Refresh the studio to load this account’s projects.'); setLoading(false);
@@ -356,9 +366,9 @@ export default function GameLearningWorkspace() {
   }, [perform, editorFiles, drafts, editorVersion, acceptProject]);
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-    const handler = (event: KeyboardEvent) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (dirty && !mutation.current) save(); } };
+    const handler = (event: KeyboardEvent) => { if (tab === 'editor' && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (dirty && !mutation.current) save(); } };
     document.addEventListener('keydown', handler); return () => document.removeEventListener('keydown', handler);
-  }, [save, dirty]);
+  }, [save, dirty, tab]);
   const create = async () => {
     if (mutation.current || !projectName.trim() || !consoleId) return;
     if (dirty) { setError('Save or reload your editor changes before creating another project.'); return; }
@@ -462,11 +472,11 @@ export default function GameLearningWorkspace() {
       {compact && <IconButton label="Open projects" icon="menu-outline" onPress={() => setSidebar(true)} />}
       <View style={{ gap: 4, flex: 1 }}><Text numberOfLines={1} style={s.title}>{project?.name || 'Game learning studio'}</Text>
         <Text style={s.subtitle}>{project ? `${profile?.label || project.console_id} · Revision ${project.version}` : 'Edit, run, and learn from real local game sessions'}</Text></View></View>
-      {!narrow && <Button label="New project" icon="add-outline" disabled={!!busy || !catalogue} onPress={() => setNewProject(true)} />}
+      {!narrow && <Button label="New project" icon="add-outline" disabled={!!busy || dirty || !catalogue} onPress={() => setNewProject(true)} />}
     </View>
     <View style={s.body}>{!compact && library}<View style={s.main}>
       {!!project && <View style={s.tabs}>{TABS.map(value => <TouchableOpacity key={value.id} accessibilityRole="tab"
-        accessibilityState={{ selected: tab === value.id }} onPress={() => setTab(value.id)} style={[s.tab, tab === value.id && s.activeTab]}>
+        accessibilityState={{ selected: tab === value.id }} onPress={() => { if (visualDirty && value.id !== 'console' || worldDirty && value.id !== 'successor') { setError('Save or discard your visual draft before switching workspaces.'); return; } setTab(value.id); }} style={[s.tab, tab === value.id && s.activeTab]}>
         <Ionicons name={value.icon} size={17} color={tab === value.id ? C.primaryHover : C.textMuted} /><Text style={[s.tabText, tab === value.id && s.activeText]}>{value.label}</Text>
       </TouchableOpacity>)}</View>}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, compact && s.compactContent]}>
@@ -484,15 +494,17 @@ export default function GameLearningWorkspace() {
           <Text style={s.description}>The catalogue identifies reference simulations and supported ROM execution separately.</Text>
           <Button label="Create a project" icon="add-outline" primary disabled={!catalogue} onPress={() => setNewProject(true)} />
         </View> : <>
-          <View style={s.alert}><View style={s.between}><Text style={s.badge}>{human(profile?.engine_kind || 'Runtime status unavailable')}</Text>
+          <View style={s.alert}><View style={s.between}><Text style={s.badge}>{project.files?.some(file => file.path === 'game/successor/spec.json') ? 'Original adventure, fishing & farming game' : project.files?.some(file => file.path === 'game/editor/console.json') ? 'Saved design scene' : human(profile?.engine_kind || 'Runtime status unavailable')}</Text>
             <Text style={ready ? s.success : s.unavailable}>{ready ? 'Workspace available' : 'Unavailable'}</Text></View>
-            <Text style={s.description}>{profile?.readiness?.message || profile?.description || 'Refresh the catalogue for current runtime capabilities.'}</Text>
+            <Text style={s.description}>{project.execution_readiness?.message || (project.files?.some(file => file.path === 'game/successor/spec.json') ? 'Your saved original world drives play, demonstrations, local learning and desktop packages.' : project.files?.some(file => file.path === 'game/editor/console.json') ? 'Play uses your saved scene, tiles, assets, controllers and sound. Native compilation uses the target’s source files and toolchain.' : profile?.readiness?.message || profile?.description || 'Refresh the catalogue for current runtime capabilities.')}</Text>
           </View>
+          {tab === 'console' && <GameConsoleEditor key={project.project_id + ':' + accountToken} project={project} disabled={!!busy || sourceDirty} onSaved={acceptVisualProject} onDirtyChange={setVisualDirty} onPlay={() => setTab('observe')} onBuild={() => setTab('build')} />}
+          {tab === 'successor' && <GameSuccessorStudio key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={!!busy || sourceDirty || visualDirty} onSaved={acceptVisualProject} onJob={acceptStudioJob} onDirtyChange={setWorldDirty} onPlay={() => setTab('observe')} />}
           {tab === 'editor' && <>
             <Section title="Project source" detail="Changes are saved to this project’s exact server revision. They run only through the selected engine.">
               <View style={s.between}><Text style={dirty ? s.unsaved : s.success}>{dirty ? 'Unsaved changes' : 'Saved source'} · revision {editorVersion}</Text>
                 <View style={s.row}><Button label="Add file" icon="add-outline" disabled={!!busy || editorFiles.length >= 96} onPress={() => { setNewPath(''); setAddFile(true); }} />
-                  <Button label="Save" icon="save-outline" primary disabled={!!busy || !dirty} onPress={save} /></View></View>
+                  <Button label="Save" icon="save-outline" primary disabled={!!busy || !sourceDirty} onPress={save} /></View></View>
               {editorChanged && <View style={s.alert}><Text style={s.description}>The server revision changed. Your local edit is retained; saving it will require resolving that revision conflict.</Text>
                 <Button label="Copy current edit" icon="copy-outline" onPress={() => { void Clipboard.setStringAsync(code); }} />
                 <Button label="Reload current server files" icon="refresh-outline" disabled={!!busy} onPress={() => { resetEditor(project); setNotice('Editor reloaded from the current server revision.'); }} /></View>}
@@ -572,6 +584,7 @@ export default function GameLearningWorkspace() {
             </Section></View>
           </View></>}
           {tab === 'learn' && <>
+            <GameStudioLearningPanel key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onJob={acceptStudioJob} />
             <Section title="Local learning" detail="Train a candidate from real engine observations. Measured evaluation and checkpoints stay separate from production promotion.">
               <Text style={s.label}>Learner</Text><View style={s.chips}>{(catalogue?.algorithms || []).map(value => <TouchableOpacity key={value.id} accessibilityRole="radio"
                 accessibilityState={{ selected: algorithm === value.id, disabled: !value.available }} disabled={!value.available} onPress={() => setAlgorithm(value.id)} style={[s.chip, algorithm === value.id && s.selected]}><Text style={s.chipText}>{value.label}{!value.available ? ' · unavailable' : ''}</Text></TouchableOpacity>)}</View>

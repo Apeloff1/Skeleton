@@ -4,7 +4,7 @@
   "owner": "skeleton/jeeves/game_emulator_catalog.py",
   "mirror": "skeleton/ai/agents/jeeves/game_emulator_catalog.py",
   "operator_bootstrap": "scripts/install_game_emulator_cores.py",
-  "bootstrap_authority": "Explicit local operator CLI only. Pin the exact six upstream repository/revision pairs, use fixed git/make commands and a stripped environment, retain licensing/source identity, inspect compiled artifacts without native execution, install private immutable content-addressed files, and approve exact target subsets atomically. No web installation, BIOS/key download or test/game execution.",
+  "bootstrap_authority": "Explicit local operator CLI only. Pin each exact declared upstream repository/revision pair, use fixed git/make commands and a stripped environment, retain licensing/source identity, inspect compiled artifacts without native execution, install private immutable content-addressed files, and approve exact target subsets atomically. No web installation, BIOS/key download or test/game execution. Optional expansion recipes use exact identified public upstream pins and required submodule commit identities. Source acquisition preserves inherited proxy/CA trust; build subprocesses retain a minimal credential-free environment. Explicit candidate registration does not grant unavailable firmware or GPU features.",
   "parent_contract": "machine/ai_game_learning.json",
   "scope": "Operator-approved installed libretro libraries and bounded exact multi-file game content under the existing Jeeves game-learning owner. Canonical Dragon hardware target identities remain authoritative.",
   "console_integration": "Add explicit emulator:<canonical hardware ID> console choices under the existing catalogue/runtime owner. Keep native-source/reference choices separate. All canonical targets receive a truthful entry even where no core is mapped or installed. The isolated host must handle installed_libretro_emulator; unsupported targets fail rather than selecting a reference simulation.",
@@ -21,9 +21,10 @@
     "options": 128,
     "system_inventory_files": 1024,
     "system_inventory_depth": 8,
-    "atomic_updates": "Private advisory operator file lock, atomic replacement and parent directory fsync; explicit removals/approvals only"
+    "atomic_updates": "Private advisory operator file lock, atomic replacement and parent directory fsync; explicit removals/approvals only",
+    "candidate_approval": "Compiled libraries with absent required firmware may be recorded approved:false with exact required filename declarations. Static code/ABI validity cannot activate such a candidate."
   },
-  "inspection": "Bounded nonsymlink regular library files, stable inode/size/time identity, exact SHA256, ELF shared-object architecture matching the host and actual exported libretro ABI symbols. Inspection never dlopens a library or runs constructors. Required firmware is presence and exact-byte identity only; no firmware/keys are fetched, disclosed or bundled. Actual ABI version/system-info/content loading occurs only in the separately declared isolated emulator host. Complete bounded system directory inventory is hashed, including optional assets and missing optional rows; the host copies every present file and compares the copied inventory digest before native activation.",
+  "inspection": "Bounded nonsymlink regular library files, stable inode/size/time identity, exact SHA256, ELF shared-object architecture matching the host and actual exported libretro ABI symbols. Inspection never dlopens a library or runs constructors. Required firmware is presence and exact-byte identity only; no external proprietary firmware/keys are fetched, disclosed or bundled. Actual ABI version/system-info/content loading occurs only in the separately declared isolated emulator host. Complete bounded system directory inventory is hashed, including optional assets and missing optional rows; the host copies every present file and compares the copied inventory digest before native activation.",
   "revalidation": "Issued immutable core descriptors bind canonical registry digest, exact library and firmware bytes, target scope and options. The host must revalidate against the current operator registry before commands; changed/withdrawn files or approvals fail closed. A descriptor is not a hardware/game compatibility certificate.",
   "content": {
     "schema_version": "skeleton.game.emulator_content.v1",
@@ -58,7 +59,9 @@
     "directory_depth": 8,
     "directories": 96,
     "stream_chunks_per_file": 131072,
-    "stream_chunks_per_bundle": 262144
+    "stream_chunks_per_bundle": 262144,
+    "opaque_core_archives": "load_game_content_for_core revalidates the exact operator-approved core binding. Only the declared DOSBox Pure/FBNeo core profiles preserve an actual ZIP (including DOSBox Pure .dosz) as opaque native content; all directory/path/member/count/ratio/expanded-byte/CRC bounds still apply before admission. Worker actual retro_system_info.block_extract must agree before loading; no caller boolean grants this behavior. Large streamed archive descriptors remain exact owned files under the isolated worker resource budget.",
+    "extension_profiles": "Fixed native-content suffix hints are copied from the exact pinned upstream core valid_extensions declarations. They permit data-only metadata admission outside known cartridge parsers only after the existing owner resolves current approved core/target authority. Missing or malformed known cartridge formats do not become opaque. These hints are not native load approval: the isolated worker checks actual loaded core valid_extensions, exact content, and applicable block_extract before admission."
   },
   "interfaces": [
     "ApprovedEmulatorCore.as_dict",
@@ -76,7 +79,9 @@
     "load_game_content",
     "operator CLI approve/remove/catalog",
     "GameEmulatorRegistry.system_inventory",
-    "ApprovedEmulatorCore.from_dict"
+    "ApprovedEmulatorCore.from_dict",
+    "load_game_content_for_core",
+    "emulator_content_extensions"
   ],
   "failure": "Unknown target, unmapped/absent/unapproved core, malformed manifest, changed SHA/scope, wrong architecture, missing ABI/firmware, unsafe filename/descriptor, exhausted bounds and missing disc dependency fail explicitly. Modern/closed systems remain unavailable unless a declared adapter exists; the target count never implies emulator availability.",
   "qualification": "NO TESTS user instruction persists. Static compile/lint/source review only. Actual core compilation/installation and later gameplay are separate operator/product work; no universal commercial-ROM or production-model qualification claim.",
@@ -93,6 +98,190 @@
     "genesis_plus_gx": "393f70cd64c7334564c19a424c383f53986c13f4",
     "snes9x": "fae2fea08f74180759ef540ee94259213f503480",
     "mgba": "143adf5aa2a60c6036810b0cd72445e13d74b0e6",
-    "pcsx_rearmed": "c8816799b50388e61cfe237fe2cdbb7d8175f20a"
+    "pcsx_rearmed": "c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+    "stella2014": "7d1361e407e63f29e52892655069e5fb4096e691",
+    "prosystem": "8a88014287c7a01cd568067e5a557d0a2b2a051f",
+    "handy": "bc55d462f0b2d6b073ea93dc552ebd73cec60fd1",
+    "mednafen_ngp": "a50d5ac288a81f2104ddf43195a4efdd15c72227",
+    "mednafen_wswan": "4b01295838ea89e3f1355bbe4cb5cf98aa6108cd",
+    "mednafen_vb": "d5ae54c8e23b573a3b34e888b2d48a588027e92c",
+    "mednafen_pce_fast": "3f946f277aef3aa99a95551618bbcd1dd2bda0d9",
+    "mednafen_supergrafx": "9c11dcd213a79d57d2c86313971631af801f2cdc",
+    "vecx": "8f671cc9d737f2890c3ce19e177e2984dcae121f",
+    "pokemini": "132111b76343559860532a1ccc094f93f1ed5650",
+    "freeintv": "ef3e0fe322bec62a7f916c0bb0834c08c348d0b4",
+    "fuse": "e997e2bc32c888348f862f69f2c53babfedf7791",
+    "eightyone": "fa7094910d040baa5fd8b11dbf6a1a618330ecd9",
+    "atari800": "4e7fbc73765c1a9670c7506616046ad1d4ccda51",
+    "cap32": "2d41a1f07e654e97c4f24ab8447c3fbd7d728bc8",
+    "crocods": "a9c63b29443715ae2add392010fca4eae7f93e67",
+    "virtualjaguar": "69c5f6a44ec1f1678e040f8a449c6cebb99e0c99",
+    "gearcoleco": "8afc7f1ccb0fb7bf4a771bcfa17a1b8002c3fe64",
+    "neocd": "b1e04c738cb48a1dae0574b8877f6a116d270ca1",
+    "mednafen_pcfx": "c1650bad5fbdcc3c3ccd45e29e3983e1ccf16cff",
+    "opera": "684926fe2079ba12b59d99082291c0a8fe780c67",
+    "melonds": "66b5d2634cd0a79030562811e6e05f5532f800ba",
+    "desmume": "95b4d798731caa809125b6c3c11d17cc332ff6ef",
+    "picodrive": "1890c2932234c9d30f4cd3851d02228baae8f09e",
+    "dosbox_pure": "6108e45e5f1c4ba7d66f32aa109027afa67d74a9",
+    "parallel_n64": "a8280501a71c1bcd4c85c5b8bfe75cfa62cd6127",
+    "fbneo": "abe41e850b515c4ffc4dca054d1d61b828e9200c",
+    "ppsspp": "e26225c99b401f259a670e45d25be4f4615bdbc5",
+    "flycast": "6b41116a315bc372d6f813439e1bd04a57718b1c"
+  },
+  "two_hour_expansion": {
+    "started_utc": "2026-10-14T04:39:16Z",
+    "deadline_utc": "2026-10-14T06:39:16Z",
+    "scope": "Broader actual pinned core compilation and explicit operator installation under the same registry; no automated tests. Firmware/render/dependency failures remain unavailable, not reference emulation.",
+    "identified_pins": {
+      "stella2014": {
+        "repository": "https://github.com/libretro/stella2014-libretro.git",
+        "revision": "7d1361e407e63f29e52892655069e5fb4096e691"
+      },
+      "prosystem": {
+        "repository": "https://github.com/libretro/prosystem-libretro.git",
+        "revision": "8a88014287c7a01cd568067e5a557d0a2b2a051f"
+      },
+      "handy": {
+        "repository": "https://github.com/libretro/libretro-handy.git",
+        "revision": "bc55d462f0b2d6b073ea93dc552ebd73cec60fd1"
+      },
+      "mednafen_ngp": {
+        "repository": "https://github.com/libretro/beetle-ngp-libretro.git",
+        "revision": "a50d5ac288a81f2104ddf43195a4efdd15c72227"
+      },
+      "mednafen_wswan": {
+        "repository": "https://github.com/libretro/beetle-wswan-libretro.git",
+        "revision": "4b01295838ea89e3f1355bbe4cb5cf98aa6108cd"
+      },
+      "mednafen_vb": {
+        "repository": "https://github.com/libretro/beetle-vb-libretro.git",
+        "revision": "d5ae54c8e23b573a3b34e888b2d48a588027e92c"
+      },
+      "mednafen_pce_fast": {
+        "repository": "https://github.com/libretro/beetle-pce-fast-libretro.git",
+        "revision": "3f946f277aef3aa99a95551618bbcd1dd2bda0d9"
+      },
+      "picodrive": {
+        "repository": "https://github.com/libretro/picodrive.git",
+        "revision": "1890c2932234c9d30f4cd3851d02228baae8f09e"
+      },
+      "vecx": {
+        "repository": "https://github.com/libretro/libretro-vecx.git",
+        "revision": "8f671cc9d737f2890c3ce19e177e2984dcae121f"
+      },
+      "freeintv": {
+        "repository": "https://github.com/libretro/FreeIntv.git",
+        "revision": "ef3e0fe322bec62a7f916c0bb0834c08c348d0b4"
+      },
+      "pokemini": {
+        "repository": "https://github.com/libretro/PokeMini.git",
+        "revision": "132111b76343559860532a1ccc094f93f1ed5650"
+      },
+      "fuse": {
+        "repository": "https://github.com/libretro/fuse-libretro.git",
+        "revision": "e997e2bc32c888348f862f69f2c53babfedf7791"
+      },
+      "eightyone": {
+        "repository": "https://github.com/libretro/81-libretro.git",
+        "revision": "fa7094910d040baa5fd8b11dbf6a1a618330ecd9"
+      },
+      "atari800": {
+        "repository": "https://github.com/libretro/libretro-atari800.git",
+        "revision": "4e7fbc73765c1a9670c7506616046ad1d4ccda51"
+      },
+      "a5200": {
+        "repository": "https://github.com/libretro/a5200.git",
+        "revision": "40c6f2f1ad4a3145b328d5baaf010fae6c7e752b"
+      },
+      "cap32": {
+        "repository": "https://github.com/libretro/libretro-cap32.git",
+        "revision": "2d41a1f07e654e97c4f24ab8447c3fbd7d728bc8"
+      },
+      "crocods": {
+        "repository": "https://github.com/libretro/libretro-crocods.git",
+        "revision": "a9c63b29443715ae2add392010fca4eae7f93e67"
+      },
+      "gearcoleco": {
+        "repository": "https://github.com/drhelius/Gearcoleco.git",
+        "revision": "8afc7f1ccb0fb7bf4a771bcfa17a1b8002c3fe64"
+      },
+      "dosbox_pure": {
+        "repository": "https://github.com/schellingb/dosbox-pure.git",
+        "revision": "6108e45e5f1c4ba7d66f32aa109027afa67d74a9"
+      },
+      "desmume": {
+        "repository": "https://github.com/libretro/desmume.git",
+        "revision": "95b4d798731caa809125b6c3c11d17cc332ff6ef"
+      },
+      "melonds": {
+        "repository": "https://github.com/libretro/melonDS.git",
+        "revision": "66b5d2634cd0a79030562811e6e05f5532f800ba"
+      },
+      "parallel_n64": {
+        "repository": "https://github.com/libretro/parallel-n64.git",
+        "revision": "a8280501a71c1bcd4c85c5b8bfe75cfa62cd6127"
+      },
+      "mupen64plus_next": {
+        "repository": "https://github.com/libretro/mupen64plus-libretro-nx.git",
+        "revision": "12edd2c74a517ff86dfa8cfc71ad75e4c10486d5"
+      },
+      "ppsspp": {
+        "repository": "https://github.com/hrydgard/ppsspp.git",
+        "revision": "e26225c99b401f259a670e45d25be4f4615bdbc5"
+      },
+      "flycast": {
+        "repository": "https://github.com/libretro/flycast.git",
+        "revision": "6b41116a315bc372d6f813439e1bd04a57718b1c"
+      },
+      "fbneo": {
+        "repository": "https://github.com/libretro/FBNeo.git",
+        "revision": "abe41e850b515c4ffc4dca054d1d61b828e9200c"
+      },
+      "mednafen_supergrafx": {
+        "repository": "https://github.com/libretro/beetle-supergrafx-libretro.git",
+        "revision": "9c11dcd213a79d57d2c86313971631af801f2cdc"
+      },
+      "mednafen_pcfx": {
+        "repository": "https://github.com/libretro/beetle-pcfx-libretro.git",
+        "revision": "c1650bad5fbdcc3c3ccd45e29e3983e1ccf16cff"
+      },
+      "neocd": {
+        "repository": "https://github.com/libretro/neocd_libretro.git",
+        "revision": "b1e04c738cb48a1dae0574b8877f6a116d270ca1"
+      },
+      "opera": {
+        "repository": "https://github.com/libretro/opera-libretro.git",
+        "revision": "684926fe2079ba12b59d99082291c0a8fe780c67"
+      },
+      "virtualjaguar": {
+        "repository": "https://github.com/libretro/virtualjaguar-libretro.git",
+        "revision": "69c5f6a44ec1f1678e040f8a449c6cebb99e0c99"
+      }
+    },
+    "software_builds": "DS scope uses exact upstream FreeBIOS and software renderer, excludes DSi. N64 scope pins Angrylion/pure interpreter and disables threaded rendering. PSP scope requests software fallback with upstream public assets; missing dependency/render/firmware capabilities fail explicitly.",
+    "system_assets": "Only public artifacts already in the exact pinned source tree may be copied under an explicit recipe, bounded1024 files/64MiB and immutable exact SHA256. Retained upstream licenses do not grant ROM or commercial-use rights.",
+    "operator_dependencies": "Build-only header paths and OpenGL library paths may be supplied explicitly through the local CLI. Installed dependency bytes are observed and recorded; the command does not fetch/install dependencies or enable hardware rendering. Actual isolated runtime admission remains separate.",
+    "inactive_gpu_scope": "Flycast can be compiled/inspected under an exact pinned recipe but is registered approved:false because the isolated host has no approved hardware rendering context. Compilation does not imply Dreamcast gameplay availability.",
+    "core_recipe_count": 35,
+    "default_bootstrap_cores": [
+      "gambatte",
+      "fceumm",
+      "genesis_plus_gx",
+      "snes9x",
+      "mgba",
+      "pcsx_rearmed"
+    ],
+    "build_bounds": {
+      "parallel_jobs": 8,
+      "per_command_timeout_seconds": 3600,
+      "copied_upstream_asset_files": 1024,
+      "copied_upstream_asset_bytes": 67108864,
+      "license_files": 256,
+      "license_bytes": 8388608
+    },
+    "license_aliases": "An upstream license symlink may be resolved only to a nonsymlink regular file inside the exact pinned source root. Copy its actual text under an immutable regular destination and record the source alias/target; external targets and unsafe installed-library paths remain rejected.",
+    "bootstrap_pins_count": 35,
+    "static_compilation_scope": "34 ELF libretro core libraries built locally at this wave end, including28 additional.29 operator-approved mappings cover46 canonical hardware targets; 4 firmware-missing candidates and1 hardware-rendering candidate remain inactive. No automated tests or actual game compatibility verification. Local artifact evidence is separate from portable checked-in source."
   }
 }

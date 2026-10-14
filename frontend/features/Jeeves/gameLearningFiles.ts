@@ -48,8 +48,8 @@ export async function saveLearningExport(file: { filename: string; mimeType: str
 }
 
 /** Save only content-checked bounded native artifacts returned by their authorized producer. */
-export async function saveLearningBinary(filename: string, bytes: Uint8Array): Promise<void> {
-  if (!bytes.byteLength || bytes.byteLength > 16 * 1024 * 1024) throw new Error('This build artifact exceeds the device export limit.');
+export async function saveLearningBinary(filename: string, bytes: Uint8Array, maxBytes: number = 16 * 1024 * 1024): Promise<void> {
+  if (![16 * 1024 * 1024, 64 * 1024 * 1024].includes(maxBytes) || !bytes.byteLength || bytes.byteLength > maxBytes) throw new Error('This build artifact exceeds the device export limit.');
   const name = filename.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^\.+/, '').slice(0, 160) || 'game-build.bin';
   if (Platform.OS === 'web') {
     const url = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type: 'application/octet-stream' })); const link = document.createElement('a');

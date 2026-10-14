@@ -296,7 +296,7 @@ def register_source_edit_tools(
                 "replacements": args["replacements"],
             }
             request_digest = _hash(_canonical(request))
-            if read_authorize("app.prepare_source_edit", request_digest, context) is not True:
+            if read_authorize("app_prepare_source_edit", request_digest, context) is not True:
                 raise ToolDenied("host denied scoped edit planning")
             plan = _parse(args)
             return {
@@ -309,7 +309,7 @@ def register_source_edit_tools(
             }
 
         preview_spec = ToolSpec(
-            name="app.prepare_source_edit",
+            name="app_prepare_source_edit",
             description="Prepare exact-hash bounded source replacements without committing.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -323,7 +323,7 @@ def register_source_edit_tools(
         registry.register(preview_spec, _preview)
 
     spec = ToolSpec(
-        name="app.patch_source_authorized",
+        name="app_patch_source_authorized",
         description="Host-authorized exact source replacement with lease/CAS and post-commit index refresh.",
         risk=RiskTier.HIGH_IMPACT,
         idempotent=False, cache_ttl_seconds=None, produces_evidence=True,
@@ -336,7 +336,7 @@ def register_source_edit_tools(
         ),
     )
     registry.register(spec, _perform)
-    return ("app.prepare_source_edit", spec.name) if read_authorize is not None else (spec.name,)
+    return ("app_prepare_source_edit", spec.name) if read_authorize is not None else (spec.name,)
 
 
 __all__ = [

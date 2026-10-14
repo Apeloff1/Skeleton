@@ -339,7 +339,7 @@ class CreatorRunbookRunner:
                 "project_id": step.command.project_id,
                 "payload": dict(step.command.payload),
             }
-            if (grant.tool_name != "creator.execute_authorized"
+            if (grant.tool_name != "creator_execute_authorized"
                     or RiskTier.HIGH_IMPACT not in grant.allowed_risks
                     or grant.argument_fingerprint != stable_fingerprint(arguments)
                     or grant.expires_at is None or grant.max_calls != 1):
@@ -354,7 +354,7 @@ class CreatorRunbookRunner:
                 call_id="creator-" + _digest([
                     self.plan.plan_sha256, step_id, context.run_id,
                 ])[:32],
-                name="creator.execute_authorized",
+                name="creator_execute_authorized",
                 arguments=arguments,
                 reason="host-authorized creator runbook step",
             )

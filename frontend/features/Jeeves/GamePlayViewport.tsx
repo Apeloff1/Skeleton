@@ -25,10 +25,12 @@ function keyAction(key: string, actions: string[]) {
     ArrowLeft: ['left', 'move_left'], a: ['left', 'move_left'], ArrowRight: ['right', 'move_right'], d: ['right', 'move_right'],
     ' ': ['jump', 'a', 'button_a', 'interact', 'fire'], z: ['a', 'button_a', 'fire', 'interact'], x: ['b', 'button_b', 'jump'],
     Enter: ['start', 'interact', 'confirm'], Shift: ['select', 'run'], c: ['c', 'button_c'],
+    e: ['interact'], j: ['attack', 'fire'], k: ['fire', 'shoot', 'attack'], f: ['fish'], h: ['hoe'], p: ['plant'], v: ['harvest'], t: ['water'], r: ['rest'], Tab: ['tool_next'],
+    '1': ['fish'], '2': ['hoe'], '3': ['water'], '4': ['plant'], '5': ['harvest'],
   };
   return maps[key]?.find(value => actions.includes(value));
 }
-function padActions(pad: Gamepad, actions: string[]) {
+function padActions(pad: Gamepad, actions: string[], tool?: string) {
   const active = new Set<string>();
   const add = (candidates: string[], pressed: boolean) => { const action = candidates.find(value => actions.includes(value)); if (action && pressed) active.add(action); };
   const down = (index: number) => !!pad.buttons[index]?.pressed;
@@ -36,8 +38,8 @@ function padActions(pad: Gamepad, actions: string[]) {
   add(['right', 'move_right'], down(15) || (pad.axes[0] ?? 0) > 0.45);
   add(['up', 'move_up'], down(12) || (pad.axes[1] ?? 0) < -0.45);
   add(['down', 'move_down'], down(13) || (pad.axes[1] ?? 0) > 0.45);
-  add(['a', 'button_a', 'jump', 'interact', 'fire'], down(0)); add(['b', 'button_b', 'fire', 'jump'], down(1));
-  add(['x', 'button_x', 'interact'], down(2)); add(['y', 'button_y'], down(3));
+  add(['a', 'button_a', 'interact', 'jump', 'fire'], down(0)); add(['b', 'button_b', 'attack', 'fire', 'jump'], down(1));
+  add(['x', 'button_x', ...(tool ? [tool] : []), 'interact'], down(2)); add(['y', 'button_y', 'tool_next'], down(3));
   add(['l', 'button_l'], down(4)); add(['r', 'button_r'], down(5)); add(['select'], down(8)); add(['start', 'confirm'], down(9));
   return active;
 }
@@ -56,6 +58,7 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
   const [sound, setSound] = useState(false);
   const [soundNotice, setSoundNotice] = useState<string | null>(null);
   const [held, setHeld] = useState<string[]>([]);
+  const [gamepadTool, setGamepadTool] = useState('fish');
   const [recordings, setRecordings] = useState<GameRecording[]>([]);
   const [recording, setRecording] = useState<GameRecording | null>(null);
   const [consent, setConsent] = useState(false);
@@ -221,7 +224,8 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
       const target = value.target as HTMLElement | null;
       if (pressed && (target?.matches('input,textarea,select,[contenteditable="true"]') || value.ctrlKey || value.metaKey || value.altKey)) return;
       const source = 'keyboard:' + value.code;
-      const action = pressed ? keyAction(value.key.length === 1 ? value.key.toLowerCase() : value.key, live.current?.actions || []) : [...heldSources.current].find(([, sources]) => sources.has(source))?.[0]; if (!action) return;
+      const actualBindings = live.current?.keyboard_bindings;
+      const action = pressed ? actualBindings ? Object.entries(actualBindings).find(([action, key]) => live.current?.actions.includes(action) && (key === value.code || key === value.key))?.[0] : keyAction(value.key.length === 1 ? value.key.toLowerCase() : value.key, live.current?.actions || []) : [...heldSources.current].find(([, sources]) => sources.has(source))?.[0]; if (!action) return;
       value.preventDefault(); if (pressed && value.repeat) return; hold(action, pressed, 'keyboard:' + value.code);
     };
     const down = (value: KeyboardEvent) => event(value, true); const up = (value: KeyboardEvent) => event(value, false);
@@ -233,14 +237,14 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
     let frameId = 0; const previous = new Set<string>();
     const poll = () => {
       const pad = Array.from(navigator.getGamepads()).find(value => !!value?.connected);
-      const active = pad ? padActions(pad, live.current?.actions || []) : new Set<string>();
+      const active = pad ? padActions(pad, live.current?.actions || [], gamepadTool) : new Set<string>();
       for (const action of previous) if (!active.has(action)) hold(action, false, 'gamepad');
       for (const action of active) if (!heldSources.current.get(action)?.has('gamepad')) hold(action, true, 'gamepad');
       previous.clear(); active.forEach(action => previous.add(action)); frameId = requestAnimationFrame(poll);
     };
     frameId = requestAnimationFrame(poll);
     return () => { cancelAnimationFrame(frameId); previous.forEach(action => hold(action, false, 'gamepad')); };
-  }, [gamepad, hold]);
+  }, [gamepad, gamepadTool, hold]);
   useEffect(() => {
     if (!recording) return;
     let active = true; let timer: ReturnType<typeof setTimeout>; const controller = new AbortController();
@@ -263,13 +267,13 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
     const audio = raw as Record<string, unknown>;
     let active = true;
     void (async () => { try {
-      const frames = audio.sample_frames; const total = audio.total_sample_frames; const rate = audio.sample_rate; const encoded = audio.samples_base64;
-      if (audio.format !== 's16le' || audio.channels !== 2 || typeof frames !== 'number' || !Number.isSafeInteger(frames) || frames < 0 || frames > 16384
+      const channels = audio.channels; const frames = audio.sample_frames; const total = audio.total_sample_frames; const rate = audio.sample_rate; const encoded = audio.samples_base64;
+      if (audio.format !== 's16le' || channels !== 1 && channels !== 2 || typeof frames !== 'number' || !Number.isSafeInteger(frames) || frames < 0 || frames > 16384
         || typeof total !== 'number' || !Number.isSafeInteger(total) || total < frames || typeof rate !== 'number' || !Number.isFinite(rate) || rate < 8000 || rate > 192000
         || typeof encoded !== 'string' || encoded.length > 90000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || typeof atob !== 'function') throw new Error('The returned audio does not match the supported bounded PCM format.');
       const session = play.play_id + ':' + play.stream_id;
       if (audioSession.current !== session) { stopSound(); audioSession.current = session; void context.resume(); }
-      const rawBytes = atob(encoded); if (rawBytes.length !== frames * 4) throw new Error('The audio byte count does not match its measured samples.');
+      const rawBytes = atob(encoded); if (rawBytes.length !== frames * channels * 2) throw new Error('The audio byte count does not match its measured samples.');
       if (audio.sample_start_frame !== undefined && audio.sample_start_frame !== total - frames) throw new Error('The audio cursor does not match its retained samples.');
       if (typeof audio.sample_digest === 'string') {
         const bytes = Uint8Array.from(rawBytes, character => character.charCodeAt(0));
@@ -282,9 +286,9 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
       const first = total - frames; const start = Math.max(first, audioCursor.current); const count = total - start;
       if (audioCursor.current && first > audioCursor.current) setSoundNotice('Some audio samples were missed. Playing the latest actual sound.');
       if (count < 1) return;
-      const buffer = context.createBuffer(2, count, rate);
-      for (let channel = 0; channel < 2; channel++) { const target = buffer.getChannelData(channel); for (let index = 0; index < count; index++) {
-        const offset = (start - first + index) * 4 + channel * 2; let sample = rawBytes.charCodeAt(offset) | rawBytes.charCodeAt(offset + 1) << 8;
+      const buffer = context.createBuffer(channels, count, rate);
+      for (let channel = 0; channel < channels; channel++) { const target = buffer.getChannelData(channel); for (let index = 0; index < count; index++) {
+        const offset = (start - first + index) * channels * 2 + channel * 2; let sample = rawBytes.charCodeAt(offset) | rawBytes.charCodeAt(offset + 1) << 8;
         if (sample & 32768) sample -= 65536; target[index] = sample / 32768;
       } }
       const source = context.createBufferSource(); source.buffer = buffer; source.connect(context.destination);
@@ -310,6 +314,8 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
     {!!savedPlays.length && <><Text style={s.label}>Saved play sessions</Text><View style={s.chips}>{savedPlays.slice(0, 8).map((value, index) => <TouchableOpacity key={value.play_id} accessibilityRole="radio" accessibilityState={{ checked: play?.play_id === value.play_id }} disabled={busy} onPress={() => { release(); setKeyboard(false); setGamepad(false); void run(async signal => { const canonical = await getGamePlay(value.play_id, { signal }); if (!signal.aborted) accept(canonical, true); }); }} style={[s.chip, play?.play_id === value.play_id && s.selected]}><Text style={s.chipText}>Session {index + 1} · {human(value.status)}</Text></TouchableOpacity>)}</View></>}
     <View style={s.observation}>{play?.latest_frame ? <GameLearningFrame frame={play.latest_frame} /> : <><Ionicons name="game-controller-outline" size={36} color={C.textDim} /><Text style={s.muted}>{play ? 'Waiting for the engine’s first frame.' : 'Start a play session to receive real engine frames.'}</Text></>}</View>
     {play && <View style={s.metrics}>{[['Steps', play.steps], ['Reward', play.reward.toLocaleString(undefined, { maximumFractionDigits: 3 })], ['Controller', human(play.controller)]].map(([name, value]) => <View style={s.metric} key={name}><Text style={s.metricValue}>{value}</Text><Text style={s.metricLabel}>{name}</Text></View>)}</View>}
+    {!!play?.latest_frame?.hud && <View style={s.metrics}>{Object.entries(play.latest_frame.hud as Record<string, unknown>).filter(([key, value]) => ['health', 'energy', 'coins', 'day', 'season', 'weather', 'fish_caught', 'harvested'].includes(key) && (typeof value === 'number' && Number.isFinite(value) || typeof value === 'string')).map(([key, value]) => <View key={key} style={s.metric}><Text style={s.metricValue}>{typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 1 }) : human(String(value))}</Text><Text style={s.metricLabel}>{human(key)}</Text></View>)}</View>}
+    {typeof play?.latest_frame?.dialogue === 'string' && <Text style={s.notice}>{play.latest_frame.dialogue}</Text>}
     {!!connection && <Text accessibilityLiveRegion="polite" style={s.unavailable}>{connection} Held inputs expire when the connection is lost.</Text>}
     {Platform.OS === 'web' && !!play?.latest_frame?.audio && <View style={s.chips}><Button label={sound ? 'Mute game sound' : 'Enable game sound'} press={toggleSound} disabled={play.status !== 'running'} />{sound && <Text style={s.muted}>Actual engine audio</Text>}</View>}
     {!!soundNotice && <Text accessibilityLiveRegion="polite" style={s.muted}>{soundNotice}</Text>}
@@ -326,6 +332,7 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
     </View>
     {!!humanControls && <>
       {Platform.OS === 'web' && <View style={s.chips}><Button label={keyboard ? 'Keyboard on · arrows / WASD' : 'Enable keyboard'} primary={keyboard} press={() => { release(); setKeyboard(value => !value); }} /><Button label={gamepad ? 'Gamepad on' : 'Enable gamepad'} primary={gamepad} press={() => { release(); setGamepad(value => !value); }} /></View>}
+      {play.actions.includes('fish') && play.actions.includes('rest') && <><Text style={s.label}>Tools · 1 Fish · 2 Hoe · 3 Water · 4 Plant · 5 Harvest</Text>{gamepad && <><Text style={s.muted}>Gamepad X uses the selected tool. A interacts, B attacks, and Y cycles the game’s hotbar.</Text><View style={s.chips}>{['fish', 'hoe', 'water', 'plant', 'harvest'].filter(action => play.actions.includes(action)).map(action => <Button key={action} label={human(action)} primary={gamepadTool === action} press={() => setGamepadTool(action)} />)}</View></>}<Text style={s.dim}>E interact · J attack · K fire · R rest. Tool actions come from this game’s actual controls.</Text></>}
       <View style={s.chips}>{play.actions.filter(action => !['noop', 'none', 'idle'].includes(action)).map(action => <TouchableOpacity key={action} accessibilityRole="button"
         accessibilityLabel={`Hold ${human(action)}`} accessibilityState={{ selected: held.includes(action) }} onPressIn={() => hold(action, true, 'touch:' + action)} onPressOut={() => hold(action, false, 'touch:' + action)}
         style={[s.button, { minWidth: 64, minHeight: 56 }, held.includes(action) && s.primaryButton]}><Text style={s.buttonText}>{human(action)}</Text></TouchableOpacity>)}</View>

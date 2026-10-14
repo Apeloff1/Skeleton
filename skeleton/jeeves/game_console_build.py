@@ -63,6 +63,112 @@ _SOURCE_SUFFIXES = {".c", ".cc", ".cpp", ".s", ".asm"}
 _BUILD_CONTROL = {"Makefile", "CMakeLists.txt"}
 _BINARY_CACHE: dict[tuple[Any, ...], tuple[str, str]] = {}
 _BINARY_LOCK = threading.Lock()
+
+
+def _operator_sdk_roots() -> tuple[str, ...]:
+    """Private operator configuration; no request can select host mounts."""
+    raw = os.environ.get("SKL_GAME_CONSOLE_SDK_ROOTS", "[]")
+    if len(raw) > 65536:
+        raise ConsoleBuildError("operator SDK configuration exceeds capacity")
+    try:
+        values = json.loads(raw)
+    except ValueError as exc:
+        raise ConsoleBuildError("operator SDK configuration must be a JSON path list") from exc
+    sdl = os.environ.get("SKL_GAME_SDL2_SDK_ROOT")
+    if sdl:
+        values = [*values, sdl] if isinstance(values, list) else values
+    if not isinstance(values, list) or len(values) > 16:
+        raise ConsoleBuildError("operator SDK roots exceed their path capacity")
+    roots = []
+    for value in values:
+        if not isinstance(value, str) or not 1 <= len(value) <= 4096:
+            raise ConsoleBuildError("operator SDK root is invalid")
+        path = Path(value)
+        if not path.is_absolute() or ".." in path.parts or str(path) != value:
+            raise ConsoleBuildError("operator SDK root must be an exact absolute path")
+        for parent in (path, *path.parents):
+            if parent.exists() and parent.is_symlink():
+                raise ConsoleBuildError("operator SDK roots cannot traverse symlinks")
+        if path.exists():
+            info = path.stat()
+            if not path.is_dir() or info.st_uid not in {0, os.geteuid()} or info.st_mode & 0o022:
+                raise ConsoleBuildError("operator SDK root must be a trusted readonly installation")
+        if value not in roots:
+            roots.append(value)
+    return tuple(roots)
+
+
+def _sdl_installation() -> dict[str, Any]:
+    configured = os.environ.get("SKL_GAME_SDL2_SDK_ROOT")
+    if configured and configured not in _operator_sdk_roots():
+        raise ConsoleBuildError("SDL SDK root lacks operator authority")
+    root = Path(configured) if configured else Path("/")
+    include = root / "usr/include/SDL2"
+    machine = {"amd64": "x86_64", "arm64": "aarch64"}.get(
+        platform.machine().lower(), platform.machine().lower()
+    )
+    triple = machine + "-linux-gnu"
+    configuration = root / "usr/include" / triple / "SDL2"
+    library = Path("/lib") / triple / "libSDL2-2.0.so.0"
+    missing = []
+    inventory = []
+    total = 0
+    for directory in (include, configuration):
+        if not directory.is_dir():
+            if directory == include:
+                missing.append("SDL2 development headers")
+            continue
+        for path in sorted(directory.glob("*.h")):
+            if len(inventory) >= 160:
+                raise ConsoleBuildError("SDL header inventory exceeds its trusted bounds")
+            if not path.resolve(strict=True).is_relative_to((root / "usr/include").resolve(strict=True)):
+                raise ConsoleBuildError("SDL header link escapes its exact operator include installation")
+            info = path.stat()
+            if (
+                not path.is_file()
+                or info.st_mode & 0o022
+                or info.st_uid not in {0, os.geteuid()}
+                or info.st_size > MAX_FILE
+            ):
+                raise ConsoleBuildError("SDL header installation is not trusted")
+            data = path.read_bytes()
+            total += len(data)
+            if total > 8 * 1024 * 1024:
+                raise ConsoleBuildError("SDL header bytes exceed installation capacity")
+            inventory.append(
+                {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+            )
+    if not (include / "SDL.h").is_file():
+        missing.append("SDL.h")
+    actual_library = None
+    if library.is_file():
+        resolved = library.resolve(strict=True)
+        info = resolved.stat()
+        if (
+            not any(resolved.is_relative_to(Path(base).resolve()) for base in ("/usr/lib", "/lib"))
+            or info.st_mode & 0o022
+            or info.st_uid not in {0, os.geteuid()}
+            or info.st_size > 64 * 1024 * 1024
+        ):
+            raise ConsoleBuildError("SDL runtime library is outside its trusted installation")
+        actual_library = {"path": str(resolved), "sha256": hashlib.sha256(resolved.read_bytes()).hexdigest()}
+    else:
+        missing.append("SDL2 native runtime library")
+    return {
+        "root": configured,
+        "include": [
+            str(directory)
+            for directory in (include, root / "usr/include", configuration.parent)
+            if directory.is_dir()
+        ],
+        "library_directory": str(library.parent),
+        "library": actual_library,
+        "headers": inventory,
+        "missing": missing,
+        "digest": _digest({"headers": inventory, "library": actual_library}),
+    }
+
+
 _SDK_PROFILES = {
     "master_system": ("/opt/devkitSMS", ("sdcc", "makesms"), {"DEVKITSMS_HOME": "/opt/devkitSMS"}, "make"),
     "game_gear": ("/opt/devkitSMS", ("sdcc", "makesms"), {"DEVKITSMS_HOME": "/opt/devkitSMS"}, "make"),
@@ -340,6 +446,7 @@ def _trusted_binary(name: str, sdk: tuple[str, ...] = ()) -> tuple[str, str] | N
             if (
                 not stat.S_ISREG(info.st_mode)
                 or info.st_mode & 0o022
+                or info.st_uid not in {0, os.geteuid()}
                 or not os.access(resolved, os.X_OK)
                 or info.st_size > 64 * 1024 * 1024
             ):
@@ -436,6 +543,25 @@ def _adapter(target_id: str) -> dict[str, Any]:
             }
         )
     result["output_extension"] = row["output"]
+    operator_roots = _operator_sdk_roots()
+    if result["class"] == "desktop_sdl":
+        sdl = _sdl_installation()
+        result["sdk"] = [sdl["root"]] if sdl["root"] else []
+        result["sdl"] = sdl
+    elif result["class"] in {"cc65", "nes_ca65"}:
+        result["sdk"] = [
+            root
+            for root in operator_roots
+            if Path(root).name == "cc65" or (Path(root) / "bin/cl65").is_file()
+        ]
+        if result["sdk"]:
+            result["environment"]["CC65_HOME"] = result["sdk"][0] + "/share/cc65"
+    elif result["class"] == "rgbds":
+        result["sdk"] = [
+            root
+            for root in operator_roots
+            if Path(root).name == "rgbds" or (Path(root) / "bin/rgbasm").is_file()
+        ]
     return result
 
 
@@ -450,8 +576,8 @@ def console_build_catalog() -> list[dict[str, Any]]:
         sdk = tuple(adapter["sdk"])
         missing = [name for name in dict.fromkeys(adapter["tools"]) if _trusted_binary(name, sdk) is None]
         missing.extend(root for root in sdk if not Path(root).is_dir())
-        if adapter["class"] == "desktop_sdl" and not Path("/usr/include/SDL2/SDL.h").is_file():
-            missing.append("SDL2 development headers/libraries")
+        if adapter["class"] == "desktop_sdl":
+            missing.extend(adapter["sdl"]["missing"])
         status = (
             "source_only"
             if adapter["class"] == "source_only" or adapter["reason"]
@@ -498,8 +624,8 @@ def _prepare(request: ConsoleBuildRequest) -> dict[str, Any]:
         else:
             binaries[name] = {"path": binding[0], "digest": binding[1]}
     missing.extend(root for root in adapter["sdk"] if not Path(root).is_dir())
-    if adapter["class"] == "desktop_sdl" and not Path("/usr/include/SDL2/SDL.h").is_file():
-        missing.append("SDL2 development headers/libraries")
+    if adapter["class"] == "desktop_sdl":
+        missing.extend(adapter["sdl"]["missing"])
     sources = {item.path: item.data for item in request.sources.files}
     # Generated projects retain their native source bundle under a namespaced
     # path. Extract that exact target subtree, never unrelated assets/code.
@@ -590,11 +716,12 @@ def _prepare(request: ConsoleBuildRequest) -> dict[str, Any]:
                 optimization,
                 *debug,
                 "-I/work/include",
-                "-I/usr/include/SDL2",
+                *["-I" + directory for directory in adapter["sdl"]["include"]],
                 "-o",
                 "build/game.elf",
                 *c,
-                "-lSDL2",
+                "-L" + adapter["sdl"]["library_directory"],
+                "-l:libSDL2-2.0.so.0",
                 "-lm",
             ]
         )
@@ -720,6 +847,11 @@ def _sandbox_argv(prepared: Mapping[str, Any], work: Path, command: list[str]) -
     sandbox = tools["bwrap"]
     if _trusted_binary("bwrap") != (sandbox["path"], sandbox["digest"]):
         raise ConsoleBuildError("trusted sandbox changed before dispatch")
+    if (
+        prepared["adapter"]["class"] == "desktop_sdl"
+        and _sdl_installation()["digest"] != prepared["adapter"]["sdl"]["digest"]
+    ):
+        raise ConsoleBuildError("trusted SDL headers/runtime changed before dispatch")
     argv = [
         tools["bwrap"]["path"],
         "--unshare-all",
@@ -739,7 +871,7 @@ def _sandbox_argv(prepared: Mapping[str, Any], work: Path, command: list[str]) -
     if Path("/etc/ld.so.cache").is_file():
         argv.extend(("--ro-bind", "/etc/ld.so.cache", "/etc/ld.so.cache"))
     for root in prepared["adapter"]["sdk"]:
-        if root not in _SDK_ROOTS:
+        if root not in (*_SDK_ROOTS, *_operator_sdk_roots()):
             raise ConsoleBuildError("undeclared SDK root cannot enter compiler sandbox")
         argv.extend(("--ro-bind", root, root))
     argv.extend(
@@ -914,7 +1046,8 @@ def _worker(prepared: dict[str, Any], channel, cancelled) -> None:
         )
         resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_ARTIFACT, MAX_ARTIFACT))
         resource.setrlimit(resource.RLIMIT_NOFILE, (128, 128))
-        resource.setrlimit(resource.RLIMIT_NPROC, (64, 64))
+        # RLIMIT_NPROC counts the shared host UID, including unrelated jobs.
+        # The supervisor measures this compiler's descendant tree instead.
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         with nullcontext(prepared["_work_directory"]) as directory:
             work = Path(directory)
@@ -946,7 +1079,7 @@ def _worker(prepared: dict[str, Any], channel, cancelled) -> None:
                 try:
                     while selector.get_map():
                         now = time.monotonic()
-                        if now - last_budget_check >= 0.2:
+                        if now - last_budget_check >= 0.05:
                             _resource_usage(process.pid, work)
                             last_budget_check = now
                         if cancelled.is_set() or time.monotonic() - started >= prepared["timeout_seconds"]:
@@ -959,7 +1092,7 @@ def _worker(prepared: dict[str, Any], channel, cancelled) -> None:
                                 }
                             )
                             return
-                        for key, _ in selector.select(0.1):
+                        for key, _ in selector.select(0.05):
                             data = os.read(key.fd, 4096)
                             if not data:
                                 selector.unregister(key.fileobj)
@@ -1105,7 +1238,16 @@ class ConsoleBuildRunner:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"},
+                env={
+                    "PATH": "/usr/bin:/bin",
+                    "LC_ALL": "C",
+                    "SKL_GAME_CONSOLE_SDK_ROOTS": os.environ.get("SKL_GAME_CONSOLE_SDK_ROOTS", "[]"),
+                    **(
+                        {"SKL_GAME_SDL2_SDK_ROOT": os.environ["SKL_GAME_SDL2_SDK_ROOT"]}
+                        if "SKL_GAME_SDL2_SDK_ROOT" in os.environ
+                        else {}
+                    ),
+                },
                 start_new_session=True,
                 close_fds=True,
             )

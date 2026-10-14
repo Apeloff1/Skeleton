@@ -9769,6 +9769,20 @@
     "existing_dragon_owner": "skeleton/ai/webcrawler",
     "status": "implementation_candidate",
     "authority": "No new capability plane, service, provider or production promotion authority",
-    "continuation": "Playable emulator workers, human reference, live actor observation, parallel local learning and native console build composition under the same declared owners"
+    "continuation": "Playable emulator workers, human reference, live actor observation, parallel local learning and native console build composition under the same declared owners",
+    "two_hour_continuation": {
+      "contracts": [
+        "machine/ai_game_console_editor.json",
+        "machine/ai_game_console_workspace.json",
+        "machine/ai_game_successor.json",
+        "machine/ai_game_style_analysis.json",
+        "machine/ai_game_successor_runtime.json",
+        "machine/ai_game_desktop_export.json",
+        "machine/ai_game_studio_learning.json"
+      ],
+      "existing_state_authority": "CORE_DB Mongo scoped workspace",
+      "scope": "Console editing/emulation/build augmentation and one/three-source original successor desktop export",
+      "new_service_or_provider": false
+    }
   }
 }

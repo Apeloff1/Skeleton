@@ -1,0 +1,53 @@
+{
+  "schema_version": "skeleton.ai.game_successor.v1",
+  "status": "implementation_candidate",
+  "parent": "machine/ai_game_learning.json",
+  "canonical_owner": "skeleton/jeeves/game_successor.py",
+  "mirrors": [
+    "skeleton/ai/agents/jeeves/game_successor.py",
+    "skeleton/ai/agents/jeeves/game_successor_assets.py"
+  ],
+  "dependencies": [
+    "machine/ai_game_style_analysis.json",
+    "machine/ai_game_successor_runtime.json"
+  ],
+  "scope": "One-source spiritual successor or exactly-three-source original coherent game synthesis under existing Jeeves game generation owner",
+  "default": "Original large top-down adventure with authored Zelda/NES adventure, Pokemon/GB fishing and Harvest Moon/SNES farming analog references. No user ROM, original assets or measured original-game behavior is claimed.",
+  "interfaces": [
+    "default_successor_profiles",
+    "compile_successor",
+    "SuccessorRecipe.as_dict/digest",
+    "optimize_successor",
+    "validate_successor_routes",
+    "optimization_metric_catalog",
+    "successor_art"
+  ],
+  "composition": "Distinct exact source origins, normalized influence weights, actual style preservation strengths, explicit mechanic priorities and confidence-labelled conflict decisions compile original world geometry, shared original sprite atlas, analytic reachable routes, experience graph and coherent adventure/fishing/farming economy.",
+  "optimization": "Bounded parameter candidates are evaluated through actual same-runtime transitions on fixed selection seeds and separate held-out seeds. Report actual counters, metrics, budgets, before/after and algorithm identity; authored preferences never fabricate reward or success.",
+  "authority": "Application source owner must authorize every non-original source before generation and workload publication; source withdrawal blocks new compile/optimization admission. Output lineage cannot grant source rights or production promotion.",
+  "bounds": {
+    "origins": [
+      1,
+      3
+    ],
+    "world_width": 8192,
+    "world_height": 4096,
+    "spec_bytes": 131072,
+    "project_bytes": 8388608,
+    "optimization_candidates": 16,
+    "optimization_episodes_per_candidate": 8,
+    "optimization_total_steps": 131072
+  },
+  "failure": "Wrong source cardinality, duplicate origin, unknown priorities, nonfinite/unbounded mechanics, inconsistent lineage and failed native simulation reject. Portable source emission is not a successful desktop build receipt.",
+  "claims": {
+    "production_promotion": false,
+    "automated_tests_requested": false,
+    "copied_original_game_assets": false,
+    "all_console_binary_support": false,
+    "original_game_mastery": false
+  },
+  "helpers": [
+    "skeleton/jeeves/game_successor_assets.py"
+  ],
+  "asset_scope": "Original deterministic 128x128 RGBA sprite atlas consumed by browser/native/Python renderers; no source sprites, ROM bytes, image crops or music copies."
+}

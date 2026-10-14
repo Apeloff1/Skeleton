@@ -1,0 +1,44 @@
+{
+  "schema_version": "skeleton.ai.game_desktop_export.v1",
+  "status": "implementation_candidate",
+  "owners": {
+    "export": "skeleton/jeeves/game_desktop_export.py",
+    "application": "backend/core/game_successor.py",
+    "api": "backend/routes/game_successor.py",
+    "product": "frontend/features/Jeeves/GameSuccessorStudio.tsx",
+    "setup": "scripts/install_game_desktop_toolchains.py"
+  },
+  "authority": "Existing exact tenant/owner/project/source/gameplay job authority; local operator export never grants application consent",
+  "scope": "Package original successor runtime/files into playable PC/macOS/Linux native browser launchers. Native SDL2 compilation is owned by the existing ConsoleBuildRunner, with its own receipt.",
+  "interfaces": [
+    "desktop_export_catalog(): actual installed approved Go compiler/sandbox readiness for five exact OS/architecture targets",
+    "DesktopExportRequest original exact files/spec+target+source_digest+bounded build limits",
+    "DesktopExportRunner plan/build/cancel/events: fixed compiler arguments in isolated approved tooling; no user shell/Makefile/network",
+    "Generated self-contained gameplay bytes embedded into loopback native launcher; session-token-only local access, strict source bounds, graceful shutdown and actual user browser launch",
+    "Exact SHA256/size/format artifact receipt; macOS native launcher labeled browser-rendered game rather than a native SDL renderer"
+  ],
+  "targets": [
+    "windows-amd64",
+    "linux-amd64",
+    "linux-arm64",
+    "darwin-amd64",
+    "darwin-arm64"
+  ],
+  "failure": "Missing actual compiler/SDK/sandbox, changed source/compiler, output mismatch, timeout/cancel/resource exhaustion reject explicitly. No arbitrary external download path or pretend native cross-platform gameplay execution.",
+  "bounds": {
+    "source_bytes": 8388608,
+    "artifact_bytes": 67108864,
+    "artifact_count": 2,
+    "build_seconds": 300,
+    "file_count": 128,
+    "file_bytes": 4194304,
+    "compiler_slots": 2,
+    "compiler_address_space_bytes": 4294967296,
+    "log_bytes": 2097152
+  },
+  "verification": "User disallows automated tests; real builds/learning/productive measurements and source checks allowed",
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "player_api": "Per-run unguessable loopback path. Generated browser bridge readSave/writeSave/quit uses same-origin bounded local player state; separate from authenticated studio authority and consent.",
+  "installer": "Explicit pinned Linux AMD64 private operator install; exact Go/SDL archive SHA-256, optional pinned cc65 compilation, tool/license/config receipts; no games, firmware, privileged package install or tests"
+}

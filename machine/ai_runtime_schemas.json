@@ -2452,17 +2452,37 @@
       "machine/ai_game_demonstrations.json",
       "machine/ai_game_play.json",
       "machine/ai_game_content_uploads.json",
-      "machine/ai_game_console_build.json"
+      "machine/ai_game_console_build.json",
+      "machine/ai_game_console_editor.json",
+      "machine/ai_game_console_workspace.json",
+      "machine/ai_game_successor.json",
+      "machine/ai_game_style_analysis.json",
+      "machine/ai_game_successor_runtime.json",
+      "machine/ai_game_desktop_export.json",
+      "machine/ai_game_studio_learning.json"
     ],
     "request_owners": [
       "backend/routes/game_learning.py",
       "backend/routes/game_content.py",
-      "backend/routes/game_console_build.py"
+      "backend/routes/game_console_build.py",
+      "backend/routes/game_console_studio.py",
+      "backend/routes/game_successor.py",
+      "backend/routes/game_studio_learning.py",
+      "backend/routes/game_studio_tools.py"
     ],
     "runtime_owners": [
       "skeleton/jeeves/game_emulator_catalog.py",
       "skeleton/jeeves/game_learning_parallel.py",
-      "skeleton/jeeves/game_learning_demonstrations.py"
+      "skeleton/jeeves/game_learning_demonstrations.py",
+      "skeleton/jeeves/game_console_editor.py",
+      "skeleton/jeeves/game_console_assets.py",
+      "skeleton/jeeves/game_console_simulation.py",
+      "skeleton/jeeves/game_successor.py",
+      "skeleton/jeeves/game_style_analysis.py",
+      "skeleton/jeeves/game_successor_runtime.py",
+      "skeleton/jeeves/game_desktop_export.py",
+      "skeleton/jeeves/game_studio_learning.py",
+      "skeleton/jeeves/game_studio_tools.py"
     ],
     "invariants": [
       "Strict finite bounded JSON and exact supported schema versions; unknown request fields reject",
@@ -2470,7 +2490,10 @@
       "Play controller token/epoch/revision and input sequence bind recorded transitions",
       "Source/project/code/config/policy identities bind demonstration replay and frozen actor batches",
       "Only actual complete episode commit advances learned policy cursor; no synthetic frames, progress or success",
-      "Production promotion and masterplan completion remain their existing separate authorities"
+      "Production promotion and masterplan completion remain their existing separate authorities",
+      "Console editor writes require exact complete source-manifest digest and current project revision; only an owned write token may fence inputs and publish a new head",
+      "Successor sources are exactly one or three distinct current owned origins or explicitly authored inspiration; neither authored values nor opaque ROM intake establish measured commercial gameplay",
+      "Desktop compiler inputs are original bounded files packaged by fixed operator tooling; target format checks do not prove execution on foreign operating systems"
     ]
   }
 }

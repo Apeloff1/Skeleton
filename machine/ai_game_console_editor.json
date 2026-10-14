@@ -1,0 +1,112 @@
+{
+  "schema_version": "skeleton.ai.game_console_editor.v1",
+  "status": "implemented_unpromoted",
+  "owners": {
+    "project": "skeleton/jeeves/game_console_editor.py",
+    "assets": "skeleton/jeeves/game_console_assets.py",
+    "simulation": "skeleton/jeeves/game_console_simulation.py",
+    "catalog": "skeleton/ai/webcrawler/dragon_native_targets.py",
+    "durable_authority": "Existing backend governed game workspace/project file manifest and CAS revision"
+  },
+  "mirrors": "Exact bytes under skeleton/ai/agents/jeeves",
+  "scope": "Original editable game projects for every canonical Dragon console/PC target, bounded real native asset codecs, target-aware validation, exact source/build handoff and explicit deterministic design-scene simulation",
+  "document": "game/editor/console.json uses skeleton.console_editor_project.v1 and is part of the existing exact project file manifest; typed edits bind the expected complete file-manifest digest; no new persistence owner",
+  "native_formats": [
+    "NES planar 2bpp",
+    "Game Boy row-interleaved 2bpp",
+    "SNES planar 4bpp",
+    "Genesis high-nibble-first 4bpp",
+    "GBA low-nibble-first 4bpp and 8bpp",
+    "SMS row-planar 4bpp",
+    "PS1 TIM 4/8/16/24bpp",
+    "hardware palette words",
+    "target tilemap entries",
+    "Padded PS1 TIM24 rows and multi-CLUT TIM planes"
+  ],
+  "original_authoring": "Imports are explicit original-authored typed assets with author/source SHA and transformation receipts. ROM ingestion never extracts commercial ROM assets into projects. Data and source edits remain inert; native compilation/execution is delegated to the existing fixed approved toolchain/core boundaries. Actual bounded PNG and PCM WAVE source decoding binds measured geometry/sample identities; asset transforms preserve original-source and exact operation provenance.",
+  "constraints": "Canonical target identity/resolution/colors/toolchain/status are reused exactly. Published known tile/VRAM/bank/endianness constraints are distinguished from conservative editor capacity caps; undeclared physical RAM and binary compatibility remain unavailable, never fabricated. Native map chunk exports preserve actual entry formats, CGB separate attributes and NES2x2 palette attributes; unsupported NES/DMG flips bake original tiles into bounded native pattern slots. Source headers and RGBDS db tables are actual encoded data, but inclusion/scrolling/bank placement remains explicit source integration, never claimed automatic compilation.",
+  "simulation": "Typed editor scene/layers/tiles/entities/controllers/audio drive a bounded local fixed-step 2D design simulation with actual collision, hazard/goal/progress rewards and actual raster/audio previews. It is never hardware emulation or proof of console compatibility. Source/script text is not executed.",
+  "bounds": {
+    "project_json_bytes": 4194304,
+    "project_files": 128,
+    "file_bytes": 1048576,
+    "project_file_bytes": 7340032,
+    "asset_bytes": 1048576,
+    "tiles": 2048,
+    "layers": 8,
+    "layer_cells": 65536,
+    "entities": 256,
+    "audio_cues": 64,
+    "simulation_steps": 4096,
+    "decoded_image_bytes": 8388608
+  },
+  "failure": "Unknown targets/formats, incompatible palette/tile/bank references, malformed/truncated assets, out-of-bounds cells/entities/audio, stale file manifests and conflicting edit IDs fail before returning a candidate manifest. No caller-supplied flag grants hardware or promotion authority.",
+  "verification": "User-directed implementation session prohibits automated tests. Source formatting/lint/syntax checks and productive original authoring/simulation/build work are allowed; no acceptance or complete hardware claim follows from source implementation alone.",
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "edit_operations": [
+    "set_tile",
+    "paint_tile",
+    "transform_tile",
+    "set_palette",
+    "upsert_palette",
+    "remove_palette",
+    "upsert_tileset",
+    "remove_tileset",
+    "set_map_cell",
+    "fill_map",
+    "upsert_layer",
+    "remove_layer",
+    "upsert_entity",
+    "remove_entity",
+    "set_controls",
+    "set_audio",
+    "set_config",
+    "put_asset",
+    "delete_asset",
+    "transform_asset",
+    "replace_source",
+    "materialize_assets",
+    "bind_native_starter",
+    "unbind_native_starter",
+    "image_to_tiles"
+  ],
+  "interfaces": {
+    "catalog": "console_editor_catalog, console_profile",
+    "document": "create_console_project, ConsoleProject.from_files/as_dict/export_files/manifest_digest/source_manifest_digest",
+    "edits": "apply_console_edits exact expected full file-manifest SHA before any candidate result",
+    "native": "ConsoleProject.native_asset_files/native_source_files/build_handoff, explicit materialize_assets updates same original file manifest",
+    "import": "import_original_asset measures PNG/TIM/WAVE/native bytes; currentrights owned by backend",
+    "simulation": "EditorSimulationEnvironment spec/reset/step/snapshot/restore/preview/close consumes exact typed authoreddocument, compactsource identity metadata and declared bindings",
+    "review": "inspect_console_project binds actual source/profile/document digests, counts/encodings and bounded staticgrid reachability; unavailablephysics/hardware/quality remains explicitly unavailable",
+    "transaction": "begin_console_edit_transaction produces exact bounded inversefile patches; undo requires postmanifest and restores prem anifest exactly; persistence/CAS remains existingbackend"
+  },
+  "native_starters": {
+    "targets": [
+      "nes",
+      "game_boy"
+    ],
+    "source_owner": "skeleton/jeeves/game_console_editor.py",
+    "factory": "native_starter_source_files(project), ConsoleProject.native_starter_source_files()",
+    "scope": "Actual bounded NROM/RGBDS source consumes authored pattern/palette/map/collision data, directional input, native sprite positions and goal marker; fixed installed build adapters remain compilation authority",
+    "edits": "Explicit bind_native_starter installs trusted kernel plus generated assets.inc; typed art edits refresh only bound data while preserving manual source. Modified kernels lose automatic source-binding assertion. Unbind is explicit.",
+    "limits": "One physical viewport-sized8px tile scene, bounded sprite/tile capacity, no scrolling/mapper/licensedSDK fabrication",
+    "deferred": [
+      "native farming/fishing/NPC quest rules",
+      "native hardware music/APU",
+      "large multi-screen world streaming",
+      "automatic arbitrary source integration"
+    ],
+    "binary_build_verified": false,
+    "native_execution_verified": false,
+    "implementation_status": "Sourceimplemented; actual build/play proof remains canonical toolchain/execution receipts"
+  },
+  "productive_work": {
+    "canonical_editor_profiles": 169,
+    "original_authoring_exports": "/workspace/scratch/console-editor-original-authoring (eight targetfamilies; no commercialROM assetextraction)",
+    "native_starter_originals": "/workspace/scratch/console-editor-native-bound",
+    "actual_build_owner_report": "NES andDMG starters compiled through fixedca65/ld65 andRGBDS and executed150actual FCEUmm/Gambatte steps each by root operator; receipts in /workspace/scratch/console-editor-compiled",
+    "design_play": "Original Meadow Workshop131fixedsteps, actualcrop harvest2/fish2; actualPNG and source/transition hashes in /workspace/scratch/console-editor-original-authoring/meadow-play",
+    "automated_tests_written_or_run": false
+  }
+}

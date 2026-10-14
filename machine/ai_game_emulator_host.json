@@ -16,7 +16,7 @@
     "learning": "EmulatorEnvironment spec/reset/step/snapshot/restore/preview/close exposes 22 finite joypad and 9 keyboard actions, actual measured pixels/audio; visual exploration is not game-success proof",
     "controller": "input_step accepts bounded four-port joypad/analog/keyboard/mouse/pointer input; arbitrary human controls are explicitly controller-only evidence unless they exactly match one finite policy action",
     "native": "Actual reset, retro_run, serialize/unserialize, bounded memory reads and controller callbacks; RGB1555/RGB565/XRGB8888 software framebuffer conversion produces actual rgb24 pixels",
-    "content": "Cartridge bytes are bounded; large authorized CD/multifile sources materialize through canonical governed readers into immutable private content roots. Worker receives only readonly local paths and verified manifests, never arbitrary artifact URIs or credentials",
+    "content": "Cartridge bytes are bounded; large authorized CD/multifile sources materialize through canonical governed readers into immutable private content roots. Worker receives only readonly local paths and verified manifests, never arbitrary artifact URIs or credentials Operator-approved FBNeo/DOSBoxPure ZIP content remains opaque only after canonical archive CRC/extent/path/expansion inspection. The actual native ABI must independently declare block_extract before ZIP loading; archive filenames never execute uploaded host source.",
     "ipc": "Length-prefixed strict bounded JSON metadata plus individually length/hash-bound binary blocks; worker/native stdout is separate from protocol; request IDs and source identities remain exact"
   },
   "bounds": {

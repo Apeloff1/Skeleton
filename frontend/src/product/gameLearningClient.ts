@@ -61,7 +61,7 @@ export type LearningProject = {
   project_id: string; name: string; console_id: string; version: number;
   program_text: string; files?: LearningFile[]; sources: LearningSource[];
   sessions: LearningSession[]; jobs: LearningJob[]; generated_projects?: LearningGeneratedProject[];
-  metrics?: Record<string, unknown>; lineage_refs?: string[]; created_at?: string; updated_at?: string; entrypoint?: string; policy_id?: string | null; environment_actions?: string[];
+  metrics?: Record<string, unknown>; lineage_refs?: string[]; created_at?: string; updated_at?: string; entrypoint?: string; policy_id?: string | null; environment_actions?: string[]; execution_descriptor?: Record<string, unknown>; execution_readiness?: { state: string; message: string };
 };
 export type ReviewedDragonSource = { source_ref: string; source_id: string; source_revision: string; title: string; url?: string; current_review: boolean };
 export type LearningProjectSummary = Pick<LearningProject, 'project_id' | 'name' | 'console_id' | 'version' | 'created_at' | 'updated_at'>;
@@ -86,10 +86,11 @@ function invalid(message: string): never { throw new ChatClientError(message, { 
 function project(value: LearningProject): LearningProject {
   if (!value || typeof value.project_id !== 'string' || !value.project_id || typeof value.name !== 'string'
     || typeof value.console_id !== 'string' || !Number.isSafeInteger(value.version) || value.version < 1
-    || typeof value.program_text !== 'string' || value.program_text.length > 128000
+    || typeof value.program_text !== 'string' || value.program_text.length > 4 * 1024 * 1024
     || !Array.isArray(value.sources) || value.sources.length > 64 || !Array.isArray(value.sessions) || value.sessions.length > 512
-    || !Array.isArray(value.jobs) || value.jobs.length > 512 || (value.files?.length ?? 0) > 96) invalid('The server returned an invalid game project.');
-  for (const file of value.files || []) if (typeof file.path !== 'string' || typeof file.content !== 'string' || file.content.length > 128000) invalid('A project file exceeds the editor bounds.');
+    || !Array.isArray(value.jobs) || value.jobs.length > 512 || (value.files?.length ?? 0) > 128) invalid('The server returned an invalid game project.');
+  for (const file of value.files || []) if (typeof file.path !== 'string' || typeof file.content !== 'string' || new TextEncoder().encode(file.content).byteLength > (file.path === 'game/editor/console.json' ? 4 * 1024 * 1024 : 1024 * 1024)) invalid('A project file exceeds the editor bounds.');
+  if ((value.files || []).reduce((sum, file) => sum + new TextEncoder().encode(file.content).byteLength, 0) > 7 * 1024 * 1024) invalid('The project file tree exceeds its governed capacity.');
   for (const source of value.sources) if (!source || typeof source.source_id !== 'string' || typeof source.kind !== 'string' || !Array.isArray(source.rights_refs) || source.rights_refs.length > 64) invalid('The server returned an invalid source identity.');
   for (const session of value.sessions) if (!session || typeof session.session_id !== 'string' || !session.session_id) invalid('The server returned an invalid session identity.');
   value.sessions = [...value.sessions].sort((a, b) => String(a.created_at || a.updated_at || '').localeCompare(String(b.created_at || b.updated_at || '')));
@@ -253,9 +254,10 @@ export async function startConsoleBuild(current: LearningProject, config: { targ
   }, options(input, key)), 'The native build could not be started.');
   return job(result.job, current.project_id);
 }
-export async function downloadConsoleArtifact(projectId: string, artifact: ConsoleBuildArtifact, input: LearningRequest = {}): Promise<Uint8Array> {
+export async function downloadConsoleArtifact(projectId: string, artifact: ConsoleBuildArtifact, input: LearningRequest = {}, maxBytes: number = 16 * 1024 * 1024): Promise<Uint8Array> {
   const route = ROOT + '/projects/' + encodeURIComponent(projectId) + '/build-artifacts/' + encodeURIComponent(artifact.artifact_id);
-  if (!artifact || !Number.isSafeInteger(artifact.bytes) || artifact.bytes < 1 || artifact.bytes > 16 * 1024 * 1024 || !/^[a-f0-9]{64}$/.test(artifact.digest)
+  if (![16 * 1024 * 1024, 64 * 1024 * 1024].includes(maxBytes)) invalid('The artifact transfer capacity is invalid.');
+  if (!artifact || !Number.isSafeInteger(artifact.bytes) || artifact.bytes < 1 || artifact.bytes > maxBytes || !/^[a-f0-9]{64}$/.test(artifact.digest)
     || artifact.download_path !== route.replace(/^\/api/, '')) invalid('The build artifact identity is invalid.');
   const token = getAuthTokenForBuild(); const controller = new AbortController(); const abort = () => controller.abort(); const timer = setTimeout(abort, 30000);
   input.signal?.addEventListener('abort', abort, { once: true }); if (input.signal?.aborted) abort();

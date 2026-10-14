@@ -516,6 +516,12 @@ class GamePlayAuthority:
             scope, project, source_id=body.get("source_id"), episode_steps=body.get("max_steps", 4096)
         )
         request = await self.workspace.environment_request(scope, binding)
+        keyboard_bindings = None
+        if request["kind"] == "console_editor":
+            from skeleton.jeeves.game_console_editor import ConsoleProject
+
+            authored = ConsoleProject.from_files(request["tree"], target_id=request["target_id"])
+            keyboard_bindings = authored.as_dict()["controls"]["bindings"]
         # The parent validates identity; actual emulator execution remains in the child.
         policy = None
         if body.get("controller", "human") == "ai":
@@ -539,6 +545,11 @@ class GamePlayAuthority:
                 }
             ]
             await self.workspace._demonstration_authority(scope, binding)
+        # Current version/epoch/tree SHA authorize an immutable executable
+        # request; retaining the same full source graph twice exceeds Mongo's
+        # document budget for valid large console projects.
+        binding.pop("files")
+        binding["files_omitted"] = True
         if len(project.get("play_ids", [])) >= 32:
             raise _error("play_limit", "This project has reached its 32-session play limit.", 413)
         active = await self.plays.count_documents(
@@ -557,6 +568,7 @@ class GamePlayAuthority:
             "input": binding,
             "request": request,
             "request_digest": request_digest,
+            "keyboard_bindings": keyboard_bindings,
             "control_version": 1,
             "controller_epoch": 1,
             "controller": "replay" if replay else body.get("controller", "human"),
@@ -912,16 +924,38 @@ class GamePlayAuthority:
     async def stop_recording(self, scope, identifier, body):
         row = await self.recording(scope, identifier)
         if body.get("consent") is not True:
+            await self.workspace.database["game_learning_campaigns"].update_many(
+                {
+                    **scope,
+                    "$or": [
+                        {"binding.demonstrations.recording_id": identifier},
+                        {"binding.inherited_demonstrations.recording_id": identifier},
+                        {"binding.derived_demonstrations.recording_id": identifier},
+                    ],
+                },
+                {"$set": {"source_fenced": True, "desired_status": "cancelled"}},
+            )
             await self.workspace.jobs.update_many(
                 {
                     **scope,
-                    "input.demonstrations.recording_id": identifier,
+                    "$or": [
+                        {"input.demonstrations.recording_id": identifier},
+                        {"input.inherited_demonstrations.recording_id": identifier},
+                        {"input.derived_demonstrations.recording_id": identifier},
+                    ],
                     "status": {"$in": ["queued", "running", "interrupted"]},
                 },
                 {"$set": {"cancel_requested": True, "input_changed": True}},
             )
             await self.plays.update_many(
-                {**scope, "input.demonstrations.recording_id": identifier},
+                {
+                    **scope,
+                    "$or": [
+                        {"input.demonstrations.recording_id": identifier},
+                        {"input.inherited_demonstrations.recording_id": identifier},
+                        {"input.derived_demonstrations.recording_id": identifier},
+                    ],
+                },
                 {"$set": {"cancel_requested": True, "_input_fenced": True}},
             )
             await self.recordings.update_one(

@@ -90,7 +90,7 @@ class GameEnvironmentRequest:
         _int(self.max_steps, "environment episode steps", 1, 4096)
         _int(self.cycles_per_step, "ROM cycles per step", 4, 140448)
         _int(self.frames_per_step, "emulator frames per step", 1, 16)
-        if self.kind not in ("builtin", "libretro"):
+        if self.kind not in ("builtin", "libretro", "console_editor", "successor"):
             raise GameLearningError("environment request kind is undeclared")
         if (
             isinstance(self.emulator_timeout_seconds, bool)
@@ -100,8 +100,12 @@ class GameEnvironmentRequest:
         ):
             raise GameLearningError("emulator command timeout is outside bounds")
         if self.tree is not None:
-            tree = _copy_json(dict(self.tree), limit=4 * 1024 * 1024)
-            if len(tree) > 96 or any(not isinstance(value, str) for value in tree.values()):
+            tree = _copy_json(dict(self.tree), limit=8 * 1024 * 1024)
+            if (
+                len(tree) > 128
+                or any(not isinstance(value, str) for value in tree.values())
+                or sum(len(value.encode()) for value in tree.values()) > 7 * 1024 * 1024
+            ):
                 raise GameLearningError("environment project file mapping is invalid")
             object.__setattr__(self, "tree", tree)
         if self.rom_source is not None and (
@@ -117,6 +121,10 @@ class GameEnvironmentRequest:
                 raise GameLearningError("emulator request needs exactly one admitted content source")
         elif any(value is not None for value in (self.core_id, self.registry_digest, self.content)):
             raise GameLearningError("builtin request cannot carry an emulator registry or content descriptor")
+        if self.kind in ("console_editor", "successor") and (
+            self.tree is None or self.rom_source is not None or self.gameplay_dialect is not None
+        ):
+            raise GameLearningError("authored environment needs an exact file tree without ROM or dialect")
         _name(self.filename, "emulator content filename")
         if self.gameplay_dialect is not None:
             _name(self.gameplay_dialect, "environment gameplay dialect")
@@ -189,6 +197,20 @@ class GameEnvironmentRequest:
     def build(self, *, cancel: Callable[[], bool] | None = None) -> Any:
         if cancel is not None and cancel():
             raise GameLearningCancelled("environment construction was cancelled")
+        if self.kind == "console_editor":
+            from .game_console_editor import ConsoleProject
+            from .game_console_simulation import EditorSimulationEnvironment
+
+            return EditorSimulationEnvironment(
+                ConsoleProject.from_files(self.tree, target_id=self.target_id), max_steps=self.max_steps
+            )
+        if self.kind == "successor":
+            from .game_successor_runtime import SuccessorEnvironment
+
+            encoded = self.tree.get("game/successor/spec.json")
+            if not isinstance(encoded, str) or len(encoded.encode()) > 131072:
+                raise GameLearningError("successor authored spec is absent or exceeds capacity")
+            return SuccessorEnvironment(json.loads(encoded), max_steps=self.max_steps)
         if self.kind == "libretro":
             from .game_emulator_host import create_emulator_environment
 

@@ -274,6 +274,8 @@ class NativeCore:
         self._initialized = True
         entry = Path(config["entrypoint"])
         extension = entry.suffix.removeprefix(".").lower()
+        if extension in {"zip", "dosz"} and not self.system.block_extract:
+            raise ValueError("actual core does not declare opaque native archive loading")
         extensions = self.info["valid_extensions"].lower().split("|")
         if extensions != [""] and extension not in extensions:
             raise ValueError("content extension is not supported by the actual core")

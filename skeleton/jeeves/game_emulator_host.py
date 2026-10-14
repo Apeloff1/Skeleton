@@ -32,7 +32,7 @@ from .game_emulator_catalog import (
     ApprovedEmulatorCore,
     GameContentBundle,
     GameEmulatorRegistry,
-    load_game_content,
+    load_game_content_for_core,
 )
 from .game_emulator_protocol import read_packet, write_packet
 from .game_learning_runtime import EpisodeStep, GameEnvironmentSpec
@@ -467,7 +467,7 @@ class EmulatorEnvironment:
         if content is None:
             if not isinstance(rom_source, bytes):
                 raise EmulatorHostError("emulator_content_required", "Actual admitted content is required")
-            content = load_game_content(rom_source, filename)
+            content = load_game_content_for_core(core, rom_source, filename, registry=self._registry)
         if isinstance(content, GameContentBundle):
             self._prepared_owner = prepare_emulator_content(content, reader=reader)
             content = self._prepared_owner

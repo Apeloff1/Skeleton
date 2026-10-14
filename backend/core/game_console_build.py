@@ -75,11 +75,13 @@ async def _persist_artifacts(scope, job, result):
     )
     output = []
     total = 0
+    artifact_limit = 64 * 1024 * 1024 if job["kind"] == "desktop" else MAX_ARTIFACT
+    output_limit = 64 * 1024 * 1024 if job["kind"] == "desktop" else MAX_OUTPUT
     if len(result.artifacts) > MAX_ARTIFACTS:
         raise GameLearningError("build_artifact_limit", "Compiler output count exceeds its budget.", 413)
     for artifact in result.artifacts:
         total += len(artifact.data)
-        if len(artifact.data) > MAX_ARTIFACT or total > MAX_OUTPUT:
+        if len(artifact.data) > artifact_limit or total > output_limit:
             raise GameLearningError("build_artifact_limit", "Compiler output bytes exceed their budget.", 413)
         await workspace._authority(scope, job["input"])
         artifact_id = str(
@@ -194,7 +196,13 @@ async def download_build_artifact(scope, project_id: str, artifact_id: str):
     if record is None:
         raise GameLearningError("build_artifact_not_found", "This build artifact is unavailable.", 404)
     job = await workspace.jobs.find_one(
-        {"_id": record["job_id"], **scope, "project_id": project_id, "kind": "build", "status": "completed"}
+        {
+            "_id": record["job_id"],
+            **scope,
+            "project_id": project_id,
+            "kind": {"$in": ["build", "desktop"]},
+            "status": "completed",
+        }
     )
     if job is None or job.get("result", {}).get("state") != "binary_ready":
         raise GameLearningError(
@@ -215,11 +223,13 @@ async def download_build_artifact(scope, project_id: str, artifact_id: str):
             "build_artifact_corrupt", "Artifact identity differs from its producing job.", 503
         )
     await workspace._authority(scope, job["input"])
+    artifact_limit = 64 * 1024 * 1024 if job["kind"] == "desktop" else MAX_ARTIFACT
+    chunk_limit = 128 if job["kind"] == "desktop" else 32
     if (
         type(record["chunk_count"]) is not int
-        or not 1 <= record["chunk_count"] <= 32
+        or not 1 <= record["chunk_count"] <= chunk_limit
         or type(record["bytes"]) is not int
-        or not 1 <= record["bytes"] <= MAX_ARTIFACT
+        or not 1 <= record["bytes"] <= artifact_limit
     ):
         raise GameLearningError(
             "build_artifact_corrupt", "Artifact geometry exceeds its declared bounds.", 503
@@ -235,8 +245,8 @@ async def download_build_artifact(scope, project_id: str, artifact_id: str):
             }
         )
         .sort("index", ASCENDING)
-        .limit(33)
-        .to_list(length=33)
+        .limit(chunk_limit + 1)
+        .to_list(length=chunk_limit + 1)
     )
     if len(rows) != record["chunk_count"]:
         raise GameLearningError("build_artifact_corrupt", "Artifact chunk coverage is incomplete.", 503)

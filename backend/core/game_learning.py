@@ -92,8 +92,8 @@ def _public(doc: Mapping[str, Any], *, payload: bool = False) -> dict[str, Any]:
 
 
 def _files(raw: object) -> list[dict[str, Any]]:
-    if not isinstance(raw, list) or len(raw) > 96:
-        raise GameLearningError("file_limit", "Projects support at most 96 text files.", 413)
+    if not isinstance(raw, list) or len(raw) > 128:
+        raise GameLearningError("file_limit", "Projects support at most 128 text files.", 413)
     files, seen, size = [], set(), 0
     for item in raw:
         if (
@@ -119,7 +119,8 @@ def _files(raw: object) -> list[dict[str, Any]]:
             )
         count = len(content.encode())
         size += count
-        if count > 128_000 or size > 1_000_000:
+        file_limit = 4 * 1024 * 1024 if path == "game/editor/console.json" else 1024 * 1024
+        if count > file_limit or size > 7 * 1024 * 1024:
             raise GameLearningError("file_bytes_limit", "Project file bytes exceed the editor limit.", 413)
         seen.add(path)
         files.append(
@@ -165,6 +166,7 @@ class GameLearningWorkspace:
         self.quotas = database["game_learning_limits"]
         self.workers = database["game_learning_workers"]
         self._tasks: dict[str, asyncio.Task] = {}
+        self._studio_continuations: set[asyncio.Task] = set()
         self._cancel: dict[str, threading.Event] = {}
         self._slots = asyncio.Semaphore(2)
         self._indexes_ready = False
@@ -436,12 +438,32 @@ class GameLearningWorkspace:
             from skeleton.jeeves.game_learning_runtime import create_game_environment
 
             try:
-                current_environment = create_game_environment(
-                    project["console_id"],
-                    tree={item["path"]: item["content"] for item in project["files"]} or None,
-                    gameplay_dialect=_manifest_dialect(project["files"]),
+                from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
+
+                tree = {item["path"]: item["content"] for item in project["files"]}
+                kind = self.authored_environment_kind(tree)
+                current_environment = (
+                    GameEnvironmentRequest(
+                        project["console_id"], kind=kind, tree=self.authored_runtime_tree(tree, kind)
+                    ).build()
+                    if kind
+                    else create_game_environment(
+                        project["console_id"],
+                        tree=tree or None,
+                        gameplay_dialect=_manifest_dialect(project["files"]),
+                    )
                 )
-                result["environment_actions"] = list(current_environment.spec.actions)
+                try:
+                    result["environment_actions"] = list(current_environment.spec.actions)
+                    result["execution_descriptor"] = (
+                        current_environment.descriptor()
+                        if callable(getattr(current_environment, "descriptor", None))
+                        else current_environment.spec.as_dict()
+                    )
+                finally:
+                    from skeleton.jeeves.game_learning_demonstrations import close_environment
+
+                    close_environment(current_environment)
             except ValueError:
                 result["execution_readiness"] = {
                     "state": "program_rejected",
@@ -463,30 +485,193 @@ class GameLearningWorkspace:
         _json(result)
         return result
 
-    async def _fence_jobs(self, scope: dict[str, str], project_id: str):
-        # This first authoritative head fence blocks admission of any new old-input session.
-        await self.projects.update_one(
-            {"_id": project_id, **scope, "state": "active"}, {"$inc": {"_input_epoch": 1}}
+    async def _fence_studio_campaigns(self, scope, project_id, *, version=None, epoch=None, cutoff=None):
+        own = {"project_id": project_id}
+        if version is not None:
+            own["binding.project_version"] = {"$lte": version}
+            own["binding.input_epoch"] = {"$lte": epoch}
+        query = {
+            **scope,
+            "source_fenced": {"$ne": True},
+            "$or": [
+                own,
+                {"binding.external_sources.project_id": project_id},
+                {"binding.derived_sources.project_id": project_id},
+            ],
+        }
+        if cutoff is not None:
+            query["created_at"] = {"$lte": cutoff}
+        await self.database["game_learning_campaigns"].update_many(
+            query, {"$set": {"source_fenced": True, "desired_status": "cancelled", "updated_at": _now()}}
         )
+
+    async def _fence_jobs(self, scope: dict[str, str], project_id: str, *, editor_claim=None):
+        # This first authoritative head fence blocks admission of any new old-input session.
+        cutoff, input_filter = {}, {}
+        if editor_claim is not None:
+            claim_filter = {
+                "_id": project_id,
+                **scope,
+                "state": "active",
+                "version": editor_claim["version"],
+                "_editor_write_token": editor_claim["token"],
+                "_editor_write_until": {"$gt": _now()},
+            }
+            head = await self.projects.find_one(claim_filter)
+            if head is None:
+                raise GameLearningError(
+                    "editor_write_fenced", "Editor reservation lost its current head.", 409
+                )
+            await self._fence_studio_campaigns(
+                scope,
+                project_id,
+                version=editor_claim["version"],
+                epoch=head.get("_editor_previous_epoch", head.get("_input_epoch", 0)),
+                cutoff=head.get("_editor_fenced_at", _now()),
+            )
+            if head.get("_editor_write_phase") != "fenced":
+                previous_epoch = head.get("_input_epoch", 0)
+                head = await self.projects.find_one_and_update(
+                    {**claim_filter, "_input_epoch": previous_epoch, "_editor_write_phase": "reserved"},
+                    {
+                        "$inc": {"_input_epoch": 1},
+                        "$set": {
+                            "_editor_write_phase": "fenced",
+                            "_editor_previous_epoch": previous_epoch,
+                            "_editor_fenced_at": _now(),
+                        },
+                    },
+                    return_document=ReturnDocument.AFTER,
+                )
+                if head is None:
+                    raise GameLearningError(
+                        "editor_write_fenced", "Project changed before its editor fence.", 409
+                    )
+            cutoff = {"created_at": {"$lte": head["_editor_fenced_at"]}}
+            input_filter = {
+                "input.project_version": {"$lte": editor_claim["version"]},
+                "input.input_epoch": {"$lte": head["_editor_previous_epoch"]},
+            }
+        else:
+            await self._fence_studio_campaigns(scope, project_id)
+            await self.projects.update_one(
+                {"_id": project_id, **scope, "state": "active"},
+                {"$inc": {"_input_epoch": 1}, "$unset": self._editor_claim_fields()},
+            )
         # Existing-session replacement is denied before actual source/editor authority changes.
         await self.sessions.update_many(
-            {**scope, "project_id": project_id}, {"$set": {"_input_fenced": True}}
+            {**scope, "project_id": project_id, **input_filter}, {"$set": {"_input_fenced": True}}
         )
         await self.database["game_learning_plays"].update_many(
-            {**scope, "project_id": project_id}, {"$set": {"_input_fenced": True, "cancel_requested": True}}
+            {**scope, "project_id": project_id, **input_filter},
+            {"$set": {"_input_fenced": True, "cancel_requested": True}},
         )
         await self.database["game_learning_recordings"].update_many(
-            {**scope, "project_id": project_id}, {"$set": {"_input_fenced": True}}
+            {**scope, "project_id": project_id, **input_filter}, {"$set": {"_input_fenced": True}}
         )
-        await self.database["game_learning_live_frames"].delete_many({**scope, "project_id": project_id})
+        await self.database["game_learning_live_frames"].delete_many(
+            {
+                **scope,
+                "project_id": project_id,
+                **(
+                    {"expires_at": {"$lte": head["_editor_fenced_at"] + timedelta(seconds=30)}}
+                    if editor_claim
+                    else {}
+                ),
+            }
+        )
+        # Existing derived jobs and active worlds retain all external source
+        # dependencies; changing an origin fences dependants before publication.
+        dependencies = {
+            **scope,
+            **cutoff,
+            "$or": [
+                {"input.external_sources.project_id": project_id},
+                {"input.derived_sources.project_id": project_id},
+            ],
+        }
         await self.jobs.update_many(
-            {**scope, "project_id": project_id, "status": {"$in": ["queued", "running", "interrupted"]}},
+            {**dependencies, "status": {"$in": ["queued", "running", "interrupted"]}},
+            {"$set": {"cancel_requested": True, "input_changed": True}},
+        )
+        await self.database["game_learning_plays"].update_many(
+            dependencies, {"$set": {"_input_fenced": True, "cancel_requested": True}}
+        )
+        await self.database["game_learning_recordings"].update_many(
+            dependencies, {"$set": {"_input_fenced": True}}
+        )
+        await self.jobs.update_many(
+            {
+                **scope,
+                "project_id": project_id,
+                **input_filter,
+                "status": {"$in": ["queued", "running", "interrupted"]},
+            },
             {"$set": {"cancel_requested": True, "input_changed": True}},
         )
         for job_id, event in tuple(self._cancel.items()):
-            row = await self.jobs.find_one({"_id": job_id, **scope, "project_id": project_id}, {"_id": 1})
+            row = await self.jobs.find_one(
+                {"_id": job_id, **scope, "project_id": project_id, **input_filter}, {"_id": 1}
+            )
             if row is not None:
                 event.set()
+
+    @staticmethod
+    def _editor_claim_fields():
+        return {
+            key: ""
+            for key in (
+                "_editor_write_token",
+                "_editor_write_until",
+                "_editor_write_operation_id",
+                "_editor_write_phase",
+                "_editor_previous_epoch",
+                "_editor_fenced_at",
+            )
+        }
+
+    @staticmethod
+    def _editor_pending(project):
+        return project.get("_editor_write_phase") == "fenced" or (
+            project.get("_editor_write_until") is not None and _time(project["_editor_write_until"]) > _now()
+        )
+
+    async def _reserve_editor(self, scope, project, operation_id):
+        token = str(uuid4())
+        phase = (
+            "fenced"
+            if project.get("_editor_write_operation_id") == operation_id
+            and project.get("_editor_write_phase") == "fenced"
+            else "reserved"
+        )
+        reserved = await self.projects.find_one_and_update(
+            {
+                "_id": project["project_id"],
+                **scope,
+                "state": "active",
+                "version": project["version"],
+                "$or": [
+                    {"_editor_write_token": {"$exists": False}},
+                    {"_editor_write_until": {"$lte": _now()}},
+                ],
+            },
+            {
+                "$set": {
+                    "_editor_write_token": token,
+                    "_editor_write_until": _now() + timedelta(seconds=120),
+                    "_editor_write_operation_id": operation_id,
+                    "_editor_write_phase": phase,
+                }
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+        if reserved is None:
+            raise GameLearningError(
+                "editor_write_busy",
+                "Another editor save owns this revision; retry the exact request when it finishes.",
+                409,
+            )
+        return {"token": token, "version": project["version"]}
 
     async def save_editor(self, scope: dict[str, str], project_id: str, body: dict[str, Any]):
         operation_id = _key(project_id, "editor", body["idempotency_key"])
@@ -535,7 +720,6 @@ class GameLearningWorkspace:
             raise GameLearningError(
                 "idempotency_conflict", "Editor key already binds a different revision.", 409
             )
-        await self._fence_jobs(scope, project_id)
         entrypoint = (
             body.get("entrypoint")
             or body.get("path")
@@ -546,18 +730,50 @@ class GameLearningWorkspace:
             raise GameLearningError(
                 "entrypoint_unavailable", "Editor entrypoint must name an existing project file."
             )
+        try:
+            claim = await self._reserve_editor(scope, project, operation_id)
+            await self._fence_jobs(scope, project_id, editor_claim=claim)
+        except GameLearningError:
+            current = await self._project(project_id, scope)
+            if operation_id in current["revision_ids"]:
+                return await self.get_project(scope, project_id)
+            raise
         updated = await self.projects.find_one_and_update(
-            {"_id": project_id, **scope, "version": body["expected_version"], "state": "active"},
+            {
+                "_id": project_id,
+                **scope,
+                "version": body["expected_version"],
+                "state": "active",
+                "_editor_write_token": claim["token"],
+                "_editor_write_until": {"$gt": _now()},
+                "_editor_write_phase": "fenced",
+            },
             {
                 "$set": {
                     "files": files,
                     "execution_mode": (
-                        "original_generated_grid"
-                        if any(item["path"] == "game/generated/game.json" for item in files)
+                        self.authored_environment_kind({item["path"]: item["content"] for item in files})
+                        or "original_generated_grid"
+                        if any(
+                            item["path"]
+                            in {
+                                "game/generated/game.json",
+                                "game/editor/console.json",
+                                "game/successor/spec.json",
+                            }
+                            for item in files
+                        )
                         else project["execution_mode"]
                     ),
                     "policy_id": (
                         project.get("policy_id") if _digest(files) == _digest(project["files"]) else None
+                    ),
+                    "derived_sources": body.get("_derived_sources", project.get("derived_sources", [])),
+                    "derived_demonstrations": body.get(
+                        "_derived_demonstrations", project.get("derived_demonstrations", [])
+                    ),
+                    "successor_candidate_id": body.get(
+                        "_successor_candidate_id", project.get("successor_candidate_id")
                     ),
                     "entrypoint": entrypoint,
                     "program_text": next(
@@ -567,10 +783,14 @@ class GameLearningWorkspace:
                 },
                 "$inc": {"version": 1},
                 "$push": {"revision_ids": operation_id},
+                "$unset": self._editor_claim_fields(),
             },
             return_document=ReturnDocument.AFTER,
         )
         if updated is None:
+            current = await self._project(project_id, scope)
+            if operation_id in current["revision_ids"]:
+                return await self.get_project(scope, project_id)
             raise GameLearningError("project_conflict", "Project changed during editor save.", 409)
         return await self.get_project(scope, project_id)
 
@@ -578,16 +798,57 @@ class GameLearningWorkspace:
         from skeleton.jeeves.game_learning_ingestion import GameLearningIngestor, GameSourceProvenance
 
         source_id = _key(project_id, "source", body["idempotency_key"])
-        digest = _digest(body)
+        payload = None
+        if body["kind"] != "dragon":
+            if body.get("content_base64") is not None:
+                try:
+                    payload = base64.b64decode(body["content_base64"], validate=True)
+                except (ValueError, binascii.Error) as exc:
+                    raise GameLearningError(
+                        "invalid_source_encoding", "Uploaded source must contain valid base64 bytes."
+                    ) from exc
+            else:
+                payload = (body.get("text") or "").encode()
+            if not payload or len(payload) > MAX_SOURCE:
+                raise GameLearningError(
+                    "source_bytes_limit", "Source bytes must be within the16MiB limit.", 413
+                )
+        request_identity = {
+            key: value for key, value in body.items() if key not in {"content_base64", "text"}
+        }
+        digest = _digest(
+            {
+                "schema_version": "skeleton.game_source_request.v2",
+                "request": request_identity,
+                "payload_digest": hashlib.sha256(payload).hexdigest() if payload is not None else None,
+                "payload_bytes": len(payload) if payload is not None else None,
+            }
+        )
         project = await self._project(project_id, scope)
         prior = await self.sources.find_one({"_id": source_id, **scope, "project_id": project_id})
         if prior is not None:
-            if prior["request_digest"] != digest:
+            compatible = prior["request_digest"] == digest
+            if not compatible and prior.get("request_identity_schema") is None:
+                try:
+                    compatible = prior["request_digest"] == _digest(body)
+                except GameLearningError as exc:
+                    if exc.code != "payload_limit":
+                        raise
+            if not compatible:
                 raise GameLearningError(
                     "idempotency_conflict", "Source key was reused with different input.", 409
                 )
+            # Preserve the issued identity of an exact legacy prepared source;
+            # compatibility never rewrites its immutable journal or payload.
+            digest = prior["request_digest"]
+            if prior.get("state") != "active" or prior.get("rights_acknowledged") is not True:
+                raise GameLearningError("source_withdrawn", "This source admission was withdrawn.", 410)
             if source_id in project["source_ids"]:
                 return await self.get_project(scope, project_id), _public(prior)
+        if body["kind"] == "rom":
+            bridged = await self._ingest_native_media(scope, project, body, payload, digest, source_id)
+            if bridged is not None:
+                return bridged
         await self._project(project_id, scope, body["expected_version"])
         if len(project["source_ids"]) >= 64:
             raise GameLearningError("source_limit", "Project source limit reached.", 413)
@@ -626,19 +887,6 @@ class GameLearningWorkspace:
                 console_id=project["console_id"],
             )
         else:
-            if body.get("content_base64") is not None:
-                try:
-                    payload = base64.b64decode(body["content_base64"], validate=True)
-                except (ValueError, binascii.Error) as exc:
-                    raise GameLearningError(
-                        "invalid_source_encoding", "Uploaded source must contain valid base64 bytes."
-                    ) from exc
-            else:
-                payload = (body.get("text") or "").encode()
-            if not payload or len(payload) > MAX_SOURCE:
-                raise GameLearningError(
-                    "source_bytes_limit", "Source bytes must be within the 16 MiB limit.", 413
-                )
             bundle = await asyncio.to_thread(
                 GameLearningIngestor().ingest_bytes,
                 payload,
@@ -655,6 +903,7 @@ class GameLearningWorkspace:
             "project_id": project_id,
             "source_id": source_id,
             "request_digest": digest,
+            "request_identity_schema": "skeleton.game_source_request.v2",
             "kind": kind,
             "filename": filename,
             "source_digest": hashlib.sha256(payload).hexdigest(),
@@ -706,12 +955,136 @@ class GameLearningWorkspace:
                 "version": body["expected_version"],
                 "source_ids": {"$ne": source_id},
             },
-            {"$push": {"source_ids": source_id}, "$inc": {"version": 1}, "$set": {"updated_at": _now()}},
+            {
+                "$push": {"source_ids": source_id},
+                "$inc": {"version": 1},
+                "$set": {"updated_at": _now()},
+                "$unset": self._editor_claim_fields(),
+            },
             return_document=ReturnDocument.AFTER,
         )
         if updated is None:
             raise GameLearningError("project_conflict", "Project changed during source admission.", 409)
         return await self.get_project(scope, project_id), _public(doc)
+
+    async def _ingest_native_media(self, scope, project, body, payload, request_digest, source_operation_id):
+        from core.game_content_uploads import CHUNK_BYTES as MEDIA_CHUNK_BYTES, content_uploads
+        from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry, emulator_content_extensions
+        from skeleton.jeeves.game_learning_ingestion import _ROM_EXTENSIONS, _has_rom_signature
+
+        filename = body.get("filename") or "source.bin"
+        target_id = project["console_id"].removeprefix("dragon_native:").removeprefix("emulator:")
+        known_targets = {
+            "nes",
+            "famicom",
+            "game_boy",
+            "game_boy_color",
+            "game_boy_pocket",
+            "game_boy_light",
+            "gb",
+            "gbc",
+            "snes",
+            "super_famicom",
+            "genesis",
+            "mega_drive",
+            "game_boy_advance",
+            "gba",
+            "nintendo_64",
+            "n64",
+        }
+        if (
+            target_id in known_targets
+            or PurePosixPath(filename).suffix.casefold() in _ROM_EXTENSIONS
+            or _has_rom_signature(payload)
+        ):
+            return None
+        marker = await self.revisions.find_one(
+            {"_id": source_operation_id, **scope, "kind": "native_media_source"}
+        )
+        if marker is not None and marker["request_digest"] != request_digest:
+            raise GameLearningError(
+                "idempotency_conflict", "Source key already binds different native media.", 409
+            )
+        if marker is None:
+            registry = GameEmulatorRegistry.from_environment()
+            try:
+                core = registry.resolve(target_id)
+            except ValueError:
+                # Absence of actual installed approval does not widen intake.
+                return None
+            if PurePosixPath(filename).suffix.casefold() not in emulator_content_extensions(core.core_id):
+                return None
+            await self._project(project["project_id"], scope, body["expected_version"])
+            if len(project["source_ids"]) >= 64:
+                raise GameLearningError("source_limit", "Project source limit reached.", 413)
+            admission = await self._admit(
+                scope, "game-learning-native-media-admission", source_operation_id, 4096
+            )
+            await self.revisions.update_one(
+                {"_id": source_operation_id},
+                {
+                    "$setOnInsert": {
+                        "_id": source_operation_id,
+                        **scope,
+                        "project_id": project["project_id"],
+                        "kind": "native_media_source",
+                        "request_digest": request_digest,
+                        "core_id": core.core_id,
+                        "registry_digest": registry.registry_digest,
+                        "filename": filename,
+                        "payload_digest": hashlib.sha256(payload).hexdigest(),
+                        "created_at": _now(),
+                        "storage_receipt": admission,
+                    }
+                },
+                upsert=True,
+            )
+            marker = await self.revisions.find_one(
+                {"_id": source_operation_id, **scope, "kind": "native_media_source"}
+            )
+        if marker is None or marker["request_digest"] != request_digest:
+            raise GameLearningError(
+                "idempotency_conflict", "Native source operation identity conflicts.", 409
+            )
+        # This is the same canonical protocol used by streamed uploads. Its
+        # immutable manifests, account quota, chunk receipts and source-head CAS
+        # remain the sole media authority, including restart recovery.
+        upload = await content_uploads.create(
+            scope,
+            project["project_id"],
+            {
+                "expected_version": body["expected_version"],
+                "idempotency_key": "native-source:" + source_operation_id,
+                "files": [
+                    {"path": filename, "bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+                ],
+                "entrypoint": filename,
+                "rights_refs": body.get("rights_refs", []),
+                "rights_acknowledged": body.get("rights_acknowledged") is True,
+            },
+        )
+        if upload["status"] != "ready":
+            current_registry = GameEmulatorRegistry.from_environment()
+            current_core = current_registry.resolve_core(marker["core_id"])
+            if (
+                current_registry.registry_digest != marker["registry_digest"]
+                or target_id not in current_core.target_ids
+            ):
+                raise GameLearningError(
+                    "emulator_approval_changed",
+                    "Native media upload approval changed; start a fresh upload under the current operator configuration.",
+                    409,
+                )
+        if upload["status"] == "uploading":
+            # On restart exact repeated chunks compare their actual digest and
+            # byte range; no retained client buffer or invented parser evidence.
+            for index, offset in enumerate(range(0, len(payload), MEDIA_CHUNK_BYTES)):
+                chunk = payload[offset : offset + MEDIA_CHUNK_BYTES]
+                await content_uploads.put_chunk(
+                    scope, upload["upload_id"], 0, index, chunk, hashlib.sha256(chunk).hexdigest()
+                )
+        result = await content_uploads.complete(scope, upload["upload_id"])
+        return result["project"], result["source"]
 
     @staticmethod
     def _source_bundle(scope, source):
@@ -796,7 +1169,9 @@ class GameLearningWorkspace:
 
     async def _guarded_write(self, scope, binding, operation):
         dragon = []
-        for expected in binding["sources"]:
+        for expected in (
+            binding["sources"] + binding.get("external_sources", []) + binding.get("derived_sources", [])
+        ):
             row = await self.sources.find_one({"_id": expected["source_id"], **scope})
             if row is not None and row["kind"] == "dragon":
                 bundle = self._source_bundle(scope, row).to_dict()
@@ -893,6 +1268,12 @@ class GameLearningWorkspace:
     async def _input(self, scope, project, *, source_id=None, episode_steps=256, require_execution=True):
         from skeleton.jeeves.game_console_catalog import resolve_console
 
+        if self._editor_pending(project):
+            raise GameLearningError(
+                "editor_write_pending",
+                "A prepared editor save must finish or recover before starting new work.",
+                409,
+            )
         target = resolve_console(project["console_id"])
         selected = source_id or project.get("default_source_id")
         sources = (
@@ -907,7 +1288,11 @@ class GameLearningWorkspace:
             .limit(64)
             .to_list(length=64)
         )
-        generated_grid = any(item["path"] == "game/generated/game.json" for item in project["files"])
+        generated_grid = any(
+            item["path"]
+            in {"game/generated/game.json", "game/editor/console.json", "game/successor/spec.json"}
+            for item in project["files"]
+        )
         if target.requires_rom and not generated_grid:
             selected = selected or next(
                 (row["source_id"] for row in sources if row["kind"] in {"rom", "content_bundle"}), None
@@ -944,6 +1329,8 @@ class GameLearningWorkspace:
             ],
             "tree_digest": _digest(project["files"]),
             "gameplay_dialect": _manifest_dialect(project["files"]),
+            "derived_sources": list(project.get("derived_sources", [])),
+            "derived_demonstrations": list(project.get("derived_demonstrations", [])),
         }
 
     async def _authority(self, scope, binding, *, dragon_guarded=False):
@@ -956,6 +1343,12 @@ class GameLearningWorkspace:
             raise GameLearningError(
                 "input_changed", "Project files changed; this operation cannot resume.", 409
             )
+        if "files" in binding and _digest(binding["files"]) != binding["tree_digest"]:
+            raise GameLearningError(
+                "frozen_files_corrupt", "Frozen files do not match their admitted identity.", 503
+            )
+        if "files" not in binding and binding.get("files_omitted") is not True:
+            raise GameLearningError("frozen_files_absent", "Input lacks its file binding.", 503)
         for expected in binding["sources"]:
             row = await self.sources.find_one(
                 {
@@ -996,7 +1389,7 @@ class GameLearningWorkspace:
                 )
             registry.resolve_core(binding["emulator_binding"]["core_id"])
         if binding.get("demonstrations") or binding.get("inherited_demonstrations"):
-            await self._demonstration_authority(scope, binding)
+            await self._demonstration_authority(scope, binding, dragon_guarded=dragon_guarded)
         for role in ("parent_policy", "generation_policy"):
             if binding.get(role):
                 parent = await self._admitted_policy(
@@ -1004,7 +1397,78 @@ class GameLearningWorkspace:
                 )
                 if parent["snapshot"]["snapshot_digest"] != binding[role]["snapshot_digest"]:
                     raise GameLearningError("parent_policy_changed", "Admitted policy identity changed.", 409)
+        await self._external_authority(scope, binding, dragon_guarded=dragon_guarded)
+        await self._derived_demonstration_authority(scope, binding, dragon_guarded=dragon_guarded)
         return project
+
+    async def _derived_demonstration_authority(self, scope, binding, *, dragon_guarded=False):
+        from skeleton.jeeves.game_learning_demonstrations import GameDemonstration
+
+        references = binding.get("derived_demonstrations", [])
+        if not isinstance(references, list) or len(references) > 64:
+            raise GameLearningError(
+                "teacher_lineage_limit", "Derived teacher provenance exceeds capacity.", 413
+            )
+        for expected in references:
+            recorded = await self.database["game_learning_recordings"].find_one(
+                {
+                    "_id": expected["recording_id"],
+                    **scope,
+                    "project_id": expected["project_id"],
+                    "status": "completed",
+                    "consent": True,
+                }
+            )
+            if recorded is None:
+                raise GameLearningError(
+                    "derived_teacher_withdrawn", "An original teacher withdrew consent.", 403
+                )
+            demo = GameDemonstration.from_dict(recorded["demonstration"])
+            if (
+                demo.digest != expected["demonstration_digest"]
+                or recorded["input"]["tree_digest"] != expected["tree_digest"]
+            ):
+                raise GameLearningError("derived_teacher_changed", "Original teacher evidence changed.", 403)
+            sources = [{**ref, "project_id": recorded["project_id"]} for ref in recorded["input"]["sources"]]
+            sources += recorded["input"].get("derived_sources", [])
+            await self._external_authority(scope, {"derived_sources": sources}, dragon_guarded=dragon_guarded)
+
+    async def _external_authority(self, scope, binding, *, dragon_guarded=False):
+        for reference in binding.get("external_sources", []) + binding.get("derived_sources", []):
+            origin = await self._project(reference["project_id"], scope)
+            if self._editor_pending(origin):
+                raise GameLearningError(
+                    "origin_write_pending", "An origin editor save is still pending.", 409
+                )
+            if reference in binding.get("external_sources", []) and (
+                origin["version"] != reference["project_version"]
+                or origin.get("_input_epoch", 0) != reference["input_epoch"]
+            ):
+                raise GameLearningError("origin_revision_changed", "An origin project changed.", 409)
+            row = await self.sources.find_one(
+                {
+                    "_id": reference["source_id"],
+                    **scope,
+                    "project_id": reference["project_id"],
+                    "state": "active",
+                    "rights_acknowledged": True,
+                }
+            )
+            if (
+                row is None
+                or row["source_id"] not in origin["source_ids"]
+                or any(row[key] != reference[key] for key in ("source_digest", "authority_epoch"))
+            ):
+                raise GameLearningError("origin_source_withdrawn", "An origin source was withdrawn.", 403)
+            bundle = self._source_bundle(scope, row)
+            if bundle.bundle_digest != reference["bundle_digest"]:
+                raise GameLearningError("origin_source_changed", "Origin source content changed.", 403)
+            if row["kind"] == "content_bundle":
+                await self._content_authority(scope, origin["project_id"], row)
+            if row["kind"] == "dragon" and not dragon_guarded:
+                current = await self._dragon_record(scope, bundle.to_dict()["provenance"]["source_ref"])
+                if hashlib.sha256(_json(current)).hexdigest() != row["source_digest"]:
+                    raise GameLearningError("dragon_authority_changed", "Origin Dragon review changed.", 403)
 
     async def _admitted_policy(self, scope, project_id, policy_id, *, dragon_guarded=False):
         saved = await self.policies.find_one({"_id": policy_id, **scope, "project_id": project_id})
@@ -1045,7 +1509,13 @@ class GameLearningWorkspace:
                         "policy_review_withdrawn", "Policy Dragon review is no longer current.", 403
                     )
         if saved["input"].get("demonstrations") or saved["input"].get("inherited_demonstrations"):
-            await self._demonstration_authority(scope, saved["input"])
+            await self._demonstration_authority(scope, saved["input"], dragon_guarded=dragon_guarded)
+        await self._external_authority(
+            scope,
+            {"derived_sources": saved["input"].get("derived_sources", [])},
+            dragon_guarded=dragon_guarded,
+        )
+        await self._derived_demonstration_authority(scope, saved["input"], dragon_guarded=dragon_guarded)
         return saved
 
     async def _factory(self, scope, binding):
@@ -1300,7 +1770,7 @@ class GameLearningWorkspace:
             result["result"] = {
                 key: value
                 for key, value in result["result"].items()
-                if key not in {"files", "file_contents", "evaluation", "config"}
+                if key not in {"files", "file_contents", "evaluation", "config", "recipe", "comparison"}
             }
         result["resume_available"] = (
             job["status"] == "interrupted"
@@ -1328,6 +1798,7 @@ class GameLearningWorkspace:
                             "_id": project_id,
                             **scope,
                             "version": body["expected_version"],
+                            "_input_epoch": old["input"].get("input_epoch", 0),
                             "_job_count": {"$lt": 512},
                             "job_ids": {"$ne": job_id},
                         },
@@ -1349,6 +1820,10 @@ class GameLearningWorkspace:
                 episode_steps=body.get("episode_steps") or 256,
                 require_execution=kind == "train",
             )
+            input_hook = getattr(self, "_job_input_hooks", {}).get(kind)
+            if input_hook is not None:
+                binding = await input_hook(scope, project, binding, body)
+            await self._authority(scope, binding)
             # Source generation does not confer emulator or native-toolchain execution.
             environment = None
             if kind == "train":
@@ -1490,6 +1965,7 @@ class GameLearningWorkspace:
                 job_id,
                 len(_json(_public(doc))) + len(_json(binding)) + (len(_json(parent)) if parent else 0),
             )
+            _json({"input": binding, "request": body, "parent": parent}, MAX_JSON - 65536)
             await self.jobs.update_one({"_id": job_id}, {"$setOnInsert": doc}, upsert=True)
             issued = await self.jobs.find_one({"_id": job_id, **scope})
             if (
@@ -1506,6 +1982,7 @@ class GameLearningWorkspace:
                     **scope,
                     "version": project["version"],
                     "_job_count": {"$lt": 512},
+                    "_input_epoch": binding["input_epoch"],
                     "job_ids": {"$ne": job_id},
                 },
                 {"$push": {"job_ids": job_id}, "$inc": {"_job_count": 1}},
@@ -1575,18 +2052,37 @@ class GameLearningWorkspace:
 
     async def _schedule(self, job_id, scope):
         if job_id not in self._tasks and len(self._tasks) < 8:
-            if (
-                await self.jobs.find_one(
-                    {"_id": job_id, **scope, "status": "queued", "cancel_requested": False}
-                )
-                is None
-            ):
+            queued = await self.jobs.find_one(
+                {"_id": job_id, **scope, "status": "queued", "cancel_requested": False}
+            )
+            if queued is None or job_id in self._tasks or len(self._tasks) >= 8:
                 return
+            expected_worker_epoch = queued.get("worker_epoch", 0) + 1
             task = asyncio.create_task(self._run_job(job_id, scope))
             self._tasks[job_id] = task
 
             def completed(task):
+                if self._tasks.get(job_id) is not task:
+                    return
                 self._tasks.pop(job_id, None)
+                if queued["kind"] == "studio_learning" and not task.cancelled() and task.exception() is None:
+                    from core.game_studio_learning import after_job
+
+                    continuation = asyncio.create_task(
+                        after_job(scope, job_id, expected_worker_epoch=expected_worker_epoch)
+                    )
+                    self._studio_continuations.add(continuation)
+
+                    def settled(done):
+                        self._studio_continuations.discard(done)
+                        if not done.cancelled() and done.exception() is not None:
+                            log.warning(
+                                "Studio continuation %s stopped with %s",
+                                job_id,
+                                type(done.exception()).__name__,
+                            )
+
+                    continuation.add_done_callback(settled)
                 if not task.cancelled() and task.exception() is not None:
                     log.warning(
                         "Game learning task %s ended with %s", job_id, type(task.exception()).__name__
@@ -1742,11 +2238,42 @@ class GameLearningWorkspace:
                 expected_credits = (
                     row["request"].get("workers", 1)
                     if row is not None and row["kind"] == "train"
-                    else 1 if row is not None and row["kind"] == "build" else 0
+                    else (
+                        1
+                        if row is not None
+                        and row["kind"]
+                        in {"build", "successor", "successor_compare", "desktop", "studio_learning"}
+                        else 0
+                    )
                 )
                 if row is None or credits.matched_count != expected_credits:
                     cancelled.set()
                     return
+                if row["kind"] == "studio_learning":
+                    campaigns = self.database["game_learning_campaigns"]
+                    renewed = await campaigns.update_one(
+                        {
+                            **scope,
+                            "active_job_id": job_id,
+                            "_worker_token": token,
+                            "_worker_epoch": row["worker_epoch"],
+                            "source_fenced": False,
+                            "_worker_lease_until": {"$gt": _now()},
+                        },
+                        {"$set": {"_worker_lease_until": row["lease_until"]}},
+                    )
+                    if not renewed.matched_count:
+                        claim = await campaigns.find_one(
+                            {**scope, "active_job_id": job_id},
+                            {"_worker_token": 1, "_worker_epoch": 1, "source_fenced": 1},
+                        )
+                        if (
+                            claim is None
+                            or claim.get("source_fenced")
+                            or claim.get("_worker_token") is not None
+                        ):
+                            cancelled.set()
+                            return
         except PyMongoError:
             cancelled.set()
             log.warning("Game learning worker lease could not be renewed")
@@ -1783,7 +2310,12 @@ class GameLearningWorkspace:
                 required = (
                     admitted["request"].get("workers", 1)
                     if admitted["kind"] == "train"
-                    else 1 if admitted["kind"] == "build" else 0
+                    else (
+                        1
+                        if admitted["kind"]
+                        in {"build", "successor", "successor_compare", "desktop", "studio_learning"}
+                        else 0
+                    )
                 )
                 from core.game_play import resource_profiles
 
@@ -2205,7 +2737,11 @@ class GameLearningWorkspace:
         )
         changed = await self.projects.update_one(
             {"_id": project_id, **scope, "version": expected_version},
-            {"$inc": {"version": 1}, "$set": {"updated_at": _now(), "policy_id": None}},
+            {
+                "$inc": {"version": 1},
+                "$set": {"updated_at": _now(), "policy_id": None},
+                "$unset": self._editor_claim_fields(),
+            },
         )
         await self.chunks.delete_many({**scope, "source_id": source_id})
         if source is not None and source["kind"] == "content_bundle":
@@ -2220,6 +2756,8 @@ class GameLearningWorkspace:
 
     async def export_project(self, scope, project_id, *, expected_version=None, generated_job_id=None):
         project = await self._project(project_id, scope, expected_version)
+        binding = await self._input(scope, project, require_execution=False)
+        await self._authority(scope, binding)
         files, generated = project["files"], None
         if generated_job_id:
             job = await self.jobs.find_one(
@@ -2268,8 +2806,8 @@ class GameLearningWorkspace:
             "raw_source_bytes_included": False,
             "production_promotion_authorized": False,
         }
-        encoded = _json(content, 2 * 1024 * 1024)
-        await self._project(project_id, scope, project["version"])
+        encoded = _json(content, MAX_JSON)
+        await self._authority(scope, binding)
         return {
             "project_id": project_id,
             "snapshot_version": project["version"],
@@ -2279,8 +2817,14 @@ class GameLearningWorkspace:
             "content_digest": hashlib.sha256(encoded).hexdigest(),
         }
 
-    def register_job_handler(self, kind, handler):
-        if kind not in {"build"} or not callable(handler):
+    def register_job_handler(self, kind, handler, *, input_hook=None):
+        if kind not in {
+            "build",
+            "successor",
+            "successor_compare",
+            "desktop",
+            "studio_learning",
+        } or not callable(handler):
             raise GameLearningError("job_handler_undeclared", "Job handler is not declared by construction.")
         if not hasattr(self, "_job_handlers"):
             self._job_handlers = {}
@@ -2288,6 +2832,17 @@ class GameLearningWorkspace:
         if previous is not None and previous is not handler:
             raise GameLearningError("job_handler_conflict", "A different handler already owns this job kind.")
         self._job_handlers[kind] = handler
+        if input_hook is not None:
+            if not callable(input_hook):
+                raise GameLearningError("job_input_hook_invalid", "Job admission hook must be callable.")
+            if not hasattr(self, "_job_input_hooks"):
+                self._job_input_hooks = {}
+            prior = self._job_input_hooks.get(kind)
+            if prior is not None and prior is not input_hook:
+                raise GameLearningError(
+                    "job_input_hook_conflict", "Job input admission already has an owner."
+                )
+            self._job_input_hooks[kind] = input_hook
 
     async def register_content_source(self, scope, project_id, manifest, source_id, expected_version):
         from skeleton.jeeves.game_emulator_catalog import GameContentBundle
@@ -2357,6 +2912,7 @@ class GameLearningWorkspace:
                 "$push": {"source_ids": source_id},
                 "$inc": {"version": 1},
                 "$set": {"default_source_id": source_id, "updated_at": _now()},
+                "$unset": self._editor_claim_fields(),
             },
         )
         if not result.modified_count:
@@ -2370,7 +2926,16 @@ class GameLearningWorkspace:
         from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry
 
         project = await self._authority(scope, binding)
-        tree = {item["path"]: item["content"] for item in binding["files"]}
+        frozen_files = binding.get("files", project["files"])
+        tree = {item["path"]: item["content"] for item in frozen_files}
+        authored_kind = self.authored_environment_kind(tree)
+        if authored_kind:
+            return GameEnvironmentRequest(
+                binding["console_id"],
+                kind=authored_kind,
+                tree=self.authored_runtime_tree(tree, authored_kind),
+                max_steps=binding["episode_steps"],
+            ).as_dict()
         generated = "game/generated/game.json" in tree
         rom, content, filename = None, None, "game.bin"
         source_id = binding.get("source_id")
@@ -2441,9 +3006,33 @@ class GameLearningWorkspace:
             max_steps=binding["episode_steps"],
             tree=tree or None,
             rom_source=rom,
-            gameplay_dialect=_manifest_dialect(binding["files"]),
+            gameplay_dialect=_manifest_dialect(frozen_files),
         )
         return request.as_dict()
+
+    @staticmethod
+    def authored_environment_kind(tree):
+        if "game/successor/spec.json" in tree:
+            return "successor"
+        if "game/editor/console.json" in tree:
+            return "console_editor"
+        return None
+
+    @staticmethod
+    def authored_runtime_tree(tree, kind):
+        if kind == "console_editor":
+            from skeleton.jeeves.game_console_editor import file_manifest_digest
+
+            return {
+                "game/editor/console.json": tree["game/editor/console.json"],
+                "game/editor/source_manifest.json": _json(
+                    {
+                        "schema_version": "skeleton.console_editor_source_identity.v1",
+                        "manifest_digest": file_manifest_digest(tree),
+                    }
+                ).decode(),
+            }
+        return {"game/successor/spec.json": tree["game/successor/spec.json"]}
 
     @staticmethod
     def _materialize_cartridge(scope, project_id, source, payload):
@@ -2508,7 +3097,7 @@ class GameLearningWorkspace:
 
         await assert_content_authority(scope, project_id, source["bundle_id"], source["source_digest"])
 
-    async def _demonstration_authority(self, scope, binding):
+    async def _demonstration_authority(self, scope, binding, *, dragon_guarded=False):
         from skeleton.jeeves.game_learning_demonstrations import GameDemonstration
 
         records = []
@@ -2547,6 +3136,11 @@ class GameLearningWorkspace:
                     raise GameLearningError(
                         "demonstration_source_withdrawn", "Recording source authority changed.", 403
                     )
+            await self._external_authority(
+                scope,
+                {"derived_sources": row["input"].get("derived_sources", [])},
+                dragon_guarded=dragon_guarded,
+            )
             if reference in binding.get("demonstrations", []):
                 records.append(demo.as_dict())
         _json(records)

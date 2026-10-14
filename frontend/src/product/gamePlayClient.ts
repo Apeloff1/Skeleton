@@ -10,7 +10,7 @@ export type GamePlay = {
   controller: 'human' | 'ai' | 'replay'; controller_epoch: number; stream_id: string; frame_sequence: number; actions: string[];
   control_token?: string; input_version: number; latest_frame?: Record<string, unknown> | null;
   observation?: Record<string, unknown>; steps: number; reward: number; recording_id?: string | null;
-  policy_id?: string | null; source_id?: string | null; input_epoch?: number;
+  keyboard_bindings?: Record<string, string> | null; policy_id?: string | null; source_id?: string | null; input_epoch?: number;
   capabilities?: { held_buttons?: boolean; keyboard?: boolean; gamepad?: boolean; max_fps?: number };
   error?: string | null; resume_available?: boolean;
 };
