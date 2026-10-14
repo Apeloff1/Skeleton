@@ -95,35 +95,33 @@ jobs:
           declare -A branch_deletion_epochs=()
 
           load_open_pr_refs() {
-            local branch heads_file bases_file
-            heads_file="$RUNNER_TEMP/open-pr-heads.txt"
-            bases_file="$RUNNER_TEMP/open-pr-bases.txt"
+            local head base refs_file candidate_file
+            refs_file="$RUNNER_TEMP/open-pr-refs.tsv"
+            candidate_file="$RUNNER_TEMP/open-pr-refs.candidate.tsv"
+
+            # Head/base pairs must come from the same completed API snapshot.
+            # Two paginated requests can observe different PR generations,
+            # and unnecessarily double request pressure during a queue storm.
+            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | [.head.ref, .base.ref] | @tsv' \
+              > "$candidate_file"; then
+              rm -f "$candidate_file"
+              echo '::warning::Branch cleanup could not load complete open pull-request refs; no further refs will be deleted.'
+              return 1
+            fi
+            if ! mv -f "$candidate_file" "$refs_file"; then
+              echo '::warning::Branch cleanup could not promote the open pull-request snapshot.'
+              return 1
+            fi
             open_pr_heads=()
             open_pr_bases=()
-
-            # Process substitution hides gh failures from set -e. Persist API
-            # results first so cleanup fails closed when PR protection is unknown.
-            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref' \
-              > "$heads_file"; then
-              echo '::warning::Branch cleanup could not load open pull-request heads; no refs will be deleted.'
-              return 1
-            fi
-            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .base.ref' \
-              > "$bases_file"; then
-              echo '::warning::Branch cleanup could not load open pull-request bases; no refs will be deleted.'
-              return 1
-            fi
-
-            while IFS= read -r branch; do
-              [[ -n "$branch" ]] || continue
-              open_pr_heads["$branch"]=1
-            done < "$heads_file"
-            while IFS= read -r branch; do
-              [[ -n "$branch" && "$branch" != main ]] || continue
-              open_pr_bases["$branch"]=1
-            done < "$bases_file"
+            while IFS=$'\t' read -r head base; do
+              [[ -n "$head" && -n "$base" ]] || continue
+              open_pr_heads["$head"]=1
+              if [[ "$base" != main ]]; then
+                open_pr_bases["$base"]=1
+              fi
+            done < "$refs_file"
           }
 
           load_merged_pr_head_tips() {
