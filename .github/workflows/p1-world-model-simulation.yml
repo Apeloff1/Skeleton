@@ -1,19 +1,6 @@
 name: P1 World-Model Simulation Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - feat/long-horizon-autonomy-vol018-20261004
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/simulation/environment.py"
-      - "skeleton/simulation/world_model.py"
-      - "skeleton/simulation/__init__.py"
-      - "skeleton/testing/test_simulation_authority_boundary.py"
-      - "skeleton/testing/test_simulation_determinism.py"
-      - "skeleton/testing/test_simulation_ecs_world_contracts.py"
-      - ".github/workflows/p1-world-model-simulation.yml"
   push:
     branches:
       - main

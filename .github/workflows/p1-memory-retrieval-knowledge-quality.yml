@@ -16,22 +16,6 @@ on:
       - "skeleton/intelligence/quality.py"
       - "skeleton/testing/test_memory_retrieval_knowledge_quality.py"
       - ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/intelligence/memory_retrieval_quality.py"
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/ai/runtime/intelligence/memory_retrieval_quality.py"
-      - "skeleton/intelligence/__init__.py"
-      - "skeleton/ai/runtime/intelligence/__init__.py"
-      - "skeleton/memory/reconciliation.py"
-      - "skeleton/retrieval/receipts.py"
-      - "skeleton/retrieval/freshness.py"
-      - "skeleton/intelligence/quality.py"
-      - "skeleton/testing/test_memory_retrieval_knowledge_quality.py"
-      - ".github/workflows/p1-memory-retrieval-knowledge-quality.yml"
   workflow_dispatch:
 
 permissions:

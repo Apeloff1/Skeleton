@@ -15,23 +15,6 @@ on:
       - "skeleton/testing/test_continuous_batching.py"
       - "skeleton/testing/test_inference_autoscaling.py"
       - ".github/workflows/p1-batching-autoscaling.yml"
-  pull_request:
-    branches:
-      - main
-      - p1/release-lane-materialize-20260928
-      - p1/dist-02-model-placement-warming-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/mesh/batching_autoscaling.py"
-      - "skeleton/ai/runtime/distributed/mesh/batching_autoscaling.py"
-      - "skeleton/network/model_placement.py"
-      - "skeleton/shells/worker_scaling.py"
-      - "skeleton/shells/worker_sla.py"
-      - "skeleton/mesh/throughput_controller.py"
-      - "skeleton/testing/test_continuous_batching.py"
-      - "skeleton/testing/test_inference_autoscaling.py"
-      - ".github/workflows/p1-batching-autoscaling.yml"
   workflow_dispatch:
 
 permissions:

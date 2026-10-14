@@ -17,25 +17,6 @@ on:
       - "skeleton/shells/worker_reservations.py"
       - "skeleton/testing/test_model_placement.py"
       - ".github/workflows/p1-model-placement.yml"
-  pull_request:
-    branches:
-      - main
-      - p1/release-lane-materialize-20260928
-      - p1/dist-01-remote-worker-trust-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/network/model_placement.py"
-      - "skeleton/ai/runtime/distributed/network/model_placement.py"
-      - "skeleton/network/remote_execution.py"
-      - "skeleton/network/__init__.py"
-      - "skeleton/ai/runtime/distributed/network/__init__.py"
-      - "skeleton/shells/worker_affinity.py"
-      - "skeleton/shells/worker_capacity.py"
-      - "skeleton/shells/worker_topology.py"
-      - "skeleton/shells/worker_reservations.py"
-      - "skeleton/testing/test_model_placement.py"
-      - ".github/workflows/p1-model-placement.yml"
   workflow_dispatch:
 
 permissions:
