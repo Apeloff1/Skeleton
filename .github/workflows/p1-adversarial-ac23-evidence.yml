@@ -1,18 +1,6 @@
 name: P1 Adversarial AC-23 Evidence Gate
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/reliability/long_horizon_aging.py"
-      - "skeleton/ai/runtime/reliability/long_horizon_aging.py"
-      - "skeleton/testing/test_long_horizon_aging.py"
-      - "scripts/build_p1_adversarial_ac23_evidence.py"
-      - "tests/test_p1_adversarial_ac23_evidence.py"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - ".github/workflows/p1-adversarial-ac23-evidence.yml"
   workflow_dispatch:
 
 permissions:

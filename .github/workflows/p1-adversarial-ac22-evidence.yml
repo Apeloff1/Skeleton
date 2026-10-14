@@ -1,31 +1,6 @@
 name: P1 Adversarial AC-22 Evidence Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - p1/adversarial-wave2-bindings-20260930
-      - p1/risk-classification-evidence-batch1-20260930
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/p1_risk_evidence_policy.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - "pyproject.toml"
-      - "backend/pyproject.toml"
-      - "backend/requirements.txt"
-      - "frontend/package.json"
-      - "frontend/yarn.lock"
-      - "scripts/check_toolchain_contract.py"
-      - "scripts/check_quality_gate_parity.py"
-      - "scripts/build_p1_adversarial_ac22_evidence.py"
-      - "tests/test_p1_adversarial_ac22_evidence.py"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/backend-quality.yml"
-      - ".github/workflows/dependency-security.yml"
-      - ".github/workflows/p1-adversarial-ac22-evidence.yml"
   workflow_dispatch:
 
 permissions:

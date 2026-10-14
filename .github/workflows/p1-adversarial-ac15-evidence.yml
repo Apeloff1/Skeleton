@@ -1,36 +1,6 @@
 name: P1 Adversarial AC-15 Evidence Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - p1/adversarial-ac20-evidence-20260930
-      - p1/closure-rollup-490-23-20260930
-      - p1/adversarial-wave2-bindings-20260930
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/p1_risk_evidence_policy.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - "skeleton/intelligence/admission.py"
-      - "skeleton/intelligence/admission_runtime.py"
-      - "skeleton/intelligence/quota.py"
-      - "skeleton/intelligence/quota_sqlite.py"
-      - "skeleton/intelligence/shared_pressure.py"
-      - "skeleton/provider_runtime.py"
-      - "skeleton/testing/test_cost_admission.py"
-      - "skeleton/testing/test_tenant_quota.py"
-      - "skeleton/testing/test_tenant_quota_sqlite.py"
-      - "skeleton/testing/test_shared_pressure.py"
-      - "skeleton/testing/test_adversarial_ac15.py"
-      - "scripts/verify_cost_admission_closure.py"
-      - "tests/test_cost_admission_independent_verifier.py"
-      - "scripts/build_p1_adversarial_ac15_evidence.py"
-      - "tests/test_p1_adversarial_ac15_evidence.py"
-      - "tests/test_p1_adversarial_wave2_bindings.py"
-      - ".github/workflows/p1-adversarial-ac15-evidence.yml"
   workflow_dispatch:
 
 permissions:

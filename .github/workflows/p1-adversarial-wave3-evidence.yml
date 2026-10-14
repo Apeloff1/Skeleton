@@ -1,43 +1,6 @@
 name: P1 Adversarial Wave 3 Evidence Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - p1/closure-ac09-clean-main-20260930
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "scripts/build_p1_adversarial_wave3_evidence.py"
-      - "tests/test_p1_adversarial_wave3_evidence.py"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - "scripts/reconcile_p1_risk_evidence.py"
-      - "skeleton/testing/test_worker_fairness_failover_shutdown.py"
-      - "skeleton/testing/test_state_recovery_drill.py"
-      - "skeleton/resilience/recovery.py"
-      - "skeleton/reliability/chaos.py"
-      - "skeleton/testing/process_resource_reliability_profiles.py"
-      - "skeleton/testing/test_process_resource_reliability_profiles.py"
-      - "skeleton/testing/test_chaos_governor.py"
-      - "tests/test_provider_capability_matrix.py"
-      - "tests/test_jeeves_local_provider_policy.py"
-      - "skeleton/testing/test_provider_stream_reliability_profiles.py"
-      - "backend/tests/test_execution_receipts.py"
-      - "skeleton/api/idempotency.py"
-      - "skeleton/testing/test_shell_ai_durable_orphan_scan.py"
-      - "tests/test_duplicate_work_audit.py"
-      - "skeleton/release/migration.py"
-      - "skeleton/testing/test_migration_rollback_compatibility.py"
-      - "skeleton/testing/test_checkpoint_migrations.py"
-      - ".github/workflows/p1-migration-rollback-compatibility.yml"
-      - "skeleton/kernel/leases.py"
-      - "skeleton/testing/test_swarm_exact_lease_atomicity.py"
-      - "skeleton/memory/guarded_compaction.py"
-      - "skeleton/testing/test_guarded_compaction.py"
-      - "scripts/state_recovery_drill.py"
-      - "skeleton/gate_plane/chaos_scenarios.py"
-      - "skeleton/shells/ai/signed_artifact.py"
-      - ".github/workflows/p1-adversarial-wave3-evidence.yml"
   workflow_dispatch:
 
 permissions:

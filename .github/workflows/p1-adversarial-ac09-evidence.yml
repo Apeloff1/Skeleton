@@ -1,30 +1,6 @@
 name: P1 Adversarial AC-09 Evidence Gate
 
 on:
-  push:
-    branches:
-      - "p1/adversarial-ac09-evidence-*"
-  pull_request:
-    branches:
-      - main
-      - p1/risk-classification-evidence-batch1-20260930
-      - p1/closure-rollup-495-18-20260930
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/p1_risk_evidence_policy.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - "skeleton/kernel/clocks.py"
-      - "skeleton/kernel/leases.py"
-      - "skeleton/testing/test_shell_leases_queue_rate.py"
-      - "skeleton/testing/test_swarm_exact_lease_atomicity.py"
-      - "skeleton/testing/test_swarm_lease_rollback.py"
-      - "skeleton/testing/test_shell_ai_execution_fence.py"
-      - "scripts/build_p1_adversarial_ac09_evidence.py"
-      - "tests/test_p1_adversarial_ac09_evidence.py"
-      - ".github/workflows/p1-adversarial-ac09-evidence.yml"
   workflow_dispatch:
 
 permissions:

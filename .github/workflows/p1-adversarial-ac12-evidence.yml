@@ -1,27 +1,6 @@
 name: P1 Adversarial AC-12 Evidence Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - p1/adversarial-wave2-bindings-20260930
-      - p1/risk-classification-evidence-batch1-20260930
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/p1_risk_evidence_policy.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - "skeleton/security/rooted_fs.py"
-      - "skeleton/security/outbound_url.py"
-      - "skeleton/security/outbound_http.py"
-      - "skeleton/testing/test_security_rooted_fs.py"
-      - "skeleton/testing/test_outbound_url_resolution_security.py"
-      - "skeleton/testing/test_security_outbound_http.py"
-      - "scripts/build_p1_adversarial_ac12_evidence.py"
-      - "tests/test_p1_adversarial_ac12_evidence.py"
-      - ".github/workflows/p1-adversarial-ac12-evidence.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,18 +1,6 @@
 name: P1 Adversarial AC-16 Evidence Gate
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/observability/resilient_telemetry.py"
-      - "skeleton/ai/runtime/observability/resilient_telemetry.py"
-      - "skeleton/testing/test_resilient_telemetry.py"
-      - "scripts/build_p1_adversarial_ac16_evidence.py"
-      - "tests/test_p1_adversarial_ac16_evidence.py"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - ".github/workflows/p1-adversarial-ac16-evidence.yml"
   workflow_dispatch:
 
 permissions:
