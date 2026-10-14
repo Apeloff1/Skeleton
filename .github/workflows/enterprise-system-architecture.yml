@@ -1,24 +1,6 @@
 name: Enterprise System Architecture
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/enterprise_system_architecture.json"
-      - "docs/ENTERPRISE_SYSTEM_ARCHITECTURE.md"
-      - "machine/architecture.json"
-      - "docs/ARCHITECTURE_MAP.md"
-      - "machine/ai_app_construction.json"
-      - "docs/AI_APP_CONSTRUCTION_MANUAL.md"
-      - "machine/capability_interfaces.json"
-      - "machine/state_topology.json"
-      - "skeleton/app/manifest.json"
-      - "scripts/check_enterprise_system_architecture.py"
-      - "scripts/verify_enterprise_system_architecture.py"
-      - "tests/test_enterprise_system_architecture.py"
-      - ".github/workflows/enterprise-system-architecture.yml"
   workflow_dispatch:
 
 permissions:

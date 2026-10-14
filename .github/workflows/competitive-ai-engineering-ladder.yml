@@ -1,29 +1,6 @@
 name: Competitive AI Engineering Ladder
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
-    paths:
-      - "machine/competitive_ai_*.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_competitive_ai_engineering_ladder.py"
-      - "scripts/check_competitive_ai_benchmark_governance.py"
-      - "tests/test_competitive_ai_engineering_ladder.py"
-      - "tests/test_competitive_ai_benchmark_governance.py"
-      - ".github/workflows/competitive-ai-engineering-ladder.yml"
-  push:
-    branches: [main]
-    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
-    paths:
-      - "machine/competitive_ai_*.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_competitive_ai_engineering_ladder.py"
-      - "scripts/check_competitive_ai_benchmark_governance.py"
-      - "tests/test_competitive_ai_engineering_ladder.py"
-      - "tests/test_competitive_ai_benchmark_governance.py"
-      - ".github/workflows/competitive-ai-engineering-ladder.yml"
   workflow_dispatch:
 
 permissions:

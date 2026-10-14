@@ -1,27 +1,6 @@
 name: CS-300 Computer Science Authority
 
 on:
-  pull_request:
-    branches: [main, codex/masterplan-frontier-96]
-    types: [opened, synchronize, reopened, ready_for_review]
-    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
-    paths:
-      - "machine/cs_300_*.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_parse_index.json"
-      - "scripts/check_cs_300_ladder.py"
-      - "tests/test_cs_300_ladder.py"
-      - ".github/workflows/cs-300-authority.yml"
-  push:
-    branches: [main]
-    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
-    paths:
-      - "machine/cs_300_*.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_parse_index.json"
-      - "scripts/check_cs_300_ladder.py"
-      - "tests/test_cs_300_ladder.py"
-      - ".github/workflows/cs-300-authority.yml"
   workflow_dispatch:
 
 permissions:

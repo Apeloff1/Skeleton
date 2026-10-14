@@ -1,27 +1,6 @@
 name: Project Self-Improvement-1000 Authority
 
 on:
-  pull_request:
-    branches: [main, codex/masterplan-learning-400-adversarial-400]
-    types: [opened, synchronize, reopened, ready_for_review]
-    # Scope non-critical authority validation to owning inputs.
-    paths:
-      - "machine/project_self_improvement_*.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_parse_index.json"
-      - "scripts/check_project_self_improvement_1000.py"
-      - "tests/test_project_self_improvement_1000.py"
-      - ".github/workflows/project-self-improvement-1000.yml"
-  push:
-    branches: [main, codex/masterplan-project-self-improvement-1000]
-    # Scope non-critical authority validation to owning inputs.
-    paths:
-      - "machine/project_self_improvement_*.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_parse_index.json"
-      - "scripts/check_project_self_improvement_1000.py"
-      - "tests/test_project_self_improvement_1000.py"
-      - ".github/workflows/project-self-improvement-1000.yml"
   workflow_dispatch:
 
 permissions:

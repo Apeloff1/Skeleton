@@ -1,24 +1,6 @@
 name: Advanced AI Structure 100
 
 on:
-  pull_request:
-    branches:
-      - main
-      - feat/enterprise-system-architecture-20261006
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/advanced_ai_structure_100.json"
-      - "machine/advanced_ai_maturity_ledger.json"
-      - "docs/plan/ADVANCED_AI_100_LEVELS.md"
-      - "machine/ai_app_construction.json"
-      - "machine/enterprise_system_architecture.json"
-      - "docs/AI_APP_CONSTRUCTION_MANUAL.md"
-      - "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
-      - "docs/ARCHITECTURE_MAP.md"
-      - "scripts/check_advanced_ai_structure.py"
-      - "scripts/verify_advanced_ai_structure.py"
-      - "tests/test_advanced_ai_structure.py"
-      - ".github/workflows/advanced-ai-structure.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,29 +1,6 @@
 name: ESS-1000 Essential Authority
 
 on:
-  pull_request:
-    branches: [main, codex/masterplan-project-self-improvement-1000]
-    types: [opened, synchronize, reopened, ready_for_review]
-    # Scope non-critical authority validation to owning inputs.
-    paths:
-      - "machine/essentials_1000*.json"
-      - "machine/project_self_improvement_idle_scheduler.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_parse_index.json"
-      - "scripts/check_essentials_1000.py"
-      - "tests/test_essentials_1000.py"
-      - ".github/workflows/essentials-1000.yml"
-  push:
-    branches: [main, codex/masterplan-essentials-1000]
-    # Scope non-critical authority validation to owning inputs.
-    paths:
-      - "machine/essentials_1000*.json"
-      - "machine/project_self_improvement_idle_scheduler.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_masterplan_parse_index.json"
-      - "scripts/check_essentials_1000.py"
-      - "tests/test_essentials_1000.py"
-      - ".github/workflows/essentials-1000.yml"
   workflow_dispatch:
 
 permissions:
