@@ -203,3 +203,15 @@ test('reconnect result preserves stable nonduplicated message IDs in sequence or
   assert.equal(result.lastSequence, 3);
   assert.equal(data[0].sequence, 3);
 });
+
+test('/ai-chat route lazily opens the canonical workspace instead of divergent draft UI', async () => {
+  const [route, workspace] = await Promise.all([
+    readFile(new URL('../app/ai-chat.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../features/Jeeves/ChatWorkspace.tsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(route, /makeLazyModalRoute/);
+  assert.match(route, /import\('\.\.\/features\/Jeeves\/ChatWorkspace'\)/);
+  assert.match(route, /'AIChatRoute'/);
+  assert.match(workspace, /export default function ChatWorkspace\(\)/);
+  assert.doesNotMatch(route, /initialThreadId=/);
+});
