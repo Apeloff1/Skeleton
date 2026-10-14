@@ -36,12 +36,12 @@ class HoldoutCase:
         if (
             not isinstance(self.shared_terms, tuple)
             or not 1 <= len(self.shared_terms) <= _MAX_TERMS
-            or len(set(self.shared_terms)) != len(self.shared_terms)
             or any(
                 not isinstance(term, str)
                 or re.fullmatch(r"[a-z0-9]{3,40}", term) is None
                 for term in self.shared_terms
             )
+            or len(set(self.shared_terms)) != len(self.shared_terms)
         ):
             raise ValueError("bounded canonical holdout terms required")
         if type(self.expected_polarity_conflict) is not bool:
