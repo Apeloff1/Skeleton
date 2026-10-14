@@ -401,9 +401,16 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
         for (const frame of frames.splice(0)) await applyFrame(frame);
       }
       if (final) return final;
+      if (expectedDetach && cursor > 0) {
+        // A completed bounded page does not prove the journal is exhausted.
+        // Reopen from the exact verified digest before accepting terminal
+        // status; probing now could skip the remaining immutable events.
+        retries = 0;
+        continue;
+      }
       const turn = await probe();
       if (turn.terminal) return turn;
-      retries = expectedDetach ? 1 : retries + 1;
+      retries += 1;
     } catch (error) {
       if (input.signal?.aborted) throw chatAbortError();
       const failure = asChatError(error);
