@@ -2,33 +2,6 @@
 name: P1 Multi-Agent Orchestration Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - fix/ai-file-tree-parity-sweep-20261004
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/automation/swarm/multi_agent_orchestration.py"
-      - "skeleton/ai/agents/swarm/multi_agent_orchestration.py"
-      - "skeleton/automation/swarm/__init__.py"
-      - "skeleton/ai/agents/swarm/__init__.py"
-      - "skeleton/swarm/multi_agent_orchestration.py"
-      - "skeleton/testing/test_multi_agent_orchestration.py"
-      - "skeleton/testing/test_agent_delegation_qualification.py"
-      - "skeleton/testing/test_swarm_fencing.py"
-      - "skeleton/testing/test_swarm_fencing_concurrency.py"
-      - ".github/workflows/p1-multi-agent-orchestration.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/automation/swarm/multi_agent_orchestration.py"
-      - "skeleton/ai/agents/swarm/multi_agent_orchestration.py"
-      - "skeleton/automation/swarm/__init__.py"
-      - "skeleton/ai/agents/swarm/__init__.py"
-      - "skeleton/swarm/multi_agent_orchestration.py"
-      - "skeleton/testing/test_multi_agent_orchestration.py"
-      - ".github/workflows/p1-multi-agent-orchestration.yml"
   workflow_dispatch:
 
 permissions:

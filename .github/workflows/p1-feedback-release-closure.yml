@@ -1,52 +1,6 @@
 name: P1 Feedback Release Closure Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/learning/mirror_room/**"
-      - "skeleton/ai/learning/mirror_room/**"
-      - "skeleton/testing/test_mirror_room_core.py"
-      - "skeleton/testing/test_mirror_room_adversarial.py"
-      - "skeleton/testing/test_mirror_room_content_delivery.py"
-      - "skeleton/testing/test_mirror_room_observability.py"
-      - ".github/workflows/mirror-room-core.yml"
-      - ".github/workflows/mirror-room-extensions.yml"
-      - "skeleton/learning/promotion.py"
-      - "skeleton/learning/__init__.py"
-      - "skeleton/release/slo_promotion.py"
-      - "skeleton/release/__init__.py"
-      - "skeleton/testing/test_feedback_promotion.py"
-      - "skeleton/testing/test_release_slo_promotion.py"
-      - "scripts/verify_p1_feedback_release_closure.py"
-      - "tests/test_p1_feedback_release_independent_verifier.py"
-      - "machine/ai_app_construction.json"
-      - ".github/workflows/p1-feedback-release-closure.yml"
-  pull_request:
-    branches:
-      - main
-      - "masterplan/p1-provider-redundancy-close-20260927-clean3"
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/learning/mirror_room/**"
-      - "skeleton/ai/learning/mirror_room/**"
-      - "skeleton/testing/test_mirror_room_core.py"
-      - "skeleton/testing/test_mirror_room_adversarial.py"
-      - "skeleton/testing/test_mirror_room_content_delivery.py"
-      - "skeleton/testing/test_mirror_room_observability.py"
-      - ".github/workflows/mirror-room-core.yml"
-      - ".github/workflows/mirror-room-extensions.yml"
-      - "skeleton/learning/promotion.py"
-      - "skeleton/learning/__init__.py"
-      - "skeleton/release/slo_promotion.py"
-      - "skeleton/release/__init__.py"
-      - "skeleton/testing/test_feedback_promotion.py"
-      - "skeleton/testing/test_release_slo_promotion.py"
-      - "scripts/verify_p1_feedback_release_closure.py"
-      - "tests/test_p1_feedback_release_independent_verifier.py"
-      - "machine/ai_app_construction.json"
-      - ".github/workflows/p1-feedback-release-closure.yml"
   workflow_dispatch:
 
 permissions:

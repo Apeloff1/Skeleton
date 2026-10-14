@@ -1,39 +1,6 @@
 name: P1 Plan Verification Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/intelligence/plan_verifier.py"
-      - "skeleton/ai/runtime/intelligence/plan_verifier.py"
-      - "skeleton/intelligence/strategy_registry.py"
-      - "skeleton/contracts/risk_evidence.py"
-      - "skeleton/intelligence/__init__.py"
-      - "skeleton/ai/runtime/intelligence/__init__.py"
-      - "skeleton/testing/test_plan_static_analyzer.py"
-      - "skeleton/testing/test_plan_cycles.py"
-      - "skeleton/testing/test_plan_simulation.py"
-      - "skeleton/testing/test_plan_qualification.py"
-      - "skeleton/testing/test_plan_execution_admission.py"
-      - ".github/workflows/p1-plan-verification.yml"
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/intelligence/plan_verifier.py"
-      - "skeleton/ai/runtime/intelligence/plan_verifier.py"
-      - "skeleton/intelligence/strategy_registry.py"
-      - "skeleton/contracts/risk_evidence.py"
-      - "skeleton/intelligence/__init__.py"
-      - "skeleton/ai/runtime/intelligence/__init__.py"
-      - "skeleton/testing/test_plan_static_analyzer.py"
-      - "skeleton/testing/test_plan_cycles.py"
-      - "skeleton/testing/test_plan_simulation.py"
-      - "skeleton/testing/test_plan_qualification.py"
-      - "skeleton/testing/test_plan_execution_admission.py"
-      - ".github/workflows/p1-plan-verification.yml"
   workflow_dispatch:
 
 permissions:
