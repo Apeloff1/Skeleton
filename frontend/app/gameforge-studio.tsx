@@ -621,6 +621,9 @@ function StudioInner() {
 
           {tab === 'Jeeves' && (
             <>
+              <TouchableOpacity testID="gs-dragon-research" style={[s.bigBtn, { backgroundColor: '#0f766e', flex: 0, marginTop: 4 }]} onPress={() => router.push('/dragon-research')}>
+                <Text style={[s.bigBtnTxt, { color: '#fff' }]}>🐉 Dragon research — articles, videos and updates</Text>
+              </TouchableOpacity>
               <Text style={s.h2}>🤵 Ask Jeeves</Text>
               <View style={s.card}>
                 <View style={s.inputRow}>
