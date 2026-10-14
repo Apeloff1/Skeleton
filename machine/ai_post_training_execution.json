@@ -1,0 +1,24 @@
+{
+  "schema_version": "skeleton.ai.post_training_execution.v1",
+  "status": "implemented_unpromoted",
+  "canonical_owners": {
+    "persistence": "skeleton/ai/runtime/training/post_training.py",
+    "execution": "skeleton/ai/runtime/training/learning_pipeline.py"
+  },
+  "authority": "existing PostTrainingLedger SQLite database; additive execution tables distinguish observed runtime evidence from compatibility caller-reported receipts",
+  "scope": "bounded local deterministic environments and trusted side-effect-free local policy callbacks; held-out local model evaluation; no external model calls, network authority, privileged tools, or production promotion",
+  "binding": ["experiment_digest", "environment_spec_digest", "environment_behavior_digest", "policy_digest", "policy_callback_digest", "model_digest", "curriculum_digest", "evaluation_suite_digest", "max_steps", "max_episodes", "max_episode_steps"],
+  "policy_identity": "canonical instruction/constant identity plus bounded defaults, closure configuration, referenced local functions/globals and captured local model digests; revalidated before and after each decision; captured state mutation fails closed",
+  "environment_identity": "actual reward table and terminal actions bind the registered environment version and cannot be rebound by another execution",
+  "limits": {"max_steps": 100000, "max_episodes": 128, "max_episode_steps": 4096, "max_actions": 64, "max_policy_configuration_bytes": 65536, "max_policy_configuration_depth": 4, "max_evaluation_cases": 128, "max_case_output_tokens": 128, "max_suite_bytes": 262144, "max_evaluation_payload_bytes": 1048576},
+  "commit_boundary": "BEGIN IMMEDIATE serializes cursor read, local policy decision, deterministic environment transition, RL receipt, runtime witness and cumulative usage; COMMIT failure rolls back",
+  "recovery": "restore the environment directly from the last committed cursor; never call policy or step for a committed transition; uncommitted side-effect-free work can repeat",
+  "fencing": "each runner admission advances a durable epoch; stale callbacks cannot commit after replacement admission",
+  "budgets": "reserve each episode once; cumulative committed steps and started episodes survive restart; exhaustion and cancellation are explicit durable states",
+  "evidence": "curriculum metrics derive only from execution-issued episode references; candidate qualification requires exact policy/model/curriculum identity and an execution-issued measured held-out evaluation",
+  "migration": "additive tables in the existing SQLite ledger; existing record_step and record_curriculum APIs remain compatibility evidence and cannot manufacture executable qualification",
+  "rollback": "preserve experiments and immutable RL/curriculum/evaluation history; withdraw execution without deleting committed evidence",
+  "tests": ["skeleton/testing/test_p3_post_training_execution.py"],
+  "production_model_promotion_authorized": false,
+  "distributed_execution_supported": false
+}

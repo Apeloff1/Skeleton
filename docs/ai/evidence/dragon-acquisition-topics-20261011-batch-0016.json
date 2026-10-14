@@ -1,0 +1,927 @@
+{
+  "schema": "skeleton.dragon.acquisition_topic_triage.v1",
+  "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "source_range": {
+    "start_inclusive": 480,
+    "end_exclusive": 512
+  },
+  "checked_at": "2026-10-11T18:14:55.000Z",
+  "topics": [
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "C++"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1a61d3fd5a502c37a79110d538ac89e18ffbbd233df58b7e675503e33e98d27e",
+          "url": "https://github.com/MADEAPPS/newton-dynamics/",
+          "representation_sha256": "011edbbd43355c4bb5bd2234c70a03d565b6abc0058208dca185c6457bbf89e8",
+          "source_revision": "a9c460c3509c935e65c5b1196b955d56627c3ffa",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The MADEAPPS repository states that it and the old forum are discontinued and points to JulioJerez/newton-dynamics as the new official repository; the captured code license is zlib-style.",
+            "span": "README.md and LICENSE at a9c460c3509c935e65c5b1196b955d56627c3ffa",
+            "limitations": "A repository handoff is an identity transition, not abandonment, public-domain status or proof that all assets, dependencies and patents share the same terms.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-1ada037d61478fa1b7b36d2d2d79c25a7266d33cdbeb368f38e9391043e1c510",
+          "url": "https://github.com/fruxo/turbobadger",
+          "representation_sha256": "3591f4cae1bbfbbc10234ed1921af1e33253cc5e9dc1ebcc361ca2345e06dbf5",
+          "source_revision": "389baa6946986d6d5afead50c90dc6b55e23b976",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Turbo Badger describes a small skinnable UI toolkit for accelerated games and applications, marks its API beta, and embeds zlib-style terms in the README.",
+            "span": "readme.md at 389baa6946986d6d5afead50c90dc6b55e23b976",
+            "limitations": "No standalone root license file was present; embedded terms require scope confirmation and do not automatically cover fonts, skins, demos or submodules.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-1ae8d3ae9ea596e680d0ffdd33f0d4efc0fb5491890a698bffd013cba459f692",
+          "url": "https://github.com/ChaiScript/ChaiScript",
+          "representation_sha256": "2d5319928261570871f30c28c9e0f4ee2f0684c8999b5efce7bdced0a30f4768",
+          "source_revision": "f635b51e3f8e95868210edfc66fdbd8e475710f5",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "ChaiScript describes a scripting language designed to embed directly in C++ and carries a BSD-3-Clause root license.",
+            "span": "readme.md and LICENSE at f635b51e3f8e95868210edfc66fdbd8e475710f5",
+            "limitations": "Dependencies, examples and integration-specific security properties were not reviewed or tested.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-1b315e95425e746ba6f57ed618e9d5a8d0a113c9a8e2c6ea1565f3ce4275252e",
+          "url": "https://github.com/cieslarmichal/faker-cxx",
+          "representation_sha256": "2c71c5c6b046215c2dddcf8f80093749bd2d8903d1ebea91c585a2c8c21be60b",
+          "source_revision": "9fe961edd98ffd9a62728b6266a4b25c91cf7793",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Faker C++ is a test-data generator for C++ with package-manager and build integrations; its root license is MIT.",
+            "span": "README.md and LICENSE at 9fe961edd98ffd9a62728b6266a4b25c91cf7793",
+            "limitations": "Realism, locale coverage, privacy suitability and randomness quality were not measured; generated fake data should not be assumed safe for every test context.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Native",
+        "Strategy"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1a669a805329e0b821d9bc21ee35296037d37e2c87d0405b8c979d381f24d717",
+          "url": "https://github.com/a-nikolaev/curseofwar",
+          "representation_sha256": "428f1e6c0f5b5526429d6d0a8278dc8941c19d674c41fe7c6a628a724b14c913",
+          "source_revision": "6292ca88b908d29c159b5e26a996d9d83c73144b",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Curse of War is a terminal/SDL real-time strategy game emphasizing infrastructure, resources and army movement rather than direct unit control; its root license is GPL-3.0.",
+            "span": "README and LICENSE at 6292ca88b908d29c159b5e26a996d9d83c73144b",
+            "limitations": "No build or gameplay claims were reproduced; distribution obligations, dependencies and media require separate review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Talks [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindres",
+        "Other Talks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1a6dc2956a13501e68b0324805982af17e18d99576745510bec9e97e049eb3bf",
+          "url": "https://www.youtube.com/watch?v=BIlr7R7UAfc%29%3A",
+          "representation_sha256": "42748bea57b920b16228f2023ce87db825344226e06dfc5f8257a3b025330207",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn179view0",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1a6dc2956a13501e68b0324805982af17e18d99576745510bec9e97e049eb3bf",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Code**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1a97547c782359326ff7f7d860772f6ba49fbc14351ed036b4a60a0cfcf41b4b",
+          "url": "http://preshing.com/20171218/how-to-write-your-own-cpp-game-engine/",
+          "representation_sha256": "1e8801dd40583f382dd9a5f40c02754e48af3b664c76698f535e6c366af24640",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn179view1",
+          "observation": {
+            "statement": "Preshing recommends growing a C++ game engine through small running increments, resisting premature unification and planning explicitly for serialization complexity.",
+            "span": "lines 12-65, 66-90 and 92-123",
+            "limitations": "This is one experienced developer's retrospective and design advice; performance, maintainability and portability outcomes were not independently reproduced.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Art"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1ab35b7e287997451eb7b9da86f2900aa6934fa91dd0b8e9ebf1e1d94e8b907c",
+          "url": "https://mobile.twitter.com/Marcel_Hampel/status/1559178642856484865",
+          "representation_sha256": "bbafd2e69d766c282d929ed403ddb23fdfbff70fb7164722ee412f16e6b09b1c",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn179view2",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1ab35b7e287997451eb7b9da86f2900aa6934fa91dd0b8e9ebf1e1d94e8b907c",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Marketing**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1ac81afebe46fba52ce581a0e54eb1d34bc1c31d491d75d04bc433b1d55d05ec",
+          "url": "https://www.devmarketingguide.com/",
+          "representation_sha256": "21c7e3c76a6dd69a0de52dd0380d035b9c4d0c3e5c5d8fde859707221963da18",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn179view3",
+          "observation": {
+            "statement": "The guide organizes developer marketing around audience personas, owned content, newsletters, testing, distribution and community projects.",
+            "span": "lines 0-68",
+            "limitations": "It is practitioner marketing guidance, not game-specific controlled engagement evidence; cited talks and tools remain individually gated.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Complete Game Sources"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1acd687f9757e1c0cd41a4cf99981c7f0d0863eecced0e31625e8428841ff97b",
+          "url": "http://www.adcolony.com/",
+          "representation_sha256": "72cc5d679e6a757f9ca23619425cc639837eb313572ae28ecbf395882f2b8900",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn179view4",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1acd687f9757e1c0cd41a4cf99981c7f0d0863eecced0e31625e8428841ff97b",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Others"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1aceb36042729560c9edc4b5a81630625881c3a62a73a7a5b7a743ec015f4763",
+          "url": "https://github.com/munificent/hauberk",
+          "representation_sha256": "a906d8a27c4f8b4ed7b79b01c0b79da4e9d5f78257cce3cf4aeeed1246323214",
+          "source_revision": "6c5c684c91082742857972f5c93607d52c189929",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Hauberk is a browser-based Dart roguelike with ASCII art and procedural dungeons; its README calls the project mostly read-only and its COPYRIGHT file grants MIT terms.",
+            "span": "README.md and COPYRIGHT at 6c5c684c91082742857972f5c93607d52c189929",
+            "limitations": "Maintainer bandwidth and read-only status do not imply abandonment; external images, Dart tooling and linked material are not covered by this receipt.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Voxel Editors"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1ae32b2c93e3ce1f0defc4fa9b8627a551cdcc356b6d268df5dba78ef889ffdc",
+          "url": "http://sproxel.blogspot.com.br/",
+          "representation_sha256": "97b65e1db460d408274413bf9f72c7f2413a866316f0c4006652f8fbc008a081",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn179view5",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1ae32b2c93e3ce1f0defc4fa9b8627a551cdcc356b6d268df5dba78ef889ffdc",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Native",
+        "FPS"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1affa063fbe47abfdc4f40eb9b07e12604fbe3df5add96726e1994fdb71e4e13",
+          "url": "https://github.com/red-eclipse",
+          "representation_sha256": "889707b0c90e5949717080c9f4a6319a9c0af9656d4be64e7a41bd5f9302fb30",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn179view6",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "2D"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b11b6d6fa7c8290fd7519ab98516106d482b0c119d2ca8919a8b81cf26255e4",
+          "url": "https://github.com/RyanNielson/PixelCamera2D",
+          "representation_sha256": "6c92505ea44104fff490562bed882029711dd74f5a211de4649dc66833aca843",
+          "source_revision": "3886d1ece5e61332eb2ea3c1a60d152ad0cf5bbd",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "PixelCamera2D uses two cameras, a render texture and scaling/letterboxing to keep Unity pixel art aligned; its root license is MIT.",
+            "span": "README.md and LICENSE at 3886d1ece5e61332eb2ea3c1a60d152ad0cf5bbd",
+            "limitations": "The project labels itself early work in progress; no Unity-version compatibility or visual-quality claim was reproduced.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Unity**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b14c62648fc3f32aa2444cf8f06453371a30422312482ae2d7b564d6d7d529e",
+          "url": "https://www.youtube.com/watch?v=yFcI6pFEgjk",
+          "representation_sha256": "e05b99b8c880bc4e9b06751ed45d70ee48df4f355ce575d12fec27330a82ee71",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn179view7",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1b14c62648fc3f32aa2444cf8f06453371a30422312482ae2d7b564d6d7d529e",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Art**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b18d67f75d26501afb48dd9b0551a9331410c34cc190bc1e3f6c8b0556ac044",
+          "url": "https://youtu.be/G4xTKnBsWro",
+          "representation_sha256": "5f4b73e51f0fe38d81b0cb1b261ea59f4476b418cec8d12ad57a3b2dbcb55750",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn180view1",
+          "observation": null
+        },
+        {
+          "source_id": "source-1b5837e464212535d1a4c22b11bc69f7417edd1ac49c784e79c7d131db69b67a",
+          "url": "http://www.gamefromscratch.com/post/2016/04/25/An-Introduction-To-Spine-A-2D-Bone-Based-Animation-System.aspx",
+          "representation_sha256": "b7ed6d54b5129a1f2b6f8c6d846875c883f8fd6e9ad3fe78012c248b10227dc4",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn179view12",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1b5837e464212535d1a4c22b11bc69f7417edd1ac49c784e79c7d131db69b67a",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "C"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b1d228fa0ce0e79379dce85bec891877b7ea83d6181d02c9595fd3cfe4041ea",
+          "url": "https://github.com/glfw/glfw",
+          "representation_sha256": "6c892cb490c2f7ed8d8d3fa1c25ba24f0fd51e250d096629f7dc62f7c19347e0",
+          "source_revision": "92dcf4ce74f2e2554a98fea09be7c705c17daa5a",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "GLFW provides a C-oriented cross-platform API for windows, graphics contexts, surfaces, input and events across OpenGL, OpenGL ES and Vulkan; it uses zlib/libpng-style terms.",
+            "span": "README.md and LICENSE.md at 92dcf4ce74f2e2554a98fea09be7c705c17daa5a",
+            "limitations": "Platform support and binary compatibility were not independently tested; graphics drivers and platform SDKs have separate conditions.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-1b377f2ead1115739d8754a529ea0b7dabb3a84994a4fd978c92d22e749c7b57",
+          "url": "https://github.com/RonenNess/GeonBit.UI",
+          "representation_sha256": "47eaf4252de7b6cee43bd5148d1d271727765715977b3e51743aa5b6957d6fa8",
+          "source_revision": "93a87aae3f9a179ed70bdfbf61c6d0874d429e9c",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "GeonBit.UI is a MonoGame UI/HUD extension with layout, events and bundled skins under a root MIT license.",
+            "span": "README.md and LICENSE at 93a87aae3f9a179ed70bdfbf61c6d0874d429e9c",
+            "limitations": "The README's skin compatibility and feature claims were not tested; linked video, documentation, examples and media need separate review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Legend"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b295ac3bfd878ec8a529fca091bb7e246cf7e182a99fb6af7b931525847c040",
+          "url": "https://en.wikipedia.org/wiki/Zlib_License",
+          "representation_sha256": "0302bbf95a5ba92f18bbc494e8f2a95013214d7108c84b8cea521b1930d41e3a",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn181view0",
+          "observation": {
+            "statement": "The secondary summary classifies zlib as permissive, non-copyleft and GPL-compatible and lists attribution, alteration-marking and notice-retention conditions.",
+            "span": "lines 120-158",
+            "limitations": "Wikipedia is not the controlling license instrument; any rights decision must use the exact license text attached to the specific work and qualified review.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Themes",
+        "External editor themes"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b2992de17fd5304cfd22ea3c9d34ef04adba8a8be006ddbfe008ec6514dd59c",
+          "url": "https://github.com/voylin/godot_color_theme/tree/master/lua",
+          "representation_sha256": "dfd1e29d804b9347d746247560c92b47fa04a3dc5a51bf9f781ec07486e209ce",
+          "source_revision": "e1d809c1fb12c048fcc809c0b53c794a1381f4c1",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The requested lua subtree contains a NeoVim theme configuration derived from Godot editor colors and exposes base, accent, font and contrast options; the repository root is MIT.",
+            "span": "README.md, lua/README.md and LICENSE at e1d809c1fb12c048fcc809c0b53c794a1381f4c1",
+            "limitations": "Repository licensing does not independently clear Godot branding, color-expression provenance, screenshots, tutorial links or third-party editor components.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Organization**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b37a3b77326da86a9a983284fbf12a03be3d64bb8846ca69ff224fe41578e4b",
+          "url": "https://medium.com/@youngchae.depriest/why-prototyping-is-important-and-should-come-first-game-development-6a724844c094",
+          "representation_sha256": "9be35c5891b1a8f8729d7ffdad85da0f9037d58e6197adfb3128add90e8b38fa",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn181view1",
+          "observation": {
+            "statement": "Depriest advocates greybox prototypes that test required mechanics before aesthetic investment while allowing exceptions for art-dependent technical risks.",
+            "span": "lines 27-73",
+            "limitations": "This is personal practitioner guidance; its game example and claimed risks were not independently measured or peer reviewed.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Learning",
+        "Computer Graphics"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b531ffcd2d3bc397f0e2bc31f1c89742b46324cec8b2d59663d8736113f37f9",
+          "url": "https://fna-xna.github.io/",
+          "representation_sha256": "416afe0fdce6b2b30e2e7f4769ab94566c68c450c7b2b27dbfa3e7f499245930",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn180view4",
+          "observation": {
+            "statement": "FNA describes itself as an accuracy-focused reimplementation of XNA Game Studio 4.0 Refresh for preserving and porting XNA games on open desktop platforms.",
+            "span": "lines 0-12",
+            "limitations": "These are project claims; compatibility coverage, shipped-title count, trademark and original XNA rights were not independently verified.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-1b603f57612d716ec579ca6d118fe89e711af3eb3df57c3f09db38ab9b524743",
+          "url": "https://en.wikipedia.org/wiki/Microsoft_XNA",
+          "representation_sha256": "7d9c778ddecacf37fee238e6559b16f618dc58de0e6f7eb428e47444b16fa2fd",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn181view2",
+          "observation": {
+            "statement": "The secondary source identifies Microsoft XNA as a managed game-development toolset for Windows, Xbox 360 and Windows Phone and reports that development ended in 2013.",
+            "span": "lines 131-154",
+            "limitations": "Discontinued development is not abandonment, public-domain status or permission to use Microsoft/Xbox intellectual property; primary Microsoft records remain required.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Native",
+        "Puzzle/card/board"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b61377cd350ecd1e4fe57ce7c3d8bb43369d3a9a5d4a38550e2464a42303993",
+          "url": "https://github.com/paulbatum/Dominion",
+          "representation_sha256": "7f74fa3c792066991f4a5933b3b5d116a6f60a1ae7ecf74cc847184dcff967b4",
+          "source_revision": "28daf2a366332fbd176b4c06f43feb6851fe5f4d",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The Dominion repository is a C# implementation of the named commercial card game; its README explicitly says card images are not distributed, while repository code is MIT.",
+            "span": "README.markdown and LICENSE.txt at 28daf2a366332fbd176b4c06f43feb6851fe5f4d",
+            "limitations": "The MIT code grant does not clear Dominion rules expression, title, trademarks, card text, artwork or other game assets.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Specialty Topics",
+        "Geometry"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b7ba942c0fe7ac32a546818cf249cd9656bacec62bed3574d571cdb97049dc7",
+          "url": "https://ciechanow.ski/mesh-transforms/",
+          "representation_sha256": "0d7c347bbb98dba7fd4b4b5624ab002ed00225b633ffd830c8adda1981873295",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn180view6",
+          "observation": {
+            "statement": "Ciechanowski explains mesh deformation through vertices and faces, first examining a private Core Animation API and then indicating an open-source alternative.",
+            "span": "lines 1-37",
+            "limitations": "Private API use may conflict with platform policy; implementations, math and the alternative library were not independently tested or licensed here.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Racing"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b868bbedca3033dc39992925eb43825a625cb8b38538a6da10b88995e931cb7",
+          "url": "http://hexgl.bkcore.com/",
+          "representation_sha256": "b1fc5545eb82c1c5d3ff82b71211108c82123582504d0b2d3bb328e28013f2ca",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn180view7",
+          "observation": {
+            "statement": "HexGL credits three.js plus third-party road texture and base-mesh contributors and links to source code and historical press coverage.",
+            "span": "lines 11-21 and 43-64",
+            "limitations": "Credits and a source link do not establish repository, asset, music, trademark or training rights; the game was not downloaded or run.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Podcasts",
+        "Talks"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1b9e5e63f3fae3c926598cef36355f32219b5391d0f9c6972d0be2e715bf90cb",
+          "url": "http://www.thecollectivepodcast.com/",
+          "representation_sha256": "7d840014b2cd12ace407de5e30b0fdca8cac7962803d2999f5d8cfb06078c70b",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn181view4",
+          "observation": {
+            "statement": "The podcast index catalogs practitioner conversations across title design, digital art, photography, cinematography, animation, concept art and creative uses of AI.",
+            "span": "lines 14-75",
+            "limitations": "Only index summaries were reviewed; episode audio, transcripts, claims and media rights were not acquired or independently evaluated.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Game Engines",
+        "Commercial"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1baa8ba29af91994564e610855b2cc2ef18a71337d3be92e3a2f7918d2e60d78",
+          "url": "https://phasereditor2d.com/",
+          "representation_sha256": "b920ff975dfe750ee7eff693f79083fdd3caf186e7e1701e91c38f0a032aca49",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn181view3",
+          "observation": {
+            "statement": "The vendor page describes a web-based Phaser 3 IDE with scene, prefab, script-node, animation, asset-pack and physics-body tooling, and states that the product has moved to a new site.",
+            "span": "lines 13-81",
+            "limitations": "Feature and version statements are vendor claims; installers, marketplace assets, license terms and generated-project rights were not fetched or tested.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Specialty Topics",
+        "Color Manipulation"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1bad61eaee80bc3602ca8d8cf319fd74bbc5d93b2408a3ed32434b84ba557067",
+          "url": "https://github.com/bahamas10/ryb",
+          "representation_sha256": "9a866d8859fa64cde28eaf8e6abc7fb0f075bf661fe721a33f0ed16999225fa3",
+          "source_revision": "e662446a2bf57c5229ecf32aa8517a7fa07612de",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "RYB is an HTML/JavaScript and d3.js color-wheel implementation whose README states MIT.",
+            "span": "README.md at e662446a2bf57c5229ecf32aa8517a7fa07612de",
+            "limitations": "No standalone root license file was present; d3.js, images and linked material retain separate provenance and terms.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Engines**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1bc96cb03f956738362b5b8a767a8c80df25d966bca60d6f1732eca03951e04c",
+          "url": "http://superpowers-html5.com/index.en.html",
+          "representation_sha256": "231045a45d19d53c6ab4f5eeae6d965ac2b15c05db6b7ba5813e89b58f73ec6d",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn179view18",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1bc96cb03f956738362b5b8a767a8c80df25d966bca60d6f1732eca03951e04c",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Talks [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindres",
+        "Conferences"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1bca8a35514bb21b6560d56288e99cc8c91c36a89d23d7ff85dd79d346413d96",
+          "url": "https://www.youtube.com/playlist?list=PLLx_Nt-I7ViqrulUPyfVQQf1xiu7Fj0b1",
+          "representation_sha256": "7f27004cb8cf880f15ca123ea7ac20d3619ad26e464282f84452cc8e33a23e5c",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn179view19",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1bca8a35514bb21b6560d56288e99cc8c91c36a89d23d7ff85dd79d346413d96",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    }
+  ],
+  "separation_note": "Source evidence, AI hypotheses, measured findings, negative results, prototype lessons and product lessons remain separate. AI-generated descendants add no independent support.",
+  "canonical_admission": "none"
+}

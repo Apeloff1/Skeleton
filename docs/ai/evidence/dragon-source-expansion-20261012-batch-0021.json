@@ -1,0 +1,4033 @@
+{
+  "schema": "skeleton.dragon.source_discovery_supplement.v1",
+  "recorded_at": "2026-10-11T23:15:51Z",
+  "baseline_registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "requested_total_urls": 44050,
+  "target_interpretation": "10 times original 4,405 URL snapshot; URLs are candidates, not independent sources.",
+  "status": "partial_discovery_only_not_ingested_into_canonical_queue",
+  "parent_supplement": "docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json",
+  "catalogs": [
+    {
+      "repository": "jordigulley/fmod_gd4",
+      "commit_sha": "d15273a8a88e705c5eaf560fc5c1218847c71454",
+      "readme_blob_sha": "73d1a95da6b74076e0a9e59c2faaab629fb22c50"
+    },
+    {
+      "repository": "codeplea/hexembed",
+      "commit_sha": "1f85180c66edc59fd471e964dc897a510819a821",
+      "readme_blob_sha": "ce34a148b64bc17c4cee29553c47ecad323069e0"
+    },
+    {
+      "repository": "Revolutionary-Games/Thrive",
+      "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+      "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077"
+    },
+    {
+      "repository": "WhitestormJS/whs.js",
+      "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+      "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57"
+    },
+    {
+      "repository": "increpare/PuzzleScript",
+      "commit_sha": "ac4207a8754e1c50d1d25f8189fa52010b3b5402",
+      "readme_blob_sha": "785ad4b79479a9f9347c13d4caf6df515093473a"
+    },
+    {
+      "repository": "prideout/streamlines_demo",
+      "commit_sha": "f35be80a31a47a7ba2b3cd1ed3e5e35311e33cbc",
+      "readme_blob_sha": "d3958ae91d710de6dfc4a051772fafd8387b57df"
+    },
+    {
+      "repository": "inkle/ink",
+      "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+      "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76"
+    },
+    {
+      "repository": "sachinthankachan/msdf-atlas-studio",
+      "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+      "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa"
+    },
+    {
+      "repository": "DaVikingCode/Citrus-Engine",
+      "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+      "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4"
+    },
+    {
+      "repository": "Rubonnek/dialogue-engine",
+      "commit_sha": "1e9e837c57c9d917f72134f5c90b84deb61188cb",
+      "readme_blob_sha": "3d820ea7c3ec46ae3a49a112b5b65119d5c554a8"
+    },
+    {
+      "repository": "AtomicGameEngine/AtomicGameEngine",
+      "commit_sha": "ff59324b7e198f4179eca0f6535b1e72484d8c4c",
+      "readme_blob_sha": "61477b60e2423a1f6fcec0466dd9ab3a509ba73b"
+    },
+    {
+      "repository": "KrofDrakula/squirts",
+      "commit_sha": "f84191f8d57eadcd3b55063231602ed4898d2b65",
+      "readme_blob_sha": "9ea9e81147af68adc872f7774746da1b53caec56"
+    }
+  ],
+  "counts": {
+    "previous_new_candidate_urls": 463,
+    "new_candidate_urls": 223,
+    "provisional_total_urls": 5091,
+    "requested_total_urls": 44050
+  },
+  "candidates": [
+    {
+      "url": "http://abdaily.surge.sh/1/",
+      "source_id": "source-ff14d3c591f38f94e77c970a3c451d4d201c8a4bdf3c555e518fe22fade53125",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://abdaily.surge.sh/1/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://abdaily.surge.sh/1/"
+        }
+      ]
+    },
+    {
+      "url": "http://abdaily.surge.sh/2/",
+      "source_id": "source-fb86370ce0622fcf6814a8d0985595230591fefa9e6d58e3c162d064d6f48779",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://abdaily.surge.sh/2/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://abdaily.surge.sh/2/"
+        }
+      ]
+    },
+    {
+      "url": "http://abdaily.surge.sh/3/",
+      "source_id": "source-bc8faeaeaeadecf8447818e23c377f11524edca5f9e151edaec50a14d2c42337",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://abdaily.surge.sh/3/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://abdaily.surge.sh/3/"
+        }
+      ]
+    },
+    {
+      "url": "http://abdaily.surge.sh/4/",
+      "source_id": "source-bd611e0f77aba0340392883d5f9eeff4fa4d2c15e65b21b8d407952060258bf0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://abdaily.surge.sh/4/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://abdaily.surge.sh/4/"
+        }
+      ]
+    },
+    {
+      "url": "http://armorgames.com/play/14737/shotgun-vs-zombies",
+      "source_id": "source-0f8178694580942ec32ac035d88c7d045a5255b43bcca201bbe6dac760c529e9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://armorgames.com/play/14737/shotgun-vs-zombies"
+        }
+      ]
+    },
+    {
+      "url": "http://artifacts.zone/lorenzav/",
+      "source_id": "source-e870ae36194fb1cd107bfe5303e593665d16546818f0a7962b1d8fc267f2d948",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://artifacts.zone/lorenzav/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://artifacts.zone/lorenzav/"
+        }
+      ]
+    },
+    {
+      "url": "http://artifacts.zone/tree/",
+      "source_id": "source-d4cd6e84678a4239ca4c7dc9c7f993a0e90f0961652f1539210f5ff3e4d6d733",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://artifacts.zone/tree/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://artifacts.zone/tree/"
+        }
+      ]
+    },
+    {
+      "url": "http://aymericlamboley.fr/blog/wp-content/uploads/2012/12/Santa",
+      "source_id": "source-31e51fcd62b3e413da8133141f088be53685391f0cba076ef5cd0c27b27b429b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://aymericlamboley.fr/blog/wp-content/uploads/2012/12/Santa"
+        }
+      ]
+    },
+    {
+      "url": "http://citrusengine.com/api/",
+      "source_id": "source-e0f8484306ade06e45a0cfc0d21e5ddb5f725ca9f363ad88a65f79611c4f6d7c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://citrusengine.com/api/"
+        }
+      ]
+    },
+    {
+      "url": "http://citrusengine.com/support/",
+      "source_id": "source-1a2ca8be16b9a58a215ac86304b401883b7e70bd36ea8196ab71b3f4f9d79821",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://citrusengine.com/support/"
+        }
+      ]
+    },
+    {
+      "url": "http://codepen.io/sasha240100/pen/JELBGX",
+      "source_id": "source-9337b587a835fca69c6d1827fedbacd591d4a2343774f1d16a5bfaa3ab570b3c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://codepen.io/sasha240100/pen/JELBGX"
+        }
+      ]
+    },
+    {
+      "url": "http://cynicmusic.com/citrus/",
+      "source_id": "source-c4ed21601f918d0c85a0000776947225dbcee68563117021e885ac251c672e38",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://cynicmusic.com/citrus/"
+        }
+      ]
+    },
+    {
+      "url": "http://fdt.powerflasher.com/",
+      "source_id": "source-15c87cadd66b58159dfa969c826985a5d0b8fa28ab95c82a1c24335ab5ec1512",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://fdt.powerflasher.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://feathersui.com/",
+      "source_id": "source-0ce058ecbaab58c72618b578d6620c376702c018186af4143fe6bb903f8afea6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://feathersui.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://forum.starling-framework.org/forum/citrus-engine",
+      "source_id": "source-b5237eecda19eb2965184585b264d23b1dbaaf601270b3acc662f2793a849ead",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://forum.starling-framework.org/forum/citrus-engine"
+        }
+      ]
+    },
+    {
+      "url": "http://hellorepublic.com/client/tibi/platform/",
+      "source_id": "source-d767b39f997193b9f881101c847c1a0f764270f233b60023932feecbbc88d635",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://hellorepublic.com/client/tibi/platform/"
+        }
+      ]
+    },
+    {
+      "url": "http://kinessia.aymericlamboley.fr/",
+      "source_id": "source-e5a0d71ef5910d0730a204215d5c320ae7b040a570e04da75a843a4b7a183955",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://kinessia.aymericlamboley.fr/"
+        }
+      ]
+    },
+    {
+      "url": "http://meowbeast.com/game/jim-loves-mary/",
+      "source_id": "source-ebcee88d0d9a1ad420f1f4caddda71cee5c4cda4e152559feff93d6a7e137b30",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://meowbeast.com/game/jim-loves-mary/"
+        }
+      ]
+    },
+    {
+      "url": "http://meowbeast.com/game/red-n-green-2/",
+      "source_id": "source-9634eac5bd83511bcbafff6b514af26d6d9675fbaebe5c527b9ed7956c1110df",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://meowbeast.com/game/red-n-green-2/"
+        }
+      ]
+    },
+    {
+      "url": "http://napephys.com/",
+      "source_id": "source-aa03fd2fbd2c0dfefc791ba1cf742d76fdcf923edb37acc24a9285fd0cd2ea28",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://napephys.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://plateaux.space/",
+      "source_id": "source-1f569211ff4c41ceb2f2c5ce87e13790859e2c3033dcde727eec5504bd8058e3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://plateaux.space/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://plateaux.space/"
+        }
+      ]
+    },
+    {
+      "url": "http://rdrct.it/monsieurbearsabc",
+      "source_id": "source-526efeca192bc69058c80478cf2a531b769f453db66483fcfb8348fe675a3969",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://rdrct.it/monsieurbearsabc"
+        }
+      ]
+    },
+    {
+      "url": "http://rdrct.it/sillyfamily",
+      "source_id": "source-80e9fbd6b816c4a79c2c51e8b71ad26cc1f80a9f34410048915706bd9283584e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://rdrct.it/sillyfamily"
+        }
+      ]
+    },
+    {
+      "url": "http://roundhousegame.com/",
+      "source_id": "source-19c5786b44162195473cdf63c6795b53f8789dd610bb126fab56ed485a812a07",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://roundhousegame.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://supertiny.agency/",
+      "source_id": "source-ff717f58af98c12a2025d02f59f572bb19683c4c8188a3b1094533f1569509bf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://supertiny.agency/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://supertiny.agency/"
+        }
+      ]
+    },
+    {
+      "url": "http://theroguepixel.com/",
+      "source_id": "source-28df4b00e74cd39c6bc9b8a38e02b2055e600e78d98e648691dcc42d02bedac8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://theroguepixel.com/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://theroguepixel.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://underwateradventuresgame.com/",
+      "source_id": "source-18df1b3b78801628a9c3fe9550f591058eeea6160698c99dfe9784c29833701f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://underwateradventuresgame.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://whs.io/",
+      "source_id": "source-1bfb27bd184705f18d602803db7cde8329d25909fff93750d53f4e391223ec95",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://whs.io/"
+        }
+      ]
+    },
+    {
+      "url": "http://wiki.starling-framework.org/citrus/start",
+      "source_id": "source-0c39236b2dce76ecdc8270d6d5103cc0348433ee7311d7e67d6a74cf61bcfcdf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://wiki.starling-framework.org/citrus/start"
+        }
+      ]
+    },
+    {
+      "url": "http://www.aymericlamboley.fr/blog/mission-eau-being-agile-with-flash-pro/",
+      "source_id": "source-dbb7c9e9919c95e92977b311452f1b78b4df88ed5e425edf2ddfdc1aa72b136e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.aymericlamboley.fr/blog/mission-eau-being-agile-with-flash-pro/"
+        }
+      ]
+    },
+    {
+      "url": "http://www.box2d.org/manual.html",
+      "source_id": "source-f711900c781d65a97f81b5ebef33c0cddb3c84b5da0d4cdf6a316b6cb0d1e66f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.box2d.org/manual.html"
+        }
+      ]
+    },
+    {
+      "url": "http://www.carefirstsocial.com/frnzy/",
+      "source_id": "source-c0aade4a0e0f4a60948d3e574138cfa10d5ce18725aeea786e67f5b3eafbfe75",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.carefirstsocial.com/frnzy/"
+        }
+      ]
+    },
+    {
+      "url": "http://www.daarboven.net/kepher_comingsoon.html",
+      "source_id": "source-1b9705683e2803a7623135395714efeb677bf55ff9f3594110e9b35f1ea054e8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.daarboven.net/kepher_comingsoon.html"
+        }
+      ]
+    },
+    {
+      "url": "http://www.inklestudios.com/",
+      "source_id": "source-0ab21e40602eadd50816e010b9193e3bf9de3f8855674d1ae29c68a37e7a2cda",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "http://www.inklestudios.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://www.inklestudios.com/ink",
+      "source_id": "source-66bfa1305b50095ff9e49ea319dfc4c8cc4b43bc0bef6cab03b1ae6c30edc3a4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "http://www.inklestudios.com/ink"
+        }
+      ]
+    },
+    {
+      "url": "http://www.inklestudios.com/ink/theintercept",
+      "source_id": "source-254518ef24523aa4d1c1c78166ec11411e9e1625627b94e4d764368c2e52235c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "http://www.inklestudios.com/ink/theintercept"
+        }
+      ]
+    },
+    {
+      "url": "http://www.inklestudios.com/ink#signup",
+      "source_id": "source-86ed720f282ceb36339b633eda0c7e866d4af1c21673e7583c7f50537520c29a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "http://www.inklestudios.com/ink#signup"
+        }
+      ]
+    },
+    {
+      "url": "http://www.jetbrains.com/",
+      "source_id": "source-bfd94ec4ac8494d1104a89bb9fb695e879de7a9d5dfec079e68329e3d29e0127",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.jetbrains.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://www.marcopoloweltrennen.de/",
+      "source_id": "source-da6426471d4ddbd4b88a301645adddc02a88a3ae22c7865b5c597406d41e39e3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.marcopoloweltrennen.de/"
+        }
+      ]
+    },
+    {
+      "url": "http://www.newgrounds.com/portal/view/598677",
+      "source_id": "source-5c7fa9d35e51d67269d29934b06b97f2fd0716227865ae453e3bc7aed1e2aae8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.newgrounds.com/portal/view/598677"
+        }
+      ]
+    },
+    {
+      "url": "http://www.newgrounds.com/portal/view/606457",
+      "source_id": "source-baec30b550b035d82918052a918816cd343ac9eab922fabd9aea1e7b58c05bef",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.newgrounds.com/portal/view/606457"
+        }
+      ]
+    },
+    {
+      "url": "http://www.newgrounds.com/portal/view/627927",
+      "source_id": "source-6707419b37c036218e4971c8462f6256e5f45ed1887f0f3290b7a84cb9b2ec4a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.newgrounds.com/portal/view/627927"
+        }
+      ]
+    },
+    {
+      "url": "http://www.newgrounds.com/portal/view/637713",
+      "source_id": "source-4a1144cababb23afefd48b9c9cff0e19b86883732e332a7eca7cc2e2aaf8bf3e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.newgrounds.com/portal/view/637713"
+        }
+      ]
+    },
+    {
+      "url": "http://www.onceuponalight.com",
+      "source_id": "source-cd3411f416bc9f1c7348f88a70294c03fe3210a29f46b87f7d761b087ec6b80d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.onceuponalight.com"
+        }
+      ]
+    },
+    {
+      "url": "http://www.patreon.com/inkle",
+      "source_id": "source-e81c75134480931f1f32ec152c77d7398286e77935f78e4a7558e16b3b8b8650",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "http://www.patreon.com/inkle"
+        }
+      ]
+    },
+    {
+      "url": "http://www.thoopid.com/snailboy-presskit",
+      "source_id": "source-56aeafa7b47eefa2cee845a216087e47bf0c70139bacb4d3fdeec0444bcf07f8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "http://www.thoopid.com/snailboy-presskit"
+        }
+      ]
+    },
+    {
+      "url": "http://www.tpain.com/",
+      "source_id": "source-9509e286a78fb4807d3249786814784574b50669097115961e2dd5a439abf967",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://www.tpain.com/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "http://www.tpain.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://www.twitter.com/inkleStudios",
+      "source_id": "source-ac37e5c9a838762fae838f247b11a8f02cfb8afd21e078df3522fcfdeab06b0f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "http://www.twitter.com/inkleStudios"
+        }
+      ]
+    },
+    {
+      "url": "https://alexbuzin.me/",
+      "source_id": "source-11b60ba05f391c2e58f4eb4538fdcf754e8f7f917fb03b731aef8289d651eadc",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://alexbuzin.me/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://alexbuzin.me/"
+        }
+      ]
+    },
+    {
+      "url": "https://cdnjs.com/libraries/whitestorm.js",
+      "source_id": "source-4f3a8ab7b55a921b2b0f25bccc812b3ee8b88766270ec5ecd3adc3944e380dcd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://cdnjs.com/libraries/whitestorm.js"
+        }
+      ]
+    },
+    {
+      "url": "https://code.visualstudio.com/",
+      "source_id": "source-177f0934751badde8cc4b6dd870c8ebebdf9bb5a6815ffa3eb5f48db6dd8864a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://code.visualstudio.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://codeplea.com/embedding-files-in-c-programs",
+      "source_id": "source-0ddae48e5580953a52de559a33d9cf3083186e1440dd92eb30fe60cf85219172",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "codeplea/hexembed",
+          "commit_sha": "1f85180c66edc59fd471e964dc897a510819a821",
+          "readme_blob_sha": "ce34a148b64bc17c4cee29553c47ecad323069e0",
+          "exact_url": "https://codeplea.com/embedding-files-in-c-programs"
+        }
+      ]
+    },
+    {
+      "url": "https://community.revolutionarygamesstudio.com/",
+      "source_id": "source-c34e7c5e72630d81a36e761665dae093501505ce09544aef759df5bf10ae9b8d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://community.revolutionarygamesstudio.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://community.revolutionarygamesstudio.com/c/dev-help",
+      "source_id": "source-96152beeaeabb8a68381297d0601960f94143c653e300fdcc0bda389bfe7b116",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://community.revolutionarygamesstudio.com/c/dev-help"
+        }
+      ]
+    },
+    {
+      "url": "https://dev.revolutionarygamesstudio.com/ci/1",
+      "source_id": "source-f724aadc9289e0d3565cc14e53290bf4c46b13c2e764f5916f15e8fe751bc76d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://dev.revolutionarygamesstudio.com/ci/1"
+        }
+      ]
+    },
+    {
+      "url": "https://discord.gg/frNetGE",
+      "source_id": "source-cf25491ff59408eb6a9e8253696b3a13e7a8946abe4078ce543dc143525f05e3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://discord.gg/frNetGE"
+        }
+      ]
+    },
+    {
+      "url": "https://discord.gg/FZxDQ4H",
+      "source_id": "source-cb3262626ed0bf29a7b806018c32ffa4e2e1e3749a145dcfca7062ac2022cd5b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://discord.gg/FZxDQ4H"
+        }
+      ]
+    },
+    {
+      "url": "https://discord.gg/inkle",
+      "source_id": "source-433cc51b35d0faab3a0934e3553c29e07880d21c547cedfe28105cc3f9c5732b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://discord.gg/inkle"
+        }
+      ]
+    },
+    {
+      "url": "https://discourse.atomicgameengine.com/",
+      "source_id": "source-912d0e8d0e4f2cb47d839aea3590350be1a1ebfbd35a4945be1b4658351a4a2f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "AtomicGameEngine/AtomicGameEngine",
+          "commit_sha": "ff59324b7e198f4179eca0f6535b1e72484d8c4c",
+          "readme_blob_sha": "61477b60e2423a1f6fcec0466dd9ab3a509ba73b",
+          "exact_url": "https://discourse.atomicgameengine.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://docs.godotengine.org/en/stable/development/compiling/introduction_to_the_buildsystem.html?highlight=compile",
+      "source_id": "source-70d0e7bd614a20bc605d608919ce80caff54891534b61b34a5e929d6c3965cc4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "jordigulley/fmod_gd4",
+          "commit_sha": "d15273a8a88e705c5eaf560fc5c1218847c71454",
+          "readme_blob_sha": "73d1a95da6b74076e0a9e59c2faaab629fb22c50",
+          "exact_url": "https://docs.godotengine.org/en/stable/development/compiling/introduction_to_the_buildsystem.html?highlight=compile"
+        }
+      ]
+    },
+    {
+      "url": "https://docs.huihoo.com/godotengine/godot-docs/godot/tutorials/asset_pipeline/_asset_pipeline.html",
+      "source_id": "source-24ed0792821e6207f2cd0d3a172b9ef0f32ba3869481af7e935b6ca2c00d4f97",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://docs.huihoo.com/godotengine/godot-docs/godot/tutorials/asset_pipeline/_asset_pipeline.html"
+        }
+      ]
+    },
+    {
+      "url": "https://docs.microsoft.com/en-us/dotnet/core/rid-catalog",
+      "source_id": "source-2c7fdaef1fcfb976823d4ee0fc2246f0a2be32ca38459f47659d15e66f7ee205",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://docs.microsoft.com/en-us/dotnet/core/rid-catalog"
+        }
+      ]
+    },
+    {
+      "url": "https://dotnet.microsoft.com/download",
+      "source_id": "source-054bcf43b526fb3525a8c4a23efd29968935a6a03f965af5ca339063fa384d42",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://dotnet.microsoft.com/download"
+        },
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://dotnet.microsoft.com/download"
+        }
+      ]
+    },
+    {
+      "url": "https://git-lfs.github.com/",
+      "source_id": "source-a7db8e624a8ceff20ded08b4813ed4b4ac7f083d935851a987b27036f0fcd7d4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://git-lfs.github.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/alamboley/Citrus-Engine-Examples",
+      "source_id": "source-da223b764056d850118b2daddd0cc65887868734947065ea3b1b37432cfcece6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://github.com/alamboley/Citrus-Engine-Examples"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/AtomicGameEngine/AtomicGameEngine/graphs/contributors",
+      "source_id": "source-b866d05c3cd287700acd118ddf9855ccdb9755c8b10aa8f4b82616025ccfd4da",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "AtomicGameEngine/AtomicGameEngine",
+          "commit_sha": "ff59324b7e198f4179eca0f6535b1e72484d8c4c",
+          "readme_blob_sha": "61477b60e2423a1f6fcec0466dd9ab3a509ba73b",
+          "exact_url": "https://github.com/AtomicGameEngine/AtomicGameEngine/graphs/contributors"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/AtomicGameEngine/AtomicGameEngine/wiki/",
+      "source_id": "source-5dfe62895ae4d6ed90f8955c172a6de7b81d5c15bd3cb259c40b9d5c918a139b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "AtomicGameEngine/AtomicGameEngine",
+          "commit_sha": "ff59324b7e198f4179eca0f6535b1e72484d8c4c",
+          "readme_blob_sha": "61477b60e2423a1f6fcec0466dd9ab3a509ba73b",
+          "exact_url": "https://github.com/AtomicGameEngine/AtomicGameEngine/wiki/"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/AtomicGameEngine/AtomicGameEngine/wiki/Building-Atomic-from-Source",
+      "source_id": "source-b9d6a352c25d6c3b72886410e0f89be4d3e248fc2b9538dc198f62d94a4a23fd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "AtomicGameEngine/AtomicGameEngine",
+          "commit_sha": "ff59324b7e198f4179eca0f6535b1e72484d8c4c",
+          "readme_blob_sha": "61477b60e2423a1f6fcec0466dd9ab3a509ba73b",
+          "exact_url": "https://github.com/AtomicGameEngine/AtomicGameEngine/wiki/Building-Atomic-from-Source"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/away3d/awayphysics-core-fp11",
+      "source_id": "source-02c9703959120a5d1be42a168cb63375482340cec82f0212d917a3b3ad14cfc8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://github.com/away3d/awayphysics-core-fp11"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/DaVikingCode/Citrus-Engine-old",
+      "source_id": "source-556d1bd7cc0b0992b25bd8338a6f21150587e792cb0818d1cd6d3c1f2307243c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://github.com/DaVikingCode/Citrus-Engine-old"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/inkle/ink-unity-integration",
+      "source_id": "source-ea8d6981a63e1c40d64fb7de412a2b9a4b7cb777f84605acfe818aa83083fd16",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink-unity-integration"
+        },
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink-unity-integration"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/inkle/ink/blob/master/Documentation/ArchitectureAndDevOverview.md",
+      "source_id": "source-499a87a448e376876abb34388d5770a6206c8ae526a4519e0fe93863ddb9adc6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink/blob/master/Documentation/ArchitectureAndDevOverview.md"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/inkle/ink/blob/master/Documentation/RunningYourInk.md",
+      "source_id": "source-cde1f79d0f52ca7931a27167b9fdb64ba25ce5002fa8e6ea8ca3833ed0676c45",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink/blob/master/Documentation/RunningYourInk.md"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/inkle/ink/blob/master/Documentation/WritingWithInk.md",
+      "source_id": "source-85835aecbc16f77117cf4759f89ef66383ee4fae12c5cdcc608e71523e4a32d6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink/blob/master/Documentation/WritingWithInk.md"
+        },
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink/blob/master/Documentation/WritingWithInk.md"
+        },
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink/blob/master/Documentation/WritingWithInk.md"
+        },
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink/blob/master/Documentation/WritingWithInk.md"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/inkle/ink/blob/master/LICENSE.txt",
+      "source_id": "source-458d26cc3fdd9128e16f589be2fa1ab47c2b39866d7ee7afb3987c96b380e1b9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink/blob/master/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/inkle/ink/discussions",
+      "source_id": "source-2978e9b1c5522f9ff3a88946ec876edb9c6ef3d2f8a69ce9599ee87d7890c430",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink/discussions"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/inkle/ink/releases",
+      "source_id": "source-f15e8263856b2a1f1a8c641b4e2be1e5b536b80f73dd349ab276ee7e0fe2e908",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/ink/releases"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/inkle/inky",
+      "source_id": "source-e773da01343d985bc44259b37938a4fcddcce5223f040e0fa1386f9283fdda96",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/inkle/inky"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/kripken/ammo.js/",
+      "source_id": "source-a85e442c754132a8c0c3a16ee008bf8d46b7351c611981ed8358a7bf849dd755",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://github.com/kripken/ammo.js/"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/orgs/Revolutionary-Games/projects/2",
+      "source_id": "source-d0dbc364dbe30d586f260178c4a8ea81a70c792d27bb91696e72c05a978e66c3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://github.com/orgs/Revolutionary-Games/projects/2"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Revolutionary-Games/Thrive-Raw-Assets",
+      "source_id": "source-18e1d167c8d677d14f47c788bdbbdb7c1670598d3605aef90af803ec540a19fd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://github.com/Revolutionary-Games/Thrive-Raw-Assets"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Revolutionary-Games/Thrive/tree/original_master",
+      "source_id": "source-8a67d1da2912ccef064e2bf7c1da09dc1612b603308b391a271bff307eb114b2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://github.com/Revolutionary-Games/Thrive/tree/original_master"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/sachinthankachan",
+      "source_id": "source-5e734080b21f73adea9e8149bf10578f7cdf3f8aca0ae7b464f17d3c5f4db468",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://github.com/sachinthankachan"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/sachinthankachan/msdf-atlas-studio.git",
+      "source_id": "source-f12172373fc78d4357f76907b35adc1014a4a38f53273c74d093a4a66087511a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://github.com/sachinthankachan/msdf-atlas-studio.git"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/sachinthankachan/msdf-atlas-studio/actions/workflows/build_and_release.yml",
+      "source_id": "source-64c574b4e75e68b53c7017f698579971b0b2ccd49fd5984395bbdb14841a447c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://github.com/sachinthankachan/msdf-atlas-studio/actions/workflows/build_and_release.yml"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/sachinthankachan/msdf-atlas-studio/releases/latest",
+      "source_id": "source-d204df507cda94ed81c4cd0a1f2d3481e30d7cb941bf4bda2aa52fd8d83b21a9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://github.com/sachinthankachan/msdf-atlas-studio/releases/latest"
+        },
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://github.com/sachinthankachan/msdf-atlas-studio/releases/latest"
+        },
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://github.com/sachinthankachan/msdf-atlas-studio/releases/latest"
+        },
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://github.com/sachinthankachan/msdf-atlas-studio/releases/latest"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/sindresorhus/xo",
+      "source_id": "source-6ddf11b70cd5de10236f809ae308da4e371a1e97ddbc2bf3b797619178a815d6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://github.com/sindresorhus/xo"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/WhitestormJS/physics-module-ammonext",
+      "source_id": "source-238c027d9ec06f29ad9e266d4d5f20f7033951a1dab65950137f7272b38a3d36",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://github.com/WhitestormJS/physics-module-ammonext"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/WhitestormJS/whitestorm.js/releases",
+      "source_id": "source-0e2d719723544f5ef4bfe5f2bbc498869d34082bfa2ae573c92a6ec4269701ff",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://github.com/WhitestormJS/whitestorm.js/releases"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/y-lohse/inkjs",
+      "source_id": "source-b4f5c551ad37e1c24468d700e7bcd135ef2e49823c48974c2c270538409d285c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://github.com/y-lohse/inkjs"
+        }
+      ]
+    },
+    {
+      "url": "https://gitter.im/AtomicGameEngine/AtomicGameEngine/",
+      "source_id": "source-d2045deb7f6b0c1d5bf7f383dd4b3149126cfe27fbb7db1f110ecf6cd9e59263",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "AtomicGameEngine/AtomicGameEngine",
+          "commit_sha": "ff59324b7e198f4179eca0f6535b1e72484d8c4c",
+          "readme_blob_sha": "61477b60e2423a1f6fcec0466dd9ab3a509ba73b",
+          "exact_url": "https://gitter.im/AtomicGameEngine/AtomicGameEngine/"
+        }
+      ]
+    },
+    {
+      "url": "https://godotengine.org",
+      "source_id": "source-b6ebf74696c4482c474bb70debcfebb1708363af8b48f997aa10d934ea064a1c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://godotengine.org"
+        }
+      ]
+    },
+    {
+      "url": "https://godotengine.org/download",
+      "source_id": "source-68fb2901c7267659631bbc5149d7c16c879fdbfa9b3151197833a07f27fec439",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://godotengine.org/download"
+        }
+      ]
+    },
+    {
+      "url": "https://isocpp.org",
+      "source_id": "source-a25a195babfeb8452bee4dce46c287d1243a61cb205fd4f82006850fb336fa31",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://isocpp.org"
+        }
+      ]
+    },
+    {
+      "url": "https://itunes.apple.com/en/app/tap-the-pixel/id688562779?mt=8",
+      "source_id": "source-602ca1bd616de2fc5316cf8e14aae58ed462c069f541e5f0de4641d0de4c570d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://itunes.apple.com/en/app/tap-the-pixel/id688562779?mt=8"
+        }
+      ]
+    },
+    {
+      "url": "https://itunes.apple.com/fr/app/sophie-la-girafe/id649739520?l=fr&ls=1&mt=8",
+      "source_id": "source-85f045693de785fb0c7021fdb6f9ec24d3707b21cd5994ecb963cda58d8b3b7c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://itunes.apple.com/fr/app/sophie-la-girafe/id649739520?l=fr&ls=1&mt=8"
+        }
+      ]
+    },
+    {
+      "url": "https://itunes.apple.com/sg/app/penguin-up!/id900800765?mt=8",
+      "source_id": "source-071ac9ce5716a0710f7ed25dcbd17317f34b48bcfe1cd3b4f9e120bd2c9eb26a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://itunes.apple.com/sg/app/penguin-up!/id900800765?mt=8"
+        }
+      ]
+    },
+    {
+      "url": "https://itunes.apple.com/us/app/alef/id632002337?ls=1&mt=8",
+      "source_id": "source-9e395d9624e8649d86ec38dc5688b98e5720772ded62c241d3d0ba9f5f69e59a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://itunes.apple.com/us/app/alef/id632002337?ls=1&mt=8"
+        }
+      ]
+    },
+    {
+      "url": "https://itunes.apple.com/us/app/chickdoom-chicken-vs-aliens/id860555162?mt=8",
+      "source_id": "source-d9a86bb346e349eb1361f4de18609929d6ec8c83cc2ba5f13212102652a8c6e5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://itunes.apple.com/us/app/chickdoom-chicken-vs-aliens/id860555162?mt=8"
+        }
+      ]
+    },
+    {
+      "url": "https://itunes.apple.com/us/app/revenge-of-robots/id855173133",
+      "source_id": "source-9135ad35ff4857bcae2e24bf6dbcdf3c0951af580930a8d28ac61060e0794734",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://itunes.apple.com/us/app/revenge-of-robots/id855173133"
+        }
+      ]
+    },
+    {
+      "url": "https://krofdrakula.github.io/squirts/",
+      "source_id": "source-e1b63a9ed632d3180e59b51355ebf855fc73c1d89607677fbb1906d242da0749",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "KrofDrakula/squirts",
+          "commit_sha": "f84191f8d57eadcd3b55063231602ed4898d2b65",
+          "readme_blob_sha": "9ea9e81147af68adc872f7774746da1b53caec56",
+          "exact_url": "https://krofdrakula.github.io/squirts/"
+        }
+      ]
+    },
+    {
+      "url": "https://moxy.studio/",
+      "source_id": "source-9120f1ccd1286cb2d2433008118470942feb6594221e98822f541ceeacbeff8f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://moxy.studio/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://moxy.studio/"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs",
+      "source_id": "source-b9051889e8c4169f7a1d0941755ea62acf8b4cef571cc15edd6fd9bde1f712cd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/0/avatar",
+      "source_id": "source-0103bd74b861e59ddf225c46cce68b0752593ce7d131fd61edef4558473fbb86",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/0/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/0/website",
+      "source_id": "source-30f79c7cfc8167a4e82dfa1cae23c992866ec67ccfa070807cc10c3736fb45a3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/0/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/1/avatar",
+      "source_id": "source-c00aa0532f3a00906aa4977042d06b7b5137755e962f5ce606d9dfde037ccf49",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/1/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/1/website",
+      "source_id": "source-7db6d63b96794c62cbc59a003192561df1b1c6266b4c0649803228d8b48fcacc",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/1/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/10/avatar",
+      "source_id": "source-38287bd58c2c47f1001c7ce9f90bca9235a619ef36aca5a612f59156c5a2f98c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/10/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/10/website",
+      "source_id": "source-44e586e6a9da2f34dc452fa2040308f66980428ef7aff4ace13e8108648a59b6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/10/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/11/avatar",
+      "source_id": "source-a66352eb53870b7d9d822b82807c5f70383b7c13314c58c51fd6810cc39a3dac",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/11/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/11/website",
+      "source_id": "source-1faadc904f0144c8538430f8c9312a8423d0bf2085a2080ba5c9a4c32abdd536",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/11/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/12/avatar",
+      "source_id": "source-3798607ed4cd779091f4e87d123b0d592faa5ca7f0e4f450f296dde3313d0e1d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/12/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/12/website",
+      "source_id": "source-1502f49b1e1611a340d2554175fc33e7b225fed94fb53b6f6910244570e5c042",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/12/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/13/avatar",
+      "source_id": "source-92ccbaca947bbf613f24b27545dc10769d0801192604db32b35ca0a686cf03d9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/13/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/13/website",
+      "source_id": "source-cd8412850f714b313d54f24f9c4bdbfb3fbd3615ad674d51f8d2bba729b8090b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/13/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/14/avatar",
+      "source_id": "source-c9711ac21c5d7faefeaabecbe4453b1b1e28d63ee5f49c5d8b7d34e74f71b770",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/14/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/14/website",
+      "source_id": "source-43d9f01b8ff0cd2a8c662cacc1f4d12b736877d133f7d6ce3c205bc93c41065b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/14/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/15/avatar",
+      "source_id": "source-9dcd74d355462aa63349f7f39e2c3e9d7465f409a72558dd169845e89ada7eb8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/15/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/15/website",
+      "source_id": "source-cf513d99778ee5d19357350a5a76711e940efe21a6d80d3aa54ebe4910f4c1c6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/15/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/16/avatar",
+      "source_id": "source-95819d26a045a4f2181dcdcda636a79c047f7455c20ef1ecc30e823eb8835d39",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/16/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/16/website",
+      "source_id": "source-87d7730c7762313fe76a82a67936d9be419dd88f21280d3f441dae01d9120803",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/16/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/17/avatar",
+      "source_id": "source-727a9dff93fbbdff20c1c6b862f5a5ab5a214bd1208f125a08dec20dcc301e65",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/17/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/17/website",
+      "source_id": "source-395ac77c00226bd19ec0ff5508a00bfd4f178fdcf0c6a3f7a74c22340ffd2daf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/17/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/18/avatar",
+      "source_id": "source-8aec67da090da1e90a7a074a2a5ff383c8da4b79f792d23d5900e45e59de1267",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/18/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/18/website",
+      "source_id": "source-3e1a46c84f9fcabbbec6ed858523789e165b8526d84cfea76169bd33565511a8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/18/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/19/avatar",
+      "source_id": "source-c258b9be00eb724143f0265beab8429034e26b2555ddf7147a5a9ff1f4b1ece5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/19/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/19/website",
+      "source_id": "source-ff9c47644bb32e150c9588b190dc5e7dd10034d5661e94d235a7761767a36632",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/19/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/2/avatar",
+      "source_id": "source-844b56bb79c1fd79e4e7520604853b0524914ee6e61ef36857b247d3202c7f0c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/2/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/2/website",
+      "source_id": "source-1386e127f8688588ab30c33caee34c781e7f9cd5d43c3af131fe9c44e500850e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/2/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/20/avatar",
+      "source_id": "source-6f8c970efb3ecdbf02eaafa5a09d903db4456de90576454bd2a5355ee33b4090",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/20/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/20/website",
+      "source_id": "source-c1febec29f992f9961aae0f77c6940eb070db90ee557ad513ef04a2ae7da5a2a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/20/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/21/avatar",
+      "source_id": "source-e1dd9eaf42c5b30f7140ae51dbfffa5fcb9541baae73d563f77d0895548f09b9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/21/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/21/website",
+      "source_id": "source-8cf1116eb056ff4e11f80c3cb9901e7c7b28107bf05b301b953514406a82330e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/21/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/22/avatar",
+      "source_id": "source-e2d72562ac4def0fc866fd003ec3dfe266acf1c4a393f1e228e253f54bae5361",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/22/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/22/website",
+      "source_id": "source-13af8846a5f1c9973f0b1b64e71ab90a071f277d71ad016069318f71dc1637da",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/22/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/23/avatar",
+      "source_id": "source-b3f9b51a623d3d1c14ae89264913b07bf4f58c4a2e7bfb9e63c0ff3a87f51a85",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/23/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/23/website",
+      "source_id": "source-05ca7899a8ef57e51a375653de754f0c3b7a02fa9a1099c026a684159f6016b2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/23/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/24/avatar",
+      "source_id": "source-f35ec8e0a043f698d366e5dc17598b4d2f1a97de26d474dc048a2e13748c9970",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/24/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/24/website",
+      "source_id": "source-ae590ede5c1c71b707874cf1b8ce6ca10b8052b791cbcef60aa177a8d1375752",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/24/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/25/avatar",
+      "source_id": "source-9b22c0fd5b4800e7bd90883a95a8547e09eef120a1465a7ac2fa5caca7bc7422",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/25/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/25/website",
+      "source_id": "source-ba41de1617ea2c67ae36db787eb694a0744420dae4db3de8da8d6cfc7239de97",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/25/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/26/avatar",
+      "source_id": "source-e11d415d7ac41177234dff2aa8c7473e56b1713c04657857c24e64bb3ba79b7e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/26/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/26/website",
+      "source_id": "source-c1821958d59f259860509071f17af0e459a9908c09051a5307e6bf24a71b1fe1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/26/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/27/avatar",
+      "source_id": "source-369be7e00e22e2474341f147b6a56472c90ff60fae8b7ac75fea7add1f795ea9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/27/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/27/website",
+      "source_id": "source-bc4398ea5a3527933bbe139f46a38962fe5111acba9210a3371e46e4eceaadb8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/27/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/28/avatar",
+      "source_id": "source-8c8b22ea89c7676273e29eee76d86da5bf5ce8a96e52e74c039d8044c4a6c207",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/28/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/28/website",
+      "source_id": "source-0885e6bf0d5a6c308678f84b9894abe6e892fd681cecf75982800df15286dcf9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/28/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/29/avatar",
+      "source_id": "source-b47ed91203f9794c8d43f2e6e383eadda65c681f058f008ad712accf21fb728b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/29/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/29/website",
+      "source_id": "source-67f399a7f1d3c751dd54fc1ebdd8ebf93edb5ac2f64f53aa1a557047dfcccd1d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/29/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/3/avatar",
+      "source_id": "source-5f763c89ca99f4e30afbb3f17bca1bad31c775b976ed00fbdf6747b52f12e02b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/3/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/3/website",
+      "source_id": "source-6c5aef71ed8ccd732dd3f7d582705c3053596786f42e6e133c37adb4a3150883",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/3/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/30/avatar",
+      "source_id": "source-2184a2493f5f0d220adcc1bfcc757eb41cdfa74a6d1f643eb5e1bb69001ae17b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/30/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/30/website",
+      "source_id": "source-1f2995269c861d7f775d277fb1d471d45d228f1c083b4bad495662a1e862a563",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/30/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/31/avatar",
+      "source_id": "source-32001d8e0529ca195ae429060f55741b571e762d5cd13fc5ccbc3b40ea2f2d43",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/31/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/31/website",
+      "source_id": "source-0ba1460c0c87fd289f1dbd6ec3f1da8d67a2be1326b7e9c2a15b102e089e6b37",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/31/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/32/avatar",
+      "source_id": "source-f50cc825a14c193f093813a31e4f329d1dd90e80f5e411ce15b140fc19897108",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/32/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/32/website",
+      "source_id": "source-3fd161d72c3ff6a1aa4c798d6d9d5563aca20d081530ac926dac7ec4ba8b5b03",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/32/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/33/avatar",
+      "source_id": "source-27110730b17d873628172d545f657152b14ed07b5f3dd0b536457dcbab26ef45",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/33/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/33/website",
+      "source_id": "source-1e071f7264cec33390ebb0c7391fff9af26075da1a0c37a3321249ac8e55a17c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/33/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/34/avatar",
+      "source_id": "source-25313d5ff195235f856892d7a41570811a63efa0885c87ed3bf2ffd8b0ff67c1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/34/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/34/website",
+      "source_id": "source-62cf13b89210ac08f59604727a2dcb8100ea68beebf450f169d1ea220b0beba8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/34/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/35/avatar",
+      "source_id": "source-ed011657b8729e4943761ebba6e99708295f55dcedd7aa83497fb63b0c96710f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/35/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/35/website",
+      "source_id": "source-596ccbafccb6efff86d3e95cb2f6d99c23987b439bd73eac45c7621c59adc419",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/35/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/36/avatar",
+      "source_id": "source-fb6a80d513d31247804f57013652f8028611b473ad7d6b97a8aa341cd6a1fa4d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/36/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/36/website",
+      "source_id": "source-18e0979bd2fc76dd125ba97f99e9bdb42d731a8c4e6bc5d7f33f79e0ba0cfcac",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/36/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/37/avatar",
+      "source_id": "source-4770ad602212f2ea34cefdd6937bac7f49a34634d81918df901df0341269a6b1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/37/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/37/website",
+      "source_id": "source-0e645a97b178057a5082d175085e06b4d47013d5b08214c250d29667f417399a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/37/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/38/avatar",
+      "source_id": "source-fb868e0be2da7d706bb9d170cc681bee37fc89a8cd6cc0b20013fd85fe56767f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/38/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/38/website",
+      "source_id": "source-a080c36cedec7c3728687906483a8d32b8db8ed2389a5abca09e6b7232dfda2f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/38/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/39/avatar",
+      "source_id": "source-7d0e2869642fc0e65984978a4f188af8b7da7502573751addeaa62b10a1f4bd3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/39/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/39/website",
+      "source_id": "source-ba91b94f6dd1b6c7035d562a48bde695669f58ff0c13a471b2d5ed64263e26d2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/39/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/4/avatar",
+      "source_id": "source-bd1dcf1bf943cd2085ca55d096399cdd9ff5b722a7c8b32eb786de0f95a48ebb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/4/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/4/website",
+      "source_id": "source-1249269a8123c0e0dd5ad53f538bbfdecf00abbe86c0c36415445375274d7e30",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/4/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/40/avatar",
+      "source_id": "source-70fa76e1d5f88bb8bc40e35f47b8b7e620e2bb7273273def301af90c477dd693",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/40/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/40/website",
+      "source_id": "source-be81262c170789aa5483fbf52a9b70c09f784c5ce89c4d4a9c52e7bfacd7d617",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/40/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/5/avatar",
+      "source_id": "source-21c56c5376938c9095a88fbb03a27f9f3508d9faace517df6dd6d102ff82daa8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/5/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/5/website",
+      "source_id": "source-c0eca6fe573fe5051b324d1aff1de426a0de9a473db3f9a3ea5909b47b026bd3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/5/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/6/avatar",
+      "source_id": "source-ea18d8ff8e1ff483b44dc28c8bc7c848ad69bd989383c3340939cd13e80ad2b3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/6/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/6/website",
+      "source_id": "source-492f6f7512bcc188f4f3812e106e41ed58bc773f4dadd2d5f8542ba5b7477b2f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/6/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/7/avatar",
+      "source_id": "source-ddfdbd4d86fdd82cec69b64566105d85e673a60e81369320686930927b5dc156",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/7/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/7/website",
+      "source_id": "source-82a4d36cafd978fcb44204fd887d350a107a026c87606d5d1bee95c6b8f7af71",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/7/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/8/avatar",
+      "source_id": "source-d7631ebf4c06312651747c4a896ad7c73581bd7120544c2f8a7337726ed6bb08",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/8/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/8/website",
+      "source_id": "source-696111332b95411726784ff0c9f303c2076a4eec42856e699a464caaa4dba21d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/8/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/9/avatar",
+      "source_id": "source-000a1edb55a2156d629f05d48ee3c8f10ba784bb0ff46b00765a7aea2a4596d2",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/9/avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs/backer/9/website",
+      "source_id": "source-707d6ca4a1e43453e1580678756b2065e55d50e5133d4f371a01ffa00e5b22ac",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs/backer/9/website"
+        }
+      ]
+    },
+    {
+      "url": "https://opencollective.com/whitestormjs#support",
+      "source_id": "source-db2be3dda9b15ebdfa4e00c0dd851610792ff3d9ec6afaacb0a2237412abb595",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://opencollective.com/whitestormjs#support"
+        }
+      ]
+    },
+    {
+      "url": "https://play.google.com/store/apps/details?id=air.air.BeekyrAndroid",
+      "source_id": "source-2b4b93a48ba1fe486a443b9ecdfe9771c297294c1556bb9396e0fbe1b2472b3c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://play.google.com/store/apps/details?id=air.air.BeekyrAndroid"
+        }
+      ]
+    },
+    {
+      "url": "https://play.google.com/store/apps/details?id=air.com.ravalmatic.ChorizosDeEspana",
+      "source_id": "source-0cf46a0fd90dfac37e10309ff28a3c55584c8bc8cf4892a95eed13f69e6e027e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://play.google.com/store/apps/details?id=air.com.ravalmatic.ChorizosDeEspana"
+        }
+      ]
+    },
+    {
+      "url": "https://play.google.com/store/apps/details?id=air.com.studio3wg.gerard",
+      "source_id": "source-9bd08bcc75f98f02366e70fddeb7f171161fe5072a6a08d0a8fdb75f85ac92a4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://play.google.com/store/apps/details?id=air.com.studio3wg.gerard"
+        }
+      ]
+    },
+    {
+      "url": "https://play.google.com/store/apps/details?id=air.com.studio3wg.SantaRush",
+      "source_id": "source-74e085ce50df0466bca7ff848bb92b9dd1b2abcfb710a0ec015a7192d35ee8c3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://play.google.com/store/apps/details?id=air.com.studio3wg.SantaRush"
+        }
+      ]
+    },
+    {
+      "url": "https://revolutionarygames.itch.io/thrive",
+      "source_id": "source-bc5d061da4166e9207bf63a7e06ff75ee6b52f03a7ae9028cc4d514243e903ac",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://revolutionarygames.itch.io/thrive"
+        }
+      ]
+    },
+    {
+      "url": "https://revolutionarygamesstudio.com/",
+      "source_id": "source-a461c2318d3401201750b6eab36f8f2041e8231cd23da6df0f8603bbaf71f175",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://revolutionarygamesstudio.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://revolutionarygamesstudio.com/application/",
+      "source_id": "source-c917e78e87c4205e1989c37ae7a6922d9f6147773414c47c7cfdc38a819e7630",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://revolutionarygamesstudio.com/application/"
+        }
+      ]
+    },
+    {
+      "url": "https://revolutionarygamesstudio.com/releases/",
+      "source_id": "source-226bfaf5854f81c3028e4461dad028c5ddb28a941f783895e7941eaab0577e94",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://revolutionarygamesstudio.com/releases/"
+        }
+      ]
+    },
+    {
+      "url": "https://rmallick6806.github.io/SolarSystemBuilder/",
+      "source_id": "source-2291b97ca612d02ba5ecd40b646e4f20fb3cdedb543290dbc92b4773c02faec1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://rmallick6806.github.io/SolarSystemBuilder/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://rmallick6806.github.io/SolarSystemBuilder/"
+        }
+      ]
+    },
+    {
+      "url": "https://scons.org/",
+      "source_id": "source-f3a70c7a27a8345af489523732e8ff3a70c2c90ffb06ad1fef5e7c079eefdba0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "sachinthankachan/msdf-atlas-studio",
+          "commit_sha": "842953b6cd7eb992318eb04ff3ad5ef76dfa84ab",
+          "readme_blob_sha": "08b143f6fe2f3953013d418071b7073fa749d7fa",
+          "exact_url": "https://scons.org/"
+        }
+      ]
+    },
+    {
+      "url": "https://spatial.100shapes.com/",
+      "source_id": "source-1c9aff405d845e1deee72fc48746ae7cd4f91e85c054a7b8052a2786c4331748",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://spatial.100shapes.com/"
+        },
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://spatial.100shapes.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://store.steampowered.com/app/1779200/Thrive/",
+      "source_id": "source-fa1fcb44bedb7d022497b59d23a805006e1ddbcce920185f6ca92d32b3dcf225",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://store.steampowered.com/app/1779200/Thrive/"
+        }
+      ]
+    },
+    {
+      "url": "https://translate.revolutionarygamesstudio.com/engage/thrive/",
+      "source_id": "source-d65289d8ae642be258a70d794e594663bbfb8285401aefe1fb6db436ddb8304d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://translate.revolutionarygamesstudio.com/engage/thrive/"
+        }
+      ]
+    },
+    {
+      "url": "https://travis-ci.org/inkle/ink",
+      "source_id": "source-ae7d80ea4c95bc9720a77e7dc9054b52656fb3116c11a6ac073b3eadc592a74f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://travis-ci.org/inkle/ink"
+        }
+      ]
+    },
+    {
+      "url": "https://travis-ci.org/WhitestormJS/whs.js?branch=develop",
+      "source_id": "source-7072d41e6db8ca1a4f801c98d36987ccc01270c5954f5971871ebd181301c6ea",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://travis-ci.org/WhitestormJS/whs.js?branch=develop"
+        }
+      ]
+    },
+    {
+      "url": "https://trello.com/b/ktjiOLrd/whitestormjs-contributions",
+      "source_id": "source-dd00a9f089858b336dd7d25628e87547ff3fc107ff7e74fddf7361eec694b2bd",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://trello.com/b/ktjiOLrd/whitestormjs-contributions"
+        }
+      ]
+    },
+    {
+      "url": "https://whs-dev.surge.sh/examples/",
+      "source_id": "source-9e111ec10204ba4eb436d5b8b2691f18bd62fa53cee206330b0f94f8c272f99c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://whs-dev.surge.sh/examples/"
+        }
+      ]
+    },
+    {
+      "url": "https://whs.io/Usage%20with%20webpack.html",
+      "source_id": "source-c2a0de27960eab086842be198d96d12ba0e5837b55448b3e5b71529a42e97838",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://whs.io/Usage%20with%20webpack.html"
+        }
+      ]
+    },
+    {
+      "url": "https://wiki.revolutionarygamesstudio.com/",
+      "source_id": "source-3a2687eaf58edd8c4856406c082dfab6544783fb61a71e597a2ca8a1a199ab37",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://wiki.revolutionarygamesstudio.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://wiki.revolutionarygamesstudio.com/wiki/Git_LFS",
+      "source_id": "source-2eab4fb7ed9fdc6977b2bd48ea3ec4a237ed9eec1d409c5c59fc47403d223471",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://wiki.revolutionarygamesstudio.com/wiki/Git_LFS"
+        }
+      ]
+    },
+    {
+      "url": "https://wiki.revolutionarygamesstudio.com/wiki/How_to_Import_Assets",
+      "source_id": "source-e83cd477f3e8e6da27e8ccf4cd74d9921ac1eb52aa68bc38bc60b4941e376a8b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://wiki.revolutionarygamesstudio.com/wiki/How_to_Import_Assets"
+        }
+      ]
+    },
+    {
+      "url": "https://www.facebook.com/aichaetvous/app_449473045088858",
+      "source_id": "source-ac7ed820accbcd53df87fbda9336dc467fc8869bf1c9e9c602387c359d039694",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "DaVikingCode/Citrus-Engine",
+          "commit_sha": "3967ad6b61a6d7d641d26b38128b056025f02487",
+          "readme_blob_sha": "51523c4a4974edabf9c9dee52ee2725e4caf6de4",
+          "exact_url": "https://www.facebook.com/aichaetvous/app_449473045088858"
+        }
+      ]
+    },
+    {
+      "url": "https://www.fmod.com/download#FMOD%20Engine-select",
+      "source_id": "source-4210beac175ef4450dda8ab3376096f6e83f2ec1f5131f4e45995a0edfcf7d44",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "jordigulley/fmod_gd4",
+          "commit_sha": "d15273a8a88e705c5eaf560fc5c1218847c71454",
+          "readme_blob_sha": "73d1a95da6b74076e0a9e59c2faaab629fb22c50",
+          "exact_url": "https://www.fmod.com/download#FMOD%20Engine-select"
+        }
+      ]
+    },
+    {
+      "url": "https://www.github.com/inkle/ink-unity-integration",
+      "source_id": "source-83718986d53ce41be806e128c12655319ec02445e2bfa456d1558aedd4b32537",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://www.github.com/inkle/ink-unity-integration"
+        }
+      ]
+    },
+    {
+      "url": "https://www.github.com/inkle/inky",
+      "source_id": "source-732a2372cd6746be29bb66c964cf9e04a8e0ee57f36fcffc04aa1d0519041918",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://www.github.com/inkle/inky"
+        }
+      ]
+    },
+    {
+      "url": "https://www.github.com/y-lohse/inkjs",
+      "source_id": "source-39caa63ab459454b10b6a59263a70d6d6febaa303ac64fbbb5f005464e95f6f5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://www.github.com/y-lohse/inkjs"
+        }
+      ]
+    },
+    {
+      "url": "https://www.inklestudios.com",
+      "source_id": "source-7420feecdf7ead483491166e4dab4e605ade15bdff6ce82f357d6d17c5d0e443",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://www.inklestudios.com"
+        }
+      ]
+    },
+    {
+      "url": "https://www.inklestudios.com/ink",
+      "source_id": "source-06aadac40fb6bd884e0179782851fd80b45e4f32ffef53ba38e02445cde6f0d5",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://www.inklestudios.com/ink"
+        }
+      ]
+    },
+    {
+      "url": "https://www.inklestudios.com/ink/web-tutorial/",
+      "source_id": "source-5f240b7f7d467579169ea8047b496edf23959d765175394577e5320ef3a5bec0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://www.inklestudios.com/ink/web-tutorial/"
+        }
+      ]
+    },
+    {
+      "url": "https://www.inklewriter.com",
+      "source_id": "source-b108395f96fe656293da23b101938d4668202ca7758dd55bfbd2df531e32ff70",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://www.inklewriter.com"
+        }
+      ]
+    },
+    {
+      "url": "https://www.npmjs.com/package/physics-module-ammonext",
+      "source_id": "source-73a4d375c2224afa4285d1c9c35b09e2394c9f30ffb03e16bc57cf4d79d73199",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://www.npmjs.com/package/physics-module-ammonext"
+        }
+      ]
+    },
+    {
+      "url": "https://www.npmjs.com/package/whs",
+      "source_id": "source-9780070849a4e21672f56e4855d77f3f5ae42b14a6e93dd543c5fc7774fdb56b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "WhitestormJS/whs.js",
+          "commit_sha": "545205fcb4d0fb90bc81a5d0a5abc1ae28c503b0",
+          "readme_blob_sha": "2809bb53cf063a2f852503e9f95c51252b869c57",
+          "exact_url": "https://www.npmjs.com/package/whs"
+        }
+      ]
+    },
+    {
+      "url": "https://www.patreon.com/thrivegame",
+      "source_id": "source-8e79a272bb25e577a629690f70bf88e2343f912d488ff0b198f5c0006558795a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Revolutionary-Games/Thrive",
+          "commit_sha": "0e8cde5952368eb564e838cb6f4b30ad7525da28",
+          "readme_blob_sha": "ff18e50e1352cd58f1af162cfe18f735d9420077",
+          "exact_url": "https://www.patreon.com/thrivegame"
+        }
+      ]
+    },
+    {
+      "url": "https://www.puzzlescript.net",
+      "source_id": "source-b4413f23ddfcd88b8b2af73f089964377caba7168ae4b9f1001cfadac1e24476",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "increpare/PuzzleScript",
+          "commit_sha": "ac4207a8754e1c50d1d25f8189fa52010b3b5402",
+          "readme_blob_sha": "785ad4b79479a9f9347c13d4caf6df515093473a",
+          "exact_url": "https://www.puzzlescript.net"
+        }
+      ]
+    },
+    {
+      "url": "https://www.puzzlescript.net/Documentation/documentation.html",
+      "source_id": "source-6dea77843dcb3c7538499c2db6c2fe3fc95d53857ae1795a0c679c693417c279",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "increpare/PuzzleScript",
+          "commit_sha": "ac4207a8754e1c50d1d25f8189fa52010b3b5402",
+          "readme_blob_sha": "785ad4b79479a9f9347c13d4caf6df515093473a",
+          "exact_url": "https://www.puzzlescript.net/Documentation/documentation.html"
+        }
+      ]
+    },
+    {
+      "url": "https://www.visualstudio.com/",
+      "source_id": "source-116683a0c8773df03f00b01826120154ef1525233e233b56fab24b707a42802c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://www.visualstudio.com/"
+        },
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://www.visualstudio.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://xamarin.com/download",
+      "source_id": "source-e4e708c13d21a7db1edd39fb4c8e48c58a81560a0cb43795b5caab40adb65dc9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://xamarin.com/download"
+        },
+        {
+          "repository": "inkle/ink",
+          "commit_sha": "35c63e52f1d36060930dc7ed3cfba38ea224b528",
+          "readme_blob_sha": "24e9b7cb22ea38181ee651b93ae3f7edb609fa76",
+          "exact_url": "https://xamarin.com/download"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Not 10× complete.",
+    "README links are discovery leads, not approval.",
+    "Repository licenses do not license linked destinations.",
+    "Frozen cursor unchanged.",
+    "Identity/mirror/edition clustering incomplete."
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": "skeleton.ai.multimodal_temporal_execution.v1",
+  "status": "implementation_candidate",
+  "volumes": [
+    "VOL-157",
+    "VOL-158",
+    "VOL-159"
+  ],
+  "owner": "skeleton/ai/runtime/learning_foundation/temporal.py",
+  "corpus_owner": "skeleton/ai/runtime/learning_foundation/multimodal.py",
+  "session_contract_owner": "skeleton/ai/runtime/extensions/multimodal.py",
+  "media_validation_owner": "skeleton/ai/runtime/multimodal/intake.py",
+  "persistence_owner": "skeleton/ai/runtime/training/data.py",
+  "architecture_reference": "machine/ai_app_construction.json",
+  "state_authority_reference": "machine/state_topology.json",
+  "scope": "bounded local speech execution and declared video evidence fusion; no provider, automatic speech recognition, video container decoding or new durable service",
+  "apis": [
+    "MultimodalCorpus.ingest(verified=True)",
+    "LiveSpeechExecution.transition",
+    "LiveSpeechExecution.append_frame",
+    "LiveSpeechExecution.submit_transcript",
+    "LiveSpeechExecution.restore",
+    "LiveSpeechExecution.export_final_text",
+    "VideoEvidenceIndex.bind",
+    "VideoEvidenceIndex.search"
+  ],
+  "speech_contract": {
+    "session": "Existing SpeechSession owns transition semantics; existing SpeechFrame and TranscriptSegment retain frame/transcript identities.",
+    "input": "Actual immutable PCM-WAV bytes decoded by the verified intake owner; transcripts are explicit operator/extractor declarations, not inferred ASR results.",
+    "ordering": "Integer frame sequences start at zero and are contiguous; first timestamp is zero and each later timestamp equals measured end of the previous frame. Measured duration is sample_count/sample_rate_hz; sample format remains constant.",
+    "provisional": "At most one provisional transcript for the next final frame; replacements retain exact session, frame, start and measured end. Provisional text never enters retrieval or training export.",
+    "final": "Final declarations commit in frame order to existing corpus speech receipt chains and preserve exact PCM source bytes and extractor identity.",
+    "commands": "Explicit command IDs bind full request digests; exact retries return prior receipts, conflicting reuse fails without mutation.",
+    "bounds": "At most 128 frames, 65536 bytes per frame, 8388608 total PCM source bytes, 32 pending frames, 128 source/rights references and 512 accepted commands per session; narrower positive integer limits permitted. Each recovery document has a 1048576-byte ceiling.",
+    "recovery": "Optional governed DatasetRegistry materialization with isolated speech_recovery purpose and snapshot split, CAS versions, bounded JSON documents containing exact PCM bytes, full accepted command requests and immutable session evidence. Recovery replays the contiguous command history and compares every receipt before reconstructing final/provisional text, state and cursors. Stable copied-frame sources retain original provenance and explicitly separate recovery consent; current withdrawal/deletion of any copied frame blocks all newer snapshots. An external source system is not observed or granted training authority. This purpose cannot grant training/evaluation authority.",
+    "atomicity": "Validate and stage local corpus/session changes; commit an optional governed snapshot before publishing local state. Rejected or stale commits leave local state unchanged."
+  },
+  "video_contract": {
+    "input": "Explicit ordered bounded timed fragments bind an existing VIDEO parent record and verified image/audio source records with text projections; callers declare container timestamps and extraction lineage.",
+    "integrity": "Parent record digest is mandatory fragment lineage; source and rights refs cannot be weakened, simulation policy matches parent, fragment bytes and projections revalidate before binding/search.",
+    "time": "Finite measured audio span durations, monotonic image frame indices and strictly ordered timestamps per modality; out-of-duration spans, duplicate identities and overlapping audio fail closed.",
+    "retrieval": "Actual deterministic lexical Jaccard fragment scores; best score per modality fused with explicit positive integer weights and fixed denominator. Selected timeline, rights, simulation and time filters run before ranking. Missing modalities contribute zero; scores cannot be inflated by repeated frame samples.",
+    "authority": "No fabricated tenant surface, caller-supplied relevance scores or instruction authority. Hits bind exact parent/timeline/source/projection identities.",
+    "bounds": "At most 128 timelines and 128 ordered fragments per timeline, 128 rights/scope references and a configurable total original source verification ceiling no greater than 134217728 bytes for each bind or search; admission precedes source hashing/decoding."
+  },
+  "failure_contract": "MultimodalFoundationError for evidence/order/policy failure; canonical DatasetRegistry typed CAS/revocation failures for durable checkpoint admission; no rejected local mutation",
+  "verification": [
+    "skeleton/testing/test_p3_live_speech_execution.py",
+    "skeleton/testing/test_p3_video_evidence_fusion.py",
+    "skeleton/testing/test_p3_multimodal_integrity.py",
+    "skeleton/testing/test_p3_multimodal_training_projection.py"
+  ],
+  "rollback": "Stop temporal admission while retaining verified original media, final corpus projections and governed versioned recovery snapshots. No lifecycle signoff or provider activation is asserted."
+}

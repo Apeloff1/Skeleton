@@ -1,0 +1,183 @@
+# Dragon source-expansion admission — October 12, 2026
+
+## Result and scope
+
+The immutable eight-catalog baseline contains **4,405 distinct unreviewed candidate URLs**. Supplements 0020–0022 contain **463 + 223 + 278 = 964** additional raw hyperlink identities, bringing the recorded *raw-link* inventory to **5,369 / 44,050 (12.19%)** of the requested tenfold target. The distinct canonical URL inventory is smaller, because some recorded links differ only by fragments or trailing slashes and some may overlap the original 4,405. These numbers are link discoveries, **not** individually verified sources, approved knowledge, legal-use grants, downloaded media, embeddings, model weights, or training examples.
+
+Before this change, all 964 were provisional evidence files outside the canonical SQLite almanac queue. A follow-up adversarial review identified **46 raw URLs that normalize differently** and **five cross-supplement canonical collisions**. Raw source IDs and receipts must remain intact as provenance, while canonical destinations receive only one policy job. The new `dragon_discovery_admission.py` bridge and `dragon_almanac_cli import-supplements` command reconcile these into distinct pending **policy** jobs and source-almanac memberships, preserving all 964 original discovery receipts. The importer performs no network access. Importing the bridge into the branch does **not** itself ingest the data into any running service; a trusted operator must run the command against the approved database.
+
+## Runbook (trusted operator, at the repository root)
+
+```bash
+python -m skeleton.ai.game_builder.dragon_almanac_cli bootstrap \
+  --trusted-local-operator --owner OWNER --database /path/to/owner-library.sqlite
+
+python -m skeleton.ai.game_builder.dragon_almanac_cli import-supplements \
+  --trusted-local-operator --owner OWNER --database /path/to/owner-library.sqlite \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json
+```
+
+If the trusted operator has already bootstrapped the baseline, only the second invocation is needed. The importer refuses a missing, out-of-order, duplicated, or count-divergent chain. It verifies the baseline catalog digest and unique URL identity and requires consistent unapproved states. Git repository/blob identities and catalog line numbers are retained **as source-discovery claims**, not described as authenticated signed provenance. Canonical URLs are allocated metadata-only records with no rights or training grant; each original raw source ID remains independently documented as a discovery receipt and maps to the normalized source-ID digest. All DB writes, topic membership and new policy-stage work occur in one transaction, with idempotent replay and owner isolation.
+
+`status` can inspect the owner-scoped queue. A worker can acquire a source only through its existing authenticated and bounded claim path. Its subsequent policy stage requires current robots, terms, SSRF and use authorization; a successful fetch and the source rights/Wiki/HOAG review require separate evidence. No supplement bypasses existing enforcement or automatically grants access.
+
+## Next substantive work
+
+Move from candidate quantity to lawful, reproducible acquisition: deploy the owner-bound import from an authorized operator; triage provisional sources by primary documentation, platform/era, originality and game-building utility; capture permission and exact target revisions; obtain independently reviewed narrow claims and replayable experiments; then promote measured knowledge only through the existing Wiki/HOAG/right-to-use gates. Expand beyond the current eight original source catalogs toward diverse official standards, hardware manuals, accessible homebrew SDK docs, historical specifications, video metadata and research repositories, with independently bounded connector/robots policy for every host. Explicitly distinguish public documentation, licenses for code or assets, and training rights.
+
+## Limitations
+
+- No new network fetch, independent source validation, source-material license or training authorization is claimed.
+- The 964 records are *available for queue import*; durable admission requires running the CLI against the deployment database.
+- No automated legal conclusion, model fitting, weight promotion, original game shipping or exhaustive archive has occurred from this batch.
+- CI on the exact GitHub commit and operator provisioning are separate release gates.
+
+Code: `skeleton/ai/game_builder/dragon_discovery_admission.py`.
+Regression: `tests/test_dragon_discovery_admission.py`.
+
+## Next reproducible extraction lane: nine pinned catalogs
+
+The manifest `machine/dragon_pinned_crawl_catalogs_20261012.json` now lists nine **additional, Git-revision-identified catalog candidates**: Game Boy, Nintendo 64, CHIP-8, C++ game creation, console-emulator documentation and case studies. This is nine potential **discovery catalogs**, **not** nine approved crawler sources and **not** yet a verified increment to the 5,369 distinct URLs.
+
+A source operator who has separately established permission to retrieve the catalog text can save each exact commit-pinned `README.md` to `/approved/catalog-cache/<owner>/<repo>/README.md`. The `dragon_catalog_expansion` utility does **not** access the network. It rejects modified content by recomputing the Git blob SHA-1 before extracting source links and header/line lineage. It then deduplicates against the full 4,405-entry baseline and the three existing supplements using the canonical URL parser, emits a fourth unapproved supplement, and checks the cumulative 10× target math before writing the evidence file. SHA-256 of each extracted README is also included to support stronger subsequent custody.
+
+Example, after populating the policy-approved cache with the **exact** pinned text:
+
+```bash
+python -m skeleton.ai.game_builder.dragon_catalog_expansion \
+  --trusted-local-operator \
+  --cache /approved/catalog-cache \
+  --observed-at 2026-10-12T02:26:00Z \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json \
+  --supplement docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json \
+  --output docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json
+```
+
+Pass the generated fourth supplement along with the first three, in that order, to `dragon_almanac_cli import-supplements` to create the additional **pending policy-stage jobs**. The timestamp above illustrates argument shape; operators must use the actual evidence-backed retrieval timestamp and never silently present an example as an observation.
+
+The new acceptance suites `tests/test_dragon_discovery_admission.py` and `tests/test_dragon_catalog_expansion.py` are wired into the hosted Dragon AI Verification workflow. They test full previous-chain counts, idempotency and tenant isolation, atomic corruption rejection, pinned-blob mismatch and non-promotability of unapproved source metadata. Hosted results must be inspected at exact PR head before release.
+
+## Per-header source almanacs and canonical deduplication
+
+An observed catalog hierarchy is now preserved as its own indexed almanac lineage. For example, an independently retrieved catalog item with the observed headings `Games → Controls → Input Latency` receives membership in each ancestor of `Sources → Provisional → <catalog repository> → Games → Controls → Input Latency`. Only **observed** headings are projected; the repository-only fallback for origin formats without heading data is explicit and does not invent new taxonomy.
+
+Metadata for an original raw URL, including every quoted heading path and repository/README identity, is retained in the owner-scoped `dragon_almanac_supplement_receipts_v2` table. Acquisition jobs use the independently canonicalized URL and its derived source ID. This prevents five known fragment/hostname collisions from creating duplicate policy jobs, while retaining all 964 raw discovery receipts. The canonical unique count is computed against the full baseline at import time; the previously recorded total **5,369 is a raw discovery count**, not a validated canonical count.
+
+Operators should first run the single-source import in a staged tenant and inspect `new_discovery_sources`, `new_provenance_receipts`, `new_policy_stage_jobs`, `raw_provisional_urls` and `canonical_discovered_urls`. Only the policy stage can authorize subsequent fetching; all derivative knowledge remains unreviewed until the independent review, rights and Wiki/HOAG gates have run. No source topic membership is itself evidence of factual accuracy.
+
+## Bounded metadata inspection
+
+A trusted local operator can inspect the owner-scoped source hierarchy without fetching any source or promoting extracted text:
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-topics --database dragon.sqlite --owner studio --trusted-local-operator
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-topics --database dragon.sqlite --owner studio --parent topic-<exact-topic-digest> --limit 25 --offset 0 --trusted-local-operator
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-sources --database dragon.sqlite --owner studio --topic topic-<exact-topic-digest> --limit 25 --trusted-local-operator
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-receipts --database dragon.sqlite --owner studio --source source-<exact-source-digest> --limit 25 --trusted-local-operator
+```
+
+`discovery-topics` returns the direct children of an observed heading path, with inherited source counts. `discovery-sources` returns one canonical acquisition identity per URL, its existing policy-stage job state and the total count of unreviewed raw provenance receipts. `discovery-receipts` returns the exact original link, catalog evidence path, observed heading paths, pinned identifiers and receipt digest. Each view validates stored source or evidence digests before presentation and carries explicit `training_authorized: false` and `scope: discovery_metadata_only` fields. Pagination is bounded to 100 rows and all queries require an explicit owner. The CLI is a local operator interface, **not** an HTTP endpoint and **not** a new runtime permission.
+
+
+## Current accepted discovery lineage — 12,777 raw leads
+
+The previously completed **10,551 raw-lead** chain comprised batches 0020–0023 and 0031–0037. An additional 12 SHA-pinned public README catalogs now supply **2,226 non-repeating raw URL leads** in consecutively linked batches **0038–0041**, for **12,777 / 44,050 (29.01%)** of the requested raw discovery target. The accepted chain is precisely fifteen evidence files: 0020, 0021, 0022, 0023, 0031–0041. Batches 0024 and 0030 are orphan/fork evidence and remain excluded, not double-counted.
+
+The new catalogs add specialized source-discovery coverage of Game Boy, N64, Xbox, PICO-8 and TIC-80 development, game networking, AI game research, level design, game production, and programming. Exact repository commit IDs, README blob SHA-1 identities, original link URLs, line numbers and observed heading paths are captured. The staging observation file `docs/ai/evidence/dragon-new-catalog-metadata-20261012-v1.json` retains 2,358 raw line observations from these 12 catalogs; admission deduplicated 105 already-recorded links and 27 repeated observations within this new source set, yielding **2,226 additional distinct raw links**. Each admitted raw URL retains bounded multiple origin references.
+
+An operator can **verify** the pinned evidence chain without network requests or any database source approval:
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-verify \
+  --database /path/to/staging-dragon.sqlite --owner studio \
+  --trusted-local-operator
+```
+
+After independent operator authorization, `import-reconciled` imports the **metadata only**, with one canonical policy-stage job per normalized URL and all distinct raw provenance receipts. It is not a crawling instruction; the separate policy worker must still perform origin-appropriate robots/terms/SSRF/license checks before fetching.
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli import-reconciled \
+  --database /path/to/staging-dragon.sqlite --owner studio \
+  --trusted-local-operator
+```
+
+Both commands use `dragon_discovery_reconciled.py`, now bound to the 12,777-lead, fifteen-file sequence, and refuse missing, reordered, duplicated or authority-promoting input. The documentation above covering 5,369 and 10,551 raw leads describes **historical milestones**, not the current maximum. The full current count remains **raw references**, not independent original sources, approved crawler destinations, verified license permissions or model training material. Source independence, current validity, relevance and rights still require separate evidence-backed assessment.
+
+### Source-diversity caution
+
+Some new collections contain many entries from GitHub, academic preprint hosts and video services. Several links may refer to the same underlying work or to unavailable destinations. Domain count is not independent-evidence count; raw URL growth is not machine knowledge growth. Source-level legal and factual scrutiny remains necessary before any ingestion, distillation or Wiki/HOAG memory promotion.
+
+
+## Latest cross-platform source cohort — 15,175 raw leads
+
+After the 12,777-lead fifteen-batch milestone, a seventh specialist catalog cohort adds **2,398 nonrepeating raw links** from `8bitworkshop/awesome-8bitgamedev`, `Calinou/awesome-godot`, `StefanoCecere/awesome-opensource-unity`, `mikeroyal/Unity-Guide`, `ellisonleao/magictools`, `kjaylee/awesome-game-design`, and `OTFCG/Awesome-Game-Analysis`. The catalogs contribute 3,187 bounded, original README-link/line observations; **562** URLs were already represented in the accepted historical supplements, and **227** were repeated within this new set. The accepted result is **15,175 / 44,050 = 34.45%** of the raw-link target, not 15,175 verified independently useful works.
+
+The staged `docs/ai/evidence/dragon-catalog-metadata-20261012-round3.json` file retains the exact README Git commit/blob identities, observed link URLs, source line numbers and bounded heading ancestry. It is **staging evidence**, not an imported source list or source-use grant. The final `docs/ai/evidence/dragon-source-expansion-20261012-batch-0042.json` incorporates **2,398 new raw URLs** in one ordered batch. Existing accepted batches 0020–0023 and 0031–0041 remain its immutable parents. The rejected orphan/fork batches 0024 and 0030 are still excluded.
+
+`discovery-verify` and `import-reconciled` now point to the strict **sixteen-file accepted chain**. A trusted operator must first validate this entire chain; any substituted source digest, missing ancestor, changed count, training authorization or rights claim must fail closed. Even after metadata import, all newly created jobs begin at the policy-review stage, not at fetch or training.
+
+The new `discovery-census` operator command reports host concentration, canonical URL deduplication, provisional source categories and words in URL paths that warrant manual rights review. It distinguishes raw-lead counts from canonical source identities and treats every domain-diversity or risk observation as a heuristic rather than a finding about independent knowledge or legal use:
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-census \
+  --database /path/to/staging-dragon.sqlite --owner studio \
+  --trusted-local-operator --limit 30
+```
+
+The census reads and validates the checked-in evidence without network access, writes no source-crawl permits and authorizes no Wiki/HOAG memory or model-weight promotion. Exact-head CI and the policy executor's separate legal, robots and SSRF gates are still required.
+
+## Nine more pinned catalogs and a console/era discovery matrix
+
+The accepted reconciled discovery chain now extends through raw-only batches
+`0043`–`0047`. These batches contain **4,053 newly recorded, raw-URL-distinct
+hyperlink leads** from nine Git SHA/README-blob-pinned game-development catalogs:
+`Calinou/awesome-gamedev`, `ChessMax/awesome-game-engines`,
+`terrehbyte/awesome-ue4`, `8bitworkshop/awesome-8bitgamedev`,
+`ellisonleao/magictools`, `Dvergar/awesome-haxe-gamedev`,
+`fire/awesome-godot-procedural-manual-generation`,
+`OTFCG/Awesome-Game-Analysis` and `devanshutak25/3d-resources`.
+The pinned READMEs supplied links and observed heading paths only. These are
+**not** confirmations that linked media are live, that a source is independent,
+that games or techniques can be copied, or that source material is lawful for
+training. The linked contents, binaries, artwork and video were not crawled.
+
+The canonical reconciled source-ledger target is now **19,228 raw leads out of
+44,050 (43.65%)**, comprising the 4,405-source original baseline, 10,770 earlier
+accepted raw leads, and 4,053 added leads. Raw URL counts are intentionally
+separate from normalized distinct source counts: a URL fragment, tracking query
+or mirror can create multiple raw mentions of the same destination. The
+`discovery-verify` and `discovery-census` commands calculate canonical
+distinct URLs from the entire evidence chain. Batch `0024` and batch `0030`
+remain excluded independent/orphan evidence paths, not accepted ancestors.
+
+The platform matrix adds explicit, conservatively named search categories for
+**42 consoles, handhelds, computer environments, web/mobile and XR targets**.
+It reports raw metadata mentions, distinct canonical URLs, distinct URL hosts,
+and keyword-triggered rights-review hints per platform, plus union-deduplicated
+generation-level groups. No detected name alone implies technical
+compatibility, native port support or original-asset rights. No matching
+metadata means a *research discovery gap*, not proof the platform is unsupported.
+
+```sh
+python -m skeleton.ai.game_builder.dragon_almanac_cli platform-matrix \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --samples-per-platform 3
+
+python -m skeleton.ai.game_builder.dragon_almanac_cli discovery-identity-audit \
+  --database dragon.sqlite --owner studio --trusted-local-operator \
+  --limit 2
+```
+
+The separate identity audit verifies the exact Git blob SHA-1 of each source
+supplement in the two frozen 10,770-lead pre-expansion cohorts. It then requires
+all 4,053 newer source IDs to be distinct from those prior raw identities and
+validates the full reconciled chain again. Digest verification is a consistency
+test over repository bytes, **not** a trust signature, license grant, proof of
+source independence or approval to use the content. All new leads remain
+`availability=not_checked`, `rights=not_assessed`,
+`training_authorized=false` and `canonical_admission=false` until separate
+policy review. No automatic network fetch, training or AI-memory promotion has
+been initiated by this source-discovery extension.

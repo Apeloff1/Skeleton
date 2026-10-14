@@ -1,0 +1,41 @@
+{
+  "schema_version": "skeleton.ai.engine_provider_inventory.v1",
+  "status": "implementation_candidate",
+  "canonical_owner": "skeleton/api/engine_routes.py",
+  "provider_authority": "skeleton/provider_runtime.py:ProviderRegistry",
+  "consumer": "backend/core/engine_client.py:EngineClient.provider_status",
+  "related_contract": "machine/ai_local_provider_activation.json",
+  "interface": {
+    "method": "GET",
+    "path": "/api/v1/engine/providers",
+    "tenant_id": "optional query string, 1..512 characters; when supplied must be allowed by the authenticated server-side service grant",
+    "authority": [
+      "existing sealed engine bearer service token",
+      "verified x-zaibatsu-attester service principal with an existing server-side EngineServiceGrant",
+      "existing engine:read scope",
+      "global non-secret readiness only when tenant is omitted; no tenant data or execution authority is exposed"
+    ],
+    "response": {
+      "active": "canonical ProviderRegistry.active_id, present among providers",
+      "available": "canonical ProviderRegistry.available boolean, including mandatory architecture acknowledgement and declared fallback readiness",
+      "providers": "canonical ProviderRegistry.statuses non-secret projections, including local artifact receipt and architecture acknowledgement"
+    },
+    "bounds": "configured canonical registry inventory only; no caller-supplied provider IDs, credentials, transport URLs, artifact paths, policy changes or model allocations",
+    "failure": {
+      "401": "missing or invalid service token or service-principal header",
+      "403": "ungranted service principal, missing engine:read scope or denied explicit tenant",
+      "422": "invalid optional tenant query bound",
+      "503": "engine provider registry unavailable or active provider undeclared",
+      "degraded": "configured but unavailable or unacknowledged provider returns canonical available=false without leaking internal errors"
+    }
+  },
+  "acceptance": [
+    "skeleton/testing/test_engine_routes.py",
+    "skeleton/testing/test_governed_model_engine_acceptance.py"
+  ],
+  "scope_limitations": [
+    "read-only projection of existing provider ownership and existing service authority",
+    "no provider transport, model inference, new service scope or tenant-data authority",
+    "candidate interface addition does not alter signed closure evidence or assert model/masterplan promotion"
+  ]
+}

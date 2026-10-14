@@ -1,0 +1,539 @@
+{
+  "schema": "skeleton.dragon.acquisition_topics.v1",
+  "checked_at": "2026-10-11T20:14:42.000Z",
+  "source_range": {
+    "start_inclusive": 544,
+    "end_exclusive": 576
+  },
+  "authority": "acquisition_side_unreviewed_only",
+  "topics": [
+    {
+      "knowledge_header": "**Marketing**",
+      "sources": [
+        {
+          "source_id": "source-1d885e0151bed26e6bd8a478eae5fd13088c04e4b9845eb3b91a9dff61ac52a4",
+          "source_offset": 544,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1d885e0151bed26e6bd8a478eae5fd13088c04e4b9845eb3b91a9dff61ac52a4",
+          "source_offset": 544,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Code**",
+      "sources": [
+        {
+          "source_id": "source-1dac287c4b46b2907a9e7ccebd7671a2d0f68fa17880f07d6829da33e54321ca",
+          "source_offset": 545,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-1e955521277a0c52f954d9ca01d684798a49e9bdc27b9bdc327e3e4b0e431bed",
+          "source_offset": 561,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        },
+        {
+          "source_id": "source-1f35d12ae58271b62901db21e17b6331b1eaeffa722c1704586a706b564e84da",
+          "source_offset": 569,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1e955521277a0c52f954d9ca01d684798a49e9bdc27b9bdc327e3e4b0e431bed",
+          "source_offset": 561,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Unity**",
+      "sources": [
+        {
+          "source_id": "source-1dacb66008c3ca3d7ef1cf42acc043c2585ec9a5bacdc5d3b3d854ea7bb140a2",
+          "source_offset": 546,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-1db775fffb516b863d212020252bbc07bba1af9f6e4d67fa53a92c16c72ecbb9",
+          "source_offset": 548,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1db775fffb516b863d212020252bbc07bba1af9f6e4d67fa53a92c16c72ecbb9",
+          "source_offset": 548,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme) > Libraries > C++",
+      "sources": [
+        {
+          "source_id": "source-1db4d74ba0ed6952626815fee6f2370b03b559a18e3b0334b974a1d56489dcca",
+          "source_offset": 547,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-1e89823dee4739dc4ea752b73ee183dc0d9428a8fb3c06efb7691c279c71c5d9",
+          "source_offset": 560,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-1ede000861d46f930c33f68592c9c1ceffa1d969d3eef8d49b698b56ae670740",
+          "source_offset": 565,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-1f5571919a8062ca01c72cc037fa0741850f6ed5b7f3cf6f23cc46d40dbc074b",
+          "source_offset": 572,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Design**",
+      "sources": [
+        {
+          "source_id": "source-1db9175924dec6e9234e8b3661a1df9ee3caf488cbe7794e24a928fd74500237",
+          "source_offset": 549,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        },
+        {
+          "source_id": "source-1de5937dc038e64b9c708028b2fcdcf8b2e93180b62db141b597e7b9bbea378f",
+          "source_offset": 553,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1db9175924dec6e9234e8b3661a1df9ee3caf488cbe7794e24a928fd74500237",
+          "source_offset": 549,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        },
+        {
+          "source_id": "source-1de5937dc038e64b9c708028b2fcdcf8b2e93180b62db141b597e7b9bbea378f",
+          "source_offset": 553,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme) > Tools / Software > Pixel Art",
+      "sources": [
+        {
+          "source_id": "source-1dca46211242ac1d966cf5987f501c2a8b12fc2fcb073a3d8cfce23ea046a369",
+          "source_offset": 550,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Native > Platform",
+      "sources": [
+        {
+          "source_id": "source-1ddee7cda0dba19e4ce470d541b5069da2b1ca3d06288a25bab9c7e538eb8cf2",
+          "source_offset": 551,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re) > Programming > Graphics",
+      "sources": [
+        {
+          "source_id": "source-1de08ec2077dcba4fe31a649ae5bc894d34ac12ca426a51e3ad09dd2039591c1",
+          "source_offset": 552,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Game Talks [![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindres > GDC Talks",
+      "sources": [
+        {
+          "source_id": "source-1de85e20739e8f5290f03e34c4851f261194d4d42d772d3ed19d607bbe5f47a4",
+          "source_offset": 554,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1de85e20739e8f5290f03e34c4851f261194d4d42d772d3ed19d607bbe5f47a4",
+          "source_offset": 554,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Browser-Based > Puzzle",
+      "sources": [
+        {
+          "source_id": "source-1e15793660779a6abcd1991d184a75bf8c66cc3a7896ebed25aeb096474843dd",
+          "source_offset": 555,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Resources**",
+      "sources": [
+        {
+          "source_id": "source-1e285a854a8ecf4057885345350c370531c42bcfecf2c49d2f7a2e314746d0c0",
+          "source_offset": 556,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1e285a854a8ecf4057885345350c370531c42bcfecf2c49d2f7a2e314746d0c0",
+          "source_offset": 556,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Organization**",
+      "sources": [
+        {
+          "source_id": "source-1e3d5f02318a2ca80c7bc7c3967919dd293a282bd4165a085eb05cc58ff9d4c4",
+          "source_offset": 557,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Table of Contents > Engines and Frameworks",
+      "sources": [
+        {
+          "source_id": "source-1e56b74745b2ceec727b6d81f023788f4745722d4d5e8dcd8deabc5b598aa5b1",
+          "source_offset": 558,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme) > Specialty Topics > Lighting / Shadows",
+      "sources": [
+        {
+          "source_id": "source-1e874a6e9e293f109ee5eaa960c7123555f7361d0784aaf71e212f0a74a73792",
+          "source_offset": 559,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "**Art**",
+      "sources": [
+        {
+          "source_id": "source-1ea52f0059c2ae5a20b9ba1c5528faf16eac87326ef1655a90e8e7b94439a0f2",
+          "source_offset": 562,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        },
+        {
+          "source_id": "source-1f36d50289a5a1fc15e98d08b609b1b5369628ea9598df3ff7b14f6edad91692",
+          "source_offset": 570,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        },
+        {
+          "source_id": "source-1f6712415f8a5423cd741b5dee8bd9774c6561b384ddd89570524e66b7dc9d02",
+          "source_offset": 573,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1ea52f0059c2ae5a20b9ba1c5528faf16eac87326ef1655a90e8e7b94439a0f2",
+          "source_offset": 562,
+          "availability": "retrieval_failed",
+          "evidence_state": "no_admitted_observation"
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re) > Plugins and scripts > Godot 3",
+      "sources": [
+        {
+          "source_id": "source-1ea68e9406ece1ef77659c524e1b5c1caade9b78f5dd7b0822dd80b4f6473bbb",
+          "source_offset": 563,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme) > Libraries > JavaScript",
+      "sources": [
+        {
+          "source_id": "source-1ed9ae59732b590230df31105c38c585bad3c8d68c8a91cb8f0d7fa249103e8c",
+          "source_offset": 564,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Table of Contents > Books",
+      "sources": [
+        {
+          "source_id": "source-1ee43f3e98bdcd950060d1f59f220ff6310d3721b094ea8e52317aecf1a6adbe",
+          "source_offset": 566,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re) > Marketing and Business",
+      "sources": [
+        {
+          "source_id": "source-1ef217ed8aab2c411380acb415f380a4d198568007be4148ffbd0b19e120def9",
+          "source_offset": 567,
+          "availability": "metadata_shell_only",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme) > Libraries > Kotlin",
+      "sources": [
+        {
+          "source_id": "source-1f13fa2f7094cdab498104338e59f6033231e0a9a5598147d994c0b1a11605ac",
+          "source_offset": 568,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re) > Demos > Godot 2",
+      "sources": [
+        {
+          "source_id": "source-1f3ff920f10091cdcbef9e5c72af8d56541f10acbb144de96c7c90f4cc0748fe",
+          "source_offset": 571,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Frameworks/Engines/Libraries",
+      "sources": [
+        {
+          "source_id": "source-1f791723b310b002bd04cfd75d724e626be5778c565990936870e4d9908d5475",
+          "source_offset": 574,
+          "availability": "repository_metadata_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    },
+    {
+      "knowledge_header": "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme) > Libraries > Zig",
+      "sources": [
+        {
+          "source_id": "source-1f865b2594b212c1af6bfdc23ec5ed8b55d5c0d1f7f20e28dd14035777828f89",
+          "source_offset": 575,
+          "availability": "page_representation_returned",
+          "evidence_state": "unreviewed_reference_observation"
+        }
+      ],
+      "source_evidence": "distinct_receipts_only",
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "canonical_admission": false
+    }
+  ],
+  "limitations": [
+    "Discovery headers do not establish authority, accuracy, rights or independence.",
+    "AI-generated descendants add no independent support.",
+    "No external material was used for model training."
+  ]
+}

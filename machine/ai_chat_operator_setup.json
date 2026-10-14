@@ -1,0 +1,80 @@
+{
+  "schema_version": "skeleton.ai.chat_operator_setup.v1",
+  "status": "implementation_candidate",
+  "claim_scope": "private_local_compose_chat_configuration_generation",
+  "canonical_owner": "scripts/configure_ai_chat.py",
+  "runtime_owners": [
+    "docker-compose.yml",
+    "skeleton/provider_runtime.py",
+    "backend/core/engine_client.py",
+    "backend/core/auth_security.py"
+  ],
+  "interface": {
+    "command": "python scripts/configure_ai_chat.py --env-file PATH --provider openai|local",
+    "required": [
+      "explicit new environment output path",
+      "explicit provider choice"
+    ],
+    "optional": [
+      "--openai-key-env NAME",
+      "--model MODEL_ID",
+      "--local-artifact PATH",
+      "--public-host HOST",
+      "--backend-port PORT",
+      "--skeleton-port PORT",
+      "--frontend-port PORT",
+      "--tenant TENANT",
+      "--force",
+      "--dry-run",
+      "--mongo-port PORT"
+    ],
+    "outputs": [
+      "private 0600 env file",
+      "private Compose override JSON",
+      "private startup instruction Markdown",
+      "non-secret presence-only JSON summary"
+    ],
+    "no_network": "no provider call, dependency install, model inference, Docker command, deployment or test execution"
+  },
+  "secrets": {
+    "generated": [
+      "SKL_ENGINE_SERVICE_TOKEN",
+      "JWT_SECRET",
+      "GAMEFORGE_JWT_SECRET",
+      "MONGO_INITDB_ROOT_PASSWORD"
+    ],
+    "entropy": "independent secrets.token_urlsafe(48) values; no fixed development secret or fake API key",
+    "hosted_key": "optional explicit existing environment variable only; never command argument value, terminal prompt, stdout, instruction file or Compose override",
+    "permissions": "0600 complete private temporary files; atomic exclusive hard-link installation refuses existing destination, symlink/nonregular paths denied, intentional --force uses checked atomic replacement",
+    "stdout": "only provider, presence flags, non-secret file paths and public endpoints",
+    "build_context": "env/output/temp names use .env or .env.* so existing Git and Docker ignore rules exclude private bytes even after abrupt interruption"
+  },
+  "compose_alignment": {
+    "mongodb": "authenticated mongo service URIs with authSource=admin; generated root initialization credentials match current Compose bootstrap",
+    "engine": "SKELETON_INTERNAL_URL=http://skeleton:8001 shared with a sealed engine token/principal; allowlisted chat capabilities and explicit tenant IDs",
+    "frontend": "EXPO_PUBLIC_BACKEND_URL and EXPO_PUBLIC_SKELETON_URL use operator-selected host-reachable addresses and actual host ports",
+    "backend_auth": "generated override passes GAMEFORGE_AUTH_ENFORCE=1 and GAMEFORGE_JWT_SECRET to actual canonical auth owner; existing legacy JWT_SECRET retained",
+    "local_artifact": "existing bounded regular host artifact mounted read-only into the skeleton container at /app/data/local-model.json via generated Compose override; no fabricated weights or copying into an unknown Docker volume",
+    "local_artifact_permissions": "existing image UID10001 must have private read access; generated Linux instructions show an explicit per-user ACL grant without changing artifact permissions automatically"
+  },
+  "readiness": "presence only; artifact format, provider access, image builds and actual service readiness remain unverified until the operator starts the stack and inspects the authenticated catalog",
+  "failure": [
+    "existing output without --force",
+    "symlink/nonregular output or artifact",
+    "missing local artifact",
+    "invalid public host/ports/tenant/model/key variable",
+    "known placeholder hosted key",
+    "unsafe dotenv control characters",
+    "partial private output creation rolls back newly created files"
+  ],
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "validation": "source review and formatting only; no tests requested or run in this wave",
+  "scope_limitations": [
+    "local Docker Compose operator handoff",
+    "file replacement does not rotate existing MongoDB users or destroy persistent volumes",
+    "no service launch or deployment",
+    "no provider/model readiness or quality claim"
+  ],
+  "operator_guide": "docs/plan/AI_CHAT_OPERATOR_SETUP.md"
+}

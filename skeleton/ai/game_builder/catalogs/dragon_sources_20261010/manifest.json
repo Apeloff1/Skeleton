@@ -1,0 +1,256 @@
+{
+  "schema": "skeleton.dragon.source_catalog.v1",
+  "catalogs": [
+    {
+      "catalog_id": "catalog-0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "url": "https://github.com/stevinz/awesome-game-engine-dev/blob/main/README.md",
+      "git_blob_sha": "0cb679e26cd9901fe0254b0501eba1d5b7bbbc29",
+      "content_sha256": "f7325b1bfce5befb73600e18cd22bc2b0a293571e901893a4fe76dafbf5682ef",
+      "observed_at": "2026-10-10T16:09:45Z",
+      "linked_content_fetched": false
+    },
+    {
+      "catalog_id": "catalog-22d1ea9ee7692d8bde120a568c842730b57f08e0",
+      "url": "https://github.com/FronkonGames/Awesome-Gamedev/blob/main/README.md",
+      "git_blob_sha": "22d1ea9ee7692d8bde120a568c842730b57f08e0",
+      "content_sha256": "1d7483235dc9bb8968684b0fec2de58eb60283cf63f4d859b7b0f4e7c371d46d",
+      "observed_at": "2026-10-10T16:09:45Z",
+      "linked_content_fetched": false
+    },
+    {
+      "catalog_id": "catalog-4270593f0271ba1b5725bfdd90b76f02bb37c6f9",
+      "url": "https://github.com/hzoo/awesome-gametalks/blob/master/README.md",
+      "git_blob_sha": "4270593f0271ba1b5725bfdd90b76f02bb37c6f9",
+      "content_sha256": "0aef3153803975325122a65f067bad987b08bc7507984adca2be6fb7bf994c93",
+      "observed_at": "2026-10-10T16:09:45Z",
+      "linked_content_fetched": false
+    },
+    {
+      "catalog_id": "catalog-5e6cf21b765dbe1cfacfdd323ba10e49a6e4b0c8",
+      "url": "https://github.com/skywind3000/awesome-gamedev/blob/master/README.md",
+      "git_blob_sha": "5e6cf21b765dbe1cfacfdd323ba10e49a6e4b0c8",
+      "content_sha256": "6621386da89bddf2e8e6fd242aa8f1f44815031749695376827a656862076305",
+      "observed_at": "2026-10-10T16:09:45Z",
+      "linked_content_fetched": false
+    },
+    {
+      "catalog_id": "catalog-6c1dd472d6c789fcf8cfc0d721f7538c2ead1158",
+      "url": "https://github.com/leereilly/games/blob/master/README.md",
+      "git_blob_sha": "6c1dd472d6c789fcf8cfc0d721f7538c2ead1158",
+      "content_sha256": "a6ea73f215584554045ca0d2055d27623f9285abac41f3e91f5a16651968d103",
+      "observed_at": "2026-10-10T16:09:45Z",
+      "linked_content_fetched": false
+    },
+    {
+      "catalog_id": "catalog-7394989fa763d76b572ea8acf2d8c75e3f35007f",
+      "url": "https://github.com/RyanNielson/awesome-unity/blob/master/README.md",
+      "git_blob_sha": "7394989fa763d76b572ea8acf2d8c75e3f35007f",
+      "content_sha256": "cd2c2f00b2f6fe567e4ee8a824c7313ab960644c57eab22d28a410a23d9b8aaa",
+      "observed_at": "2026-10-10T16:09:45Z",
+      "linked_content_fetched": false
+    },
+    {
+      "catalog_id": "catalog-e07646729442a33df33d9ab3072ecb77fd7e8f75",
+      "url": "https://github.com/Calinou/awesome-godot/blob/master/README.md",
+      "git_blob_sha": "e07646729442a33df33d9ab3072ecb77fd7e8f75",
+      "content_sha256": "c901b80f00a1d19bdcfe2e0d3c4c3a1b917673566f5505c578b886d6b0aef5a1",
+      "observed_at": "2026-10-10T16:09:45Z",
+      "linked_content_fetched": false
+    },
+    {
+      "catalog_id": "catalog-ea02900f953b417abd2e71286e7f51cf640baf02",
+      "url": "https://github.com/dawdle-deer/awesome-learn-gamedev/blob/main/README.md",
+      "git_blob_sha": "ea02900f953b417abd2e71286e7f51cf640baf02",
+      "content_sha256": "ed61dad18d2f49bdbec76fb167c83e23cef647ffcef2c76656c1f180a0bb0ccf",
+      "observed_at": "2026-10-10T16:09:45Z",
+      "linked_content_fetched": false
+    }
+  ],
+  "unique_urls": 4405,
+  "unique_hosts": 1359,
+  "kinds": {
+    "video_candidate": 631,
+    "web_candidate": 3774
+  },
+  "coverage": "discovered_catalog_links_not_exhaustive_web_inventory",
+  "individually_fetched_sources": 0,
+  "approved_sources": 0,
+  "catalog_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "shards": [
+    {
+      "path": "sources-000.jsonl",
+      "sha256": "409c5c678772744a50d69015ce3a6a7d8b0778d2cfc7398a9042f1c0739dd833",
+      "count": 128
+    },
+    {
+      "path": "sources-001.jsonl",
+      "sha256": "1f855bb9919a8786f33e2328b5890e1f9e53ac70233829759ddd41ae54f3c4d2",
+      "count": 128
+    },
+    {
+      "path": "sources-002.jsonl",
+      "sha256": "13e270185415cef2bc021b154cfc629a2a04499805e8d5c1735408840e41e36e",
+      "count": 128
+    },
+    {
+      "path": "sources-003.jsonl",
+      "sha256": "ea33f4af0461fb4af7e7a8d4279733e85bccab7899e969f77e024916a0afe40e",
+      "count": 128
+    },
+    {
+      "path": "sources-004.jsonl",
+      "sha256": "9e419501adaa865d076c447209f12db23f4240a0eeebc9af72b2c29da0d70d60",
+      "count": 128
+    },
+    {
+      "path": "sources-005.jsonl",
+      "sha256": "4829e9725d931b1b3020c4173d524af735ab128dbe243ff006965cf3a37113b7",
+      "count": 128
+    },
+    {
+      "path": "sources-006.jsonl",
+      "sha256": "876cf86926d997cb83ff2d4737399d205e621b18e81d9f8f9fd7b0788b50b64e",
+      "count": 128
+    },
+    {
+      "path": "sources-007.jsonl",
+      "sha256": "6df9938026705bc4a04db5fdc1c9e996def55cd20d63235969a331c95644f58b",
+      "count": 128
+    },
+    {
+      "path": "sources-008.jsonl",
+      "sha256": "5e79fa60e78c674183a8179d04a0611ee40d231f771270581347fc73c39a118f",
+      "count": 128
+    },
+    {
+      "path": "sources-009.jsonl",
+      "sha256": "18ad214a4e50a4c7149f330aef84eb86a14af466720071681913b6473db79c25",
+      "count": 128
+    },
+    {
+      "path": "sources-010.jsonl",
+      "sha256": "35c0f6822e7f6894b1f3e7f6153094c2e717c7e23fa61aa537a8cdd7cdb19e03",
+      "count": 128
+    },
+    {
+      "path": "sources-011.jsonl",
+      "sha256": "c7efb8215216043776eb7a89c7c1fe28dcc1d4874aba297cc0bb3db0a287e6af",
+      "count": 128
+    },
+    {
+      "path": "sources-012.jsonl",
+      "sha256": "9e99ea20005bc79beaf387ea92cea57251a8d18f389471be422126b6d70b6c3d",
+      "count": 128
+    },
+    {
+      "path": "sources-013.jsonl",
+      "sha256": "0a8b1de2624045e180dd0da0bdc485dd6cc64eafd164edb112c911c3882dc12b",
+      "count": 128
+    },
+    {
+      "path": "sources-014.jsonl",
+      "sha256": "004d549147e026783ead7bb7ee3691fa12dbb3fdabc8dfc942c16f425ecd9dc3",
+      "count": 128
+    },
+    {
+      "path": "sources-015.jsonl",
+      "sha256": "fa45f9f23856831f57f2e7765f789d7eb8568ae8e8fd6a48bdcdcb3228809c07",
+      "count": 128
+    },
+    {
+      "path": "sources-016.jsonl",
+      "sha256": "a648c3273bd3e800fc83dfd925af0e7d81d83de358658ff762258a35fe92d397",
+      "count": 128
+    },
+    {
+      "path": "sources-017.jsonl",
+      "sha256": "b45806774e57ca9143b705677342e1932a2234a4eed63a5cf3fa64c7af2f9c4f",
+      "count": 128
+    },
+    {
+      "path": "sources-018.jsonl",
+      "sha256": "18a0f7353207e1c4b788752cc40455768cab538d38d21f47342535a21b87666a",
+      "count": 128
+    },
+    {
+      "path": "sources-019.jsonl",
+      "sha256": "6f7c9ca37d131134712eeab7030bc747113cba94db0a8b04dced08ecc059584b",
+      "count": 128
+    },
+    {
+      "path": "sources-020.jsonl",
+      "sha256": "0716846b71e3cf5f50b922a0650f1328f2fcc88cf49b800322ecfc578c2550d0",
+      "count": 128
+    },
+    {
+      "path": "sources-021.jsonl",
+      "sha256": "954bcba84bd1412334b59e1bff823ce0a1331ddf7adb06e0eda76947e9c1bd11",
+      "count": 128
+    },
+    {
+      "path": "sources-022.jsonl",
+      "sha256": "e8b4fa33e2aac88ab95ad9011f8e30ac4bb047b690dfc9119818ec372964a932",
+      "count": 128
+    },
+    {
+      "path": "sources-023.jsonl",
+      "sha256": "dde86b2a8a6d9c8632ae3b7b0be92cf44f89cfc206cbd1bdd06acbd18d552fea",
+      "count": 128
+    },
+    {
+      "path": "sources-024.jsonl",
+      "sha256": "43a357967d960a148b79c871cef108e5d120517f42218ac1f63972cf85a9ee28",
+      "count": 128
+    },
+    {
+      "path": "sources-025.jsonl",
+      "sha256": "ca0e3fa2f7ba87173a6ca0ec4df1b805e8ac64782434b92e37dc8f3a4f82b104",
+      "count": 128
+    },
+    {
+      "path": "sources-026.jsonl",
+      "sha256": "d8601c2ae600f4a1871c14bca12789d925bd301d86e44e12f2bbf563c98a6162",
+      "count": 128
+    },
+    {
+      "path": "sources-027.jsonl",
+      "sha256": "5d74d230072ac9155322c69e9c19512d58dfd7b0c20676a98dd04a603a8e002c",
+      "count": 128
+    },
+    {
+      "path": "sources-028.jsonl",
+      "sha256": "77a11b6e3bccbefd6cec592a6d94c037d5b008fcbf34dccc8f92f35b6e7aa010",
+      "count": 128
+    },
+    {
+      "path": "sources-029.jsonl",
+      "sha256": "16f5b1ca7cb7337e44cfd10b32d25d69e645f88375a6e7899951a58003fc2b0b",
+      "count": 128
+    },
+    {
+      "path": "sources-030.jsonl",
+      "sha256": "e04d64ffe5081da7718f251a1b2bc91e883a1accf8d8c741ed5e5c0b6c7b8f25",
+      "count": 128
+    },
+    {
+      "path": "sources-031.jsonl",
+      "sha256": "374f1f39f2a71e9a26845d77b40f239e0e60bfd9172af6409c8eb8785e97501d",
+      "count": 128
+    },
+    {
+      "path": "sources-032.jsonl",
+      "sha256": "d809a67269b19526962a8ce1d0e157c8c82ef730279b079899363a07ca83a8f9",
+      "count": 128
+    },
+    {
+      "path": "sources-033.jsonl",
+      "sha256": "c7463e1d240ce2e4ac497000513f13a70fbd96ec195296cddef2a63b23ee3851",
+      "count": 128
+    },
+    {
+      "path": "sources-034.jsonl",
+      "sha256": "f9cb0e9a59d126f804422288dd71dcbe202839718f6d72626fdf28fc13b7200d",
+      "count": 53
+    }
+  ]
+}

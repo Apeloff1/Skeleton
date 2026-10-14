@@ -1,0 +1,29 @@
+# Dragon learning pipeline — 100 matrices, governed tiers, video and RSS
+**Implemented:** 2026-10-12 UTC | **PR:** #3605 | **Status:** feature branch, not deployed
+
+## Mother Dragon: 100 independently attested scrutiny matrices
+Implemented 100 unique criteria in 10 groups of 10: source identity, fact provenance, source independence, contradiction, reproducibility, game compatibility, legal safety, code quality, training hygiene and operational evidence. Each criterion has an individual signed Ed25519 receipt tied to the owner, canonical knowledge digest, evidence digest, named criterion, reviewer key, source-group claims and bounded validity interval. Zero missing, rejected, conflicted or stale criteria are allowed to qualify a new shadow-review proposal. Matrix results never grant website rights, neural training or automatic normal/hyper promotion.
+
+An opt-in run_hundred_matrix_mother_to_shadow entry point now invokes the already-existing mother-to-shadow pipeline only after all 100 checks are independently signed and valid. The original idle planner, resource admission, evidence lineage, calibrated normalization, replay and human-approval controls still apply. The prior legacy handoff is not silently rewritten; production orchestration must use the stricter entry point when choosing this policy.
+
+**Critical distinction:** 100 *auditable criteria* are not 100 trained models or a guarantee of factual truth. The independent source-group digests and fact-check decisions must come from an external trusted reviewer. The Dragon cannot self-sign authentic evidence. A cryptographic signature proves custody of a reviewer assertion, not that the reviewer was right.
+
+## Two independent promotion sandboxes
+Both shadow-to-routing-weight and routing-weight-to-hyper-index tiers require a separately signed out-of-sample evaluation: >=12 unique trials across >=3 task families and >=3 source groups, no previously-correct regression, at least two newly correct cases, improved total task accuracy, no task-family regression, p95 latency within 1.05x baseline, and peak memory within 1.10x baseline. The sandbox verifies the complete signed 100-matrix report and checks it is exactly bound to the evaluation. An operator independently signs the final activation. Invalid signatures, missing holdouts, outdated baselines, exceeded resource thresholds and stale generations fail closed.
+
+## Jeeves fast hyperweight index
+JeevesWeightOverlay uses compact indexed term postings, owner-scoped snapshot reads and generation-based compare-and-swap activation. A separately approved sandbox result enables rapid atomic switching of an immutable retrieval overlay; a bounded rollback history allows falling back to the previous generation. This changes application-level retrieval hints, **not** the weights of an underlying neural model. Real model fine-tuning, quantitative model-improvement claims and production activation remain separate projects.
+
+## Video Dragon: visual digestion and inspiration
+Video inspiration uses already-consented FrameBatch custody, VisualFeatureBatch decoder output, timecoded video transcript chunks and actual frame-description/OCR observations. It checks frame identity and transcript alignment, generates bounded topic/tool/editor tags, and stores digest-indexed visual bookmarks and notes. A frame decoder is required; the code does not claim to see pixels where none have been provided. Lower-confidence descriptions remain explicitly unverified. The resulting aspirational tool leads are not promoted to weights without independent review and sandbox testing.
+
+## Updates Dragon: RSS queue
+DragonRssUpdateQueue persists signed feed snapshots and deduplicated news leads in owner-scoped SQLite records. The existing short-lived Updates hatchling worker ticket must be rechecked before parsing and before durable storage. The queue verifies an external Ed25519 snapshot signature, digest, issuer, 1-hour maximum validity and owner/source/URL scope. RSS and Atom parser budgets limit payload size and entry count; DTD/ENTITY markup is rejected. The RSS component does **not** fetch network feeds or grant source rights. A deployed trusted fetcher must separately enforce robots, terms, permission, consent and idle work admission.
+
+## Weekly milestone backlog
+The exporter writes a dated YYYY-Www/dragon-upgrade-backlog.md and dragon-bookmarks.json from provided owner-bound custody reports, preserving source references and explicitly noting unreviewed items. A Monday UTC GitHub Actions workflow produces these as a downloadable artifact. Without a verified source payload it truthfully emits an empty backlog. GitHub scheduled workflows execute only on the default branch, so the scheduled job is NOT live while PR #3605 remains unmerged. Trusted production input and retention policy need operator setup. It never commits private copied source text automatically.
+
+## Tests and review gates
+New test_dragon_hyperweight_pipeline covers all 100 signed receipts, absence/conflicts/signature tampering, both sandbox tiers, evaluator/operator signature failures, latency/memory/accuracy regressions, Jeeves retrieval and rollback, visual source custody, RSS idempotency/tenant isolation/tampering, weekly Markdown/JSON output, and the stricter mother-to-shadow handoff. The Dragon Source Safety CI compiles all modules and runs these alongside its existing tests.
+
+2026-10-12 UTC improvements: (100 uniquely named evidence checks); (signed independent fact review before shadow eligibility); (two independent quality sandboxes with no-regression evaluation); (fast reversible Jeeves retrieval); (visual inspiration notes grounded in actual frame custody); (idle-only signed RSS queue); (weekly dated backlog artifact, ready after default-branch activation).

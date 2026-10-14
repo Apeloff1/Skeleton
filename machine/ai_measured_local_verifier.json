@@ -1,0 +1,70 @@
+{
+  "schema_version": "skeleton.ai.measured_local_verifier.v1",
+  "status": "implementation_candidate",
+  "volume_refs": [
+    "VOL-148",
+    "VOL-152"
+  ],
+  "canonical_owner": "skeleton/ai/runtime/training/evaluation.py:EvaluationLedger",
+  "implementation_extensions": [
+    "skeleton/ai/runtime/training/verifier.py",
+    "skeleton/ai/runtime/training/evaluation_store.py"
+  ],
+  "existing_suite": "EvaluationSuite with heldout/holdout/test population and immutable version/digest",
+  "inference": {
+    "runtime": "existing LocalInferenceEngine with cache disabled; no provider SDK, credential, network, tool or production execution authority",
+    "roles": "candidate generator, pinned baseline generator and distinct local verifier, each bound to exact model/runtime/training identity and observed receipt-bound training document fingerprints",
+    "verifier_input": "canonical prompt and actual generated answer; expected answer/gold correctness label excluded",
+    "verifier_output": "one bounded JSON object with exactly decision and confidence; decision accept/reject, finite numeric confidence in [0.5,1], duplicate keys, booleans, nonfinite values, extra fields and trailing output rejected",
+    "gold_predicate": "one casefold-based expected-substring predicate shared with existing EvaluationHarness and learning runner",
+    "measurement": "actual candidate/baseline/verifier outputs and token counts plus measured monotonic elapsed nanoseconds, exact input/result/model/suite identities",
+    "runtime_identity": "Bounded serialized local weights plus Python backend class/helper/override code, defaults, captured configuration and referenced local helper functions; fingerprint changes fail before reuse"
+  },
+  "metrics": {
+    "calibration": "empirical ten-bin expected calibration error over probability-of-accept derived from parsed decision confidence; Brier score also recorded",
+    "errors": "false accept over gold-negative samples, false reject over gold-positive samples, and same-case correlated wrong accepts across candidate and baseline",
+    "comparison": "actual candidate and baseline gold accuracies, with explicit bounded regression policy pinned before inference",
+    "coverage": "both positive and negative labeled samples required by declared gate"
+  },
+  "contamination": {
+    "checks": "observed normalized heldout prompt/full labeled sample fingerprints against exact training document sequence bound by original training receipt or canonical completed durable training artifact; optional gate rejects shared verifier/generator training document fingerprints",
+    "live_authority": "canonical materialized training sources are checked for current rights/authority epoch before inference and before durable case publication and qualification/reusable verifier admission",
+    "limits": "exact normalized sample and shared-document checks only; no semantic overlap, external dataset completeness, factual label correctness or real-world bias proof"
+  },
+  "persistence": {
+    "authority": "append-only measured extension tables on the existing EvaluationLedger SQLite connection and lock; no second durable registry owner",
+    "transactions": "BEGIN IMMEDIATE, durable WAL/FULL settings, run lease epochs and expiry fences, exact immutable intake binding and contiguous completed case sequence",
+    "recovery": "completed case evidence is validated and reused without repeating local inference; uncommitted local work may be retried; stale workers cannot commit or qualify",
+    "integrity": "strict bounded canonical JSON, exact schema/key validation and complete output/classification/metric/qualification rederivation; malformed or tampered evidence fails closed",
+    "qualification": "registry-issued completed measured receipt handles only; caller-supplied VerifierReport rates or approval flags cannot issue measured qualification; publication requires a runner-issued private execution capability and live exact candidate/baseline/verifier source identities",
+    "scope": "candidate qualification and reusable local inference proposal only, production_promotion_authorized always false"
+  },
+  "bounds": {
+    "cases_per_suite": 256,
+    "prompt_characters": 65536,
+    "expected_characters": 4096,
+    "generated_answer_bytes": 65536,
+    "verifier_output_bytes": 4096,
+    "training_documents_per_model": 8192,
+    "training_bytes_per_model": 67108864,
+    "durable_record_bytes": 16777216,
+    "runs": 4096,
+    "lease_seconds": [
+      1,
+      3600
+    ],
+    "case_evidence_bytes": 262144,
+    "run_case_evidence_bytes": 16777216,
+    "backend_python_functions": 256,
+    "backend_marshaled_code_bytes": 262144,
+    "backend_identity_descriptor_bytes": 262144,
+    "backend_dependency_depth": 8
+  },
+  "tests": [
+    "skeleton/testing/test_measured_local_verifier.py",
+    "skeleton/testing/test_measured_verifier_fences.py",
+    "skeleton/testing/test_measured_verifier_runtime_identity.py"
+  ],
+  "completion_checkbox": false,
+  "signoffs_granted": false
+}
