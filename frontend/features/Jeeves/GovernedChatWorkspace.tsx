@@ -9,7 +9,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import { useChatController } from '../../src/product/useChatController';
 import { getAuthToken } from '../../src/auth/gameforgeAuth';
-import type { ConversationMessage, ConversationThread } from '../../src/product/conversationClient';
+import type { ConversationMessage, ConversationThread } from '../../src/product/governedConversationClient';
 import { attachmentCapabilities, CHAT_ATTACHMENT_MIMES, deleteChatAttachment, readPickedAttachment, uploadChatAttachment } from './chatFiles';
 import MessageContent from './MessageContent';
 import JeevesRuntimeStatus from './JeevesRuntimeStatus';
