@@ -5118,3 +5118,8 @@ def _kick_build_watchdog_start():
 # semantics that the old per-router try/except blocks had.
 from core.routes_registry import register_known_routes as _register_known_routes
 _register_known_routes(app)
+
+# Opt-in operator installation; absent or invalid authority never becomes a
+# user-supplied DB path or a silently created research vault.
+from core.dragon_research_startup import configure_dragon_research_dashboard as _configure_dragon_research_dashboard
+_configure_dragon_research_dashboard(app)
