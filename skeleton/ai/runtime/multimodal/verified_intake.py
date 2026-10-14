@@ -83,9 +83,9 @@ def verify_media_intake(
     limits: MediaValidationLimits | None = None,
 ) -> VerifiedMediaIntakeReceipt:
     """Sanitize first; decode only supported images / PCM WAVE under strict caps."""
-    if modality not in {Modality.IMAGE, Modality.AUDIO} or not isinstance(
-        modality, Modality
-    ):
+    if not isinstance(modality, Modality) or modality not in {
+        Modality.IMAGE, Modality.AUDIO
+    }:
         raise MediaValidationError("verified intake supports image and PCM WAVE audio only")
     if limits is None:
         limits = MediaValidationLimits()
