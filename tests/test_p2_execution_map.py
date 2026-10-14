@@ -72,10 +72,11 @@ class P2ExecutionMapTests(unittest.TestCase):
         root = self._fixture()
         path = root / "machine/ai_p2_task_backlog.json"
         data = json.loads(path.read_text(encoding="utf-8"))
-        data["tasks"][0]["completion_checkbox"] = True
-        data["tasks"][0]["completion_checkbox_mark"] = "[x]"
+        # A closed task already has checked completion. Forge its independent
+        # verification instead of performing a no-op on the canonical fixture.
+        data["tasks"][0]["verification_signed"] = False
         path.write_text(json.dumps(data), encoding="utf-8")
-        with self.assertRaisesRegex(MODULE.P2ValidationError, "may not assert completion"):
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "closed requires both signoffs"):
             MODULE.validate(root)
 
     def test_rejects_narrowed_masterplan_risk(self) -> None:
@@ -151,8 +152,10 @@ class P2ExecutionMapTests(unittest.TestCase):
         root = self._fixture()
         path = root / "machine/ai_p2_execution_map.json"
         data = json.loads(path.read_text(encoding="utf-8"))
+        # The canonical lane is now closed, with no landed-unpromoted tasks.
+        # Duplicating a closed task into the active projection is still invalid.
         data["progress"]["active_tasks"] = [
-            data["progress"]["landed_unpromoted_tasks"][0]
+            data["progress"]["closed_tasks"][0]
         ]
         path.write_text(json.dumps(data), encoding="utf-8")
         with self.assertRaisesRegex(
@@ -168,7 +171,7 @@ class P2ExecutionMapTests(unittest.TestCase):
         by_id = {task["task_id"]: task for task in data["tasks"]}
         by_id["P2-TRACE-01"]["evidence_refs"] = []
         path.write_text(json.dumps(data), encoding="utf-8")
-        with self.assertRaisesRegex(MODULE.P2ValidationError, "requires at least three evidence refs"):
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "closed requires evidence"):
             MODULE.validate(root)
 
 
@@ -189,12 +192,14 @@ class P2ExecutionMapTests(unittest.TestCase):
                 ):
                     self.assertEqual(obligation[field], source[field])
         for ref in refs[-4:]:
-            self.assertEqual(canonical[ref]["implementation_status"], "unverified")
+            self.assertEqual(canonical[ref]["implementation_status"], "implemented")
             self.assertFalse(canonical[ref]["completion_checkbox"])
             self.assertTrue(canonical[ref]["gaps"])
-        self.assertFalse(task["completion_checkbox"])
-        self.assertFalse(task["implementation_signed"])
-        self.assertFalse(task["verification_signed"])
+        # Independent volume sign-off and P2 task sign-off are separate
+        # authorities. The task is signed, these four volume gaps remain.
+        self.assertTrue(task["completion_checkbox"])
+        self.assertTrue(task["implementation_signed"])
+        self.assertTrue(task["verification_signed"])
 
     def test_rejects_unowned_security_volume(self) -> None:
         root = self._fixture()
@@ -217,9 +222,11 @@ class P2ExecutionMapTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.P2ValidationError, r"narrows/drifts masterplan VOL-172.tests"):
             MODULE.validate(root)
 
-    def test_verified_volume_does_not_promote_unsigned_task(self) -> None:
-        master = json.loads((ROOT / "machine/ai_master_plan.json").read_text(encoding="utf-8"))
-        backlog = json.loads((ROOT / "machine/ai_p2_task_backlog.json").read_text(encoding="utf-8"))
+    def test_verified_volume_does_not_bypass_task_signoff(self) -> None:
+        root = self._fixture()
+        master = json.loads((root / "machine/ai_master_plan.json").read_text(encoding="utf-8"))
+        path = root / "machine/ai_p2_task_backlog.json"
+        backlog = json.loads(path.read_text(encoding="utf-8"))
         architecture = next(v for v in master["volumes"] if v["key"] == "VOL-002")
         self.assertTrue(architecture["completion_checkbox"])
         self.assertEqual(architecture["implementation_status"], "verified")
@@ -227,8 +234,10 @@ class P2ExecutionMapTests(unittest.TestCase):
         task = next(t for t in backlog["tasks"] if t["task_id"] == "P2-ARCH-01")
         obligation = next(o for o in task["masterplan_obligations"] if o["volume_ref"] == "VOL-002")
         self.assertTrue(obligation["completion_checkbox"])
-        self.assertFalse(task["completion_checkbox"])
-        self.assertFalse(task["verification_signed"])
+        task["verification_signed"] = False
+        path.write_text(json.dumps(backlog), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.P2ValidationError, "closed requires both signoffs"):
+            MODULE.validate(root)
 
     def test_rejects_verified_volume_without_canonical_evidence(self) -> None:
         root = self._fixture()
