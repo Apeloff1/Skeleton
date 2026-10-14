@@ -67,3 +67,6 @@ def test_cleanup_stops_at_rate_limits_instead_of_spamming_delete_calls() -> None
     assert text.count("grep -Eqi '(rate.limit|abuse detection)'") >= 3
     assert "Rate-limit backpressure activated: $rate_limited" in text
     assert "Old-run cleanup deferred: GitHub API rate limit reached." in text
+    # Backpressure must persist across subsequent cleanup steps.
+    assert text.count('touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"') == 2
+    assert text.count('if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]') == 2
