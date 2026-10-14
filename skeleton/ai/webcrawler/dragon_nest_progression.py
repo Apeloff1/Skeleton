@@ -88,6 +88,7 @@ class DragonNest:
     source_ids: tuple[str, ...]
     catalog_digest: str
     consumed: tuple[str, ...] = ()
+    consumed_material: tuple[str, ...] = ()
     level: int = 0
     stage: str = "egg"
     children: tuple[Hatchling, ...] = ()
@@ -119,6 +120,7 @@ def _state_digest(state: DragonNest) -> str:
         "source_ids": state.source_ids,
         "catalog_digest": state.catalog_digest,
         "consumed": state.consumed,
+        "consumed_material": state.consumed_material,
         "level": state.level,
         "stage": state.stage,
         "children": [
@@ -176,7 +178,12 @@ def feed_parent(state: DragonNest, source_id: str, *, content_sha256: str,
         raise ValueError("content digest required")
     if source_id in state.consumed:
         return state  # retries and republished versions cannot multiply XP
+    if content_sha256 in state.consumed_material:
+        raise ValueError(
+            "duplicate content across census sources cannot earn independent growth"
+        )
     consumed = tuple(sorted((*state.consumed, source_id)))
+    consumed_material = tuple(sorted((*state.consumed_material, content_sha256)))
     level = min(LEVELS, max(1, math.ceil(LEVELS * len(consumed) / len(state.source_ids))))
     if len(consumed) == len(state.source_ids):
         stage = "adult"
@@ -187,7 +194,10 @@ def feed_parent(state: DragonNest, source_id: str, *, content_sha256: str,
         stage, children = "juvenile", ()
     else:
         stage, children = "young_adult", ()
-    next_state = replace(state, consumed=consumed, level=level, stage=stage, children=children)
+    next_state = replace(
+        state, consumed=consumed, consumed_material=consumed_material,
+        level=level, stage=stage, children=children,
+    )
     note = (f"(progress improved: {len(consumed)}/{len(state.source_ids)} reviewed sources; "
             f"level {state.level}->{level}; {state.stage}->{stage})")
     next_state = _record(next_state, at=at, action="parent_grew",
