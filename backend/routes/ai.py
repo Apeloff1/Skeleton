@@ -45,7 +45,7 @@ from skeleton.contracts.context import (
     ContextTrust,
 )
 from skeleton.contracts.conversation import ConversationAuthorType, ConversationMessage
-from skeleton.context.compiler import ContextCompiler
+from skeleton.context.compiler import ContextCompiler, ContextCompilationError
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.context.sources import artifact_segment, conversation_message_segment
 from skeleton.ai.assistant.live_evidence import bind_provider_receipt_set
@@ -1316,13 +1316,17 @@ async def ai_chat(
                 raise ChatAttachmentError(
                     "Attachment text does not fit the selected model context", 413
                 )
-    except ChatAttachmentError as exc:
-        # The canonical user message already committed. Terminalize the turn
-        # rather than indefinitely blocking new turns behind a vanished source.
+    except (ChatAttachmentError, ContextCompilationError) as exc:
+        # The user message already committed. Fail the durable turn and append
+        # a canonical closure marker so subsequent requests are not blocked
+        # behind a permanently incomplete context-compilation state.
+        source_failure = isinstance(exc, ChatAttachmentError)
+        code = ("attachment_context_unavailable" if source_failure
+                else "context_compilation_failed")
         try:
             await chat_turn_lifecycle.fail(
                 chat_turn, tenant_id=tenant_id, owner_id=owner_id,
-                reason_code="attachment_context_unavailable",
+                reason_code=code,
             )
             current_thread = await conversation_authority.get_thread(
                 request.thread_id, tenant_id=tenant_id, owner_id=owner_id,
@@ -1331,13 +1335,17 @@ async def ai_chat(
                 thread=current_thread, user_message=user_message,
                 tenant_id=tenant_id, owner_id=owner_id,
                 operation_id=operation_id, execution_id=execution_id,
-                terminal_state="failed", failure_code="attachment_context_unavailable",
+                terminal_state="failed", failure_code=code,
             )
         except Exception:
             logger.exception(
-                "failed to close rejected attachment turn operation=%s", operation_id
+                "failed to close rejected compiled turn operation=%s", operation_id
             )
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=exc.status_code if source_failure else 422,
+            detail=str(exc) if source_failure else
+                   "Canonical context cannot be compiled within the model limits",
+        ) from exc
     try:
         chat_turn = await chat_turn_lifecycle.advance(
             chat_turn,
