@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from math import isfinite
 from typing import Callable, Iterable
+from itertools import islice
 from urllib.parse import urlsplit
 import re
 
@@ -193,8 +194,10 @@ def prioritize_game_sources(
     genre = _GENRE_ALIASES.get(genre.casefold().strip(),genre)
     if genre not in _DOMAINS or engine not in _ENGINES:
         raise ValueError("unsupported genre/engine")
-    entries = tuple(sources)
-    if len(entries) > max_sources or not 1 <= max_sources <= 1000:
+    if type(max_sources) is not int or not 1 <= max_sources <= 1000:
+        raise ValueError("game source capacity exceeded")
+    entries = tuple(islice(sources, max_sources + 1))
+    if len(entries) > max_sources:
         raise ValueError("game source capacity exceeded")
     interests = set(_DOMAINS[genre] + _ENGINES[engine] + (genre, engine))
     def relevance(item: GameSource) -> tuple[int, str]:
@@ -208,12 +211,12 @@ def queue_game_sources(
     engine: CrawlEngine, sources: Iterable[GameSource], *,
     max_enqueues: int = 200,
 ) -> tuple[str, ...]:
-    if not isinstance(engine, CrawlEngine) or not 1 <= max_enqueues <= 10000:
+    if not isinstance(engine, CrawlEngine) or type(max_enqueues) is not int or not 1 <= max_enqueues <= 10000:
         raise ValueError("invalid crawler frontier")
     accepted = []
-    for candidate in sources:
-        if len(accepted) >= max_enqueues:
-            break
+    # Bound inspected proposals as well as successful admissions. An infinite
+    # duplicate/rejected stream must not monopolize an acquisition worker.
+    for candidate in islice(sources, max_enqueues):
         if not isinstance(candidate, GameSource):
             raise ValueError("invalid source proposal")
         if engine.enqueue(candidate.url, depth=0, priority=1.0):
@@ -221,24 +224,85 @@ def queue_game_sources(
     return tuple(accepted)
 
 
-# 05: Fetch admitted pages using existing CrawlEngine.step, not a bypass client.
-def acquire_game_documents(
-    engine: CrawlEngine, *, now: float,
-    max_steps: int = 50,
-) -> tuple[CrawlDocument, ...]:
-    if not isinstance(engine, CrawlEngine) or not 1 <= max_steps <= 10000:
-        raise ValueError("invalid acquisition execution")
-    if not isfinite(now) or now < 0:
+@dataclass(frozen=True)
+class GameAcquisitionBatch:
+    """One non-blocking acquisition turn; documents remain untrusted evidence."""
+
+    documents: tuple[CrawlDocument, ...]
+    stop_reason: str
+    steps: int
+    requests: int
+    response_bytes: int
+    pending_sources: int
+    next_ready_at: float | None
+
+
+def _validate_acquisition_budget(
+    engine: CrawlEngine, now: float, max_steps: int, max_documents: int,
+) -> None:
+    if not isinstance(engine, CrawlEngine):
+        raise ValueError("invalid crawler frontier")
+    for value, ceiling in ((max_steps, 10000), (max_documents, 10000)):
+        if type(value) is not int or not 1 <= value <= ceiling:
+            raise ValueError("invalid acquisition execution budget")
+    if isinstance(now, bool) or not isinstance(now, (int, float)) or not isfinite(now) or now < 0:
         raise ValueError("invalid acquisition clock")
+
+
+def acquire_game_batch(
+    engine: CrawlEngine, *, now: float, max_steps: int = 50,
+    max_documents: int = 1000,
+) -> GameAcquisitionBatch:
+    """Drain ready work without spinning, sleeping or inventing future time.
+
+    The caller schedules another turn at next_ready_at after a deferred result.
+    The document ceiling is checked before each step, including recursive links
+    and sources already queued by previous turns. Request/byte usage includes
+    robots, failed requests and redirects charged by the canonical engine.
+    """
+    _validate_acquisition_budget(engine, now, max_steps, max_documents)
     accepted = []
-    for _ in range(max_steps):
+    steps = 0
+    initial_requests = engine.budget.requests
+    initial_bytes = engine.budget.bytes
+    while True:
         if engine.budget.exhausted:
+            reason = "budget_exhausted"
+            break
+        ready = engine.next_ready_at()
+        if ready is None:
+            reason = "frontier_empty"
+            break
+        if len(accepted) >= max_documents:
+            reason = "document_limit"
+            break
+        if ready > now:
+            reason = "deferred"
+            break
+        if steps >= max_steps:
+            reason = "step_limit"
             break
         doc = engine.step(now=now)
+        steps += 1
         if doc is not None:
             _validated_document(doc)
             accepted.append(doc)
-    return tuple(accepted)
+    return GameAcquisitionBatch(
+        tuple(accepted), reason, steps,
+        engine.budget.requests - initial_requests,
+        engine.budget.bytes - initial_bytes,
+        engine.pending_count, engine.next_ready_at(),
+    )
+
+
+# 05: Fetch admitted pages using existing CrawlEngine.step, not a bypass client.
+def acquire_game_documents(
+    engine: CrawlEngine, *, now: float,
+    max_steps: int = 50, max_documents: int = 10000,
+) -> tuple[CrawlDocument, ...]:
+    return acquire_game_batch(
+        engine, now=now, max_steps=max_steps, max_documents=max_documents,
+    ).documents
 
 
 # 06: Parse durable text sections with exact character locations.

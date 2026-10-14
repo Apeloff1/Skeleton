@@ -6,8 +6,12 @@ database operations; web text never gains executable/approval authority.
 """
 from __future__ import annotations
 from collections import Counter
+from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
+from itertools import islice
+from typing import Iterable
+from uuid import uuid4
 import json
 import re
 import sqlite3
@@ -139,6 +143,56 @@ class GameKnowledgeIndex:
         return GameKnowledgeHit(pid,sid,url,digest,text,tuple(json.loads(tags)),
                                 round(float(score),6),a,b,engine,year)
 
+    @contextmanager
+    def _ingestion_transaction(self):
+        """Compose batch and single-document writes without committing callers.
+
+        Releasing an outermost savepoint commits our writes; nested savepoints
+        remain part of the caller's existing transaction. The generated name
+        contains only a fixed identifier prefix and hexadecimal UUID bytes.
+        """
+        name = "game_ingest_" + uuid4().hex
+        self.db.execute(f"SAVEPOINT {name}")
+        try:
+            yield
+            self.db.execute(f"RELEASE SAVEPOINT {name}")
+        except BaseException:
+            if self.db.in_transaction:
+                self.db.execute(f"ROLLBACK TO SAVEPOINT {name}")
+                self.db.execute(f"RELEASE SAVEPOINT {name}")
+            raise
+
+    def ingest_documents(
+        self, documents: Iterable[tuple[str, CrawlDocument]], *,
+        engine: str = "", year: int | None = None, authorized: bool,
+        max_documents: int = 100, max_sections: int = 100,
+    ) -> int:
+        """Index a bounded batch atomically, including all derived projections.
+
+        Returns the document count. Oversized iterables are rejected after at
+        most max_documents + 1 reads, before any database mutation. A malformed
+        document or storage error rolls the entire batch back, preserving the
+        previously active revisions, tags, symbols, relations and FTS rows.
+        """
+        if not authorized:
+            raise PermissionError("knowledge ingestion requires authorization")
+        if type(max_documents) is not int or not 1 <= max_documents <= 1000:
+            raise ValueError("invalid game document budget")
+        if not isinstance(engine, str) or len(engine) > 80:
+            raise ValueError("invalid engine")
+        if year is not None and (type(year) is not int or not 1400 <= year <= 2200):
+            raise ValueError("invalid publication year")
+        if type(max_sections) is not int or not 1 <= max_sections <= 1000:
+            raise ValueError("invalid section budget")
+        entries = tuple(islice(documents, max_documents + 1))
+        if len(entries) > max_documents:
+            raise ValueError("game document ingestion budget exceeded")
+        with self._ingestion_transaction():
+            for source_id, document in entries:
+                self.ingest_document(source_id, document, engine=engine, year=year,
+                                     authorized=True, max_sections=max_sections)
+        return len(entries)
+
     # 11: Ingest real acquired source as indexed, immutable game evidence.
     def ingest_document(
         self, source_id: str, document: CrawlDocument, *, engine: str = "",
@@ -165,7 +219,7 @@ class GameKnowledgeIndex:
                 f"{source_id}:{p.passage_id}".encode("utf-8")
             ).hexdigest() for p in passages
         }
-        with self.db:
+        with self._ingestion_transaction():
             # A previous revision remains for history but no longer counts
             # as current corroboration or search context.
             self.db.execute("UPDATE game_knowledge_sources SET active=0 WHERE source_id=?", (source_id,))

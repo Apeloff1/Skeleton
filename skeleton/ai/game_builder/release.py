@@ -414,6 +414,8 @@ class GoldMasterBundle:
             raise ValueError("gold-master critical gates must use canonical order")
         if len(gate_ids) != len(set(gate_ids)):
             raise ValueError("gold-master critical gate ids must be unique")
+        if "rights" not in gate_ids:
+            raise ValueError("gold-master bundle requires an explicit rights critical gate")
 
     @classmethod
     def create(

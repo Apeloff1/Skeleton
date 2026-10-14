@@ -23,7 +23,13 @@ def fetch_with_policy(engine,url,*,now):
         fetch_once=getattr(engine.fetcher,"fetch_once",None)
         if fetch_once is None:
             if hop:raise RedirectPolicyError("fetcher cannot expose redirect hops")
-            response=engine.fetcher.fetch(current,user_agent=engine.policy.user_agent,max_bytes=engine.policy.max_response_bytes)
+            try:
+                response=engine.fetcher.fetch(
+                    current,user_agent=engine.policy.user_agent,
+                    max_bytes=engine.policy.max_response_bytes)
+            except Exception as exc:
+                raise RedirectFetchError(
+                    "redirect hop fetch failed",request_started=True) from exc
         else:
             try:response=fetch_once(current,user_agent=engine.policy.user_agent,max_bytes=engine.policy.max_response_bytes)
             except Exception as exc:raise RedirectFetchError("redirect hop fetch failed",request_started=True) from exc
