@@ -12,6 +12,10 @@ Runtime contract: `skeleton/app/manifest.json`
 
 This document is the mandatory human construction manual for building, assembling, validating, operating, and evolving the complete Skeleton AI application. The machine-readable construction contract is authoritative for automation; this manual explains how to use it.
 
+## Jeeves game-learning candidate
+
+The `/game-learning` studio composes existing Jeeves reference engines and Dragon native/source/knowledge owners with bounded local policy learning. See [the operator and capability record](plan/JEEVES_GAME_LEARNING_2026-10-14.md) and `machine/ai_game_learning.json`. Source/build checks do not establish complete console emulation or studio qualification.
+
 ## Mandatory bootstrap
 
 Before an AI coding agent, human contributor, runtime provider adapter, automation, or integration changes or activates the system, it must load the active contracts in this order:

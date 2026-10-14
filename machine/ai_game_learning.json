@@ -1,0 +1,70 @@
+{
+  "schema_version": "skeleton.ai.game_learning.v1",
+  "status": "implementation_candidate",
+  "scope": "Authenticated Jeeves game-learning workspaces compose existing historical game-engine, simulation, ingestion, learning and product owners; no new service, external provider or runtime root",
+  "implementation_session": {
+    "start_utc": "2026-10-14T02:30:16Z",
+    "deadline_utc": "2026-10-14T03:30:16Z",
+    "automated_tests_authorized": false
+  },
+  "owners": {
+    "engine_catalogue": "skeleton/jeeves/game_console_catalog.py",
+    "runtime_adapter": "skeleton/jeeves/game_learning_runtime.py",
+    "ingestion": "skeleton/jeeves/game_learning_ingestion.py",
+    "learning": "skeleton/jeeves/game_learning.py",
+    "generation": "skeleton/jeeves/game_learning_generation.py",
+    "existing_engine": "skeleton/jeeves/game_engine_runtime.py",
+    "application_workspace": "backend/core/game_learning.py",
+    "api": "backend/routes/game_learning.py",
+    "product": "frontend/features/Jeeves/GameLearningWorkspace.tsx",
+    "experimental_rom_runtime": "skeleton/jeeves/game_rom_runtime.py",
+    "operator": "skeleton/jeeves/game_learning_cli.py",
+    "native_rom_generation": "skeleton/jeeves/game_rom_generation.py",
+    "dragon_gameplay": "skeleton/jeeves/game_dragon_runtime.py"
+  },
+  "dependencies": {
+    "simulation": "Existing Jeeves legacy/3D/modern runtime families and explicitly registered existing ROM execution implementations only",
+    "learning": "Existing learning/evaluation principles: measured local transitions, held-out evaluation, immutable candidate lineage; no production mutation",
+    "ingestion": "Existing Dragon scrape/knowledge records are untrusted sources with owner/tenant/rights scope; no feature-owned external provider",
+    "persistence": "Existing CORE_DB Mongo application authority stores project/source/session/job revisions and policy snapshots",
+    "product": "Existing authenticated endpoint resolver and backend API; no browser-owned game or policy authority",
+    "experimental_rom": "machine/ai_game_rom_runtime.json; explicitly bounded Game Boy profile only, no universal emulation claim",
+    "dragon": "Existing current-main skeleton/ai/webcrawler native target/source builders, owner-scoped knowledge custody and practice records; no feature-owned scraping/provider"
+  },
+  "interfaces": {
+    "catalogue": "Truthful registered platform/engine profiles, exact action/observation capabilities and supported ingestion formats; reference simulation and full hardware emulation are distinct statuses",
+    "sources": "Bounded validated ROM/project/trace/text/Dragon evidence with digest, explicit provenance and retained rights; unknown unsupported formats remain unavailable",
+    "editor": "Server-owned project files and per-platform configuration edits with exact expected revision, canonical path/bounds and immutable history",
+    "simulation": "Bounded actual reset/step/action/observation/snapshot/restore through registered local runtime adapters; no fabricated frames or universal console compatibility",
+    "training": "Actual bounded local policy updates from measured transitions, deterministic seeds, durable policy/episode cursor, cancellation and truthful failure/recovery status",
+    "evaluation": "Executed paired candidate/baseline held-out episodes remain candidate evidence; no automatic production promotion",
+    "generation": "Seeded original compatible game projects from grounded metadata and learned policy lineage; source ROM assets/code are not copied into outputs",
+    "export": "Authorized exact-version project bundle with truthful target/runtime/toolchain capability and bounded file content"
+  },
+  "bounds": {
+    "upload_bytes": 16777216,
+    "project_files": 96,
+    "project_file_bytes": 128000,
+    "project_tree_bytes": 1000000,
+    "episode_steps": 4096,
+    "training_episodes": 256,
+    "source_records": 64
+  },
+  "failure": "Invalid source, unavailable emulator, unsupported hardware instruction/mapper, mismatched project revision, foreign source/policy identity, exhausted resources and cancelled/expired jobs fail explicitly; generic historical simulations never establish hardware compatibility",
+  "rollback": "Keep source/project/policy revisions and restore the prior approved project or policy; disabling this additive UI/API does not change existing provider routing or erase canonical history",
+  "verification": "User-directed one-hour source implementation; automated tests are not run or added. Compilation, lint, typechecks and build checks may run. Studio acceptance and hardware compatibility require future evidence.",
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "contracts": [
+    "machine/ai_game_learning.json",
+    "machine/ai_game_learning_generation.json",
+    "machine/ai_game_learning_ingestion.json",
+    "machine/ai_game_learning_operator.json",
+    "machine/ai_game_learning_runtime.json",
+    "machine/ai_game_learning_workspace.json",
+    "machine/ai_game_policy_learning.json",
+    "machine/ai_game_rom_runtime.json"
+  ],
+  "integration_base": "c85512043",
+  "implementation_scope": "Actual existing coded owners, bounded local learning and studio workflow; no complete all-game/hardware compatibility or studio qualification claim"
+}

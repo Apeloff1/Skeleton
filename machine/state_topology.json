@@ -898,6 +898,33 @@
         "skeleton/testing/test_reference_provenance.py",
         "docs/architecture/REFERENCE_PROVENANCE.md"
       ]
+    },
+    {
+      "id": "jeeves-game-learning-workspace",
+      "owner_plane": "application-api",
+      "physical_store": "mongo",
+      "logical_location": "CORE_DB_NAME.game_learning_projects/sources/source_chunks/sessions/jobs/episodes/policies/limits/workers",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "implementation-candidate",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "project source epoch and revision fencing; session/job/checkpoint compare-and-set; prepared immutable source chunks and scoped manifests",
+      "consistency": "Exact tenant/owner/project identity; source withdrawal and editor input epochs fence active publication; only complete episode snapshots advance learned policy cursor; receipts bind current admitted source and exact code/environment identities",
+      "retention": "Owner-scoped source withdrawal scrubs original chunks and blocks new admission; historical derived copies and exported artifacts are not claimed globally erased",
+      "backup_restore": "Restore existing Mongo workspace records before accepting resume; expired worker leases expose interrupted status and retain committed episodes",
+      "migration": "Additive existing-store collections/indexes; retain immutable project/source/operation/job/policy identifiers and original input epoch; no other domain is promoted or replaced",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "machine/ai_game_learning.json",
+        "machine/ai_game_learning_workspace.json",
+        "backend/core/game_learning.py",
+        "backend/routes/game_learning.py",
+        "machine/ai_game_policy_learning.json"
+      ]
     }
   ],
   "state_flows": [

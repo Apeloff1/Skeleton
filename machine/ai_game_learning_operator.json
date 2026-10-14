@@ -1,0 +1,21 @@
+{
+  "schema_version": "skeleton.ai.game_learning_operator.v1",
+  "status": "implementation_candidate",
+  "owner": "skeleton/jeeves/game_learning_cli.py",
+  "scope": "Explicit local operator uses same runtime/policy/generation owners without provider credentials or application service. Private JSON checkpoints are operator artifacts, never application authority or promotion evidence.",
+  "commands": [
+    "catalog",
+    "build-dmg",
+    "train",
+    "evaluate"
+  ],
+  "checkpoint": "Bounded exact snapshot, private atomic replace; optional idempotent episode traces precede policy commit; exact resume and explicit new policy fork retain original environment/code/lineage/seed identities",
+  "limits": {
+    "policy_bytes": 8388608,
+    "rom_bytes": 2097152,
+    "episode_steps": 4096,
+    "episode_count": 256
+  },
+  "native_output": "Actual original 32KiB maze cartridge generated from byte assembler plus structural header check; no executed emulator/hardware compatibility evidence",
+  "verification": "No tests or training/evaluation runs performed during this implementation session. Source checks and builds only."
+}
