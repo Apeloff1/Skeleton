@@ -97,7 +97,7 @@ def test_bounded_unique_independent_source_groups_required() -> None:
         _review(key, (_sign(key, MATRIX_IDS[0], independent_group_digests=(GROUPS[0],)),))
     with pytest.raises(ValueError, match="attestation"):
         _review(key, (_sign(key, MATRIX_IDS[0], issued_at=-1),))
-    with pytest.raises(ValueError, match="review"):
+    with pytest.raises(ValueError, match="trusted"):
         _review(key, (), trusted_reviewer="x" * 129)
 
 
