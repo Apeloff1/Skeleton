@@ -22,7 +22,9 @@ def engine(fetcher,**policy):
 def test_delayed_host_does_not_block_ready_other_host():
     f=Fetcher({"https://a.example/one":response("https://a.example/one"),
                "https://a.example/two":response("https://a.example/two"),
-               "https://b.example/one":response("https://b.example/one")})
+               # Novel cross-host content is needed: the crawler correctly
+               # deduplicates identical b"ok" response bodies globally.
+               "https://b.example/one":response("https://b.example/one",body=b"independent host content")})
     e=engine(f);e.enqueue("https://a.example/one");e.enqueue("https://a.example/two");e.enqueue("https://b.example/one")
     assert e.step(now=0)
     assert e.step(now=1)
