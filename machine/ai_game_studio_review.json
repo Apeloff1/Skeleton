@@ -1,0 +1,47 @@
+{
+  "schema_version": "skeleton.ai.game_studio_review.v1",
+  "status": "implementation_candidate",
+  "parent": "machine/ai_game_learning.json",
+  "owner": "skeleton/jeeves/game_studio_review.py",
+  "mirror": "skeleton/ai/agents/jeeves/game_studio_review.py",
+  "application_owners": [
+    "backend/core/game_studio_review.py",
+    "backend/routes/game_studio_review.py"
+  ],
+  "scope": "Read-only bounded executable studio review of exact admitted project runtime frames, using existing Dragon numeric raster checks and temporal segmentation. Existing workspace jobs own authorization, source rights, cancellation, leases and result publication.",
+  "interfaces": {
+    "pure": "analyze_frame_sequence(frames, source_identity=None) accepts actual runtime-produced frame projections and measured operation timings; returns quantitative findings with evidence references",
+    "execute": "review_project_sequence(environment_request, actions, seed, capture_every, policy_snapshot, cancel, on_event) executes only canonical registered environment adapters",
+    "api": "POST /api/game-learning/projects/{project_id}/review starts existing scoped review job; GET /api/game-learning/jobs/{job_id} reads canonical completion; GET /api/game-learning/projects/{project_id}/reviews/{job_id} rechecks current source authority"
+  },
+  "bounds": {
+    "steps": 512,
+    "frames": 25,
+    "input_frame_png_bytes": 524288,
+    "decoded_frame_pixels": 1048576,
+    "input_frame_total_bytes": 13107200,
+    "sampled_pixels_per_frame": 4096,
+    "thumbnail_pixels": 9216,
+    "result_bytes": 2097152,
+    "runtime_seconds": 60,
+    "findings": 128
+  },
+  "measurements": [
+    "actual decoded pixel palette/luminance/edge/opacity statistics",
+    "sampled adjacent frame motion and repeated-image evidence",
+    "Dragon unclassified temporal feature transitions",
+    "actual simulation and preview operation wall times, separate from presentation FPS",
+    "actual project/frame/output byte budgets"
+  ],
+  "authority": "No caller-uploaded screenshots at the application route, no arbitrary callback or user code, no model credentials/network. Exact frozen source/project epoch/policy digest revalidated before publication and review-specific reads. Numeric findings are advisory candidate constraints, not promotion or deployment authority.",
+  "recovery": "Existing job fencing rejects stale/cancelled publication. Interrupted read-only reviews may rerun from their frozen initial seed; no user play state or committed training policy is modified.",
+  "limitations": [
+    "No subjective aesthetics or trained language model critic",
+    "No OCR, semantic HUD readability or accessibility certification",
+    "No display refresh, browser/native presentation FPS, isolated memory measurement or hardware claims from an offline preview",
+    "Repeated frames during observed movement are candidates requiring inspection, not proven stutter",
+    "Numeric evidence cannot establish original asset rights"
+  ],
+  "automated_tests_requested": false,
+  "storage": "Existing workspace storage admitter reserves at most2MiB output per exact job identity before execution; receipts remain in frozen job input and completion is fenced by the existing owner."
+}

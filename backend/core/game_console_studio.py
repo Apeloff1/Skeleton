@@ -75,6 +75,7 @@ async def document(scope, project_id):
     return {
         "project": project,
         "document": authored.as_dict(),
+        "scene_graph": authored.scene_graph.as_dict(),
         "profile": console_profile(project["console_id"]).as_dict(),
         "manifest_digest": file_manifest_digest(files),
     }

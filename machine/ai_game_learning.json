@@ -72,7 +72,20 @@
     "studio_learning_client": "frontend/src/product/gameStudioLearningClient.ts",
     "studio_tool_api": "backend/routes/game_studio_tools.py",
     "jeeves_studio_registry": "skeleton/jeeves/core.py",
-    "existing_app_capability_bridge": "skeleton/jeeves/app_capability_bridge.py"
+    "existing_app_capability_bridge": "skeleton/jeeves/app_capability_bridge.py",
+    "console_graph": "skeleton/jeeves/game_console_graph.py",
+    "studio_review": "skeleton/jeeves/game_studio_review.py",
+    "studio_review_application": "backend/core/game_studio_review.py",
+    "studio_review_api": "backend/routes/game_studio_review.py",
+    "scene_timeline_product": "frontend/features/Jeeves/GameSceneTimeline.tsx",
+    "compiled_rom_product": "frontend/features/Jeeves/GameCompiledRomPanel.tsx",
+    "compiled_rom_client": "frontend/src/product/gameCompiledRomClient.ts",
+    "studio_agent_application": "backend/core/game_studio_agent.py",
+    "studio_agent_api": "backend/routes/game_studio_agent.py",
+    "studio_agent_product": "frontend/features/Jeeves/GameStudioAssistantPanel.tsx",
+    "studio_agent_client": "frontend/src/product/gameStudioAgentClient.ts",
+    "studio_recovery_scheduler": "backend/core/scheduler.py",
+    "studio_review_product": "frontend/features/Jeeves/GameStudioReviewPanel.tsx"
   },
   "dependencies": {
     "simulation": "Existing Jeeves legacy/3D/modern runtime families and explicitly registered existing ROM execution implementations only",
@@ -146,7 +159,9 @@
     "machine/ai_game_successor_runtime.json",
     "machine/ai_game_desktop_export.json",
     "machine/ai_game_console_workspace.json",
-    "machine/ai_game_studio_learning.json"
+    "machine/ai_game_studio_learning.json",
+    "machine/ai_game_studio_continuation.json",
+    "machine/ai_game_studio_review.json"
   ],
   "integration_base": "c85512043",
   "implementation_scope": "Actual existing coded owners, bounded local learning and studio workflow; no complete all-game/hardware compatibility or studio qualification claim",
@@ -180,5 +195,13 @@
       "transitions": 9600,
       "lessons": 68
     }
-  }
+  },
+  "continued_studio_pass": {
+    "started_utc": "2026-10-14T06:54:57Z",
+    "scope": "Close actual native edit/build/play and AI app-use integration; deepen advanced scene/animation/rule authoring and multiobjective retained-learning campaigns under existing owners",
+    "source_freeze_target_utc": "2026-10-14T07:40:00Z",
+    "integration_target_utc": "2026-10-14T07:55:00Z",
+    "automated_tests_authorized": false
+  },
+  "advanced_work_report": "docs/plan/JEEVES_STUDIO_ADVANCED_2026-10-14.md"
 }

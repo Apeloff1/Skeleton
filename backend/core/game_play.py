@@ -568,6 +568,9 @@ class GamePlayAuthority:
             "input": binding,
             "request": request,
             "request_digest": request_digest,
+            "execution_kind": request["kind"],
+            "source_id": binding.get("source_id"),
+            "compiled_artifact": binding.get("compiled_artifact"),
             "keyboard_bindings": keyboard_bindings,
             "control_version": 1,
             "controller_epoch": 1,
@@ -1337,14 +1340,26 @@ class GamePlayAuthority:
             if stopped:
                 stopped.set()
             if process:
-                await asyncio.to_thread(process.join, 2)
-                if process.is_alive():
-                    self._terminate(process)
-                    await asyncio.to_thread(process.join, 2)
-                if process.is_alive():
-                    self._terminate(process, force=True)
-                    await asyncio.to_thread(process.join)
-                process.close()
+
+                async def quiesce():
+                    if process.pid is not None:
+                        await asyncio.to_thread(process.join, 2)
+                        if process.is_alive():
+                            self._terminate(process)
+                            await asyncio.to_thread(process.join, 2)
+                        if process.is_alive():
+                            self._terminate(process, force=True)
+                            await asyncio.to_thread(process.join)
+                    process.close()
+
+                cleanup = asyncio.create_task(quiesce())
+                while not cleanup.done():
+                    try:
+                        await asyncio.shield(cleanup)
+                    except asyncio.CancelledError:
+                        if stopped:
+                            stopped.set()
+                await cleanup
             for channel in (commands, outputs):
                 if channel is not None:
                     channel.cancel_join_thread()

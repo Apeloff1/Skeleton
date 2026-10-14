@@ -12,9 +12,13 @@ from core.game_console_build import (
     build_catalog,
     download_build_artifact,
     register_console_build_handler,
+    artifact_playback,
+    admit_artifact_source,
+    start_artifact_play,
+    start_artifact_training,
 )
 from core.game_learning import workspace
-from routes.game_learning import Request, User, _call, _scope
+from routes.game_learning import Request, User, WriteRequest, PlayRequest, TrainRequest, _call, _scope
 
 router = APIRouter(prefix="/game-learning", tags=["Console builds"])
 
@@ -60,4 +64,43 @@ async def build_artifact(project_id: str, artifact_id: str, user: User):
             "Cache-Control": "private, no-store",
             "X-Content-Type-Options": "nosniff",
         },
+    )
+
+
+class ArtifactAdmission(WriteRequest):
+    pass
+
+
+class ArtifactPlay(PlayRequest):
+    source_id: None = None
+
+
+class ArtifactTrain(TrainRequest):
+    source_id: None = None
+    fresh_policy: bool = Field(default=True, strict=True)
+
+
+@router.get("/projects/{project_id}/build-artifacts/{artifact_id}/playback")
+async def get_artifact_playback(project_id: str, artifact_id: str, user: User):
+    return {"playback": await _call(artifact_playback(_scope(user), project_id, artifact_id))}
+
+
+@router.post("/projects/{project_id}/build-artifacts/{artifact_id}/admit")
+async def admit_compiled_source(project_id: str, artifact_id: str, body: ArtifactAdmission, user: User):
+    return await _call(
+        admit_artifact_source(_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
+    )
+
+
+@router.post("/projects/{project_id}/build-artifacts/{artifact_id}/play")
+async def play_compiled_source(project_id: str, artifact_id: str, body: ArtifactPlay, user: User):
+    return await _call(
+        start_artifact_play(_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
+    )
+
+
+@router.post("/projects/{project_id}/build-artifacts/{artifact_id}/train")
+async def train_compiled_source(project_id: str, artifact_id: str, body: ArtifactTrain, user: User):
+    return await _call(
+        start_artifact_training(_scope(user), project_id, artifact_id, body.model_dump(exclude_none=True))
     )

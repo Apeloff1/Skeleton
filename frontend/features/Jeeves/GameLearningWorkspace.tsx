@@ -24,7 +24,10 @@ import GameContentUpload from './GameContentUpload';
 import GameConsoleEditor from './GameConsoleEditor';
 import GameSuccessorStudio from './GameSuccessorStudio';
 import GameStudioLearningPanel from './GameStudioLearningPanel';
-import { getGameResources, listGameRecordings, type GameRecording, type GameResourceProfile } from '../../src/product/gamePlayClient';
+import GameCompiledRomPanel from './GameCompiledRomPanel';
+import GameStudioAssistantPanel from './GameStudioAssistantPanel';
+import GameStudioReviewPanel from './GameStudioReviewPanel';
+import { getGameResources, listGameRecordings, type GamePlay, type GameRecording, type GameResourceProfile } from '../../src/product/gamePlayClient';
 import s, { gameLearningColors as C } from './GameLearningWorkspace.styles';
 
 type Icon = keyof typeof Ionicons.glyphMap;
@@ -148,7 +151,8 @@ export default function GameLearningWorkspace() {
   const [projects, setProjects] = useState<LearningProjectSummary[]>([]);
   const [project, setProject] = useState<LearningProject | null>(null);
   const [jobs, setJobs] = useState<Record<string, LearningJob>>({});
-  const [tab, setTab] = useState<Tab>('console');
+  const [initialPlay, setInitialPlay] = useState<GamePlay | null>(null);
+  const [tab, setTab] = useState<Tab>('console'); const [learningPane, setLearningPane] = useState<'assistant' | 'review' | 'campaign' | 'local'>('assistant');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -244,6 +248,7 @@ export default function GameLearningWorkspace() {
   }, [resetEditor]);
   const acceptVisualProject = useCallback((value: LearningProject) => { setVisualDirty(false); setWorldDirty(false); acceptProject(value, true); }, [acceptProject]);
   const acceptStudioJob = useCallback((value: LearningJob) => { setJobs(current => Object.fromEntries(Object.values({ ...current, [value.job_id]: value }).sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || '')).slice(0, 128).map(job => [job.job_id, job]))); }, []);
+  const acceptCompiledPlay = useCallback((value: GamePlay) => { setInitialPlay(value); if (value.source_id) setSelectedSource(value.source_id); setTab('observe'); }, []);
   const contentBusy = useCallback((active: boolean) => setBusy(active ? 'Uploading large content' : null), []);
   const openProject = useCallback(async (id: string) => {
     if (mutation.current) return;
@@ -286,7 +291,7 @@ export default function GameLearningWorkspace() {
   useEffect(() => {
     if (previousAccount.current === accountToken) return;
     previousAccount.current = accountToken; epoch.current++; abort.current?.abort();
-    setProject(null); setProjects([]); setJobs({}); setVisualDirty(false); setWorldDirty(false); setCatalogue(null); setDrafts({}); setEditorFiles([]); setSourceText(''); setDragonRef(''); setRights(''); setConsent(false);
+    setProject(null); setProjects([]); setJobs({}); setInitialPlay(null); setVisualDirty(false); setWorldDirty(false); setCatalogue(null); setDrafts({}); setEditorFiles([]); setSourceText(''); setDragonRef(''); setRights(''); setConsent(false);
     setDragonSources([]); setGenerationTitle(''); setProjectName(''); setSelectedSource(''); setSelectedSession(''); setTrainSessions([]); setDemonstrations([]); setTrainDemonstrations([]); setResourceProfiles([]); setResourceProfile(''); setObservedJob(''); setNewProject(false); setAddFile(false); setWithdrawSource(null);
     createAttempt.current = null; trainAttempt.current = null; generationAttempt.current = null; buildAttempt.current = null; setBuildTargets([]); setBuildStyle(''); setBuildCatalogueError(null);
     setConnectionRevision(value => value + 1); setError('Your account changed. Refresh the studio to load this account’s projects.'); setLoading(false);
@@ -563,7 +568,7 @@ export default function GameLearningWorkspace() {
                 {source.state !== 'revoked' && <Button label="Withdraw source" icon="remove-circle-outline" disabled={!!busy} onPress={() => setWithdrawSource(source.source_id)} />}</View>)}
             </Section>
           </>}
-          {tab === 'observe' && <><GamePlayViewport key={project.project_id + ':' + accountToken} project={project} sourceId={selectedSource || undefined} seed={/^\d+$/.test(seed) ? Number(seed) : 13} disabled={dirty || !!busy} onRecordingsChange={setDemonstrations} /><View style={narrow ? undefined : s.split}>
+          {tab === 'observe' && <><GamePlayViewport key={project.project_id + ':' + accountToken} initialPlay={initialPlay?.project_id === project.project_id ? initialPlay : undefined} project={project} sourceId={selectedSource || undefined} seed={/^\d+$/.test(seed) ? Number(seed) : 13} disabled={dirty || !!busy} onRecordingsChange={setDemonstrations} /><View style={narrow ? undefined : s.split}>
             <View style={s.column}><Section title="Live engine observation"><Observation session={session} />
               <Metrics values={session ? { ...(session.steps !== undefined ? { steps: session.steps } : {}), ...(session.total_reward !== undefined ? { total_reward: session.total_reward } : {}), ...(session.terminated !== undefined ? { terminated: session.terminated } : {}), ...(session.truncated !== undefined ? { truncated: session.truncated } : {}), ...session.metrics } : undefined} />
             </Section><Section title="Observation lineage"><Lineage refs={session?.lineage_refs} />{!!session?.snapshot_digest && <Text selectable style={s.reference}>Snapshot: {session.snapshot_digest}</Text>}</Section></View>
@@ -584,8 +589,11 @@ export default function GameLearningWorkspace() {
             </Section></View>
           </View></>}
           {tab === 'learn' && <>
-            <GameStudioLearningPanel key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onJob={acceptStudioJob} />
-            <Section title="Local learning" detail="Train a candidate from real engine observations. Measured evaluation and checkpoints stay separate from production promotion.">
+            <View style={s.chips}>{([{ id: 'assistant', label: 'Jeeves assistant' }, { id: 'review', label: 'Measured review' }, { id: 'campaign', label: 'Self-learning campaign' }, { id: 'local', label: 'Local training & instances' }] as const).map(value => <TouchableOpacity key={value.id} accessibilityRole="tab" accessibilityState={{ selected: learningPane === value.id }} onPress={() => setLearningPane(value.id)} style={[s.tab, learningPane === value.id && s.activeTab]}><Text style={[s.tabText, learningPane === value.id && s.activeText]}>{value.label}</Text></TouchableOpacity>)}</View>
+            {learningPane === 'review' && <GameStudioReviewPanel key={'review:' + project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onJob={acceptStudioJob} />}
+            {learningPane === 'assistant' && <GameStudioAssistantPanel key={'assistant:' + project.project_id + ':' + accountToken} project={project} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} onPlay={acceptCompiledPlay} />}
+            {learningPane === 'campaign' && <GameStudioLearningPanel key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} />}
+            {learningPane === 'local' && <><Section title="Local learning" detail="Train a candidate from real engine observations. Measured evaluation and checkpoints stay separate from production promotion.">
               <Text style={s.label}>Learner</Text><View style={s.chips}>{(catalogue?.algorithms || []).map(value => <TouchableOpacity key={value.id} accessibilityRole="radio"
                 accessibilityState={{ selected: algorithm === value.id, disabled: !value.available }} disabled={!value.available} onPress={() => setAlgorithm(value.id)} style={[s.chip, algorithm === value.id && s.selected]}><Text style={s.chipText}>{value.label}{!value.available ? ' · unavailable' : ''}</Text></TouchableOpacity>)}</View>
               {!availableAlgorithms.length && <Text style={s.unavailable}>No local learner is ready. Refresh the catalogue to check again.</Text>}
@@ -609,9 +617,10 @@ export default function GameLearningWorkspace() {
             {!!allJobs.filter(job => job.kind === 'train' || job.kind === 'training').length && <><View style={s.chips}>{allJobs.filter(job => job.kind === 'train' || job.kind === 'training').slice(0, 8).map((job, index) => <TouchableOpacity key={job.job_id} accessibilityRole="radio" accessibilityState={{ checked: (observedJob || allJobs.find(value => value.kind === 'train' || value.kind === 'training')?.job_id) === job.job_id }} onPress={() => setObservedJob(job.job_id)} style={[s.chip, observedJob === job.job_id && s.selected]}><Text style={s.chipText}>Learning job {index + 1} · {human(job.status)}</Text></TouchableOpacity>)}</View>{(() => { const job = allJobs.find(value => value.job_id === observedJob) || allJobs.find(value => value.kind === 'train' || value.kind === 'training'); return job ? <GameTrainingInstances key={job.job_id + ':' + accountToken} job={job} /> : null; })()}</>}
             <Section title="Measured learning jobs">{!allJobs.filter(job => job.kind === 'train' || job.kind === 'training').length && <Text style={s.muted}>Training metrics and checkpoints will appear after a real job starts.</Text>}
               {allJobs.filter(job => job.kind === 'train' || job.kind === 'training').slice(0, 12).map(job => <JobCard key={job.job_id} job={job} busy={!!busy} cancel={cancel} resume={resume} />)}</Section>
-            <Section title="Project learning lineage"><Lineage refs={project.lineage_refs} /><Metrics values={project.metrics} /></Section>
+            <Section title="Project learning lineage"><Lineage refs={project.lineage_refs} /><Metrics values={project.metrics} /></Section></>}
           </>}
           {tab === 'build' && <>
+            <GameCompiledRomPanel key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onSaved={acceptVisualProject} onPlay={acceptCompiledPlay} onJob={acceptStudioJob} />
             <Section title="Native console build" detail="Compile the exact saved files with this console’s installed toolchain. A source export remains available when its compiler or SDK is unavailable.">
               {buildCatalogueError && <Text style={s.error}>{buildCatalogueError}</Text>}
               {nativeTarget ? <>

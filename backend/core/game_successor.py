@@ -50,7 +50,7 @@ async def sources(scope):
             .to_list(length=64)
         )
         for row in rows:
-            if row["kind"] == "content_bundle":
+            if row["kind"] in {"content_bundle", "build_artifact"}:
                 # Media descriptors are playable source authority, not numeric game-feel evidence.
                 continue
             reference = await _reference(scope, project, row)
@@ -135,10 +135,10 @@ async def _synthesis_input(scope, project, binding, body):
                 raise GameLearningError(
                     "origin_source_unavailable", "Select a currently owned admitted source.", 403
                 )
-            if row["kind"] == "content_bundle":
+            if row["kind"] in {"content_bundle", "build_artifact"}:
                 raise GameLearningError(
                     "source_profile_unavailable",
-                    "Use an admitted analysed source or authored inspiration; media bytes alone have no measured game profile.",
+                    "Use an admitted analysed source or authored inspiration; media bytes and compiler output alone have no measured game profile.",
                 )
             references.append(await _reference(scope, origin, row))
             profiles.append(

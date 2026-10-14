@@ -45,9 +45,10 @@ function padActions(pad: Gamepad, actions: string[], tool?: string) {
 }
 
 /** Live controls are authenticated input to the canonical runtime, never local gameplay. */
-export default function GamePlayViewport({ project, sourceId, seed, disabled, onRecordingsChange }: {
+export default function GamePlayViewport({ project, sourceId, seed, disabled, onRecordingsChange, initialPlay }: {
   project: LearningProject; sourceId?: string; seed: number; disabled?: boolean;
   onRecordingsChange?: (recordings: GameRecording[]) => void;
+  initialPlay?: GamePlay | null;
 }) {
   const [savedPlays, setSavedPlays] = useState<GamePlay[]>([]);
   const [play, setPlay] = useState<GamePlay | null>(null);
@@ -84,6 +85,7 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
   const startAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
   const recordAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
   const replayAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  const openedPlay = useRef('');
   const projectRef = useRef(project); projectRef.current = project;
   const account = getAuthToken();
   const safe = useCallback(() => mounted.current && owner.current.token === getAuthToken() && owner.current.projectId === projectRef.current.project_id, []);
@@ -103,6 +105,7 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
     }
     live.current = value; setPlay(value); setSavedPlays(current => current.some(item => item.play_id === value.play_id) ? current.map(item => item.play_id === value.play_id ? value : item) : [value, ...current].slice(0, 32));
   }, [safe]);
+  useEffect(() => { if (!initialPlay || initialPlay.project_id !== projectRef.current.project_id || openedPlay.current === initialPlay.play_id || !safe()) return; openedPlay.current = initialPlay.play_id; accept(initialPlay, true); setKeyboard(Platform.OS === 'web' && initialPlay.controller === 'human'); }, [initialPlay, accept, safe]);
   const stopSound = useCallback(() => {
     audioSources.current.forEach(source => { try { source.stop(); } catch { /* The source already ended. */ } }); audioSources.current.clear();
     audioTime.current = 0; audioCursor.current = 0; audioSession.current = '';

@@ -29,6 +29,7 @@ READ_OPERATIONS = (
     "campaign.inspect",
     "campaign.rounds",
     "lessons.search",
+    "artifact.inspect",
 )
 WRITE_OPERATIONS = (
     "console.edit",
@@ -39,6 +40,10 @@ WRITE_OPERATIONS = (
     "successor.synthesize",
     "successor.compare",
     "desktop.build",
+    "project.review",
+    "artifact.admit",
+    "artifact.train",
+    "artifact.play",
     "play.start",
     "play.input",
     "play.control",

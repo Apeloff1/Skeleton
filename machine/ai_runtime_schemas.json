@@ -2459,7 +2459,9 @@
       "machine/ai_game_style_analysis.json",
       "machine/ai_game_successor_runtime.json",
       "machine/ai_game_desktop_export.json",
-      "machine/ai_game_studio_learning.json"
+      "machine/ai_game_studio_learning.json",
+      "machine/ai_game_studio_continuation.json",
+      "machine/ai_game_studio_review.json"
     ],
     "request_owners": [
       "backend/routes/game_learning.py",
@@ -2468,7 +2470,9 @@
       "backend/routes/game_console_studio.py",
       "backend/routes/game_successor.py",
       "backend/routes/game_studio_learning.py",
-      "backend/routes/game_studio_tools.py"
+      "backend/routes/game_studio_tools.py",
+      "backend/routes/game_studio_review.py",
+      "backend/routes/game_studio_agent.py"
     ],
     "runtime_owners": [
       "skeleton/jeeves/game_emulator_catalog.py",
@@ -2482,7 +2486,9 @@
       "skeleton/jeeves/game_successor_runtime.py",
       "skeleton/jeeves/game_desktop_export.py",
       "skeleton/jeeves/game_studio_learning.py",
-      "skeleton/jeeves/game_studio_tools.py"
+      "skeleton/jeeves/game_studio_tools.py",
+      "skeleton/jeeves/game_console_graph.py",
+      "skeleton/jeeves/game_studio_review.py"
     ],
     "invariants": [
       "Strict finite bounded JSON and exact supported schema versions; unknown request fields reject",

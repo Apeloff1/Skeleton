@@ -470,7 +470,32 @@ class GameLearningWorkspace:
                     "message": "Editor files need a valid executable manifest and configuration.",
                 }
         result.update(
-            sources=[_public(row) for row in sources],
+            sources=[
+                {
+                    **_public(row),
+                    **(
+                        {
+                            "execution_current": row.get("state") == "active"
+                            and row["artifact_manifest"]["producer_version"] == project["version"]
+                            and row["artifact_manifest"]["producer_epoch"] == project.get("_input_epoch", 0),
+                            "status": (
+                                "withdrawn"
+                                if row.get("state") != "active"
+                                else (
+                                    "current_compiled"
+                                    if row["artifact_manifest"]["producer_version"] == project["version"]
+                                    and row["artifact_manifest"]["producer_epoch"]
+                                    == project.get("_input_epoch", 0)
+                                    else "superseded"
+                                )
+                            ),
+                        }
+                        if row["kind"] == "build_artifact"
+                        else {}
+                    ),
+                }
+                for row in sources
+            ],
             sessions=[
                 {
                     **_public(row),
@@ -1090,6 +1115,11 @@ class GameLearningWorkspace:
     def _source_bundle(scope, source):
         from skeleton.jeeves.game_learning_ingestion import GameSourceBundle
 
+        if source["kind"] == "build_artifact":
+            from core.game_console_build import artifact_source_projection
+
+            return artifact_source_projection(scope, source)
+
         if source["kind"] == "content_bundle":
             from skeleton.jeeves.game_emulator_catalog import GameContentBundle
 
@@ -1229,6 +1259,18 @@ class GameLearningWorkspace:
                 "source_rights_unavailable", "Source authority is revoked or unavailable.", 403
             )
         self._source_bundle(scope, source)
+        if source["kind"] == "build_artifact":
+            from core.game_console_build import assert_artifact_source, download_build_artifact
+
+            await assert_artifact_source(scope, source)
+            _, payload, digest = await download_build_artifact(
+                scope, project["project_id"], source["artifact_manifest"]["artifact_id"]
+            )
+            if digest != source["source_digest"] or len(payload) != source["byte_length"]:
+                raise GameLearningError(
+                    "compiled_source_corrupt", "Compiled bytes differ from their source authority.", 503
+                )
+            return source, payload
         if (
             type(source.get("byte_length")) is not int
             or not 1 <= source["byte_length"] <= MAX_SOURCE
@@ -1288,12 +1330,19 @@ class GameLearningWorkspace:
             .limit(64)
             .to_list(length=64)
         )
+        sources = [row for row in sources if row["kind"] != "build_artifact" or row["source_id"] == selected]
+        picked = next((row for row in sources if row["source_id"] == selected), None)
+        compiled = picked is not None and picked["kind"] == "build_artifact"
+        if compiled:
+            from core.game_console_build import assert_artifact_source
+
+            await assert_artifact_source(scope, picked)
         generated_grid = any(
             item["path"]
             in {"game/generated/game.json", "game/editor/console.json", "game/successor/spec.json"}
             for item in project["files"]
         )
-        if target.requires_rom and not generated_grid:
+        if target.requires_rom and not generated_grid and not compiled:
             selected = selected or next(
                 (row["source_id"] for row in sources if row["kind"] in {"rom", "content_bundle"}), None
             )
@@ -1309,7 +1358,7 @@ class GameLearningWorkspace:
             raise GameLearningError(
                 "source_not_found", "Selected source is not admitted to this project.", 404
             )
-        return {
+        binding = {
             "schema_version": "skeleton.game_learning.input.v1",
             "project_id": project["project_id"],
             "project_version": project["version"],
@@ -1332,6 +1381,18 @@ class GameLearningWorkspace:
             "derived_sources": list(project.get("derived_sources", [])),
             "derived_demonstrations": list(project.get("derived_demonstrations", [])),
         }
+        if compiled:
+            pin = picked["artifact_manifest"]
+            binding["execution_selection"] = "compiled_artifact"
+            binding["compiled_artifact"] = {
+                key: pin[key]
+                for key in ("artifact_id", "job_id", "artifact_digest", "producer_input_digest", "target_id")
+            }
+            binding["emulator_binding"] = {
+                "core_id": pin["core_id"],
+                "registry_digest": pin["registry_digest"],
+            }
+        return binding
 
     async def _authority(self, scope, binding, *, dragon_guarded=False):
         project = await self._project(binding["project_id"], scope, binding["project_version"])
@@ -1369,6 +1430,29 @@ class GameLearningWorkspace:
                     "source_authority_changed", "Source rights or source identity changed.", 403
                 )
             bundle = self._source_bundle(scope, row)
+            if row["kind"] == "build_artifact":
+                from core.game_console_build import assert_artifact_source
+
+                await assert_artifact_source(scope, row, dragon_guarded=dragon_guarded)
+                if expected["source_id"] == binding.get("source_id"):
+                    pin = row["artifact_manifest"]
+                    expected_pin = {
+                        key: pin[key]
+                        for key in (
+                            "artifact_id",
+                            "job_id",
+                            "artifact_digest",
+                            "producer_input_digest",
+                            "target_id",
+                        )
+                    }
+                    if (
+                        binding.get("execution_selection") != "compiled_artifact"
+                        or binding.get("compiled_artifact") != expected_pin
+                    ):
+                        raise GameLearningError(
+                            "compiled_execution_binding_changed", "Compiled execution identity differs.", 503
+                        )
             if row["kind"] == "content_bundle":
                 await self._content_authority(scope, project["project_id"], row)
             if row["kind"] == "dragon" and not dragon_guarded:
@@ -1390,7 +1474,7 @@ class GameLearningWorkspace:
             registry.resolve_core(binding["emulator_binding"]["core_id"])
         if binding.get("demonstrations") or binding.get("inherited_demonstrations"):
             await self._demonstration_authority(scope, binding, dragon_guarded=dragon_guarded)
-        for role in ("parent_policy", "generation_policy"):
+        for role in ("parent_policy", "generation_policy", "review_policy"):
             if binding.get(role):
                 parent = await self._admitted_policy(
                     scope, project["project_id"], binding[role]["policy_id"], dragon_guarded=dragon_guarded
@@ -1401,7 +1485,9 @@ class GameLearningWorkspace:
         await self._derived_demonstration_authority(scope, binding, dragon_guarded=dragon_guarded)
         return project
 
-    async def _derived_demonstration_authority(self, scope, binding, *, dragon_guarded=False):
+    async def _derived_demonstration_authority(
+        self, scope, binding, *, dragon_guarded=False, allowed_editor_operation_id=None
+    ):
         from skeleton.jeeves.game_learning_demonstrations import GameDemonstration
 
         references = binding.get("derived_demonstrations", [])
@@ -1431,15 +1517,41 @@ class GameLearningWorkspace:
                 raise GameLearningError("derived_teacher_changed", "Original teacher evidence changed.", 403)
             sources = [{**ref, "project_id": recorded["project_id"]} for ref in recorded["input"]["sources"]]
             sources += recorded["input"].get("derived_sources", [])
-            await self._external_authority(scope, {"derived_sources": sources}, dragon_guarded=dragon_guarded)
+            await self._external_authority(
+                scope,
+                {"derived_sources": sources},
+                dragon_guarded=dragon_guarded,
+                allowed_editor_operation_id=allowed_editor_operation_id,
+            )
 
-    async def _external_authority(self, scope, binding, *, dragon_guarded=False):
+    async def _external_authority(
+        self, scope, binding, *, dragon_guarded=False, allowed_editor_operation_id=None
+    ):
         for reference in binding.get("external_sources", []) + binding.get("derived_sources", []):
             origin = await self._project(reference["project_id"], scope)
             if self._editor_pending(origin):
-                raise GameLearningError(
-                    "origin_write_pending", "An origin editor save is still pending.", 409
+                same_operation = bool(
+                    allowed_editor_operation_id
+                    and origin.get("_editor_write_operation_id") == allowed_editor_operation_id
                 )
+                prepared = (
+                    await self.revisions.find_one(
+                        {
+                            "_id": allowed_editor_operation_id,
+                            **scope,
+                            "project_id": origin["project_id"],
+                            "version": origin["version"] + 1,
+                        }
+                    )
+                    if same_operation
+                    else None
+                )
+                if prepared is None:
+                    raise GameLearningError(
+                        "origin_write_pending",
+                        "An unrelated or unprepared origin editor save is pending.",
+                        409,
+                    )
             if reference in binding.get("external_sources", []) and (
                 origin["version"] != reference["project_version"]
                 or origin.get("_input_epoch", 0) != reference["input_epoch"]
@@ -1463,6 +1575,10 @@ class GameLearningWorkspace:
             bundle = self._source_bundle(scope, row)
             if bundle.bundle_digest != reference["bundle_digest"]:
                 raise GameLearningError("origin_source_changed", "Origin source content changed.", 403)
+            if row["kind"] == "build_artifact":
+                from core.game_console_build import assert_artifact_source
+
+                await assert_artifact_source(scope, row, dragon_guarded=dragon_guarded)
             if row["kind"] == "content_bundle":
                 await self._content_authority(scope, origin["project_id"], row)
             if row["kind"] == "dragon" and not dragon_guarded:
@@ -1470,7 +1586,23 @@ class GameLearningWorkspace:
                 if hashlib.sha256(_json(current)).hexdigest() != row["source_digest"]:
                     raise GameLearningError("dragon_authority_changed", "Origin Dragon review changed.", 403)
 
-    async def _admitted_policy(self, scope, project_id, policy_id, *, dragon_guarded=False):
+    async def _admitted_policy(
+        self,
+        scope,
+        project_id,
+        policy_id,
+        *,
+        dragon_guarded=False,
+        allow_environment_changed=False,
+        allowed_editor_operation_id=None,
+        _ancestor_ids=(),
+    ):
+        identity = (project_id, policy_id)
+        if identity in _ancestor_ids or len(_ancestor_ids) >= 64:
+            raise GameLearningError(
+                "policy_ancestry_invalid", "Policy ancestry contains a cycle or exceeds64parents.", 413
+            )
+        ancestry = (*_ancestor_ids, identity)
         saved = await self.policies.find_one({"_id": policy_id, **scope, "project_id": project_id})
         if saved is None:
             raise GameLearningError("policy_not_found", "An owned completed policy is required.", 404)
@@ -1479,11 +1611,15 @@ class GameLearningWorkspace:
         )
         if (
             issuer is None
+            or issuer.get("input") != saved["input"]
+            or issuer.get("policy_id") != policy_id
             or issuer.get("result", {}).get("policy_digest") != saved["snapshot"]["snapshot_digest"]
+            or _digest({k: v for k, v in saved["snapshot"].items() if k != "snapshot_digest"})
+            != saved["snapshot"]["snapshot_digest"]
         ):
             raise GameLearningError("policy_uncommitted", "Policy lacks its completed issuing receipt.", 409)
         project = await self._project(project_id, scope)
-        if _digest(project["files"]) != saved["input"]["tree_digest"]:
+        if not allow_environment_changed and _digest(project["files"]) != saved["input"]["tree_digest"]:
             raise GameLearningError(
                 "policy_environment_changed", "Policy belongs to a different editor tree.", 409
             )
@@ -1502,6 +1638,12 @@ class GameLearningWorkspace:
             bundle = self._source_bundle(scope, row)
             if bundle.bundle_digest != source["bundle_digest"]:
                 raise GameLearningError("policy_source_changed", "Parent source features changed.", 403)
+            if row["kind"] == "build_artifact":
+                from core.game_console_build import assert_artifact_source
+
+                await assert_artifact_source(scope, row, dragon_guarded=dragon_guarded)
+            if row["kind"] == "content_bundle":
+                await self._content_authority(scope, project_id, row)
             if row["kind"] == "dragon" and not dragon_guarded:
                 current = await self._dragon_record(scope, bundle.to_dict()["provenance"]["source_ref"])
                 if hashlib.sha256(_json(current)).hexdigest() != row["source_digest"]:
@@ -1509,13 +1651,52 @@ class GameLearningWorkspace:
                         "policy_review_withdrawn", "Policy Dragon review is no longer current.", 403
                     )
         if saved["input"].get("demonstrations") or saved["input"].get("inherited_demonstrations"):
-            await self._demonstration_authority(scope, saved["input"], dragon_guarded=dragon_guarded)
+            await self._demonstration_authority(
+                scope,
+                saved["input"],
+                dragon_guarded=dragon_guarded,
+                allowed_editor_operation_id=allowed_editor_operation_id,
+            )
         await self._external_authority(
             scope,
             {"derived_sources": saved["input"].get("derived_sources", [])},
             dragon_guarded=dragon_guarded,
+            allowed_editor_operation_id=allowed_editor_operation_id,
         )
-        await self._derived_demonstration_authority(scope, saved["input"], dragon_guarded=dragon_guarded)
+        await self._derived_demonstration_authority(
+            scope,
+            saved["input"],
+            dragon_guarded=dragon_guarded,
+            allowed_editor_operation_id=allowed_editor_operation_id,
+        )
+        parent_pin = saved["input"].get("parent_policy")
+        parent_digest = saved["snapshot"].get("parent_snapshot_digest")
+        if parent_pin:
+            if parent_digest != parent_pin.get("snapshot_digest") or saved["snapshot"].get(
+                "parent_policy_id"
+            ) != parent_pin.get("policy_id"):
+                raise GameLearningError(
+                    "policy_parent_changed",
+                    "Full learned policy differs from its admitted parent identity.",
+                    503,
+                )
+            parent = await self._admitted_policy(
+                scope,
+                project_id,
+                parent_pin["policy_id"],
+                dragon_guarded=dragon_guarded,
+                allow_environment_changed=allow_environment_changed,
+                allowed_editor_operation_id=allowed_editor_operation_id,
+                _ancestor_ids=ancestry,
+            )
+            if parent["snapshot"]["snapshot_digest"] != parent_pin["snapshot_digest"]:
+                raise GameLearningError(
+                    "policy_parent_changed", "Original learned parent snapshot differs.", 403
+                )
+        elif parent_digest is not None or saved["snapshot"].get("parent_policy_id") is not None:
+            raise GameLearningError(
+                "policy_parent_missing", "Inherited learned policy lacks its original admitted parent.", 503
+            )
         return saved
 
     async def _factory(self, scope, binding):
@@ -2242,7 +2423,7 @@ class GameLearningWorkspace:
                         1
                         if row is not None
                         and row["kind"]
-                        in {"build", "successor", "successor_compare", "desktop", "studio_learning"}
+                        in {"build", "successor", "successor_compare", "desktop", "studio_learning", "review"}
                         else 0
                     )
                 )
@@ -2313,7 +2494,7 @@ class GameLearningWorkspace:
                     else (
                         1
                         if admitted["kind"]
-                        in {"build", "successor", "successor_compare", "desktop", "studio_learning"}
+                        in {"build", "successor", "successor_compare", "desktop", "studio_learning", "review"}
                         else 0
                     )
                 )
@@ -2436,7 +2617,12 @@ class GameLearningWorkspace:
                     result, policy = await asyncio.shield(worker)
                 except asyncio.CancelledError:
                     cancelled.set()
-                    await asyncio.gather(asyncio.shield(worker), return_exceptions=True)
+                    cleanup = asyncio.ensure_future(asyncio.gather(worker, return_exceptions=True))
+                    while not cleanup.done():
+                        try:
+                            await asyncio.shield(cleanup)
+                        except asyncio.CancelledError:
+                            cancelled.set()
                     raise
                 await self._authority(scope, job["input"])
                 _json({"policy": policy, "input": job["input"]})
@@ -2465,7 +2651,12 @@ class GameLearningWorkspace:
                     result = await asyncio.shield(worker)
                 except asyncio.CancelledError:
                     cancelled.set()
-                    await asyncio.gather(asyncio.shield(worker), return_exceptions=True)
+                    cleanup = asyncio.ensure_future(asyncio.gather(worker, return_exceptions=True))
+                    while not cleanup.done():
+                        try:
+                            await asyncio.shield(cleanup)
+                        except asyncio.CancelledError:
+                            cancelled.set()
                     raise
             _json(result, 2 * 1024 * 1024)
             done = await self._complete_job(scope, job, token, result)
@@ -2688,7 +2879,8 @@ class GameLearningWorkspace:
                     raise GameLearningError(
                         "source_bundle_changed", "Source features differ from the admitted job.", 409
                     )
-                source_features.append(bundle.to_dict())
+                if saved["kind"] != "build_artifact":
+                    source_features.append(bundle.to_dict())
             request = GameGenerationRequest(
                 project_id=job["job_id"],
                 title=body.get("title") or "Original learned game",
@@ -2824,6 +3016,7 @@ class GameLearningWorkspace:
             "successor_compare",
             "desktop",
             "studio_learning",
+            "review",
         } or not callable(handler):
             raise GameLearningError("job_handler_undeclared", "Job handler is not declared by construction.")
         if not hasattr(self, "_job_handlers"):
@@ -2928,15 +3121,28 @@ class GameLearningWorkspace:
         project = await self._authority(scope, binding)
         frozen_files = binding.get("files", project["files"])
         tree = {item["path"]: item["content"] for item in frozen_files}
+        source_id = binding.get("source_id")
+        selected_source = (
+            await self.sources.find_one(
+                {"_id": source_id, **scope, "project_id": project["project_id"], "state": "active"}
+            )
+            if source_id
+            else None
+        )
+        compiled = selected_source is not None and selected_source["kind"] == "build_artifact"
+        if binding.get("execution_selection") == "compiled_artifact" and not compiled:
+            raise GameLearningError(
+                "compiled_source_unavailable", "Selected compiled source is unavailable.", 403
+            )
         authored_kind = self.authored_environment_kind(tree)
-        if authored_kind:
+        if authored_kind and not compiled:
             return GameEnvironmentRequest(
                 binding["console_id"],
                 kind=authored_kind,
                 tree=self.authored_runtime_tree(tree, authored_kind),
                 max_steps=binding["episode_steps"],
             ).as_dict()
-        generated = "game/generated/game.json" in tree
+        generated = "game/generated/game.json" in tree and not compiled
         rom, content, filename = None, None, "game.bin"
         source_id = binding.get("source_id")
         if source_id is not None and not generated:
@@ -2952,6 +3158,11 @@ class GameLearningWorkspace:
                 from core.game_content_uploads import materialize_content
 
                 content = await materialize_content(scope, project["project_id"], source["bundle_id"])
+            elif source["kind"] == "build_artifact":
+                _, payload = await self._source_bytes(scope, project, source_id)
+                content = await asyncio.to_thread(
+                    self._materialize_cartridge, scope, project["project_id"], source, payload
+                )
             elif source["kind"] == "rom":
                 _, rom = await self._source_bytes(scope, project, source_id)
                 if len(rom) > 2 * 1024 * 1024:
@@ -3024,6 +3235,11 @@ class GameLearningWorkspace:
             from skeleton.jeeves.game_console_editor import file_manifest_digest
 
             return {
+                **(
+                    {"game/editor/graph.json": tree["game/editor/graph.json"]}
+                    if "game/editor/graph.json" in tree
+                    else {}
+                ),
                 "game/editor/console.json": tree["game/editor/console.json"],
                 "game/editor/source_manifest.json": _json(
                     {
@@ -3097,7 +3313,9 @@ class GameLearningWorkspace:
 
         await assert_content_authority(scope, project_id, source["bundle_id"], source["source_digest"])
 
-    async def _demonstration_authority(self, scope, binding, *, dragon_guarded=False):
+    async def _demonstration_authority(
+        self, scope, binding, *, dragon_guarded=False, allowed_editor_operation_id=None
+    ):
         from skeleton.jeeves.game_learning_demonstrations import GameDemonstration
 
         records = []
@@ -3136,10 +3354,15 @@ class GameLearningWorkspace:
                     raise GameLearningError(
                         "demonstration_source_withdrawn", "Recording source authority changed.", 403
                     )
+                if source["kind"] == "build_artifact":
+                    from core.game_console_build import assert_artifact_source
+
+                    await assert_artifact_source(scope, source, dragon_guarded=dragon_guarded)
             await self._external_authority(
                 scope,
                 {"derived_sources": row["input"].get("derived_sources", [])},
                 dragon_guarded=dragon_guarded,
+                allowed_editor_operation_id=allowed_editor_operation_id,
             )
             if reference in binding.get("demonstrations", []):
                 records.append(demo.as_dict())

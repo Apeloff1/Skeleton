@@ -22,7 +22,7 @@ export type LearningCatalogue = {
 };
 export type LearningFile = { path: string; content: string; language?: string; revision?: number };
 export type LearningSource = {
-  source_id: string; kind: LearningSourceKind; filename?: string; console_id?: string;
+  source_id: string; kind: LearningSourceKind | 'build_artifact'; filename?: string; console_id?: string;
   source_digest?: string; rights_refs: string[]; created_at?: string;
   summary?: string; status?: string; size_bytes?: number; lineage_refs?: string[];
   metadata?: Record<string, unknown>;

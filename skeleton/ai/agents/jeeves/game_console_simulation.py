@@ -24,12 +24,13 @@ from .game_console_editor import (
     _int,
     _json,
 )
+from .game_console_graph import ConsoleGraphRuntime
 from .game_learning_runtime import EpisodeStep, GameEnvironmentSpec
 
 SIMULATION_SCHEMA = "skeleton.console_editor_simulation.v1"
 _SNAPSHOT_SCHEMA = "skeleton.console_editor_simulation_snapshot.v1"
 _ACTIONS = ("idle", "left", "right", "up", "down", "jump", "attack", "interact", "water", "plant", "fish")
-_REWARDS = ("progress", "goal", "pickup", "farming", "fishing", "quest", "combat", "damage", "time")
+_REWARDS = ("progress", "goal", "pickup", "farming", "fishing", "quest", "combat", "damage", "time", "rule")
 
 
 def _overlap(a, b):
@@ -50,6 +51,8 @@ class EditorSimulationEnvironment:
             )
         self.project = ConsoleProject(project.as_dict(), project.export_files())
         self.document = self.project.as_dict()
+        self._graph = ConsoleGraphRuntime(self.project.scene_graph)
+        self._observed_variables = tuple(sorted(self._graph.variable_specs)[:18])
         self.max_steps = _int(max_steps, 1, 4096, "design simulation steps")
         self._config = self.document["config"]
         self._layers = self.document["layers"]
@@ -94,7 +97,12 @@ class EditorSimulationEnvironment:
                 self._unrendered_assets.append(row["id"])
         code = {
             name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest()
-            for name in ("game_console_simulation.py", "game_console_editor.py", "game_console_assets.py")
+            for name in (
+                "game_console_simulation.py",
+                "game_console_editor.py",
+                "game_console_assets.py",
+                "game_console_graph.py",
+            )
         }
         self._descriptor = {
             "schema_version": SIMULATION_SCHEMA,
@@ -105,6 +113,13 @@ class EditorSimulationEnvironment:
             "manifest_digest": self.project.manifest_digest,
             "source_manifest_digest": self.project.source_manifest_digest,
             "controller_bindings": dict(self.document["controls"]["bindings"]),
+            "scene_graph_digest": self.project.scene_graph.digest,
+            "observed_graph_variables": list(self._observed_variables),
+            "unobserved_graph_variables": sorted(
+                set(self._graph.variable_specs) - set(self._observed_variables)
+            ),
+            "policy_observation_scope": "14 scene features plus first18 lexicallyordered graphvariables; additional graphstate is replaybound but partiallyobserved by finitepolicy",
+            "scene_graph_scope": "Actual bounded hierarchy/animation/rule design interpretation; no native kernel semantics",
             "python": list(sys.version_info[:3]),
             "source_code_digest": _digest(code),
             "tick_hz": 60,
@@ -137,6 +152,7 @@ class EditorSimulationEnvironment:
                     "crops",
                     "fish",
                     "quest_progress",
+                    *["var:" + key for key in self._observed_variables],
                 )
             },
             _REWARDS,
@@ -174,6 +190,7 @@ class EditorSimulationEnvironment:
     def reset(self, seed: int = 0):
         self._seed = _int(seed, 0, 2**63 - 1, "design episode seed")
         self._rng = random.Random(seed)
+        self._graph.reset()
         self._closed = False
         self._tick, self._actions, self._audio_total, self._audio, self._last_events = 0, [], 0, b"", []
         self._x, self._y = self._player_source["x"], self._player_source["y"]
@@ -201,8 +218,12 @@ class EditorSimulationEnvironment:
     def _player_rect(self):
         return (self._x, self._y, self._player_source["width"], self._player_source["height"])
 
+    def _visible(self, row):
+        return self._graph.pose(row["id"], self._tick)["visible"]
+
     def _rect(self, row):
-        x, y = row["x"], row["y"]
+        pose = self._graph.pose(row["id"], self._tick)
+        x, y = row["x"] + pose["x"], row["y"] + pose["y"]
         if row["kind"] == "enemy":
             properties = row["properties"]
             radius = properties["patrol_range"]
@@ -244,12 +265,13 @@ class EditorSimulationEnvironment:
         for row in self._entities:
             if (
                 row["kind"] == "platform"
+                and self._visible(row)
                 and _overlap(rect, self._rect(row))
                 and (
                     not row["properties"]["one_way"]
                     or downward
                     and previous_bottom is not None
-                    and previous_bottom <= row["y"] + 0.01
+                    and previous_bottom <= self._rect(row)[1] + 0.01
                 )
             ):
                 return True
@@ -296,10 +318,10 @@ class EditorSimulationEnvironment:
         return result
 
     def _goal_distance(self):
-        goals = [row for row in self._entities if row["kind"] == "goal"]
+        goals = [row for row in self._entities if row["kind"] == "goal" and self._visible(row)]
         if not goals:
             return 0.0
-        return min(math.hypot(row["x"] - self._x, row["y"] - self._y) for row in goals)
+        return min(math.hypot(self._rect(row)[0] - self._x, self._rect(row)[1] - self._y) for row in goals)
 
     def _day(self):
         return int(self._tick / (self._config["day_length_seconds"] * 60))
@@ -307,6 +329,7 @@ class EditorSimulationEnvironment:
     def _state(self):
         return {
             "tick": self._tick,
+            "scene_graph": self._graph.state(),
             "position": [self._x, self._y],
             "velocity": [self._vx, self._vy],
             "health": self._health,
@@ -329,9 +352,9 @@ class EditorSimulationEnvironment:
         }
 
     def _observation(self):
-        goals = [row for row in self._entities if row["kind"] == "goal"]
+        goals = [row for row in self._entities if row["kind"] == "goal" and self._visible(row)]
         goal = (
-            min(goals, key=lambda row: math.hypot(row["x"] - self._x, row["y"] - self._y))
+            min(goals, key=lambda row: math.hypot(self._rect(row)[0] - self._x, self._rect(row)[1] - self._y))
             if goals
             else {"x": self._x, "y": self._y}
         )
@@ -349,8 +372,8 @@ class EditorSimulationEnvironment:
             "y": self._y / self._world_height,
             "vx": max(-1.0, min(1.0, self._vx / speed)),
             "vy": max(-1.0, min(1.0, self._vy / max(speed, self._config["jump_speed"]))),
-            "goal_dx": (goal["x"] - self._x) / self._world_width,
-            "goal_dy": (goal["y"] - self._y) / self._world_height,
+            "goal_dx": ((self._rect(goal)[0] if "id" in goal else goal["x"]) - self._x) / self._world_width,
+            "goal_dy": ((self._rect(goal)[1] if "id" in goal else goal["y"]) - self._y) / self._world_height,
             "health": self._health / self._player_source["properties"]["health"],
             "grounded": float(self._grounded),
             "day_phase": self._tick
@@ -361,6 +384,13 @@ class EditorSimulationEnvironment:
             "crops": min(1.0, self._crops / 100),
             "fish": min(1.0, self._fish / 100),
             "quest_progress": len(self._completed) / max(1, quests),
+            **{
+                "var:"
+                + key: (value - self._graph.variable_specs[key]["min"])
+                / (self._graph.variable_specs[key]["max"] - self._graph.variable_specs[key]["min"])
+                for key, value in self._graph.variables.items()
+                if key in self._observed_variables
+            },
         }
 
     def step(self, action: str):
@@ -397,6 +427,8 @@ class EditorSimulationEnvironment:
                 ):
                     state["age_days"] += 1
         for row in self._entities:
+            if not self._visible(row):
+                continue
             kind, properties, identity = row["kind"], row["properties"], row["id"]
             overlapping = _overlap(self._player_rect(), self._rect(row))
             if kind == "goal" and overlapping and not self._won:
@@ -522,8 +554,50 @@ class EditorSimulationEnvironment:
                 self._score += 1
                 rewards["fishing"] += 0.1
                 events.append("fish")
+
+        def metrics():
+            return {
+                "health": self._health,
+                "money": self._money,
+                "crops": self._crops,
+                "fish": self._fish,
+                "seeds": self._seeds,
+                "score": self._score,
+                "tick": self._tick,
+            }
+
+        def mutate_metric(key, value):
+            maximum = self._player_source["properties"]["health"] if key == "health" else 1000000
+            if not 0 <= value <= maximum:
+                return False
+            setattr(self, "_" + key, value)
+            return True
+
+        def teleport(x, y):
+            self._x, self._y = x, y
+
+        def win():
+            self._won = True
+
+        def dialogue(text):
+            self._dialogue = {"rule_text": text}
+
+        emitted, cue_ids, rule_reward = self._graph.advance(
+            tick=self._tick,
+            action=action,
+            player_rect=self._player_rect(),
+            events=events,
+            metrics=metrics,
+            mutate_metric=mutate_metric,
+            collision=self._collision,
+            teleport=teleport,
+            win=win,
+            dialogue=dialogue,
+        )
+        events.extend(emitted)
+        rewards["rule"] = rule_reward
         self._last_events = events[:64]
-        self._audio = self._synthesize(events)
+        self._audio = self._synthesize(events, cue_ids)
         self._audio_total += len(self._audio) // 2
         self._actions.append(action)
         observation = self._observation()
@@ -543,12 +617,16 @@ class EditorSimulationEnvironment:
             observation,
             rewards,
             self._health <= 0 or self._won and config.get("end_on_goal", False),
-            self._tick >= self.max_steps,
+            self._tick >= self.max_steps
+            and not (self._health <= 0 or self._won and config.get("end_on_goal", False)),
             {
                 "runtime_kind": "design_scene_simulation",
                 "won": self._won,
                 "state_digest": evidence["state_digest"],
                 "events": self._last_events,
+                "rules_fired": list(self._graph.last_rule_ids),
+                "rule_actions_executed_total": self._graph.executed_actions,
+                "rule_actions_skipped_total": self._graph.skipped_actions,
                 "day": state["day"],
                 "season": state["season"],
                 "inventory": state["inventory"],
@@ -557,8 +635,10 @@ class EditorSimulationEnvironment:
             self._chain,
         )
 
-    def _synthesize(self, events):
-        cues = [cue for cue in self.document["audio"]["cues"] if cue["event"] in events][:8]
+    def _synthesize(self, events, cue_ids=()):
+        cues = [
+            cue for cue in self.document["audio"]["cues"] if cue["event"] in events or cue["id"] in cue_ids
+        ][:8]
         if not cues:
             return b""
         rate, maximum = 22050, 16384
@@ -668,7 +748,12 @@ class EditorSimulationEnvironment:
             while painted < len(layers) and layers[painted]["z"] <= depth:
                 paint_layer(layers[painted])
                 painted += 1
-            if row["id"] in self._collected or row["kind"] == "enemy" and self._enemy_health[row["id"]] <= 0:
+            if (
+                not self._visible(row)
+                or row["id"] in self._collected
+                or row["kind"] == "enemy"
+                and self._enemy_health[row["id"]] <= 0
+            ):
                 continue
             rect = self._player_rect() if row["kind"] == "player" else self._rect(row)
             x, y, rw, rh = rect
@@ -679,7 +764,9 @@ class EditorSimulationEnvironment:
                     color = bytes((100, 64, 32, 255))
                 elif crop["age_days"] >= self._growth_days(row):
                     color = bytes((240, 210, 70, 255))
-            texture = self._images.get(row["asset_id"])
+            pose = self._graph.pose(row["id"], self._tick)
+            atlas = pose["frame"]
+            texture = self._images.get(atlas["asset_id"] if atlas else row["asset_id"])
             for py in range(
                 max(0, int((y - camera_y) * ratio)), min(height, math.ceil((y + rh - camera_y) * ratio))
             ):
@@ -689,8 +776,10 @@ class EditorSimulationEnvironment:
                     actual = color
                     if texture:
                         tw, th, raw = texture
-                        sx = min(tw - 1, max(0, int((camera_x + px / ratio - x) / rw * tw)))
-                        sy = min(th - 1, max(0, int((camera_y + py / ratio - y) / rh * th)))
+                        fw, fh = (atlas["width"], atlas["height"]) if atlas else (tw, th)
+                        fx, fy = (atlas["x"], atlas["y"]) if atlas else (0, 0)
+                        sx = fx + min(fw - 1, max(0, int((camera_x + px / ratio - x) / rw * fw)))
+                        sy = fy + min(fh - 1, max(0, int((camera_y + py / ratio - y) / rh * fh)))
                         source = (sy * tw + sx) * 4
                         actual = raw[source : source + 4]
                     blend((py * width + px) * 4, actual)
@@ -722,6 +811,8 @@ class EditorSimulationEnvironment:
             "inventory": self._state()["inventory"],
             "events": self._last_events,
             "dialogue": self._dialogue,
+            "scene_graph": self._graph.state(),
+            "scene_graph_digest": self.project.scene_graph.digest,
             "controller_bindings": dict(self.document["controls"]["bindings"]),
             "audio": {
                 "format": "s16le",

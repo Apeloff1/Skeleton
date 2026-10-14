@@ -9778,7 +9778,9 @@
         "machine/ai_game_style_analysis.json",
         "machine/ai_game_successor_runtime.json",
         "machine/ai_game_desktop_export.json",
-        "machine/ai_game_studio_learning.json"
+        "machine/ai_game_studio_learning.json",
+        "machine/ai_game_studio_continuation.json",
+        "machine/ai_game_studio_review.json"
       ],
       "existing_state_authority": "CORE_DB Mongo scoped workspace",
       "scope": "Console editing/emulation/build augmentation and one/three-source original successor desktop export",

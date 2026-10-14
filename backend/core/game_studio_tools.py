@@ -89,6 +89,23 @@ def _mutation_receipt(value):
     return result
 
 
+def _authoring_summary(row, *, inventory=False):
+    if not isinstance(row, dict):
+        return row
+    result = {}
+    for key, value in row.items():
+        if key in {"cells", "tiles", "data_base64", "source_files"}:
+            result[key + "_count"] = len(value) if isinstance(value, (list, dict, str)) else None
+        elif inventory and isinstance(value, list):
+            result[key + "_count"] = len(value)
+            result[key + "_ids"] = [
+                item["id"] for item in value[:256] if isinstance(item, dict) and "id" in item
+            ]
+        else:
+            result[key] = value
+    return result
+
+
 async def execute_studio_command(scope: Mapping[str, str], command: StudioCommand) -> Any:
     """Every branch delegates scoped real owners; no user shell or authority flags."""
     if not isinstance(command, StudioCommand):
@@ -111,7 +128,7 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
             "offset": offset,
         }
     if operation == "project.inspect":
-        _only(payload, ("path",))
+        _only(payload, ("path", "offset", "limit"))
         result = _project_summary(_public(project))
         if "path" in payload:
             name = payload["path"]
@@ -122,13 +139,30 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
                 raise GameLearningError(
                     "studio_file_absent", "This file does not belong to the current project.", 404
                 )
-            if len(source["content"].encode()) > 128000:
+            offset, limit = payload.get("offset", 0), payload.get("limit", 1500)
+            if (
+                type(offset) is not int
+                or not 0 <= offset <= len(source["content"])
+                or type(limit) is not int
+                or not 1 <= limit <= 1500
+            ):
                 raise GameLearningError(
-                    "studio_file_large",
-                    "Use the bounded visual editor for this large authoring document.",
+                    "studio_file_page_invalid",
+                    "Source inspection pages contain at most1500Unicodecharacters.",
                     422,
                 )
-            result["selected_file"] = source
+            result["selected_file"] = {
+                **source,
+                "content": source["content"][offset : offset + limit],
+                "offset": offset,
+                "limit": limit,
+                "total_characters": len(source["content"]),
+                "sha256": hashlib.sha256(source["content"].encode()).hexdigest(),
+            }
+        elif "offset" in payload or "limit" in payload:
+            raise GameLearningError(
+                "studio_path_required", "Select an exact file before paging source text.", 422
+            )
         return result
     if operation == "source.inspect":
         _only(payload, ("source_id",), required=("source_id",))
@@ -140,46 +174,88 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
             raise GameLearningError("studio_source_absent", "Source does not belong to this project.", 404)
         source_binding = await workspace._input(scope, project, source_id=identifier, require_execution=False)
         await workspace._authority(scope, source_binding)
-        return {
+        projection = {
             key: source[key]
             for key in (
                 "source_id",
                 "kind",
-                "digest",
+                "source_digest",
+                "authority_epoch",
+                "state",
                 "filename",
                 "metadata",
-                "provenance",
-                "status",
-                "bundle_digest",
                 "version",
             )
             if key in source
         }
+        bundle = workspace._source_bundle(scope, source).to_dict()
+        projection["bundle_digest"] = bundle["bundle_digest"]
+        projection["provenance"] = bundle["provenance"]
+        return projection
     if operation.startswith("console."):
         from core import game_console_studio as console
 
         if operation == "console.inspect":
-            _only(payload, ("section",))
+            _only(payload, ("section", "record_id", "field", "offset", "limit"))
             result = await console.document(scope, command.project_id)
             document = result["document"]
             section = payload.get("section")
-            if section is not None and (not isinstance(section, str) or section not in document):
+            graph = result.get("scene_graph", {})
+            sections = {**document, "scene_graph": graph}
+            sections.update({"scene_graph." + key: value for key, value in graph.items()})
+            if section is not None and (not isinstance(section, str) or section not in sections):
                 raise GameLearningError(
                     "studio_section_unknown", "Select a current console authoring section.", 422
+                )
+            offset, limit = _page({key: payload[key] for key in ("offset", "limit") if key in payload})
+            selected = None
+            if section is not None:
+                selected = sections[section]
+                if "record_id" in payload:
+                    identifier = _id(payload, "record_id")
+                    selected = (
+                        next(
+                            (
+                                row
+                                for row in selected
+                                if isinstance(row, dict) and row.get("id") == identifier
+                            ),
+                            None,
+                        )
+                        if isinstance(selected, list)
+                        else None
+                    )
+                    if selected is None:
+                        raise GameLearningError(
+                            "studio_record_absent", "Select an exact record in the requested section.", 404
+                        )
+                if "field" in payload:
+                    field = payload["field"]
+                    if not isinstance(field, str) or not isinstance(selected, dict) or field not in selected:
+                        raise GameLearningError(
+                            "studio_field_absent", "Select an existing field in this authoring record.", 422
+                        )
+                    selected = selected[field]
+                if isinstance(selected, list):
+                    selected = {
+                        "rows": [_authoring_summary(row) for row in selected[offset : offset + limit]],
+                        "total": len(selected),
+                        "offset": offset,
+                        "limit": limit,
+                    }
+                else:
+                    selected = _authoring_summary(selected)
+            elif "record_id" in payload or "field" in payload:
+                raise GameLearningError(
+                    "studio_section_required", "Choose a section before selecting its records.", 422
                 )
             return {
                 "project": _project_summary(result["project"]),
                 "profile": result["profile"],
                 "manifest_digest": result["manifest_digest"],
-                "document": (
-                    {section: document[section]}
-                    if section
-                    else {
-                        key: value
-                        for key, value in document.items()
-                        if key not in {"tiles", "maps", "source_files"}
-                    }
-                ),
+                "sections": list(sections),
+                "document": {section: selected} if section else _authoring_summary(document, inventory=True),
+                "scene_graph": _authoring_summary(graph, inventory=True) if section is None else None,
             }
         if operation == "console.handoff":
             _only(payload, ())
@@ -215,10 +291,14 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
         if operation == "job.inspect":
             _only(payload, (field,), required=(field,))
             result = await workspace.get_job(scope, identifier)
+            issued = await workspace.jobs.find_one({"_id": identifier, **scope})
+            if issued is None:
+                raise GameLearningError("studio_job_absent", "This job is unavailable.", 404)
+            await workspace._authority(scope, issued["input"])
         else:
-            from routes.game_learning import PlayInput, PlayControl, _play
+            from routes.game_learning import PlayInput, PlayControl, _plays
 
-            owner = _play()
+            owner = _plays()
             result = await owner.get(scope, identifier)
             if result.get("project_id") != command.project_id:
                 raise GameLearningError(
@@ -239,18 +319,37 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
             )
         return _mutation_receipt(result)
     if operation == "play.start":
-        from routes.game_learning import PlayRequest, _play
+        from routes.game_learning import PlayRequest, _plays
 
         return _mutation_receipt(
-            await _play().create(scope, command.project_id, _model(PlayRequest, payload))
+            await _plays().create(scope, command.project_id, _model(PlayRequest, payload))
         )
+    if operation.startswith("artifact."):
+        from core import game_console_build as builds
+        from routes.game_console_build import ArtifactAdmission, ArtifactPlay, ArtifactTrain
+
+        artifact_id = _id(payload, "artifact_id")
+        body = {key: value for key, value in payload.items() if key != "artifact_id"}
+        if operation == "artifact.inspect":
+            _only(body, ())
+            return await builds.artifact_playback(scope, command.project_id, artifact_id)
+        model, handler = {
+            "artifact.admit": (ArtifactAdmission, builds.admit_artifact_source),
+            "artifact.train": (ArtifactTrain, builds.start_artifact_training),
+            "artifact.play": (ArtifactPlay, builds.start_artifact_play),
+        }[operation]
+        result = await handler(scope, command.project_id, artifact_id, _model(model, body))
+        if isinstance(result, dict) and "play" in result:
+            result = {**result, "play": _mutation_receipt(result["play"])}
+        return result
     if operation == "simulate":
         from routes.game_learning import SimulationRequest
 
-        return _mutation_receipt(
-            await workspace.simulate(scope, command.project_id, _model(SimulationRequest, payload))
+        project, receipt = await workspace.simulate(
+            scope, command.project_id, _model(SimulationRequest, payload)
         )
-    if operation in {"build", "train", "successor.synthesize", "desktop.build"}:
+        return {"project": _project_summary(project), "result": _mutation_receipt(receipt)}
+    if operation in {"build", "train", "successor.synthesize", "desktop.build", "project.review"}:
         if operation == "build":
             from routes.game_console_build import ConsoleBuildBody as model
 
@@ -263,10 +362,14 @@ async def execute_studio_command(scope: Mapping[str, str], command: StudioComman
             from routes.game_successor import SynthesisRequest as model
 
             kind = "successor"
-        else:
+        elif operation == "desktop.build":
             from routes.game_successor import DesktopRequest as model
 
             kind = "desktop"
+        else:
+            from routes.game_studio_review import StudioReviewBody as model
+
+            kind = "review"
         body = _model(model, payload)
         return await workspace.start_job(scope, command.project_id, kind, body)
     if operation == "successor.compare":
@@ -294,6 +397,178 @@ def studio_agent_user_id(scope: Mapping[str, str]) -> str:
 
     admitted = workspace._scope(scope["tenant_id"], scope["owner_id"])
     return "studio-user-" + _digest(admitted)[:48]
+
+
+def studio_application_schemas() -> dict[str, Any]:
+    """Discover exact application request shapes without delegating authority."""
+    from routes.game_console_build import ConsoleBuildBody, ArtifactAdmission, ArtifactPlay, ArtifactTrain
+    from routes.game_console_studio import EditConsoleProject
+    from routes.game_learning import SimulationRequest, TrainRequest
+    from routes.game_studio_learning import CampaignCreate, CampaignControl
+    from routes.game_studio_review import StudioReviewBody
+    from routes.game_successor import CompareRequest, DesktopRequest, SynthesisRequest, WorldRequest
+
+    models = {
+        "console.edit": EditConsoleProject,
+        "world.edit": WorldRequest,
+        "simulate": SimulationRequest,
+        "train": TrainRequest,
+        "build": ConsoleBuildBody,
+        "project.review": StudioReviewBody,
+        "desktop.build": DesktopRequest,
+        "successor.synthesize": SynthesisRequest,
+        "successor.compare": CompareRequest,
+        "campaign.create": CampaignCreate,
+        "artifact.admit": ArtifactAdmission,
+        "artifact.play": ArtifactPlay,
+        "artifact.train": ArtifactTrain,
+    }
+    shapes = {name: model.model_json_schema() for name, model in models.items()}
+    for name in ("artifact.admit", "artifact.play", "artifact.train"):
+        shapes[name]["properties"]["artifact_id"] = {"type": "string", "maxLength": 128}
+        shapes[name].setdefault("required", []).append("artifact_id")
+    shapes["artifact.inspect"] = {
+        "required": ["artifact_id"],
+        "properties": {"artifact_id": {"type": "string", "maxLength": 128}},
+    }
+    # This discovery projection describes real owner operations; the editor
+    # still validates all nested hardware/scene invariants before committing.
+    fields = {
+        "set_tile": ["tileset_id", "tile_index", "pixels"],
+        "paint_tile": ["tileset_id", "tile_index", "x", "y", "color"],
+        "set_palette": ["palette_id", "colors"],
+        "set_map_cell": ["layer_id", "x", "y", "cell"],
+        "fill_map": ["layer_id", "x", "y", "width", "height", "cell"],
+        "upsert_palette": ["palette"],
+        "upsert_tileset": ["tileset"],
+        "upsert_layer": ["layer"],
+        "upsert_entity": ["entity"],
+        "transform_tile": ["tileset_id", "tile_index", "flip_x", "flip_y", "quarter_turns"],
+        "set_controls": ["controls"],
+        "set_audio": ["audio"],
+        "set_config": ["config"],
+        "put_asset": ["asset"],
+        "transform_asset": ["id", "flip_x", "flip_y", "quarter_turns"],
+        "image_to_tiles": ["asset_id", "tileset_id", "palette_id", "bank"],
+        "bind_native_starter": [],
+        "unbind_native_starter": [],
+        "materialize_assets": [],
+        "replace_source": ["path", "content"],
+        "set_scene_graph": ["graph"],
+        "upsert_graph_node": ["node"],
+        "upsert_animation": ["animation"],
+        "upsert_rule": ["rule"],
+        "upsert_variable": ["variable"],
+    }
+    for op in (
+        "remove_layer",
+        "remove_entity",
+        "delete_asset",
+        "remove_palette",
+        "remove_tileset",
+        "remove_graph_node",
+        "remove_animation",
+        "remove_rule",
+        "remove_variable",
+    ):
+        fields[op] = ["id"]
+    shapes["console.edit"]["x-owner-edit-fields"] = {op: ["op", *keys] for op, keys in fields.items()}
+    shapes["console.edit"]["x-invariants"] = (
+        "Inspect existing exact section/record first. Upserts/settings use the complete validated record, "
+        "not a partial patch. Native graph execution requires an explicit source port."
+    )
+    shapes["console.edit"]["x-graph-record-examples"] = {
+        "node": {
+            "id": "node1",
+            "parent_id": None,
+            "entity_id": None,
+            "x": 0,
+            "y": 0,
+            "visible": True,
+            "frames": [],
+        },
+        "atlas_frame": {"asset_id": "existing_image_id", "x": 0, "y": 0, "width": 8, "height": 8},
+        "animation": {
+            "id": "anim1",
+            "node_id": "node1",
+            "property": "x",
+            "duration_ticks": 120,
+            "loop": True,
+            "interpolation": "linear",
+            "keyframes": [{"tick": 0, "value": 0}, {"tick": 120, "value": 16}],
+        },
+        "variable": {"id": "visits", "initial": 0, "min": 0, "max": 1000},
+        "rule": {
+            "id": "visit",
+            "trigger": {"kind": "region_enter", "x": 32, "y": 32, "width": 16, "height": 16},
+            "conditions": [],
+            "actions": [{"kind": "add_variable", "variable_id": "visits", "value": 1}],
+            "cooldown_ticks": 60,
+            "once": False,
+            "enabled": True,
+        },
+        "action_fields": {
+            "set_variable": ["variable_id", "value"],
+            "add_variable": ["variable_id", "value"],
+            "set_metric": ["metric", "value"],
+            "add_metric": ["metric", "value"],
+            "trade": ["cost", "resource", "amount"],
+            "set_node_visibility": ["node_id", "visible"],
+            "set_node_offset": ["node_id", "x", "y"],
+            "emit_event": ["event"],
+            "play_audio": ["cue_id"],
+            "dialogue": ["text"],
+            "teleport": ["x", "y"],
+            "win": [],
+            "reward": ["value"],
+        },
+    }
+    for name in ("campaign.pulse", "campaign.pause", "campaign.resume", "campaign.cancel"):
+        shapes[name] = CampaignControl.model_json_schema()
+        shapes[name]["properties"]["campaign_id"] = {"type": "string", "maxLength": 128}
+    shapes.update(
+        {
+            "project.inspect": {
+                "properties": {
+                    "path": {"type": "string", "maxLength": 256},
+                    "offset": {"type": "integer", "minimum": 0},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 1500},
+                },
+                "description": "Read exact owned source in1500-character Unicode pages; includes full original source SHA.",
+            },
+            "console.inspect": {
+                "properties": {
+                    "section": {"type": "string"},
+                    "record_id": {"type": "string"},
+                    "field": {"type": "string"},
+                    "offset": {"type": "integer", "minimum": 0},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 32},
+                },
+                "description": "No section returns bounded IDs/counts. Select exact sections or scene_graph.nodes/animations/rules/variables; record_id selects one record, field pages cells/tiles/frames.",
+            },
+            "console.handoff": {"properties": {}},
+            "job.inspect": {"required": ["job_id"], "properties": {"job_id": {"type": "string"}}},
+            "source.inspect": {"required": ["source_id"], "properties": {"source_id": {"type": "string"}}},
+            "successor.inspect": {
+                "required": ["candidate_id"],
+                "properties": {"candidate_id": {"type": "string"}},
+            },
+            "campaign.inspect": {
+                "required": ["campaign_id"],
+                "properties": {"campaign_id": {"type": "string"}},
+            },
+            "campaign.rounds": {
+                "required": ["campaign_id"],
+                "properties": {
+                    "campaign_id": {"type": "string"},
+                    "after": {"type": "integer"},
+                    "limit": {"type": "integer"},
+                },
+            },
+            "lessons.search": {"properties": {"q": {"type": "string"}, "limit": {"type": "integer"}}},
+        }
+    )
+    return shapes
 
 
 def register_application_studio_tools(

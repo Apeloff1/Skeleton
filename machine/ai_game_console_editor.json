@@ -6,7 +6,8 @@
     "assets": "skeleton/jeeves/game_console_assets.py",
     "simulation": "skeleton/jeeves/game_console_simulation.py",
     "catalog": "skeleton/ai/webcrawler/dragon_native_targets.py",
-    "durable_authority": "Existing backend governed game workspace/project file manifest and CAS revision"
+    "durable_authority": "Existing backend governed game workspace/project file manifest and CAS revision",
+    "graph": "skeleton/jeeves/game_console_graph.py"
   },
   "mirrors": "Exact bytes under skeleton/ai/agents/jeeves",
   "scope": "Original editable game projects for every canonical Dragon console/PC target, bounded real native asset codecs, target-aware validation, exact source/build handoff and explicit deterministic design-scene simulation",
@@ -69,7 +70,16 @@
     "materialize_assets",
     "bind_native_starter",
     "unbind_native_starter",
-    "image_to_tiles"
+    "image_to_tiles",
+    "set_scene_graph",
+    "upsert_graph_node",
+    "remove_graph_node",
+    "upsert_animation",
+    "remove_animation",
+    "upsert_rule",
+    "remove_rule",
+    "upsert_variable",
+    "remove_variable"
   ],
   "interfaces": {
     "catalog": "console_editor_catalog, console_profile",
@@ -90,16 +100,18 @@
     "factory": "native_starter_source_files(project), ConsoleProject.native_starter_source_files()",
     "scope": "Actual bounded NROM/RGBDS source consumes authored pattern/palette/map/collision data, directional input, native sprite positions and goal marker; fixed installed build adapters remain compilation authority",
     "edits": "Explicit bind_native_starter installs trusted kernel plus generated assets.inc; typed art edits refresh only bound data while preserving manual source. Modified kernels lose automatic source-binding assertion. Unbind is explicit.",
-    "limits": "One physical viewport-sized8px tile scene, bounded sprite/tile capacity, no scrolling/mapper/licensedSDK fabrication",
+    "limits": "NES one physical viewport; DMG GameBoy one bounded32x32 tile world with actual SCX/SCY follow camera and shadow OAM DMA, maximum40 sprites/hardware10 per scanline; no mapper or larger world streaming",
     "deferred": [
       "native farming/fishing/NPC quest rules",
       "native hardware music/APU",
       "large multi-screen world streaming",
-      "automatic arbitrary source integration"
+      "automatic arbitrary source integration",
+      "scene graph animation/event/economy mechanics in native ROM"
     ],
     "binary_build_verified": false,
     "native_execution_verified": false,
-    "implementation_status": "Sourceimplemented; actual build/play proof remains canonical toolchain/execution receipts"
+    "implementation_status": "Sourceimplemented; actual build/play proof remains canonical toolchain/execution receipts",
+    "scrolling_candidate": "Actual fixed RGBDS source uses bounded256x256 DMG background tile map, world-space collision and camera, copied HRAM DMA routine for atomic160byte shadow OAM transfer. Source availability does not establish successful build/play."
   },
   "productive_work": {
     "canonical_editor_profiles": 169,
@@ -107,6 +119,48 @@
     "native_starter_originals": "/workspace/scratch/console-editor-native-bound",
     "actual_build_owner_report": "NES andDMG starters compiled through fixedca65/ld65 andRGBDS and executed150actual FCEUmm/Gambatte steps each by root operator; receipts in /workspace/scratch/console-editor-compiled",
     "design_play": "Original Meadow Workshop131fixedsteps, actualcrop harvest2/fish2; actualPNG and source/transition hashes in /workspace/scratch/console-editor-original-authoring/meadow-play",
-    "automated_tests_written_or_run": false
+    "automated_tests_written_or_run": false,
+    "graph_play": "Original authored Meadow graph120ticks plus exactsnapshot reopen/continuedtick: composedhierarchy+actualsprite atlas/timeline, seed trade12money->9 and3seeds->5, visitvariable6 includingnext-tick customevent+regionedge,16actualruleactions; actualPNG/state/transition artifacts /workspace/scratch/console-editor-graph-authoring, no automated tests",
+    "scrolling_dmg_play": "Original32x32 DMG editor scene compiled32768byte actualRGBDS cartridge then271actualGambatte runs, actualscrollednativePNG/code/content receipts /workspace/scratch/console-editor-scrolling-authoring; no full commercialcompatibility claim"
+  },
+  "scene_graph": {
+    "document": "game/editor/graph.json",
+    "schema_version": "skeleton.console_scene_graph.v1",
+    "scope": "Optional exact-manifest-bound authored hierarchy, sprite atlas timeline, finite variables and nonrecursive typed event/region/input/tick rule graph, executed by existing design scene simulation. Native ROM kernel excludes graph mechanics unless explicit fixed source integration proves them.",
+    "bounds": {
+      "json_bytes": 524288,
+      "nodes": 256,
+      "hierarchy_depth": 32,
+      "animations": 128,
+      "keyframes_per_animation": 128,
+      "variables": 32,
+      "rules": 64,
+      "conditions_per_rule": 8,
+      "actions_per_rule": 16,
+      "rule_fires_per_tick": 64,
+      "rule_actions_per_tick": 1024,
+      "pending_named_events": 1024,
+      "observed_variables": 18,
+      "variable_id_characters": 60
+    },
+    "runtime": "Fixed60Hz exact tick animation; translations affect actual entity collision and raster geometry. Rules read immutable trigger event snapshot, so emitted events cannot recursively dispatch more rules within one tick. Current variable/economy/visibility state and fired rule identities bind replay/transition digests. Emitted custom events deduplicate into at most1024 next-tick names; event cycles are explicit in inspection and remain bounded by64rules/cooldown/episode steps, with no recursive same-tick dispatch. Rule property overrides take precedence over timeline channels until reset. Moving platforms block according to animated geometry but do not carry a standing player. Policy observations expose14 existing scene features plus first18 lexicallyordered graphvariable IDs; remaining variables remain fullreplay state but are explicitly partiallyobserved, preserving existing32feature learner cap.",
+    "actions": [
+      "set_variable",
+      "add_variable",
+      "set_metric",
+      "add_metric",
+      "trade",
+      "set_node_visibility",
+      "set_node_offset",
+      "emit_event",
+      "play_audio",
+      "dialogue",
+      "teleport",
+      "win",
+      "reward"
+    ],
+    "state_authority": "Same existing project file manifest/CAS and bounded replay snapshot, no new persistence owner",
+    "metrics_scope": "Measured structure/reference/cycle/economy limits and actual rule fire/action counters, not hardware behavior or game quality",
+    "verification": "Source static checks and productive original authoring/play only; no automated tests per user."
   }
 }

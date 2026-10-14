@@ -39,6 +39,12 @@ from .game_console_assets import (
     transform_rgba,
     transform_tim,
 )
+from .game_console_graph import (
+    GRAPH_PATH,
+    ConsoleSceneGraph,
+    SceneGraphError,
+    empty_scene_graph,
+)
 
 PROJECT_SCHEMA = "skeleton.console_editor_project.v1"
 PROJECT_PATH = "game/editor/console.json"
@@ -944,6 +950,17 @@ class ConsoleProject:
         normalized = _document(document)
         self._document_json = _json(normalized).decode()
         self._files = MappingProxyType(_files(files or {}))
+        try:
+            self._scene_graph = ConsoleSceneGraph(
+                (
+                    _load(self._files[GRAPH_PATH])
+                    if GRAPH_PATH in self._files
+                    else empty_scene_graph(normalized["project_id"])
+                ),
+                normalized,
+            )
+        except SceneGraphError as exc:
+            raise ConsoleEditorError(exc.code, str(exc), exc.status_code) from exc
 
     @classmethod
     def from_files(cls, files: Mapping[str, str], *, target_id: str | None = None) -> ConsoleProject:
@@ -957,6 +974,10 @@ class ConsoleProject:
         if target_id is not None and _target_id(target_id) != project.target_id:
             raise ConsoleEditorError("editor_target_conflict", "Requested console and editor document differ")
         return project
+
+    @property
+    def scene_graph(self) -> ConsoleSceneGraph:
+        return self._scene_graph
 
     @property
     def target_id(self) -> str:
@@ -1216,6 +1237,7 @@ class ConsoleEditResult:
             "files": dict(self.files),
             "manifest_digest": self.manifest_digest,
             "document": self.project.as_dict(),
+            "scene_graph": self.project.scene_graph.as_dict(),
             "changes": list(self.changes),
             "validation": self.validation.as_dict(),
         }
@@ -1240,6 +1262,7 @@ def apply_console_edits(
         )
     project = ConsoleProject.from_files(source_files, target_id=target_id)
     document = project.as_dict()
+    graph = project.scene_graph.as_dict()
     if project_id is not None and document["project_id"] != project_id:
         raise ConsoleEditorError(
             "editor_identity_conflict", "Project ID differs from the committed editor document", 409
@@ -1271,7 +1294,40 @@ def apply_console_edits(
                 raise ConsoleEditorError("editor_reference_missing", "Typed edit refers to an absent record")
             return row
 
-        if op in {"set_tile", "paint_tile"}:
+        if op == "set_scene_graph":
+            if set(edit) != {"op", "graph"} or not isinstance(edit["graph"], Mapping):
+                raise ConsoleEditorError("editor_edit_invalid", "Scene graph edit fields differ")
+            graph = json.loads(_json(edit["graph"], 512 * 1024))
+            source_files[GRAPH_PATH] = _json(graph).decode() + "\n"
+        elif op in {"upsert_graph_node", "upsert_animation", "upsert_rule", "upsert_variable"}:
+            key, group = {
+                "upsert_graph_node": ("node", "nodes"),
+                "upsert_animation": ("animation", "animations"),
+                "upsert_rule": ("rule", "rules"),
+                "upsert_variable": ("variable", "variables"),
+            }[op]
+            if set(edit) != {"op", key} or not isinstance(edit[key], Mapping):
+                raise ConsoleEditorError("editor_edit_invalid", "Graph record edit fields differ")
+            row = json.loads(_json(edit[key]))
+            _id(row.get("id"))
+            graph[group] = [item for item in graph[group] if item["id"] != row["id"]] + [row]
+            source_files[GRAPH_PATH] = _json(graph).decode() + "\n"
+        elif op in {"remove_graph_node", "remove_animation", "remove_rule", "remove_variable"}:
+            if set(edit) != {"op", "id"}:
+                raise ConsoleEditorError("editor_edit_invalid", "Graph removal fields differ")
+            group = {
+                "remove_graph_node": "nodes",
+                "remove_animation": "animations",
+                "remove_rule": "rules",
+                "remove_variable": "variables",
+            }[op]
+            if not any(row["id"] == edit["id"] for row in graph[group]):
+                raise ConsoleEditorError(
+                    "editor_reference_missing", "Graph removal refers to an absent record"
+                )
+            graph[group] = [row for row in graph[group] if row["id"] != edit["id"]]
+            source_files[GRAPH_PATH] = _json(graph).decode() + "\n"
+        elif op in {"set_tile", "paint_tile"}:
             row = find("tilesets", edit.get("tileset_id"))
             index = _int(edit.get("tile_index"), 0, len(row["tiles"]) - 1, "tile index")
             if op == "set_tile":
@@ -1472,7 +1528,7 @@ def apply_console_edits(
             generated = candidate.native_source_files()
             source_files.update(generated)
         elif op == "replace_source":
-            if set(edit) != {"op", "path", "content"} or edit["path"] == PROJECT_PATH:
+            if set(edit) != {"op", "path", "content"} or edit["path"] in {PROJECT_PATH, GRAPH_PATH}:
                 raise ConsoleEditorError(
                     "editor_edit_invalid", "Source edit must preserve typed editor document authority"
                 )
@@ -1805,7 +1861,7 @@ def _starter_plan(project: ConsoleProject) -> dict:
         raise ConsoleEditorError(
             "editor_native_starter_mode", "Native starter supports the declared bounded topdown control model"
         )
-    width, height = (32, 30) if target == "nes" else (20, 18)
+    width, height = (32, 30) if target == "nes" else (32, 32)
     visible = [layer for layer in document["layers"] if layer["visible"]]
     if len(visible) != 1 or len(document["layers"]) != 1:
         raise ConsoleEditorError(
@@ -1816,7 +1872,7 @@ def _starter_plan(project: ConsoleProject) -> dict:
     if layer["width"] > width or layer["height"] > height or layer["offset"] != [0.0, 0.0]:
         raise ConsoleEditorError(
             "editor_native_starter_map",
-            "Native starter requires one physical viewport-sized map withzero origin; largeworld streaming remains explicit source integration",
+            "Native starter requires one bounded hardware tile map withzero origin; largerworld streaming remains explicit source integration",
         )
     if any(
         row["width"] != 8
@@ -1824,8 +1880,8 @@ def _starter_plan(project: ConsoleProject) -> dict:
         or type(row["x"]) not in (int, float)
         or row["x"] != int(row["x"])
         or row["y"] != int(row["y"])
-        or not 0 <= row["x"] <= width * 8 - 8
-        or not 0 <= row["y"] <= height * 8 - 8
+        or not 0 <= row["x"] <= layer["width"] * 8 - 8
+        or not 0 <= row["y"] <= layer["height"] * 8 - 8
         for row in document["entities"]
     ):
         raise ConsoleEditorError(
@@ -1957,9 +2013,13 @@ def _starter_plan(project: ConsoleProject) -> dict:
         "health": next(
             row["properties"]["health"] for row in document["entities"] if row["kind"] == "player"
         ),
-        "max_x": width * 8 - 8,
-        "max_y": height * 8 - 8,
-        "deferred": ["farming", "fishing", "NPCquests", "hardwaremusic", "scrolling"],
+        "max_x": layer["width"] * 8 - 8,
+        "max_y": layer["height"] * 8 - 8,
+        "max_camera_x": max(0, layer["width"] * 8 - 160),
+        "max_camera_y": max(0, layer["height"] * 8 - 144),
+        "camera_follow": document["config"]["camera_follow"],
+        "deferred": ["farming", "fishing", "NPCquests", "hardwaremusic", "scene_graph"]
+        + (["scrolling"] if target == "nes" else ["larger_than_32x32_map_streaming"]),
         "projection_digest": _digest(projection),
     }
 
@@ -2349,9 +2409,16 @@ Start:
  ld de,NameTable
  ld bc,1024
  call Copy
- ld hl,$FE00
- ld de,SpritePositions
- ld bc,ACTOR_BYTES
+ ld hl,ShadowOAM
+ ld b,160
+ xor a
+.clearShadow:
+ ld [hli],a
+ dec b
+ jr nz,.clearShadow
+ ld hl,$FF80
+ ld de,DmaRoutine
+ ld bc,DmaRoutineEnd-DmaRoutine
  call Copy
  ld a,INIT_X
  ld [PlayerX],a
@@ -2362,13 +2429,16 @@ Start:
  xor a
  ld [Won],a
  ld [DamageTimer],a
+ ld [CameraX],a
+ ld [CameraY],a
  ld a,BGP_VALUE
  ldh [rBGP],a
  ldh [rOBP0],a
+ call BuildSprites
+ call UploadFrame
  ld a,$93
  ldh [rLCDC],a
 .loop:
- call WaitFrame
  call PollPad
  ld a,[Health]
  and a
@@ -2376,7 +2446,9 @@ Start:
  call Movement
  call CheckGoal
 .frozen:
- call Sprites
+ call BuildSprites
+ call WaitFrame
+ call UploadFrame
  jr .loop
 Copy:
  ld a,[de]
@@ -2578,13 +2650,91 @@ CheckGoal:
  ld a,30
  ld [DamageTimer],a
  ret
-Sprites:
- ld a,[PlayerY]
- add 16
- ld [$FE00+PLAYER_OAM],a
+; Prepare sprites in ordinary WRAM during visible scanlines. Only the
+; copied HRAM DMA routine touches native OAM during vblank.
+BuildSprites:
+ ld a,CAMERA_FOLLOW
+ and a
+ jr z,.cameraDone
  ld a,[PlayerX]
+ sub 80
+ jr nc,.positiveX
+ xor a
+.positiveX:
+ cp MAX_CAMERA_X+1
+ jr c,.storeX
+ ld a,MAX_CAMERA_X
+.storeX:
+ ld [CameraX],a
+ ld a,[PlayerY]
+ sub 72
+ jr nc,.positiveY
+ xor a
+.positiveY:
+ cp MAX_CAMERA_Y+1
+ jr c,.storeY
+ ld a,MAX_CAMERA_Y
+.storeY:
+ ld [CameraY],a
+.cameraDone:
+ ld hl,ShadowOAM
+ ld de,SpritePositions
+ ld b,ACTOR_COUNT
+.actor:
+ ld a,[de]
+ inc de
+ ld [SpriteY],a
+ ld a,[de]
+ inc de
+ ld [SpriteX],a
+ ld a,l
+ cp PLAYER_OAM
+ jr nz,.static
+ ld a,[PlayerY]
+ ld [SpriteY],a
+ ld a,[PlayerX]
+ ld [SpriteX],a
+.static:
+ ld a,[CameraY]
+ ld c,a
+ ld a,[SpriteY]
+ sub c
+ jr c,.hidden
+ cp 144
+ jr nc,.hidden
+ add 16
+ ld [hl],a
+ ld a,[CameraX]
+ ld c,a
+ ld a,[SpriteX]
+ sub c
+ jr c,.hidden
+ cp 160
+ jr nc,.hidden
  add 8
- ld [$FE01+PLAYER_OAM],a
+ inc hl
+ ld [hli],a
+ jr .art
+.hidden:
+ xor a
+ ld [hli],a
+ ld [hli],a
+.art:
+ ld a,[de]
+ inc de
+ ld [hli],a
+ ld a,[de]
+ inc de
+ ld [hli],a
+ dec b
+ jr nz,.actor
+ ret
+UploadFrame:
+ ld a,[CameraX]
+ ldh [rSCX],a
+ ld a,[CameraY]
+ ldh [rSCY],a
+ call $FF80
  ld a,[Won]
  and a
  ld a,BGP_VALUE
@@ -2593,6 +2743,16 @@ Sprites:
 .palette:
  ldh [rOBP0],a
  ret
+DmaRoutine:
+ ld a,HIGH(ShadowOAM)
+ ldh [$FF46],a
+ ld a,40
+.wait:
+ dec a
+ jr nz,.wait
+ ret
+DmaRoutineEnd:
+
 INCLUDE "assets.inc"
 SECTION "Variables",WRAM0
 PlayerX: ds 1
@@ -2603,6 +2763,12 @@ Buttons: ds 1
 Won: ds 1
 Health: ds 1
 DamageTimer: ds 1
+CameraX: ds 1
+CameraY: ds 1
+SpriteX: ds 1
+SpriteY: ds 1
+SECTION "Shadow OAM",WRAM0,ALIGN[8]
+ShadowOAM: ds 160
 """
 
 
@@ -2624,13 +2790,17 @@ def native_starter_source_files(project: ConsoleProject) -> dict[str, str]:
         "STEP": plan["speed"],
         "PLAYER_OAM": player_index * 4,
         "ACTOR_BYTES": len(plan["actors"]) * 4,
+        "ACTOR_COUNT": len(plan["actors"]),
+        "MAX_CAMERA_X": plan["max_camera_x"],
+        "MAX_CAMERA_Y": plan["max_camera_y"],
+        "CAMERA_FOLLOW": int(plan["camera_follow"]),
     }
     positions = bytearray()
     for row in plan["actors"]:
         if target == "nes":
             positions.extend(((row["y"] - 1) & 255, row["tile"], 0, row["x"]))
         else:
-            positions.extend((row["y"] + 16, row["x"] + 8, row["tile"] + plan["sprite_offset"], 0))
+            positions.extend((row["y"], row["x"], row["tile"] + plan["sprite_offset"], 0))
     kernel = _nes_starter_kernel() if target == "nes" else _gb_starter_kernel()
     lines = ["; Generated original editordata. SHA256 " + project.digest]
     lines.extend(
@@ -2694,7 +2864,11 @@ SEGMENTS {
         "assets_path": prefix + "assets.inc",
         "assets_sha256": hashlib.sha256(result[prefix + "assets.inc"].encode()).hexdigest(),
         "profile_digest": project.as_dict()["profile_digest"],
-        "scope": "bounded_native_tile_scene_movement_collision_goal",
+        "scope": (
+            "bounded_native_32x32_world_movement_collision_goal_scroll_dma"
+            if target == "game_boy"
+            else "bounded_native_tile_scene_movement_collision_goal"
+        ),
         "deferred_mechanics": plan["deferred"],
         "movement_quantization": {
             "requested_pixels_per_nominal_second": project.as_dict()["config"]["speed"],
@@ -2743,15 +2917,23 @@ def _native_binding_status(project: ConsoleProject) -> dict:
             "message": str(exc),
             "source_integration_required": True,
         }
+    graph_active = any(
+        project.scene_graph.as_dict()[key] for key in ("nodes", "animations", "rules", "variables")
+    )
     valid = (
-        binding["document_digest"] == project.digest
+        not graph_active
+        and binding["document_digest"] == project.digest
         and binding["profile_digest"] == project.as_dict()["profile_digest"]
         and all(project._files.get(name) == text for name, text in expected.items())
     )
     return {
         **binding,
         "bound": valid,
-        "code": "source_data_bound" if valid else "source_modified_or_stale",
+        "code": (
+            "scene_graph_requires_native_source_port"
+            if graph_active
+            else "source_data_bound" if valid else "source_modified_or_stale"
+        ),
         "source_integration_required": not valid,
         "binary_build_verified": False,
         "native_execution_verified": False,
@@ -2779,7 +2961,8 @@ def inspect_console_project(
     entities = Counter(row["kind"] for row in document["entities"])
     source_bytes = sum(len(text.encode()) for text in files.values())
     asset_bytes = sum(len(base64.b64decode(row["data_base64"], validate=True)) for row in document["assets"])
-    checks = [
+    checks = [{"id": "scene_graph", "status": "pass", "metrics": project.scene_graph.inspect()}]
+    checks += [
         {
             "id": "typed_document",
             "status": "pass",
@@ -2841,6 +3024,7 @@ def inspect_console_project(
     }
     if (
         include_reachability
+        and not any(project.scene_graph.as_dict()[key] for key in ("nodes", "animations", "rules"))
         and document["config"]["movement_mode"] == "top_down"
         and len(document["layers"]) == 1
         and document["layers"][0]["offset"] == [0.0, 0.0]
@@ -2926,6 +3110,7 @@ def inspect_console_project(
             "entities": dict(entities),
             "reachable_cells": navigation.get("reachable_cells"),
             "goal_reachability": navigation.get("goal_reachability"),
+            "scene_graph": project.scene_graph.inspect(),
         },
         "validation": project.validate().as_dict(),
         "hardware_emulation": False,
