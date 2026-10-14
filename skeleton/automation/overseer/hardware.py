@@ -87,6 +87,8 @@ class HardwareState:
     battery_charging: Optional[bool]
     io_wait: float            # 0..1
     read_at: float = field(default_factory=time.time)
+    # Never let platform fallbacks masquerade as measured available RAM.
+    memory_sample_verified: bool = False
 
     def thermal_max(self) -> float:
         return max(self.temps_celsius) if self.temps_celsius else 0.0
@@ -95,6 +97,7 @@ class HardwareState:
         return {
             "cpu_load": round(self.cpu_load, 3),
             "memory_pressure": round(self.memory_pressure, 3),
+            "memory_sample_verified": self.memory_sample_verified,
             "swap_pressure": round(self.swap_pressure, 3),
             "thermal_max_c": round(self.thermal_max(), 1),
             "battery_level": self.battery_level,
@@ -174,7 +177,7 @@ class HardwareProbe:
 
     def read_state(self) -> HardwareState:
         cpu_load, per_core, io_wait = self._cpu_load()
-        mem_used, mem_avail, mem_pressure, swap_pressure = self._memory_state()
+        mem_used, mem_avail, mem_pressure, swap_pressure, memory_verified = self._memory_state()
         temps = self._temps()
         batt_level, batt_charging = self._battery_state()
 
@@ -189,6 +192,7 @@ class HardwareProbe:
             battery_level=batt_level,
             battery_charging=batt_charging,
             io_wait=io_wait,
+            memory_sample_verified=memory_verified,
         )
         self._prev_state = state
         return state
@@ -243,7 +247,7 @@ class HardwareProbe:
             pass
         return 4096  # conservative default
 
-    def _memory_state(self) -> Tuple[int, int, float, float]:
+    def _memory_state(self) -> Tuple[int, int, float, float, bool]:
         total = self._memory_total_mb()
         try:
             if self._sys == "linux":
@@ -256,11 +260,14 @@ class HardwareProbe:
                 swap_total = info.get("SwapTotal", 0)
                 swap_free = info.get("SwapFree", 0)
                 swap_p = (swap_total - swap_free) / swap_total if swap_total else 0.0
-                return used, avail, used / max(1, total), swap_p
+                verified = (info.get("MemTotal", 0) > 0
+                            and "MemAvailable" in info and 0 <= avail <= info["MemTotal"]
+                            and total == info["MemTotal"])
+                return used, avail, used / max(1, total), swap_p, verified
         except Exception:
             pass
         used = total // 2
-        return used, total - used, 0.5, 0.0
+        return used, total - used, 0.5, 0.0, False
 
     def _cpu_load(self) -> Tuple[float, List[float], float]:
         try:
