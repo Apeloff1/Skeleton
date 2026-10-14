@@ -2,22 +2,6 @@ name: Reliability Capacity Baseline
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/testing/api_gateway_reliability_profiles.py"
-      - "skeleton/testing/provider_stream_reliability_profiles.py"
-      - "skeleton/testing/process_resource_reliability_profiles.py"
-      - ".github/workflows/reliability-capacity-baseline.yml"
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths:
-      - "skeleton/testing/api_gateway_reliability_profiles.py"
-      - "skeleton/testing/provider_stream_reliability_profiles.py"
-      - "skeleton/testing/process_resource_reliability_profiles.py"
-      - ".github/workflows/reliability-capacity-baseline.yml"
-
 permissions:
   contents: read
 

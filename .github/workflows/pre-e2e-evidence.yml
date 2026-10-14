@@ -1,16 +1,6 @@
 name: Pre-E2E Evidence and Massive Offline Journeys
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "scripts/e2e_evidence.py"
-      - "scripts/e2e_advanced_parse.py"
-      - "scripts/e2e_merge_evidence.py"
-      - "machine/e2e_suites.json"
-      - "tests/test_e2e_evidence_preflight.py"
-      - ".github/workflows/pre-e2e-evidence.yml"
   workflow_dispatch:
     inputs:
       run_offline:

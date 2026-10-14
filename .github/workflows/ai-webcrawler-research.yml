@@ -16,13 +16,6 @@ on:
       - "tests/test_retrieval_provenance_idempotency.py"
       - "scripts/check_ai_webcrawler.py"
       - ".github/workflows/ai-webcrawler-research.yml"
-  pull_request:
-    branches: [main]
-    paths:
-      - "skeleton/ai/webcrawler/**"
-      - "tests/test_ai_webcrawler_*.py"
-      - "scripts/check_ai_webcrawler.py"
-      - ".github/workflows/ai-webcrawler-research.yml"
   workflow_dispatch:
 
 permissions:
