@@ -1,21 +1,6 @@
 name: AI Research Lineage Closure
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/research/**"
-      - "skeleton/ai/research/**"
-      - "skeleton/eval/research_acceptance.py"
-      - "skeleton/ai/evaluation/research_acceptance.py"
-      - "skeleton/testing/test_research_lineage.py"
-      - "skeleton/testing/test_research_system_acceptance.py"
-      - "scripts/check_ai_edge_case_catalog.py"
-      - "scripts/verify_research_lineage_closure.py"
-      - "tests/test_research_lineage_independent_verifier.py"
-      - "machine/ai_master_plan.json"
-      - ".github/workflows/ai-research-lineage.yml"
   workflow_dispatch:
 
 permissions:

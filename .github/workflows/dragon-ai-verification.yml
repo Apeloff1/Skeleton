@@ -1,17 +1,5 @@
 name: Dragon AI Verification
 on:
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/ai/webcrawler/dragon_*.py"
-      - "tests/test_ai*dragon*.py"
-      - "frontend/src/components/Dragon*.tsx"
-      - "frontend/src/components/dragon*.ts"
-      - "frontend/src/components/GameplayRecorder.tsx"
-      - "frontend/scripts/test-dragon-companion.cjs"
-      - "frontend/scripts/test-dragon-canonical-wire.cjs"
-      - "tests/fixtures/dragon_visual_wire_v1.json"
-      - ".github/workflows/dragon-ai-verification.yml"
   workflow_dispatch:
 permissions:
   contents: read

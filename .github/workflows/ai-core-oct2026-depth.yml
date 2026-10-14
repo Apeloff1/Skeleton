@@ -1,21 +1,6 @@
 name: AI Core October 2026 Depth Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/intelligence/routing_governance.py"
-      - "skeleton/intelligence/knowledge_store.py"
-      - "skeleton/context/semantic_compression.py"
-      - "skeleton/ai/runtime/intelligence/routing_governance.py"
-      - "skeleton/ai/runtime/intelligence/knowledge_store.py"
-      - "skeleton/ai/runtime/context/semantic_compression.py"
-      - "skeleton/testing/test_routing_governance_oct2026.py"
-      - "skeleton/testing/test_semantic_compression_oct2026.py"
-      - "skeleton/testing/test_temporal_knowledge_store_oct2026.py"
-      - "machine/ai_master_plan.json"
-      - ".github/workflows/ai-core-oct2026-depth.yml"
   workflow_dispatch:
 
 permissions:

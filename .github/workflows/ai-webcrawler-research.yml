@@ -1,21 +1,6 @@
 name: AI Webcrawler Research Plane
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/ai/webcrawler/**"
-      - "skeleton/retrieval/provenance.py"
-      - "skeleton/retrieval/provenance_checkpoint.py"
-      - "skeleton/retrieval/provenance_checkpoint.py"
-      - "skeleton/retrieval/provenance.py"
-      - "tests/test_ai_webcrawler_*.py"
-      - "tests/test_retrieval_provenance_idempotency.py"
-      - "tests/test_retrieval_provenance_checkpoint.py"
-      - "tests/test_retrieval_provenance_checkpoint.py"
-      - "tests/test_retrieval_provenance_idempotency.py"
-      - "scripts/check_ai_webcrawler.py"
-      - ".github/workflows/ai-webcrawler-research.yml"
   workflow_dispatch:
 
 permissions:

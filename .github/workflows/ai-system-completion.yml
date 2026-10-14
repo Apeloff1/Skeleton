@@ -1,28 +1,6 @@
 name: AI System Completion
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/ai/runtime/system_completion.py"
-      - "skeleton/ai/runtime/functional_ai.py"
-      - "skeleton/ai/runtime/context/**"
-      - "skeleton/ai/runtime/memory/**"
-      - "skeleton/ai/learning/**"
-      - "skeleton/ai/evaluation/system_qualification.py"
-      - "skeleton/intelligence/execution_runtime.py"
-      - "skeleton/testing/test_ai_system_completion_plane.py"
-      - "skeleton/testing/test_vs001_functional_ai.py"
-      - "skeleton/testing/test_vs005_self_improvement.py"
-      - "tests/test_ai_system_completion_verifier.py"
-      - "tests/test_ai_system_qualification.py"
-      - "tests/test_ai_system_qualification_receipt_verifier.py"
-      - "machine/ai_system_completion_contract.json"
-      - "scripts/verify_ai_system_completion.py"
-      - "scripts/run_ai_system_completion_qualification.py"
-      - "scripts/verify_ai_system_qualification_receipt.py"
-      - ".github/workflows/ai-system-completion.yml"
   workflow_dispatch:
 
 permissions:

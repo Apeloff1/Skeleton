@@ -1,19 +1,6 @@
 name: AI Delta Memory Recovery
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/memory/delta_memory.py"
-      - "skeleton/ai/runtime/memory/delta_memory.py"
-      - "skeleton/testing/test_ai_delta_memory_restore.py"
-      - ".github/workflows/ai-delta-memory-recovery.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/memory/delta_memory.py"
-      - "skeleton/ai/runtime/memory/delta_memory.py"
-      - "skeleton/testing/test_ai_delta_memory_restore.py"
-      - ".github/workflows/ai-delta-memory-recovery.yml"
   workflow_dispatch:
 
 permissions:
