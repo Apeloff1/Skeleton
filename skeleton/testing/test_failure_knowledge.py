@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 
 import pytest
 
-from skeleton.contracts.canonical import EvidenceRef
+from skeleton.contracts.canonical import EvidenceRef, canonical_json_bytes
 from skeleton.contracts.risk_evidence import RiskBindingEvaluation
 from skeleton.eval.failure_knowledge import (
     FailureDisposition,
@@ -489,3 +490,28 @@ def test_rejected_failure_knowledge_cannot_materialize_evidence() -> None:
         match="cannot become promotion evidence",
     ):
         decision.accepted_evidence_ref()
+
+
+def test_learning_signal_identity_uses_shared_canonical_contract_bytes() -> None:
+    signal = LearningSignal(
+        record_digest="1" * 64,
+        failure_fingerprint="2" * 64,
+        risk_obligation_digest="3" * 64,
+        signal_kind=LearningSignalKind.REGRESSION_REINFORCEMENT,
+        target_regression_case_digest="4" * 64,
+        non_applicability_digest=None,
+    )
+
+    assert signal.signal_digest == hashlib.sha256(
+        canonical_json_bytes(signal.payload())
+    ).hexdigest()
+
+
+def test_failure_knowledge_source_and_ai_mirror_are_byte_identical() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    source = root / "skeleton/eval/failure_knowledge.py"
+    mirror = root / "skeleton/ai/evaluation/failure_knowledge.py"
+
+    assert source.read_bytes() == mirror.read_bytes()

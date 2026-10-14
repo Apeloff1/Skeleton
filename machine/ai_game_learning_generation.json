@@ -1,0 +1,42 @@
+{
+  "schema_version": "skeleton.ai.game_learning_generation.v1",
+  "status": "implementation_candidate",
+  "owner": "skeleton/jeeves/game_learning_generation.py",
+  "mirror": "skeleton/ai/agents/jeeves/game_learning_generation.py",
+  "parent_contract": "machine/ai_game_learning.json",
+  "interfaces": ["GameGenerationRequest", "GeneratedGameProject", "GeneratedGameEnvironment", "generate_game_project", "restore_generated_project", "edit_generated_project"],
+  "execution": {
+    "existing_owner": "skeleton/jeeves/game_engine_project.py",
+    "output": "bounded VirtualFileTree with original browser game and canonical era-compiled engine planes",
+    "portable_entrypoint": "game/generated/index.html",
+    "simulation": "existing game_learning_runtime selects GeneratedGameEnvironment for actual bounded original generated-grid controller rules; continuous browser platform physics remains a separate approximation",
+    "export": "existing game_engine_export project package and deterministic ZIP owners",
+    "native_source_export": "existing skeleton.ai.webcrawler.dragon_native_projects.render_native_project emitters with exact target/style capability; source_generated only, no subprocess/toolchain execution",
+    "experimental_native_rom": "existing game_rom_generation original seeded DMG maze adapter for explicit compatible Game Boy design target; generated base64 ROM bytes plus original source, hardware execution unverified",
+    "runtime_extension": "existing game_engine_runtime permits dedicated game/generated/ files; compiled plane exact inventories remain enforced",
+    "general_console_binary_export": false,
+    "rom_asset_or_code_copy": false,
+    "automatic_quality_claim": false
+  },
+  "generated_environment": {
+    "runtime_kind": "original_generated_grid_simulation",
+    "binding": "exact generated config, full virtual tree digest, local implementation bytes, target, step limit",
+    "effects": "actual bounded grid movement, enemy pursuit/combat, collection, switches, cards, branching choice and resource-building state transitions",
+    "restore": "replay original seed and exact committed action prefix; compare complete final state and transition chain",
+    "authority": "no host code execution, network, uploaded-code execution or additional persistence owner"
+  },
+  "policy": {
+    "implementation": "existing game_learning GamePolicyLearner.predict",
+    "role": "measured learned control actions; declared evaluation and visit evidence may guide bounded design adaptation",
+    "not_claimed": ["trained genre classification", "universal commercial ROM compatibility", "neural asset generation", "production promotion"],
+    "untrained_mode": "explicit deterministic seeded design when no measured policy is supplied"
+  },
+  "source_influence": {
+    "input": "bounded ingested source feature bundles resolved by existing backend authority",
+    "retained": "bundle/source digests, declared or lexical feature evidence references and classifications",
+    "copy_excluded": ["ROM bytes", "uploaded source code", "uploaded art", "uploaded audio", "documents"],
+    "authority": "generation metadata is descriptive; current source rights and tenant ownership remain existing backend admission responsibility"
+  },
+  "bounds": {"files": 96, "file_bytes": 128000, "tree_bytes": 1000000, "sources": 64, "feature_document_bytes": 131072, "seed": "unsigned 32-bit", "complexity": [1, 5], "generated_grid_cells": 768, "generated_entities": 64, "policy_probe_steps": 128},
+  "verification": {"automated_tests_requested": false, "execution_checked": false, "closure_authority": false}
+}

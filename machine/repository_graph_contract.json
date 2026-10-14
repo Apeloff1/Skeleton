@@ -6,15 +6,12 @@
   "masterplan_binding": {
     "volume_ref": "VOL-021",
     "title": "Code Intelligence",
-    "required_gap_texts": [
-      "complete cross-language graph extraction",
-      "connect ownership/test mapping to change planner"
-    ]
+    "required_gap_texts": []
   },
   "sources": [
     {
       "path": "skeleton/automation/backlog_index.py",
-      "git_blob_sha": "797dc9d3071789aad467a295b4ae2323c6be7fa9",
+      "git_blob_sha": "c0eeb9e32ecba9659157bec71a3ccb22eb5b8910",
       "role": "bounded static file/symbol/import/dependency/test/workflow index"
     },
     {
@@ -24,12 +21,12 @@
     },
     {
       "path": "machine/architecture_ownership.json",
-      "git_blob_sha": "a40faf5fc7ec9ef4f6ad2e73a9f9cb076a9c53a6",
+      "git_blob_sha": "429282f802fb49d83a8885f7dd913aaf576fd37b",
       "role": "canonical physical/semantic ownership"
     },
     {
       "path": "machine/master_traceability.json",
-      "git_blob_sha": "bb6115a18d5acda6b7c1f73310f56cc3e7763906",
+      "git_blob_sha": "24497202bb7fc16733e18e46e95a1eb99b0fab94",
       "role": "requirement/capability change-impact authority"
     }
   ],

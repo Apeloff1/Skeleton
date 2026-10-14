@@ -1,0 +1,697 @@
+"""Jeeves application awareness and typed creator proposal tools.
+
+The host owns all filesystem capabilities. This adapter only *reads* bounded
+canonical machine registries or compiles the existing creator command surface;
+it NEVER executes an editor, writes a file, or supplies its own execution grant.
+Host-side ToolExecutor / epistemic permits still gate every real action.
+"""
+from __future__ import annotations
+
+from collections.abc import Mapping
+from hashlib import sha256
+import json
+from pathlib import Path
+from typing import Any
+
+SCHEMA = "jeeves.app_capability_bridge.v1"
+MAX_MANIFEST_BYTES = 16 * 1024 * 1024
+MAX_QUERY = 160
+MAX_PAGE = 64
+MAX_ROWS = 40000
+
+
+class AppCapabilityBridgeError(ValueError):
+    """Input or a canonical machine-index authority is invalid."""
+
+
+def _root(root: Path | str | None) -> Path:
+    if root is not None:
+        value = Path(root).resolve()
+        if not (value / "machine" / "ai_file_tree.json").is_file():
+            raise AppCapabilityBridgeError("repository root has no canonical AI file-tree index")
+        return value
+    for path in Path(__file__).resolve().parents:
+        if (path / "machine" / "ai_file_tree.json").is_file():
+            return path
+    raise AppCapabilityBridgeError("repository machine index is unavailable")
+
+
+def _manifest(path: Path) -> dict[str, Any]:
+    try:
+        if path.stat().st_size > MAX_MANIFEST_BYTES:
+            raise AppCapabilityBridgeError("machine index exceeds size budget")
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, OSError) as exc:
+        raise AppCapabilityBridgeError(f"cannot read canonical machine index: {path.name}") from exc
+    if not isinstance(raw, dict):
+        raise AppCapabilityBridgeError("machine index must be a JSON object")
+    return raw
+
+
+def _page(query: str, limit: int, offset: int) -> tuple[str, int, int]:
+    if not isinstance(query, str) or len(query) > MAX_QUERY:
+        raise AppCapabilityBridgeError("query must be at most 160 characters")
+    if type(limit) is not int or not 1 <= limit <= MAX_PAGE:
+        raise AppCapabilityBridgeError("limit must be an integer in 1..64")
+    if type(offset) is not int or not 0 <= offset <= MAX_ROWS:
+        raise AppCapabilityBridgeError("offset exceeds index range")
+    return query.casefold().strip(), limit, offset
+
+
+def _row(mapping: Mapping[str, Any], roots: list[Mapping[str, Any]]) -> dict[str, Any]:
+    identity = mapping.get("id")
+    source = mapping.get("source")
+    destination = mapping.get("destination")
+    if not all(isinstance(x, str) and x and len(x) <= 1024 for x in (identity, source, destination)):
+        raise AppCapabilityBridgeError("AI mapping has invalid identity/path")
+    owner = ""
+    for node in roots:
+        prefix = node.get("path", "")
+        if isinstance(prefix, str) and (source == prefix or source.startswith(prefix.rstrip("/") + "/")):
+            if len(prefix) > len(owner):
+                owner = prefix
+    return {
+        "id": identity,
+        "source": source,
+        "destination": destination,
+        "owner_root": owner or "unresolved",
+        "role": str(mapping.get("role") or "")[:512],
+        "parity_mode": str(mapping.get("parity_mode") or "unspecified")[:80],
+        "authority": "index-only",
+    }
+
+
+def capability_catalog(*, query: str = "", limit: int = 20, offset: int = 0,
+                       root: Path | str | None = None) -> dict[str, Any]:
+    """Paged machine index with a content hash; no recursive repository reads.
+
+    An indexed/mirrored file is not automatically a working or granted editor.
+    This returns what the architecture *declares*, not model-invented abilities.
+    """
+    needle, limit, offset = _page(query, limit, offset)
+    home = _root(root)
+    tree = _manifest(home / "machine" / "ai_file_tree.json")
+    arch = _manifest(home / "machine" / "architecture.json")
+    interfaces = _manifest(home / "machine" / "capability_interfaces.json")
+    mappings, roots, links = tree.get("mappings"), arch.get("canonical_roots"), interfaces.get("entries")
+    if not isinstance(mappings, list) or not isinstance(roots, list) or not isinstance(links, list):
+        raise AppCapabilityBridgeError("canonical index arrays are absent")
+    if len(mappings) > MAX_ROWS or len(links) > MAX_ROWS:
+        raise AppCapabilityBridgeError("canonical index exceeds entry budget")
+    rows = [_row(row, roots) for row in mappings if isinstance(row, dict)]
+    ids = [row["id"] for row in rows]
+    if len(set(ids)) != len(ids):
+        raise AppCapabilityBridgeError("AI mapping has duplicate IDs")
+    rows.sort(key=lambda x: (x["source"], x["id"]))
+    digest = sha256(json.dumps(rows, sort_keys=True, separators=(",", ":"),
+                               ensure_ascii=True).encode("utf-8")).hexdigest()
+    matches = [row for row in rows if not needle or needle in (
+        row["id"] + " " + row["source"] + " " + row["destination"]
+        + " " + row["role"] + " " + row["owner_root"]
+    ).casefold()]
+    page = matches[offset: offset + limit]
+    return {
+        "schema": SCHEMA,
+        "query": query,
+        "total_indexed": len(rows),
+        "total_matched": len(matches),
+        "interface_contracts": len(links),
+        "owner_roots": len(roots),
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + len(page) < len(matches),
+        "index_sha256": digest,
+        "capabilities": page,
+        "execution_authority": "none",
+        "validation": "index-only; no runtime execution evidence",
+    }
+
+
+def capability_concepts(*, query: str = "", limit: int = 20, offset: int = 0,
+                        root: Path | str | None = None) -> dict[str, Any]:
+    """Paged declared-knowledge concepts, never represented as executable tools."""
+    needle, limit, offset = _page(query, limit, offset)
+    home = _root(root)
+    taxonomy = _manifest(home / "machine" / "capability_taxonomy.json")
+    concepts = taxonomy.get("concepts")
+    if not isinstance(concepts, list) or len(concepts) > MAX_ROWS:
+        raise AppCapabilityBridgeError("capability taxonomy lacks bounded concepts")
+    rows: list[dict[str, Any]] = []
+    for concept in concepts:
+        if not isinstance(concept, dict):
+            raise AppCapabilityBridgeError("capability concept must be an object")
+        identity = concept.get("concept_id")
+        name = concept.get("canonical_name")
+        forms = concept.get("declared_forms")
+        volume_refs = concept.get("volume_refs")
+        if (not isinstance(identity, str) or not identity or len(identity) > 160
+                or not isinstance(name, str) or not name or len(name) > 512
+                or not isinstance(forms, list) or not isinstance(volume_refs, list)
+                or any(not isinstance(f, str) for f in forms + volume_refs)):
+            raise AppCapabilityBridgeError("invalid capability concept identity")
+        rows.append({
+            "concept_id": identity,
+            "name": name,
+            "declared_forms": forms[:8],
+            "volume_refs": volume_refs[:16],
+            "authority": "declaration-only",
+            "implementation_verified": False,
+        })
+    rows.sort(key=lambda item: item["concept_id"])
+    if len({x["concept_id"] for x in rows}) != len(rows):
+        raise AppCapabilityBridgeError("capability taxonomy duplicates concept IDs")
+    digest = sha256(json.dumps(rows, sort_keys=True, separators=(",", ":"),
+                               ensure_ascii=True).encode("utf-8")).hexdigest()
+    filtered = [item for item in rows if not needle or needle in
+                (item["concept_id"] + " " + item["name"] + " "
+                 + " ".join(item["declared_forms"] + item["volume_refs"])).casefold()]
+    page = filtered[offset: offset + limit]
+    return {
+        "schema": SCHEMA,
+        "index": "capability-taxonomy",
+        "query": query,
+        "total_declared": len(rows),
+        "total_matched": len(filtered),
+        "index_sha256": digest,
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + len(page) < len(filtered),
+        "concepts": page,
+        "execution_authority": "none",
+        "validation": "taxonomy declaration; runtime proof required",
+    }
+
+
+
+def _catalog_strings(value: Any, *, field: str, maximum: int = 128) -> list[str]:
+    """Bound machine-authored descriptions before presenting them to the agent."""
+    if not isinstance(value, list) or len(value) > maximum:
+        raise AppCapabilityBridgeError(f"{field} must be a bounded array")
+    if any(not isinstance(item, str) or not item or len(item) > 1024 for item in value):
+        raise AppCapabilityBridgeError(f"{field} has an invalid entry")
+    return list(value)
+
+
+def _catalog_result(rows: list[dict[str, Any]], *, name: str, query: str,
+                    limit: int, offset: int) -> dict[str, Any]:
+    needle, limit, offset = _page(query, limit, offset)
+    if len(rows) > MAX_ROWS:
+        raise AppCapabilityBridgeError("machine capability catalog exceeds entry budget")
+    identities = [row["id"] for row in rows]
+    if len(set(identities)) != len(identities):
+        raise AppCapabilityBridgeError("machine capability catalog has duplicate IDs")
+    rows.sort(key=lambda row: row["id"])
+    encoded = json.dumps(rows, sort_keys=True, separators=(",", ":"),
+                         ensure_ascii=True, allow_nan=False)
+    digest = sha256(encoded.encode("utf-8")).hexdigest()
+    selected = [row for row in rows if not needle
+                or needle in json.dumps(row, sort_keys=True, ensure_ascii=True).casefold()]
+    page = selected[offset:offset + limit]
+    return {
+        "schema": SCHEMA,
+        "catalog": name,
+        "query": query,
+        "total_declared": len(rows),
+        "total_matched": len(selected),
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + len(page) < len(selected),
+        "index_sha256": digest,
+        "entries": page,
+        "execution_authority": "none",
+        "validation": "machine declaration only; execution requires host grant and live readiness",
+    }
+
+
+def product_capability_catalog(*, query: str = "", limit: int = 20,
+                               offset: int = 0,
+                               root: Path | str | None = None) -> dict[str, Any]:
+    """List declared AI features without mistaking 'enabled' for live availability.
+
+    This registry describes product intent, required planes, provider needs and
+    readiness obligations. The host still decides whether an actual operation
+    exists, is healthy, and is authorized for the current principal.
+    """
+    _page(query, limit, offset)
+    home = _root(root)
+    declared = _manifest(home / "machine" / "ai_capabilities.json").get("capabilities")
+    if not isinstance(declared, list) or len(declared) > MAX_ROWS:
+        raise AppCapabilityBridgeError("AI capability registry is absent or unbounded")
+    rows: list[dict[str, Any]] = []
+    for record in declared:
+        if not isinstance(record, dict):
+            raise AppCapabilityBridgeError("AI capability must be an object")
+        identity = record.get("capability_id")
+        owner = record.get("owner_plane")
+        status = record.get("implementation_state")
+        risk = record.get("risk_class")
+        enabled = record.get("enabled")
+        if (not isinstance(identity, str) or not 1 <= len(identity) <= 192
+                or not isinstance(owner, str) or not 1 <= len(owner) <= 192
+                or not isinstance(status, str) or not 1 <= len(status) <= 80
+                or not isinstance(risk, str) or not 1 <= len(risk) <= 80
+                or type(enabled) is not bool):
+            raise AppCapabilityBridgeError("invalid AI capability record")
+        rows.append({
+            "id": identity,
+            "owner_plane": owner,
+            "implementation_state": status,
+            "risk_class": risk,
+            "enabled_by_contract": enabled,
+            "live_availability": "unverified" if enabled else "disabled",
+            "required_planes": _catalog_strings(
+                record.get("required_planes", []), field="required_planes"),
+            "required_provider_capabilities": _catalog_strings(
+                record.get("required_provider_capabilities", []),
+                field="required_provider_capabilities"),
+            "readiness_requirements": _catalog_strings(
+                record.get("readiness_requirements", []), field="readiness_requirements"),
+            "verification_level": str(record.get("verification_level", ""))[:80],
+            "authority": "declaration-only",
+        })
+    return _catalog_result(rows, name="product-ai-features", query=query,
+                           limit=limit, offset=offset)
+
+
+
+def plane_capability_catalog(*, query: str = "", limit: int = 20,
+                             offset: int = 0,
+                             root: Path | str | None = None) -> dict[str, Any]:
+    """Show the architecture's runtime planes, owners and incoming consumers.
+
+    Dependency discovery deliberately does not assert that a plane is online
+    or assign Jeeves the right to call it. Operations remain with each owner.
+    """
+    _page(query, limit, offset)
+    home = _root(root)
+    declared = _manifest(home / "machine" / "capability_registry.json").get("capabilities")
+    if not isinstance(declared, list) or len(declared) > MAX_ROWS:
+        raise AppCapabilityBridgeError("runtime plane registry is absent or unbounded")
+    rows: list[dict[str, Any]] = []
+    for record in declared:
+        if not isinstance(record, dict):
+            raise AppCapabilityBridgeError("runtime plane capability must be an object")
+        identity, plane, status = (
+            record.get("id"), record.get("plane"), record.get("status"),
+        )
+        if any(not isinstance(value, str) or not 1 <= len(value) <= 192
+               for value in (identity, plane, status)):
+            raise AppCapabilityBridgeError("invalid runtime plane descriptor")
+        rows.append({
+            "id": identity,
+            "plane": plane,
+            "declared_status": status,
+            "owners": _catalog_strings(record.get("owners", []), field="owners"),
+            "dependency_planes": _catalog_strings(
+                record.get("dependency_planes", []), field="dependency_planes"),
+            "incoming_consumer_planes": _catalog_strings(
+                record.get("incoming_consumer_planes", []),
+                field="incoming_consumer_planes"),
+            "interface_edge_refs": _catalog_strings(
+                record.get("interface_edge_refs", []), field="interface_edge_refs"),
+            "live_availability": "unverified",
+            "authority": "declaration-only; owners remain authoritative",
+        })
+    return _catalog_result(rows, name="runtime-plane-capabilities",
+                           query=query, limit=limit, offset=offset)
+
+
+
+def dependency_impact(plane: str, *, direction: str = "upstream", max_depth: int = 5,
+                      root: Path | str | None = None) -> dict[str, Any]:
+    """Resolve a bounded owner-aware cross-plane impact graph from the ledger.
+
+    'upstream' traces runtime dependencies; 'downstream' traces consumers.
+    This is architecture planning data, never a permit to change a target.
+    """
+    if not isinstance(plane, str) or not plane or len(plane) > 192:
+        raise AppCapabilityBridgeError("plane must be a bounded identifier")
+    if direction not in ("upstream", "downstream"):
+        raise AppCapabilityBridgeError("direction must be upstream or downstream")
+    if type(max_depth) is not int or not 0 <= max_depth <= 8:
+        raise AppCapabilityBridgeError("max_depth must be an integer in 0..8")
+    home = _root(root)
+    declared = _manifest(home / "machine" / "capability_registry.json").get("capabilities")
+    if not isinstance(declared, list) or len(declared) > MAX_ROWS:
+        raise AppCapabilityBridgeError("canonical runtime plane descriptors unavailable")
+    by_plane: dict[str, dict[str, Any]] = {}
+    for record in declared:
+        if not isinstance(record, dict) or not isinstance(record.get("plane"), str):
+            raise AppCapabilityBridgeError("invalid runtime plane descriptor")
+        name = record["plane"]
+        if name in by_plane:
+            raise AppCapabilityBridgeError("duplicate runtime plane identity")
+        by_plane[name] = record
+    if plane not in by_plane:
+        raise AppCapabilityBridgeError("unknown canonical runtime plane")
+    adjacency: dict[str, set[str]] = {name: set() for name in by_plane}
+    for name, record in by_plane.items():
+        for dependency in _catalog_strings(
+            record.get("dependency_planes", []), field="dependency_planes",
+        ):
+            if dependency not in by_plane:
+                raise AppCapabilityBridgeError("runtime plane has an unresolved dependency")
+            if direction == "upstream":
+                adjacency[name].add(dependency)
+            else:
+                adjacency[dependency].add(name)
+
+    paths: dict[str, tuple[str, ...]] = {plane: (plane,)}
+    frontier = [plane]
+    edges: set[tuple[str, str]] = set()
+    for _ in range(max_depth):
+        following: list[str] = []
+        for current in sorted(frontier):
+            for neighbor in sorted(adjacency[current]):
+                edges.add((current, neighbor))
+                candidate = paths[current] + (neighbor,)
+                if neighbor not in paths:
+                    if len(paths) >= 128:
+                        raise AppCapabilityBridgeError("impact closure exceeds node budget")
+                    paths[neighbor] = candidate
+                    following.append(neighbor)
+        frontier = following
+        if not frontier:
+            break
+    rows = []
+    for name in sorted(paths):
+        descriptor = by_plane[name]
+        rows.append({
+            "plane": name,
+            "depth": len(paths[name]) - 1,
+            "path": list(paths[name]),
+            "owners": _catalog_strings(descriptor.get("owners", []), field="owners"),
+            "declared_status": str(descriptor.get("status", ""))[:80],
+            "live_availability": "unverified",
+        })
+    content = {
+        "schema": SCHEMA,
+        "catalog": "runtime-dependency-impact",
+        "origin_plane": plane,
+        "direction": direction,
+        "max_depth": max_depth,
+        "nodes": rows,
+        "edges": [list(edge) for edge in sorted(edges)],
+        "execution_authority": "none",
+    }
+    content["index_sha256"] = sha256(
+        json.dumps(content, sort_keys=True, separators=(",", ":"),
+                   ensure_ascii=True, allow_nan=False).encode("utf-8")
+    ).hexdigest()
+    return content
+
+
+def interface_catalog(*, query: str = "", limit: int = 20, offset: int = 0,
+                      root: Path | str | None = None) -> dict[str, Any]:
+    """Find canonical cross-plane contracts without acquiring target-plane rights."""
+    _page(query, limit, offset)
+    home = _root(root)
+    declared = _manifest(home / "machine" / "capability_interfaces.json").get("entries")
+    if not isinstance(declared, list) or len(declared) > MAX_ROWS:
+        raise AppCapabilityBridgeError("interface registry is absent or unbounded")
+    rows: list[dict[str, Any]] = []
+    for record in declared:
+        if not isinstance(record, dict):
+            raise AppCapabilityBridgeError("interface entry must be an object")
+        fields = ("id", "relation", "source_plane", "target_plane",
+                  "source_owner", "target_owner", "boundary", "binding")
+        values = {key: record.get(key) for key in fields}
+        if any(not isinstance(value, str) or not value or len(value) > 1024
+               for value in values.values()):
+            raise AppCapabilityBridgeError("invalid canonical interface entry")
+        rows.append({
+            **values,
+            "target_contract_surface": _catalog_strings(
+                record.get("target_contract_surface", []),
+                field="target_contract_surface"),
+            "target_failure_contract": str(record.get("target_failure_contract", ""))[:1024],
+            "authority": "dependency-only; target owner retains execution rights",
+        })
+    return _catalog_result(rows, name="canonical-plane-interfaces",
+                           query=query, limit=limit, offset=offset)
+
+
+def creator_operation_catalog() -> dict[str, Any]:
+    from skeleton.forge.creator.command_surface import surface_manifest
+    surface = surface_manifest("api")
+    return {
+        "schema": SCHEMA,
+        "catalog": surface.to_dict(),
+        "execution_authority": "none",
+        "approval_required_for_execution": True,
+    }
+
+
+def creator_proposal(operation: str, project_id: str,
+                     payload: Mapping[str, Any]) -> dict[str, Any]:
+    from skeleton.forge.creator.command_surface import build_creator_command
+    command = build_creator_command(operation, project_id=project_id, payload=payload)
+    return {
+        "schema": SCHEMA,
+        "kind": "creator-proposal",
+        "command": command.to_dict(),
+        "execution_authority": "none",
+        "dispatch_performed": False,
+    }
+
+
+
+def creator_plan(project_id: str, steps: list[Mapping[str, Any]]) -> dict[str, Any]:
+    """Compile a bounded, ordered, dependency-aware set of creator proposals.
+
+    This never dispatches an operation. Each command must be re-authorized by
+    the host using its exact digest, project, principal, scope and current state.
+    No implicit wildcard authorization is produced from a plan digest.
+    """
+    from skeleton.forge.creator.command_surface import build_creator_command
+
+    if not isinstance(steps, list) or not 1 <= len(steps) <= 32:
+        raise AppCapabilityBridgeError("creator plan must contain 1..32 steps")
+    names: set[str] = set()
+    commands: list[dict[str, Any]] = []
+    for index, step in enumerate(steps):
+        if not isinstance(step, Mapping) or set(step) != {
+            "step_id", "operation", "payload", "after",
+        }:
+            raise AppCapabilityBridgeError(
+                "creator step requires step_id, operation, payload and after"
+            )
+        name, after = step["step_id"], step["after"]
+        if (not isinstance(name, str) or not 1 <= len(name) <= 128
+                or not name.replace("_", "").replace("-", "").replace(".", "").isalnum()
+                or name in names):
+            raise AppCapabilityBridgeError("creator step has invalid or duplicate step_id")
+        if (not isinstance(after, list) or len(after) > 32
+                or any(not isinstance(dep, str) for dep in after)
+                or len(after) != len(set(after)) or any(dep not in names for dep in after)):
+            raise AppCapabilityBridgeError("creator dependencies must name earlier steps")
+        if not isinstance(step["payload"], Mapping):
+            raise AppCapabilityBridgeError("creator step payload must be an object")
+        command = build_creator_command(
+            step["operation"], project_id=project_id, payload=step["payload"],
+        )
+        commands.append({
+            "index": index,
+            "step_id": name,
+            "after": list(after),
+            "command": command.to_dict(),
+            "dispatch_performed": False,
+        })
+        names.add(name)
+    serialized = json.dumps(
+        commands, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        allow_nan=False,
+    ).encode("utf-8")
+    if len(serialized) > 256 * 1024:
+        raise AppCapabilityBridgeError("creator plan exceeds proposal byte budget")
+    return {
+        "schema": SCHEMA,
+        "kind": "creator-plan",
+        "project_id": project_id,
+        "steps": commands,
+        "plan_sha256": sha256(serialized).hexdigest(),
+        "execution_authority": "none",
+        "dispatch_performed": False,
+        "authorization": "each command requires a separate host permit and exact digest",
+    }
+
+
+def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str, ...]:
+    """Add only READ_ONLY tools to the existing trusted host registry.
+
+    This intentionally registers NO mutating editor, export or release tool.
+    Even an explicit host grant cannot make an unregistered tool execute.
+    """
+    from skeleton.jeeves.agent.tools import ArgumentRule, ToolRegistry, ToolSpec
+    from skeleton.jeeves.agent.types import RiskTier
+
+    if not isinstance(registry, ToolRegistry):
+        raise TypeError("registry must be a host ToolRegistry")
+    # Resolve root at registration, *not* from model-supplied arguments.
+    home = _root(root)
+    entries = (
+        (ToolSpec(
+            name="app_capabilities",
+            description="Read paged, indexed app file ownership and mirror mappings; no execution.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("query", "string", required=False, max_length=MAX_QUERY),
+                ArgumentRule("limit", "integer", required=False, minimum=1, maximum=MAX_PAGE),
+                ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
+            ),
+        ), lambda args, _ctx: capability_catalog(
+            query=args.get("query", ""), limit=args.get("limit", 20),
+            offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="app_concepts",
+            description="Read declared capability concepts with explicit unverified status.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("query", "string", required=False, max_length=MAX_QUERY),
+                ArgumentRule("limit", "integer", required=False, minimum=1, maximum=MAX_PAGE),
+                ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
+            ),
+        ), lambda args, _ctx: capability_concepts(
+            query=args.get("query", ""), limit=args.get("limit", 20),
+            offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="app_features",
+            description="Read declared AI product features, owners, risks and missing readiness proof; no execution.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("query", "string", required=False, max_length=MAX_QUERY),
+                ArgumentRule("limit", "integer", required=False, minimum=1, maximum=MAX_PAGE),
+                ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
+            ),
+        ), lambda args, _ctx: product_capability_catalog(
+            query=args.get("query", ""), limit=args.get("limit", 20),
+            offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="app_planes",
+            description="Discover app runtime planes, declared owners, dependencies and consumers; no execution.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("query", "string", required=False, max_length=MAX_QUERY),
+                ArgumentRule("limit", "integer", required=False, minimum=1, maximum=MAX_PAGE),
+                ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
+            ),
+        ), lambda args, _ctx: plane_capability_catalog(
+            query=args.get("query", ""), limit=args.get("limit", 20),
+            offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="app_dependency_impact",
+            description="Trace a bounded upstream or downstream app-plane dependency and ownership graph.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("plane", "string", max_length=192),
+                ArgumentRule("direction", "string", required=False,
+                             choices=("upstream", "downstream")),
+                ArgumentRule("max_depth", "integer", required=False,
+                             minimum=0, maximum=8),
+            ),
+        ), lambda args, _ctx: dependency_impact(
+            args["plane"], direction=args.get("direction", "upstream"),
+            max_depth=args.get("max_depth", 5), root=home)),
+        (ToolSpec(
+            name="app_interfaces",
+            description="Read canonical cross-plane dependency, owner and failure contracts; no execution.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("query", "string", required=False, max_length=MAX_QUERY),
+                ArgumentRule("limit", "integer", required=False, minimum=1, maximum=MAX_PAGE),
+                ArgumentRule("offset", "integer", required=False, minimum=0, maximum=MAX_ROWS),
+            ),
+        ), lambda args, _ctx: interface_catalog(
+            query=args.get("query", ""), limit=args.get("limit", 20),
+            offset=args.get("offset", 0), root=home)),
+        (ToolSpec(
+            name="creator_plan",
+            description="Compile ordered creator commands with explicit prior-step dependencies; never dispatch.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("project_id", "string", max_length=128),
+                ArgumentRule("steps", "array", max_length=32),
+            ),
+        ), lambda args, _ctx: creator_plan(args["project_id"], args["steps"])),
+        (ToolSpec(
+            name="creator_operations",
+            description="Read the canonical bounded creator operation schema; no execution.",
+            risk=RiskTier.READ_ONLY,
+        ), lambda _args, _ctx: creator_operation_catalog()),
+        (ToolSpec(
+            name="creator_propose",
+            description="Validate and fingerprint a typed creator proposal without executing it.",
+            risk=RiskTier.READ_ONLY,
+            arguments=(
+                ArgumentRule("operation", "string", choices=("create", "edit", "test", "preview", "export")),
+                ArgumentRule("project_id", "string", max_length=128),
+                ArgumentRule("payload", "object", max_length=512),
+            ),
+        ), lambda args, _ctx: creator_proposal(
+            args["operation"], args["project_id"], args["payload"])),
+    )
+    for spec, handler in entries:
+        registry.register(spec, handler)
+    return tuple(spec.name for spec, _ in entries)
+
+
+def register_authorized_creator_tool(
+    registry,
+    *,
+    handlers,
+    authorize,
+) -> str:
+    """Opt in a real B014 editor dispatch under host-owned exact-command policy.
+
+    No handler, auth verifier, or execution grant is ever constructed by
+    Jeeves. The host callback must check tenant, principal, project, scope,
+    lease, decision and canonical command digest. Even after registration a
+    ToolExecutor HIGH_IMPACT grant is still required for the individual run.
+    """
+    from collections.abc import Callable, Mapping
+    from skeleton.forge.creator.command_surface import OPERATIONS
+    from skeleton.jeeves.agent.tools import (
+        ArgumentRule, ToolDenied, ToolRegistry, ToolSpec,
+    )
+    from skeleton.jeeves.agent.types import RiskTier
+
+    if not isinstance(registry, ToolRegistry):
+        raise TypeError("registry must be a host ToolRegistry")
+    if not isinstance(handlers, Mapping) or not handlers:
+        raise TypeError("trusted creator handlers are required")
+    if not callable(authorize):
+        raise TypeError("host authorization callback is required")
+    enabled = tuple(sorted(handlers))
+    if any(name not in OPERATIONS or not callable(handlers[name]) for name in enabled):
+        raise ValueError("creator handlers must be known operations and callable")
+
+    def _perform(arguments, context):
+        from skeleton.forge.creator.command_surface import (
+            build_creator_command, dispatch_creator_command,
+        )
+        command = build_creator_command(
+            arguments["operation"],
+            project_id=arguments["project_id"],
+            payload=arguments["payload"],
+        )
+        if authorize(command, context) is not True:
+            raise ToolDenied("host did not authorize this exact creator command")
+        receipt = dispatch_creator_command(command, handlers=handlers)
+        return receipt.to_dict()
+
+    spec = ToolSpec(
+        name="creator_execute_authorized",
+        description="Host-authorized and tool-granted creator dispatch. Never autonomous.",
+        risk=RiskTier.HIGH_IMPACT,
+        arguments=(
+            ArgumentRule("operation", "string", choices=enabled),
+            ArgumentRule("project_id", "string", max_length=128),
+            ArgumentRule("payload", "object", max_length=512),
+        ),
+        idempotent=False,
+        cache_ttl_seconds=None,
+        timeout_seconds=20.0,
+        produces_evidence=True,
+    )
+    registry.register(spec, _perform)
+    return spec.name

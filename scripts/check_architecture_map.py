@@ -555,6 +555,337 @@ def _path_is_within(path: str, root: str) -> bool:
     return path == root or path.startswith(root + "/")
 
 
+def _path_specificity(path: str) -> tuple[int, int]:
+    """Return a stable specificity key for normalized repository paths."""
+    pure = PurePosixPath(path)
+    return (len(pure.parts), len(path))
+
+
+def _select_most_specific_path(
+    relative_path: str,
+    candidates: list[tuple[str, dict[str, Any]]],
+    *,
+    label: str,
+) -> tuple[str, list[dict[str, Any]]] | None:
+    matches = [
+        (prefix, record)
+        for prefix, record in candidates
+        if _path_is_within(relative_path, prefix)
+    ]
+    if not matches:
+        return None
+    best = max(_path_specificity(prefix) for prefix, _ in matches)
+    finalists = [
+        (prefix, record)
+        for prefix, record in matches
+        if _path_specificity(prefix) == best
+    ]
+    prefixes = sorted({prefix for prefix, _ in finalists})
+    if len(prefixes) != 1:
+        raise ValueError(
+            f"{label} ownership is ambiguous for {relative_path}: "
+            + ", ".join(prefixes)
+        )
+    prefix = prefixes[0]
+    records = [record for candidate, record in finalists if candidate == prefix]
+    return prefix, records
+
+
+def resolve_architecture_owner(
+    architecture: dict[str, Any],
+    relative_path: object,
+) -> dict[str, Any]:
+    """Resolve ownership for an existing *or future* repository path.
+
+    Resolution is contract-only: the path does not need to exist on disk.  The
+    most-specific declared plane owner wins, followed by canonical roots, zone
+    roots and finally explicit top-level policy roots.  Transitional/legacy
+    roots are returned as known but non-authoritative so callers cannot mistake
+    migration inventory for production ownership.
+    """
+
+    path = _normalized_repo_path(relative_path)
+
+    root_candidates: list[tuple[str, dict[str, Any]]] = []
+    raw_roots = architecture.get("canonical_roots")
+    if isinstance(raw_roots, list):
+        for root in raw_roots:
+            if not isinstance(root, dict):
+                continue
+            try:
+                prefix = _normalized_repo_path(root.get("path"))
+            except ValueError:
+                continue
+            root_candidates.append((prefix, root))
+    root_match = _select_most_specific_path(
+        path, root_candidates, label="canonical-root"
+    )
+
+    zone_candidates: list[tuple[str, dict[str, Any]]] = []
+    raw_zones = architecture.get("zones")
+    if isinstance(raw_zones, list):
+        for zone in raw_zones:
+            if not isinstance(zone, dict):
+                continue
+            roots = zone.get("roots")
+            if not isinstance(roots, list):
+                continue
+            for raw_root in roots:
+                try:
+                    prefix = _normalized_repo_path(raw_root)
+                except ValueError:
+                    continue
+                zone_candidates.append((prefix, zone))
+    zone_match = _select_most_specific_path(path, zone_candidates, label="zone")
+
+    plane_candidates: list[tuple[str, dict[str, Any]]] = []
+    blueprint = architecture.get("structural_blueprint")
+    if isinstance(blueprint, dict):
+        placements = blueprint.get("plane_placements")
+        if isinstance(placements, list):
+            for placement in placements:
+                if not isinstance(placement, dict):
+                    continue
+                try:
+                    prefix = _normalized_repo_path(placement.get("owner"))
+                except ValueError:
+                    continue
+                plane_candidates.append((prefix, placement))
+    plane_match = _select_most_specific_path(path, plane_candidates, label="plane")
+
+    policy_candidates: list[tuple[str, dict[str, Any]]] = []
+    policy = architecture.get("top_level_policy")
+    policy_classes = (
+        ("runtime_roots", True),
+        ("control_roots", True),
+        ("evidence_roots", True),
+        ("transitional_roots", False),
+        ("legacy_root_entrypoints", False),
+    )
+    if isinstance(policy, dict):
+        for policy_class, authoritative in policy_classes:
+            raw_paths = policy.get(policy_class)
+            if not isinstance(raw_paths, list):
+                continue
+            for raw_path in raw_paths:
+                try:
+                    prefix = _normalized_repo_path(raw_path)
+                except ValueError:
+                    continue
+                policy_candidates.append(
+                    (
+                        prefix,
+                        {
+                            "policy_class": policy_class,
+                            "authoritative": authoritative,
+                        },
+                    )
+                )
+    policy_match = _select_most_specific_path(path, policy_candidates, label="policy")
+
+    matches = [
+        ("plane", plane_match, 4),
+        ("canonical_root", root_match, 3),
+        ("zone", zone_match, 2),
+        ("policy", policy_match, 1),
+    ]
+    available = [
+        (kind, match, priority)
+        for kind, match, priority in matches
+        if match is not None
+    ]
+    if not available:
+        raise ValueError(f"path is outside declared architecture ownership: {path}")
+
+    best_specificity = max(
+        _path_specificity(match[0])
+        for _, match, _ in available
+        if match is not None
+    )
+    most_specific = [
+        (kind, match, priority)
+        for kind, match, priority in available
+        if match is not None and _path_specificity(match[0]) == best_specificity
+    ]
+    kind, owner_match, _ = max(most_specific, key=lambda item: item[2])
+    assert owner_match is not None
+    owner_path, owner_records = owner_match
+
+    canonical_root_id = None
+    if root_match is not None:
+        canonical_root_id = root_match[1][0].get("id")
+    zone_id = None
+    if zone_match is not None:
+        zone_ids = sorted(
+            {
+                record.get("id")
+                for record in zone_match[1]
+                if isinstance(record.get("id"), str)
+            }
+        )
+        if len(zone_ids) > 1:
+            raise ValueError(
+                f"zone ownership is ambiguous for {path}: " + ", ".join(zone_ids)
+            )
+        zone_id = zone_ids[0] if zone_ids else None
+
+    plane_ids: tuple[str, ...] = ()
+    if plane_match is not None:
+        plane_ids = tuple(
+            sorted(
+                {
+                    record.get("plane")
+                    for record in plane_match[1]
+                    if isinstance(record.get("plane"), str)
+                }
+            )
+        )
+
+    authoritative = kind != "policy"
+    policy_class = None
+    if policy_match is not None:
+        policy_class = policy_match[1][0].get("policy_class")
+        if kind == "policy":
+            authoritative = all(
+                record.get("authoritative") is True
+                for record in policy_match[1]
+            )
+
+    return {
+        "path": path,
+        "owner_path": owner_path,
+        "owner_kind": kind,
+        "canonical_root": canonical_root_id,
+        "zone": zone_id,
+        "planes": plane_ids,
+        "policy_class": policy_class,
+        "authoritative": authoritative,
+    }
+
+
+def _validate_component_ownership_fitness(
+    architecture: dict[str, Any],
+    repo_root: Path,
+    nodes: dict[str, dict[str, Any]],
+    errors: list[str],
+) -> dict[str, int]:
+    """Exercise ownership fitness across all declared/generated runtime surfaces."""
+
+    stats = {
+        "runtime_nodes": 0,
+        "construction_planes": 0,
+        "generated_mappings": 0,
+        "generated_sources": 0,
+        "generated_destinations": 0,
+    }
+
+    for node_id, node in sorted(nodes.items()):
+        stats["runtime_nodes"] += 1
+        try:
+            resolution = resolve_architecture_owner(architecture, node.get("path"))
+        except ValueError as exc:
+            errors.append(f"runtime node {node_id} has no architecture owner: {exc}")
+            continue
+        if not resolution["authoritative"]:
+            errors.append(
+                f"runtime node {node_id} resolves only to non-authoritative "
+                f"ownership {resolution['owner_path']}"
+            )
+        declared_zone = node.get("zone")
+        if resolution["zone"] != declared_zone:
+            errors.append(
+                f"runtime node {node_id} owner-zone drift: "
+                f"resolved={resolution['zone']!r} declared={declared_zone!r}"
+            )
+
+    construction = architecture.get("construction")
+    if isinstance(construction, dict):
+        try:
+            construction_path = _normalized_repo_path(construction.get("contract"))
+            contract = _load_json(repo_root / construction_path)
+        except ValueError as exc:
+            errors.append(f"component fitness construction contract: {exc}")
+            contract = {}
+        planes = contract.get("planes")
+        if not isinstance(planes, list):
+            errors.append("component fitness construction planes must be a list")
+            planes = []
+        for index, plane in enumerate(planes):
+            if not isinstance(plane, dict):
+                errors.append(f"component fitness construction plane[{index}] must be an object")
+                continue
+            stats["construction_planes"] += 1
+            plane_id = plane.get("id", f"index-{index}")
+            try:
+                resolution = resolve_architecture_owner(
+                    architecture, plane.get("owner")
+                )
+            except ValueError as exc:
+                errors.append(
+                    f"construction plane {plane_id} has no architecture owner: {exc}"
+                )
+                continue
+            if not resolution["authoritative"]:
+                errors.append(
+                    f"construction plane {plane_id} resolves only to "
+                    f"non-authoritative ownership {resolution['owner_path']}"
+                )
+
+    sources = architecture.get("sources")
+    ai_tree_path = None
+    if isinstance(sources, dict):
+        ai_tree_path = sources.get("ai_file_tree")
+    try:
+        tree_relative = _normalized_repo_path(ai_tree_path)
+        tree = _load_json(repo_root / tree_relative)
+    except ValueError as exc:
+        errors.append(f"component fitness AI file tree: {exc}")
+        return stats
+
+    mappings = tree.get("mappings")
+    if not isinstance(mappings, list):
+        errors.append("component fitness AI file tree mappings must be a list")
+        return stats
+
+    seen_mapping_ids: set[str] = set()
+    for index, mapping in enumerate(mappings):
+        if not isinstance(mapping, dict):
+            errors.append(f"AI file-tree mapping[{index}] must be an object")
+            continue
+        mapping_id = mapping.get("id")
+        if not isinstance(mapping_id, str) or not mapping_id:
+            errors.append(f"AI file-tree mapping[{index}].id must be non-empty")
+            mapping_id = f"index-{index}"
+        elif mapping_id in seen_mapping_ids:
+            errors.append(f"duplicate AI file-tree mapping id: {mapping_id}")
+        else:
+            seen_mapping_ids.add(mapping_id)
+        stats["generated_mappings"] += 1
+
+        for field, stat_key, require_authority in (
+            ("source", "generated_sources", False),
+            ("destination", "generated_destinations", True),
+        ):
+            try:
+                resolution = resolve_architecture_owner(
+                    architecture, mapping.get(field)
+                )
+            except ValueError as exc:
+                errors.append(
+                    f"AI file-tree mapping {mapping_id}.{field} has no "
+                    f"architecture owner: {exc}"
+                )
+                continue
+            stats[stat_key] += 1
+            if require_authority and not resolution["authoritative"]:
+                errors.append(
+                    f"AI file-tree mapping {mapping_id}.{field} resolves only "
+                    f"to non-authoritative ownership {resolution['owner_path']}"
+                )
+
+    return stats
+
+
 def _validate_structural_blueprint(
     architecture: dict[str, Any],
     zones: dict[str, dict[str, Any]],
@@ -1344,6 +1675,9 @@ def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[
     _validate_change_routing(architecture, roots, errors)
     top_level_paths = _validate_top_level_policy(architecture, repo_root, errors)
     structure = _validate_structural_blueprint(architecture, zones, repo_root, errors)
+    component_fitness = _validate_component_ownership_fitness(
+        architecture, repo_root, nodes, errors
+    )
 
     summary = {
         "ok": not errors,
@@ -1359,6 +1693,7 @@ def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[
         else 0,
         "top_level_paths": top_level_paths,
         "structure": structure,
+        "component_fitness": component_fitness,
         "errors": errors,
     }
     return errors, summary
@@ -1403,6 +1738,9 @@ def main(argv: list[str] | None = None) -> int:
             f"execution-profiles={summary['structure'].get('execution_profiles', 0)}; "
             f"startup-groups={summary['structure'].get('startup_groups', 0)}; "
             f"shutdown-groups={summary['structure'].get('shutdown_groups', 0)}; "
+            f"fitness-runtime={summary['component_fitness'].get('runtime_nodes', 0)}; "
+            f"fitness-planes={summary['component_fitness'].get('construction_planes', 0)}; "
+            f"fitness-ai-mappings={summary['component_fitness'].get('generated_mappings', 0)}; "
             f"zone-order={zone_order}; "
             f"runtime-order={order})"
         )

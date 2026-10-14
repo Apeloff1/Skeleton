@@ -1,0 +1,2288 @@
+{
+  "schema_version": 1,
+  "mode": "dry_run_only",
+  "authority": "non_mutating_reconstruction_plan",
+  "source": "machine/accountability_recovery_evidence.json",
+  "record_count": 170,
+  "records": [
+    {
+      "record_id": "ACC-AIQ-S0-COST-01",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-AIQ-S0-GOV-01",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-AIQ-S0-GOV-02",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-AIQ-S0-GOV-03",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-AIQ-S0-STATE-01",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-AIQ-S0-STATE-02",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-01",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-02",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-03",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-04",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-05",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-06",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-000",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-001",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "49b7f43cf818f1b472c1b12ce11ccf0b238b2acc"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-003",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "24fed75d93cc80cbc478c9c3704c29217ad42df0"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-006",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-008",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-009",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-010",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-011",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-012",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-013",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-014",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-015",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-016",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-017",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-018",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-019",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-020",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "ef8ed4bb1b77a339ee300cc0d5877032b3bb43ce"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-021",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "d189a6cc169efae2382a334cefa0187084a1cb5e"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-022",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-023",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-024",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-025",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-026",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-028",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-029",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-030",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-031",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-032",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "704b8f519cc7525441bb31c612b2d790bcde3eb4"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-034",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-035",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-036",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-037",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-038",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-039",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "501852240108902baf293d9ad163b851ec4c37e3"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-040",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-041",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-042",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-043",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-044",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-045",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-046",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-047",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-048",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-049",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-050",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-054",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "9fa6af86306644656afaf5ecfe0acab75b85bad1"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-056",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-057",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-059",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-060",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-061",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-062",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-063",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-064",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-065",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-066",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-067",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-068",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-069",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-070",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-071",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-072",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-075",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-076",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-077",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-078",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-079",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-080",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-082",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-083",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-084",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-093",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-097",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "de822397823ddcb0f9c6b7711647de61cf6b70b1"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-098",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "de822397823ddcb0f9c6b7711647de61cf6b70b1"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-099",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-100",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "515092c37d13bc67b1480ede1c8abde94cc6face"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-101",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "515092c37d13bc67b1480ede1c8abde94cc6face"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-102",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "515092c37d13bc67b1480ede1c8abde94cc6face"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-103",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "515092c37d13bc67b1480ede1c8abde94cc6face"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-104",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "9699a6109af52fc35e71ba5c0504dede7f6f2d5e"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-105",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-106",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-107",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-108",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-109",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-111",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-143",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-144",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-145",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-146",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-147",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-148",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-149",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-150",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-151",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-152",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-153",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-154",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-155",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-156",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-157",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-158",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-161",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-162",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-164",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-165",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-168",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-170",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-171",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-179",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_promotion_from_this_anchor",
+        "verification_signoff"
+      ],
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-196",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "704b8f519cc7525441bb31c612b2d790bcde3eb4"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-200",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "fc3b6d17c7a7509f9c2ec658564fbc0016e7a0b1"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-201",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-202",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-205",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-207",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-208",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-248",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "d06925c181862f46cd6c87bdfa5401efe8f2e472"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-251",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-252",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-253",
+      "recoverable": [
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "8d74b7d3979421780d50b23c211788f185a379b81"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-254",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-255",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-256",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-257",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-258",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-259",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-318",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-320",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-321",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-322",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-323",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-324",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-325",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-361",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-362",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-363",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-369",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-370",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-381",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-382",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-385",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-386",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-390",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-391",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-392",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-397",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-398",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-399",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-403",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-404",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-405",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-406",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-409",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-414",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-415",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-419",
+      "recoverable": [
+        "implementation_signoff_presence"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-420",
+      "recoverable": [
+        "implementation_signoff_presence",
+        "verification_evidence_anchor"
+      ],
+      "blocked": [
+        "completion",
+        "verification_signoff"
+      ],
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    }
+  ]
+}

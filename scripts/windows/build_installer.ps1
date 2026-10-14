@@ -134,6 +134,40 @@ $PyInstallerArgs = @(
     "--hidden-import", "skeleton.app.installer",
     "--hidden-import", "skeleton.app.preloader",
     "--hidden-import", "skeleton.app.setup_runtime",
+    "--hidden-import", "skeleton.app.local_ai",
+    "--hidden-import", "skeleton.app.local_ai_acceptance",
+    "--hidden-import", "skeleton.app.local_ai_benchmark",
+    "--hidden-import", "skeleton.app.local_ai_dataset",
+    "--hidden-import", "skeleton.app.local_ai_gguf",
+    "--hidden-import", "skeleton.app.local_ai_improvement",
+    "--hidden-import", "skeleton.app.local_ai_replay",
+    "--hidden-import", "skeleton.app.local_ai_training",
+    "--hidden-import", "skeleton.app.local_ai_transcript",
+    "--hidden-import", "skeleton.app.offline_chat_cli",
+    "--hidden-import", "skeleton.app.offline_cli",
+    "--hidden-import", "skeleton.app.offline_qualification",
+    "--hidden-import", "skeleton.app.offline_snapshot",
+    "--hidden-import", "skeleton.app.offline_library",
+    "--hidden-import", "skeleton.app.offline_workspace",
+    "--hidden-import", "skeleton.app.offline_audit",
+    "--hidden-import", "skeleton.app.offline_readiness",
+    "--hidden-import", "skeleton.app.offline_index_queue",
+    "--hidden-import", "skeleton.app.offline_http",
+    "--hidden-import", "skeleton.app.offline_knowledge",
+    "--hidden-import", "skeleton.app.offline_grounding",
+    "--hidden-import", "skeleton.app.offline_web",
+    "--hidden-import", "skeleton.ai.runtime.inference.local",
+    "--hidden-import", "skeleton.ai.runtime.inference.native_runtime",
+    "--hidden-import", "skeleton.ai.runtime.inference.artifact",
+    "--hidden-import", "skeleton.ai.runtime.inference.deployment",
+    "--hidden-import", "skeleton.ai.runtime.inference.llama_cpp",
+    "--hidden-import", "skeleton.ai.model_runtime.native_llm_runtime",
+    "--hidden-import", "skeleton.ai.model_runtime.offline_chat",
+    "--hidden-import", "skeleton.ai.model_runtime.chat_engine",
+    "--hidden-import", "skeleton.ai.model_runtime.chat_protocol",
+    "--hidden-import", "skeleton.ai.model_runtime.runtime_checkpoint",
+    "--hidden-import", "skeleton.ai.model_runtime.tokenization",
+    "--hidden-import", "skeleton.cortex.transformer",
     "--hidden-import", "tkinter",
     $EntryPoint
 )
@@ -147,6 +181,29 @@ if (-not (Test-Path -LiteralPath $LauncherExe)) {
     throw "Expected launcher not found: $LauncherExe"
 }
 Copy-Item -LiteralPath $LauncherExe -Destination (Join-Path $PayloadDir "Skeleton.exe") -Force
+
+# The windowed GUI is intentionally separate from the genuine console entry.
+# Reuse the same pinned interpreter and source tree; no extra downloads.
+$ConsoleArgs = @($PyInstallerArgs)
+$WindowFlagIndex = [Array]::IndexOf($ConsoleArgs, "--windowed")
+$ConsoleNameIndex = [Array]::IndexOf($ConsoleArgs, "Skeleton")
+$ConsoleEntryIndex = [Array]::IndexOf($ConsoleArgs, $EntryPoint)
+if ($WindowFlagIndex -lt 0 -or $ConsoleNameIndex -lt 0 -or $ConsoleEntryIndex -lt 0) {
+    throw "Unable to derive canonical offline console build"
+}
+$ConsoleArgs[$WindowFlagIndex] = "--console"
+$ConsoleArgs[$ConsoleNameIndex] = "SkeletonOffline"
+$ConsoleArgs[$ConsoleEntryIndex] = Join-Path $RepoRoot "packaging\windows\offline_cli_entry.py"
+& python @ConsoleArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "PyInstaller offline console build failed"
+}
+$ConsoleExe = Join-Path $LauncherDist "SkeletonOffline.exe"
+if (-not (Test-Path -LiteralPath $ConsoleExe)) {
+    throw "Expected offline console not found: $ConsoleExe"
+}
+Copy-Item -LiteralPath $ConsoleExe -Destination (Join-Path $PayloadDir "SkeletonOffline.exe") -Force
+
 
 $CompilerCandidates = @(
     (Join-Path $env:ProgramFiles "Inno Setup 7\ISCC.exe"),

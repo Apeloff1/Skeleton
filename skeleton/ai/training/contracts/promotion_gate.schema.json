@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-07:promotion_gate:v1",
+  "title": "FLGB-07 promotion gate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_digest",
+    "exact_head_commit",
+    "rights_digest",
+    "contamination_scan_digest",
+    "evaluation_digest",
+    "rollback_digest",
+    "independent_verifier",
+    "rights_passed",
+    "contamination_clear",
+    "evaluation_passed",
+    "rollback_ready"
+  ],
+  "properties": {
+    "candidate_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "exact_head_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rights_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "contamination_scan_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evaluation_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rollback_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "independent_verifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "rights_passed": {
+      "type": "boolean"
+    },
+    "contamination_clear": {
+      "type": "boolean"
+    },
+    "evaluation_passed": {
+      "type": "boolean"
+    },
+    "rollback_ready": {
+      "type": "boolean"
+    }
+  }
+}

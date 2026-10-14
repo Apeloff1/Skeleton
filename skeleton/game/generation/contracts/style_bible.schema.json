@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-14:style_bible:v1",
+  "title": "FLGB-14 style bible",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rule_id",
+    "category",
+    "rule_digest",
+    "severity"
+  ],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "rule_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "severity": {
+      "enum": [
+        "advisory",
+        "required",
+        "forbidden"
+      ]
+    }
+  }
+}

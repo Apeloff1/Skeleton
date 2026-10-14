@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Skeleton Salon — conversation, not a reply box</title>
+<style>
+  :root {
+    --ink: #e7dcc4;
+    --dim: #9a8d76;
+    --coal: #12110f;
+    --panel: #1c1a16;
+    --line: #3a3428;
+    --gold: #c6a15a;
+    --ember: #8d4a32;
+    --lamp: #d7b56d;
+    --seal: #6e8f72;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--coal); color: var(--ink); }
+  body {
+    font-family: "Iowan Old Style", Palatino, "Palatino Linotype", serif;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100%;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 22px; border-bottom: 1px solid var(--line);
+    letter-spacing: 0.14em; text-transform: uppercase; font-size: 12px;
+  }
+  header strong { color: var(--gold); font-weight: 600; }
+  #lamp {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--dim);
+    box-shadow: 0 0 0 0 transparent; margin-right: 8px; display: inline-block;
+  }
+  #lamp.hearing { background: var(--lamp); box-shadow: 0 0 12px var(--lamp); }
+  #lamp.composing { background: var(--gold); }
+  #lamp.adage { background: var(--ember); box-shadow: 0 0 14px var(--ember); }
+  #lamp.sealed { background: var(--seal); }
+  #lamp.interrupted { background: var(--ember); }
+  main { display: grid; grid-template-columns: 1fr 280px; min-height: 0; }
+  #thread {
+    overflow: auto; padding: 28px 8vw 40px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .beat { max-width: 68ch; line-height: 1.45; }
+  .beat.presence { color: var(--dim); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; }
+  .beat.ingress { color: var(--gold); }
+  .beat.stance { color: var(--dim); font-style: italic; }
+  .beat.body { font-size: 18px; }
+  .beat.adage {
+    border-left: 2px solid var(--ember); padding-left: 14px; color: #e6c2b2;
+  }
+  .beat.callback { font-size: 13px; color: var(--gold); }
+  .beat.open_hand { color: var(--ink); }
+  .beat.seal { color: var(--seal); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .chip {
+    border: 1px solid var(--line); color: var(--gold); padding: 2px 8px;
+    font-size: 11px; letter-spacing: 0.06em; text-decoration: none;
+  }
+  aside {
+    border-left: 1px solid var(--line); padding: 18px; background: #16140f;
+    font-size: 13px; color: var(--dim);
+  }
+  aside h2 { color: var(--gold); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; }
+  footer { border-top: 1px solid var(--line); padding: 12px 18px 16px; background: #0e0d0b; }
+  #rail { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  button, #send {
+    background: transparent; color: var(--ink); border: 1px solid var(--line);
+    padding: 6px 10px; letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px;
+    cursor: pointer;
+  }
+  button:hover, #send:hover { border-color: var(--gold); color: var(--gold); }
+  #composer { display: flex; gap: 8px; }
+  textarea {
+    flex: 1; resize: none; height: 54px; background: var(--panel); color: var(--ink);
+    border: 1px solid var(--line); padding: 10px 12px; font: 16px/1.4 Palatino, serif;
+  }
+  textarea:focus { outline: 1px solid var(--gold); }
+  @media (max-width: 800px) {
+    main { grid-template-columns: 1fr; }
+    aside { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #lamp { box-shadow: none !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div><span id="lamp"></span><strong>Salon</strong> · Skeleton chat · October 2026</div>
+  <div id="meta">thread · idle</div>
+</header>
+<main>
+  <section id="thread" aria-live="polite"></section>
+  <aside>
+    <h2>Room</h2>
+    <p>A turn is a sequence of beats. Ingress acknowledges. Stance sets the weather. Body carries the work. The adage is impromptu and budgeted. The open hand is refuseable.</p>
+    <p id="ledger">motifs 0 · adages waiting</p>
+    <h2>Law</h2>
+    <p>stored_prose = 0. The ledger keeps hashes. Interrupt cuts the tail. Seal rearms the composer.</p>
+  </aside>
+</main>
+<footer>
+  <div id="rail">
+    <button data-react="quieter">quieter</button>
+    <button data-react="more_play">more play</button>
+    <button data-react="pin">pin</button>
+    <button data-react="fork">fork</button>
+    <button data-react="hold">hold</button>
+    <button id="cut">interrupt</button>
+  </div>
+  <form id="composer">
+    <label class="sr" for="say" style="position:absolute;left:-999px">Say</label>
+    <textarea id="say" placeholder="Speak. The room answers in beats, not a bubble."></textarea>
+    <button id="send" type="submit">send</button>
+  </form>
+</footer>
+<script>
+const ADAGES = [
+  "A chat that only answers is a filing cabinet with better lighting.",
+  "The aside is the part that proves someone is in the room.",
+  "Cadence is courtesy. Silence between beats is not lag.",
+  "Pin the motif. The thread remembers the hash, not the sentence.",
+  "Fork when the room splits. Do not pretend it is still one talk.",
+  "An open hand is a question you can refuse. That is the point."
+];
+const state = {
+  gap: 2, since: 0, play: 0.35, hands: 1, reduced: matchMedia("(prefers-reduced-motion: reduce)").matches,
+  turn: 0, motifs: [], pins: [], timer: null, live: [], thread: "salon"
+};
+const thread = document.getElementById("thread");
+const lamp = document.getElementById("lamp");
+const meta = document.getElementById("meta");
+const ledger = document.getElementById("ledger");
+function setLamp(name) {
+  lamp.className = name;
+  meta.textContent = state.thread + " · " + name;
+}
+function actOf(text) {
+  const t = text.toLowerCase().trim();
+  if (/^(hi|hey|hello|hei|hallo)\b/.test(t)) return "greeting";
+  if (/\b(bye|goodbye|later)\b/.test(t)) return "farewell";
+  if (/\b(no,|i meant|wrong|again|retry)\b/.test(t)) return "repair";
+  if (/\b(prove|disagree|cite|source)\b/.test(t)) return "challenge";
+  if (t.endsWith("?") || /^(how|why|what|when|should)\b/.test(t)) return "ask";
+  return "assert";
+}
+function affectOf(text, act) {
+  const t = text.toLowerCase();
+  if (/useless|annoyed|hate|again/.test(t)) return "heated";
+  if (/precise|spec|contract/.test(t)) return "precise";
+  if (act === "aside" || state.play >= 0.8) return "playful";
+  return "neutral";
+}
+function cadence(kind, affect) {
+  if (state.reduced) return 0;
+  const base = {presence:80,ingress:220,stance:180,body:40,adage:460,callback:280,open_hand:240,seal:60}[kind] || 120;
+  return affect === "heated" ? Math.floor(base * 0.6) : base;
+}
+function plan(text) {
+  const act = actOf(text);
+  const affect = affectOf(text, act);
+  const beats = [
+    {kind:"presence", text:"lamp:hearing", interruptible:false},
+    {kind:"ingress", text: act === "ask" ? "Heard. Holding the question before I answer it." : "Taken. I'll stay in the room.", interruptible:true},
+    {kind:"stance", text: affect === "heated" ? "Shorter sentences. No lecture." : "Straight answer, then one open hand.", interruptible:true},
+    {kind:"body", text:"The work sits in the body beat. The rest is conversation.", interruptible:true}
+  ];
+  const heated = affect === "heated";
+  if (!heated && state.since >= state.gap && act !== "farewell") {
+    beats.push({kind:"adage", text: ADAGES[state.turn % ADAGES.length], interruptible:true});
+    state.since = 0;
+  } else state.since += 1;
+  if (state.motifs.length) beats.push({kind:"callback", text:"Callback to motif " + state.motifs[state.motifs.length-1] + ". Same grain, earlier cut.", interruptible:true});
+  if (state.hands && act !== "farewell") beats.push({kind:"open_hand", text:"Want the short cut, or the seam underneath?", interruptible:true});
+  beats.push({kind:"seal", text:"composer:rearm", interruptible:false});
+  state.motifs.push("m" + state.turn);
+  state.turn += 1;
+  return beats.map((b, seq) => Object.assign({seq, cadence: cadence(b.kind, affect), lamp: b.kind === "seal" ? "sealed" : b.kind}, b));
+}
+function renderBeat(beat) {
+  const node = document.createElement("article");
+  node.className = "beat " + beat.kind;
+  node.dataset.seq = String(beat.seq);
+  node.textContent = beat.text;
+  thread.appendChild(node);
+  thread.scrollTop = thread.scrollHeight;
+  setLamp(beat.lamp || beat.kind);
+}
+function play(beats) {
+  clearTimeout(state.timer);
+  state.live = beats;
+  let i = 0;
+  const step = () => {
+    if (i >= state.live.length) { document.getElementById("say").focus(); ledger.textContent = "motifs " + state.motifs.length + " · pins " + state.pins.length; return; }
+    const beat = state.live[i];
+    renderBeat(beat);
+    i += 1;
+    state.timer = setTimeout(step, beat.cadence);
+  };
+  step();
+}
+document.getElementById("composer").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const box = document.getElementById("say");
+  const text = box.value.trim();
+  if (!text) return;
+  const you = document.createElement("article");
+  you.className = "beat body";
+  you.textContent = text;
+  thread.appendChild(you);
+  box.value = "";
+  play(plan(text));
+});
+document.getElementById("rail").addEventListener("click", (event) => {
+  const verb = event.target.dataset && event.target.dataset.react;
+  if (!verb) return;
+  if (verb === "quieter") { state.gap = Math.min(8, state.gap + 2); state.hands = 0; }
+  if (verb === "more_play") { state.gap = Math.max(0, state.gap - 1); state.hands = 1; state.play = 1; }
+  if (verb === "pin" && state.motifs.length) state.pins.push(state.motifs[state.motifs.length - 1]);
+  if (verb === "fork") state.thread += "#fork";
+  if (verb === "hold") setLamp("idle");
+  ledger.textContent = verb + " · motifs " + state.motifs.length;
+});
+document.getElementById("cut").addEventListener("click", () => {
+  clearTimeout(state.timer);
+  state.live = [];
+  setLamp("interrupted");
+  document.getElementById("say").focus();
+});
+setLamp("idle");
+</script>
+</body>
+</html>

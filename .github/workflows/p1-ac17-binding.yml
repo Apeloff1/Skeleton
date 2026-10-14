@@ -97,16 +97,7 @@ jobs:
               if not row["evaluation"]["resolved"]
               and row["obligation"]["kind"] == "adversarial"
           }
-          expected = {
-              "AC-01",
-              "AC-08",
-              "AC-10",
-              "AC-16",
-              "AC-19",
-              "AC-21",
-              "AC-23",
-          }
-          if residual != expected:
+          if residual:
               raise SystemExit(
                   f"AC-17 residual axis drift: {sorted(residual)!r}"
               )

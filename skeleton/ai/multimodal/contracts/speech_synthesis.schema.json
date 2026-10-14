@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-08:speech_synthesis:v1",
+  "title": "FLGB-08 speech synthesis",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "text_digest",
+    "voice_id",
+    "voice_rights_digest",
+    "output_format",
+    "max_duration_ms"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "text_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "voice_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "voice_rights_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "output_format": {
+      "enum": [
+        "wav",
+        "mp3",
+        "ogg",
+        "flac"
+      ]
+    },
+    "max_duration_ms": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

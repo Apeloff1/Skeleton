@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-07:contamination_scan:v1",
+  "title": "FLGB-07 contamination scan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dataset_item_digest",
+    "benchmark_item_digest",
+    "relation"
+  ],
+  "properties": {
+    "dataset_item_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "benchmark_item_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "relation": {
+      "enum": [
+        "exact",
+        "derived",
+        "near-duplicate"
+      ]
+    }
+  }
+}

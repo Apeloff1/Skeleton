@@ -1,49 +1,51 @@
 """
 Skeleton — Root package metadata
 
-Tutolage Skeleton — the v16 rewrite of the Tutolage platform.
-
-Root exports kernel primitives plus curated light exports from the
-dependency-light subsystems; heavier surfaces stay in their own
-packages to keep root imports cheap.
+Root exports are intentionally lazy: importing a lightweight submodule must not
+eagerly import configuration, crypto, database, or web-framework dependencies.
+Public compatibility is preserved through module __getattr__.
 """
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
 
 __version__ = "16.0.0"
 __codename__ = "Skeleton"
 
-from skeleton.kernel.errors import SkeletonError
-from skeleton.kernel.events import DomainEvent, EventBus
-from skeleton.kernel.registry import CapabilityRegistry
+_LAZY_EXPORTS = {
+    "SkeletonError": ("skeleton.kernel.errors", "SkeletonError"),
+    "DomainEvent": ("skeleton.kernel.events", "DomainEvent"),
+    "EventBus": ("skeleton.kernel.events", "EventBus"),
+    "CapabilityRegistry": ("skeleton.kernel.registry", "CapabilityRegistry"),
+    "SettingsSnapshotBridge": ("skeleton.config.snapshots", "SettingsSnapshotBridge"),
+    "Fuser": ("skeleton.retrieval.fusion", "Fuser"),
+    "FusionStrategy": ("skeleton.retrieval.fusion", "FusionStrategy"),
+    "ScoredResult": ("skeleton.retrieval.fusion", "ScoredResult"),
+    "Ranker": ("skeleton.retrieval.ranking", "Ranker"),
+    "AccessPolicy": ("skeleton.vault.access", "AccessPolicy"),
+    "Role": ("skeleton.vault.access", "Role"),
+    "EnvelopeKMS": ("skeleton.vault.kms", "EnvelopeKMS"),
+    "Coordinator": ("skeleton.agents.coordination", "Coordinator"),
+    "Sampler": ("skeleton.observability.sampling", "Sampler"),
+    "default_sampler": ("skeleton.observability.sampling", "default_sampler"),
+    "TestCase": ("skeleton.testing.scaffold", "TestCase"),
+    "TestOutcome": ("skeleton.testing.scaffold", "TestOutcome"),
+    "TestScaffold": ("skeleton.testing.scaffold", "TestScaffold"),
+}
 
-# curated light exports from the new subsystems
-from skeleton.config.snapshots import SettingsSnapshotBridge
-from skeleton.retrieval.fusion import Fuser, FusionStrategy, ScoredResult
-from skeleton.retrieval.ranking import Ranker
-from skeleton.vault.access import AccessPolicy, Role
-from skeleton.vault.kms import EnvelopeKMS
-from skeleton.agents.coordination import Coordinator
-from skeleton.observability.sampling import Sampler, default_sampler
-from skeleton.testing.scaffold import TestCase, TestOutcome, TestScaffold
+__all__ = ["__version__", "__codename__", *_LAZY_EXPORTS]
 
-__all__ = [
-    "__version__",
-    "__codename__",
-    "SkeletonError",
-    "EventBus",
-    "DomainEvent",
-    "CapabilityRegistry",
-    "SettingsSnapshotBridge",
-    "Fuser",
-    "FusionStrategy",
-    "ScoredResult",
-    "Ranker",
-    "AccessPolicy",
-    "Role",
-    "EnvelopeKMS",
-    "Coordinator",
-    "Sampler",
-    "default_sampler",
-    "TestCase",
-    "TestOutcome",
-    "TestScaffold",
-]
+
+def __getattr__(name: str) -> Any:
+    target = _LAZY_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attribute = target
+    value = getattr(import_module(module_name), attribute)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))

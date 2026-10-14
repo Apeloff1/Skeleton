@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from core.engine_client import EngineClientConfig, EngineUnavailableError
+from core.engine_client import EngineClientConfig, EngineNotFoundError, EngineUnavailableError
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
@@ -40,9 +40,30 @@ def _thread(*, version: int = 1, sequence: int = 0) -> ConversationThread:
 def route(monkeypatch):
     import routes.ai as ai
     import routes.gameforge_auth as auth
+    from core.chat_turn_lifecycle import ChatTurnLifecycle
+    from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository
 
+    class _AsyncChatTurnAuthority:
+        def __init__(self, repository):
+            self.repository = repository
+
+        def __getattr__(self, name):
+            target = getattr(self.repository, name)
+
+            async def invoke(*args, **kwargs):
+                return target(*args, **kwargs)
+
+            return invoke
+
+    turn_repository = SQLiteChatTurnRepository()
     monkeypatch.setattr(auth, "_enforced", lambda: False)
-    return ai
+    monkeypatch.setattr(
+        ai,
+        "chat_turn_lifecycle",
+        ChatTurnLifecycle(_AsyncChatTurnAuthority(turn_repository)),
+    )
+    yield ai
+    turn_repository.close()
 
 
 @pytest.fixture
@@ -170,6 +191,9 @@ def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
             service_principal="codedock-backend",
             execution_timeout_s=5,
         )
+
+        async def wait_for_terminal(self, **_kwargs):
+            raise EngineNotFoundError("not submitted yet")
 
         async def execute(self, command):
             captured["command"] = command
@@ -318,6 +342,9 @@ def test_configured_engine_outage_never_falls_back_to_backend_provider(
             execution_timeout_s=5,
         )
 
+        async def wait_for_terminal(self, **_kwargs):
+            raise EngineNotFoundError("not submitted yet")
+
         async def execute(self, command):
             raise EngineUnavailableError("offline")
 
@@ -436,6 +463,9 @@ def test_explicit_chat_memory_policy_delegates_verified_memory_and_commits_refs(
             execution_timeout_s=5,
         )
 
+        async def wait_for_terminal(self, **_kwargs):
+            raise EngineNotFoundError("not submitted yet")
+
         async def execute(self, command):
             captured["command"] = command
             return SimpleNamespace(
@@ -444,6 +474,7 @@ def test_explicit_chat_memory_policy_delegates_verified_memory_and_commits_refs(
                 final_output="You prefer concise answers.",
                 verification="verification:memory-policy",
                 evidence_refs=(),
+                provider_receipts=("provider:local:memory-policy",),
                 tool_receipts=(),
                 memory_refs=("memory:preference-1",),
                 artifact_refs=(),

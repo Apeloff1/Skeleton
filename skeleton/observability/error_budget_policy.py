@@ -3,15 +3,15 @@
 Budget state is advisory evidence only. It cannot waive safety/reliability
 checks, grant release authority, or mutate alerting/release configuration.
 """
-
 from __future__ import annotations
 
+from dataclasses import dataclass
+from decimal import Decimal, ROUND_FLOOR
 import hashlib
 import json
-from dataclasses import dataclass
-from decimal import ROUND_FLOOR, Decimal
 
-from skeleton.ai.runtime.observability.slo import SLI, SLO, assess_slo
+from skeleton.observability.slo import SLI, SLO, assess_slo
+
 
 _PPM = 1_000_000
 
@@ -46,12 +46,16 @@ def _digest(value: object) -> str:
             allow_nan=False,
         )
     except (TypeError, ValueError) as exc:
-        raise ErrorBudgetPolicyError("error-budget evidence must be canonical JSON") from exc
+        raise ErrorBudgetPolicyError(
+            "error-budget evidence must be canonical JSON"
+        ) from exc
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _allowed_bad_ppm(target: float) -> int:
-    result = ((Decimal(1) - Decimal(str(target))) * Decimal(_PPM)).to_integral_value(rounding=ROUND_FLOOR)
+    result = (
+        (Decimal("1") - Decimal(str(target))) * Decimal(_PPM)
+    ).to_integral_value(rounding=ROUND_FLOOR)
     return max(0, int(result))
 
 
@@ -139,7 +143,9 @@ class BurnRate:
         if not isinstance(self.unbounded, bool):
             raise ErrorBudgetPolicyError("unbounded must be boolean")
         if self.unbounded != (self.burn_multiple_ppm is None):
-            raise ErrorBudgetPolicyError("unbounded burn must be represented by a null multiple")
+            raise ErrorBudgetPolicyError(
+                "unbounded burn must be represented by a null multiple"
+            )
 
     @property
     def digest(self) -> str:
@@ -182,7 +188,9 @@ class BudgetDecision:
             raise ErrorBudgetPolicyError("unknown budget decision status")
         reasons = tuple(sorted(set(self.blocking_reasons)))
         if any(not isinstance(item, str) or not item for item in reasons):
-            raise ErrorBudgetPolicyError("blocking_reasons must contain non-empty strings")
+            raise ErrorBudgetPolicyError(
+                "blocking_reasons must contain non-empty strings"
+            )
         object.__setattr__(self, "blocking_reasons", reasons)
         for name in (
             "safety_gate_passed",
@@ -200,7 +208,9 @@ class BudgetDecision:
         if not self.reliability_gate_passed:
             expected_reasons.append("reliability-gate-failed")
         if self.blocking_reasons != tuple(sorted(expected_reasons)):
-            raise ErrorBudgetPolicyError("blocking reasons do not match budget/gate evidence")
+            raise ErrorBudgetPolicyError(
+                "blocking reasons do not match budget/gate evidence"
+            )
 
         if not self.safety_gate_passed or not self.reliability_gate_passed:
             expected_status = "blocked"
@@ -209,7 +219,9 @@ class BudgetDecision:
         else:
             expected_status = "healthy"
         if self.status != expected_status:
-            raise ErrorBudgetPolicyError("status does not match budget/gate evidence")
+            raise ErrorBudgetPolicyError(
+                "status does not match budget/gate evidence"
+            )
 
         if self.safety_override is not False:
             raise ErrorBudgetPolicyError("error budget cannot override safety gate")
@@ -272,7 +284,9 @@ def calculate_burn_rate(budget: ErrorBudget) -> BurnRate:
             burn_multiple_ppm=None,
             unbounded=True,
         )
-    multiple = (budget.observed_bad_ppm * _PPM + budget.allowed_bad_ppm - 1) // budget.allowed_bad_ppm
+    multiple = (
+        budget.observed_bad_ppm * _PPM + budget.allowed_bad_ppm - 1
+    ) // budget.allowed_bad_ppm
     return BurnRate(
         budget_digest=budget.digest,
         burn_multiple_ppm=multiple,
@@ -293,7 +307,9 @@ def evaluate_budget_decision(
         raise TypeError("burn_rate must be BurnRate")
     if burn_rate.budget_digest != budget.digest:
         raise ErrorBudgetPolicyError("burn rate belongs to a different budget")
-    if not isinstance(safety_gate_passed, bool) or not isinstance(reliability_gate_passed, bool):
+    if not isinstance(safety_gate_passed, bool) or not isinstance(
+        reliability_gate_passed, bool
+    ):
         raise ErrorBudgetPolicyError("gate states must be boolean")
 
     reasons: list[str] = []

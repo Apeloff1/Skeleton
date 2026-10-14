@@ -36,7 +36,10 @@ jobs:
       ARTIFACT_RETENTION_DAYS: '14'
       FAILED_RUN_RETENTION_DAYS: '21'
       MAX_CACHE_DELETES: '500'
-      MAX_RUN_DELETES: '1000'
+      # A 1,000-delete sweep held the independent ARM lane for eleven minutes,
+      # starving branch pruning while hundreds of CI jobs were queued. Process
+      # cold history in bounded batches; later scheduled/woken sweeps continue.
+      MAX_RUN_DELETES: '150'
       LIVE_RUN_STALE_MINUTES: '10'
       LIVE_FORCE_CANCEL_STALE_MINUTES: '1440'
       # Provider-stuck runs can reject force-cancel indefinitely. Keep a
@@ -68,12 +71,19 @@ jobs:
             while true; do
               : > "$tmp"
               if gh api --paginate "/repos/${REPO}/actions/runs?status=${status_name}&per_page=100" \
-                --jq '.workflow_runs[] | [.id, .name, .event, .head_sha, .head_branch, .created_at] | @tsv' > "$tmp"; then
+                --jq '.workflow_runs[] | [.id, .name, .event, .head_sha, .head_branch, .created_at] | @tsv' > "$tmp" 2>"$RUNNER_TEMP/live-inventory-api-error.txt"; then
                 cat "$tmp" >> "$inventory"
                 rm -f "$tmp"
                 return 0
               else
                 status=$?
+                # API exhaustion is not transient within this sweep. Keep
+                # incomplete inventory unusable, and skip all later stages.
+                if grep -Eqi '(rate.limit|abuse detection)' "$RUNNER_TEMP/live-inventory-api-error.txt"; then
+                  touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
+                  echo '::warning::Housekeeping inventory deferred due to GitHub API limits.'
+                  exit 0
+                fi
               fi
               if (( attempt >= 4 )); then
                 rm -f "$tmp"
@@ -471,6 +481,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]; then
+            echo '::warning::Skipping cache cleanup under GitHub API rate pressure.'
+            exit 0
+          fi
           cutoff=$(date -u -d "${CACHE_RETENTION_DAYS} days ago" +%s)
           inventory="$RUNNER_TEMP/caches.tsv"
           deleted=0
@@ -482,11 +496,18 @@ jobs:
             local attempt=1 delay=2 status tmp="${inventory}.candidate"
             while true; do
               : > "$tmp"
-              if gh api --paginate "/repos/${REPO}/actions/caches?per_page=100" --jq '.actions_caches[] | [.id, .last_accessed_at, .created_at, .size_in_bytes] | @tsv' > "$tmp"; then
+              if gh api --paginate "/repos/${REPO}/actions/caches?per_page=100" --jq '.actions_caches[] | [.id, .last_accessed_at, .created_at, .size_in_bytes] | @tsv' > "$tmp" 2>"$RUNNER_TEMP/cache-inventory-api-error.txt"; then
                 mv "$tmp" "$inventory"
                 return 0
               else
                 status=$?
+                # API exhaustion is not transient within this sweep. Keep
+                # incomplete inventory unusable, and skip all later stages.
+                if grep -Eqi '(rate.limit|abuse detection)' "$RUNNER_TEMP/cache-inventory-api-error.txt"; then
+                  touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
+                  echo '::warning::Housekeeping inventory deferred due to GitHub API limits.'
+                  exit 0
+                fi
               fi
               if (( attempt >= 4 )); then
                 rm -f "$tmp"
@@ -506,9 +527,14 @@ jobs:
             accessed_epoch=$(date -u -d "$accessed" +%s)
             size=${size:-0}
             if (( accessed_epoch < cutoff && deleted < MAX_CACHE_DELETES )); then
-              if gh api --method DELETE "/repos/${REPO}/actions/caches/${id}" >/dev/null 2>&1; then
+              delete_error="$RUNNER_TEMP/cache-delete-error.txt"
+              if gh api --method DELETE "/repos/${REPO}/actions/caches/${id}" >/dev/null 2>"$delete_error"; then
                 deleted=$((deleted + 1))
                 reclaimed=$((reclaimed + size))
+              elif grep -Eqi '(rate.limit|abuse detection)' "$delete_error"; then
+                touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
+                echo '::warning::Cache cleanup deferred: GitHub API rate limit reached.'
+                break
               else
                 failed=$((failed + 1))
               fi
@@ -532,6 +558,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # A prior cleanup step exhausted the installation API budget.
+          # Preserve all later resources instead of retrying doomed mutations.
+          if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]; then
+            echo '::warning::Skipping artifact deletion under GitHub API rate pressure.'
+            exit 0
+          fi
           cutoff=$(date -u -d "${ARTIFACT_RETENTION_DAYS} days ago" +%s)
           inventory="$RUNNER_TEMP/artifacts.tsv"
           deleted=0
@@ -542,11 +574,18 @@ jobs:
             local attempt=1 delay=2 status tmp="${inventory}.candidate"
             while true; do
               : > "$tmp"
-              if gh api --paginate "/repos/${REPO}/actions/artifacts?per_page=100" --jq '.artifacts[] | [.id, .created_at, .expired] | @tsv' > "$tmp"; then
+              if gh api --paginate "/repos/${REPO}/actions/artifacts?per_page=100" --jq '.artifacts[] | [.id, .created_at, .expired] | @tsv' > "$tmp" 2>"$RUNNER_TEMP/artifact-inventory-api-error.txt"; then
                 mv "$tmp" "$inventory"
                 return 0
               else
                 status=$?
+                # API exhaustion is not transient within this sweep. Keep
+                # incomplete inventory unusable, and skip all later stages.
+                if grep -Eqi '(rate.limit|abuse detection)' "$RUNNER_TEMP/artifact-inventory-api-error.txt"; then
+                  touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
+                  echo '::warning::Housekeeping inventory deferred due to GitHub API limits.'
+                  exit 0
+                fi
               fi
               if (( attempt >= 4 )); then
                 rm -f "$tmp"
@@ -564,8 +603,13 @@ jobs:
             [[ -n "${id:-}" && -n "${created:-}" ]] || continue
             created_epoch=$(date -u -d "$created" +%s)
             if [[ "$expired" == 'true' || "$created_epoch" -lt "$cutoff" ]]; then
-              if gh api --method DELETE "/repos/${REPO}/actions/artifacts/${id}" >/dev/null 2>&1; then
+              delete_error="$RUNNER_TEMP/artifact-delete-error.txt"
+              if gh api --method DELETE "/repos/${REPO}/actions/artifacts/${id}" >/dev/null 2>"$delete_error"; then
                 deleted=$((deleted + 1))
+              elif grep -Eqi '(rate.limit|abuse detection)' "$delete_error"; then
+                touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
+                echo '::warning::Artifact cleanup deferred: GitHub API rate limit reached.'
+                break
               else
                 failed=$((failed + 1))
               fi
@@ -585,6 +629,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]; then
+            echo '::warning::Skipping old-run deletion under GitHub API rate pressure.'
+            exit 0
+          fi
           cutoff=$(date -u -d "${FAILED_RUN_RETENTION_DAYS} days ago" +%s)
           cutoff_iso=$(date -u -d "${FAILED_RUN_RETENTION_DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)
           inventory="$RUNNER_TEMP/runs.tsv"
@@ -603,12 +651,19 @@ jobs:
                 --status "$status_name" \
                 --created "<${cutoff_iso}" \
                 --json databaseId,createdAt,conclusion,name \
-                --jq '.[] | [.databaseId, .createdAt, .conclusion, .name] | @tsv' > "$tmp"; then
+                --jq '.[] | [.databaseId, .createdAt, .conclusion, .name] | @tsv' > "$tmp" 2>"$RUNNER_TEMP/failed-run-inventory-api-error.txt"; then
                 cat "$tmp" >> "$inventory"
                 rm -f "$tmp"
                 return 0
               else
                 status=$?
+                # API exhaustion is not transient within this sweep. Keep
+                # incomplete inventory unusable, and skip all later stages.
+                if grep -Eqi '(rate.limit|abuse detection)' "$RUNNER_TEMP/failed-run-inventory-api-error.txt"; then
+                  touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
+                  echo '::warning::Housekeeping inventory deferred due to GitHub API limits.'
+                  exit 0
+                fi
               fi
               if (( attempt >= 4 )); then
                 rm -f "$tmp"
@@ -631,19 +686,23 @@ jobs:
           deleted=0
           failed=0
           kept=0
+          rate_limited=false
           while IFS=$'\t' read -r id created conclusion name; do
             [[ -n "${id:-}" && -n "${created:-}" ]] || continue
             [[ "$id" != "$GITHUB_RUN_ID" ]] || continue
             created_epoch=$(date -u -d "$created" +%s)
-            # Keep a local age guard even though the server query is already
-            # bounded, so malformed or unexpectedly broad results cannot delete
-            # a recent run.
+            # Keep an independent local age guard against broad API results.
             if (( created_epoch >= cutoff || deleted >= MAX_RUN_DELETES )); then
               kept=$((kept + 1))
               continue
             fi
-            if gh run delete "$id" --repo "$REPO"; then
+            delete_error="$RUNNER_TEMP/old-run-delete-error.txt"
+            if gh run delete "$id" --repo "$REPO" 2>"$delete_error"; then
               deleted=$((deleted + 1))
+            elif grep -Eqi '(rate.limit|abuse detection)' "$delete_error"; then
+              rate_limited=true
+              echo '::warning::Old-run cleanup deferred: GitHub API rate limit reached.'
+              break
             else
               failed=$((failed + 1))
             fi
@@ -653,6 +712,7 @@ jobs:
             echo "- Old unsuccessful runs deleted: $deleted"
             echo "- Recent/over-cap unsuccessful runs preserved: $kept"
             echo "- Run deletion failures: $failed"
+            echo "- Rate-limit backpressure activated: $rate_limited"
             echo "- Unsuccessful-run retention threshold: ${FAILED_RUN_RETENTION_DAYS} days"
             echo "- Per-sweep run deletion cap: ${MAX_RUN_DELETES}"
             echo "- Server-side stale-run cutoff: <${cutoff_iso}"

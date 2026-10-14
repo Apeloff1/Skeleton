@@ -115,6 +115,7 @@ class SpineCiQualificationVerify:
         for field in (
             "required_check_policy_digest",
             "checks_digest",
+            "qualification_identity",
             "attestation_digest",
         ):
             value = card.get(field)
@@ -222,6 +223,18 @@ class SpineCiQualificationVerify:
             raise SpineCiQualificationVerifyError(
                 "CI required-check policy digest mismatch"
             )
+        expected_identity = _digest(
+            {
+                "repository": repository,
+                "head_sha": head_sha,
+                "required_check_policy_digest": REQUIRED_CHECK_POLICY_DIGEST,
+                "checks_digest": card["checks_digest"],
+            }
+        )
+        if card["qualification_identity"] != expected_identity:
+            raise SpineCiQualificationVerifyError(
+                "CI qualification identity mismatch"
+            )
         for field in ("catalog_complete", "receipt_authenticated", "ci_green"):
             if card.get(field) is not True:
                 raise SpineCiQualificationVerifyError(
@@ -258,6 +271,7 @@ class SpineCiQualificationVerify:
             "required_check_count": count,
             "checks": normalized_checks,
             "checks_digest": card["checks_digest"],
+            "qualification_identity": card["qualification_identity"],
             "check_names": list(names),
             "attestation_digest": card["attestation_digest"],
             "catalog_complete": card["catalog_complete"],
@@ -278,8 +292,11 @@ class SpineCiQualificationVerify:
             "hit": True,
             "law": "CI-verification-does-not-grant-merge-authority",
             "citation": "VOL-134",
+            "repository": repository,
             "head_sha": head_sha,
+            "required_check_policy_digest": card["required_check_policy_digest"],
             "qualification_digest": digest,
+            "qualification_identity": expected_identity,
             "verified": True,
             "ci_green": True,
             "merge_authority": False,

@@ -21,11 +21,12 @@ context VCS behind it.
 
 from __future__ import annotations
 
+import heapq
 import math
 import re
 import threading
 import time
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Callable, Mapping, Sequence
@@ -361,10 +362,24 @@ class MemoryGameIndex:
         self.policy = policy or MemoryGamePolicy()
         self._clock = clock
         self._cards: dict[str, IndexCard] = {}
+        self._namespace_to_cards: dict[str, set[str]] = defaultdict(set)
         self._source_to_cards: dict[tuple[str, str], set[str]] = defaultdict(set)
         self._token_to_cards: dict[tuple[str, str], set[str]] = defaultdict(set)
         self._relations: dict[str, CardRelation] = {}
         self._relations_by_card: dict[str, set[str]] = defaultdict(set)
+        self._lexical_cache_limit = 8_192
+        self._lexical_cache: OrderedDict[
+            tuple[str, str, tuple[str, ...]],
+            tuple[Counter[str], float, frozenset[str]],
+        ] = OrderedDict()
+        self._retrieval_stats = {
+            "queries": 0,
+            "scored_cards": 0,
+            "lexical_cache_hits": 0,
+            "lexical_cache_misses": 0,
+            "lexical_cache_evictions": 0,
+            "interference_candidates": 0,
+        }
         self._lock = threading.RLock()
 
     def put_card(self, card: IndexCard) -> IndexCard:
@@ -375,9 +390,11 @@ class MemoryGameIndex:
             if prior is None and len(self._cards) >= self.policy.maximum_cards:
                 self._evict_one()
             if prior is not None:
+                self._namespace_to_cards[prior.namespace_key].discard(prior.card_id)
                 self._source_to_cards[(prior.namespace_key, prior.source_ref)].discard(prior.card_id)
                 self._remove_token_index(prior)
             self._cards[card.card_id] = card
+            self._namespace_to_cards[card.namespace_key].add(card.card_id)
             self._source_to_cards[(card.namespace_key, card.source_ref)].add(card.card_id)
             self._add_token_index(card)
             return card
@@ -603,6 +620,7 @@ class MemoryGameIndex:
         )
         minimum_trust = self.policy.minimum_trust if minimum_trust is None else probability("minimum_trust", minimum_trust)
         query_tokens = self._tokens(query)
+        query_norm = self._counter_norm(query_tokens)
         tier_set = {
             value if isinstance(value, SourceTier) else SourceTier(str(value))
             for value in source_tiers
@@ -611,6 +629,7 @@ class MemoryGameIndex:
         now = self._clock()
 
         with self._lock:
+            self._retrieval_stats["queries"] += 1
             candidate_ids: set[str] = set()
             for token in query_tokens:
                 candidate_ids.update(self._token_to_cards.get((namespace_key, token), ()))
@@ -621,19 +640,28 @@ class MemoryGameIndex:
                 source_cards = (self._cards[card_id] for card_id in candidate_ids if card_id in self._cards)
             else:
                 source_cards = (
-                    card for card in self._cards.values() if card.namespace_key == namespace_key
+                    self._cards[card_id]
+                    for card_id in self._namespace_to_cards.get(namespace_key, ())
+                    if card_id in self._cards
                 )
-            cards = [
-                card
-                for card in source_cards
-                if card.namespace_key == namespace_key
-                and card.trust >= minimum_trust
-                and (not tier_set or card.source_tier in tier_set)
-                and (not tag_set or tag_set.issubset(set(card.tags)))
-            ]
-            scored: list[RecallHit] = [self._score_card(card, query_tokens, now) for card in cards]
-            scored.sort(key=lambda hit: (hit.score, hit.card.updated_at, hit.card.card_id), reverse=True)
-            direct = tuple(scored[:limit])
+            direct = tuple(
+                heapq.nlargest(
+                    limit,
+                    (
+                        self._score_card(card, query_tokens, query_norm, now)
+                        for card in source_cards
+                        if card.namespace_key == namespace_key
+                        and card.trust >= minimum_trust
+                        and (not tier_set or card.source_tier in tier_set)
+                        and (not tag_set or tag_set.issubset(set(card.tags)))
+                    ),
+                    key=lambda hit: (
+                        hit.score,
+                        hit.card.updated_at,
+                        hit.card.card_id,
+                    ),
+                )
+            )
             direct_ids = {hit.card.card_id for hit in direct}
 
             relation_candidates: dict[str, tuple[float, list[str]]] = {}
@@ -668,7 +696,7 @@ class MemoryGameIndex:
                 card = self._cards.get(card_id)
                 if card is None:
                     continue
-                base = self._score_card(card, query_tokens, now)
+                base = self._score_card(card, query_tokens, query_norm, now)
                 boosted = min(1.0, base.score * 0.75 + relation_score * 0.25)
                 associative.append(
                     RecallHit(
@@ -684,8 +712,17 @@ class MemoryGameIndex:
                         matched_relations=tuple(sorted(set(relation_ids))),
                     )
                 )
-            associative.sort(key=lambda hit: (hit.score, hit.card.updated_at, hit.card.card_id), reverse=True)
-            associative_tuple = tuple(associative[:associative_limit])
+            associative_tuple = tuple(
+                heapq.nlargest(
+                    associative_limit,
+                    associative,
+                    key=lambda hit: (
+                        hit.score,
+                        hit.card.updated_at,
+                        hit.card.card_id,
+                    ),
+                )
+            )
 
             all_hits = (*direct, *associative_tuple)
             best_score = direct[0].score if direct else 0.0
@@ -770,8 +807,18 @@ class MemoryGameIndex:
                     continue
                 importance = card.salience * 0.35 + card.trust * 0.25 + card.confidence * 0.20 + card.surprise * 0.20
                 candidates.append((urgency * 0.65 + importance * 0.35, card))
-        candidates.sort(key=lambda item: (item[0], item[1].updated_at, item[1].card_id), reverse=True)
-        return tuple(card for _, card in candidates[:limit])
+        return tuple(
+            card
+            for _, card in heapq.nlargest(
+                limit,
+                candidates,
+                key=lambda item: (
+                    item[0],
+                    item[1].updated_at,
+                    item[1].card_id,
+                ),
+            )
+        )
 
     def predicted_next_cards(
         self,
@@ -807,8 +854,17 @@ class MemoryGameIndex:
                 for next_id, score in candidates.items()
                 if next_id in self._cards
             ]
-            values.sort(key=lambda item: (item[1], item[0].updated_at, item[0].card_id), reverse=True)
-            return tuple(values[:limit])
+            return tuple(
+                heapq.nlargest(
+                    limit,
+                    values,
+                    key=lambda item: (
+                        item[1],
+                        item[0].updated_at,
+                        item[0].card_id,
+                    ),
+                )
+            )
 
     def source_cards(self, namespace_key: str, source_ref: str) -> tuple[IndexCard, ...]:
         with self._lock:
@@ -821,6 +877,7 @@ class MemoryGameIndex:
             card = self._cards.pop(card_id, None)
             if card is None:
                 return False
+            self._namespace_to_cards[card.namespace_key].discard(card.card_id)
             self._source_to_cards[(card.namespace_key, card.source_ref)].discard(card.card_id)
             self._remove_token_index(card)
             relation_ids = tuple(self._relations_by_card.pop(card.card_id, set()))
@@ -848,10 +905,21 @@ class MemoryGameIndex:
 
     def cards(self, namespace_key: str | None = None) -> tuple[IndexCard, ...]:
         with self._lock:
-            values = self._cards.values()
-            if namespace_key is not None:
-                values = (card for card in values if card.namespace_key == namespace_key)
-            return tuple(sorted(values, key=lambda card: (card.updated_at, card.card_id), reverse=True))
+            if namespace_key is None:
+                values = self._cards.values()
+            else:
+                values = (
+                    self._cards[card_id]
+                    for card_id in self._namespace_to_cards.get(namespace_key, ())
+                    if card_id in self._cards
+                )
+            return tuple(
+                sorted(
+                    values,
+                    key=lambda card: (card.updated_at, card.card_id),
+                    reverse=True,
+                )
+            )
 
     def card(self, card_id: str) -> IndexCard | None:
         with self._lock:
@@ -873,7 +941,7 @@ class MemoryGameIndex:
         with self._lock:
             if namespace_key is None:
                 return len(self._cards)
-            return sum(1 for card in self._cards.values() if card.namespace_key == namespace_key)
+            return len(self._namespace_to_cards.get(namespace_key, ()))
 
     @property
     def fingerprint(self) -> str:
@@ -891,12 +959,28 @@ class MemoryGameIndex:
                 }
             )
 
-    def _score_card(self, card: IndexCard, query_tokens: Counter[str], now: float) -> RecallHit:
-        cue_tokens = self._tokens(card.cue + " " + card.preview + " " + " ".join(card.tags))
-        cue_score = self._cosine(query_tokens, cue_tokens)
+    def _score_card(
+        self,
+        card: IndexCard,
+        query_tokens: Counter[str],
+        query_norm: float,
+        now: float,
+    ) -> RecallHit:
+        lexical_tokens, lexical_norm, cue_tokens = self._lexical_features(card)
+        cue_score = self._cosine_precomputed(
+            query_tokens,
+            query_norm,
+            lexical_tokens,
+            lexical_norm,
+        )
+        self._retrieval_stats["scored_cards"] += 1
         age = max(0.0, now - card.updated_at)
         recency = math.exp(-math.log(2.0) * age / self.policy.half_life_seconds)
-        retrieval_probability = self._retrieval_probability(card, now)
+        retrieval_probability = self._retrieval_probability(
+            card,
+            now,
+            cue_tokens=cue_tokens,
+        )
         strength = card.retrieval_strength
         utility = float(card.metadata.get("retrieval_utility", 0.5))
         utility = max(0.0, min(1.0, utility))
@@ -924,7 +1008,13 @@ class MemoryGameIndex:
             retrieval_probability=retrieval_probability,
         )
 
-    def _retrieval_probability(self, card: IndexCard, now: float) -> float:
+    def _retrieval_probability(
+        self,
+        card: IndexCard,
+        now: float,
+        *,
+        cue_tokens: frozenset[str] | None = None,
+    ) -> float:
         elapsed_hours = max(0.0, now - (card.last_success_at or card.created_at)) / 3600.0
         # Activation is deliberately transparent.  Strength and successful
         # spaced retrieval increase activation; time, failures and interference
@@ -932,7 +1022,7 @@ class MemoryGameIndex:
         spacing_bonus = math.log1p(card.successful_retrievals) * 0.30
         failure_penalty = math.log1p(card.failed_retrievals) * 0.35
         time_penalty = math.log1p(elapsed_hours / 24.0) * 0.18
-        similar_cards = self._interference_count(card)
+        similar_cards = self._interference_count(card, cue_tokens=cue_tokens)
         interference_penalty = math.log1p(similar_cards) * 0.08
         activation = (
             (card.retrieval_strength - 0.5) * 3.0
@@ -978,18 +1068,38 @@ class MemoryGameIndex:
         self._cards[card_id] = touched
         return touched
 
-    def _interference_count(self, card: IndexCard) -> int:
-        card_tokens = set(self._tokens(card.cue))
+    def _interference_count(
+        self,
+        card: IndexCard,
+        *,
+        cue_tokens: frozenset[str] | None = None,
+    ) -> int:
+        card_tokens = cue_tokens
+        if card_tokens is None:
+            _lexical, _norm, card_tokens = self._lexical_features(card)
         if not card_tokens:
             return 0
+
+        candidate_ids: set[str] = set()
+        for token in card_tokens:
+            candidate_ids.update(
+                self._token_to_cards.get((card.namespace_key, token), ())
+            )
+        candidate_ids.discard(card.card_id)
+        self._retrieval_stats["interference_candidates"] += len(candidate_ids)
+
         count = 0
-        for other in self._cards.values():
-            if other.card_id == card.card_id or other.namespace_key != card.namespace_key:
+        for card_id in candidate_ids:
+            other = self._cards.get(card_id)
+            if other is None or other.namespace_key != card.namespace_key:
                 continue
-            other_tokens = set(self._tokens(other.cue))
+            _lexical, _norm, other_tokens = self._lexical_features(other)
             if not other_tokens:
                 continue
-            jaccard = len(card_tokens & other_tokens) / max(1, len(card_tokens | other_tokens))
+            jaccard = len(card_tokens & other_tokens) / max(
+                1,
+                len(card_tokens | other_tokens),
+            )
             if jaccard >= 0.55:
                 count += 1
         return count
@@ -1008,11 +1118,13 @@ class MemoryGameIndex:
         return False
 
     def _add_token_index(self, card: IndexCard) -> None:
-        for token in self._tokens(card.cue + " " + card.preview + " " + " ".join(card.tags)):
+        lexical_tokens, _norm, _cue_tokens = self._lexical_features(card)
+        for token in lexical_tokens:
             self._token_to_cards[(card.namespace_key, token)].add(card.card_id)
 
     def _remove_token_index(self, card: IndexCard) -> None:
-        for token in self._tokens(card.cue + " " + card.preview + " " + " ".join(card.tags)):
+        lexical_tokens, _norm, _cue_tokens = self._lexical_features(card)
+        for token in lexical_tokens:
             key = (card.namespace_key, token)
             bucket = self._token_to_cards.get(key)
             if bucket is None:
@@ -1026,15 +1138,72 @@ class MemoryGameIndex:
         return Counter(token.casefold() for token in _TOKEN_RE.findall(text or ""))
 
     @staticmethod
-    def _cosine(left: Counter[str], right: Counter[str]) -> float:
-        if not left or not right:
+    def _counter_norm(tokens: Counter[str]) -> float:
+        return (
+            math.sqrt(sum(value * value for value in tokens.values()))
+            if tokens
+            else 0.0
+        )
+
+    @staticmethod
+    def _lexical_key(card: IndexCard) -> tuple[str, str, tuple[str, ...]]:
+        return (card.cue, card.preview, card.tags)
+
+    def _lexical_features(
+        self,
+        card: IndexCard,
+    ) -> tuple[Counter[str], float, frozenset[str]]:
+        cache_key = self._lexical_key(card)
+        cached = self._lexical_cache.get(cache_key)
+        if cached is not None:
+            self._lexical_cache.move_to_end(cache_key)
+            self._retrieval_stats["lexical_cache_hits"] += 1
+            return cached
+
+        lexical_tokens = self._tokens(
+            card.cue + " " + card.preview + " " + " ".join(card.tags)
+        )
+        cue_tokens = frozenset(self._tokens(card.cue))
+        prepared = (
+            lexical_tokens,
+            self._counter_norm(lexical_tokens),
+            cue_tokens,
+        )
+        self._lexical_cache[cache_key] = prepared
+        self._retrieval_stats["lexical_cache_misses"] += 1
+        while len(self._lexical_cache) > self._lexical_cache_limit:
+            self._lexical_cache.popitem(last=False)
+            self._retrieval_stats["lexical_cache_evictions"] += 1
+        return prepared
+
+    @staticmethod
+    def _cosine_precomputed(
+        left: Counter[str],
+        left_norm: float,
+        right: Counter[str],
+        right_norm: float,
+    ) -> float:
+        if not left or not right or not left_norm or not right_norm:
             return 0.0
         dot = sum(count * right.get(token, 0) for token, count in left.items())
-        ln = math.sqrt(sum(value * value for value in left.values()))
-        rn = math.sqrt(sum(value * value for value in right.values()))
-        if not ln or not rn:
-            return 0.0
-        return max(0.0, min(1.0, dot / (ln * rn)))
+        return max(0.0, min(1.0, dot / (left_norm * right_norm)))
+
+    @classmethod
+    def _cosine(cls, left: Counter[str], right: Counter[str]) -> float:
+        return cls._cosine_precomputed(
+            left,
+            cls._counter_norm(left),
+            right,
+            cls._counter_norm(right),
+        )
+
+    def retrieval_stats(self) -> Mapping[str, int]:
+        with self._lock:
+            return {
+                **self._retrieval_stats,
+                "lexical_cache_entries": len(self._lexical_cache),
+                "lexical_cache_limit": self._lexical_cache_limit,
+            }
 
     def _evict_one(self) -> None:
         if not self._cards:
@@ -1053,6 +1222,7 @@ class MemoryGameIndex:
             ),
         )
         self._cards.pop(victim.card_id, None)
+        self._namespace_to_cards[victim.namespace_key].discard(victim.card_id)
         self._source_to_cards[(victim.namespace_key, victim.source_ref)].discard(victim.card_id)
         self._remove_token_index(victim)
         relation_ids = tuple(self._relations_by_card.pop(victim.card_id, set()))

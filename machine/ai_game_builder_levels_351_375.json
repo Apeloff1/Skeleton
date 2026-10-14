@@ -1,0 +1,1629 @@
+{
+  "schema_version": "skeleton.ai_game_builder_levels_shard.v1",
+  "manifest": "machine/ai_game_builder_500_levels.json",
+  "start": 351,
+  "end": 375,
+  "count": 25,
+  "levels": [
+    {
+      "id": "GBL-351",
+      "ordinal": 351,
+      "family_id": "GB36",
+      "family": "Accessibility & Inclusive Design",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+      "owner": "backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json",
+      "batches": [
+        "B024",
+        "B075"
+      ],
+      "metrics": [
+        "feature coverage",
+        "task equivalence",
+        "discoverability",
+        "regression resistance"
+      ],
+      "requirements": [
+        "Specify Accessibility & Inclusive Design: Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+        "Declare player/service outcomes, supported conditions, anti-goals, invariants and acceptance fixtures.",
+        "Bind backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json and B024, B075."
+      ],
+      "adversarial": [
+        "color-only signaling",
+        "unremappable action",
+        "subtitle failure",
+        "inaccessible timing",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-351 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-352",
+      "ordinal": 352,
+      "family_id": "GB36",
+      "family": "Accessibility & Inclusive Design",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+      "owner": "backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json",
+      "batches": [
+        "B024",
+        "B075"
+      ],
+      "metrics": [
+        "feature coverage",
+        "task equivalence",
+        "discoverability",
+        "regression resistance"
+      ],
+      "requirements": [
+        "Define typed authoritative state/protocol/schema identities, ordering/versioning, provenance and deterministic serialization.",
+        "Make compatibility and unsupported states explicit.",
+        "Separate authority from UI/cache/model context."
+      ],
+      "adversarial": [
+        "color-only signaling",
+        "unremappable action",
+        "subtitle failure",
+        "inaccessible timing",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-352 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-353",
+      "ordinal": 353,
+      "family_id": "GB36",
+      "family": "Accessibility & Inclusive Design",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+      "owner": "backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json",
+      "batches": [
+        "B024",
+        "B075"
+      ],
+      "metrics": [
+        "feature coverage",
+        "task equivalence",
+        "discoverability",
+        "regression resistance"
+      ],
+      "requirements": [
+        "Implement/configure through canonical runtime contracts from ProjectDNA, champion and governed state.",
+        "Record generated config/code/model transformations.",
+        "Use transactional/idempotent state changes and retain a reference path."
+      ],
+      "adversarial": [
+        "color-only signaling",
+        "unremappable action",
+        "subtitle failure",
+        "inaccessible timing",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-353 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-354",
+      "ordinal": 354,
+      "family_id": "GB36",
+      "family": "Accessibility & Inclusive Design",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+      "owner": "backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json",
+      "batches": [
+        "B024",
+        "B075"
+      ],
+      "metrics": [
+        "feature coverage",
+        "task equivalence",
+        "discoverability",
+        "regression resistance"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote with rival role rotation.",
+        "Opponent attacks failure tolerance, usability, abuse/exploit paths and state correctness, then submits a better candidate.",
+        "Hard deterministic gates decide promotion."
+      ],
+      "adversarial": [
+        "color-only signaling",
+        "unremappable action",
+        "subtitle failure",
+        "inaccessible timing",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-354 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-355",
+      "ordinal": 355,
+      "family_id": "GB36",
+      "family": "Accessibility & Inclusive Design",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+      "owner": "backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json",
+      "batches": [
+        "B024",
+        "B075"
+      ],
+      "metrics": [
+        "feature coverage",
+        "task equivalence",
+        "discoverability",
+        "regression resistance"
+      ],
+      "requirements": [
+        "Verify coupling with input, gameplay, world/narrative state, UI, platform, persistence and release contracts.",
+        "Propagate contract/version changes to dependents.",
+        "Reject local improvements that strand users or corrupt long-horizon state."
+      ],
+      "adversarial": [
+        "color-only signaling",
+        "unremappable action",
+        "subtitle failure",
+        "inaccessible timing",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-355 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-356",
+      "ordinal": 356,
+      "family_id": "GB36",
+      "family": "Accessibility & Inclusive Design",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+      "owner": "backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json",
+      "batches": [
+        "B024",
+        "B075"
+      ],
+      "metrics": [
+        "feature coverage",
+        "task equivalence",
+        "discoverability",
+        "regression resistance"
+      ],
+      "requirements": [
+        "Run deterministic compatibility matrices, fault injection, property/fuzz tests and replay evidence.",
+        "Attack color-only signaling, unremappable action, subtitle failure, inaccessible timing.",
+        "Persist minimized failing traces as regressions."
+      ],
+      "adversarial": [
+        "color-only signaling",
+        "unremappable action",
+        "subtitle failure",
+        "inaccessible timing",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-356 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-357",
+      "ordinal": 357,
+      "family_id": "GB36",
+      "family": "Accessibility & Inclusive Design",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+      "owner": "backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json",
+      "batches": [
+        "B024",
+        "B075"
+      ],
+      "metrics": [
+        "feature coverage",
+        "task equivalence",
+        "discoverability",
+        "regression resistance"
+      ],
+      "requirements": [
+        "Improve feature coverage, task equivalence, discoverability, regression resistance jointly with accessibility, performance, security and maintainability.",
+        "Reject aggregate wins that hide critical cohort/network/state failures.",
+        "Keep current champion unless improvement is Pareto-safe."
+      ],
+      "adversarial": [
+        "color-only signaling",
+        "unremappable action",
+        "subtitle failure",
+        "inaccessible timing",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-357 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-358",
+      "ordinal": 358,
+      "family_id": "GB36",
+      "family": "Accessibility & Inclusive Design",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+      "owner": "backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json",
+      "batches": [
+        "B024",
+        "B075"
+      ],
+      "metrics": [
+        "feature coverage",
+        "task equivalence",
+        "discoverability",
+        "regression resistance"
+      ],
+      "requirements": [
+        "Support explicit version migration, semantic diff, rollback and crash-safe checkpoint recovery.",
+        "Resume exact state/protocol/canon/rival/evaluator identity.",
+        "No migration may silently discard authoritative player state."
+      ],
+      "adversarial": [
+        "color-only signaling",
+        "unremappable action",
+        "subtitle failure",
+        "inaccessible timing",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-358 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-359",
+      "ordinal": 359,
+      "family_id": "GB36",
+      "family": "Accessibility & Inclusive Design",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+      "owner": "backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json",
+      "batches": [
+        "B024",
+        "B075"
+      ],
+      "metrics": [
+        "feature coverage",
+        "task equivalence",
+        "discoverability",
+        "regression resistance"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000, exactly three stages per round, no wall-clock deadline.",
+        "Stress many devices/clients/versions/save histories under bounded resources.",
+        "Detect drift, nondeterminism, retry storms and evaluator overfit."
+      ],
+      "adversarial": [
+        "color-only signaling",
+        "unremappable action",
+        "subtitle failure",
+        "inaccessible timing",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-359 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "deep-effort resilience report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-360",
+      "ordinal": 360,
+      "family_id": "GB36",
+      "family": "Accessibility & Inclusive Design",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Integrate visual, auditory, motor, cognitive, input and difficulty accessibility into design, implementation and QA.",
+      "owner": "backend/gameforge/roles/enhanced_role_data_sets/accessibility_enhanced_batch_01.json",
+      "batches": [
+        "B024",
+        "B075"
+      ],
+      "metrics": [
+        "feature coverage",
+        "task equivalence",
+        "discoverability",
+        "regression resistance"
+      ],
+      "requirements": [
+        "Require independent exact-head compatibility/failure-recovery evidence.",
+        "Block accessibility, security, rights, determinism or state-integrity failures.",
+        "Expire qualification on material implementation/protocol/model/evaluator drift."
+      ],
+      "adversarial": [
+        "color-only signaling",
+        "unremappable action",
+        "subtitle failure",
+        "inaccessible timing",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-360 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "deep-effort resilience report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-361",
+      "ordinal": 361,
+      "family_id": "GB37",
+      "family": "Multiplayer & Networked Play",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+      "owner": "skeleton/ai/simulation/game/replay.py",
+      "batches": [
+        "B061",
+        "B062",
+        "B063",
+        "B065",
+        "B066",
+        "B068"
+      ],
+      "metrics": [
+        "sync correctness",
+        "latency tolerance",
+        "abuse resistance",
+        "cross-version safety"
+      ],
+      "requirements": [
+        "Specify Multiplayer & Networked Play: Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+        "Declare player/service outcomes, supported conditions, anti-goals, invariants and acceptance fixtures.",
+        "Bind skeleton/ai/simulation/game/replay.py and B061, B062, B063, B065, B066, B068."
+      ],
+      "adversarial": [
+        "desync",
+        "packet reorder",
+        "authority spoof",
+        "rollback divergence",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-361 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-362",
+      "ordinal": 362,
+      "family_id": "GB37",
+      "family": "Multiplayer & Networked Play",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+      "owner": "skeleton/ai/simulation/game/replay.py",
+      "batches": [
+        "B061",
+        "B062",
+        "B063",
+        "B065",
+        "B066",
+        "B068"
+      ],
+      "metrics": [
+        "sync correctness",
+        "latency tolerance",
+        "abuse resistance",
+        "cross-version safety"
+      ],
+      "requirements": [
+        "Define typed authoritative state/protocol/schema identities, ordering/versioning, provenance and deterministic serialization.",
+        "Make compatibility and unsupported states explicit.",
+        "Separate authority from UI/cache/model context."
+      ],
+      "adversarial": [
+        "desync",
+        "packet reorder",
+        "authority spoof",
+        "rollback divergence",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-362 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-363",
+      "ordinal": 363,
+      "family_id": "GB37",
+      "family": "Multiplayer & Networked Play",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+      "owner": "skeleton/ai/simulation/game/replay.py",
+      "batches": [
+        "B061",
+        "B062",
+        "B063",
+        "B065",
+        "B066",
+        "B068"
+      ],
+      "metrics": [
+        "sync correctness",
+        "latency tolerance",
+        "abuse resistance",
+        "cross-version safety"
+      ],
+      "requirements": [
+        "Implement/configure through canonical runtime contracts from ProjectDNA, champion and governed state.",
+        "Record generated config/code/model transformations.",
+        "Use transactional/idempotent state changes and retain a reference path."
+      ],
+      "adversarial": [
+        "desync",
+        "packet reorder",
+        "authority spoof",
+        "rollback divergence",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-363 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-364",
+      "ordinal": 364,
+      "family_id": "GB37",
+      "family": "Multiplayer & Networked Play",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+      "owner": "skeleton/ai/simulation/game/replay.py",
+      "batches": [
+        "B061",
+        "B062",
+        "B063",
+        "B065",
+        "B066",
+        "B068"
+      ],
+      "metrics": [
+        "sync correctness",
+        "latency tolerance",
+        "abuse resistance",
+        "cross-version safety"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote with rival role rotation.",
+        "Opponent attacks failure tolerance, usability, abuse/exploit paths and state correctness, then submits a better candidate.",
+        "Hard deterministic gates decide promotion."
+      ],
+      "adversarial": [
+        "desync",
+        "packet reorder",
+        "authority spoof",
+        "rollback divergence",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-364 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-365",
+      "ordinal": 365,
+      "family_id": "GB37",
+      "family": "Multiplayer & Networked Play",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+      "owner": "skeleton/ai/simulation/game/replay.py",
+      "batches": [
+        "B061",
+        "B062",
+        "B063",
+        "B065",
+        "B066",
+        "B068"
+      ],
+      "metrics": [
+        "sync correctness",
+        "latency tolerance",
+        "abuse resistance",
+        "cross-version safety"
+      ],
+      "requirements": [
+        "Verify coupling with input, gameplay, world/narrative state, UI, platform, persistence and release contracts.",
+        "Propagate contract/version changes to dependents.",
+        "Reject local improvements that strand users or corrupt long-horizon state."
+      ],
+      "adversarial": [
+        "desync",
+        "packet reorder",
+        "authority spoof",
+        "rollback divergence",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-365 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-366",
+      "ordinal": 366,
+      "family_id": "GB37",
+      "family": "Multiplayer & Networked Play",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+      "owner": "skeleton/ai/simulation/game/replay.py",
+      "batches": [
+        "B061",
+        "B062",
+        "B063",
+        "B065",
+        "B066",
+        "B068"
+      ],
+      "metrics": [
+        "sync correctness",
+        "latency tolerance",
+        "abuse resistance",
+        "cross-version safety"
+      ],
+      "requirements": [
+        "Run deterministic compatibility matrices, fault injection, property/fuzz tests and replay evidence.",
+        "Attack desync, packet reorder, authority spoof, rollback divergence.",
+        "Persist minimized failing traces as regressions."
+      ],
+      "adversarial": [
+        "desync",
+        "packet reorder",
+        "authority spoof",
+        "rollback divergence",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-366 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-367",
+      "ordinal": 367,
+      "family_id": "GB37",
+      "family": "Multiplayer & Networked Play",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+      "owner": "skeleton/ai/simulation/game/replay.py",
+      "batches": [
+        "B061",
+        "B062",
+        "B063",
+        "B065",
+        "B066",
+        "B068"
+      ],
+      "metrics": [
+        "sync correctness",
+        "latency tolerance",
+        "abuse resistance",
+        "cross-version safety"
+      ],
+      "requirements": [
+        "Improve sync correctness, latency tolerance, abuse resistance, cross-version safety jointly with accessibility, performance, security and maintainability.",
+        "Reject aggregate wins that hide critical cohort/network/state failures.",
+        "Keep current champion unless improvement is Pareto-safe."
+      ],
+      "adversarial": [
+        "desync",
+        "packet reorder",
+        "authority spoof",
+        "rollback divergence",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-367 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-368",
+      "ordinal": 368,
+      "family_id": "GB37",
+      "family": "Multiplayer & Networked Play",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+      "owner": "skeleton/ai/simulation/game/replay.py",
+      "batches": [
+        "B061",
+        "B062",
+        "B063",
+        "B065",
+        "B066",
+        "B068"
+      ],
+      "metrics": [
+        "sync correctness",
+        "latency tolerance",
+        "abuse resistance",
+        "cross-version safety"
+      ],
+      "requirements": [
+        "Support explicit version migration, semantic diff, rollback and crash-safe checkpoint recovery.",
+        "Resume exact state/protocol/canon/rival/evaluator identity.",
+        "No migration may silently discard authoritative player state."
+      ],
+      "adversarial": [
+        "desync",
+        "packet reorder",
+        "authority spoof",
+        "rollback divergence",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-368 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-369",
+      "ordinal": 369,
+      "family_id": "GB37",
+      "family": "Multiplayer & Networked Play",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+      "owner": "skeleton/ai/simulation/game/replay.py",
+      "batches": [
+        "B061",
+        "B062",
+        "B063",
+        "B065",
+        "B066",
+        "B068"
+      ],
+      "metrics": [
+        "sync correctness",
+        "latency tolerance",
+        "abuse resistance",
+        "cross-version safety"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000, exactly three stages per round, no wall-clock deadline.",
+        "Stress many devices/clients/versions/save histories under bounded resources.",
+        "Detect drift, nondeterminism, retry storms and evaluator overfit."
+      ],
+      "adversarial": [
+        "desync",
+        "packet reorder",
+        "authority spoof",
+        "rollback divergence",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-369 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "deep-effort resilience report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-370",
+      "ordinal": 370,
+      "family_id": "GB37",
+      "family": "Multiplayer & Networked Play",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Design sessions, replication, prediction, rollback, matchmaking, authority and abuse-resistant protocol behavior.",
+      "owner": "skeleton/ai/simulation/game/replay.py",
+      "batches": [
+        "B061",
+        "B062",
+        "B063",
+        "B065",
+        "B066",
+        "B068"
+      ],
+      "metrics": [
+        "sync correctness",
+        "latency tolerance",
+        "abuse resistance",
+        "cross-version safety"
+      ],
+      "requirements": [
+        "Require independent exact-head compatibility/failure-recovery evidence.",
+        "Block accessibility, security, rights, determinism or state-integrity failures.",
+        "Expire qualification on material implementation/protocol/model/evaluator drift."
+      ],
+      "adversarial": [
+        "desync",
+        "packet reorder",
+        "authority spoof",
+        "rollback divergence",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-370 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "deep-effort resilience report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-371",
+      "ordinal": 371,
+      "family_id": "GB38",
+      "family": "Save, Load, Replay & Migration",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+      "owner": "skeleton/jeeves/game_engine_saves.py",
+      "batches": [
+        "B025",
+        "B049",
+        "B072"
+      ],
+      "metrics": [
+        "state fidelity",
+        "migration safety",
+        "replay determinism",
+        "corruption recovery"
+      ],
+      "requirements": [
+        "Specify Save, Load, Replay & Migration: Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+        "Declare player/service outcomes, supported conditions, anti-goals, invariants and acceptance fixtures.",
+        "Bind skeleton/jeeves/game_engine_saves.py and B025, B049, B072."
+      ],
+      "adversarial": [
+        "partial save",
+        "schema mismatch",
+        "replay divergence",
+        "corrupt checkpoint",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-371 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-372",
+      "ordinal": 372,
+      "family_id": "GB38",
+      "family": "Save, Load, Replay & Migration",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+      "owner": "skeleton/jeeves/game_engine_saves.py",
+      "batches": [
+        "B025",
+        "B049",
+        "B072"
+      ],
+      "metrics": [
+        "state fidelity",
+        "migration safety",
+        "replay determinism",
+        "corruption recovery"
+      ],
+      "requirements": [
+        "Define typed authoritative state/protocol/schema identities, ordering/versioning, provenance and deterministic serialization.",
+        "Make compatibility and unsupported states explicit.",
+        "Separate authority from UI/cache/model context."
+      ],
+      "adversarial": [
+        "partial save",
+        "schema mismatch",
+        "replay divergence",
+        "corrupt checkpoint",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-372 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-373",
+      "ordinal": 373,
+      "family_id": "GB38",
+      "family": "Save, Load, Replay & Migration",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+      "owner": "skeleton/jeeves/game_engine_saves.py",
+      "batches": [
+        "B025",
+        "B049",
+        "B072"
+      ],
+      "metrics": [
+        "state fidelity",
+        "migration safety",
+        "replay determinism",
+        "corruption recovery"
+      ],
+      "requirements": [
+        "Implement/configure through canonical runtime contracts from ProjectDNA, champion and governed state.",
+        "Record generated config/code/model transformations.",
+        "Use transactional/idempotent state changes and retain a reference path."
+      ],
+      "adversarial": [
+        "partial save",
+        "schema mismatch",
+        "replay divergence",
+        "corrupt checkpoint",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-373 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-374",
+      "ordinal": 374,
+      "family_id": "GB38",
+      "family": "Save, Load, Replay & Migration",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+      "owner": "skeleton/jeeves/game_engine_saves.py",
+      "batches": [
+        "B025",
+        "B049",
+        "B072"
+      ],
+      "metrics": [
+        "state fidelity",
+        "migration safety",
+        "replay determinism",
+        "corruption recovery"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote with rival role rotation.",
+        "Opponent attacks failure tolerance, usability, abuse/exploit paths and state correctness, then submits a better candidate.",
+        "Hard deterministic gates decide promotion."
+      ],
+      "adversarial": [
+        "partial save",
+        "schema mismatch",
+        "replay divergence",
+        "corrupt checkpoint",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-374 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-375",
+      "ordinal": 375,
+      "family_id": "GB38",
+      "family": "Save, Load, Replay & Migration",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Persist full game state, migrate schemas, reproduce sessions and recover safely across versions and failures.",
+      "owner": "skeleton/jeeves/game_engine_saves.py",
+      "batches": [
+        "B025",
+        "B049",
+        "B072"
+      ],
+      "metrics": [
+        "state fidelity",
+        "migration safety",
+        "replay determinism",
+        "corruption recovery"
+      ],
+      "requirements": [
+        "Verify coupling with input, gameplay, world/narrative state, UI, platform, persistence and release contracts.",
+        "Propagate contract/version changes to dependents.",
+        "Reject local improvements that strand users or corrupt long-horizon state."
+      ],
+      "adversarial": [
+        "partial save",
+        "schema mismatch",
+        "replay divergence",
+        "corrupt checkpoint",
+        "cross-version long-tail failure",
+        "local fix causing whole-project regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "state/protocol provenance known",
+        "critical accessibility/security failures forbidden",
+        "deterministic/replay integrity",
+        "bounded resources",
+        "rollback/recovery proven",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-375 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "compatibility/integration report",
+        "fault/replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ]
+}

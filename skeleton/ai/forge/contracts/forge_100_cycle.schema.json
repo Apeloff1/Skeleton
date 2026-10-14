@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-17:forge_100_cycle:v1",
+  "title": "FLGB-17 forge 100 cycle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tier",
+    "cycles",
+    "minimum_delta_ppm",
+    "maximum_risk_ppm"
+  ],
+  "properties": {
+    "tier": {
+      "const": "forge-100"
+    },
+    "cycles": {
+      "const": 100
+    },
+    "minimum_delta_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "maximum_risk_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    }
+  }
+}

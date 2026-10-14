@@ -102,7 +102,8 @@ def test_security_digest_updates_one_issue_body_without_hourly_comment_growth() 
 def test_security_digest_checks_batch_bound_after_collection() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "expected_batch=$(( total < BATCH_SIZE ? total : BATCH_SIZE ))" in text
+    assert "actionable_total=$((canonical_code_count + dep_count))" in text
+    assert "expected_batch=$(( actionable_total < BATCH_SIZE ? actionable_total : BATCH_SIZE ))" in text
     assert "batch_count > BATCH_SIZE" in text
     assert "Nominal target before de-duplication" in text
 

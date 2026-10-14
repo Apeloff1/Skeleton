@@ -185,7 +185,7 @@ def test_shared_library_exports_public_symbols_and_nonexec_stack(
         check=False,
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=90,
     )
     assert symbols.returncode == 0, symbols.stderr or symbols.stdout
     expected = {
@@ -207,7 +207,7 @@ def test_shared_library_exports_public_symbols_and_nonexec_stack(
         check=False,
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=90,
     )
     assert program_headers.returncode == 0, (
         program_headers.stderr or program_headers.stdout

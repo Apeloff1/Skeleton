@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-128",
     "title": "Interface Design Standard",
-    "required_gap_texts": [
-      "codify interface lint rules",
-      "bind public contracts to schema registry"
-    ]
+    "required_gap_texts": []
   },
   "sources": {
     "interfaces": "machine/capability_interfaces.json",

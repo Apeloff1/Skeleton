@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-15:achievements:v1",
+  "title": "FLGB-15 achievements",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "achievement_id",
+    "condition_digest",
+    "irreversible"
+  ],
+  "properties": {
+    "achievement_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "condition_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "irreversible": {
+      "type": "boolean"
+    }
+  }
+}

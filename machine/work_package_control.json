@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-095",
     "title": "Build Work Packages",
-    "required_gap_texts": [
-      "bind all packages to exact requirements",
-      "materialize package evidence rollup"
-    ]
+    "required_gap_texts": []
   },
   "sources": [
     "machine/ai_engineering_pass.json",

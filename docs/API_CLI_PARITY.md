@@ -59,3 +59,75 @@ Transport adapters should not invent alternate meanings for these codes. New com
 ## Streaming
 
 Contract version 1.0 records streaming capability in command metadata but does not introduce a shared streaming protocol. Commands are request/response in this version. A later contract version can add event framing without changing the existing result/error envelope.
+
+## Creator CLI: explicit evidence boundary (2026-10-13)
+
+The **creator CLI** `python -m skeleton run` uses the ten-stage
+`skeleton.context.pipeline.GameForgeRun` application workflow. The
+shared `run` command and HTTP `POST /gameforge/run` now use the **same
+engine when `target="godot"` is explicitly requested**; those calls do
+not accept remote output paths. The legacy default `target="json"` and
+YAML specification path retain the existing `state.gameforge.run`
+compatibility contract and are **not** yet equivalent to Godot generation.
+Deterministic fixture-based manifest comparison and real Godot boot
+evidence remain required for complete [#3613](https://github.com/Apeloff1/Skeleton/issues/3613) acceptance.
+
+Creator CLI now supports questionnaire intake and real headless Godot
+boot verification:
+
+```sh
+python -m skeleton cockpit BIND ERA cozy_wholesome
+python -m skeleton cockpit BIND ARCHETYPE auto
+python -m skeleton cockpit SNAPSHOT --out ./creator-steering.json
+python -m skeleton run "a peaceful village" --answers ./answers.json \
+    --out ./output/village --playtest require --repair-mode apply
+python -m skeleton cockpit RESTORE ./creator-steering.json
+python -m skeleton run "a new village" --era soulslike --playtest auto
+```
+
+`--answers` accepts a UTF-8 JSON object whose keys and values are
+strings, with a 64 KiB size limit. Missing/invalid input fails without
+launching the forge. `--playtest off` is the default; `auto` records
+the Godot boot result when available; `require` makes a missing or
+failed headless boot fatal and reports the failing `emit` stage.
+`--repair-mode` accepts `apply` or `suggest`.
+
+The console persists **operator steering only** in
+`~/.skeleton/cockpit.json` (override with
+`SKELETON_COCKPIT_STATE`). Era, ten tensor axes, era blend, hardware
+generation, and archetype survive separate invocations. `SNAPSHOT
+--out` and `RESTORE` export/import that exact steering schema.
+A command-line `--era` overrides a saved era/era blend. Execution
+ledgers, model traces, transient inference state and credentials are
+**not** persisted by this creator-control file. Writes are atomic and
+private to the local operator account.
+
+## Source manifest parity (October 2026)
+
+Every ten-stage Godot build now includes a deterministic
+`source_manifest` object: `schema`, `file_count`, `files` mapping generated
+relative names to SHA-256 content hashes, and `sha256` of the canonical
+JSON-encoded mapping. `python -m skeleton run ... --json` returns this
+receipt without returning every source file; `POST /gameforge/run` returns
+it even with `include_files=false`. Project `FORGE_MANIFEST.json` writes
+`source_sha256` using the same algorithm; the sealed
+`build_report.md` includes that same digest. The receipt proves equality
+of emitted bytes only. Real Godot boot/playability is still controlled by
+`playtest` and not implied by a matching hash. The JSON/YAML legacy target
+continues to use its separate specification format.
+
+## Security and verification boundary
+
+The HTTP `/gameforge/intake` endpoint is now in-memory only. It rejects
+`project_root`, `out`, and `overwrite` with HTTP 422 instead of letting
+remote clients select server-side filesystem destinations. The local,
+authorized CLI retains project output and overwrite support.
+
+`skeleton.forge.source_manifest` applies the projector's complete Godot
+filename validation even for builds returned only in memory. Unsafe relative
+paths, casefold aliases, Windows-reserved filenames, metadata collisions,
+and missing `project.godot` are rejected at the `emit` stage, before
+Godot verification and before any publication. A failed ten-stage pipeline
+may still contain partial generated source, but does not claim a sealed
+`source_manifest`: that field remains null until the pipeline succeeds.
+This digest is a source identity receipt, not proof of runtime playability.

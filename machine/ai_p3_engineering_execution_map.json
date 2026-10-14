@@ -1,7 +1,7 @@
 {
   "schema_version": "skeleton.ai.p3.engineering_execution_map.v1",
   "map_version": "0.1.0",
-  "status": "active",
+  "status": "closed",
   "phase": "P3-T1",
   "phase_objective": "Extend the sealed P3-T0 autonomous-intelligence frontier into bounded autonomous engineering without re-owning T0 volumes.",
   "prerequisite": {
@@ -592,7 +592,7 @@
     "in_progress_count": 0,
     "ready_count": 0,
     "blocked_count": 0,
-    "landed_unpromoted_count": 6,
+    "landed_unpromoted_count": 0,
     "scheduled_volume_count": 37,
     "queued_volume_count": 197,
     "source_volume_count": 234

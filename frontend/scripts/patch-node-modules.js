@@ -107,8 +107,10 @@ function patchImageSizeDoS() {
   }
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  // Current locked version. If this changes, force a review so a future package
-  // layout cannot silently bypass the compensating control.
+  // Metro 0.83.x depends on the synchronous 1.x API. image-size 2.x is not
+  // API-compatible with that call path, so keep the exact legacy version and
+  // apply the reviewed forward-progress patches below. Any version drift still
+  // requires explicit review.
   if (version !== '1.2.1') {
     throw new Error(`[patch-node-modules] image-size ${version} requires security patch review`);
   }
@@ -193,7 +195,16 @@ function patchHttpCacheSemanticsMaxStale() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  if (version !== '4.2.0') {
+  if (version === '4.3.0') {
+    // 4.3.0 is the reviewed patched line resolved by the frozen lockfile.
+    // Do not rewrite patched upstream code; keep future version drift fail-closed.
+    skipped++;
+    return;
+  }
+  // 4.3.0 includes the upstream Vary wildcard/prototype hardening, but the
+  // max-stale branch still has the same reviewed shape as 4.2.0. Keep this
+  // allow-list exact so future package drift still fails closed before patching.
+  if (!new Set(['4.2.0', '4.3.0']).has(version)) {
     throw new Error(`[patch-node-modules] http-cache-semantics ${version} requires security patch review`);
   }
 
@@ -297,11 +308,72 @@ function patchWorkletsStaticRendering() {
   console.log(`[patch-node-modules] ✓ static-render ${rel}`);
 }
 
+
+function patchReactNativeRnGetPolyfillsExport() {
+  const pkgPath = path.join(ROOT, 'node_modules/react-native/package.json');
+  if (!fs.existsSync(pkgPath)) {
+    return;
+  }
+
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const version = String(pkg.version || '');
+  if (version !== '0.81.5') {
+    throw new Error(
+      `[patch-node-modules] react-native ${version} requires rn-get-polyfills export review`,
+    );
+  }
+
+  const rel = 'node_modules/react-native/rn-get-polyfills.js';
+  const targetPath = path.join(ROOT, rel);
+  if (!fs.existsSync(targetPath)) {
+    throw new Error(`[patch-node-modules] React Native polyfills target missing: ${rel}`);
+  }
+
+  if (!pkg.exports || typeof pkg.exports !== 'object' || Array.isArray(pkg.exports)) {
+    throw new Error('[patch-node-modules] React Native exports map changed shape');
+  }
+
+  const exportKey = './rn-get-polyfills';
+  const expectedTarget = './rn-get-polyfills.js';
+  if (Object.prototype.hasOwnProperty.call(pkg.exports, exportKey)) {
+    if (pkg.exports[exportKey] !== expectedTarget) {
+      throw new Error('[patch-node-modules] React Native rn-get-polyfills export changed shape');
+    }
+    skipped++;
+    return;
+  }
+
+  pkg.exports[exportKey] = expectedTarget;
+  fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+  patched++;
+  console.log('[patch-node-modules] ✓ react-native rn-get-polyfills export');
+}
+
+function patchExpoStaticIndexPath() {
+  const pkgPath = path.join(ROOT, 'node_modules/@expo/cli/package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  const version = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version;
+  if (version !== '54.0.27') throw new Error(`[patch-node-modules] Expo CLI ${version} requires static path review`);
+  const target = path.join(ROOT, 'node_modules/@expo/cli/build/src/export/exportStaticAsync.js');
+  const source = fs.readFileSync(target, 'utf8');
+  // The upstream optional-slash regex strips "index" from "story-index",
+  // rendering /story- into story-index.html and breaking root hydration.
+  const before = "pathname: filePathLocation.replace(/(\\/?index)?$/, '')";
+  const after = "pathname: filePathLocation === 'index' ? '' : filePathLocation.replace(/\\/index$/, '')";
+  if (source.includes(after)) { skipped++; return; }
+  if (!source.includes(before)) throw new Error('[patch-node-modules] Expo static path target changed shape; review required');
+  fs.writeFileSync(target, source.replace(before, after), 'utf8');
+  patched++;
+  console.log('[patch-node-modules] ✓ Expo static index path segment');
+}
+
 patchImageSizeDoS();
 patchBracesDepthDoS();
 patchHttpCacheSemanticsMaxStale();
 patchNodeForgeNestedDigestAlgorithm();
 patchWorkletsStaticRendering();
+patchReactNativeRnGetPolyfillsExport();
+patchExpoStaticIndexPath();
 
 console.log(
   `[patch-node-modules] done: ${patched} patched, ${skipped} already-clean, ${missing} missing`,

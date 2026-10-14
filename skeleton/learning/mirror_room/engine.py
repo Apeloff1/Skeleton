@@ -19,6 +19,7 @@ from .contracts import (
     MirrorScenario,
     ScenarioSplit,
     _digest,
+    _sha256,
 )
 from .curriculum import build_curriculum
 from .evaluation import ComparisonReport, PairedEvaluator
@@ -127,6 +128,17 @@ class MirrorRunReceipt:
             raise MirrorRoomError("Mirror Run requires executor identity")
         if self.generator_id == self.executor_id:
             raise MirrorRoomError("generator and sandbox evaluator identities must remain independent")
+        for field in (
+            "spec_digest",
+            "manifest_digest",
+            "sealed_holdout_digest",
+            "split_integrity_digest",
+        ):
+            object.__setattr__(self, field, _sha256(field, getattr(self, field)))
+        if not isinstance(self.production_baseline, MirrorCandidate):
+            raise MirrorRoomError("production_baseline must be MirrorCandidate")
+        if not isinstance(self.final_sandbox_champion, MirrorCandidate):
+            raise MirrorRoomError("final_sandbox_champion must be MirrorCandidate")
         if (
             isinstance(self.validation_candidate_evaluations, bool)
             or not isinstance(self.validation_candidate_evaluations, int)
@@ -137,12 +149,39 @@ class MirrorRunReceipt:
             raise MirrorRoomError("Mirror Run cannot have production authority")
         if self.direct_self_modify is not False:
             raise MirrorRoomError("Mirror Run cannot directly self-modify")
-        expected = (
+
+        holdout = self.holdout_report
+        candidate_changed = (
             self.final_sandbox_champion.candidate_id
             != self.production_baseline.candidate_id
-            and self.holdout_report is not None
-            and self.holdout_report.passed
         )
+        if holdout is not None:
+            if not isinstance(holdout, ComparisonReport):
+                raise MirrorRoomError("holdout_report must be ComparisonReport")
+            if not candidate_changed:
+                raise MirrorRoomError(
+                    "holdout report is invalid when final candidate equals production baseline"
+                )
+            if holdout.run_id != self.run_id:
+                raise MirrorRoomError("holdout report run identity mismatch")
+            if holdout.split is not ScenarioSplit.HOLDOUT:
+                raise MirrorRoomError("holdout report must use sealed holdout split")
+            if (
+                holdout.baseline_candidate_id
+                != self.production_baseline.candidate_id
+                or holdout.baseline_candidate_digest
+                != self.production_baseline.digest
+            ):
+                raise MirrorRoomError("holdout report baseline identity mismatch")
+            if (
+                holdout.candidate_id
+                != self.final_sandbox_champion.candidate_id
+                or holdout.candidate_digest
+                != self.final_sandbox_champion.digest
+            ):
+                raise MirrorRoomError("holdout report candidate identity mismatch")
+
+        expected = candidate_changed and holdout is not None and holdout.passed
         if self.eligible_for_external_promotion != expected:
             raise MirrorRoomError("promotion eligibility does not match holdout evidence")
 

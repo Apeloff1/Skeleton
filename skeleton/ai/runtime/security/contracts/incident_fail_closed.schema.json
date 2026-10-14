@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-05:incident_fail_closed:v1",
+  "title": "FLGB-05 incident fail closed",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "incident_id",
+    "severity",
+    "state",
+    "blocked_capabilities"
+  ],
+  "properties": {
+    "incident_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "state": {
+      "enum": [
+        "open",
+        "contained",
+        "recovering",
+        "closed"
+      ]
+    },
+    "blocked_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  }
+}

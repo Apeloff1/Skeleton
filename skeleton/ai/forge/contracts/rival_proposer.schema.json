@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-17:rival_proposer:v1",
+  "title": "FLGB-17 rival proposer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposal_id",
+    "round_index",
+    "artifact_digest",
+    "rationale_digest",
+    "source_provenance_digest"
+  ],
+  "properties": {
+    "proposal_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "round_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rationale_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_provenance_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

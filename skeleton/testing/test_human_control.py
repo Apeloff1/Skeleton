@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 
 import pytest
 
@@ -18,7 +19,7 @@ from skeleton.agents.human_control import (
     HumanControlState,
     evaluate_human_control,
 )
-from skeleton.contracts.canonical import EvidenceRef
+from skeleton.contracts.canonical import EvidenceRef, canonical_json_bytes
 
 
 NOW = 1_800_000_000.0
@@ -398,6 +399,28 @@ def test_command_evidence_is_sorted_deduplicated_and_digest_stable() -> None:
     assert left.digest == right.digest
 
 
+def test_human_control_identity_uses_shared_canonical_contract_bytes() -> None:
+    delegation = _delegation()
+    autonomy = _autonomy(delegation)
+    state = _state(autonomy)
+    command = _command(state)
+
+    decision = evaluate_human_control(
+        state=state,
+        command=command,
+        autonomy_state=autonomy,
+        observed_at=NOW,
+    )
+
+    assert command.digest == hashlib.sha256(canonical_json_bytes(command.payload())).hexdigest()
+    assert decision.decision_digest == hashlib.sha256(
+        canonical_json_bytes(decision.identity_payload())
+    ).hexdigest()
+    assert decision.receipt_digest == hashlib.sha256(
+        canonical_json_bytes(decision.receipt_payload())
+    ).hexdigest()
+
+
 def test_invalid_command_and_state_shapes_fail_closed() -> None:
     delegation = _delegation()
     autonomy = _autonomy(delegation)
@@ -430,3 +453,13 @@ def test_invalid_command_and_state_shapes_fail_closed() -> None:
         _command(state, issued_at=NOW, expires_at=NOW)
     with pytest.raises(HumanControlError, match="last_receipt_digest"):
         _state(autonomy, last_receipt_digest="not-a-digest")
+
+
+def test_source_and_ai_human_control_mirror_are_byte_identical() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    source = root / "skeleton/automation/agents/human_control.py"
+    mirror = root / "skeleton/ai/agents/core/human_control.py"
+
+    assert source.read_bytes() == mirror.read_bytes()

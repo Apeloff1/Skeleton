@@ -1,0 +1,1604 @@
+{
+  "schema_version": "skeleton.ai_game_builder_levels_shard.v1",
+  "manifest": "machine/ai_game_builder_500_levels.json",
+  "start": 76,
+  "end": 100,
+  "count": 25,
+  "levels": [
+    {
+      "id": "GBL-076",
+      "ordinal": 76,
+      "family_id": "GB08",
+      "family": "Dialogue & Conversational Scenes",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Create dialogue with distinct voice, subtext, state-aware choices, consequences, performance intent and runtime-safe branching.",
+      "owner": "backend/core/dialogue_runtime.py",
+      "batches": [
+        "B036"
+      ],
+      "metrics": [
+        "voice consistency",
+        "subtext quality",
+        "choice meaningfulness",
+        "state correctness"
+      ],
+      "requirements": [
+        "Add deterministic validation plus replayable simulation/playthrough evidence.",
+        "Attack exposition dump, voice homogenization, impossible choice, dialogue dead end.",
+        "Keep minimized counterexamples as regressions."
+      ],
+      "adversarial": [
+        "exposition dump",
+        "voice homogenization",
+        "impossible choice",
+        "dialogue dead end",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-076 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-077",
+      "ordinal": 77,
+      "family_id": "GB08",
+      "family": "Dialogue & Conversational Scenes",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Create dialogue with distinct voice, subtext, state-aware choices, consequences, performance intent and runtime-safe branching.",
+      "owner": "backend/core/dialogue_runtime.py",
+      "batches": [
+        "B036"
+      ],
+      "metrics": [
+        "voice consistency",
+        "subtext quality",
+        "choice meaningfulness",
+        "state correctness"
+      ],
+      "requirements": [
+        "Improve voice consistency, subtext quality, choice meaningfulness, state correctness jointly with originality, accessibility, performance and maintainability.",
+        "Reject local wins that harm global player value/consistency.",
+        "Keep champion on non-Pareto challengers."
+      ],
+      "adversarial": [
+        "exposition dump",
+        "voice homogenization",
+        "impossible choice",
+        "dialogue dead end",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-077 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-078",
+      "ordinal": 78,
+      "family_id": "GB08",
+      "family": "Dialogue & Conversational Scenes",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Create dialogue with distinct voice, subtext, state-aware choices, consequences, performance intent and runtime-safe branching.",
+      "owner": "backend/core/dialogue_runtime.py",
+      "batches": [
+        "B036"
+      ],
+      "metrics": [
+        "voice consistency",
+        "subtext quality",
+        "choice meaningfulness",
+        "state correctness"
+      ],
+      "requirements": [
+        "Support semantic diff, branch-aware edit and rollback.",
+        "Checkpoint canon/rival/evaluator/artifact identities.",
+        "Recover failed or interrupted edits without orphan state."
+      ],
+      "adversarial": [
+        "exposition dump",
+        "voice homogenization",
+        "impossible choice",
+        "dialogue dead end",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-078 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-079",
+      "ordinal": 79,
+      "family_id": "GB08",
+      "family": "Dialogue & Conversational Scenes",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Create dialogue with distinct voice, subtext, state-aware choices, consequences, performance intent and runtime-safe branching.",
+      "owner": "backend/core/dialogue_runtime.py",
+      "batches": [
+        "B036"
+      ],
+      "metrics": [
+        "voice consistency",
+        "subtext quality",
+        "choice meaningfulness",
+        "state correctness"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rival rounds, three stages each, no wall-clock deadline.",
+        "Prove bounded resources and exact checkpoint/resume.",
+        "Detect repetition, branch explosion, context erosion and evaluator overfit."
+      ],
+      "adversarial": [
+        "exposition dump",
+        "voice homogenization",
+        "impossible choice",
+        "dialogue dead end",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-079 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-080",
+      "ordinal": 80,
+      "family_id": "GB08",
+      "family": "Dialogue & Conversational Scenes",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Create dialogue with distinct voice, subtext, state-aware choices, consequences, performance intent and runtime-safe branching.",
+      "owner": "backend/core/dialogue_runtime.py",
+      "batches": [
+        "B036"
+      ],
+      "metrics": [
+        "voice consistency",
+        "subtext quality",
+        "choice meaningfulness",
+        "state correctness"
+      ],
+      "requirements": [
+        "Require independent exact-head promotion evidence.",
+        "Block unknown rights, unresolved similarity, canon/state failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "exposition dump",
+        "voice homogenization",
+        "impossible choice",
+        "dialogue dead end",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-080 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-081",
+      "ordinal": 81,
+      "family_id": "GB09",
+      "family": "Quest & Mission Design",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+      "owner": "backend/core/quest_graph.py",
+      "batches": [
+        "B028",
+        "B037"
+      ],
+      "metrics": [
+        "reachability",
+        "objective clarity",
+        "consequence quality",
+        "reward fit"
+      ],
+      "requirements": [
+        "Specify Quest & Mission Design: Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+        "Declare domain inputs/outputs/invariants/anti-goals/failures and acceptance tests.",
+        "Bind backend/core/quest_graph.py and B028, B037."
+      ],
+      "adversarial": [
+        "unreachable objective",
+        "cyclic prerequisite",
+        "reward exploit",
+        "softlock",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-081 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-082",
+      "ordinal": 82,
+      "family_id": "GB09",
+      "family": "Quest & Mission Design",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+      "owner": "backend/core/quest_graph.py",
+      "batches": [
+        "B028",
+        "B037"
+      ],
+      "metrics": [
+        "reachability",
+        "objective clarity",
+        "consequence quality",
+        "reward fit"
+      ],
+      "requirements": [
+        "Define typed identity/state/provenance/canon links for Quest & Mission Design.",
+        "Preserve parent context and deterministic representation.",
+        "Define compatibility and unknown states."
+      ],
+      "adversarial": [
+        "unreachable objective",
+        "cyclic prerequisite",
+        "reward exploit",
+        "softlock",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-082 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-083",
+      "ordinal": 83,
+      "family_id": "GB09",
+      "family": "Quest & Mission Design",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+      "owner": "backend/core/quest_graph.py",
+      "batches": [
+        "B028",
+        "B037"
+      ],
+      "metrics": [
+        "reachability",
+        "objective clarity",
+        "consequence quality",
+        "reward fit"
+      ],
+      "requirements": [
+        "Create/edit from ProjectDNA, canon, champion and rights-classified evidence.",
+        "Record source/model/tool transformations.",
+        "Use rollback-safe state changes and retain a reference path."
+      ],
+      "adversarial": [
+        "unreachable objective",
+        "cyclic prerequisite",
+        "reward exploit",
+        "softlock",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-083 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-084",
+      "ordinal": 84,
+      "family_id": "GB09",
+      "family": "Quest & Mission Design",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+      "owner": "backend/core/quest_graph.py",
+      "batches": [
+        "B028",
+        "B037"
+      ],
+      "metrics": [
+        "reachability",
+        "objective clarity",
+        "consequence quality",
+        "reward fit"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate roles.",
+        "Challenger must return an improved artifact plus concrete defect ledger.",
+        "Promotion is deterministic and independent of either rival."
+      ],
+      "adversarial": [
+        "unreachable objective",
+        "cyclic prerequisite",
+        "reward exploit",
+        "softlock",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-084 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-085",
+      "ordinal": 85,
+      "family_id": "GB09",
+      "family": "Quest & Mission Design",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+      "owner": "backend/core/quest_graph.py",
+      "batches": [
+        "B028",
+        "B037"
+      ],
+      "metrics": [
+        "reachability",
+        "objective clarity",
+        "consequence quality",
+        "reward fit"
+      ],
+      "requirements": [
+        "Verify chronology, character/world state, quest/mechanic dependencies, themes and style bibles.",
+        "Propagate consequences to coupled branches/systems.",
+        "Block accidental contradiction and measure continuity debt."
+      ],
+      "adversarial": [
+        "unreachable objective",
+        "cyclic prerequisite",
+        "reward exploit",
+        "softlock",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-085 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-086",
+      "ordinal": 86,
+      "family_id": "GB09",
+      "family": "Quest & Mission Design",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+      "owner": "backend/core/quest_graph.py",
+      "batches": [
+        "B028",
+        "B037"
+      ],
+      "metrics": [
+        "reachability",
+        "objective clarity",
+        "consequence quality",
+        "reward fit"
+      ],
+      "requirements": [
+        "Add deterministic validation plus replayable simulation/playthrough evidence.",
+        "Attack unreachable objective, cyclic prerequisite, reward exploit, softlock.",
+        "Keep minimized counterexamples as regressions."
+      ],
+      "adversarial": [
+        "unreachable objective",
+        "cyclic prerequisite",
+        "reward exploit",
+        "softlock",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-086 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-087",
+      "ordinal": 87,
+      "family_id": "GB09",
+      "family": "Quest & Mission Design",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+      "owner": "backend/core/quest_graph.py",
+      "batches": [
+        "B028",
+        "B037"
+      ],
+      "metrics": [
+        "reachability",
+        "objective clarity",
+        "consequence quality",
+        "reward fit"
+      ],
+      "requirements": [
+        "Improve reachability, objective clarity, consequence quality, reward fit jointly with originality, accessibility, performance and maintainability.",
+        "Reject local wins that harm global player value/consistency.",
+        "Keep champion on non-Pareto challengers."
+      ],
+      "adversarial": [
+        "unreachable objective",
+        "cyclic prerequisite",
+        "reward exploit",
+        "softlock",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-087 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-088",
+      "ordinal": 88,
+      "family_id": "GB09",
+      "family": "Quest & Mission Design",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+      "owner": "backend/core/quest_graph.py",
+      "batches": [
+        "B028",
+        "B037"
+      ],
+      "metrics": [
+        "reachability",
+        "objective clarity",
+        "consequence quality",
+        "reward fit"
+      ],
+      "requirements": [
+        "Support semantic diff, branch-aware edit and rollback.",
+        "Checkpoint canon/rival/evaluator/artifact identities.",
+        "Recover failed or interrupted edits without orphan state."
+      ],
+      "adversarial": [
+        "unreachable objective",
+        "cyclic prerequisite",
+        "reward exploit",
+        "softlock",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-088 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-089",
+      "ordinal": 89,
+      "family_id": "GB09",
+      "family": "Quest & Mission Design",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+      "owner": "backend/core/quest_graph.py",
+      "batches": [
+        "B028",
+        "B037"
+      ],
+      "metrics": [
+        "reachability",
+        "objective clarity",
+        "consequence quality",
+        "reward fit"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rival rounds, three stages each, no wall-clock deadline.",
+        "Prove bounded resources and exact checkpoint/resume.",
+        "Detect repetition, branch explosion, context erosion and evaluator overfit."
+      ],
+      "adversarial": [
+        "unreachable objective",
+        "cyclic prerequisite",
+        "reward exploit",
+        "softlock",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-089 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-090",
+      "ordinal": 90,
+      "family_id": "GB09",
+      "family": "Quest & Mission Design",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Create objectives, prerequisites, paths, fail states, rewards, consequences and systemic hooks with reachability and persistence proof.",
+      "owner": "backend/core/quest_graph.py",
+      "batches": [
+        "B028",
+        "B037"
+      ],
+      "metrics": [
+        "reachability",
+        "objective clarity",
+        "consequence quality",
+        "reward fit"
+      ],
+      "requirements": [
+        "Require independent exact-head promotion evidence.",
+        "Block unknown rights, unresolved similarity, canon/state failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "unreachable objective",
+        "cyclic prerequisite",
+        "reward exploit",
+        "softlock",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-090 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-091",
+      "ordinal": 91,
+      "family_id": "GB10",
+      "family": "Branching Choice & Consequence",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+      "owner": "skeleton/ai/runtime/intelligence/narrative.py",
+      "batches": [
+        "B028",
+        "B035"
+      ],
+      "metrics": [
+        "consequence persistence",
+        "branch coherence",
+        "state-space control",
+        "ending causality"
+      ],
+      "requirements": [
+        "Specify Branching Choice & Consequence: Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+        "Declare domain inputs/outputs/invariants/anti-goals/failures and acceptance tests.",
+        "Bind skeleton/ai/runtime/intelligence/narrative.py and B028, B035."
+      ],
+      "adversarial": [
+        "choice illusion",
+        "branch bleed",
+        "forgotten consequence",
+        "ending disconnected from choices",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-091 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-092",
+      "ordinal": 92,
+      "family_id": "GB10",
+      "family": "Branching Choice & Consequence",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+      "owner": "skeleton/ai/runtime/intelligence/narrative.py",
+      "batches": [
+        "B028",
+        "B035"
+      ],
+      "metrics": [
+        "consequence persistence",
+        "branch coherence",
+        "state-space control",
+        "ending causality"
+      ],
+      "requirements": [
+        "Define typed identity/state/provenance/canon links for Branching Choice & Consequence.",
+        "Preserve parent context and deterministic representation.",
+        "Define compatibility and unknown states."
+      ],
+      "adversarial": [
+        "choice illusion",
+        "branch bleed",
+        "forgotten consequence",
+        "ending disconnected from choices",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-092 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-093",
+      "ordinal": 93,
+      "family_id": "GB10",
+      "family": "Branching Choice & Consequence",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+      "owner": "skeleton/ai/runtime/intelligence/narrative.py",
+      "batches": [
+        "B028",
+        "B035"
+      ],
+      "metrics": [
+        "consequence persistence",
+        "branch coherence",
+        "state-space control",
+        "ending causality"
+      ],
+      "requirements": [
+        "Create/edit from ProjectDNA, canon, champion and rights-classified evidence.",
+        "Record source/model/tool transformations.",
+        "Use rollback-safe state changes and retain a reference path."
+      ],
+      "adversarial": [
+        "choice illusion",
+        "branch bleed",
+        "forgotten consequence",
+        "ending disconnected from choices",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-093 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-094",
+      "ordinal": 94,
+      "family_id": "GB10",
+      "family": "Branching Choice & Consequence",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+      "owner": "skeleton/ai/runtime/intelligence/narrative.py",
+      "batches": [
+        "B028",
+        "B035"
+      ],
+      "metrics": [
+        "consequence persistence",
+        "branch coherence",
+        "state-space control",
+        "ending causality"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate roles.",
+        "Challenger must return an improved artifact plus concrete defect ledger.",
+        "Promotion is deterministic and independent of either rival."
+      ],
+      "adversarial": [
+        "choice illusion",
+        "branch bleed",
+        "forgotten consequence",
+        "ending disconnected from choices",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-094 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-095",
+      "ordinal": 95,
+      "family_id": "GB10",
+      "family": "Branching Choice & Consequence",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+      "owner": "skeleton/ai/runtime/intelligence/narrative.py",
+      "batches": [
+        "B028",
+        "B035"
+      ],
+      "metrics": [
+        "consequence persistence",
+        "branch coherence",
+        "state-space control",
+        "ending causality"
+      ],
+      "requirements": [
+        "Verify chronology, character/world state, quest/mechanic dependencies, themes and style bibles.",
+        "Propagate consequences to coupled branches/systems.",
+        "Block accidental contradiction and measure continuity debt."
+      ],
+      "adversarial": [
+        "choice illusion",
+        "branch bleed",
+        "forgotten consequence",
+        "ending disconnected from choices",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-095 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-096",
+      "ordinal": 96,
+      "family_id": "GB10",
+      "family": "Branching Choice & Consequence",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+      "owner": "skeleton/ai/runtime/intelligence/narrative.py",
+      "batches": [
+        "B028",
+        "B035"
+      ],
+      "metrics": [
+        "consequence persistence",
+        "branch coherence",
+        "state-space control",
+        "ending causality"
+      ],
+      "requirements": [
+        "Add deterministic validation plus replayable simulation/playthrough evidence.",
+        "Attack choice illusion, branch bleed, forgotten consequence, ending disconnected from choices.",
+        "Keep minimized counterexamples as regressions."
+      ],
+      "adversarial": [
+        "choice illusion",
+        "branch bleed",
+        "forgotten consequence",
+        "ending disconnected from choices",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-096 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-097",
+      "ordinal": 97,
+      "family_id": "GB10",
+      "family": "Branching Choice & Consequence",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+      "owner": "skeleton/ai/runtime/intelligence/narrative.py",
+      "batches": [
+        "B028",
+        "B035"
+      ],
+      "metrics": [
+        "consequence persistence",
+        "branch coherence",
+        "state-space control",
+        "ending causality"
+      ],
+      "requirements": [
+        "Improve consequence persistence, branch coherence, state-space control, ending causality jointly with originality, accessibility, performance and maintainability.",
+        "Reject local wins that harm global player value/consistency.",
+        "Keep champion on non-Pareto challengers."
+      ],
+      "adversarial": [
+        "choice illusion",
+        "branch bleed",
+        "forgotten consequence",
+        "ending disconnected from choices",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-097 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-098",
+      "ordinal": 98,
+      "family_id": "GB10",
+      "family": "Branching Choice & Consequence",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+      "owner": "skeleton/ai/runtime/intelligence/narrative.py",
+      "batches": [
+        "B028",
+        "B035"
+      ],
+      "metrics": [
+        "consequence persistence",
+        "branch coherence",
+        "state-space control",
+        "ending causality"
+      ],
+      "requirements": [
+        "Support semantic diff, branch-aware edit and rollback.",
+        "Checkpoint canon/rival/evaluator/artifact identities.",
+        "Recover failed or interrupted edits without orphan state."
+      ],
+      "adversarial": [
+        "choice illusion",
+        "branch bleed",
+        "forgotten consequence",
+        "ending disconnected from choices",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-098 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-099",
+      "ordinal": 99,
+      "family_id": "GB10",
+      "family": "Branching Choice & Consequence",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+      "owner": "skeleton/ai/runtime/intelligence/narrative.py",
+      "batches": [
+        "B028",
+        "B035"
+      ],
+      "metrics": [
+        "consequence persistence",
+        "branch coherence",
+        "state-space control",
+        "ending causality"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rival rounds, three stages each, no wall-clock deadline.",
+        "Prove bounded resources and exact checkpoint/resume.",
+        "Detect repetition, branch explosion, context erosion and evaluator overfit."
+      ],
+      "adversarial": [
+        "choice illusion",
+        "branch bleed",
+        "forgotten consequence",
+        "ending disconnected from choices",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-099 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-100",
+      "ordinal": 100,
+      "family_id": "GB10",
+      "family": "Branching Choice & Consequence",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Ensure player decisions persist coherently through later scenes, quests, relationships, systems, world state and endings.",
+      "owner": "skeleton/ai/runtime/intelligence/narrative.py",
+      "batches": [
+        "B028",
+        "B035"
+      ],
+      "metrics": [
+        "consequence persistence",
+        "branch coherence",
+        "state-space control",
+        "ending causality"
+      ],
+      "requirements": [
+        "Require independent exact-head promotion evidence.",
+        "Block unknown rights, unresolved similarity, canon/state failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "choice illusion",
+        "branch bleed",
+        "forgotten consequence",
+        "ending disconnected from choices",
+        "protected-expression leakage",
+        "long-form regression"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved high similarity risk",
+        "long-form consistency",
+        "bounded resources",
+        "state durability",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-100 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "continuity report",
+        "rights/originality report",
+        "tests/replay",
+        "quality delta",
+        "deep-effort report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ]
+}

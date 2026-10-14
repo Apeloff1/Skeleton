@@ -7,10 +7,9 @@ import argparse
 import hashlib
 import json
 import os
-import sys
-from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+import sys
+from typing import Any, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 GAP_ID = "gap-provider-interaction-protocol"
@@ -73,7 +72,11 @@ def find_entry(items: object, key: str, value: str) -> dict[str, Any] | None:
     if not isinstance(items, list):
         return None
     return next(
-        (item for item in items if isinstance(item, dict) and item.get(key) == value),
+        (
+            item
+            for item in items
+            if isinstance(item, dict) and item.get(key) == value
+        ),
         None,
     )
 
@@ -116,7 +119,7 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     else:
         if blueprint.get("gap") != GAP_ID:
             errors.append("provider protocol blueprint gap binding is invalid")
-        if blueprint.get("status") != "complete":
+        if blueprint.get("status") not in {"complete", "closed"}:
             errors.append("provider protocol blueprint is not complete")
         if blueprint.get("remaining") not in ([], None):
             errors.append("provider protocol blueprint still has remaining work")
@@ -134,11 +137,14 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     if evidence is None:
         errors.append("provider protocol closure evidence is missing")
     else:
-        for field in ("gap_status", "closure_decision"):
-            if evidence.get(field) != "closed":
-                errors.append(f"provider protocol {field} is not closed")
-        if evidence.get("implementation_state") != "complete":
-            errors.append("provider protocol implementation_state is not complete")
+        expected_states = {
+            "gap_status": "closed",
+            "implementation_state": "complete",
+            "closure_decision": "closed",
+        }
+        for field, expected in expected_states.items():
+            if evidence.get(field) != expected:
+                errors.append(f"provider protocol {field} is not {expected}")
         if evidence.get("outstanding_evidence") not in ([], None):
             errors.append("provider protocol evidence is still outstanding")
         if evidence.get("blockers") not in ([], None):
@@ -191,7 +197,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f" - {error}", file=sys.stderr)
         return 1
     print(
-        f"provider-protocol-closure: OK (boundaries={len(receipt['boundary_digests'])})"
+        "provider-protocol-closure: OK "
+        f"(boundaries={len(receipt['boundary_digests'])})"
     )
     return 0
 

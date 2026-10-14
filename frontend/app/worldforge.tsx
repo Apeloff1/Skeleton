@@ -15,7 +15,8 @@ import {
   Linking, Share,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { validProjectId, projectHref } from '../src/product/worldWorkspace';
 import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
 
@@ -45,6 +46,8 @@ const DEFAULT_MODES: Record<string, string[]> = {
 
 export default function Worldforge() {
   const router = useRouter();
+  const sourceParams = useLocalSearchParams<{ game?: string | string[] }>();
+  const initialGameId = validProjectId(Array.isArray(sourceParams.game) ? sourceParams.game[0] : sourceParams.game);
   const haptics = useHaptics();
   const { width } = useWindowDimensions();
 
@@ -200,7 +203,11 @@ export default function Worldforge() {
   const openGames = async () => {
     setShowGames(true);
     const r = await api.get<{ games: GameSrc[] }>('/api/worldforge/sources?limit=30', { timeoutMs: 12000 });
-    if (r.ok && r.data) setGames(r.data.games || []);
+    if (r.ok && r.data) {
+      const items = Array.isArray(r.data.games) ? r.data.games : [];
+      setGames([...items].sort((a: GameSrc, b: GameSrc) =>
+        Number(b.id === initialGameId) - Number(a.id === initialGameId)));
+    }
   };
   const forgeFromGame = async (g: GameSrc) => {
     haptics.notify('success'); setForging(g.id);
@@ -369,6 +376,15 @@ export default function Worldforge() {
         contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => generate()} tintColor="#60A5FA" />}
       >
+        {initialGameId ? (
+          <View style={{ backgroundColor: '#172638', padding: 12, borderRadius: 12, marginBottom: 12, gap: 8 }}>
+            <Text style={{ color: '#DBEAFE', fontWeight: '800' }}>Current game: {initialGameId}</Text>
+            <Text style={{ color: '#9FB6D2', fontSize: 12 }}>Use “From a game” to choose this source; generation and saving are never started automatically.</Text>
+            <TouchableOpacity testID="worldforge-workbench" accessibilityRole="button"
+              onPress={() => router.push(projectHref('/world-workbench',initialGameId)! as never)}
+              style={styles.fromGameBtn}><Text style={styles.fromGameTxt}>← World Workbench</Text></TouchableOpacity>
+          </View>
+        ) : null}
         {/* scale selector */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
           {scales.map((s) => (
@@ -681,7 +697,7 @@ export default function Worldforge() {
                   <TouchableOpacity key={g.id} testID={`wf-game-${g.id}`} style={styles.gameRow} disabled={!!forging} onPress={() => forgeFromGame(g)}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.gameTitle} numberOfLines={1}>{g.title}</Text>
-                      <Text style={styles.gameMeta}>{g.source} · {g.genre || 'game'}</Text>
+                      <Text style={styles.gameMeta}>{g.source} · {g.genre || 'game'}{g.id === initialGameId ? ' · selected in Workbench' : ''}</Text>
                     </View>
                     {forging === g.id ? <ActivityIndicator color="#60A5FA" /> : <Text style={styles.gameForge}>Forge →</Text>}
                   </TouchableOpacity>

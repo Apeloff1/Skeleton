@@ -1,0 +1,244 @@
+name: Advanced Godot Native Farming Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_farming_godot.py"
+      - "skeleton/ai/game_builder/advanced_farming_runtime.py"
+      - "skeleton/ai/game_builder/advanced_godot_export.py"
+      - "docs/GAME_BUILDER_SYSTEM_EDITOR_FABRIC.md"
+      - ".github/workflows/game-builder-advanced-system-engines.yml"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/advanced_genre_engines.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_farming_godot.py"
+      - ".github/workflows/game-builder-advanced-farming-native.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: advanced-native-farming-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  independently-execute-farming:
+    name: Python/Godot farming parity on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 23
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact PR head with safe source scope
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_farming_godot.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Godot 4.4.1 native runtime and export templates
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Validate exact source and Python proof contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+          python -m py_compile skeleton/ai/game_builder/advanced_gameplay_runtime.py skeleton/ai/game_builder/advanced_farming_runtime.py skeleton/ai/game_builder/advanced_godot_export.py skeleton/ai/game_builder/advanced_farming_godot.py
+          python -m unittest tests.test_game_builder_advanced_farming_godot -v
+      - name: Build eight original authored farms with genuine economic decisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+          from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session
+          from skeleton.ai.game_builder.advanced_farming_godot import render_farming_godot_package
+          from skeleton.ai.game_builder.advanced_godot_export import write_advanced_godot_package
+          root=Path(os.environ["RUNNER_TEMP"])/"advanced-native-farming"
+          root.mkdir()
+          winner=(["plant:0","plant:1","plant:2","plant:3","advance",
+                   "harvest:0","harvest:1","harvest:2","harvest:3","sell"]*2)
+          cases=(
+              ("original",{},["plant:0","advance","water:0","advance:4"],0),
+              ("rain",{"field_tiles":4},["plant:0","plant:1","advance:4",
+                                        "harvest:1","sell"],1),
+              ("market_win",{"growth_days":2,"crop_types":4,"livestock":False},
+                winner,2),
+              ("livestock",{},["advance:4","collect","sell"],3),
+              ("soil",{},["compost:0","plant:0","advance",
+                           "water:0","advance"],4),
+              ("no_seasons",{"seasons":False,"livestock":False},
+               ["plant:1","advance:4","harvest:1","sell"],5),
+              ("pests",{"growth_days":20},
+               ["plant:2","advance:4","advance:4","advance:4"],6),
+              ("scarce",{"crop_types":1,"field_tiles":1,"livestock":False},
+               ["plant:0","advance","water:0","advance:4"],7),
+          )
+          observed=set()
+          for name,config,actions,seed in cases:
+              layout={"plots":[{"id":i,"soil":3 if name=="soil" and i==0 else 5,
+                                "moisture":5}
+                               for i in range(min(4,config.get("field_tiles",4)))],
+                      "market_multiplier":2,"starting_weather":"rain"}
+              scene=make_advanced_scene("farming",config,seed=seed,layout=layout)
+              session=run_advanced_session("farming",config,actions,seed=seed,scene=scene)
+              if name=="market_win":
+                  assert session["state"]["finished"] and session["terminal"]
+                  assert session["state"]["contracts_completed"]>=2
+              if name=="no_seasons":
+                  assert session["state"]["season"]==0
+              observed.update(event for item in session["trace"] for event in item["events"])
+              native=render_farming_godot_package(session,config,authorized=True)
+              write_advanced_godot_package(native,root/name,authorized=True)
+              print("NATIVE_FARMING_SOURCE",name,len(actions),session["state"]["day"],
+                    session["state"]["harvested"],session["digest"])
+          assert {"crop_planted","crop_grew","mature_crop_harvested",
+                  "genuine_harvest_sold","market_contract_fulfilled",
+                  "profitable_farm_established","livestock_produced",
+                  "animal_products_collected","soil_composted","seasonal_pests"}<=observed,observed
+          PY
+      - name: Independently replay eight original farming games in real Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/advanced-native-farming"
+          python - "$root" <<'PY'
+          import os, pathlib, subprocess, sys
+          root=pathlib.Path(sys.argv[1])
+          cases=("original","rain","market_win","livestock",
+                 "soil","no_seasons","pests","scarce")
+          for case in cases:
+              project=root/case/"godot"
+              print("NATIVE_ADVANCED_FARMING_CASE",case,flush=True)
+              for args in (["--headless","--path",str(project),"--import"],
+                           ["--headless","--path",str(project),"--","--verify-farming"]):
+                  try:
+                      # Git Bash provides the Godot launcher on Windows, but
+                      # CreateProcess cannot resolve that shell-only command.
+                      # Use the exact Git Bash installed by actions' bash shell.
+                      cmd=(["godot",*args] if sys.platform!="win32" else [
+                          str(pathlib.Path(os.environ["ProgramFiles"])/"Git"/"bin"/"bash.exe"),
+                          "-c",'godot "$@"',"godot",*args])
+                      result=subprocess.run(cmd,stdout=subprocess.PIPE,
+                                            stderr=subprocess.STDOUT,text=True,
+                                            encoding="utf-8",errors="replace",timeout=45)
+                  except subprocess.TimeoutExpired as exc:
+                      print("NATIVE_ADVANCED_FARMING_TIMEOUT",case,args,flush=True)
+                      if exc.stdout:
+                          print(exc.stdout.decode("utf-8","replace") if isinstance(exc.stdout,bytes) else exc.stdout)
+                      raise
+                  print(result.stdout,flush=True)
+                  if "--verify-farming" in args:
+                      (root/case/"native-replay.log").write_text(result.stdout,encoding="utf-8")
+                      if "NATIVE_ADVANCED_FARMING_OK" not in result.stdout:
+                          raise SystemExit("native gameplay proof marker absent: "+case)
+                  if result.returncode:
+                      raise SystemExit(f"Godot returned {result.returncode} on {case} {args}")
+          PY
+      - name: Export Linux desktop farming executable and execute the actual binary
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/advanced-native-farming/market_win/godot"
+          executable="$RUNNER_TEMP/advanced-native-farming/original-advanced-farming.x86_64"
+          godot --headless --path "$project" --export-release Linux "$executable"
+          test -s "$executable"
+          chmod +x "$executable"
+          "$executable" --headless -- --verify-farming | tee "$RUNNER_TEMP/advanced-native-farming/linux-export-replay.log"
+          grep -q "NATIVE_ADVANCED_FARMING_OK" "$RUNNER_TEMP/advanced-native-farming/linux-export-replay.log"
+      - name: Export actual Windows game and verify native console executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'advanced-native-farming'
+          $project = Join-Path $root 'market_win/godot'
+          $binary = Join-Path $root 'original-advanced-farming.exe'
+          # The setup-godot Windows GUI editor can detach without a reliable
+          # synchronous exit code. Use the same pinned official console engine
+          # already required by the repository's Windows native integration.
+          $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
+          $engineDir = Join-Path $root 'pinned-godot-console'
+          if (-not (Test-Path $archive)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
+            Invoke-WebRequest -Uri 'https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip' -OutFile $archive -MaximumRedirection 5
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          $nativeEditor = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $nativeEditor) {
+            throw "Version-pinned official Godot Windows console editor unavailable"
+          }
+          & $nativeEditor.FullName --version
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows console startup failed" }
+          & $nativeEditor.FullName --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Advanced farming Windows resource import failed" }
+          & $nativeEditor.FullName --headless --path $project --export-release 'Windows Desktop' $binary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $binary)) {
+            throw "Advanced Godot Windows console game executable export failed"
+          }
+          if ((Get-Item $binary).Length -le 1024) {
+            throw "Advanced Godot Windows game executable is empty"
+          }
+          $console = Join-Path $root 'original-advanced-farming.console.exe'
+          if (-not (Test-Path $console)) {
+            throw "Exported original farming lacks an observable Windows console binary"
+          }
+          $python = @'
+          import subprocess,sys
+          result=subprocess.run(
+              [sys.argv[1],"--headless","--","--verify-farming"],
+              capture_output=True,text=True,timeout=90)
+          print(result.stdout)
+          print(result.stderr)
+          sys.exit(0 if result.returncode==0 and
+              "NATIVE_ADVANCED_FARMING_OK" in result.stdout+result.stderr else 1)
+          '@
+          $proofScript = Join-Path $root 'verify_windows_native.py'
+          [IO.File]::WriteAllText($proofScript, $python)
+          & python $proofScript $console
+          if ($LASTEXITCODE -ne 0) {
+            throw "Exported Windows homebrew farming gameplay diverged from reviewed Python"
+          }
+          Write-Host "Native Windows executable SHA256:"
+          Get-FileHash -Algorithm SHA256 $binary | Format-List
+          Get-FileHash -Algorithm SHA256 $console | Format-List
+      - name: Upload native gameplay proof logs and source release manifests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-advanced-farming-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/advanced-native-farming/*/native-replay.log
+            ${{ runner.temp }}/advanced-native-farming/*/release.json
+            ${{ runner.temp }}/advanced-native-farming/linux-export-replay.log
+            ${{ runner.temp }}/advanced-native-farming/original-advanced-farming.exe
+            ${{ runner.temp }}/advanced-native-farming/original-advanced-farming.console.exe
+            ${{ runner.temp }}/advanced-native-farming/original-advanced-farming.x86_64
+          if-no-files-found: warn
+          retention-days: 7

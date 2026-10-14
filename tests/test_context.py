@@ -550,8 +550,10 @@ class TestBlend:
         c.apply("ROLL ORACLE")
         out = GameForgeRun(cockpit=c).execute("")
         assert out["succeeded"], out["run"]
-        assert "~" in out["era"]
-        assert out["build_plan"]["seed"]
+        assert "~" in str(out["era"]), {"era": out["era"], "run": out["run"]}
+        assert out["build_plan"] and out["build_plan"]["seed"], {
+            "build_plan": out["build_plan"], "run": out["run"],
+        }
 
 
 class TestWorld:

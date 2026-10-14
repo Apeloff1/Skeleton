@@ -1,0 +1,75 @@
+name: VOL-039 Event Durability & Causal Inbox
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'skeleton/frontier/runtime/event_architecture.py'
+      - 'skeleton/frontier/runtime/operation_stream_store.py'
+      - 'skeleton/ai/inbox_causality.py'
+      - 'skeleton/ai/inbox_sqlite.py'
+      - 'skeleton/testing/test_event_architecture.py'
+      - 'skeleton/testing/test_event_integrity_audit.py'
+      - 'skeleton/testing/test_inbox_sqlite.py'
+      - '.github/workflows/vol039-event-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol039-event-recovery-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  event-and-inbox-durability:
+    name: Verify VOL-039 event/inbox runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: '.'
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11.16'
+
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pytest==8.4.2
+
+      - name: Compile changed runtime and regression sources
+        run: >-
+          python -m compileall -q
+          skeleton/frontier/runtime/event_architecture.py
+          skeleton/frontier/runtime/operation_stream_store.py
+          skeleton/ai/inbox_causality.py
+          skeleton/ai/inbox_sqlite.py
+          skeleton/testing/test_event_architecture.py
+          skeleton/testing/test_event_integrity_audit.py
+          skeleton/testing/test_inbox_sqlite.py
+
+      - name: Execute event schema and durable stream regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_event_architecture.py
+          skeleton/testing/test_event_integrity_audit.py
+          skeleton/testing/test_operation_stream.py
+          skeleton/testing/test_operation_stream_store.py
+
+      - name: Execute persistent causal inbox fault-injection regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_inbox_sqlite.py
+
+      - name: Enforce canonical architecture ownership
+        run: python scripts/check_architecture_map.py

@@ -7,18 +7,12 @@
     {
       "volume_ref": "VOL-052",
       "title": "Internal Python Architecture",
-      "required_gap_texts": [
-        "define package layer manifest",
-        "add import graph fitness test"
-      ]
+      "required_gap_texts": []
     },
     {
       "volume_ref": "VOL-053",
       "title": "Import Architecture",
-      "required_gap_texts": [
-        "remove remaining path hacks",
-        "materialize packaged-wheel import test"
-      ]
+      "required_gap_texts": []
     }
   ],
   "policy": {

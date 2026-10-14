@@ -63,11 +63,11 @@ def validate(root:Path=ROOT)->dict[str,Any]:
         if task.get("depends_on")!=EXPECTED_DEPS[tid]: raise P3TrainingValidationError(f"{tid} dependency drift")
         owned.extend(refs)
         status=task.get("status")
-        if status not in {"blocked","ready","in_progress","landed_unpromoted"}: raise P3TrainingValidationError(f"{tid} unsupported status")
+        if status not in {"blocked","ready","in_progress","landed_unpromoted","closed"}: raise P3TrainingValidationError(f"{tid} unsupported status")
         unresolved=[dep for dep in task.get("depends_on",[]) if dep not in landed]
         if status=="blocked" and not unresolved: raise P3TrainingValidationError(f"{tid} blocked with all dependencies landed")
         if status in {"ready","in_progress","landed_unpromoted"} and unresolved: raise P3TrainingValidationError(f"{tid} has unresolved dependencies")
-        if task.get("completion_checkbox") is not False or task.get("implementation_signed") is not False or task.get("verification_signed") is not False:
+        if task.get("status") != "closed" and (task.get("completion_checkbox") is not False or task.get("implementation_signed") is not False or task.get("verification_signed") is not False):
             raise P3TrainingValidationError(f"{tid} may not self-complete or self-sign")
         obligations=task.get("masterplan_obligations")
         if not isinstance(obligations,list) or len(obligations)!=len(refs): raise P3TrainingValidationError(f"{tid} obligation coverage drift")

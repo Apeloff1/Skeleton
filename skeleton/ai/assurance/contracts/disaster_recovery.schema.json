@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-06:disaster_recovery:v1",
+  "title": "FLGB-06 disaster recovery",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plan_id",
+    "rpo_ms",
+    "rto_ms",
+    "steps",
+    "evidence_digest"
+  ],
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "rpo_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 31536000000
+    },
+    "rto_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 31536000000
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "evidence_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

@@ -6,6 +6,8 @@ helpers used by observability, dense retrieval, and physics.
 """
 from __future__ import annotations
 
+import atexit
+import json
 import os
 import shutil
 import threading
@@ -13,7 +15,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from skeleton.native.jvm_protocol import JvmCapability, capability_for
+from skeleton.native.profiling import source_identity
+from skeleton.native.selection import (
+    ProfileEvidence,
+    evaluate_candidate,
+    policy_from_mapping,
+)
+
 _ACCELERATOR_NAMES = ("observability", "vector", "physics")
+_JVM_CANDIDATE_IDS = {
+    "observability": "ACCEL-JVM-OBSERVABILITY",
+    "vector": "ACCEL-JVM-VECTOR",
+    "physics": "ACCEL-JVM-PHYSICS",
+}
+_PROFILE_SELECTED_STATE = "profile_selected_unpromoted"
+_JVM_PROTOCOL = "skeleton.acceleration.rpc@1.0"
 
 
 class JvmAcceleratorRegistryError(RuntimeError):
@@ -28,6 +45,9 @@ class JvmAcceleratorPreflight:
     source: str
     java_available: bool
     source_available: bool
+    capability_digest: str = ""
+    protocol_versions: tuple[int, ...] = ()
+    minimum_java_major: int = 0
 
     @property
     def ready(self) -> bool:
@@ -64,8 +84,37 @@ class JvmAcceleratorRuntimeStatus:
         return self.java_available and self.source_available
 
 
+@dataclass(frozen=True, slots=True)
+class JvmAccelerationSelection:
+    """Revalidated profile-selection state for one JVM accelerator."""
+
+    name: str
+    candidate_id: str
+    selected: bool
+    reasons: tuple[str, ...] = ()
+    evidence_ids: tuple[str, ...] = ()
+    source_identity: str | None = None
+    policy_path: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.name not in _ACCELERATOR_NAMES:
+            raise ValueError("invalid JVM accelerator selection name")
+        if self.candidate_id != _JVM_CANDIDATE_IDS[self.name]:
+            raise ValueError("JVM accelerator candidate identity mismatch")
+        if not isinstance(self.selected, bool):
+            raise TypeError("selected must be boolean")
+        if not isinstance(self.reasons, tuple) or any(
+            not isinstance(reason, str) or not reason
+            for reason in self.reasons
+        ):
+            raise ValueError("selection reasons must be non-empty strings")
+        if self.selected and self.reasons:
+            raise ValueError("selected JVM accelerator cannot carry rejection reasons")
+
+
 ConfigProvider = Callable[[], Any]
 AcceleratorFactory = Callable[[], Any]
+SelectionProvider = Callable[[str], JvmAccelerationSelection]
 
 
 def _default_config_provider(name: str) -> ConfigProvider:
@@ -121,6 +170,181 @@ def _resolve_java(binary: str) -> str | None:
     return shutil.which(binary)
 
 
+def _reject_nonfinite(token: str) -> None:
+    raise ValueError(f"non-finite JSON token rejected: {token}")
+
+
+def _strict_object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    output: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in output:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        output[key] = value
+    return output
+
+
+def _load_acceleration_policy(path: Path) -> dict[str, Any]:
+    raw = path.read_text(encoding="utf-8")
+    payload = json.loads(
+        raw,
+        object_pairs_hook=_strict_object_pairs,
+        parse_constant=_reject_nonfinite,
+    )
+    if not isinstance(payload, dict):
+        raise ValueError("acceleration policy must be an object")
+    return payload
+
+
+def _repository_root() -> Path:
+    explicit = os.environ.get("SKELETON_REPOSITORY_ROOT")
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+
+    anchors = (Path(__file__).resolve().parent, Path.cwd().resolve())
+    for anchor in anchors:
+        for candidate in (anchor, *anchor.parents):
+            if (candidate / "machine" / "acceleration_policy.json").is_file():
+                return candidate
+    # A packaged runtime without repository policy must fail closed rather than
+    # guessing that a mirrored module path is the repository root.
+    return Path.cwd().resolve()
+
+
+def _profile_evidence_from_mapping(raw: Mapping[str, Any]) -> ProfileEvidence:
+    return ProfileEvidence(
+        evidence_id=raw["evidence_id"],
+        candidate_id=raw["candidate_id"],
+        source_identity=raw["source_identity"],
+        environment_id=raw["environment_id"],
+        sample_count=raw["sample_count"],
+        reference_median_ns=raw["reference_median_ns"],
+        candidate_median_ns=raw["candidate_median_ns"],
+        correctness_passed=raw["correctness_passed"],
+        max_abs_error=raw["max_abs_error"],
+        crash_count=raw.get("crash_count", 0),
+        timeout_count=raw.get("timeout_count", 0),
+    )
+
+
+def _default_selection_provider(name: str) -> JvmAccelerationSelection:
+    candidate_id = _JVM_CANDIDATE_IDS[name]
+    root = _repository_root()
+    configured = os.environ.get("SKELETON_ACCELERATION_POLICY_PATH")
+    configured_path = Path(configured).expanduser() if configured else None
+    policy_path = (
+        configured_path
+        if configured_path is not None and configured_path.is_absolute()
+        else root / configured_path
+        if configured_path is not None
+        else root / "machine" / "acceleration_policy.json"
+    )
+    policy_path_text = str(policy_path)
+
+    if not policy_path.is_file():
+        return JvmAccelerationSelection(
+            name=name,
+            candidate_id=candidate_id,
+            selected=False,
+            reasons=("policy-unavailable",),
+            policy_path=policy_path_text,
+        )
+
+    try:
+        policy = _load_acceleration_policy(policy_path)
+        candidates = policy["candidates"]
+        if not isinstance(candidates, list):
+            raise ValueError("candidates must be a list")
+        matches = [
+            item
+            for item in candidates
+            if isinstance(item, dict) and item.get("id") == candidate_id
+        ]
+        if len(matches) != 1:
+            raise ValueError("candidate identity must resolve exactly once")
+        candidate = matches[0]
+        if candidate.get("plane") != "jvm":
+            raise ValueError("candidate plane must be jvm")
+        if candidate.get("registry") != "skeleton/native/jvm_registry.py":
+            raise ValueError("candidate registry authority drift")
+
+        identity_paths = candidate.get("source_identity_paths")
+        if not isinstance(identity_paths, list) or not identity_paths:
+            raise ValueError("candidate source identity paths are required")
+        current_identity = source_identity(root, identity_paths)
+
+        raw_evidence = candidate.get("profile_evidence", [])
+        if not isinstance(raw_evidence, list):
+            raise ValueError("candidate profile_evidence must be a list")
+        evidence = tuple(
+            _profile_evidence_from_mapping(item)
+            for item in raw_evidence
+            if isinstance(item, Mapping)
+        )
+        if len(evidence) != len(raw_evidence):
+            raise ValueError("candidate profile evidence entry must be an object")
+
+        selection_policy = policy_from_mapping(policy["selection_policy"])
+        refs = candidate.get("reference_paths")
+        if not isinstance(refs, list) or not refs:
+            raise ValueError("candidate reference paths are required")
+        reference_available = all((root / Path(path)).exists() for path in refs)
+        isolation_satisfied = candidate.get("isolation") == "subprocess"
+        capability = capability_for(name)
+        protocol_compatible = (
+            candidate.get("protocol") == _JVM_PROTOCOL
+            and 1 in capability.protocol_versions
+        )
+        decision = evaluate_candidate(
+            candidate_id=candidate_id,
+            current_source_identity=current_identity,
+            reference_available=reference_available,
+            isolation_satisfied=isolation_satisfied,
+            protocol_compatible=protocol_compatible,
+            evidence=evidence,
+            policy=selection_policy,
+        )
+
+        persisted = candidate.get("selection_decision")
+        reasons = list(decision.reason_codes)
+        if candidate.get("automatic_selection") is not True:
+            reasons.append("automatic-selection-disabled")
+        if candidate.get("state") != _PROFILE_SELECTED_STATE:
+            reasons.append("candidate-state-not-selected")
+        if not isinstance(persisted, Mapping):
+            reasons.append("persisted-selection-missing")
+        else:
+            expected_ids = tuple(sorted(decision.evidence_ids))
+            persisted_ids = persisted.get("evidence_ids")
+            if (
+                persisted.get("qualified") is not True
+                or persisted.get("route") != "accelerated"
+                or persisted.get("effective_route") != "accelerated"
+                or persisted.get("source_identity") != current_identity
+                or not isinstance(persisted_ids, list)
+                or tuple(sorted(persisted_ids)) != expected_ids
+            ):
+                reasons.append("persisted-selection-drift")
+
+        normalized = tuple(sorted(set(reasons)))
+        return JvmAccelerationSelection(
+            name=name,
+            candidate_id=candidate_id,
+            selected=not normalized,
+            reasons=normalized,
+            evidence_ids=tuple(sorted(decision.evidence_ids)),
+            source_identity=current_identity,
+            policy_path=policy_path_text,
+        )
+    except Exception:
+        return JvmAccelerationSelection(
+            name=name,
+            candidate_id=candidate_id,
+            selected=False,
+            reasons=("policy-invalid",),
+            policy_path=policy_path_text,
+        )
+
+
 class JvmAcceleratorRegistry:
     """Lazy manager for the three optional JVM helpers.
 
@@ -135,6 +359,7 @@ class JvmAcceleratorRegistry:
         *,
         factories: Mapping[str, AcceleratorFactory] | None = None,
         config_providers: Mapping[str, ConfigProvider] | None = None,
+        selection_provider: SelectionProvider | None = None,
     ) -> None:
         supplied_factories = dict(factories or {})
         supplied_configs = dict(config_providers or {})
@@ -156,6 +381,7 @@ class JvmAcceleratorRegistry:
             for name in _ACCELERATOR_NAMES
         }
         self._instances: dict[str, Any] = {}
+        self._selection_provider = selection_provider or _default_selection_provider
         self._lock = threading.RLock()
 
     @property
@@ -166,6 +392,10 @@ class JvmAcceleratorRegistry:
         self._validate_name(name)
         with self._lock:
             return name in self._instances
+
+    def capability(self, name: str) -> JvmCapability:
+        self._validate_name(name)
+        return capability_for(name)
 
     def preflight(
         self,
@@ -178,6 +408,7 @@ class JvmAcceleratorRegistry:
             java_binary = str(getattr(config, "java_binary", ""))
             source = Path(getattr(config, "source"))
             java_path = _resolve_java(java_binary)
+            capability = self.capability(item)
             output[item] = JvmAcceleratorPreflight(
                 name=item,
                 java_binary=java_binary,
@@ -185,10 +416,28 @@ class JvmAcceleratorRegistry:
                 source=str(source),
                 java_available=java_path is not None,
                 source_available=source.is_file(),
+                capability_digest=capability.capability_digest,
+                protocol_versions=capability.protocol_versions,
+                minimum_java_major=capability.minimum_java_major,
             )
         return output
 
+    def selection(self, name: str) -> JvmAccelerationSelection:
+        """Return fail-closed profile-selection state without starting Java."""
+        self._validate_name(name)
+        decision = self._selection_provider(name)
+        if not isinstance(decision, JvmAccelerationSelection):
+            raise JvmAcceleratorRegistryError(
+                "selection provider returned invalid decision"
+            )
+        if decision.name != name:
+            raise JvmAcceleratorRegistryError(
+                "selection provider returned mismatched accelerator"
+            )
+        return decision
+
     def get(self, name: str) -> Any:
+        """Return a raw lazy helper for diagnostics, tests, or explicit operators."""
         self._validate_name(name)
         with self._lock:
             instance = self._instances.get(name)
@@ -196,6 +445,16 @@ class JvmAcceleratorRegistry:
                 instance = self._factories[name]()
                 self._instances[name] = instance
             return instance
+
+    def get_selected(self, name: str) -> Any:
+        """Return a helper only after canonical profile policy selects it."""
+        decision = self.selection(name)
+        if not decision.selected:
+            detail = ",".join(decision.reasons) or "not-selected"
+            raise JvmAcceleratorRegistryError(
+                f"{name} JVM accelerator is not profile-selected: {detail}"
+            )
+        return self.get(name)
 
     def warm(
         self,
@@ -438,9 +697,53 @@ class JvmAcceleratorRegistry:
         return (name,)
 
 
+_default_registry: JvmAcceleratorRegistry | None = None
+_default_registry_lock = threading.Lock()
+
+
+def get_default_jvm_registry() -> JvmAcceleratorRegistry:
+    """Return the single process-wide JVM accelerator lifecycle owner.
+
+    Domain compatibility getters delegate here instead of maintaining their
+    own singleton process references. The registry remains lazy: obtaining it
+    does not construct or start an accelerator.
+    """
+    global _default_registry
+    with _default_registry_lock:
+        if _default_registry is None:
+            _default_registry = JvmAcceleratorRegistry()
+        return _default_registry
+
+
+def close_default_jvm_accelerator(name: str) -> None:
+    """Close one default-registry helper without materializing the registry."""
+    JvmAcceleratorRegistry._validate_name(name)
+    with _default_registry_lock:
+        registry = _default_registry
+    if registry is not None:
+        registry.close(name)
+
+
+def close_default_jvm_registry() -> None:
+    """Close every initialized JVM helper owned by the default registry."""
+    global _default_registry
+    with _default_registry_lock:
+        registry = _default_registry
+        _default_registry = None
+    if registry is not None:
+        registry.close()
+
+
+atexit.register(close_default_jvm_registry)
+
+
 __all__ = [
+    "JvmAccelerationSelection",
     "JvmAcceleratorPreflight",
     "JvmAcceleratorRegistry",
     "JvmAcceleratorRegistryError",
     "JvmAcceleratorRuntimeStatus",
+    "close_default_jvm_accelerator",
+    "close_default_jvm_registry",
+    "get_default_jvm_registry",
 ]

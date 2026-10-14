@@ -503,3 +503,343 @@ test('transcript export includes context, failure status and honest file omissio
   assert.match(output, /file not included/);
   assert.match(output, /Artifacts are not included/);
 });
+
+
+test('ambiguous delivered reply is recovered from canonical history without second generation', async () => {
+  let submitted;
+  let executions = 0;
+  const store = await controller(
+    async body => {
+      executions++;
+      submitted = body;
+      throw new Error('response lost after server commit');
+    },
+    storage(),
+    async sessionId => ({
+      ok: true, available: true, session_id: sessionId,
+      turns: submitted ? [{
+        session_id: sessionId,
+        client_message_id: submitted.client_message_id,
+        role_user: submitted.message,
+        role_jeeves: 'Committed answer',
+        canonical_assistant_message_id: 'recovered-assistant',
+        status: 'complete', ts: 100,
+      }] : [],
+    }),
+  );
+  store.edit({ draft: 'What was built?' });
+  await store.send();
+  assert.equal(executions, 1);
+  assert.deepEqual(store.active.messages.map(m => m.text), ['What was built?', 'Committed answer']);
+  assert.deepEqual(store.active.messages.map(m => m.status), ['complete', 'complete']);
+  assert.match(store.getSnapshot().notice, /recovered/i);
+});
+
+test('unresolved send is held without erasing the next draft or creating a phantom turn', async () => {
+  let calls = 0;
+  const store = await controller(async () => { calls++; throw new Error('unavailable'); });
+  store.edit({ draft: 'First' });
+  await store.send();
+  assert.equal(store.active.messages.at(-1).status, 'failed');
+  store.edit({ draft: 'Keep this draft' });
+  await store.send();
+  assert.equal(calls, 1);
+  assert.equal(store.active.draft, 'Keep this draft');
+  assert.equal(store.active.messages.length, 1);
+  assert.match(store.getSnapshot().notice, /resolve the interrupted turn/i);
+});
+
+test('retry checks canonical history and never resubmits an already committed answer', async () => {
+  let submitted;
+  let calls = 0;
+  let committed = false;
+  const store = await controller(
+    async body => { calls++; submitted = body; throw new Error('timeout'); },
+    storage(),
+    async sessionId => ({
+      ok: true, available: true, session_id: sessionId,
+      turns: committed ? [{
+        session_id: sessionId,
+        client_message_id: submitted.client_message_id,
+        role_user: submitted.message, role_jeeves: 'Previously committed',
+        status: 'complete', ts: 110,
+      }] : [],
+    }),
+  );
+  store.edit({ draft: 'Do not duplicate' });
+  await store.send();
+  const id = store.active.messages[0].id;
+  assert.equal(store.active.messages[0].status, 'failed');
+  committed = true;
+  await store.retry(id);
+  assert.equal(calls, 1);
+  assert.deepEqual(store.active.messages.map(m => m.status), ['complete', 'complete']);
+  assert.equal(store.active.messages[1].text, 'Previously committed');
+});
+
+test('simultaneous retries are fenced during slow canonical-history reads', async () => {
+  let executions = 0;
+  let reads = 0;
+  const waiting = deferred();
+  const empty = sessionId => ({
+    ok: true, available: true, session_id: sessionId, turns: [],
+  });
+  const store = await controller(
+    async () => {
+      executions++;
+      if (executions === 1) throw new Error('temporary offline');
+      return { reply: 'Finally answered' };
+    },
+    storage(),
+    async sessionId => ++reads === 1 ? empty(sessionId) : waiting.promise,
+  );
+  store.edit({ draft: 'Only one retry' });
+  await store.send();
+  const id = store.active.messages[0].id;
+  const first = store.retry(id);
+  const duplicate = store.retry(id);
+  assert.equal(executions, 1);
+  waiting.resolve(empty(store.active.id));
+  await Promise.all([first, duplicate]);
+  assert.equal(executions, 2);
+  assert.deepEqual(store.active.messages.map(m => m.text), ['Only one retry', 'Finally answered']);
+});
+
+test('cancelled first turn can be reconciled using its original device conversation identity', async () => {
+  const pending = deferred();
+  let submitted;
+  let committed = false;
+  const store = await controller(
+    body => { submitted = body; return pending.promise; },
+    storage(),
+    async sessionId => ({
+      ok: true, available: true, session_id: sessionId,
+      turns: committed ? [{
+        session_id: sessionId, client_message_id: submitted.client_message_id,
+        role_user: submitted.message, role_jeeves: 'Server finished',
+        status: 'complete', ts: 115,
+      }] : [],
+    }),
+  );
+  const sessionId = store.active.id;
+  store.edit({ draft: 'Stop and check' });
+  const first = store.send();
+  store.cancel();
+  assert.equal(store.active.sessionId, null);
+  committed = true;
+  assert.equal(await store.refreshCanonical(), true);
+  assert.equal(store.active.sessionId, sessionId);
+  assert.deepEqual(store.active.messages.map(m => m.text), ['Stop and check', 'Server finished']);
+  pending.resolve({ reply: 'late transport payload', session_id: sessionId });
+  await first;
+  assert.equal(store.active.messages[1].text, 'Server finished');
+});
+
+
+test('retry fails closed if the canonical transcript cannot be checked', async () => {
+  let executions = 0;
+  const store = await controller(
+    async () => { executions++; throw new Error('response may have committed'); },
+    storage(),
+    async () => { throw new Error('authoritative history offline'); },
+  );
+  store.edit({ draft: 'Did you receive this?' });
+  await store.send();
+  assert.equal(store.active.messages[0].status, 'failed');
+  await store.retry(store.active.messages[0].id);
+  assert.equal(executions, 1);
+  assert.equal(store.active.messages.length, 1);
+  assert.match(store.getSnapshot().notice, /retry was not sent/i);
+});
+
+test('manual Retry cannot overtake an in-flight automatic reconciliation', async () => {
+  const history = deferred();
+  let executions = 0;
+  let sent;
+  const store = await controller(
+    async body => { executions++; sent = body; throw new Error('transport timeout'); },
+    storage(),
+    async sessionId => history.promise,
+  );
+  store.edit({ draft: 'Answer before reconnect' });
+  const send = store.send();
+  await tick();
+  const pending = store.active.messages.at(-1);
+  assert.equal(pending.status, 'failed');
+  await store.retry(pending.id);
+  assert.equal(executions, 1);
+  history.resolve({
+    ok: true, available: true, session_id: store.active.id,
+    turns: [{
+      session_id: store.active.id, client_message_id: sent.client_message_id,
+      role_user: sent.message, role_jeeves: 'Recovered while checking',
+      status: 'complete', ts: 125,
+    }],
+  });
+  await send;
+  assert.equal(executions, 1);
+  assert.equal(store.active.messages.at(-1).text, 'Recovered while checking');
+});
+
+test('retry preserves submitted context and form preference after edits and reload', async () => {
+  const disk = storage();
+  let original;
+  const first = await controller(async body => {
+    original = body;
+    throw new Error('response lost');
+  }, disk);
+  first.edit({ draft: 'Build the scene', context: 'Original project', allForms: true });
+  await first.send();
+  first.edit({ context: 'Changed project', allForms: false });
+  await first.whenSaved();
+  let retried;
+  const restored = await controller(async body => {
+    retried = body;
+    return { reply: 'Recovered', session_id: body.session_id };
+  }, disk);
+  await restored.retry(restored.active.messages[0].id);
+  assert.deepEqual(retried, original);
+  assert.equal(restored.active.context, 'Changed project');
+  assert.equal(restored.active.allForms, false);
+  assert.equal(restored.active.messages[0].retryRequest, undefined);
+});
+
+test('reattachment after reload retries the original turn without duplicating it', async () => {
+  const disk = storage();
+  let original;
+  const first = await controller(async body => {
+    original = body;
+    throw new Error('response lost');
+  }, disk);
+  first.edit({ draft: 'Read this report', context: 'Original project', allForms: true });
+  const attachment = { modality: 'pdf', base64: 'ORIGINAL_PRIVATE_BYTES', name: 'report.pdf' };
+  await first.send(attachment);
+  first.edit({ context: 'New project', allForms: false });
+  await first.whenSaved();
+  assert.ok(!disk.data.get(W.WORKSPACE_KEY).includes(attachment.base64));
+  let calls = 0;
+  const restored = await controller(async body => {
+    calls++;
+    assert.deepEqual(body, original);
+    return { reply: 'Report read', session_id: body.session_id };
+  }, disk, async sessionId => ({ ok: true, available: true, session_id: sessionId, turns: [] }));
+  const id = restored.active.messages[0].id;
+  await restored.retry(id);
+  assert.equal(calls, 0);
+  assert.equal(restored.active.draft, 'Read this report');
+  await restored.send(attachment);
+  assert.equal(calls, 1);
+  assert.equal(restored.active.messages.length, 2);
+  assert.equal(restored.active.messages[0].id, id);
+  assert.equal(restored.active.messages[0].status, 'complete');
+  assert.equal(restored.active.draft, '');
+});
+
+test('reattachment does not overwrite a new draft or bypass canonical history', async () => {
+  const workspace = W.createWorkspace();
+  workspace.conversations[0].messages = [message({ status: 'failed', attachmentName: 'report.pdf' })];
+  let calls = 0;
+  const store = await controller(async () => { calls++; return { reply: 'wrong' }; },
+    storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) }),
+    async () => { throw new Error('offline'); });
+  const attachment = { modality: 'pdf', base64: 'PRIVATE', name: 'report.pdf' };
+  store.edit({ draft: 'different question' });
+  await store.send(attachment);
+  assert.equal(calls, 0);
+  assert.equal(store.active.draft, 'different question');
+  store.edit({ draft: 'question' });
+  await store.send(attachment);
+  assert.equal(calls, 0);
+  assert.equal(store.active.draft, 'question');
+  assert.equal(store.active.messages[0].status, 'failed');
+});
+
+test('reattachment conflict preserves the failed turn, restored draft, and retry bytes', async () => {
+  const workspace = W.createWorkspace();
+  workspace.conversations[0].messages = [message({ status: 'failed', attachmentName: 'report.pdf' })];
+  let calls = 0;
+  const store = await controller(async body => {
+    calls++;
+    assert.equal(body.pdf_base64, 'REATTACHED_BYTES');
+    if (calls === 1) throw new Error('Saved request conflicts');
+    return { reply: 'Recovered' };
+  }, storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) }));
+  await store.retry(store.active.messages[0].id);
+  await store.send({ modality: 'pdf', base64: 'REATTACHED_BYTES', name: 'report.pdf' });
+  assert.equal(store.active.draft, 'question');
+  assert.equal(store.active.messages.length, 1);
+  assert.equal(store.active.messages[0].status, 'failed');
+  await store.retry(store.active.messages[0].id);
+  assert.equal(calls, 2);
+});
+
+test('late canonical refresh cannot erase a newer completed exchange', async () => {
+  const history = deferred();
+  const store = await controller(async body => ({ reply: 'Answer', session_id: body.session_id }),
+    storage(), async () => history.promise);
+  store.edit({ draft: 'First question' });
+  await store.send();
+  const refresh = store.refreshCanonical();
+  store.edit({ draft: 'Second question' });
+  await store.send();
+  history.resolve({ ok: true, available: true, session_id: store.active.sessionId, turns: [] });
+  assert.equal(await refresh, false);
+  assert.equal(store.active.messages.length, 4);
+  assert.equal(store.active.messages[2].text, 'Second question');
+});
+
+test('retry metadata persists only bounded allowlisted fields and no binary payload', () => {
+  const workspace = W.createWorkspace();
+  workspace.conversations[0].messages = [message({ status: 'failed', retryRequest: {
+    session_id: 'original-session', context: 'Original context', force_all_forms: true,
+    pdf_base64: 'SECRET', image_base64: 'SECRET', history: 'SECRET',
+  } })];
+  const raw = W.encodeWorkspace(workspace);
+  assert.ok(!raw.includes('SECRET'));
+  assert.deepEqual(W.decodeWorkspace(raw).conversations[0].messages[0].retryRequest, {
+    session_id: 'original-session', context: 'Original context', force_all_forms: true,
+  });
+  workspace.conversations[0].messages[0].retryRequest.context = 'x'.repeat(W.MAX_CONTEXT + 1);
+  assert.equal(W.decodeWorkspace(W.encodeWorkspace(workspace)).conversations[0].messages[0].retryRequest, undefined);
+});
+
+test('reattachment recovers a committed answer without a second generation', async () => {
+  const workspace = W.createWorkspace();
+  const pending = message({ status: 'failed', attachmentName: 'report.pdf' });
+  workspace.conversations[0].messages = [pending];
+  workspace.conversations[0].draft = pending.text;
+  let calls = 0;
+  const store = await controller(async () => { calls++; return { reply: 'duplicate' }; },
+    storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) }),
+    async sessionId => ({
+      ok: true, available: true, session_id: sessionId,
+      turns: [{ session_id: sessionId, client_message_id: pending.id, role_user: pending.text,
+        role_jeeves: 'Already committed', status: 'complete', ts: 1 }],
+    }));
+  await store.send({ modality: 'pdf', base64: 'PRIVATE', name: 'report.pdf' });
+  assert.equal(calls, 0);
+  assert.equal(store.active.messages.length, 2);
+  assert.equal(store.active.messages[1].text, 'Already committed');
+  assert.equal(store.active.draft, '');
+});
+
+test('Jeeves Markdown renderer is inert, bounded to display primitives, and JSX syntax-valid', () => {
+  const path = require('node:path');
+  const fileName = path.join(__dirname, '..', 'features', 'Jeeves', 'MessageContent.tsx');
+  const source = fs.readFileSync(fileName, 'utf8');
+  const result = ts.transpileModule(source, {
+    fileName,
+    reportDiagnostics: true,
+    compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+  });
+  const errors = (result.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error);
+  assert.deepEqual(errors.map(d => String(d.messageText)), []);
+  assert.match(source, /function markdown\(text: string\)/);
+  assert.match(source, /streaming = false/);
+  assert.match(source, /function CodeBlock\(/);
+  assert.match(source, /kind: 'list'/);
+  assert.match(source, /kind: 'table'/);
+  assert.match(source, /kind: 'heading'/);
+  assert.ok(source.includes('mailto:') && source.includes('https?:'), 'links limited to authored http/mailto schemes');
+  assert.doesNotMatch(source, /dangerouslySetInnerHTML|WebView|\beval\s*\(/);
+});

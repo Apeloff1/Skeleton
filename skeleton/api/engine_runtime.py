@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+from typing import Iterable
 
 from skeleton.api.engine_service import (
     EngineExecutionCommand,
     EngineExecutionService,
     EngineServiceError,
 )
-from skeleton.contracts.ai_execution import (
-    AIExecutionResult,
-    ExecutionState,
-    execution_payload_digest,
-)
+from skeleton.contracts.ai_execution import AIExecutionResult
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.kernel.runtime_supervision import (
+    RuntimeServiceLifecycle,
+    RuntimeSupervisionError,
+    WorkLease,
+)
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
     FinalizationBindingHook,
@@ -51,10 +53,6 @@ class EngineExecutionCoordinatorError(RuntimeError):
     """Engine execution could not be scheduled or reconciled safely."""
 
 
-class _LocalProviderBindingError(EngineExecutionCoordinatorError):
-    """A local recovery identity cannot authorize further model dispatch."""
-
-
 class EngineExecutionCoordinator:
     """Single-process launcher over durable execution state.
 
@@ -72,26 +70,43 @@ class EngineExecutionCoordinator:
         tool_runtime: AsyncToolRuntime | None = None,
         verification_hook: VerificationHook | None = None,
         finalization_binding_hook: FinalizationBindingHook | None = None,
+        lifecycle: RuntimeServiceLifecycle | None = None,
     ) -> None:
         if not isinstance(service, EngineExecutionService):
             raise TypeError("service must be EngineExecutionService")
         self.service = service
-        self.provider_registry = provider_registry or ProviderRegistry.from_env(retain_unavailable=True)
+        self.provider_registry = provider_registry or ProviderRegistry.from_env()
         self.tool_runtime = tool_runtime or AsyncToolRuntime()
         self.verification_hook = verification_hook
         self.finalization_binding_hook = finalization_binding_hook
+        if lifecycle is not None and not isinstance(
+            lifecycle,
+            RuntimeServiceLifecycle,
+        ):
+            raise TypeError("lifecycle must be RuntimeServiceLifecycle")
+        self.lifecycle = lifecycle
         self._lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._lifecycle_leases: dict[asyncio.Task[None], WorkLease] = {}
+        self._supervision_faults: list[str] = []
         self._closed = False
 
     async def ensure_started(
         self,
         command: EngineExecutionCommand,
+        *,
+        allow_starting: bool = False,
     ) -> None:
         if not isinstance(command, EngineExecutionCommand):
             raise TypeError("command must be EngineExecutionCommand")
         if self._closed:
-            raise EngineExecutionCoordinatorError("engine execution coordinator is closed")
+            raise EngineExecutionCoordinatorError(
+                "engine execution coordinator is closed"
+            )
+        if self._supervision_faults:
+            raise EngineExecutionCoordinatorError(
+                "engine execution coordinator supervision is faulted"
+            )
         execution_id = command.execution_request.execution_id
         if self.service.repository.result(execution_id) is not None:
             return
@@ -100,16 +115,67 @@ class EngineExecutionCoordinator:
             existing = self._tasks.get(execution_id)
             if existing is not None and not existing.done():
                 return
-            task = asyncio.create_task(
-                self._drive(command),
-                name="engine-execution:" + execution_id,
-            )
+            if existing is not None and existing.done():
+                self._task_done(execution_id, existing)
+
+            lease = None
+            if self.lifecycle is not None:
+                try:
+                    lease = self.lifecycle.acquire_work(
+                        "engine-execution:" + execution_id,
+                        allow_starting=allow_starting,
+                    )
+                except RuntimeSupervisionError as exc:
+                    raise EngineExecutionCoordinatorError(
+                        "engine lifecycle denied execution admission"
+                    ) from exc
+
+            try:
+                task = asyncio.create_task(
+                    self._drive(command),
+                    name="engine-execution:" + execution_id,
+                )
+            except BaseException:
+                if lease is not None:
+                    self.lifecycle.release_work(lease)
+                raise
+
             self._tasks[execution_id] = task
+            if lease is not None:
+                self._lifecycle_leases[task] = lease
             task.add_done_callback(
                 lambda completed, eid=execution_id: self._task_done(
                     eid,
                     completed,
                 )
+            )
+
+    def _record_supervision_fault(self, message: str) -> None:
+        normalized = str(message).strip()[:1024]
+        if normalized and normalized not in self._supervision_faults:
+            self._supervision_faults.append(normalized)
+
+    def _release_lifecycle_lease(
+        self,
+        task: asyncio.Task[None],
+    ) -> None:
+        lease = self._lifecycle_leases.pop(task, None)
+        if lease is None or self.lifecycle is None:
+            return
+        try:
+            released = self.lifecycle.release_work(lease)
+        except RuntimeSupervisionError as exc:
+            self._record_supervision_fault(
+                "lifecycle lease release failed for "
+                + lease.work_id
+                + ": "
+                + str(exc)
+            )
+            return
+        if not released:
+            self._record_supervision_fault(
+                "lifecycle lease disappeared before task retirement: "
+                + lease.work_id
             )
 
     def _task_done(
@@ -120,6 +186,7 @@ class EngineExecutionCoordinator:
         current = self._tasks.get(execution_id)
         if current is task:
             self._tasks.pop(execution_id, None)
+        self._release_lifecycle_lease(task)
         if task.cancelled():
             return
         # Retrieve the exception so the event loop never reports an unobserved
@@ -129,65 +196,157 @@ class EngineExecutionCoordinator:
         except asyncio.CancelledError:
             pass
 
+    def supervision_snapshot(self) -> dict[str, object]:
+        """Return identity-safe local supervision state for health/evidence."""
+
+        tasks = tuple(
+            sorted(
+                execution_id
+                for execution_id, task in self._tasks.items()
+                if not task.done()
+            )
+        )
+        lease_ids = tuple(
+            sorted(lease.work_id for lease in self._lifecycle_leases.values())
+        )
+        return {
+            "closed": self._closed,
+            "active_execution_ids": tasks,
+            "active_task_count": len(tasks),
+            "active_lease_ids": lease_ids,
+            "active_lease_count": len(lease_ids),
+            "supervision_faults": tuple(self._supervision_faults),
+            "faulted": bool(self._supervision_faults),
+        }
+
     async def ensure_execution(self, execution_id: str) -> None:
         stored = self.service.submissions.get_by_execution_id(
             str(execution_id),
         )
         if stored is None:
-            raise EngineExecutionCoordinatorError("engine submission is unavailable for execution")
+            raise EngineExecutionCoordinatorError(
+                "engine submission is unavailable for execution"
+            )
         await self.ensure_started(stored.command)
 
     async def interrupt_cancelled_execution(self, execution_id: str) -> None:
-        """Drain an execution after its authorized cancellation was committed.
+        """Wake a running execution after durable cancellation is requested.
 
-        The cognitive runtime interrupts cooperative provider work and fences
-        late noncooperative responses, including their actual usage. Cancelling
-        its driver task here would bypass that durable finalization. Shield the
-        driver so cancellation of this waiter cannot revoke execution authority.
+        Cooperative providers observe the repository cancellation bit from the
+        canonical runtime. Cancelling the coordinator task would bypass that
+        terminalization path, so this method waits for the running driver to
+        consume the durable request and only restarts recovery when no driver
+        is active.
         """
-
-        if not isinstance(execution_id, str) or not execution_id.strip():
-            raise ValueError("execution_id must be a nonempty string")
-        while True:
+        execution_id = str(execution_id)
+        try:
             execution = self.service.repository.get(execution_id)
-            if execution.terminal:
-                return
-            if not execution.cancellation_requested:
-                raise EngineExecutionCoordinatorError("execution cancellation has not been durably requested")
+        except Exception as exc:
+            raise EngineExecutionCoordinatorError(
+                "engine execution is unavailable for cancellation"
+            ) from exc
+        if not execution.cancellation_requested:
+            raise EngineExecutionCoordinatorError(
+                "execution cancellation has not been requested"
+            )
+        if execution.terminal or self.service.repository.result(execution_id) is not None:
+            return
 
+        async with self._lock:
+            task = self._tasks.get(execution_id)
+        if task is None or task.done():
             await self.ensure_execution(execution_id)
             async with self._lock:
                 task = self._tasks.get(execution_id)
-            if task is not None:
-                await asyncio.shield(task)
-            # A driver may have stopped at an approval checkpoint just as the
-            # durable flag was committed. Resume that checkpoint until the
-            # canonical runtime records a terminal result, without dispatching
-            # another provider turn after observing cancellation.
+        # Cancellation acknowledgement must not wait for the entire
+        # execution driver.  It should, however, give cooperative providers a
+        # short bounded window to observe the durable bit and persist the
+        # terminal cancellation result.  This keeps local cancellation
+        # deterministic without deadlocking providers whose response can only
+        # arrive after the caller regains control.
+        if task is not None:
+            done, _ = await asyncio.wait({task}, timeout=0.15)
+            if task in done:
+                # _drive is fail-closed and normally consumes its own errors.
+                # Observe the task result so an unexpected terminal exception
+                # can never become an un-retrieved task warning.
+                try:
+                    task.result()
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    pass
 
     async def recover(self) -> tuple[str, ...]:
         recovered: list[str] = []
         for execution in self.service.repository.recoverable():
-            stored = self.service.submissions.get_by_execution_id(execution.execution_id)
+            stored = self.service.submissions.get_by_execution_id(
+                execution.execution_id
+            )
             if stored is None:
                 await self._finalize_failure(
                     execution.execution_id,
                     "submission_command_missing",
                 )
                 continue
-            await self.ensure_started(stored.command)
+            await self.ensure_started(
+                stored.command,
+                allow_starting=True,
+            )
             recovered.append(execution.execution_id)
         return tuple(recovered)
 
     async def shutdown(self) -> None:
         self._closed = True
         async with self._lock:
-            tasks = tuple(self._tasks.values())
-            self._tasks.clear()
-        for task in tasks:
+            task_items = tuple(self._tasks.items())
+
+        for _execution_id, task in task_items:
             task.cancel()
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        if task_items:
+            await asyncio.gather(
+                *(task for _execution_id, task in task_items),
+                return_exceptions=True,
+            )
+
+        # Done callbacks normally retire exact task leases. Reconcile
+        # synchronously as well so shutdown correctness never depends on the
+        # event loop scheduling callback delivery before lifecycle STOPPED.
+        for execution_id, task in task_items:
+            self._task_done(execution_id, task)
+
+        async with self._lock:
+            stranded_tasks = tuple(
+                execution_id
+                for execution_id, task in self._tasks.items()
+                if not task.done()
+            )
+            self._tasks = {
+                execution_id: task
+                for execution_id, task in self._tasks.items()
+                if not task.done()
+            }
+
+        if stranded_tasks:
+            self._record_supervision_fault(
+                "shutdown left active tasks: " + ",".join(sorted(stranded_tasks))
+            )
+        if self._lifecycle_leases:
+            leaked = tuple(
+                sorted(
+                    lease.work_id
+                    for lease in self._lifecycle_leases.values()
+                )
+            )
+            self._record_supervision_fault(
+                "shutdown left lifecycle leases: " + ",".join(leaked)
+            )
+
+        if self._supervision_faults:
+            raise EngineExecutionCoordinatorError(
+                "engine execution coordinator shutdown supervision failed: "
+                + "; ".join(self._supervision_faults)
+            )
 
     async def _drive(
         self,
@@ -203,15 +362,7 @@ class EngineExecutionCoordinator:
             )
             return
         try:
-            selection = command.execution_request.context_policy.get("provider_selection")
-            if selection is None:
-                provider = self.provider_registry.require_active()
-            elif isinstance(selection, dict) and set(selection) == {"provider_id", "model_id"}:
-                provider = self.provider_registry.require_selection(
-                    selection["provider_id"], selection["model_id"]
-                )
-            else:
-                raise ProviderUnavailableError("invalid declared provider selection")
+            provider = self.provider_registry.require_active()
         except ProviderUnavailableError:
             await self._finalize_failure(
                 execution_id,
@@ -233,7 +384,7 @@ class EngineExecutionCoordinator:
         for tool_id in allowed_tool_ids:
             try:
                 await self.tool_runtime.manifest(tool_id)
-            except Exception:  # noqa: BLE001 - Fail closed at the tool owner boundary.
+            except Exception:
                 await self._finalize_failure(
                     execution_id,
                     "tool_handler_unavailable",
@@ -245,7 +396,11 @@ class EngineExecutionCoordinator:
             "verification_adapter_for",
             None,
         )
-        semantic_verification_adapter = verifier_selector(provider) if callable(verifier_selector) else None
+        semantic_verification_adapter = (
+            verifier_selector(provider)
+            if callable(verifier_selector)
+            else None
+        )
 
         runtime = CognitiveExecutionRuntime(
             self.service.repository,
@@ -266,11 +421,15 @@ class EngineExecutionCoordinator:
                 )
             ),
         )
-        history = tuple(AIMessage(role=role, content=content) for role, content in handoff.history)
+        history = tuple(
+            AIMessage(role=role, content=content)
+            for role, content in handoff.history
+        )
 
         try:
-            checkpoint = self.service.repository.latest_checkpoint(execution_id)
-            checkpoint = self._pin_local_provider(command, runtime, provider, checkpoint, history)
+            checkpoint = self.service.repository.latest_checkpoint(
+                execution_id
+            )
             approval_refs = self.service.active_approval_refs(
                 execution_id,
             )
@@ -289,75 +448,16 @@ class EngineExecutionCoordinator:
                     approval_refs=approval_refs,
                 )
             if self.service.repository.result(execution_id) is not None:
-                self.service.complete_execution_admission(execution_id)
+                self.service.complete_execution_admission(
+                    execution_id
+                )
         except asyncio.CancelledError:
             raise
-        except _LocalProviderBindingError as exc:
-            await self._finalize_failure(execution_id, str(exc))
-        except Exception:  # noqa: BLE001 - Finalize any driver or hook failure.
+        except Exception:
             await self._finalize_failure(
                 execution_id,
                 "engine_execution_exception",
             )
-
-    def _pin_local_provider(self, command, runtime, provider, checkpoint, history):
-        """Commit or verify a local pin before the canonical runtime dispatches."""
-
-        field = "local_provider_binding"
-        prior = None if checkpoint is None else checkpoint.payload.get(field)
-        is_local = getattr(provider, "provider_id", None) == "local"
-        if not is_local and prior is None:
-            return checkpoint
-        descriptor = getattr(provider, "execution_identity", None)
-        if not is_local or not callable(descriptor):
-            raise _LocalProviderBindingError("local_provider_binding_mismatch")
-        try:
-            identity = descriptor()
-            if (
-                not isinstance(identity, dict)
-                or identity.get("schema_version") != "skeleton.local_provider_execution_identity.v1"
-                or identity.get("provider_id") != "local"
-                or identity.get("model_id") != getattr(provider, "model", None)
-            ):
-                raise ValueError("invalid local execution identity")
-            binding = {"identity": identity, "binding_digest": execution_payload_digest(identity)}
-            if prior is not None:
-                if (
-                    not isinstance(prior, dict)
-                    or set(prior) != {"identity", "binding_digest"}
-                    or execution_payload_digest(prior["identity"]) != prior["binding_digest"]
-                    or prior != binding
-                ):
-                    raise ValueError("local binding drift")
-                return checkpoint
-        except (ValueError, TypeError, KeyError, ProviderUnavailableError) as exc:
-            raise _LocalProviderBindingError("local_provider_binding_mismatch") from exc
-        handoff = command.compiled_context
-        initial = runtime._initial_payload(
-            command.execution_request,
-            instructions=handoff.instructions,
-            prompt=handoff.prompt,
-            context_digest=handoff.context_digest,
-            history=history,
-        )
-        current = self.service.repository.get(command.execution_request.execution_id)
-        observed_checkpoint_version = 0 if checkpoint is None else checkpoint.checkpoint_version
-        if current.checkpoint_version != observed_checkpoint_version:
-            authoritative = self.service.repository.latest_checkpoint(current.execution_id)
-            if authoritative is None:
-                raise _LocalProviderBindingError("local_provider_binding_missing")
-            return self._pin_local_provider(command, runtime, provider, authoritative, history)
-        if current.state is not ExecutionState.CREATED:
-            raise _LocalProviderBindingError("local_provider_binding_missing")
-        if checkpoint is not None and (checkpoint.payload != initial):
-            raise _LocalProviderBindingError("local_provider_binding_missing")
-        initial[field] = binding
-        return self.service.repository.checkpoint(
-            current.execution_id,
-            initial,
-            expected_execution_version=current.version,
-            expected_checkpoint_version=current.checkpoint_version,
-        )
 
     async def _finalize_failure(
         self,
@@ -370,45 +470,26 @@ class EngineExecutionCoordinator:
             return
         try:
             current = repository.get(execution_id)
-        except Exception:  # noqa: BLE001 - Reconciliation needs a readable snapshot.
+        except Exception:
             return
         if current.terminal:
             return
-        now = datetime.now(UTC)
-        payload = {}
-        try:
-            checkpoint = repository.latest_checkpoint(execution_id)
-            if checkpoint is not None:
-                payload = dict(checkpoint.payload)
-            if any(
-                type(payload.get(key, 0)) is not int or payload.get(key, 0) < 0
-                for key in ("model_turns", "tool_calls")
-            ) or any(
-                not isinstance(payload.get(key, []), list)
-                or any(not isinstance(item, str) or not item.strip() for item in payload.get(key, []))
-                for key in ("provider_receipts", "tool_receipts")
-            ):
-                raise ValueError("checkpoint usage identity is malformed")
-            if not isinstance(payload.get("usage_events", []), list) or any(
-                not isinstance(item, dict) for item in payload.get("usage_events", [])
-            ):
-                raise ValueError("checkpoint usage events are malformed")
-        except Exception:  # noqa: BLE001 - Corrupt checkpoints cannot supply usage evidence.
-            payload = {"usage_evidence_unavailable": True}
+        now = datetime.now(timezone.utc)
         result = AIExecutionResult(
             operation_id=current.operation_id,
             execution_id=current.execution_id,
             status="failed",
             usage={
                 "error_code": str(error_code),
-                "model_turns": int(payload.get("model_turns", 0)),
-                "tool_calls": int(payload.get("tool_calls", 0)),
-                "provider_usage": list(payload.get("usage_events", [])),
-                **({"usage_evidence_unavailable": True} if payload.get("usage_evidence_unavailable") else {}),
+                "model_turns": 0,
+                "tool_calls": 0,
             },
-            provider_receipts=tuple(payload.get("provider_receipts", ())),
-            tool_receipts=tuple(payload.get("tool_receipts", ())),
-            stream_terminal_event=("stream-terminal:" + current.execution_id + ":failed:" + str(error_code)),
+            stream_terminal_event=(
+                "stream-terminal:"
+                + current.execution_id
+                + ":failed:"
+                + str(error_code)
+            ),
             completed_at=now,
         )
         try:

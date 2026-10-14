@@ -13,7 +13,7 @@ def test_mirror_room_registry_mount_exposes_read_only_observatory_routes() -> No
 
     assert report["ok"] == 1
     assert report["skipped"] == 0
-    paths = {route.path for route in app.routes}
+    paths = {route.path for route in app.routes if hasattr(route, "path")}
     assert {
         "/api/mirror-room/status",
         "/api/mirror-room/file-tree",

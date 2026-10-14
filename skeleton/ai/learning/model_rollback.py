@@ -288,6 +288,27 @@ class RuntimeStateEnvelope:
             _nonnegative_int("minimum_training_step", self.minimum_training_step),
         )
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "architecture_config_digest": self.architecture_config_digest,
+            "representation_id": self.representation_id,
+            "runtime_abi": self.runtime_abi,
+            "optimizer_family": self.optimizer_family,
+            "optimizer_version": self.optimizer_version,
+            "optimizer_schema_version": self.optimizer_schema_version,
+            "parameter_group_digest": self.parameter_group_digest,
+            "data_manifest_root": self.data_manifest_root,
+            "mixture_digest": self.mixture_digest,
+            "cursor_schema": self.cursor_schema,
+            "checkpoint_format": self.checkpoint_format,
+            "supported_checkpoint_versions": list(self.supported_checkpoint_versions),
+            "minimum_training_step": self.minimum_training_step,
+        }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class MigrationEdge:
@@ -316,6 +337,20 @@ class MigrationEdge:
         if not isinstance(self.reversible, bool):
             raise TypeError("reversible must be boolean")
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "component": self.component,
+            "from_version": self.from_version,
+            "to_version": self.to_version,
+            "migration_id": self.migration_id,
+            "reversible": self.reversible,
+            "verifier_ref": self.verifier_ref,
+        }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class RollbackPolicy:
@@ -343,6 +378,19 @@ class RollbackPolicy:
             ),
         )
 
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "allow_optimizer_migration": self.allow_optimizer_migration,
+            "allow_cursor_migration": self.allow_cursor_migration,
+            "require_reversible_migrations": self.require_reversible_migrations,
+            "require_same_data_manifest": self.require_same_data_manifest,
+            "forbid_step_regression_below": self.forbid_step_regression_below,
+        }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
+
 
 @dataclass(frozen=True, slots=True)
 class RollbackReceipt:
@@ -350,6 +398,98 @@ class RollbackReceipt:
     admissible: bool
     blockers: tuple[str, ...]
     migration_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "checkpoint_id",
+            _text("checkpoint_id", self.checkpoint_id),
+        )
+        if not isinstance(self.admissible, bool):
+            raise TypeError("admissible must be boolean")
+        blockers = _unique("rollback blocker", self.blockers)
+        migration_ids = _unique("migration_id", self.migration_ids)
+        if self.admissible and blockers:
+            raise ModelRollbackError("admissible rollback cannot contain blockers")
+        if not self.admissible and not blockers:
+            raise ModelRollbackError("inadmissible rollback must explain at least one blocker")
+        object.__setattr__(self, "blockers", blockers)
+        object.__setattr__(self, "migration_ids", migration_ids)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "checkpoint_id": self.checkpoint_id,
+            "admissible": self.admissible,
+            "blockers": list(self.blockers),
+            "migration_ids": list(self.migration_ids),
+        }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackDecisionEvidence:
+    checkpoint_id: str
+    checkpoint_claimed_integrity_digest: str
+    checkpoint_computed_integrity_digest: str
+    runtime_digest: str
+    policy_digest: str
+    migration_inventory_digests: tuple[str, ...]
+    receipt: RollbackReceipt
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "checkpoint_id",
+            _text("checkpoint_id", self.checkpoint_id),
+        )
+        for field_name in (
+            "checkpoint_claimed_integrity_digest",
+            "checkpoint_computed_integrity_digest",
+            "runtime_digest",
+            "policy_digest",
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                _sha(field_name, getattr(self, field_name)),
+            )
+        digests = tuple(
+            _sha("migration_inventory_digest", value)
+            for value in self.migration_inventory_digests
+        )
+        if len(digests) != len(set(digests)):
+            raise ModelRollbackError(
+                "migration inventory digests must be unique"
+            )
+        object.__setattr__(
+            self,
+            "migration_inventory_digests",
+            tuple(sorted(digests)),
+        )
+        if not isinstance(self.receipt, RollbackReceipt):
+            raise TypeError("receipt must be RollbackReceipt")
+        if self.receipt.checkpoint_id != self.checkpoint_id:
+            raise ModelRollbackError(
+                "rollback evidence checkpoint identity mismatch"
+            )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "checkpoint_id": self.checkpoint_id,
+            "checkpoint_claimed_integrity_digest": self.checkpoint_claimed_integrity_digest,
+            "checkpoint_computed_integrity_digest": self.checkpoint_computed_integrity_digest,
+            "runtime_digest": self.runtime_digest,
+            "policy_digest": self.policy_digest,
+            "migration_inventory_digests": list(self.migration_inventory_digests),
+            "receipt": self.receipt.as_dict(),
+        }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
 
 
 def _find_migration(
@@ -391,9 +531,21 @@ def evaluate_rollback(
         raise TypeError("policy must be RollbackPolicy")
     if any(not isinstance(edge, MigrationEdge) for edge in migrations):
         raise TypeError("migrations must contain MigrationEdge values")
+    migration_ids = [edge.migration_id for edge in migrations]
+    if len(migration_ids) != len(set(migration_ids)):
+        raise ModelRollbackError("migration ids must be unique")
+    unsupported_components = sorted(
+        {edge.component for edge in migrations}
+        - {"optimizer", "data_cursor"}
+    )
+    if unsupported_components:
+        raise ModelRollbackError(
+            "unsupported migration component(s): "
+            + ", ".join(unsupported_components)
+        )
 
     blockers: list[str] = []
-    migration_ids: list[str] = []
+    selected_migration_ids: list[str] = []
 
     try:
         checkpoint.assert_integrity()
@@ -432,7 +584,7 @@ def evaluate_rollback(
             if edge is None:
                 blockers.append("optimizer schema migration is unavailable")
             else:
-                migration_ids.append(edge.migration_id)
+                selected_migration_ids.append(edge.migration_id)
 
     if (
         active_policy.require_same_data_manifest
@@ -456,7 +608,7 @@ def evaluate_rollback(
             if edge is None:
                 blockers.append("data cursor schema migration is unavailable")
             else:
-                migration_ids.append(edge.migration_id)
+                selected_migration_ids.append(edge.migration_id)
 
     floor = max(
         runtime.minimum_training_step,
@@ -469,7 +621,34 @@ def evaluate_rollback(
         checkpoint_id=checkpoint.checkpoint_id,
         admissible=not blockers,
         blockers=tuple(blockers),
-        migration_ids=tuple(migration_ids),
+        migration_ids=tuple(selected_migration_ids),
+    )
+
+
+def evaluate_rollback_evidence(
+    checkpoint: ModelCheckpoint,
+    runtime: RuntimeStateEnvelope,
+    *,
+    policy: RollbackPolicy | None = None,
+    migrations: Sequence[MigrationEdge] = (),
+) -> RollbackDecisionEvidence:
+    """Return a content-addressed rollback decision bound to its full context."""
+
+    active_policy = policy or RollbackPolicy()
+    receipt = evaluate_rollback(
+        checkpoint,
+        runtime,
+        policy=active_policy,
+        migrations=migrations,
+    )
+    return RollbackDecisionEvidence(
+        checkpoint_id=checkpoint.checkpoint_id,
+        checkpoint_claimed_integrity_digest=checkpoint.integrity_digest,
+        checkpoint_computed_integrity_digest=checkpoint.computed_integrity_digest,
+        runtime_digest=runtime.digest,
+        policy_digest=active_policy.digest,
+        migration_inventory_digests=tuple(edge.digest for edge in migrations),
+        receipt=receipt,
     )
 
 
@@ -535,9 +714,11 @@ __all__ = [
     "ModelCheckpoint",
     "ModelRollbackError",
     "OptimizerStateIdentity",
+    "RollbackDecisionEvidence",
     "RollbackPolicy",
     "RollbackReceipt",
     "RuntimeStateEnvelope",
     "build_checkpoint",
     "evaluate_rollback",
+    "evaluate_rollback_evidence",
 ]

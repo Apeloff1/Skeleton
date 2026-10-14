@@ -1,6 +1,6 @@
 # Manifest Reference Integrity
 
-<!-- machine-git-blob: machine/manifest_reference_policy.json@c53d7e58cc0bc9a1314c865081f7f567de920068 -->
+<!-- machine-git-blob: machine/manifest_reference_policy.json@22df0ae36845e420314dff9f4ef8008e78db2596 -->
 
 Machine authority: `machine/manifest_reference_policy.json`
 

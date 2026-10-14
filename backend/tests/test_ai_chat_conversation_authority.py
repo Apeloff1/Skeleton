@@ -179,18 +179,28 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
         captured["commit"] = {"thread_id": thread_id, **kwargs}
         return after_assistant, assistant
 
-    async def fake_call_llm(system_prompt, user_prompt, *, history=None, **kwargs):
-        captured["history"] = history
-        captured["user_prompt"] = user_prompt
-        captured["envelope"] = kwargs.get("context_envelope")
-        return {
-            "success": True,
-            "response": "canonical answer",
-            "provider": "test-provider",
-            "model": "test-model",
-            "provider_request_id": "provider-request-1",
-            "latency_ms": 1.0,
-        }
+    class FakeEngineClient:
+        config = SimpleNamespace(
+            service_principal="codedock-backend",
+            execution_timeout_s=5.0,
+        )
+
+        async def wait_for_terminal(self, **_kwargs):
+            raise route.EngineNotFoundError("engine execution not found")
+
+        async def execute(self, command):
+            captured["command"] = command
+            return SimpleNamespace(
+                operation_id=command.operation.operation_id,
+                execution_id=command.execution_request.execution_id,
+                final_output="canonical answer",
+                verification="verification:conversation-authority",
+                evidence_refs=("evidence:conversation-authority",),
+                provider_receipts=("provider:test:provider-request-1",),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
+            )
 
     monkeypatch.setattr(
         route,
@@ -201,7 +211,11 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
             commit_assistant_message=commit_assistant_message,
         ),
     )
-    monkeypatch.setattr(route, "call_llm", fake_call_llm)
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        lambda: FakeEngineClient(),
+    )
 
     response = client.post(
         "/ai/chat",
@@ -214,26 +228,28 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
     )
 
     assert response.status_code == 200
+    command = captured["command"]
+    execution_id = command.execution_request.execution_id
     assert captured["append"]["expected_thread_version"] == 1
-    assert captured["history"] == [
-        {"role": "user", "content": "older question"},
-        {"role": "assistant", "content": "older answer"},
-    ]
+    assert command.compiled_context.history == (
+        ("user", "older question"),
+        ("assistant", "older answer"),
+    )
     assert captured["commit"]["expected_thread_version"] == 2
     assert captured["commit"]["causal_user_message_id"] == user_message.message_id
     assert captured["commit"]["idempotency_key"] == "client-1:assistant"
-    assert captured["commit"]["ai_result_id"] == "provider-result:test-provider:provider-request-1"
+    assert captured["commit"]["ai_result_id"] == "engine-result:" + execution_id
     assert captured["commit"]["operation_id"]
-    assert captured["commit"]["context_id"] == captured["envelope"].context_id
-    assert captured["commit"]["context_digest"] == captured["envelope"].context_digest
+    assert captured["commit"]["context_id"] == command.compiled_context.context_id
+    assert captured["commit"]["context_digest"] == command.compiled_context.context_digest
     assert (
         captured["commit"]["context_source_snapshot"]
-        == captured["envelope"].source_snapshot
+        == command.compiled_context.source_snapshot
     )
     body = response.json()
     assert body["thread"]["version"] == 3
     assert body["assistant_message"]["content"] == "canonical answer"
-    assert body["ai_result_id"] == "provider-result:test-provider:provider-request-1"
+    assert body["ai_result_id"] == "engine-result:" + execution_id
 
 
 
@@ -395,12 +411,17 @@ def test_provider_failure_keeps_user_message_canonical_for_retry(
         committed["assistant"] += 1
         raise AssertionError("failed provider must not commit assistant state")
 
-    async def failed_call(*args, **kwargs):
-        return {
-            "success": False,
-            "error": "AI provider is unavailable",
-            "error_code": "provider_unavailable",
-        }
+    class OfflineEngineClient:
+        config = SimpleNamespace(
+            service_principal="codedock-backend",
+            execution_timeout_s=5.0,
+        )
+
+        async def wait_for_terminal(self, **_kwargs):
+            raise route.EngineNotFoundError("engine execution not found")
+
+        async def execute(self, _command):
+            raise route.EngineUnavailableError("engine unavailable")
 
     monkeypatch.setattr(
         route,
@@ -411,7 +432,11 @@ def test_provider_failure_keeps_user_message_canonical_for_retry(
             commit_assistant_message=commit_assistant_message,
         ),
     )
-    monkeypatch.setattr(route, "call_llm", failed_call)
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        lambda: OfflineEngineClient(),
+    )
 
     response = client.post(
         "/ai/chat",
@@ -566,16 +591,35 @@ def test_chat_compiles_immutable_context_and_keeps_ephemeral_context_untrusted(
     async def commit_assistant_message(*args, **kwargs):
         return committed, assistant
 
-    async def fake_call_llm(*args, **kwargs):
-        captured["envelope"] = kwargs["context_envelope"]
-        return {
-            "success": True,
-            "response": "answer",
-            "provider": "test",
-            "model": "test",
-            "provider_request_id": "req-context",
-            "latency_ms": 1.0,
-        }
+    original_command_from_context = route.command_from_context
+
+    def capture_command_from_context(*args, **kwargs):
+        captured["envelope"] = kwargs["context"]
+        command = original_command_from_context(*args, **kwargs)
+        captured["command"] = command
+        return command
+
+    class FakeEngineClient:
+        config = SimpleNamespace(
+            service_principal="codedock-backend",
+            execution_timeout_s=5.0,
+        )
+
+        async def wait_for_terminal(self, **_kwargs):
+            raise route.EngineNotFoundError("engine execution not found")
+
+        async def execute(self, command):
+            return SimpleNamespace(
+                operation_id=command.operation.operation_id,
+                execution_id=command.execution_request.execution_id,
+                final_output="answer",
+                verification="verification:context-authority",
+                evidence_refs=("evidence:context-authority",),
+                provider_receipts=("provider:test:req-context",),
+                tool_receipts=(),
+                memory_refs=(),
+                artifact_refs=(),
+            )
 
     monkeypatch.setattr(
         route,
@@ -586,7 +630,16 @@ def test_chat_compiles_immutable_context_and_keeps_ephemeral_context_untrusted(
             commit_assistant_message=commit_assistant_message,
         ),
     )
-    monkeypatch.setattr(route, "call_llm", fake_call_llm)
+    monkeypatch.setattr(
+        route,
+        "command_from_context",
+        capture_command_from_context,
+    )
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        lambda: FakeEngineClient(),
+    )
 
     response = client.post(
         "/ai/chat",

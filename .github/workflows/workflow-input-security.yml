@@ -3,7 +3,7 @@ name: Workflow Input Security
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
     paths:
       - '.github/workflows/**'
       - '.machine/**'

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-06:fault_taxonomy:v1",
+  "title": "FLGB-06 fault taxonomy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fault_id",
+    "category",
+    "severity",
+    "retryable",
+    "operator_action"
+  ],
+  "properties": {
+    "fault_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "severity": {
+      "enum": [
+        "info",
+        "warning",
+        "error",
+        "critical"
+      ]
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "operator_action": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}

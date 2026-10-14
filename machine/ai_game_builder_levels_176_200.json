@@ -1,0 +1,1594 @@
+{
+  "schema_version": "skeleton.ai_game_builder_levels_shard.v1",
+  "manifest": "machine/ai_game_builder_500_levels.json",
+  "start": 176,
+  "end": 200,
+  "count": 25,
+  "levels": [
+    {
+      "id": "GBL-176",
+      "ordinal": 176,
+      "family_id": "GB18",
+      "family": "Combat & Ability Design",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/combat_engine.py",
+      "batches": [
+        "B027"
+      ],
+      "metrics": [
+        "combat readability",
+        "tactical depth",
+        "counterplay",
+        "determinism"
+      ],
+      "requirements": [
+        "Run deterministic input/physics simulations, fuzz/property tests and replayable playtests.",
+        "Attack dominant strategy, unreadable hit logic, stunlock loop, resource exploit.",
+        "Keep minimized failure traces as regressions."
+      ],
+      "adversarial": [
+        "dominant strategy",
+        "unreadable hit logic",
+        "stunlock loop",
+        "resource exploit",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-176 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-177",
+      "ordinal": 177,
+      "family_id": "GB18",
+      "family": "Combat & Ability Design",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/combat_engine.py",
+      "batches": [
+        "B027"
+      ],
+      "metrics": [
+        "combat readability",
+        "tactical depth",
+        "counterplay",
+        "determinism"
+      ],
+      "requirements": [
+        "Improve combat readability, tactical depth, counterplay, determinism plus player feel, accessibility, performance and maintainability jointly.",
+        "Reject tuning wins that break predictability or skill expression.",
+        "Preserve champion if challenger is not Pareto-safe."
+      ],
+      "adversarial": [
+        "dominant strategy",
+        "unreadable hit logic",
+        "stunlock loop",
+        "resource exploit",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-177 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-178",
+      "ordinal": 178,
+      "family_id": "GB18",
+      "family": "Combat & Ability Design",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/combat_engine.py",
+      "batches": [
+        "B027"
+      ],
+      "metrics": [
+        "combat readability",
+        "tactical depth",
+        "counterplay",
+        "determinism"
+      ],
+      "requirements": [
+        "Support semantic diff, remap/migration, rollback and exact state checkpointing.",
+        "Recover interrupted edits without corrupt bindings or motion state.",
+        "Maintain replay compatibility or explicit migration."
+      ],
+      "adversarial": [
+        "dominant strategy",
+        "unreadable hit logic",
+        "stunlock loop",
+        "resource exploit",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-178 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-179",
+      "ordinal": 179,
+      "family_id": "GB18",
+      "family": "Combat & Ability Design",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/combat_engine.py",
+      "batches": [
+        "B027"
+      ],
+      "metrics": [
+        "combat readability",
+        "tactical depth",
+        "counterplay",
+        "determinism"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rounds with three stages and no wall-clock deadline.",
+        "Stress many devices, frame rates, geometry cases and adversarial action sequences.",
+        "Prove bounded resources, checkpoint/restart and no iterative feel degradation."
+      ],
+      "adversarial": [
+        "dominant strategy",
+        "unreadable hit logic",
+        "stunlock loop",
+        "resource exploit",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-179 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort stress report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-180",
+      "ordinal": 180,
+      "family_id": "GB18",
+      "family": "Combat & Ability Design",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Design attacks, abilities, timing, hit logic, resources, enemy interactions, readability and tactical counterplay.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/combat_engine.py",
+      "batches": [
+        "B027"
+      ],
+      "metrics": [
+        "combat readability",
+        "tactical depth",
+        "counterplay",
+        "determinism"
+      ],
+      "requirements": [
+        "Require independent exact-head playable evidence.",
+        "Block rights/provenance, accessibility, determinism, state or exploit failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "dominant strategy",
+        "unreadable hit logic",
+        "stunlock loop",
+        "resource exploit",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-180 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort stress report",
+        "independent playable verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-181",
+      "ordinal": 181,
+      "family_id": "GB19",
+      "family": "Movement & Traversal",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+      "owner": "skeleton/jeeves/game_engine_physics.py",
+      "batches": [
+        "B021",
+        "B024"
+      ],
+      "metrics": [
+        "responsiveness",
+        "predictability",
+        "skill expression",
+        "collision robustness"
+      ],
+      "requirements": [
+        "Specify Movement & Traversal: Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+        "Declare semantic actions/state/feedback, invariants, anti-goals and player-facing acceptance tests.",
+        "Bind skeleton/jeeves/game_engine_physics.py and B021, B024."
+      ],
+      "adversarial": [
+        "input-to-motion lag",
+        "edge snag",
+        "speed exploit",
+        "camera/motion conflict",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-181 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-182",
+      "ordinal": 182,
+      "family_id": "GB19",
+      "family": "Movement & Traversal",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+      "owner": "skeleton/jeeves/game_engine_physics.py",
+      "batches": [
+        "B021",
+        "B024"
+      ],
+      "metrics": [
+        "responsiveness",
+        "predictability",
+        "skill expression",
+        "collision robustness"
+      ],
+      "requirements": [
+        "Define typed action/state/event contracts, deterministic ordering, device/physics provenance and replay identity.",
+        "Separate authority from presentation.",
+        "Define invalid-state and compatibility behavior."
+      ],
+      "adversarial": [
+        "input-to-motion lag",
+        "edge snag",
+        "speed exploit",
+        "camera/motion conflict",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-182 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-183",
+      "ordinal": 183,
+      "family_id": "GB19",
+      "family": "Movement & Traversal",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+      "owner": "skeleton/jeeves/game_engine_physics.py",
+      "batches": [
+        "B021",
+        "B024"
+      ],
+      "metrics": [
+        "responsiveness",
+        "predictability",
+        "skill expression",
+        "collision robustness"
+      ],
+      "requirements": [
+        "Create/edit through canonical input/physics/gameplay state and ProjectDNA.",
+        "Record generated code/config provenance and retain reference behavior.",
+        "Make mutations rollback-safe."
+      ],
+      "adversarial": [
+        "input-to-motion lag",
+        "edge snag",
+        "speed exploit",
+        "camera/motion conflict",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-183 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-184",
+      "ordinal": 184,
+      "family_id": "GB19",
+      "family": "Movement & Traversal",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+      "owner": "skeleton/jeeves/game_engine_physics.py",
+      "batches": [
+        "B021",
+        "B024"
+      ],
+      "metrics": [
+        "responsiveness",
+        "predictability",
+        "skill expression",
+        "collision robustness"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rivals.",
+        "Challenge feel, responsiveness, exploitability, clarity and accessibility with an improved playable candidate.",
+        "Deterministic gates decide promotion."
+      ],
+      "adversarial": [
+        "input-to-motion lag",
+        "edge snag",
+        "speed exploit",
+        "camera/motion conflict",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-184 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-185",
+      "ordinal": 185,
+      "family_id": "GB19",
+      "family": "Movement & Traversal",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+      "owner": "skeleton/jeeves/game_engine_physics.py",
+      "batches": [
+        "B021",
+        "B024"
+      ],
+      "metrics": [
+        "responsiveness",
+        "predictability",
+        "skill expression",
+        "collision robustness"
+      ],
+      "requirements": [
+        "Verify coupling with camera, animation, combat, level geometry, accessibility, networking and save/replay state.",
+        "Propagate contract changes.",
+        "Reject local improvements that harm player control elsewhere."
+      ],
+      "adversarial": [
+        "input-to-motion lag",
+        "edge snag",
+        "speed exploit",
+        "camera/motion conflict",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-185 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-186",
+      "ordinal": 186,
+      "family_id": "GB19",
+      "family": "Movement & Traversal",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+      "owner": "skeleton/jeeves/game_engine_physics.py",
+      "batches": [
+        "B021",
+        "B024"
+      ],
+      "metrics": [
+        "responsiveness",
+        "predictability",
+        "skill expression",
+        "collision robustness"
+      ],
+      "requirements": [
+        "Run deterministic input/physics simulations, fuzz/property tests and replayable playtests.",
+        "Attack input-to-motion lag, edge snag, speed exploit, camera/motion conflict.",
+        "Keep minimized failure traces as regressions."
+      ],
+      "adversarial": [
+        "input-to-motion lag",
+        "edge snag",
+        "speed exploit",
+        "camera/motion conflict",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-186 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-187",
+      "ordinal": 187,
+      "family_id": "GB19",
+      "family": "Movement & Traversal",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+      "owner": "skeleton/jeeves/game_engine_physics.py",
+      "batches": [
+        "B021",
+        "B024"
+      ],
+      "metrics": [
+        "responsiveness",
+        "predictability",
+        "skill expression",
+        "collision robustness"
+      ],
+      "requirements": [
+        "Improve responsiveness, predictability, skill expression, collision robustness plus player feel, accessibility, performance and maintainability jointly.",
+        "Reject tuning wins that break predictability or skill expression.",
+        "Preserve champion if challenger is not Pareto-safe."
+      ],
+      "adversarial": [
+        "input-to-motion lag",
+        "edge snag",
+        "speed exploit",
+        "camera/motion conflict",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-187 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-188",
+      "ordinal": 188,
+      "family_id": "GB19",
+      "family": "Movement & Traversal",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+      "owner": "skeleton/jeeves/game_engine_physics.py",
+      "batches": [
+        "B021",
+        "B024"
+      ],
+      "metrics": [
+        "responsiveness",
+        "predictability",
+        "skill expression",
+        "collision robustness"
+      ],
+      "requirements": [
+        "Support semantic diff, remap/migration, rollback and exact state checkpointing.",
+        "Recover interrupted edits without corrupt bindings or motion state.",
+        "Maintain replay compatibility or explicit migration."
+      ],
+      "adversarial": [
+        "input-to-motion lag",
+        "edge snag",
+        "speed exploit",
+        "camera/motion conflict",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-188 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-189",
+      "ordinal": 189,
+      "family_id": "GB19",
+      "family": "Movement & Traversal",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+      "owner": "skeleton/jeeves/game_engine_physics.py",
+      "batches": [
+        "B021",
+        "B024"
+      ],
+      "metrics": [
+        "responsiveness",
+        "predictability",
+        "skill expression",
+        "collision robustness"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rounds with three stages and no wall-clock deadline.",
+        "Stress many devices, frame rates, geometry cases and adversarial action sequences.",
+        "Prove bounded resources, checkpoint/restart and no iterative feel degradation."
+      ],
+      "adversarial": [
+        "input-to-motion lag",
+        "edge snag",
+        "speed exploit",
+        "camera/motion conflict",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-189 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort stress report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-190",
+      "ordinal": 190,
+      "family_id": "GB19",
+      "family": "Movement & Traversal",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Design locomotion, acceleration, jumping, climbing, dashing, vehicles and traversal affordances with controllable feel.",
+      "owner": "skeleton/jeeves/game_engine_physics.py",
+      "batches": [
+        "B021",
+        "B024"
+      ],
+      "metrics": [
+        "responsiveness",
+        "predictability",
+        "skill expression",
+        "collision robustness"
+      ],
+      "requirements": [
+        "Require independent exact-head playable evidence.",
+        "Block rights/provenance, accessibility, determinism, state or exploit failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "input-to-motion lag",
+        "edge snag",
+        "speed exploit",
+        "camera/motion conflict",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-190 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort stress report",
+        "independent playable verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-191",
+      "ordinal": 191,
+      "family_id": "GB20",
+      "family": "Input & Controls",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+      "owner": "skeleton/jeeves/game_engine_input.py",
+      "batches": [
+        "B024"
+      ],
+      "metrics": [
+        "input latency",
+        "remap coverage",
+        "device parity",
+        "accessibility"
+      ],
+      "requirements": [
+        "Specify Input & Controls: Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+        "Declare semantic actions/state/feedback, invariants, anti-goals and player-facing acceptance tests.",
+        "Bind skeleton/jeeves/game_engine_input.py and B024."
+      ],
+      "adversarial": [
+        "binding collision",
+        "lost input",
+        "device divergence",
+        "inaccessible chord",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-191 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-192",
+      "ordinal": 192,
+      "family_id": "GB20",
+      "family": "Input & Controls",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+      "owner": "skeleton/jeeves/game_engine_input.py",
+      "batches": [
+        "B024"
+      ],
+      "metrics": [
+        "input latency",
+        "remap coverage",
+        "device parity",
+        "accessibility"
+      ],
+      "requirements": [
+        "Define typed action/state/event contracts, deterministic ordering, device/physics provenance and replay identity.",
+        "Separate authority from presentation.",
+        "Define invalid-state and compatibility behavior."
+      ],
+      "adversarial": [
+        "binding collision",
+        "lost input",
+        "device divergence",
+        "inaccessible chord",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-192 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-193",
+      "ordinal": 193,
+      "family_id": "GB20",
+      "family": "Input & Controls",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+      "owner": "skeleton/jeeves/game_engine_input.py",
+      "batches": [
+        "B024"
+      ],
+      "metrics": [
+        "input latency",
+        "remap coverage",
+        "device parity",
+        "accessibility"
+      ],
+      "requirements": [
+        "Create/edit through canonical input/physics/gameplay state and ProjectDNA.",
+        "Record generated code/config provenance and retain reference behavior.",
+        "Make mutations rollback-safe."
+      ],
+      "adversarial": [
+        "binding collision",
+        "lost input",
+        "device divergence",
+        "inaccessible chord",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-193 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-194",
+      "ordinal": 194,
+      "family_id": "GB20",
+      "family": "Input & Controls",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+      "owner": "skeleton/jeeves/game_engine_input.py",
+      "batches": [
+        "B024"
+      ],
+      "metrics": [
+        "input latency",
+        "remap coverage",
+        "device parity",
+        "accessibility"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote and rotate rivals.",
+        "Challenge feel, responsiveness, exploitability, clarity and accessibility with an improved playable candidate.",
+        "Deterministic gates decide promotion."
+      ],
+      "adversarial": [
+        "binding collision",
+        "lost input",
+        "device divergence",
+        "inaccessible chord",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-194 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-195",
+      "ordinal": 195,
+      "family_id": "GB20",
+      "family": "Input & Controls",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+      "owner": "skeleton/jeeves/game_engine_input.py",
+      "batches": [
+        "B024"
+      ],
+      "metrics": [
+        "input latency",
+        "remap coverage",
+        "device parity",
+        "accessibility"
+      ],
+      "requirements": [
+        "Verify coupling with camera, animation, combat, level geometry, accessibility, networking and save/replay state.",
+        "Propagate contract changes.",
+        "Reject local improvements that harm player control elsewhere."
+      ],
+      "adversarial": [
+        "binding collision",
+        "lost input",
+        "device divergence",
+        "inaccessible chord",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-195 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-196",
+      "ordinal": 196,
+      "family_id": "GB20",
+      "family": "Input & Controls",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+      "owner": "skeleton/jeeves/game_engine_input.py",
+      "batches": [
+        "B024"
+      ],
+      "metrics": [
+        "input latency",
+        "remap coverage",
+        "device parity",
+        "accessibility"
+      ],
+      "requirements": [
+        "Run deterministic input/physics simulations, fuzz/property tests and replayable playtests.",
+        "Attack binding collision, lost input, device divergence, inaccessible chord.",
+        "Keep minimized failure traces as regressions."
+      ],
+      "adversarial": [
+        "binding collision",
+        "lost input",
+        "device divergence",
+        "inaccessible chord",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-196 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-197",
+      "ordinal": 197,
+      "family_id": "GB20",
+      "family": "Input & Controls",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+      "owner": "skeleton/jeeves/game_engine_input.py",
+      "batches": [
+        "B024"
+      ],
+      "metrics": [
+        "input latency",
+        "remap coverage",
+        "device parity",
+        "accessibility"
+      ],
+      "requirements": [
+        "Improve input latency, remap coverage, device parity, accessibility plus player feel, accessibility, performance and maintainability jointly.",
+        "Reject tuning wins that break predictability or skill expression.",
+        "Preserve champion if challenger is not Pareto-safe."
+      ],
+      "adversarial": [
+        "binding collision",
+        "lost input",
+        "device divergence",
+        "inaccessible chord",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-197 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-198",
+      "ordinal": 198,
+      "family_id": "GB20",
+      "family": "Input & Controls",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+      "owner": "skeleton/jeeves/game_engine_input.py",
+      "batches": [
+        "B024"
+      ],
+      "metrics": [
+        "input latency",
+        "remap coverage",
+        "device parity",
+        "accessibility"
+      ],
+      "requirements": [
+        "Support semantic diff, remap/migration, rollback and exact state checkpointing.",
+        "Recover interrupted edits without corrupt bindings or motion state.",
+        "Maintain replay compatibility or explicit migration."
+      ],
+      "adversarial": [
+        "binding collision",
+        "lost input",
+        "device divergence",
+        "inaccessible chord",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-198 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-199",
+      "ordinal": 199,
+      "family_id": "GB20",
+      "family": "Input & Controls",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+      "owner": "skeleton/jeeves/game_engine_input.py",
+      "batches": [
+        "B024"
+      ],
+      "metrics": [
+        "input latency",
+        "remap coverage",
+        "device parity",
+        "accessibility"
+      ],
+      "requirements": [
+        "Run 100/1000/10000 rounds with three stages and no wall-clock deadline.",
+        "Stress many devices, frame rates, geometry cases and adversarial action sequences.",
+        "Prove bounded resources, checkpoint/restart and no iterative feel degradation."
+      ],
+      "adversarial": [
+        "binding collision",
+        "lost input",
+        "device divergence",
+        "inaccessible chord",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-199 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort stress report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-200",
+      "ordinal": 200,
+      "family_id": "GB20",
+      "family": "Input & Controls",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Map player intent to remappable semantic actions across keyboard, mouse, touch, controller and accessibility devices.",
+      "owner": "skeleton/jeeves/game_engine_input.py",
+      "batches": [
+        "B024"
+      ],
+      "metrics": [
+        "input latency",
+        "remap coverage",
+        "device parity",
+        "accessibility"
+      ],
+      "requirements": [
+        "Require independent exact-head playable evidence.",
+        "Block rights/provenance, accessibility, determinism, state or exploit failures.",
+        "Expire qualification on material identity drift."
+      ],
+      "adversarial": [
+        "binding collision",
+        "lost input",
+        "device divergence",
+        "inaccessible chord",
+        "cross-system feel regression",
+        "protected-expression leakage"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "known rights/provenance",
+        "no unresolved similarity risk",
+        "control/gameplay consistency",
+        "bounded resources",
+        "state/replay integrity",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-200 fixture",
+        "exact-head implementation",
+        "rival transcript",
+        "integration report",
+        "rights report",
+        "simulation/replay",
+        "quality delta",
+        "deep-effort stress report",
+        "independent playable verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ]
+}

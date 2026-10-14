@@ -316,8 +316,8 @@ def validate(root: Path = ROOT, *, require_closed: bool = False) -> dict[str, An
             "P2-T1-FUNCTIONAL-01",
         ):
             task = tasks.get(task_id, {})
-            if task.get("status") != "landed_unpromoted":
-                errors.append(f"closed functional frontier requires {task_id} landed_unpromoted")
+            if task.get("status") not in {"landed_unpromoted", "closed"}:
+                errors.append(f"closed functional frontier requires {task_id} landed_unpromoted or closed")
             refs = list(map(str, task.get("evidence_refs", [])))
             if not any(ref.startswith("workflow:P2 Functional AI Acceptance@") and ref.endswith(":success") for ref in refs):
                 errors.append(f"{task_id} lacks Functional-AI exact-head evidence")

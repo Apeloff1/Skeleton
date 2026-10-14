@@ -276,6 +276,67 @@ def test_backend_tool_registry_has_no_provider_edge_after_llm_retirement() -> No
     assert validate_provider_bootstrap(ROOT) == []
 
 
+def test_ai_build_provider_facades_delegate_to_canonical_automation_owners() -> None:
+    from skeleton.ai.build.automation.chatgpt_adapter import (
+        ChatGPTReasoner as AiChatGPTReasoner,
+        ReasoningRequest as AiReasoningRequest,
+        ReasoningResult as AiReasoningResult,
+        require_repository_provider_credentials_absent as ai_require_credentials_absent,
+    )
+    from skeleton.ai.build.automation.free_model import (
+        FreeModelClient as AiFreeModelClient,
+        ModelError as AiModelError,
+        redact_secrets as ai_redact_secrets,
+    )
+    from skeleton.ai.build.shift_supervisor.model_gateway import (
+        ModelGateway as AiModelGateway,
+        ModelRequestError as AiModelRequestError,
+    )
+    from skeleton.automation.chatgpt_adapter import (
+        ChatGPTReasoner,
+        ReasoningRequest,
+        ReasoningResult,
+        require_repository_provider_credentials_absent,
+    )
+    from skeleton.automation.free_model import (
+        FreeModelClient,
+        ModelError,
+        redact_secrets,
+    )
+    from skeleton.automation.shift_supervisor.model_gateway import (
+        ModelGateway,
+        ModelRequestError,
+    )
+
+    assert AiChatGPTReasoner is ChatGPTReasoner
+    assert AiReasoningRequest is ReasoningRequest
+    assert AiReasoningResult is ReasoningResult
+    assert ai_require_credentials_absent is require_repository_provider_credentials_absent
+    assert AiFreeModelClient is FreeModelClient
+    assert AiModelError is ModelError
+    assert ai_redact_secrets is redact_secrets
+    assert AiModelGateway is ModelGateway
+    assert AiModelRequestError is ModelRequestError
+
+
+def test_ai_build_provider_facades_do_not_own_provider_edges() -> None:
+    facades = (
+        "skeleton/ai/build/automation/chatgpt_adapter.py",
+        "skeleton/ai/build/automation/free_model.py",
+        "skeleton/ai/build/shift_supervisor/model_gateway.py",
+    )
+    discovered = discover_provider_surfaces(ROOT)
+
+    for relative in facades:
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        assert relative not in discovered
+        assert "urllib.request" not in source
+        assert "urlopen(" not in source
+        assert "OPENAI_API_KEY" not in source
+        assert "MODEL_API_KEY" not in source
+        assert "load_provider_architecture(" not in source
+
+
 def test_shift_supervisor_model_gateway_is_declared_automation_provider_surface() -> None:
     import json
 

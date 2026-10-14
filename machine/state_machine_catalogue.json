@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-127",
     "title": "State Machine Catalogue",
-    "required_gap_texts": [
-      "extract existing lifecycle machines",
-      "bind transition tests"
-    ]
+    "required_gap_texts": []
   },
   "sources": {
     "runtime_schema": "machine/ai_runtime_schemas.json",
@@ -88,7 +85,7 @@
       "domain_id": "engine-mongo-state",
       "owner_plane": "data-persistence",
       "authority": "authoritative",
-      "status": "declared-partial"
+      "status": "production-bound"
     },
     {
       "domain_id": "backend-rag-local-chroma",

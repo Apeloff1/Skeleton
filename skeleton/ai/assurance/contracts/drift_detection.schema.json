@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-06:drift_detection:v1",
+  "title": "FLGB-06 drift detection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metric_id",
+    "baseline_ppm",
+    "observed_ppm",
+    "threshold_ppm"
+  ],
+  "properties": {
+    "metric_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "baseline_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "observed_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "threshold_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    }
+  }
+}

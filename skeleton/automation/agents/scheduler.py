@@ -31,6 +31,12 @@ from skeleton.automation.agents.ledger import ActivityLedger
 from skeleton.kernel.errors import SchedulingError, TaskDeadLetteredError
 from skeleton.kernel.events import EventBus
 from skeleton.kernel.ids import AgentId
+from skeleton.kernel.global_resource_scheduler import (
+    GlobalResourceScheduler,
+    ResourceConflict,
+    ResourceRequest,
+    ResourceVector,
+)
 
 TaskFn = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -66,6 +72,9 @@ class Task:
     task_id: str = field(default_factory=lambda: f"task_{next(_counter):08d}")
     submitted_at: float = field(default_factory=time.time)
     finished_at: float | None = None
+    resources: ResourceVector | None = None
+    resource_preemptible: bool = True
+    resource_epoch: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -79,6 +88,9 @@ class Task:
             "error": self.error,
             "submitted_at": self.submitted_at,
             "finished_at": self.finished_at,
+            "resources": None if self.resources is None else self.resources.as_dict(),
+            "resource_preemptible": self.resource_preemptible,
+            "resource_epoch": self.resource_epoch,
         }
 
 
@@ -94,6 +106,10 @@ class SwarmScheduler:
         backoff_base: float = 0.5,
         backoff_cap: float = 30.0,
         clock: Callable[[], float] = time.time,
+        global_resources: GlobalResourceScheduler | None = None,
+        resource_plane: str = "automation",
+        resource_tenant_id: str = "system",
+        default_resources: ResourceVector | None = None,
     ) -> None:
         self._ledger = ledger or ActivityLedger()
         self._bus = bus or EventBus()
@@ -101,6 +117,20 @@ class SwarmScheduler:
         self._backoff_base = backoff_base
         self._backoff_cap = backoff_cap
         self._clock = clock
+        if global_resources is not None and not isinstance(
+            global_resources, GlobalResourceScheduler
+        ):
+            raise TypeError("global_resources must be GlobalResourceScheduler or None")
+        if default_resources is not None and not isinstance(default_resources, ResourceVector):
+            raise TypeError("default_resources must be ResourceVector or None")
+        if global_resources is not None:
+            global_resources.policy.plane(resource_plane)
+        self._global_resources = global_resources
+        self._resource_plane = str(resource_plane).strip()
+        self._resource_tenant_id = str(resource_tenant_id).strip()
+        if not self._resource_plane or not self._resource_tenant_id:
+            raise ValueError("resource plane and tenant id must be non-empty")
+        self._default_resources = default_resources
         # Heap of (priority, sequence, task); sequence gives FIFO within a class.
         self._queue: list[tuple[int, int, Task]] = []
         self._sequence = itertools.count()
@@ -121,6 +151,8 @@ class SwarmScheduler:
         priority: int = 5,
         owner: AgentId | None = None,
         max_retries: int = 3,
+        resources: ResourceVector | None = None,
+        preemptible: bool = True,
     ) -> Task:
         """Enqueue a task. Raises once shutdown has begun."""
         if not self._accepting:
@@ -133,6 +165,22 @@ class SwarmScheduler:
                 "Priority must be within [0, 9]",
                 context={"task": name, "priority": priority},
             )
+        task_resources = self._default_resources if resources is None else resources
+        if task_resources is not None and not isinstance(task_resources, ResourceVector):
+            raise SchedulingError(
+                "resources must be a ResourceVector",
+                context={"task": name},
+            )
+        if self._global_resources is not None and task_resources is None:
+            raise SchedulingError(
+                "global resource scheduling requires declared task resources",
+                context={"task": name},
+            )
+        if not isinstance(preemptible, bool):
+            raise SchedulingError(
+                "preemptible must be boolean",
+                context={"task": name},
+            )
         task = Task(
             name=name,
             capability=capability,
@@ -141,6 +189,8 @@ class SwarmScheduler:
             priority=priority,
             owner=owner,
             max_retries=max_retries,
+            resources=task_resources,
+            resource_preemptible=preemptible,
         )
         self._tasks[task.task_id] = task
         heapq.heappush(self._queue, (task.priority, next(self._sequence), task))
@@ -152,6 +202,12 @@ class SwarmScheduler:
         if task.state is TaskState.QUEUED:
             task.state = TaskState.CANCELLED
             task.finished_at = self._clock()
+            if self._global_resources is not None and task.resources is not None:
+                request_id = self._resource_request_id(task)
+                try:
+                    self._global_resources.cancel(request_id)
+                except ResourceConflict:
+                    pass
             self._bus.emit("agent.scheduler.cancelled", task.to_dict())
         return task
 
@@ -164,6 +220,26 @@ class SwarmScheduler:
         task = self._next_runnable()
         if task is None:
             return None
+        resource_grant = None
+        if self._global_resources is not None and task.resources is not None:
+            request_id = self._resource_request_id(task)
+            self._global_resources.submit(
+                ResourceRequest(
+                    request_id=request_id,
+                    plane=self._resource_plane,
+                    tenant_id=self._resource_tenant_id,
+                    resources=task.resources,
+                    priority=task.priority,
+                    preemptible=task.resource_preemptible,
+                )
+            )
+            resource_grant = self._global_resources.admit_request(request_id)
+            if resource_grant is None:
+                heapq.heappush(
+                    self._queue,
+                    (task.priority, next(self._sequence), task),
+                )
+                return None
         self._in_flight.add(task.task_id)
         task.state = TaskState.IN_FLIGHT
         task.attempts += 1
@@ -185,6 +261,8 @@ class SwarmScheduler:
             self._bus.emit("agent.scheduler.succeeded", task.to_dict())
         finally:
             self._in_flight.discard(task.task_id)
+            if resource_grant is not None and self._global_resources is not None:
+                self._global_resources.release(resource_grant.grant_id)
         return task
 
     def run_until_idle(self, *, max_iterations: int = 10_000) -> list[Task]:
@@ -214,6 +292,12 @@ class SwarmScheduler:
         for item in skipped:
             heapq.heappush(self._queue, item)
         return chosen
+
+    def _resource_request_id(self, task: Task) -> str:
+        return (
+            f"{task.task_id}:epoch:{task.resource_epoch}:"
+            f"attempt:{task.attempts + 1}"
+        )
 
     def _handle_failure(self, task: Task, exc: Exception) -> None:
         task.error = f"{type(exc).__name__}: {exc}"
@@ -280,6 +364,7 @@ class SwarmScheduler:
         self._dead_letters.remove(task)
         task.state = TaskState.QUEUED
         task.attempts = 0
+        task.resource_epoch += 1
         task.error = None
         task.not_before = 0.0
         heapq.heappush(self._queue, (task.priority, next(self._sequence), task))

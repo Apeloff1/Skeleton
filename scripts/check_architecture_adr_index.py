@@ -61,11 +61,19 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     if binding.get("volume_ref") != "VOL-058" or binding.get("title") != volume.get("title"):
         raise ADRIndexError("ADR index must remain bound to VOL-058")
     gaps = binding.get("required_gap_texts")
-    if not isinstance(gaps, list) or not gaps:
-        raise ADRIndexError("ADR index masterplan gaps must be non-empty")
-    for gap in gaps:
-        if gap not in volume.get("gaps", []):
-            raise ADRIndexError(f"ADR index masterplan gap drift: {gap!r}")
+    canonical_gaps = volume.get("gaps")
+    if (not isinstance(gaps, list)
+            or any(not isinstance(gap, str) or not gap.strip() for gap in gaps)
+            or len(gaps) != len(set(gaps))):
+        raise ADRIndexError("ADR index masterplan gaps must be unique non-empty strings")
+    # A fully remediated volume legitimately has zero gaps, but a missing,
+    # non-array, malformed, or duplicate canonical declaration is never zero.
+    if (not isinstance(canonical_gaps, list)
+            or any(not isinstance(gap, str) or not gap.strip() for gap in canonical_gaps)
+            or len(canonical_gaps) != len(set(canonical_gaps))):
+        raise ADRIndexError("ADR index canonical masterplan gaps must be unique non-empty strings")
+    if gaps != canonical_gaps:
+        raise ADRIndexError("ADR index masterplan gap drift")
 
     policy = index.get("policy")
     if not isinstance(policy, dict):

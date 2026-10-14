@@ -538,8 +538,18 @@ def test_apply_failure_is_in_doubt_and_partial_failure(tmp_path):
 
 def test_global_deadline_bounds_verifier_and_rolls_back(
     tmp_path,
+    monkeypatch,
 ):
     state = {}
+    fixed_now = utc_now()
+    monkeypatch.setattr(
+        "skeleton.ai.runtime.effects.runtime.utc_now",
+        lambda: fixed_now,
+    )
+    monkeypatch.setattr(
+        "skeleton.ai.runtime.effects.registry.utc_now",
+        lambda: fixed_now,
+    )
 
     async def apply(proposal, context):
         state[proposal.target] = proposal.payload["value"]
@@ -601,7 +611,7 @@ def test_global_deadline_bounds_verifier_and_rolls_back(
             {},
             subject_id="alice",
             deadline=(
-                utc_now()
+                fixed_now
                 + timedelta(milliseconds=15)
             ),
         )

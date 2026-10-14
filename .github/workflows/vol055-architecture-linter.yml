@@ -1,0 +1,145 @@
+name: VOL-055 Architecture Linter
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/architecture.json"
+      - "machine/architecture_rule_registry.json"
+      - "scripts/check_architecture*.py"
+      - "scripts/check_ai_file_tree.py"
+      - "scripts/check_ai_scope_freeze.py"
+      - "scripts/verify_vol055_architecture_linter.py"
+      - "tests/test_architecture_rule_registry.py"
+      - "tests/test_vol055_architecture_linter_independent.py"
+      - ".github/workflows/vol055-architecture-linter.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/architecture.json"
+      - "machine/architecture_rule_registry.json"
+      - "scripts/check_architecture*.py"
+      - "scripts/check_ai_file_tree.py"
+      - "scripts/check_ai_scope_freeze.py"
+      - "scripts/verify_vol055_architecture_linter.py"
+      - "tests/test_architecture_rule_registry.py"
+      - "tests/test_vol055_architecture_linter_independent.py"
+      - ".github/workflows/vol055-architecture-linter.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol055-architecture-linter-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  architecture-linter:
+    name: Canonical architecture registry behavior
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+      - name: Compile VOL-055 surfaces
+        run: >-
+          python -m compileall -q
+          scripts/check_architecture_rule_registry.py
+          scripts/verify_vol055_architecture_linter.py
+          tests/test_architecture_rule_registry.py
+          tests/test_vol055_architecture_linter_independent.py
+      - name: Execute canonical architecture registry validator
+        run: python scripts/check_architecture_rule_registry.py --json
+      - name: Run canonical registry regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_architecture_rule_registry.py
+
+  architecture-linter-independent:
+    name: Independent exact-head VOL-055 verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+      - name: Run independent VOL-055 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol055_architecture_linter_independent.py
+      - name: Emit independent exact-head receipt
+        run: >-
+          python scripts/verify_vol055_architecture_linter.py
+          --evidence-out .vol055-architecture-linter.json
+          --print-evidence
+      - name: Assert exact-head receipt identity and coverage
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol055-architecture-linter.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("VOL-055 receipt does not bind exact head")
+          if receipt.get("volume") != "VOL-055":
+              raise SystemExit("VOL-055 verifier bound wrong volume")
+          if receipt.get("verifier") != "independent-vol055-architecture-linter-v1":
+              raise SystemExit("unexpected VOL-055 verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent VOL-055 verification failed")
+          binding = receipt.get("registry_binding") or {}
+          if binding.get("rule_count", 0) < 10:
+              raise SystemExit("VOL-055 architecture rule coverage is too small")
+          if binding.get("registered_validator_count") != binding.get("discovered_validator_count"):
+              raise SystemExit("VOL-055 architecture validator inventory is incomplete")
+          if binding.get("allowed_waiver_rule_count", 0) <= 0:
+              raise SystemExit("VOL-055 bounded waiver coverage is missing")
+          if binding.get("nonwaivable_rule_count", 0) <= 0:
+              raise SystemExit("VOL-055 non-waivable critical rules are missing")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("VOL-055 receipt digest is invalid")
+          print(
+              "VOL-055 independent exact-head receipt:",
+              expected,
+              receipt["receipt_digest"],
+          )
+          PY

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-05:policy_evaluation:v1",
+  "title": "FLGB-05 policy evaluation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "effect",
+    "matched_rule_ids",
+    "reason"
+  ],
+  "properties": {
+    "action": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "effect": {
+      "enum": [
+        "allow",
+        "deny",
+        "require-approval"
+      ]
+    },
+    "matched_rule_ids": {
+      "type": "array",
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}

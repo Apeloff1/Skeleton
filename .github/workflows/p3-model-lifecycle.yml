@@ -21,7 +21,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: p3-model-lifecycle-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref_name }}
+  group: p3-model-lifecycle-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   lifecycle:

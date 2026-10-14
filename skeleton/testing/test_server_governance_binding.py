@@ -134,7 +134,8 @@ async def test_api_startup_binds_canonical_artifact_store(
         def bind_canonical_retrieval_index(self):
             calls.append("retrieval")
 
-        def bind_engine_execution_service(self):
+        def bind_engine_execution_service(self, *, runtime_lifecycle=None):
+            assert runtime_lifecycle is not None
             calls.append("engine")
 
         async def bind_canonical_memory_writer(self):

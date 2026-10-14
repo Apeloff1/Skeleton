@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import httpx
 import pytest
@@ -100,7 +100,7 @@ def _context() -> ContextEnvelope:
         compiler_version="cross-service-v1",
     )
     return ContextEnvelope(
-        context_id=str(uuid4()),
+        context_id=str(uuid5(NAMESPACE_URL, "skeleton-context:" + digest)),
         operation_id=operation_id,
         execution_id=execution_id,
         turn_id=turn_id,
@@ -339,6 +339,9 @@ async def test_full_server_gate_defers_engine_auth_to_service_boundary(
 
     service = _service(tmp_path)
     app = create_app()
+    app.state.runtime_lifecycle.mark_ready(
+        reason="test-engine-http-boundary",
+    )
     app.dependency_overrides[_engine_service] = lambda: service
     app.dependency_overrides[_engine_service_token] = lambda: _SERVICE_TOKEN
     app.dependency_overrides[_engine_coordinator] = lambda: None

@@ -12,7 +12,7 @@ import math
 import re
 import threading
 import time
-from collections import Counter
+from collections import Counter, OrderedDict
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
@@ -31,6 +31,7 @@ from .types import (
 )
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_'-]+")
+_PRIVACY_DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class MemoryError(RuntimeError):
@@ -233,13 +234,19 @@ class InMemoryStore:
         self._clock = clock
         self._records: dict[str, MemoryRecord] = {}
         self._fingerprints: dict[tuple[str, str], str] = {}
+        self._privacy_tombstones: dict[tuple[str, str], str] = {}
         self._lock = threading.RLock()
 
     def put(self, record: MemoryRecord) -> MemoryRecord:
         if not isinstance(record, MemoryRecord):
             raise TypeError("record must be MemoryRecord")
         key = (record.namespace.key, record.fingerprint)
+        subject = (record.namespace.tenant_id, record.namespace.user_id)
         with self._lock:
+            if subject in self._privacy_tombstones:
+                raise MemoryError(
+                    "privacy-deleted subject cannot be materialized"
+                )
             duplicate_id = self._fingerprints.get(key)
             if duplicate_id is not None and duplicate_id != record.memory_id:
                 return self._records[duplicate_id]
@@ -265,6 +272,76 @@ class InMemoryStore:
             self._fingerprints.pop((record.namespace.key, record.fingerprint), None)
             return True
 
+    def privacy_delete_subject(
+        self,
+        tenant_id: str,
+        user_id: str,
+        *,
+        authority_receipt_digest: str,
+    ) -> tuple[str, ...]:
+        """Delete every memory for a subject and permanently fence reinsertion."""
+
+        tenant = require_id("tenant_id", tenant_id)
+        user = require_id("user_id", user_id)
+        receipt = str(authority_receipt_digest).strip().lower()
+        if _PRIVACY_DIGEST_RE.fullmatch(receipt) is None:
+            raise MemoryError(
+                "authority_receipt_digest must be lowercase sha256"
+            )
+        subject = (tenant, user)
+        with self._lock:
+            prior = self._privacy_tombstones.get(subject)
+            if prior is not None and prior != receipt:
+                raise MemoryError(
+                    "privacy tombstone replay changed authority receipt"
+                )
+            self._privacy_tombstones[subject] = receipt
+            deleted = tuple(
+                sorted(
+                    memory_id
+                    for memory_id, record in self._records.items()
+                    if record.namespace.tenant_id == tenant
+                    and record.namespace.user_id == user
+                )
+            )
+            for memory_id in deleted:
+                record = self._records.pop(memory_id)
+                self._fingerprints.pop(
+                    (record.namespace.key, record.fingerprint),
+                    None,
+                )
+            return deleted
+
+    def privacy_tombstone_receipt(
+        self,
+        tenant_id: str,
+        user_id: str,
+    ) -> str | None:
+        tenant = require_id("tenant_id", tenant_id)
+        user = require_id("user_id", user_id)
+        with self._lock:
+            return self._privacy_tombstones.get((tenant, user))
+
+    def scan_namespace(
+        self,
+        namespace: MemoryNamespace,
+        *,
+        include_parent: bool = True,
+        include_expired: bool = False,
+    ) -> tuple[MemoryRecord, ...]:
+        """Return namespace records without imposing presentation ordering."""
+        now = self._clock()
+        keys = {namespace.key}
+        if include_parent and namespace.session_id is not None:
+            keys.add(namespace.parent().key)
+        with self._lock:
+            return tuple(
+                record
+                for record in self._records.values()
+                if record.namespace.key in keys
+                and (include_expired or not record.expired(now))
+            )
+
     def list_namespace(
         self,
         namespace: MemoryNamespace,
@@ -272,17 +349,18 @@ class InMemoryStore:
         include_parent: bool = True,
         include_expired: bool = False,
     ) -> tuple[MemoryRecord, ...]:
-        now = self._clock()
-        keys = {namespace.key}
-        if include_parent and namespace.session_id is not None:
-            keys.add(namespace.parent().key)
-        with self._lock:
-            records = [
-                record
-                for record in self._records.values()
-                if record.namespace.key in keys and (include_expired or not record.expired(now))
-            ]
-        return tuple(sorted(records, key=lambda item: (item.updated_at, item.memory_id), reverse=True))
+        records = self.scan_namespace(
+            namespace,
+            include_parent=include_parent,
+            include_expired=include_expired,
+        )
+        return tuple(
+            sorted(
+                records,
+                key=lambda item: (item.updated_at, item.memory_id),
+                reverse=True,
+            )
+        )
 
     def prune_expired(self) -> int:
         now = self._clock()
@@ -327,6 +405,17 @@ class MemoryRetriever:
             raise ValueError("half_life_seconds must be positive")
         self.half_life_seconds = half_life
         self._clock = clock
+        self._lexical_cache_limit = 8_192
+        self._lexical_cache: OrderedDict[
+            tuple[str, tuple[str, ...]], tuple[Counter[str], float]
+        ] = OrderedDict()
+        self._cache_lock = threading.RLock()
+        self._stats = {
+            "searches": 0,
+            "lexical_cache_hits": 0,
+            "lexical_cache_misses": 0,
+            "lexical_cache_evictions": 0,
+        }
 
     def search(
         self,
@@ -342,18 +431,27 @@ class MemoryRetriever:
         limit = positive_int("limit", limit, maximum=1000)
         minimum_trust = probability("minimum_trust", minimum_trust)
         query_tokens = self._tokens(query)
+        query_norm = self._counter_norm(query_tokens)
+        with self._cache_lock:
+            self._stats["searches"] += 1
         kind_set = None if kinds is None else {kind if isinstance(kind, MemoryKind) else MemoryKind(str(kind)) for kind in kinds}
         required_tags = {str(tag).strip().lower() for tag in tags if str(tag).strip()}
         now = self._clock()
         hits: list[MemoryHit] = []
-        for record in self.store.list_namespace(namespace, include_parent=include_parent):
+        for record in self.store.scan_namespace(namespace, include_parent=include_parent):
             if kind_set is not None and record.kind not in kind_set:
                 continue
             if record.trust < minimum_trust:
                 continue
             if required_tags and not required_tags.issubset(set(record.tags)):
                 continue
-            lexical = self._lexical(query_tokens, self._tokens(record.content + " " + " ".join(record.tags)))
+            document_tokens, document_norm = self._record_lexical(record)
+            lexical = self._lexical_precomputed(
+                query_tokens,
+                query_norm,
+                document_tokens,
+                document_norm,
+            )
             age = max(0.0, now - record.updated_at)
             recency = math.exp(-math.log(2) * age / self.half_life_seconds)
             frequency = 1.0 - math.exp(-record.access_count / 5.0)
@@ -373,16 +471,61 @@ class MemoryRetriever:
         return Counter(token.casefold() for token in _TOKEN_RE.findall(text or ""))
 
     @staticmethod
-    def _lexical(query: Counter[str], document: Counter[str]) -> float:
-        if not query:
-            return 0.0
-        overlap = sum(min(count, document.get(token, 0)) for token, count in query.items())
-        query_norm = math.sqrt(sum(count * count for count in query.values()))
-        document_norm = math.sqrt(sum(count * count for count in document.values()))
+    def _counter_norm(tokens: Counter[str]) -> float:
+        return math.sqrt(sum(count * count for count in tokens.values())) if tokens else 0.0
+
+    def _record_lexical(self, record: MemoryRecord) -> tuple[Counter[str], float]:
+        cache_key = (record.content, record.tags)
+        with self._cache_lock:
+            cached = self._lexical_cache.get(cache_key)
+            if cached is not None:
+                self._lexical_cache.move_to_end(cache_key)
+                self._stats["lexical_cache_hits"] += 1
+                return cached
+
+        tokens = self._tokens(record.content + " " + " ".join(record.tags))
+        prepared = (tokens, self._counter_norm(tokens))
+        with self._cache_lock:
+            cached = self._lexical_cache.get(cache_key)
+            if cached is not None:
+                self._lexical_cache.move_to_end(cache_key)
+                self._stats["lexical_cache_hits"] += 1
+                return cached
+            self._lexical_cache[cache_key] = prepared
+            self._stats["lexical_cache_misses"] += 1
+            while len(self._lexical_cache) > self._lexical_cache_limit:
+                self._lexical_cache.popitem(last=False)
+                self._stats["lexical_cache_evictions"] += 1
+        return prepared
+
+    @staticmethod
+    def _lexical_precomputed(
+        query: Counter[str],
+        query_norm: float,
+        document: Counter[str],
+        document_norm: float,
+    ) -> float:
         if not query_norm or not document_norm:
             return 0.0
         dot = sum(count * document.get(token, 0) for token, count in query.items())
         return max(0.0, min(1.0, dot / (query_norm * document_norm)))
+
+    @classmethod
+    def _lexical(cls, query: Counter[str], document: Counter[str]) -> float:
+        return cls._lexical_precomputed(
+            query,
+            cls._counter_norm(query),
+            document,
+            cls._counter_norm(document),
+        )
+
+    def retrieval_stats(self) -> Mapping[str, int]:
+        with self._cache_lock:
+            return {
+                **self._stats,
+                "lexical_cache_entries": len(self._lexical_cache),
+                "lexical_cache_limit": self._lexical_cache_limit,
+            }
 
 
 class MemoryConsolidator:

@@ -3,15 +3,14 @@
 This module evaluates declared latency ceilings and stage budgets. Retries are
 recorded as evidence but cannot erase or downgrade an observed latency breach.
 """
-
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
 import math
-from collections.abc import Mapping
-from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Mapping
 
 
 class LatencyBudgetError(ValueError):
@@ -111,12 +110,16 @@ class LatencyBudget:
             raise LatencyBudgetError("latency stage IDs must be unique")
         ordered = tuple(sorted(self.stages, key=lambda stage: stage.stage_id))
         if sum(stage.budget_ms for stage in ordered) > self.p99_ms + 1e-12:
-            raise LatencyBudgetError("stage budgets cannot oversubscribe p99 end-to-end budget")
+            raise LatencyBudgetError(
+                "stage budgets cannot oversubscribe p99 end-to-end budget"
+            )
         object.__setattr__(self, "stages", ordered)
 
     @property
     def stage_budgets(self) -> Mapping[str, float]:
-        return MappingProxyType({stage.stage_id: stage.budget_ms for stage in self.stages})
+        return MappingProxyType(
+            {stage.stage_id: stage.budget_ms for stage in self.stages}
+        )
 
     @property
     def digest(self) -> str:
@@ -128,7 +131,8 @@ class LatencyBudget:
                 "p95_ms": self.p95_ms,
                 "p99_ms": self.p99_ms,
                 "stages": [
-                    {"stage_id": stage.stage_id, "budget_ms": stage.budget_ms} for stage in self.stages
+                    {"stage_id": stage.stage_id, "budget_ms": stage.budget_ms}
+                    for stage in self.stages
                 ],
             }
         )
@@ -253,7 +257,9 @@ def assess_latency(
         budget.operation_class != observation.operation_class
         or budget.environment_id != observation.environment_id
     ):
-        raise LatencyBudgetError("latency observation must match budget operation/environment identity")
+        raise LatencyBudgetError(
+            "latency observation must match budget operation/environment identity"
+        )
 
     reasons: list[str] = []
     if observation.p95_ms > budget.p95_ms:

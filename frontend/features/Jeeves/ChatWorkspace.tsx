@@ -1,612 +1,386 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, SafeAreaView,
-  ScrollView, Text, TextInput, TouchableOpacity, View, useWindowDimensions,
+  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView,
+  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { useChatController } from '../../src/product/useChatController';
-import { getAuthToken } from '../../src/auth/gameforgeAuth';
-import type { ConversationMessage, ConversationThread } from '../../src/product/conversationClient';
-import { attachmentCapabilities, CHAT_ATTACHMENT_MIMES, deleteChatAttachment, readPickedAttachment, uploadChatAttachment } from './chatFiles';
+import * as FileSystem from 'expo-file-system/legacy';
+import api from '../../src/utils/apiClient';
+import { WorkspaceController } from './WorkspaceController';
 import MessageContent from './MessageContent';
 import JeevesRuntimeStatus from './JeevesRuntimeStatus';
 import ChatTaskActions from './workbench/ChatTaskActions';
 import ChatSceneActions from './ChatSceneActions';
 import ChatStoryActions from './ChatStoryActions';
+import type { ChatHistoryResponse, ChatResponse } from './WorkspaceController';
+import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
+import type { Artifact, Attachment, Conversation, Message } from './workspace';
+import { exportTranscript, MAX_ATTACHMENT_BYTES, saveArtifact, validateAttachment } from './chatFiles';
+import { consumeHandoff } from './workbench/handoff';
+import CaptureEditor from './workbench/CaptureEditor';
+import { captureInput } from './workbench/capture';
+import type { CaptureInput } from './workbench/capture';
 import DragonCompanionPanel from './companion/DragonCompanionPanel';
 import DragonDemoPlayer from './companion/DragonDemoPlayer';
-import { useDragonAcademy } from './companion/useDragonAcademy';
-import ChatAttachments from './ChatAttachments';
-import { saveChatExport } from './ChatExport';
-import s, { colors as C } from './ChatWorkspace.styles';
+import {useDragonAcademy} from './companion/useDragonAcademy';
 
-const MAX_MESSAGE_LENGTH = 32000;
-const ACCEPTED_FILES: string[] = [...CHAT_ATTACHMENT_MIMES];
-const STARTERS: { icon: Icon; title: string; detail: string; prompt: string }[] = [
-  { icon: 'bulb-outline', title: 'Explore an idea', detail: 'Find a practical way to get started.', prompt: 'Help me think through an idea. Ask me what I want to build and what constraints matter.' },
-  { icon: 'code-slash-outline', title: 'Work through code', detail: 'Explain, improve, or debug a problem.', prompt: 'Help me work through a coding problem. Ask me for the code, what I expect, and what happens instead.' },
-  { icon: 'school-outline', title: 'Learn something', detail: 'Build understanding, one step at a time.', prompt: 'Help me learn a topic. First ask what I want to understand and how much I already know.' },
-  { icon: 'list-outline', title: 'Make a plan', detail: 'Turn a goal into manageable next steps.', prompt: 'Help me make a realistic plan. Ask about my goal, available time, and the main obstacles.' },
-];
+const C = { bg: '#0b1220', card: '#111a2e', edge: '#28364e', text: '#e2e8f0', muted: '#94a3b8', purple: '#a78bfa', green: '#86efac', red: '#fca5a5' };
 type Icon = keyof typeof Ionicons.glyphMap;
-type UploadedFile = Awaited<ReturnType<typeof uploadChatAttachment>>;
-type ManageAction = 'menu' | 'rename' | 'delete' | 'export';
+const STARTERS: { icon: Icon; title: string; detail: string; prompt: string }[] = [
+  { icon: 'map-outline', title: 'Plan a game', detail: 'Turn an idea into achievable milestones.', prompt: 'Help me plan a small playable game. First ask about my game idea, engine, experience and time budget.' },
+  { icon: 'bug-outline', title: 'Debug together', detail: 'Work through a problem step by step.', prompt: 'Help me debug a problem. Ask me for the error, relevant code, expected behavior and what I already tried.' },
+  { icon: 'school-outline', title: 'Learn a concept', detail: 'Build understanding with a worked example.', prompt: 'Teach me a game development concept. Ask about my current level and what I want to understand, then give me a small practice task.' },
+  { icon: 'git-compare-outline', title: 'Review a design', detail: 'Explore tradeoffs before building.', prompt: 'Review my game design. Ask for the core loop, audience and constraints, then identify risks and a small prototype to test the idea.' },
+];
 
-function Button({ icon, label, onPress, disabled = false, primary = false, danger = false }: {
-  icon?: Icon; label: string; onPress: () => void; disabled?: boolean; primary?: boolean; danger?: boolean;
+function Button({ icon, label, onPress, disabled = false, selected = false }: {
+  icon: Icon; label: string; onPress: () => void; disabled?: boolean; selected?: boolean;
 }) {
-  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label}
-    accessibilityState={{ disabled }} onPress={onPress} disabled={disabled}
-    style={[s.button, primary && s.primaryButton, danger && s.dangerButton, disabled && s.disabled]}>
-    {icon && <Ionicons name={icon} size={17} color={danger ? C.danger : C.text} />}
-    <Text style={[s.buttonText, danger && s.dangerText]}>{label}</Text>
+  return <TouchableOpacity onPress={onPress} disabled={disabled} accessibilityRole="button"
+    accessibilityLabel={label} accessibilityState={{ disabled, selected }}
+    style={[s.button, selected && s.selected, disabled && s.disabled]}>
+    <Ionicons name={icon} size={17} color={selected ? C.purple : C.text} />
+    <Text style={s.buttonText}>{label}</Text>
   </TouchableOpacity>;
 }
 
-function IconButton({ icon, label, onPress, disabled = false }: {
-  icon: Icon; label: string; onPress: () => void; disabled?: boolean;
-}) {
-  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label}
-    accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
-    style={[s.iconButton, disabled && s.disabled]}>
-    <Ionicons name={icon} size={20} color={C.textMuted} />
-  </TouchableOpacity>;
-}
-
-function MiniButton({ icon, label, onPress, disabled = false }: {
-  icon: Icon; label: string; onPress: () => void; disabled?: boolean;
-}) {
-  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }}
-    onPress={onPress} disabled={disabled} style={[s.miniButton, disabled && s.disabled]}>
-    <Ionicons name={icon} size={15} color={C.textMuted} /><Text style={s.miniText}>{label}</Text>
-  </TouchableOpacity>;
-}
-
-function Dialog({ title, close, children }: { title: string; close: () => void; children: React.ReactNode }) {
-  return <Modal transparent animationType="fade" onRequestClose={close} visible>
-    <KeyboardAvoidingView style={s.modalKeyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <View style={s.overlay}><View style={s.dialog} accessibilityViewIsModal>
-      <View style={s.between}><Text accessibilityRole="header" style={s.dialogTitle}>{title}</Text>
-        <IconButton icon="close-outline" label={`Close ${title}`} onPress={close} /></View>
-      {children}
-    </View></View></KeyboardAvoidingView>
-  </Modal>;
-}
-
-function MessageCard({ message, busy, notify, edit, regenerate }: {
-  message: ConversationMessage; busy: boolean; notify: (text: string) => void;
-  edit: (id: string, text: string) => Promise<void>; regenerate: (id: string) => Promise<void>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(message.content || '');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const user = message.author_type === 'user';
-  const text = message.content || '';
-  const attachmentRefs = message.attachment_refs.filter(reference => reference.startsWith('chat-attachment://'));
-  const save = async () => {
-    if (!draft.trim() || saving) return;
-    setSaving(true); setError(null);
-    try { await edit(message.message_id, draft.trim()); setEditing(false); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : 'This message could not be edited.'); }
-    finally { setSaving(false); }
-  };
-  return <View style={[s.message, user ? s.userMessage : s.assistantMessage]}>
-    <View style={s.row}>
-      {!user && <View style={s.avatar}><Ionicons name="sparkles-outline" size={14} color={C.primaryHover} /></View>}
-      <Text style={s.messageAuthor}>{user ? 'You' : 'Jeeves'}</Text>
-    </View>
-    {editing ? <>
-      <TextInput value={draft} onChangeText={setDraft} multiline maxLength={MAX_MESSAGE_LENGTH}
-        autoFocus editable={!saving} accessibilityLabel="Edit your message" style={s.editInput} />
-      {error && <Text accessibilityRole="alert" style={s.errorText}>{error}</Text>}
-      <View style={s.dialogActions}>
-        <Button label="Cancel" disabled={saving} onPress={() => { setEditing(false); setError(null); }} />
-        <Button label={saving ? 'Sending…' : 'Save & resend'} primary disabled={saving || !draft.trim() || busy}
-          onPress={() => { void save(); }} />
-      </View>
-    </> : <>
-      {user ? <Text selectable style={s.userText}>{text}</Text> : <MessageContent text={text} notify={notify} />}
-      {!!attachmentRefs.length && <ChatAttachments references={attachmentRefs} threadId={message.thread_id} />}
-      {!user && !!text.trim() && <>
-        <ChatTaskActions text={text} conversationId={message.thread_id}
-          messageId={message.message_id} notify={notify} />
-        <ChatSceneActions text={text} conversationId={message.thread_id}
-          messageId={message.message_id} notify={notify} />
-        <ChatStoryActions text={text} conversationId={message.thread_id}
-          messageId={message.message_id} notify={notify} />
-      </>}
-      <View style={s.messageActions}>
-        <MiniButton icon={copied ? 'checkmark-outline' : 'copy-outline'} label={copied ? 'Copied' : 'Copy'}
-          onPress={() => { void Clipboard.setStringAsync(text).then(() => setCopied(true)).catch(() => notify('Clipboard unavailable. Select the message text to copy it.')); }} />
-        {user && <MiniButton icon="create-outline" label="Edit" disabled={busy}
-          onPress={() => { setDraft(text); setEditing(true); }} />}
-        {!user && <MiniButton icon="refresh-outline" label="Regenerate" disabled={busy}
-          onPress={() => { void regenerate(message.message_id).catch(caught => notify(caught instanceof Error ? caught.message : 'The reply could not be regenerated.')); }} />}
-      </View>
-    </>}
+function ArtifactCard({ artifact, notify }: { artifact: Artifact; notify: (message: string) => void }) {
+  const image = ['image/png', 'image/jpeg', 'image/webp'].includes(artifact.mime);
+  return <View style={s.artifact}>
+    <Text style={s.label}>{artifact.title || artifact.filename || artifact.type}</Text>
+    {image && <Image source={{ uri: `data:${artifact.mime};base64,${artifact.base64}` }} style={s.artifactImage} resizeMode="contain" accessibilityLabel={artifact.title || 'Generated image'} />}
+    <Button icon="download-outline" label="Save file" onPress={() => {
+      void saveArtifact(artifact).catch(error => notify(error instanceof Error ? error.message : 'Could not save this file.'));
+    }} />
   </View>;
 }
 
-function groupThreads(threads: ConversationThread[]) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const week = today.getTime() - 6 * 86400000;
-  const groups: { title: string; threads: ConversationThread[] }[] = [
-    { title: 'Today', threads: [] }, { title: 'Previous 7 days', threads: [] }, { title: 'Earlier', threads: [] },
-  ];
-  for (const thread of [...threads].sort((a, b) => b.updated_at.localeCompare(a.updated_at))) {
-    const timestamp = new Date(thread.updated_at).getTime();
-    groups[timestamp >= today.getTime() ? 0 : timestamp >= week ? 1 : 2].threads.push(thread);
-  }
-  return groups.filter(group => group.threads.length);
+function MessageCard({ message, controller, busy }: { message: Message; controller: WorkspaceController; busy: boolean }) {
+  const [capture, setCapture] = useState<CaptureInput | null>(null);
+  const user = message.role === 'user';
+  const failed = message.status === 'failed' || message.status === 'cancelled';
+  return <View style={[s.messageRow, user && s.userRow]}>
+    <View style={[s.message, user && s.userMessage]}>
+      <View style={s.row}>
+        <Ionicons name={user ? 'person-outline' : 'sparkles-outline'} color={user ? C.text : C.purple} size={15} />
+        <Text style={s.messageAuthor}>{user ? 'You' : 'Jeeves'}</Text>
+        <Text style={s.small}>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+      </View>
+      {!user && message.model && <Text style={s.metadata}>{message.model}{message.tier ? ` · ${message.tier}` : ''}</Text>}
+      <MessageContent text={message.text} notify={controller.notify} />
+      {!user && message.status === 'complete' && <ChatTaskActions
+        text={message.text} conversationId={controller.active.id}
+        messageId={message.id} notify={controller.notify} />}
+      {!user && message.status === 'complete' && <ChatSceneActions
+        text={message.text} conversationId={controller.active.id}
+        messageId={message.id} notify={controller.notify} />}
+      {!user && message.status === 'complete' && !!message.text.trim() &&
+        <ChatStoryActions text={message.text} conversationId={controller.active.sessionId || controller.active.id}
+          messageId={message.id} notify={controller.notify} />}
+      {message.attachmentName && <Text style={s.metadata}>Attachment · {message.attachmentName}</Text>}
+      {(message.artifacts || []).map((artifact, i) => <ArtifactCard key={`${artifact.type}-${i}`} artifact={artifact} notify={controller.notify} />)}
+      {!message.artifacts?.length && !!message.artifactCount && <Text style={s.metadata}>{message.artifactCount} artifact(s) from an earlier visit. File contents are not stored locally.</Text>}
+      <View style={s.messageActions}>
+        <Button icon="copy-outline" label="Copy" onPress={() => {
+          void Clipboard.setStringAsync(message.text).then(() => controller.notify('Message copied.')).catch(() => controller.notify('Clipboard is unavailable. Select the message text to copy it.'));
+        }} />
+        {failed && <Button icon="cloud-download-outline" label="Check server" disabled={busy} onPress={() => {
+          void controller.refreshCanonical().then(() => {
+            const current = controller.active.messages.find(item => item.id === message.id);
+            controller.notify(current?.status === 'complete'
+              ? 'The completed reply was recovered from canonical history.'
+              : 'No confirmed reply yet. Retry will reuse the original message ID.');
+          });
+        }} />}
+        {failed && <Button icon="refresh-outline" label="Retry" disabled={busy} onPress={() => { void controller.retry(message.id); }} />}
+        {message.status === 'complete' && !!message.text.trim() && <Button icon="book-outline" label="Save note" onPress={() => setCapture(captureInput(controller.active, message, ''))} />}
+      </View>
+      {failed && <Text accessibilityRole="alert" style={s.error}>{message.error || 'Reply was not delivered.'}</Text>}
+      {capture && <CaptureEditor input={capture} close={() => setCapture(null)} />}
+    </View>
+  </View>;
 }
 
-function inferredMime(filename: string, supplied?: string) {
-  const extension = filename.toLowerCase().split('.').at(-1);
-  const types: Record<string, string> = {
-    txt: 'text/plain', md: 'text/markdown', markdown: 'text/markdown', csv: 'text/csv',
-    json: 'application/json', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg',
-    jpeg: 'image/jpeg', webp: 'image/webp', wav: 'audio/wav',
-  };
-  return supplied && ACCEPTED_FILES.includes(supplied) ? supplied : types[extension || ''] || supplied || 'application/octet-stream';
-}
-
-export type ChatWorkspaceProps = { initialThreadId?: string };
-
-export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = {}) {
-  const router = useRouter();
-  const { controller, state } = useChatController({ initialThreadId });
-  const dragonAcademy = useDragonAcademy();
-  const { width } = useWindowDimensions();
-  const compact = width < 900;
-  const narrow = width < 560;
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+function Library({ controller, close }: { controller: WorkspaceController; close: () => void }) {
+  const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const [query, setQuery] = useState('');
   const [archived, setArchived] = useState(false);
-  const [modelsOpen, setModelsOpen] = useState(false);
-  const [manage, setManage] = useState<{ thread: ConversationThread; action: ManageAction } | null>(null);
-  const [renameTitle, setRenameTitle] = useState('');
-  const [exportFormat, setExportFormat] = useState<'json' | 'markdown'>('markdown');
-  const [mutationBusy, setMutationBusy] = useState(false);
-  const [dialogError, setDialogError] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [files, setFiles] = useState<Record<string, UploadedFile[]>>({});
-  const [attachmentConsent, setAttachmentConsent] = useState(false);
-  const [consentChecked, setConsentChecked] = useState(false);
-  const [attachmentTypes, setAttachmentTypes] = useState<string[]>([]);
-  const [checkingAttachments, setCheckingAttachments] = useState(false);
-  const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [focused, setFocused] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [newBelow, setNewBelow] = useState(false);
+  const chats = searchConversations(snapshot.workspace, query, archived);
+  const remove = (conversation: Conversation) => {
+    const action = () => controller.remove(conversation.id);
+    const question = `Delete "${conversation.title}" from this device? Export it first if you want to keep a copy.`;
+    if (Platform.OS === 'web') { if (globalThis.confirm(question)) action(); }
+    else Alert.alert('Delete conversation?', question, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: action }]);
+  };
+  return <View style={s.library}>
+    <View style={s.sectionHeader}><Text style={s.sectionTitle}>Conversations</Text><Button icon="close" label="Close" onPress={close} /></View>
+    <Button icon="add-outline" label="New conversation" onPress={() => { controller.create(); close(); }} />
+    <TextInput value={query} onChangeText={setQuery} placeholder="Search titles and messages" placeholderTextColor={C.muted} style={s.field} accessibilityLabel="Search conversations" />
+    <View style={s.row}>
+      <Button icon="chatbubbles-outline" label="Active" selected={!archived} onPress={() => setArchived(false)} />
+      <Button icon="archive-outline" label="Archived" selected={archived} onPress={() => setArchived(true)} />
+    </View>
+    <Text style={s.small}>{snapshot.workspace.conversations.length} / 30 saved on this device</Text>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.libraryList}>
+      {!chats.length && <Text style={s.emptyText}>{query ? 'No matching conversations.' : 'No conversations here yet.'}</Text>}
+      {chats.map(conversation => <View key={conversation.id} style={[s.chatItem, conversation.id === snapshot.workspace.activeId && s.selected]}>
+        <TouchableOpacity onPress={() => { controller.select(conversation.id); close(); }} accessibilityRole="button" accessibilityLabel={`Open ${conversation.title}`} style={s.chatItemMain}>
+          <Text numberOfLines={2} style={s.chatTitle}>{conversation.pinned ? '★ ' : ''}{conversation.title}</Text>
+          <Text style={s.small}>{conversation.messages.length} messages · {new Date(conversation.updatedAt).toLocaleDateString()}</Text>
+          <Text numberOfLines={2} style={s.chatPreview}>{conversation.draft ? `Draft: ${conversation.draft}` : conversation.messages.at(-1)?.text || 'Ready for your first question'}</Text>
+        </TouchableOpacity>
+        <View style={s.row}>
+          <Button icon={archived ? 'arrow-undo-outline' : 'archive-outline'} label={archived ? 'Restore' : 'Archive'} onPress={() => controller.archive(conversation.id, !archived)} />
+          <Button icon="trash-outline" label="Delete" onPress={() => remove(conversation)} />
+        </View>
+      </View>)}
+    </ScrollView>
+    <Text style={s.small}>The server owns conversation history. Drafts and a rebuildable cache stay on this device; attachments last only for this visit.</Text>
+  </View>;
+}
+
+export default function ChatWorkspace() {
+  const router = useRouter();
+  const dragonAcademy = useDragonAcademy();
+  const { width: viewportWidth } = useWindowDimensions();
+  const [hydrated, setHydrated] = useState(Platform.OS !== 'web');
+  useEffect(() => { setHydrated(true); }, []);
+  // Expo exports this route at width zero. Keep the first browser render
+  // identical, then apply responsive layout once hydration has completed.
+  const width = hydrated ? viewportWidth : 0;
+  const [composerHeight, setComposerHeight] = useState(168);
+  const [companionOpen, setCompanionOpen] = useState(false);
+  const [controller] = useState(() => new WorkspaceController(
+    AsyncStorage,
+    async (body, signal) => {
+      const result = await api.post<ChatResponse>(
+        '/api/jeeves/chat',
+        body,
+        { signal, timeoutMs: 60000, retries: 0 },
+      );
+      if (!result.ok || !result.data) {
+        const message = result.status === 429 ? 'Jeeves is busy. Wait a moment and retry.'
+          : result.status === 408 ? 'Jeeves took too long to answer. Try again.'
+            : result.status >= 500 ? 'Jeeves is temporarily unavailable on the server.'
+              : result.status === 413 ? 'This attachment is too large.'
+                : result.status === 409 ? 'This turn conflicts with the saved request. Retry with the original file and message, or start a new conversation.'
+                : result.status === 422 ? 'Jeeves could not accept this message. Check its length and attachments.'
+                  : 'The connection to Jeeves was interrupted. Check your connection and retry.';
+        throw new Error(message);
+      }
+      return result.data;
+    },
+    async sessionId => {
+      const result = await api.get<ChatHistoryResponse>(
+        '/api/jeeves/chat/' + encodeURIComponent(sessionId) + '?limit=50',
+        { timeoutMs: 20000, retries: 1 },
+      );
+      if (!result.ok || !result.data) {
+        throw new Error('Canonical Jeeves history is unavailable.');
+      }
+      return result.data;
+    },
+  ));
+  const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
+  const conversation = controller.active;
+  const busy = snapshot.busyId !== null;
+  const [library, setLibrary] = useState(false);
+  const [settings, setSettings] = useState(false);
+  const [title, setTitle] = useState('');
+  const [context, setContext] = useState('');
+  const [attachment, setAttachment] = useState<Attachment | undefined>();
+  const [picking, setPicking] = useState(false);
   const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
-  const input = useRef<TextInput>(null);
-  const searchInput = useRef<TextInput>(null);
-  const nearBottom = useRef(true);
-  const uploadController = useRef<AbortController | null>(null);
+  const pickerGeneration = useRef(0);
   const mounted = useRef(true);
-  const sending = useRef(false);
-  const creatingRef = useRef(false);
-  const accountToken = getAuthToken();
-  const previousAccountToken = useRef(accountToken);
-  const threadId = state.activeThread?.thread_id || '__new';
-  const threadIdRef = useRef(threadId);
-  threadIdRef.current = threadId;
-  const draft = drafts[threadId] || '';
-  const attached = files[threadId] || [];
-  const busy = ['submitting', 'streaming', 'reconnecting', 'cancelling'].includes(state.status);
-  const loading = state.status === 'loading';
-  const selectedModel = state.models.find(model => model.id === state.selectedModelId);
-  const modelReady = !!selectedModel?.available && selectedModel.selectable;
-  const canSend = !!draft.trim() && !state.pending && !busy && !loading && !uploading && !creating && state.ready && modelReady && state.activeThread?.state !== 'archived';
-  const messages = state.messages.filter(message => message.author_type === 'user' || message.author_type === 'assistant');
-  const pending = state.pending?.threadId === state.activeThread?.thread_id ? state.pending : null;
-  const threadGroups = useMemo(() => groupThreads(state.threads.filter(thread =>
-    thread.state === (archived ? 'archived' : 'active') && (!query.trim() || thread.title.toLowerCase().includes(query.trim().toLowerCase()))
-  )), [state.threads, archived, query]);
-  const notify = useCallback((text: string) => setToast(text), []);
-  const run = useCallback((action: () => Promise<void>) => {
-    void action().catch(caught => notify(caught instanceof Error ? caught.message : 'This action could not be completed.'));
-  }, [notify]);
-  const setDraft = (value: string) => setDrafts(current => ({ ...current, [threadId]: value }));
-  const scrollToBottom = useCallback((animated = true) => {
-    scroll.current?.scrollToEnd({ animated }); nearBottom.current = true; setNewBelow(false);
-  }, []);
-  const createConversation = useCallback(async () => {
-    if (creatingRef.current || busy || loading || uploading) return;
-    creatingRef.current = true; setCreating(true); setSidebarOpen(false);
-    try { await controller.newConversation(); input.current?.focus(); }
-    finally { creatingRef.current = false; if (mounted.current) setCreating(false); }
-  }, [controller, busy, loading, uploading]);
 
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; uploadController.current?.abort(); };
-  }, []);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(timer);
-  }, [toast]);
-  useEffect(() => {
-    if (state.error?.kind !== 'authorization') return;
-    uploadController.current?.abort();
-    setDrafts({}); setFiles({}); setManage(null); setAttachmentConsent(false);
-  }, [state.error?.kind]);
-  useEffect(() => {
-    if (previousAccountToken.current === accountToken) return;
-    previousAccountToken.current = accountToken;
-    uploadController.current?.abort();
-    setDrafts({}); setFiles({}); setManage(null); setAttachmentConsent(false);
-  }, [accountToken]);
-  useEffect(() => {
-    if (!attachmentConsent) return;
-    const abort = new AbortController();
-    setCheckingAttachments(true); setCapabilitiesError(null); setAttachmentTypes([]);
-    void attachmentCapabilities({ signal: abort.signal }).then(result => {
-      if (abort.signal.aborted) return;
-      if (!Array.isArray(result?.types) || result.types.length > 32) throw new Error('File attachment availability could not be read.');
-      const available = [...new Set<string>(result.types.filter((entry: { media_type?: unknown; available?: unknown }) =>
-        entry?.available === true && typeof entry.media_type === 'string' && ACCEPTED_FILES.includes(entry.media_type)
-      ).map((entry: { media_type: string }) => entry.media_type))];
-      setAttachmentTypes(available);
-      if (!available.length) setCapabilitiesError('Files cannot be attached right now. Try again later.');
-    }).catch(caught => { if (!abort.signal.aborted) setCapabilitiesError(caught instanceof Error ? caught.message : 'File attachments are unavailable.'); })
-      .finally(() => { if (!abort.signal.aborted) setCheckingAttachments(false); });
-    return () => abort.abort();
-  }, [attachmentConsent]);
-  useEffect(() => {
-    if (!state.ready) return;
-    const timer = setTimeout(() => run(() => controller.refreshThreads({ query: query.trim(), includeArchived: archived })), 250);
-    return () => clearTimeout(timer);
-  }, [archived, controller, query, run, state.ready]);
-  useEffect(() => {
-    nearBottom.current = true; setNewBelow(false); setUploadError(null);
-    const timer = setTimeout(() => scrollToBottom(false), 30);
-    return () => clearTimeout(timer);
-  }, [threadId, scrollToBottom]);
-  useEffect(() => {
-    if (nearBottom.current) {
-      const timer = setTimeout(() => scrollToBottom(false), 40);
-      return () => clearTimeout(timer);
+    void controller.initialize();
+    return () => { mounted.current = false; pickerGeneration.current++; controller.cancel(); };
+  }, [controller]);
+
+  useEffect(() => { setAttachment(undefined); pickerGeneration.current++; setPicking(false); }, [conversation.id]);
+  useFocusEffect(React.useCallback(() => {
+    if (snapshot.ready) {
+      void consumeHandoff(AsyncStorage, controller);
+      void controller.refreshCanonical();
     }
-    setNewBelow(true);
-  }, [messages.length, pending?.streamText, scrollToBottom]);
+  }, [controller, snapshot.ready]));
   useEffect(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-    const handler = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'o') {
-        event.preventDefault();
-        run(createConversation);
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        if (compact) setSidebarOpen(true);
-        else searchInput.current?.focus();
-      }
-      if (event.key === 'Escape') {
-        setModelsOpen(false); setSidebarOpen(false);
-        if (!mutationBusy) setManage(null);
-        setAttachmentConsent(false);
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [createConversation, compact, mutationBusy, run]);
+    const timer = setTimeout(() => {
+      if (conversation.messages.length) scroll.current?.scrollToEnd({ animated: true });
+      else scroll.current?.scrollTo({ y: 0, animated: false });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [conversation.id, conversation.messages.length, busy]);
 
-  const send = async () => {
-    if (!canSend || sending.current) return;
-    sending.current = true;
-    const sendingAccount = getAuthToken();
-    const text = draft.trim();
-    const origin = threadId;
-    const attachments = attached.map(file => file.attachmentRef);
-    setDrafts(current => ({ ...current, [origin]: '' }));
-    nearBottom.current = true; setNewBelow(false);
-    try {
-      await controller.send(text, { attachmentRefs: attachments });
-      const next = controller.getSnapshot();
-      if (next.pending?.accepted || next.status === 'idle') setFiles(current => ({ ...current, [origin]: [] }));
-      else if (next.error && !next.pending?.accepted && sendingAccount === getAuthToken()) setDrafts(current => current[origin] ? current : { ...current, [origin]: text });
-    } catch (caught) {
-      if (sendingAccount === getAuthToken()) setDrafts(current => current[origin] ? current : { ...current, [origin]: text });
-      notify(caught instanceof Error ? caught.message : 'The message could not be sent.');
-    } finally { sending.current = false; }
-  };
+  const storageLabel = useMemo(() => ({ loading: 'Opening chat cache…', saving: 'Caching…', saved: 'Synced · cache saved', error: 'Cache not saved' })[snapshot.saveState], [snapshot.saveState]);
 
-  const pickAttachment = async () => {
-    if (uploading || busy || creatingRef.current || !attachmentTypes.length) return;
-    setUploading(true); setUploadError(null);
-    const origin = threadIdRef.current;
-    const uploadingAccount = getAuthToken();
-    const abort = new AbortController(); uploadController.current = abort;
+  const pick = async (kind: 'image' | 'pdf') => {
+    if (picking || busy) return;
+    const generation = ++pickerGeneration.current;
+    setPicking(true);
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: attachmentTypes, copyToCacheDirectory: true, multiple: false });
-      if (result.canceled) return;
-      const file = result.assets[0];
-      const base64 = await readPickedAttachment(file);
-      if (abort.signal.aborted) return;
-      if (uploadingAccount !== getAuthToken()) throw new Error('Your account changed. Choose the file again in the intended conversation.');
-      let thread = controller.getSnapshot().activeThread;
-      if (origin === '__new') {
-        if (thread) throw new Error('The conversation changed. Choose the file again in the intended chat.');
-        await controller.newConversation();
-        thread = controller.getSnapshot().activeThread;
-      } else if (thread?.thread_id !== origin) {
-        throw new Error('The conversation changed. Choose the file again in the intended chat.');
+      let next: Attachment | undefined;
+      if (kind === 'image') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) { controller.notify('Allow photo access in device settings to attach an image.'); return; }
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.6 });
+        const asset = !result.canceled ? result.assets[0] : null;
+        if (asset?.base64) next = { modality: 'image', base64: asset.base64, name: asset.fileName || 'image.jpg' };
+      } else {
+        const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+        const asset = !result.canceled ? result.assets[0] : null;
+        if (asset) {
+          if ((asset.size || 0) > MAX_ATTACHMENT_BYTES) throw new Error('Choose a PDF smaller than 5 MB.');
+          let base64: string;
+          if (Platform.OS === 'web') {
+            const blob = asset.file || await (await fetch(asset.uri)).blob();
+            if (blob.size > MAX_ATTACHMENT_BYTES) throw new Error('Choose a PDF smaller than 5 MB.');
+            base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+              reader.onerror = () => reject(new Error('Could not read the PDF.'));
+              reader.onabort = () => reject(new Error('Reading the PDF was cancelled.'));
+              reader.readAsDataURL(blob);
+            });
+          } else base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+          next = { modality: 'pdf', base64, name: asset.name || 'document.pdf' };
+        }
       }
-      if (!thread || thread.state !== 'active') throw new Error('Open an active conversation before attaching a file.');
-      const uploadThreadId = thread.thread_id;
-      if (uploadingAccount !== getAuthToken()) throw new Error('Your account changed. Choose the file again in the intended conversation.');
-      if (origin === '__new') setDrafts(current => ({ ...current, [uploadThreadId]: current.__new || '', __new: '' }));
-      if ((files[thread.thread_id] || []).length >= 4) throw new Error('You can attach up to four files per message.');
-      const uploaded = await uploadChatAttachment({ threadId: thread.thread_id, filename: file.name,
-        mimeType: inferredMime(file.name, file.mimeType), base64, rightsAcknowledged: true, signal: abort.signal });
-      if (!mounted.current || abort.signal.aborted || uploadingAccount !== getAuthToken()) return;
-      setFiles(current => ({ ...current, [uploadThreadId]: [...(current[uploadThreadId] || []), uploaded] }));
-      input.current?.focus();
-    } catch (caught) {
-      if (mounted.current && !abort.signal.aborted) setUploadError(caught instanceof Error ? caught.message : 'This file could not be attached.');
+      if (next) validateAttachment(next.base64);
+      if (mounted.current && pickerGeneration.current === generation && next) setAttachment(next);
+    } catch (error) {
+      if (mounted.current && pickerGeneration.current === generation) controller.notify(error instanceof Error ? error.message : 'Could not open this attachment.');
     } finally {
-      if (mounted.current) setUploading(false);
-      if (uploadController.current === abort) uploadController.current = null;
+      if (mounted.current && pickerGeneration.current === generation) setPicking(false);
     }
   };
 
-  const removeAttachment = (file: UploadedFile) => {
-    if (!state.activeThread) return;
-    const origin = state.activeThread.thread_id;
-    run(async () => {
-      await deleteChatAttachment(file.attachmentRef, origin);
-      setFiles(current => ({ ...current, [origin]: (current[origin] || []).filter(item => item.attachmentRef !== file.attachmentRef) }));
+  const send = () => {
+    if (!snapshot.ready || busy || picking || (!conversation.draft.trim() && !attachment)) return;
+    const pending = controller.send(attachment);
+    // A full conversation is rejected before its draft is cleared.
+    if (!controller.active.draft) setAttachment(undefined);
+    void pending.then(() => {
+      if (controller.active.id === conversation.id && !controller.active.draft) {
+        setAttachment(current => current === attachment ? undefined : current);
+      }
     });
   };
 
-  const manageAction = async (action: 'rename' | 'archive' | 'delete' | 'export') => {
-    if (!manage || mutationBusy) return;
-    setMutationBusy(true); setDialogError(null);
-    const managingAccount = getAuthToken();
-    try {
-      if (controller.getSnapshot().activeThread?.thread_id !== manage.thread.thread_id) await controller.openConversation(manage.thread.thread_id);
-      const selected = controller.getSnapshot();
-      if (selected.activeThread?.thread_id !== manage.thread.thread_id) throw new Error('This conversation could not be opened. Refresh and try again.');
-      if (selected.pending && action !== 'export') throw new Error('Finish or stop the reply before changing this conversation.');
-      if (action === 'rename') await controller.rename(renameTitle.trim());
-      else if (action === 'archive') await controller.archive(manage.thread.state !== 'archived');
-      else if (action === 'export') {
-        const document = await controller.exportConversation(exportFormat);
-        if (managingAccount !== getAuthToken()) throw new Error('Your account changed. Open the conversation again to export it.');
-        await saveChatExport(document);
-        notify(Platform.OS === 'web' ? 'Conversation download started.' : 'Conversation export prepared.');
-      }
-      else {
-        await controller.remove();
-        const removed = manage.thread.thread_id;
-        setDrafts(current => { const next = { ...current }; delete next[removed]; return next; });
-        setFiles(current => { const next = { ...current }; delete next[removed]; return next; });
-      }
-      setManage(null);
-      if (action !== 'export') await controller.refreshThreads({ query: query.trim(), includeArchived: archived });
-    } catch (caught) { setDialogError(caught instanceof Error ? caught.message : 'This conversation could not be updated.'); }
-    finally { setMutationBusy(false); }
-  };
-
-  const sidebar = <View style={[s.sidebar, compact && s.mobileSidebar]}>
-    <View style={s.between}><View style={s.row}><View style={s.brandMark}><Ionicons name="sparkles-outline" size={20} color={C.primaryHover} /></View><Text style={s.brand}>Jeeves</Text></View>
-      {compact && <IconButton icon="close-outline" label="Close conversations" onPress={() => setSidebarOpen(false)} />}</View>
-    <Button icon="add-outline" label={creating ? 'Creating…' : 'New conversation'} primary disabled={busy || uploading || loading || creating}
-      onPress={() => run(createConversation)} />
-    <View style={s.searchBox}><Ionicons name="search-outline" size={17} color={C.textDim} />
-      <TextInput ref={searchInput} value={query} onChangeText={setQuery} placeholder="Search conversations" placeholderTextColor={C.textDim}
-        accessibilityLabel="Search conversation titles" style={s.search} maxLength={200} autoCapitalize="none" autoCorrect={false} />
-      {!!query && <IconButton icon="close-outline" label="Clear search" onPress={() => setQuery('')} />}</View>
-    <View style={s.tabs}>{['Chats', 'Archived'].map((label, index) => <TouchableOpacity key={label} accessibilityRole="tab"
-      accessibilityState={{ selected: archived === !!index }} onPress={() => setArchived(!!index)} style={[s.tab, archived === !!index && s.activeTab]}>
-      <Text style={[s.tabText, archived === !!index && s.selectedText]}>{label}</Text></TouchableOpacity>)}</View>
-    <ScrollView style={s.threadList} contentContainerStyle={s.threadListContent} keyboardShouldPersistTaps="handled">
-      {!state.ready && <ActivityIndicator color={C.primaryHover} />}
-      {state.ready && !threadGroups.length && <Text style={s.muted}>{query ? 'No matching conversations.' : archived ? 'No archived conversations.' : 'Your conversations will appear here.'}</Text>}
-      {threadGroups.map(group => <View key={group.title}><Text style={s.groupLabel}>{group.title}</Text>{group.threads.map(thread =>
-        <View key={thread.thread_id} style={[s.thread, thread.thread_id === state.activeThread?.thread_id && s.selectedThread]}>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Open ${thread.title}`}
-            accessibilityState={{ selected: thread.thread_id === state.activeThread?.thread_id, disabled: busy || uploading || loading || creating }}
-            disabled={busy || uploading || loading || creating} style={s.threadMain} onPress={() => { setSidebarOpen(false); run(() => controller.openConversation(thread.thread_id)); }}>
-            <Text numberOfLines={2} style={s.threadTitle}>{thread.title || 'Untitled conversation'}</Text>
-            <Text style={s.threadDate}>{new Date(thread.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text>
-          </TouchableOpacity>
-          <IconButton icon="ellipsis-horizontal" label={`Options for ${thread.title}`} disabled={busy || uploading || loading || creating}
-            onPress={() => { setManage({ thread, action: 'menu' }); setDialogError(null); }} />
-        </View>)}</View>)}
-      {state.hasMoreThreads && <Button label="Load more" onPress={() => run(() => controller.refreshThreads({ query: query.trim(), includeArchived: archived, loadMore: true }))} />}
-    </ScrollView>
-    <View style={s.between}><IconButton icon="home-outline" label="Return home" onPress={() => router.replace('/product')} /><Text style={s.sidebarFooter}>Conversation history</Text>
-      <IconButton icon="refresh-outline" label="Refresh conversations" disabled={busy} onPress={() => run(() => controller.refreshThreads({ query: query.trim(), includeArchived: archived }))} /></View>
-  </View>;
-
-  return <SafeAreaView style={s.root}>
-    <KeyboardAvoidingView style={s.workspace} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {!compact && sidebar}
-      <View style={s.main}>
-        <View style={[s.header, compact && s.compactHeader]}>
-          {compact && <IconButton icon="menu-outline" label="Open conversations" onPress={() => setSidebarOpen(true)} />}
-          <View style={s.headerTitles}><Text numberOfLines={1} style={s.headerTitle}>{state.activeThread?.title || 'New conversation'}</Text>
-            {!narrow && <Text style={s.muted}>{state.activeThread?.state === 'archived' ? 'Archived conversation' : 'Think, build, and learn together'}</Text>}</View>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Choose model. ${selectedModel?.label || 'No model selected'}`}
-            onPress={() => setModelsOpen(true)} style={s.modelButton}>
-            <View style={[s.dot, !modelReady && s.unavailableDot]} />
-            <Text numberOfLines={1} style={s.modelLabel}>{selectedModel?.label || 'Choose a model'}</Text>
-            <Ionicons name="chevron-down-outline" size={14} color={C.textMuted} />
-          </TouchableOpacity>
-          {state.activeThread && !narrow && <IconButton icon="ellipsis-horizontal" label="Conversation options" disabled={busy}
-            onPress={() => { setManage({ thread: state.activeThread!, action: 'menu' }); setDialogError(null); }} />}
-        </View>
-        <JeevesRuntimeStatus />
-        <View style={[s.companionDock, compact && s.companionDockCompact]}>
-          <DragonCompanionPanel draft={draft}
-            lastUserText={messages.slice().reverse().find(message => message.author_type === 'user')?.content || undefined}
-            academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} />
-        </View>
-        <DragonDemoPlayer demo={dragonAcademy.demo} onClose={dragonAcademy.closeDemo} />
-        {!!dragonAcademy.error && <Text accessibilityRole="alert" style={s.errorText}>{dragonAcademy.error}</Text>}
-        {state.error && <View style={s.alert} accessibilityRole={state.error.kind === 'cancelled' ? undefined : 'alert'}><View style={s.row}>
-          <Ionicons name={state.error.kind === 'cancelled' ? 'stop-circle-outline' : 'alert-circle-outline'} size={20} color={state.error.kind === 'cancelled' ? C.textMuted : C.warning} />
-          <Text style={s.alertText}>{state.error.message}</Text>
-          <IconButton icon="close-outline" label="Dismiss error" onPress={controller.dismissError} /></View>
-          <View style={s.row}>{state.error.retryable && <MiniButton icon="refresh-outline" label="Try again" disabled={busy}
-            onPress={() => run(async () => {
-              if (state.pending) await controller.retry();
-              else if (state.activeThread) await controller.refreshConversation();
-              else { await controller.refreshThreads(); await controller.refreshModels(); }
-            })} />}
-            {state.error.kind === 'conflict' && <MiniButton icon="refresh-outline" label="Refresh conversation" disabled={busy}
-              onPress={() => run(controller.refreshConversation)} />}
-            {state.error.kind === 'unavailable' && <MiniButton icon="options-outline" label="Choose model" onPress={() => setModelsOpen(true)} />}</View>
-        </View>}
-        {state.notice && <View style={s.alert} accessibilityLiveRegion="polite"><View style={s.row}><Text style={s.alertText}>{state.notice}</Text>
-          <IconButton icon="close-outline" label="Dismiss notice" onPress={controller.dismissNotice} /></View></View>}
-        {loading ? <View style={s.loading}><ActivityIndicator color={C.primaryHover} /><Text style={s.muted}>{state.ready ? 'Opening conversation…' : 'Opening your conversations…'}</Text></View> :
-          <ScrollView ref={scroll} style={s.scroll} contentContainerStyle={[s.messagesContent, !compact && s.messagesWithCompanion, compact && s.compactContent]}
-            keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" scrollEventThrottle={100}
-            onScroll={event => { const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-              nearBottom.current = layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
-              if (nearBottom.current) setNewBelow(false);
-            }} onContentSizeChange={() => { if (nearBottom.current) scroll.current?.scrollToEnd({ animated: false }); }}>
-            {!messages.length && !pending ? <View style={s.empty}>
-              <View style={s.heroIcon}><Ionicons name="sparkles-outline" size={30} color={C.primaryHover} /></View>
-              <View style={{ gap: 12 }}><Text accessibilityRole="header" style={s.heroTitle}>What are we working on?</Text>
-                <Text style={s.heroDetail}>Bring a question, an idea, or something you’re stuck on. We’ll take it from there.</Text></View>
-              <View style={s.suggestions}>{STARTERS.map(starter => <TouchableOpacity key={starter.title} accessibilityRole="button"
-                accessibilityLabel={starter.title} style={s.suggestion} onPress={() => { setDraft(starter.prompt); input.current?.focus(); }}>
-                <Ionicons name={starter.icon} size={22} color={C.primaryHover} /><View style={{ gap: 6 }}>
-                  <Text style={s.suggestionTitle}>{starter.title}</Text><Text style={s.suggestionDetail}>{starter.detail}</Text></View>
-              </TouchableOpacity>)}</View>
-            </View> : <View style={s.messagesColumn}>
-              {messages.map(message => <MessageCard key={message.message_id} message={message} busy={busy || !!state.pending || state.activeThread?.state !== 'active'}
-                notify={notify} edit={controller.edit} regenerate={controller.regenerate} />)}
-              {pending?.kind === 'chat' && !messages.some(message => message.author_type === 'user' && message.idempotency_key === pending.idempotencyKey) &&
-                <View style={[s.message, s.userMessage]}><Text style={s.messageAuthor}>You</Text><Text selectable style={s.userText}>{pending.message}</Text></View>}
-              {pending && <View style={[s.message, s.assistantMessage]}>
-                <View style={s.row}><View style={s.avatar}><Ionicons name="sparkles-outline" size={14} color={C.primaryHover} /></View><Text style={s.messageAuthor}>Jeeves</Text></View>
-                {!!pending.streamText && <MessageContent text={pending.streamText} notify={notify} streaming={busy} />}
-                {busy && <View style={s.thinking}><ActivityIndicator size="small" color={C.primaryHover} /><Text style={s.muted}>
-                  {state.status === 'cancelling' ? 'Stopping…' : state.status === 'reconnecting' ? 'Reconnecting…' : pending.streamText ? 'Writing…' : 'Thinking…'}
-                </Text></View>}
-                {!busy && <View style={s.messageActions}><Text style={s.muted}>{pending.state === 'cancelled' ? 'Response stopped' : 'Response interrupted'}</Text>
-                  <MiniButton icon="refresh-outline" label="Retry" onPress={() => run(controller.retry)} />
-                  <MiniButton icon="stop-circle-outline" label="Stop reply" onPress={() => run(controller.cancel)} /></View>}
-              </View>}
-            </View>}
-          </ScrollView>}
-        {newBelow && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Scroll to latest message" onPress={() => scrollToBottom()} style={s.jump}>
-          <Ionicons name="arrow-down-outline" size={16} color={C.text} /><Text style={s.miniText}>Latest message</Text></TouchableOpacity>}
-        <View style={[s.composerArea, compact && s.compactContent]}><View style={s.composerColumn}>
-          {state.activeThread?.state === 'archived' ? <View style={s.alert}><Text style={s.alertText}>Restore this conversation to continue chatting.</Text>
-            <Button icon="arrow-undo-outline" label="Restore conversation" onPress={() => run(() => controller.archive(false))} /></View> : <>
-            {!!uploadError && <View style={s.row}><Text style={[s.errorText, { flex: 1 }]} accessibilityRole="alert">{uploadError}</Text><IconButton icon="close-outline" label="Dismiss file error" onPress={() => setUploadError(null)} /></View>}
-            <View style={[s.composer, focused && s.focusedComposer]}>
-              {!!attached.length && <View style={s.files}>{attached.map(file => <View key={file.attachmentRef} style={s.file}>
-                <Ionicons name="document-outline" size={17} color={C.primaryHover} /><Text numberOfLines={1} style={s.fileName}>{file.filename}</Text>
-                <Text style={s.fileSize}>{Math.max(1, Math.ceil(file.sizeBytes / 1024))} KB</Text>
-                <IconButton icon="close-outline" label={`Remove ${file.filename}`} disabled={busy} onPress={() => removeAttachment(file)} />
-              </View>)}</View>}
-              <TextInput ref={input} value={draft} onChangeText={setDraft} multiline maxLength={MAX_MESSAGE_LENGTH}
-                placeholder={busy ? 'Your next message…' : 'Message Jeeves…'} placeholderTextColor={C.textDim}
-                accessibilityLabel="Message Jeeves" style={s.composerInput} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-                onKeyPress={event => { if (Platform.OS !== 'web') return;
-                  const key = event.nativeEvent as unknown as KeyboardEvent;
-                  if (key.key === 'Enter' && !key.shiftKey && !key.isComposing && !key.altKey && canSend) { event.preventDefault(); void send(); }
-                }} />
-              <View style={s.between}><View style={s.row}>
-                <IconButton icon="attach-outline" label="Attach a file" disabled={busy || loading || creating || uploading || attached.length >= 4 || !state.ready}
-                  onPress={() => { setConsentChecked(false); setAttachmentConsent(true); }} />
-                {uploading ? <View style={s.row}><ActivityIndicator size="small" color={C.primaryHover} /><Text style={s.muted}>Attaching…</Text>
-                  <MiniButton icon="close-outline" label="Cancel" onPress={() => uploadController.current?.abort()} /></View> :
-                  <Text style={s.muted}>{draft.length > 30000 ? `${draft.length.toLocaleString()} / ${MAX_MESSAGE_LENGTH.toLocaleString()}` : attached.length ? `${attached.length} / 4 files` : 'Ask anything'}</Text>}
-              </View>
-                {busy ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Stop generating" accessibilityState={{ disabled: state.status === 'cancelling' }}
-                  disabled={state.status === 'cancelling'} style={[s.sendButton, s.stopButton]} onPress={() => run(controller.cancel)}><Ionicons name="stop" size={17} color={C.text} /></TouchableOpacity> :
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send message" accessibilityState={{ disabled: !canSend }}
-                    disabled={!canSend} onPress={() => { void send(); }} style={[s.sendButton, !canSend && s.disabled]}><Ionicons name="arrow-up-outline" size={23} color={C.text} /></TouchableOpacity>}
-              </View>
-            </View>
-            <Text style={s.composerHint}>{pending && !busy ? 'Retry or stop the interrupted reply to continue.' : busy ? 'You can draft your next message while Jeeves replies.' : modelReady ? Platform.OS === 'web' ? 'Enter to send · Shift + Enter for a new line' : 'Check important information.' : 'Choose an available model to start chatting.'}</Text>
-          </>}
-        </View></View>
+  return <SafeAreaView style={s.safe}>
+    <View style={s.header}>
+      <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button" style={s.back} testID="back-btn"><Ionicons name="chevron-back" size={24} color={C.text} /></TouchableOpacity>
+      <View style={s.brand}><Text style={s.brandTitle}>Jeeves</Text><Text style={s.small}>{storageLabel}</Text></View>
+      <Button icon="chatbubbles-outline" label={width > 600 ? 'Conversations' : 'Chats'} onPress={() => setLibrary(true)} disabled={!snapshot.ready} />
+      <Button icon="folder-outline" label="Workbench" onPress={() => router.push('/jeeves-workbench')} />
+      {width > 650 && <Button icon="add-outline" label="New chat" onPress={() => controller.create()} disabled={!snapshot.ready} />}
+    </View>
+    {!snapshot.ready ? <View style={s.loading}>
+      {snapshot.loadError ? <><Text accessibilityRole="alert" style={s.error}>{snapshot.loadError}</Text><Button icon="refresh-outline" label="Retry opening chats" onPress={() => { void controller.initialize(); }} /></> : <ActivityIndicator color={C.purple} />}
+    </View> : <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={s.chatToolbar}>
+        <View style={s.flex}><Text numberOfLines={1} style={s.chatTitle}>{conversation.title}</Text><Text style={s.small}>{conversation.messages.length} / 100 messages{conversation.context ? ' · Project context attached' : ''}</Text></View>
+        <Button icon={conversation.pinned ? 'star' : 'star-outline'} label="Pin" selected={conversation.pinned} onPress={() => controller.edit({ pinned: !conversation.pinned })} />
+        <Button icon="options-outline" label="Details" onPress={() => { setTitle(conversation.title); setContext(conversation.context); setSettings(true); }} />
       </View>
-    </KeyboardAvoidingView>
-    {compact && sidebarOpen && <Modal visible animationType="slide" onRequestClose={() => setSidebarOpen(false)}>
-      <SafeAreaView style={s.root}>{sidebar}</SafeAreaView></Modal>}
-    {modelsOpen && <Dialog title="Choose a model" close={() => setModelsOpen(false)}>
-      <Text style={s.dialogBody}>Choose how you’d like Jeeves to respond.</Text>
-      <ScrollView style={s.dialogScroll} contentContainerStyle={s.modelList} keyboardShouldPersistTaps="handled">
-        {!state.models.length && <Text style={s.dialogBody}>No models are available right now. Refresh to check again.</Text>}
-        {state.models.map(model => <TouchableOpacity key={model.id} accessibilityRole="button"
-          accessibilityLabel={`${model.label}. ${model.selectable && model.available ? 'Ready' : model.readiness?.message || 'Unavailable'}`}
-          accessibilityState={{ selected: model.id === state.selectedModelId, disabled: !model.selectable || !model.available || busy }}
-          disabled={!model.selectable || !model.available || busy} style={[s.modelItem, model.id === state.selectedModelId && s.selectedModel]}
-          onPress={() => { controller.selectModel(model.id); setModelsOpen(false); input.current?.focus(); }}>
-          <View style={s.between}><Text style={s.modelName}>{model.label}</Text>
-            <Text style={[s.badge, (!model.selectable || !model.available) && s.unavailableBadge]}>{model.selectable && model.available ? 'Ready' : 'Unavailable'}</Text>
-            {model.id === state.selectedModelId && <Ionicons name="checkmark-circle" size={19} color={C.primaryHover} />}</View>
-          <Text style={s.modelDetails}>{model.selectable && model.available ? `${model.credential_free ? 'Runs locally' : 'Connected model'}${model.context_window ? ` · ${Math.round(model.context_window / 1000)}K context` : ''}` : model.readiness?.message || 'This model is not ready to use.'}</Text>
-        </TouchableOpacity>)}
+      <JeevesRuntimeStatus />
+      {(snapshot.notice || snapshot.saveState === 'error') && <View style={s.notice} accessibilityRole="alert">
+        <Text style={[s.small, s.flex]}>{snapshot.notice || 'Changes could not be saved to this device.'}</Text>
+        {snapshot.saveState === 'error' ? <Button icon="refresh-outline" label="Save again" onPress={controller.retrySave} /> : <TouchableOpacity accessibilityLabel="Dismiss notice" onPress={controller.dismissNotice}><Ionicons name="close" size={20} color={C.text} /></TouchableOpacity>}
+      </View>}
+      {width < 760 && <View style={s.companionToggle}><Button icon="sparkles-outline" label={companionOpen ? 'Hide companion' : 'Show companion'} onPress={() => setCompanionOpen(open => !open)} /></View>}
+      {(width >= 760 || companionOpen) && <ScrollView style={[s.companionDock, { bottom: composerHeight + 12 }, width < 760 && s.companionDockCompact]} keyboardShouldPersistTaps="handled">
+        <DragonCompanionPanel draft={conversation.draft} lastUserText={[...conversation.messages].reverse().find(message => message.role === 'user')?.text} academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} />
+      </ScrollView>}
+      <DragonDemoPlayer demo={dragonAcademy.demo} onClose={dragonAcademy.closeDemo} />
+      {!!dragonAcademy.error && <Text accessibilityRole="alert" style={s.small}>{dragonAcademy.error}</Text>}
+      <ScrollView ref={scroll} style={s.flex} contentContainerStyle={[s.transcript, width < 760 && s.transcriptCompact]} keyboardShouldPersistTaps="handled" testID="jeeves-transcript">
+        {!conversation.messages.length && <View style={s.welcome}>
+          <View style={s.crest}><Ionicons name="sparkles-outline" size={34} color={C.purple} /></View>
+          <Text style={s.welcomeTitle}>What shall we work on?</Text>
+          <Text style={s.welcomeSubtitle}>Your companion for building, debugging and learning. Give Jeeves a goal and a little context to get started.</Text>
+          <View style={s.starters}>{STARTERS.map(starter => <TouchableOpacity key={starter.title} style={[s.starter, { width: width > 600 ? '48%' : '100%' }]} accessibilityRole="button" onPress={() => controller.edit({ draft: starter.prompt })}>
+            <Ionicons name={starter.icon} color={C.purple} size={23} /><Text style={s.chatTitle}>{starter.title}</Text><Text style={s.small}>{starter.detail}</Text>
+          </TouchableOpacity>)}</View>
+          <Text style={s.emptyText}>Responses use the server’s configured provider and available knowledge. Local extractive responses may be limited.</Text>
+        </View>}
+        {conversation.messages.map(message => <MessageCard key={message.id} message={message} controller={controller} busy={busy} />)}
+        {busy && <View style={s.composing}><ActivityIndicator color={C.purple} /><Text style={s.small}>Jeeves is composing…</Text><Button icon="stop-outline" label="Stop" onPress={controller.cancel} /></View>}
       </ScrollView>
-      <Button icon="refresh-outline" label="Refresh models" disabled={busy} onPress={() => run(controller.refreshModels)} />
-    </Dialog>}
-    {manage && <Dialog title={manage.action === 'rename' ? 'Rename conversation' : manage.action === 'delete' ? 'Delete conversation?' : manage.action === 'export' ? 'Export conversation' : 'Conversation options'} close={() => { if (!mutationBusy) setManage(null); }}>
-      {manage.action === 'menu' ? <>
-        <Text numberOfLines={3} style={s.dialogBody}>{manage.thread.title}</Text>
-        <Button icon="create-outline" label="Rename" onPress={() => { setRenameTitle(manage.thread.title); setManage({ ...manage, action: 'rename' }); }} />
-        <Button icon={manage.thread.state === 'archived' ? 'arrow-undo-outline' : 'archive-outline'}
-          label={manage.thread.state === 'archived' ? 'Restore conversation' : 'Archive conversation'} disabled={mutationBusy}
-          onPress={() => { void manageAction('archive'); }} />
-        <Button icon="download-outline" label="Export conversation" onPress={() => { setExportFormat('markdown'); setManage({ ...manage, action: 'export' }); }} />
-        <Button icon="trash-outline" label="Delete conversation" danger onPress={() => setManage({ ...manage, action: 'delete' })} />
-      </> : manage.action === 'rename' ? <>
-        <TextInput value={renameTitle} onChangeText={setRenameTitle} maxLength={200} autoFocus accessibilityLabel="Conversation title"
-          style={s.input} editable={!mutationBusy} onSubmitEditing={() => { if (renameTitle.trim()) void manageAction('rename'); }} />
-        <View style={s.dialogActions}><Button label="Cancel" disabled={mutationBusy} onPress={() => setManage(null)} />
-          <Button label={mutationBusy ? 'Saving…' : 'Save'} primary disabled={mutationBusy || !renameTitle.trim()} onPress={() => { void manageAction('rename'); }} /></View>
-      </> : manage.action === 'export' ? <>
-        <Text style={s.dialogBody}>Download this conversation as a readable document or a JSON file.</Text>
-        <View style={s.tabs}>{(['markdown', 'json'] as const).map(format => <TouchableOpacity key={format} accessibilityRole="radio"
-          accessibilityState={{ selected: exportFormat === format, disabled: mutationBusy }} disabled={mutationBusy}
-          onPress={() => setExportFormat(format)} style={[s.tab, exportFormat === format && s.activeTab]}>
-          <Text style={[s.tabText, exportFormat === format && s.selectedText]}>{format === 'markdown' ? 'Markdown (.md)' : 'JSON (.json)'}</Text>
-        </TouchableOpacity>)}</View>
-        <View style={s.dialogActions}><Button label="Cancel" disabled={mutationBusy} onPress={() => setManage(null)} />
-          <Button icon="download-outline" label={mutationBusy ? 'Preparing…' : Platform.OS === 'web' ? 'Download' : 'Save or share'} primary
-            disabled={mutationBusy} onPress={() => { void manageAction('export'); }} /></View>
-      </> : <>
-        <Text style={s.dialogBody}>“{manage.thread.title}” and its messages will be deleted. This cannot be undone.</Text>
-        <View style={s.dialogActions}><Button label="Keep conversation" disabled={mutationBusy} onPress={() => setManage(null)} />
-          <Button icon="trash-outline" label={mutationBusy ? 'Deleting…' : 'Delete'} danger disabled={mutationBusy} onPress={() => { void manageAction('delete'); }} /></View>
-      </>}
-      {dialogError && <Text accessibilityRole="alert" style={s.errorText}>{dialogError}</Text>}
-    </Dialog>}
-    {attachmentConsent && <Dialog title="Attach a file" close={() => setAttachmentConsent(false)}>
-      {checkingAttachments ? <View style={s.thinking}><ActivityIndicator size="small" color={C.primaryHover} /><Text style={s.muted}>Checking available file types…</Text></View> : <>
-        {capabilitiesError && <Text style={s.errorText} accessibilityRole="alert">{capabilitiesError}</Text>}
-        {!!attachmentTypes.length && <>
-          <Text style={s.dialogBody}>Attach a supported file. Up to four files per message, 5 MB each.</Text>
-          <Text style={s.dialogBody}>Text{attachmentTypes.includes('application/pdf') ? ' and PDF' : ''} content can be read.{attachmentTypes.some(type => type.startsWith('image/')) || attachmentTypes.includes('audio/wav') ? ' Images and audio are validated as files; this chat does not describe images or transcribe audio.' : ''}</Text>
-        </>}
-      </>}
-      <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: consentChecked }} onPress={() => setConsentChecked(value => !value)} style={s.checkbox}>
-        <View style={[s.checkboxBox, consentChecked && s.checkedBox]}>{consentChecked && <Ionicons name="checkmark" size={17} color={C.text} />}</View>
-        <Text style={s.checkboxText}>I have permission to use this file in this conversation.</Text>
-      </TouchableOpacity>
-      <View style={s.dialogActions}><Button label="Cancel" onPress={() => setAttachmentConsent(false)} />
-        <Button icon="document-outline" label="Choose file" primary disabled={!consentChecked || checkingAttachments || !attachmentTypes.length}
-          onPress={() => { setAttachmentConsent(false); void pickAttachment(); }} /></View>
-    </Dialog>}
-    {!!toast && <View pointerEvents="none" style={s.toast} accessibilityLiveRegion="polite"><Text style={s.toastText}>{toast}</Text></View>}
+      <View style={s.composer} onLayout={event => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}>
+        {attachment && <View style={s.row}><Ionicons name="attach" color={C.green} size={18} /><Text numberOfLines={1} style={[s.small, s.flex]}>{attachment.name}</Text><Button icon="close" label="Remove" onPress={() => setAttachment(undefined)} /></View>}
+        <TextInput value={conversation.draft} onChangeText={draft => controller.edit({ draft })} style={s.composerInput} multiline maxLength={MAX_TEXT}
+          placeholder="Ask Jeeves about your next step…" placeholderTextColor={C.muted} accessibilityLabel="Message Jeeves" testID="chat-input" />
+        <View style={s.composerActions}>
+          <Button icon="image-outline" label="Image" disabled={busy || picking} onPress={() => { void pick('image'); }} />
+          <Button icon="document-attach-outline" label="PDF" disabled={busy || picking} onPress={() => { void pick('pdf'); }} />
+          <Button icon="layers-outline" label="All forms" selected={conversation.allForms} onPress={() => controller.edit({ allForms: !conversation.allForms })} />
+          <View style={s.flex} />
+          <TouchableOpacity onPress={send} disabled={busy || picking || (!conversation.draft.trim() && !attachment)} style={[s.send, (busy || picking || (!conversation.draft.trim() && !attachment)) && s.disabled]} accessibilityRole="button" accessibilityLabel="Send message" testID="chat-send"><Ionicons name="arrow-up" size={22} color={C.bg} /></TouchableOpacity>
+        </View>
+        <Text style={s.composerHint}>{picking ? 'Reading attachment…' : `${conversation.draft.length.toLocaleString()} / 16,000 · Attachments up to 5 MB`}</Text>
+      </View>
+    </KeyboardAvoidingView>}
+    <Modal visible={library} animationType="slide" onRequestClose={() => setLibrary(false)}><SafeAreaView style={s.safe}><Library controller={controller} close={() => setLibrary(false)} /></SafeAreaView></Modal>
+    <Modal visible={settings} animationType="slide" onRequestClose={() => setSettings(false)}><SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.details} keyboardShouldPersistTaps="handled">
+      <View style={s.sectionHeader}><Text style={s.sectionTitle}>Conversation details</Text><Button icon="close" label="Cancel" onPress={() => setSettings(false)} /></View>
+      <Text style={s.label}>Title</Text><TextInput value={title} onChangeText={setTitle} maxLength={100} style={s.field} accessibilityLabel="Conversation title" />
+      <Text style={s.label}>Project context</Text><Text style={s.small}>Describe your engine, goals, experience and constraints. This text is sent with each message in this conversation.</Text>
+      <TextInput value={context} onChangeText={setContext} maxLength={MAX_CONTEXT} multiline style={[s.field, s.contextField]} placeholder="Godot 4 · first 2D platformer · beginner · one weekend" placeholderTextColor={C.muted} accessibilityLabel="Project context" />
+      <Text style={s.small}>{context.length} / {MAX_CONTEXT}</Text>
+      <Button icon="checkmark-outline" label="Save details" onPress={() => { controller.edit({ title, context }); setSettings(false); }} />
+      <View style={s.divider} /><Text style={s.label}>Keep a copy</Text><Text style={s.small}>Export a Markdown transcript. Attachment and generated file contents are excluded.</Text>
+      <Button icon="download-outline" label="Export transcript" onPress={() => { void exportTranscript(conversation).catch(() => controller.notify('Could not export the transcript. Try copying individual messages.')); }} />
+      <Text style={s.small}>Conversation history is kept on the server. The chat list, drafts and a rebuildable cache stay on this device; attachments last only for this visit.</Text>
+    </ScrollView></SafeAreaView></Modal>
   </SafeAreaView>;
 }
+
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 }, disabled: { opacity: 0.4 },
+  header: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: 1, borderColor: C.edge },
+  back: { padding: 7 }, brand: { flex: 1 }, brandTitle: { fontSize: 22, fontWeight: '800', color: C.text },
+  small: { color: C.muted, fontSize: 12, lineHeight: 18 }, row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 10, borderWidth: 1, borderColor: C.edge, borderRadius: 9, minHeight: 40 },
+  buttonText: { color: C.text, fontSize: 12, fontWeight: '600' }, selected: { backgroundColor: '#292042', borderColor: '#6d52a4' },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20, padding: 32 },
+  chatToolbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 12, gap: 8, borderBottomWidth: 1, borderColor: C.edge },
+  chatTitle: { color: C.text, fontSize: 15, fontWeight: '700', lineHeight: 21 },
+  notice: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#26223c', padding: 12 },
+  companionToggle: { paddingHorizontal: 14, paddingVertical: 6, alignItems: 'flex-start' },
+  companionDock: { position: 'absolute', right: 16, top: 112, width: 310, zIndex: 8 }, companionDockCompact: { position: 'relative', right: undefined, top: undefined, bottom: undefined, width: '100%', maxWidth: 420, maxHeight: 240, flexShrink: 1, alignSelf: 'center', paddingHorizontal: 14, paddingTop: 10 },
+  transcript: { padding: 18, paddingBottom: 30, paddingRight: 340, width: '100%', maxWidth: 1280, alignSelf: 'center', flexGrow: 1 }, transcriptCompact: { paddingRight: 18, maxWidth: 960 },
+  welcome: { alignItems: 'center', justifyContent: 'center', paddingVertical: 30, gap: 16 },
+  crest: { padding: 20, backgroundColor: '#241c38', borderRadius: 24, borderWidth: 1, borderColor: '#463362' },
+  welcomeTitle: { fontSize: 28, fontWeight: '700', color: C.text, textAlign: 'center' },
+  welcomeSubtitle: { color: C.muted, fontSize: 15, lineHeight: 23, maxWidth: 520, textAlign: 'center' },
+  starters: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, maxWidth: 650, width: '100%', marginTop: 12 },
+  starter: { backgroundColor: C.card, borderWidth: 1, borderColor: C.edge, borderRadius: 14, padding: 18, gap: 8 },
+  emptyText: { color: C.muted, fontSize: 12, textAlign: 'center', padding: 18, maxWidth: 600, lineHeight: 19 },
+  messageRow: { alignItems: 'flex-start', marginBottom: 18 }, userRow: { alignItems: 'flex-end' },
+  message: { maxWidth: '94%', minWidth: 170, backgroundColor: C.card, borderColor: C.edge, borderWidth: 1, padding: 16, borderRadius: 16, gap: 10 },
+  userMessage: { backgroundColor: '#28203f', borderColor: '#493568' }, messageAuthor: { color: C.text, fontWeight: '700', fontSize: 12, flex: 1 },
+  messageText: { color: C.text, fontSize: 15, lineHeight: 23 }, metadata: { color: C.muted, fontSize: 11, lineHeight: 17 },
+  messageActions: { flexDirection: 'row', gap: 8, marginTop: 4 }, error: { color: C.red, fontSize: 13, lineHeight: 20 },
+  artifact: { padding: 12, backgroundColor: C.bg, borderWidth: 1, borderColor: C.edge, borderRadius: 12, gap: 10 },
+  artifactImage: { width: '100%', minWidth: 210, height: 210 }, composing: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10 },
+  composer: { marginHorizontal: 14, marginBottom: 10, padding: 12, backgroundColor: C.card, borderWidth: 1, borderColor: C.edge, borderRadius: 18, gap: 8 },
+  composerInput: { color: C.text, fontSize: 15, lineHeight: 22, padding: 8, minHeight: 54, maxHeight: 160, textAlignVertical: 'top' },
+  composerActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }, send: { backgroundColor: C.green, width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  composerHint: { color: C.muted, fontSize: 10, paddingHorizontal: 5 },
+  library: { flex: 1, padding: 20, gap: 14, maxWidth: 800, width: '100%', alignSelf: 'center' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, sectionTitle: { color: C.text, fontSize: 20, fontWeight: '700', flex: 1 },
+  field: { color: C.text, padding: 14, backgroundColor: C.card, borderColor: C.edge, borderWidth: 1, borderRadius: 10, fontSize: 14 },
+  libraryList: { gap: 12, paddingBottom: 24 }, chatItem: { borderWidth: 1, borderColor: C.edge, borderRadius: 14, padding: 14, gap: 12, backgroundColor: C.card },
+  chatItemMain: { gap: 6 }, chatPreview: { color: C.muted, fontSize: 13, lineHeight: 19 },
+  details: { padding: 24, gap: 16, maxWidth: 760, width: '100%', alignSelf: 'center' }, label: { color: C.text, fontSize: 14, fontWeight: '700' },
+  contextField: { minHeight: 160, textAlignVertical: 'top' }, divider: { height: 1, backgroundColor: C.edge, marginVertical: 10 },
+});

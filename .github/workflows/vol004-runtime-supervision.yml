@@ -1,0 +1,212 @@
+name: VOL-004 Runtime Supervision Closure
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/runtime_supervision.json"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_master_plan.json"
+      - "scripts/check_architecture_runtime_supervision.py"
+      - "scripts/verify_vol004_runtime_supervision.py"
+      - "skeleton/kernel/runtime_supervision.py"
+      - "skeleton/ai/runtime/kernel/runtime_supervision.py"
+      - "skeleton/kernel/supervisor.py"
+      - "skeleton/shells/cancellation.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/automation/free_model.py"
+      - "skeleton/automation/chatgpt_adapter.py"
+      - "skeleton/automation/shift_supervisor/model_gateway.py"
+      - "skeleton/api/server.py"
+      - "skeleton/api/engine_runtime.py"
+      - "skeleton/api/engine_service.py"
+      - "backend/server.py"
+      - "backend/core/engine_client.py"
+      - "tests/test_architecture_runtime_supervision.py"
+      - "tests/test_vol004_runtime_supervision_independent.py"
+      - "skeleton/testing/test_vol004_runtime_supervision_v2.py"
+      - "skeleton/testing/test_kernel_supervisor_cancellation.py"
+      - "backend/tests/test_engine_cross_service_closure.py"
+      - "docs/architecture/RUNTIME_SUPERVISION.md"
+      - ".github/workflows/vol004-runtime-supervision.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/runtime_supervision.json"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_master_plan.json"
+      - "scripts/check_architecture_runtime_supervision.py"
+      - "scripts/verify_vol004_runtime_supervision.py"
+      - "skeleton/kernel/runtime_supervision.py"
+      - "skeleton/ai/runtime/kernel/runtime_supervision.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/automation/free_model.py"
+      - "skeleton/automation/chatgpt_adapter.py"
+      - "skeleton/automation/shift_supervisor/model_gateway.py"
+      - "skeleton/api/server.py"
+      - "skeleton/api/engine_runtime.py"
+      - "skeleton/api/engine_service.py"
+      - "backend/server.py"
+      - "backend/core/engine_client.py"
+      - "tests/test_architecture_runtime_supervision.py"
+      - "tests/test_vol004_runtime_supervision_independent.py"
+      - "skeleton/testing/test_vol004_runtime_supervision_v2.py"
+      - "skeleton/testing/test_kernel_supervisor_cancellation.py"
+      - "backend/tests/test_engine_cross_service_closure.py"
+      - "docs/architecture/RUNTIME_SUPERVISION.md"
+      - ".github/workflows/vol004-runtime-supervision.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol004-runtime-supervision-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  runtime-supervision:
+    name: Canonical runtime supervision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install runtime test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check .
+          "pytest>=8,<9" "pytest-asyncio>=0.24,<1" httpx fastapi
+
+      - name: Compile supervision surfaces
+        run: >-
+          python -m compileall -q
+          scripts/check_architecture_runtime_supervision.py
+          scripts/verify_vol004_runtime_supervision.py
+          skeleton/kernel/runtime_supervision.py
+          skeleton/ai/runtime/kernel/runtime_supervision.py
+          skeleton/automation/free_model.py
+          skeleton/automation/chatgpt_adapter.py
+          skeleton/automation/shift_supervisor/model_gateway.py
+          skeleton/provider_runtime.py
+          skeleton/api/server.py
+          skeleton/api/engine_runtime.py
+          skeleton/api/engine_service.py
+          backend/core/engine_client.py
+          backend/server.py
+
+      - name: Validate semantic supervision and connector inventory
+        run: python scripts/check_architecture_runtime_supervision.py --json
+
+      - name: Require canonical governed lifecycle parity
+        run: cmp skeleton/kernel/runtime_supervision.py skeleton/ai/runtime/kernel/runtime_supervision.py
+
+      - name: Run lifecycle and cancellation adversarial tests
+        run: >-
+          python -m pytest -q -p pytest_asyncio.plugin --noconftest
+          tests/test_architecture_runtime_supervision.py
+          skeleton/testing/test_vol004_runtime_supervision_v2.py
+          skeleton/testing/test_kernel_supervisor_cancellation.py
+          backend/tests/test_engine_cross_service_closure.py
+
+      - name: Validate masterplan consistency
+        run: python scripts/check_ai_master_plan.py
+
+  runtime-supervision-independent:
+    name: Independent exact-head runtime supervision verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol004_runtime_supervision_independent.py
+
+      - name: Emit independent exact-head receipt
+        run: >-
+          python scripts/verify_vol004_runtime_supervision.py
+          --evidence-out .vol004-runtime-supervision-independent.json
+          --print-evidence
+
+      - name: Assert exact-head receipt identity and coverage
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol004-runtime-supervision-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("VOL-004 receipt does not bind exact head")
+          if receipt.get("verifier") != "independent-vol004-runtime-supervision-v1":
+              raise SystemExit("unexpected VOL-004 verifier identity")
+          if receipt.get("volume") != "VOL-004":
+              raise SystemExit("runtime verifier bound wrong masterplan volume")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent VOL-004 verification failed")
+          connector_digests = receipt.get("connector_digests") or {}
+          if len(connector_digests) != 5:
+              raise SystemExit("VOL-004 connector coverage is incomplete")
+          binding_digests = receipt.get("binding_digests") or {}
+          if len(binding_digests) < 6:
+              raise SystemExit("VOL-004 service-binding coverage is incomplete")
+          mirror = receipt.get("lifecycle_mirror") or {}
+          if len(mirror.get("canonical") or "") != 64:
+              raise SystemExit("VOL-004 canonical lifecycle digest is missing")
+          if mirror.get("canonical") != mirror.get("mirror"):
+              raise SystemExit("VOL-004 lifecycle mirror parity is broken")
+          if len(receipt.get("contract_digest") or "") != 64:
+              raise SystemExit("VOL-004 contract digest is invalid")
+          binding = receipt.get("volume_binding") or {}
+          if len(binding.get("binding_digest") or "") != 64:
+              raise SystemExit("VOL-004 masterplan binding digest is missing")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("VOL-004 closure receipt digest is invalid")
+          print(
+              "VOL-004 independent exact-head receipt:",
+              expected,
+              receipt["receipt_digest"],
+          )
+          PY

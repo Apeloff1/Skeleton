@@ -166,8 +166,8 @@ def validate(root: Path) -> dict:
             raise P2ValidationError(f"task {task_id} cannot depend on itself")
     _assert_acyclic(task_nodes, task_edges, "task")
 
-    allowed_statuses = {"blocked", "ready", "in_progress", "landed_unpromoted"}
-    terminal_dependency_statuses = {"landed_unpromoted"}
+    allowed_statuses = {"blocked", "ready", "in_progress", "landed_unpromoted", "closed"}
+    terminal_dependency_statuses = {"landed_unpromoted", "closed"}
     task_by_id = {t["task_id"]: t for t in tasks}
     for task in tasks:
         task_id = task["task_id"]
@@ -203,6 +203,14 @@ def validate(root: Path) -> dict:
                 raise P2ValidationError(
                     f"task {task_id} landed_unpromoted may not fabricate sign-off"
                 )
+        if status == "closed":
+            evidence = task.get("evidence_refs")
+            if not isinstance(evidence, list) or len(evidence) < 3:
+                raise P2ValidationError(f"task {task_id} closed requires evidence")
+            if task.get("completion_checkbox") is not True or task.get("completion_checkbox_mark") != "[x]":
+                raise P2ValidationError(f"task {task_id} closed requires checkbox")
+            if task.get("implementation_signed") is not True or task.get("verification_signed") is not True:
+                raise P2ValidationError(f"task {task_id} closed requires both signoffs")
 
     owned_refs = [ref for t in tasks for ref in t.get("primary_volume_refs", [])]
     if _duplicates(owned_refs):
@@ -225,6 +233,9 @@ def validate(root: Path) -> dict:
         "contracts",
         "risks",
         "gaps",
+        "implementation_paths",
+        "tests",
+        "evaluations",
     )
     for task in tasks:
         refs = task.get("primary_volume_refs", [])
@@ -255,9 +266,17 @@ def validate(root: Path) -> dict:
                     raise P2ValidationError(
                         f"task {task['task_id']} narrows/drifts masterplan {ref}.{field}"
                     )
-            if canonical.get("completion_checkbox") is not False:
+            # A masterplan volume may be independently verified while the broader
+            # P2 task remains unpromoted. Preserve that source authority rather
+            # than forcing a stale false checkbox into the inherited snapshot.
+            if canonical.get("completion_checkbox") is True:
+                if canonical.get("implementation_status") != "verified" or not canonical.get("evidence"):
+                    raise P2ValidationError(
+                        f"scheduled masterplan volume {ref} claims completion without verified implementation and evidence"
+                    )
+            elif canonical.get("completion_checkbox") is not False:
                 raise P2ValidationError(
-                    f"scheduled masterplan volume {ref} is already completion-checked"
+                    f"scheduled masterplan volume {ref} has invalid completion checkbox"
                 )
             if canonical.get("signing_required") is not True:
                 raise P2ValidationError(
@@ -265,6 +284,8 @@ def validate(root: Path) -> dict:
                 )
 
     for task in tasks:
+        if task.get("status") == "closed":
+            continue
         if task.get("completion_checkbox") is not False:
             raise P2ValidationError(f"foundation task {task['task_id']} may not assert completion")
         if task.get("completion_checkbox_mark") != "[ ]":
@@ -293,6 +314,11 @@ def validate(root: Path) -> dict:
         for task in tasks
         if task.get("status") == "landed_unpromoted"
     ]
+    expected_closed = [
+        task["task_id"]
+        for task in tasks
+        if task.get("status") == "closed"
+    ]
     expected_active = [
         task["task_id"]
         for task in tasks
@@ -305,6 +331,7 @@ def validate(root: Path) -> dict:
     ]
     for field, expected in (
         ("landed_unpromoted_tasks", expected_landed),
+        ("closed_tasks", expected_closed),
         ("active_tasks", expected_active),
         ("blocked_tasks", expected_blocked),
     ):
@@ -315,6 +342,7 @@ def validate(root: Path) -> dict:
             )
     projected = (
         list(progress.get("landed_unpromoted_tasks", []))
+        + list(progress.get("closed_tasks", []))
         + list(progress.get("active_tasks", []))
         + list(progress.get("blocked_tasks", []))
     )
@@ -332,6 +360,7 @@ def validate(root: Path) -> dict:
         "ready_count": sum(t.get("status") == "ready" for t in tasks),
         "blocked_count": sum(t.get("status") == "blocked" for t in tasks),
         "landed_unpromoted_count": sum(t.get("status") == "landed_unpromoted" for t in tasks),
+        "closed_count": sum(t.get("status") == "closed" for t in tasks),
         "scheduled_volume_count": len(scheduled),
         "queued_volume_count": len(queued),
         "source_volume_count": len(p2_source),

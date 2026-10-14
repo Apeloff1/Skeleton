@@ -3,13 +3,12 @@
 This module records deletion intent, tombstones, and coverage evidence. It does
 not delete data, mutate storage, erase backups, or authorize destructive work.
 """
-
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
-from collections.abc import Iterable
-from dataclasses import dataclass
+from typing import Iterable
 
 
 class DataDeletionError(ValueError):
@@ -41,7 +40,10 @@ def _pairs(
         raise DataDeletionError(f"{name} must be a collection")
     result: set[tuple[str, str]] = set()
     for value in values:
-        if not isinstance(value, tuple) or len(value) != 2:
+        if (
+            not isinstance(value, tuple)
+            or len(value) != 2
+        ):
             raise DataDeletionError(f"{name} entries must be (target, surface) pairs")
         result.add(
             (
@@ -150,7 +152,9 @@ class DeletionTombstone:
             _non_negative_int("deleted_at_ns", self.deleted_at_ns),
         )
         if self.resurrection_blocked is not True:
-            raise DataDeletionError("deletion tombstone must block resurrection")
+            raise DataDeletionError(
+                "deletion tombstone must block resurrection"
+            )
 
     @property
     def pair(self) -> tuple[str, str]:
@@ -197,7 +201,9 @@ class DeletionEvidence:
             or any(character not in "0123456789abcdef" for character in value)
             for value in tombstones
         ):
-            raise DataDeletionError("tombstone_digests must contain lowercase sha256 digests")
+            raise DataDeletionError(
+                "tombstone_digests must contain lowercase sha256 digests"
+            )
         object.__setattr__(self, "tombstone_digests", tombstones)
         object.__setattr__(
             self,
@@ -210,14 +216,18 @@ class DeletionEvidence:
             _pairs("missing_pairs", self.missing_pairs),
         )
         if set(self.covered_pairs) & set(self.missing_pairs):
-            raise DataDeletionError("covered and missing deletion pairs must be disjoint")
+            raise DataDeletionError(
+                "covered and missing deletion pairs must be disjoint"
+            )
         object.__setattr__(
             self,
             "assessed_at_ns",
             _non_negative_int("assessed_at_ns", self.assessed_at_ns),
         )
         if self.external_side_effects is not False:
-            raise DataDeletionError("deletion evidence cannot perform external side effects")
+            raise DataDeletionError(
+                "deletion evidence cannot perform external side effects"
+            )
 
     @property
     def coverage_complete(self) -> bool:
@@ -251,12 +261,20 @@ def assess_deletion_evidence(
         raise TypeError("request must be DeletionRequest")
     rows = tuple(tombstones)
     if any(not isinstance(item, DeletionTombstone) for item in rows):
-        raise DataDeletionError("tombstones must contain DeletionTombstone values")
+        raise DataDeletionError(
+            "tombstones must contain DeletionTombstone values"
+        )
     assessed = _non_negative_int("assessed_at_ns", assessed_at_ns)
     if assessed < request.requested_at_ns:
-        raise DataDeletionError("deletion assessment cannot predate request")
+        raise DataDeletionError(
+            "deletion assessment cannot predate request"
+        )
 
-    expected = {(target, surface) for target in request.target_refs for surface in request.required_surfaces}
+    expected = {
+        (target, surface)
+        for target in request.target_refs
+        for surface in request.required_surfaces
+    }
     covered: set[tuple[str, str]] = set()
     tombstone_ids: set[str] = set()
     for item in rows:
@@ -266,9 +284,13 @@ def assess_deletion_evidence(
         if item.request_id != request.request_id:
             raise DataDeletionError("tombstone request identity mismatch")
         if item.pair not in expected:
-            raise DataDeletionError("tombstone is outside declared deletion scope")
+            raise DataDeletionError(
+                "tombstone is outside declared deletion scope"
+            )
         if item.pair in covered:
-            raise DataDeletionError("duplicate tombstone for deletion target/surface pair")
+            raise DataDeletionError(
+                "duplicate tombstone for deletion target/surface pair"
+            )
         if item.deleted_at_ns < request.requested_at_ns:
             raise DataDeletionError("tombstone predates deletion request")
         if assessed < item.deleted_at_ns:

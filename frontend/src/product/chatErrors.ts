@@ -51,10 +51,16 @@ export function chatApiError(result: ApiResult<unknown>, fallback: string): Chat
           : status === 422 || status === 400 ? 'validation'
             : status === 429 || status >= 500 ? 'unavailable'
               : status === 0 ? 'network' : 'execution';
-  return new ChatClientError(safeMessage(detail) ?? transport ?? fallback, {
-    kind, status, requestId: result.rid,
-    code: typeof structured?.code === 'string' ? structured.code : kind,
-  });
+  // Server faults, transport failures and throttling are not user-safe prose.
+  // Preserve the stable code and correlation ID, never an internal traceback.
+  const visible = (status >= 500 || status === 429 || status === 0)
+    ? fallback : (safeMessage(detail) ?? transport ?? fallback);
+  const rawCode = structured?.code;
+  const code = typeof rawCode === 'string' && /^[a-z][a-z0-9_.-]{0,80}$/i.test(rawCode)
+    ? rawCode : kind;
+  const requestId = typeof result.rid === 'string' && result.rid.length <= 128
+    ? result.rid : null;
+  return new ChatClientError(visible, { kind, status, requestId, code });
 }
 
 export function asChatError(error: unknown, fallback = 'The conversation could not be updated.'): ChatClientError {
@@ -65,9 +71,8 @@ export function asChatError(error: unknown, fallback = 'The conversation could n
   if (error instanceof Error && (error.name === 'AbortError' || error.message === 'aborted')) {
     return new ChatClientError('Request detached.', { kind: 'cancelled', retryable: false });
   }
-  return new ChatClientError(error instanceof Error ? error.message : fallback, {
-    kind: 'network', retryable: true,
-  });
+  // Unknown thrown errors can contain connection strings or backend internals.
+  return new ChatClientError(fallback, { kind: 'network', retryable: true });
 }
 
 export function chatAbortError(): ChatClientError {

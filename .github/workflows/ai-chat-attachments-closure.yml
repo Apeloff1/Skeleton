@@ -1,0 +1,114 @@
+name: AI Chat Attachments Closure
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/assistant/attachments.py"
+      - "skeleton/ai/assistant/__init__.py"
+      - "skeleton/testing/test_ai_chat_attachments.py"
+      - "machine/ai_chat_attachments.json"
+      - "scripts/check_ai_chat_attachments.py"
+      - "scripts/verify_ai_chat_attachments.py"
+      - "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+      - ".github/workflows/ai-chat-attachments-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-chat-attachments-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  attachments:
+    name: AI chat attachment contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Validate attachment structure
+        run: python scripts/check_ai_chat_attachments.py
+
+      - name: Compile attachment surface
+        run: python -m compileall -q skeleton/ai/assistant/attachments.py
+
+      - name: Run attachment regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_ai_chat_attachments.py
+          skeleton/testing/test_multimodal_ingestion.py
+          skeleton/testing/test_context_compiler.py
+
+      - name: Emit exact-head attachment evidence
+        env:
+          ATTACHMENT_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/check_ai_chat_attachments.py
+          --head-sha "$ATTACHMENT_HEAD_SHA"
+          --evidence-out .ai-chat-attachments.json
+          --print-evidence
+
+      - name: Independently verify attachment evidence
+        env:
+          ATTACHMENT_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_ai_chat_attachments.py
+          .ai-chat-attachments.json
+          --head-sha "$ATTACHMENT_HEAD_SHA"
+          --evidence-out .ai-chat-attachments-independent.json
+          --print-evidence
+
+      - name: Assert exact-head closure
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          structural = json.loads(
+              Path(".ai-chat-attachments.json").read_text(encoding="utf-8")
+          )
+          independent = json.loads(
+              Path(".ai-chat-attachments-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if structural.get("head_sha") != expected:
+              raise SystemExit("attachment structural receipt is not exact-head")
+          if structural.get("valid") is not True or structural.get("errors"):
+              raise SystemExit("attachment structural validation failed")
+          if len(structural.get("digests") or {}) != 6:
+              raise SystemExit("attachment digest coverage incomplete")
+          if independent.get("expected_head") != expected:
+              raise SystemExit("attachment independent receipt is not exact-head")
+          if independent.get("valid") is not True or independent.get("errors"):
+              raise SystemExit("attachment independent verification failed")
+          if (
+              independent.get("structural_evidence_digest")
+              != independent.get("recomputed_structural_evidence_digest")
+          ):
+              raise SystemExit("attachment evidence was not independently rehashed")
+          print("AI chat attachment exact-head closure verified:", expected)
+          PY

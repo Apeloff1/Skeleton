@@ -1,3 +1,4 @@
+# Evidence refresh trigger: VOL-016 current-main delegation verification.
 name: P1 Agent Delegation Qualification Gate
 
 on:
@@ -8,22 +9,32 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/agents/delegation_qualification.py"
+      - "skeleton/agents/agent_runtime.py"
+      - "skeleton/automation/agents/agent_runtime.py"
       - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/agents/core/delegation_qualification.py"
+      - "skeleton/ai/agents/core/agent_runtime.py"
       - "skeleton/agents/__init__.py"
+      - "skeleton/automation/agents/__init__.py"
       - "skeleton/ai/agents/core/__init__.py"
       - "skeleton/testing/test_agent_delegation_qualification.py"
+      - "skeleton/testing/test_agent_runtime_durable.py"
       - ".github/workflows/p1-agent-delegation-qualification.yml"
   push:
     branches:
       - main
     paths:
       - "skeleton/agents/delegation_qualification.py"
+      - "skeleton/agents/agent_runtime.py"
+      - "skeleton/automation/agents/agent_runtime.py"
       - "machine/ai_p1_task_backlog.json"
       - "skeleton/ai/agents/core/delegation_qualification.py"
+      - "skeleton/ai/agents/core/agent_runtime.py"
       - "skeleton/agents/__init__.py"
+      - "skeleton/automation/agents/__init__.py"
       - "skeleton/ai/agents/core/__init__.py"
       - "skeleton/testing/test_agent_delegation_qualification.py"
+      - "skeleton/testing/test_agent_runtime_durable.py"
       - ".github/workflows/p1-agent-delegation-qualification.yml"
   workflow_dispatch:
 
@@ -70,12 +81,15 @@ jobs:
         run: >-
           python -m compileall -q
           skeleton/agents/delegation_qualification.py
+          skeleton/automation/agents/agent_runtime.py
           skeleton/ai/agents/core/delegation_qualification.py
+          skeleton/ai/agents/core/agent_runtime.py
 
       - name: Run delegation and lease regressions
         run: >-
           python -m pytest -q --noconftest
           skeleton/testing/test_agent_delegation_qualification.py
+          skeleton/testing/test_agent_runtime_durable.py
           skeleton/testing/test_swarm_exact_lease_atomicity.py
           skeleton/testing/test_swarm_fencing.py
           skeleton/testing/test_swarm_fencing_concurrency.py
@@ -94,8 +108,11 @@ jobs:
 
           evidence_files = [
               "skeleton/agents/delegation_qualification.py",
+              "skeleton/automation/agents/agent_runtime.py",
               "skeleton/ai/agents/core/delegation_qualification.py",
+              "skeleton/ai/agents/core/agent_runtime.py",
               "skeleton/testing/test_agent_delegation_qualification.py",
+              "skeleton/testing/test_agent_runtime_durable.py",
           ]
           refs = []
           for name in evidence_files:
@@ -132,6 +149,8 @@ jobs:
               digest(
                   [
                       "skeleton/agents/delegation_qualification.py",
+                      "skeleton/automation/agents/agent_runtime.py",
+                      "skeleton/ai/agents/core/agent_runtime.py",
                       ".github/workflows/p1-agent-delegation-qualification.yml",
                   ]
               ),
@@ -141,6 +160,7 @@ jobs:
               digest(
                   [
                       "skeleton/testing/test_agent_delegation_qualification.py",
+                      "skeleton/testing/test_agent_runtime_durable.py",
                       "skeleton/testing/test_swarm_exact_lease_atomicity.py",
                       "skeleton/testing/test_swarm_fencing.py",
                       "skeleton/testing/test_swarm_fencing_concurrency.py",

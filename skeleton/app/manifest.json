@@ -48,7 +48,8 @@
       "MONGO_URL",
       "SKL_MONGO_URI",
       "MONGO_INITDB_ROOT_PASSWORD",
-      "JWT_SECRET"
+      "JWT_SECRET",
+      "SKL_ENGINE_SERVICE_TOKEN"
     ],
     "optional_env": [
       "OPENAI_API_KEY",

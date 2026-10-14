@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:local_model_bridge:v1",
+  "title": "FLGB-02 local model bridge",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operation_id",
+    "model_identity_digest",
+    "input_digest",
+    "max_output_tokens",
+    "deadline_ms",
+    "authority_scope"
+  ],
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "model_identity_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "max_output_tokens": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "deadline_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400000
+    },
+    "authority_scope": {
+      "const": "inference-only"
+    }
+  }
+}

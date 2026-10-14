@@ -112,7 +112,7 @@ def test_local_model_artifact_receipt_binds_exact_file_and_model(tmp_path) -> No
     assert loaded.receipt.model_digest == expected.model_digest
     assert loaded.receipt.artifact_sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
     assert loaded.receipt.reference.startswith("local-model-artifact:")
-    assert loaded.receipt.schema == "reference_ngram"
+    assert loaded.receipt.schema == "skeleton.reference_ngram.v1"
 
 
 def test_local_model_artifact_rejects_duplicate_keys_and_digest_drift(tmp_path) -> None:

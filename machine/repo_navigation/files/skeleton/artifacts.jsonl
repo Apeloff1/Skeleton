@@ -1,0 +1,5 @@
+{"b":361,"f":"skeleton/artifacts","g":"64a40839a4b0cb97d520d631c9bc1ed715953037","m":"100644","p":"skeleton/artifacts/__init__.py","t":"blob","z":"unclassified"}
+{"b":1501,"f":"skeleton/artifacts","g":"a31622ec809b0e062b3c2519a6575507924173cf","m":"100644","p":"skeleton/artifacts/dependency_graph.py","t":"blob","z":"unclassified"}
+{"b":2207,"f":"skeleton/artifacts","g":"e5546e8e5e7575f5142a030cac9d31d735e9130a","m":"100644","p":"skeleton/artifacts/license_intelligence.py","t":"blob","z":"unclassified"}
+{"b":16538,"f":"skeleton/artifacts","g":"d52a47868f85c4d5ec715d3040ce0adb899f435c","m":"100644","p":"skeleton/artifacts/multimodal_ingestion.py","t":"blob","z":"unclassified"}
+{"b":1417,"f":"skeleton/artifacts","g":"ae17c23c1481b9ad1edd7b3125cde878d34f9f65","m":"100644","p":"skeleton/artifacts/rebuild.py","t":"blob","z":"unclassified"}

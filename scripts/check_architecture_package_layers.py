@@ -142,11 +142,24 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         if binding.get("title") != volume.get("title"):
             raise PackageLayerError(f"masterplan title drift for {ref}")
         gaps = binding.get("required_gap_texts")
-        if not isinstance(gaps, list) or not gaps:
-            raise PackageLayerError(f"{ref} requires gap bindings")
-        for gap in gaps:
-            if gap not in volume.get("gaps", []):
-                raise PackageLayerError(f"masterplan gap drift for {ref}: {gap!r}")
+        recorded = volume.get("gaps")
+        if not isinstance(gaps, list) or not isinstance(recorded, list):
+            raise PackageLayerError(f"{ref} requires typed gap bindings")
+        if gaps != recorded:
+            raise PackageLayerError(f"masterplan gap drift for {ref}: exact binding required")
+        signed = volume.get("completion_checkbox")
+        if signed is True:
+            if (
+                volume.get("implementation_status") != "verified"
+                or volume.get("completion_checkbox_mark") != "[x]"
+                or recorded
+            ):
+                raise PackageLayerError(f"{ref} inconsistent signed closure")
+        elif signed is False:
+            if volume.get("completion_checkbox_mark") != "[ ]" or not recorded:
+                raise PackageLayerError(f"{ref} incomplete unsigned gap declaration")
+        else:
+            raise PackageLayerError(f"{ref} malformed completion checkbox")
     if seen_bindings != {"VOL-052", "VOL-053"}:
         raise PackageLayerError("package layers must remain bound to VOL-052 and VOL-053")
 

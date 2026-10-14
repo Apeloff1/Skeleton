@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, json, sys
+import argparse, json, sys, re
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -74,18 +74,33 @@ def validate(root:Path=ROOT)->dict[str,Any]:
     volumes={v.get("key"):v for v in master.get("volumes",[]) if isinstance(v,dict) and v.get("key")}
     tasks={t.get("task_id"):t for t in backlog.get("tasks",[]) if isinstance(t,dict) and t.get("task_id")}
     if set(tasks)!=set(EXPECTED_TASKS): raise P3EngineeringValidationError("P3-T1 task inventory drift")
-    landed={tid for tid,t in tasks.items() if t.get("status")=="landed_unpromoted"}; owned=[]
+    landed={tid for tid,t in tasks.items() if t.get("status") in {"landed_unpromoted","closed"}}; owned=[]
     for tid,expected in EXPECTED_TASKS.items():
         task=tasks[tid]; refs=task.get("primary_volume_refs")
         if not isinstance(refs,list) or set(refs)!=expected: raise P3EngineeringValidationError(f"{tid} ownership drift")
         if task.get("depends_on")!=EXPECTED_DEPS[tid]: raise P3EngineeringValidationError(f"{tid} dependency drift")
         if set(refs)&INHERITED_ONLY: raise P3EngineeringValidationError(f"{tid} re-owns inherited P3-T0 volume")
         owned.extend(refs); status=task.get("status")
-        if status not in {"blocked","ready","in_progress","landed_unpromoted"}: raise P3EngineeringValidationError(f"{tid} unsupported status")
+        if status not in {"blocked","ready","in_progress","landed_unpromoted","closed"}: raise P3EngineeringValidationError(f"{tid} unsupported status")
         unresolved=[dep for dep in task.get("depends_on",[]) if dep not in landed]
         if status=="blocked" and not unresolved: raise P3EngineeringValidationError(f"{tid} blocked with all dependencies landed")
         if status in {"ready","in_progress","landed_unpromoted"} and unresolved: raise P3EngineeringValidationError(f"{tid} has unresolved dependencies")
-        if task.get("completion_checkbox") is not False or task.get("implementation_signed") is not False or task.get("verification_signed") is not False: raise P3EngineeringValidationError(f"{tid} may not self-complete or self-sign")
+        if status == "closed":
+            if (task.get("completion_checkbox") is not True
+                or task.get("implementation_signed") is not True
+                or task.get("verification_signed") is not True
+                or task.get("completion_checkbox_mark") != "[x]"):
+                raise P3EngineeringValidationError(f"{tid} closed requires verified signoffs")
+            evidence = task.get("evidence_refs")
+            if not isinstance(evidence, list) or not all(isinstance(x, str) for x in evidence):
+                raise P3EngineeringValidationError(f"{tid} closed evidence must be typed")
+            heads = {ref.removeprefix("git-head:") for ref in evidence if re.fullmatch(r"git-head:[0-9a-f]{40}", ref)}
+            if not heads or not any(f"workflow:P3 Engineering Extension Authority@{head}:success" in evidence for head in heads) or not any(re.fullmatch(r"github-actions-run:[0-9]+", ref) for ref in evidence):
+                raise P3EngineeringValidationError(f"{tid} closed requires pinned successful acceptance evidence")
+        elif (task.get("completion_checkbox") is not False
+              or task.get("implementation_signed") is not False
+              or task.get("verification_signed") is not False):
+            raise P3EngineeringValidationError(f"{tid} may not self-complete or self-sign unless closed")
         obligations=task.get("masterplan_obligations")
         if not isinstance(obligations,list) or len(obligations)!=len(refs): raise P3EngineeringValidationError(f"{tid} obligation coverage drift")
         by_ref={o.get("volume_ref"):o for o in obligations if isinstance(o,dict)}

@@ -1,0 +1,593 @@
+{
+  "schema_version": 1,
+  "status": "recovery_evidence_only",
+  "authority_boundary": "This manifest records repository-history evidence anchors only. It does not itself sign, complete, verify, or mutate canonical accountability records.",
+  "anchors": [
+    {
+      "record_ids": [
+        "ACC-AIQ-S0-STATE-01",
+        "ACC-AIQ-S0-STATE-02",
+        "ACC-AIQ-S0-GOV-01",
+        "ACC-AIQ-S0-GOV-02",
+        "ACC-AIQ-S0-GOV-03",
+        "ACC-AIQ-S0-COST-01"
+      ],
+      "source_commit": "669b1398d00c9d37ae95ee2022181579098bd265",
+      "claim": "independent verification and completion explicitly recorded by repository history",
+      "verification": [
+        {
+          "run_id": 36284789226,
+          "job_id": 108523369309,
+          "name": "State Recovery Drill"
+        },
+        {
+          "run_id": 36284789145,
+          "job_id": 108523368586,
+          "name": "Governance Closure Gate"
+        },
+        {
+          "run_id": 36284789200,
+          "job_id": 108523367880,
+          "name": "Cost Admission Closure Gate"
+        }
+      ],
+      "exact_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+      "record_details": {
+        "ACC-AIQ-S0-STATE-01": {
+          "verification_signer": "github-actions:State Recovery Drill",
+          "signed_at_utc": "2026-09-27T01:14:27Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789226,
+          "verification_job": 108523369309,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        },
+        "ACC-AIQ-S0-STATE-02": {
+          "verification_signer": "github-actions:State Recovery Drill",
+          "signed_at_utc": "2026-09-27T01:14:27Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789226,
+          "verification_job": 108523369309,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        },
+        "ACC-AIQ-S0-GOV-01": {
+          "verification_signer": "github-actions:Governance Closure Gate",
+          "signed_at_utc": "2026-09-27T01:18:24Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789145,
+          "verification_job": 108523368586,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        },
+        "ACC-AIQ-S0-GOV-02": {
+          "verification_signer": "github-actions:Governance Closure Gate",
+          "signed_at_utc": "2026-09-27T01:18:24Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789145,
+          "verification_job": 108523368586,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        },
+        "ACC-AIQ-S0-GOV-03": {
+          "verification_signer": "github-actions:Governance Closure Gate",
+          "signed_at_utc": "2026-09-27T01:18:24Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789145,
+          "verification_job": 108523368586,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        },
+        "ACC-AIQ-S0-COST-01": {
+          "verification_signer": "github-actions:Cost Admission Closure Gate",
+          "signed_at_utc": "2026-09-27T01:14:42Z",
+          "evidence_head": "4c5c5b485c03bd0ec8f2afc8015090881a6ba931",
+          "verification_run": 36284789200,
+          "verification_job": 108523367880,
+          "completed_at_utc": "2026-09-27T05:06:47Z",
+          "completion_commit": "4569245fa1bc921a759eb109f0020b202c3b6a33"
+        }
+      },
+      "recovery_granularity": "full_signature_history"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-248"
+      ],
+      "source_commit": "d06925c181862f46cd6c87bdfa5401efe8f2e472",
+      "claim": "independent verification and completion explicitly recorded by repository history",
+      "verification": [
+        {
+          "run_id": 37167919250,
+          "job_id": 111334677962,
+          "name": "P1 Reasoning Search Stop Policy Gate"
+        },
+        {
+          "run_id": 37167919351,
+          "job_id": 111334676216,
+          "name": "P1 Evidence Identity"
+        },
+        {
+          "run_id": 37167919282,
+          "job_id": 111334676231,
+          "name": "P1 Required Gate Authority"
+        },
+        {
+          "run_id": 37167919357,
+          "job_id": 111334676388,
+          "name": "P1 Reproducibility Bundle"
+        }
+      ],
+      "exact_head": "31d7ea22706a83a4c46e9aa95e5700a68a69f902",
+      "recovery_granularity": "full_signature_history",
+      "verification_signer": "github-actions:P1 Reasoning Search Stop Policy Gate",
+      "signed_at_utc": "2026-10-04T04:16:00Z",
+      "completed_at_utc": "2026-10-04T04:16:01Z",
+      "completion_commit": "30b49c289ccdec43bda819ccddba0a5909139b2c"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-013",
+        "ACC-VOL-014"
+      ],
+      "source_commit": "58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6",
+      "claim": "independent CI verification and later canonical completion explicitly recorded",
+      "verification": [
+        {
+          "run_id": 36356867896,
+          "name": "P1 Reasoning Search Stop Policy Gate",
+          "record_id": "ACC-VOL-013"
+        },
+        {
+          "run_id": 36365420651,
+          "name": "P1 Plan Verification Gate",
+          "record_id": "ACC-VOL-014"
+        }
+      ],
+      "record_details": {
+        "ACC-VOL-013": {
+          "verification_signer": "github-actions:P1 Reasoning Search Stop Policy Gate",
+          "signed_at_utc": "2026-09-27T22:57:02Z",
+          "evidence_head": "ff7d3e764d81c7f80bbc698516b03bd872c04961",
+          "verification_run": 36356867896,
+          "completed_at_utc": "2026-10-04T00:48:31Z",
+          "completion_commit": "fa9b64bd9f18c596d5d27f7480f2d490cf52af7e"
+        },
+        "ACC-VOL-014": {
+          "verification_signer": "github-actions:P1 Plan Verification Gate",
+          "signed_at_utc": "2026-09-28T01:22:42Z",
+          "evidence_head": "8dc9e313566284c83b2401783015fb5638536f6e",
+          "verification_run": 36365420651,
+          "completed_at_utc": "2026-10-04T00:48:31Z",
+          "completion_commit": "fa9b64bd9f18c596d5d27f7480f2d490cf52af7e"
+        }
+      },
+      "completion_source_commit": "8d74b7d3979421780d50b23fb5c10a06204a1219"
+    },
+    {
+      "record_ids": [
+        "ACC-P1-EVID-01",
+        "ACC-P1-EVID-02",
+        "ACC-P1-EVID-03",
+        "ACC-P1-EVID-04",
+        "ACC-P1-EVID-05",
+        "ACC-P1-EVID-06"
+      ],
+      "source_commit": "08874cbc93a8014d53a95ee2022181579098bd265",
+      "artifact": "machine/accountability_events/P1-L0/implementation_reconciliation.json",
+      "claim": "implementation signoff only; verification explicitly unsigned"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-056",
+        "ACC-VOL-057",
+        "ACC-VOL-059"
+      ],
+      "source_commit": "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+      "claim": "independent CI verification and canonical completion explicitly recorded",
+      "verification_signer": "github-actions:P1 Evidence Identity Gate",
+      "completed_at_utc": "2026-10-04T04:32:01Z",
+      "evidence_head": "de1c7870e4c231eaa4d74b25f79b88c09af75fbc",
+      "corroborating_runs": [
+        37175244818,
+        37175244907,
+        37175244918,
+        37175244962
+      ]
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-015"
+      ],
+      "source_commit": "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+      "claim": "independent verification and hardened completion explicitly recorded",
+      "verification_signer": "github-actions:Tool Runtime Closure Gate",
+      "completed_at_utc": "2026-10-04T15:47:01Z",
+      "evidence_head": "a506a14df1c8b03146ffb03f1956d343efc3a4b5",
+      "verification_runs": [
+        37177682751,
+        37177682750,
+        37177682705,
+        37177682768,
+        37177682821
+      ]
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-016"
+      ],
+      "source_commit": "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+      "claim": "independent verification and hardened completion explicitly recorded",
+      "verification_signer": "github-actions:Agent Runtime Closure Gate",
+      "completed_at_utc": "2026-10-04T15:47:01Z",
+      "evidence_head": "a506a14df1c8b03146ffb03f1956d343efc3a4b5",
+      "verification_runs": [
+        37177682843,
+        37177682746,
+        37177682705,
+        37177682768,
+        37177682821
+      ]
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-017"
+      ],
+      "source_commit": "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+      "claim": "independent verification and hardened completion explicitly recorded",
+      "verification_signer": "github-actions:P1 Multi-Agent Orchestration Gate",
+      "completed_at_utc": "2026-10-04T15:47:01Z",
+      "evidence_head": "a506a14df1c8b03146ffb03f1956d343efc3a4b5",
+      "signed_at_utc": "2026-10-04T15:47:00Z",
+      "verification_runs": [
+        37177682773,
+        37177682705,
+        37177682768,
+        37177682821
+      ],
+      "verification_jobs": [
+        111363635935,
+        111363635774,
+        111363636080,
+        111363636497
+      ],
+      "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/37177682773",
+      "recovered_from": "machine/ai_build_accountability.json patch in source_commit"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-000",
+        "ACC-VOL-034",
+        "ACC-VOL-035",
+        "ACC-VOL-036",
+        "ACC-VOL-037",
+        "ACC-VOL-038",
+        "ACC-VOL-078",
+        "ACC-VOL-079",
+        "ACC-VOL-080",
+        "ACC-VOL-420"
+      ],
+      "source_commit": "1f37192640454a439cde23c211788f185a379b81",
+      "claim": "repository history explicitly records completion at verified P1-L0 target with independent CI verification and governed gap evidence",
+      "recovery_granularity": "commit_claim_plus_verifier_identity",
+      "limitation": "historical ledger blob is truncated through connector; do not synthesize verifier identity, timestamp, run/job, or signature fields from this anchor alone",
+      "source_pr": 2693,
+      "source_pr_head": "6cf0549d70b4e11532dc3f1d80dbf347d456c4e0",
+      "verification_signer": "github-actions:P1 Evidence Identity Gate",
+      "corroborating_gate_names": [
+        "P1 Evidence Identity Gate",
+        "P1 Reproducibility Bundle Gate",
+        "P1 Scope Freeze Gate",
+        "P1 Required Gate Authority Gate"
+      ],
+      "workflow_caveat": "PR #2693 later workflow batch is cancelled/skipped and is not evidence; exact historical successful receipt IDs remain unrecovered.",
+      "automatic_signature_write_authorized": false
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-143",
+        "ACC-VOL-144",
+        "ACC-VOL-145",
+        "ACC-VOL-146",
+        "ACC-VOL-147",
+        "ACC-VOL-148",
+        "ACC-VOL-149",
+        "ACC-VOL-150",
+        "ACC-VOL-151",
+        "ACC-VOL-152",
+        "ACC-VOL-153",
+        "ACC-VOL-154",
+        "ACC-VOL-155",
+        "ACC-VOL-156",
+        "ACC-VOL-157",
+        "ACC-VOL-158",
+        "ACC-VOL-161",
+        "ACC-VOL-162",
+        "ACC-VOL-171",
+        "ACC-VOL-179",
+        "ACC-VOL-006",
+        "ACC-VOL-019",
+        "ACC-VOL-022",
+        "ACC-VOL-026",
+        "ACC-VOL-070",
+        "ACC-VOL-071",
+        "ACC-VOL-072",
+        "ACC-VOL-093",
+        "ACC-VOL-099",
+        "ACC-VOL-105",
+        "ACC-VOL-106",
+        "ACC-VOL-107",
+        "ACC-VOL-108",
+        "ACC-VOL-109",
+        "ACC-VOL-111"
+      ],
+      "source_commit": "6f2cc7d07feba38ec2be19e9a8082981306f98e8",
+      "claim": "implementation-agent signoffs and audit history explicitly added for 35 landed volumes",
+      "recovery_granularity": "implementation_signoff_cohort",
+      "verification_state": "explicitly_unsigned",
+      "completion_state": "explicitly_open"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-032",
+        "ACC-VOL-196"
+      ],
+      "source_commit": "704b8f519cc7525441bb31c612b2d790bcde3eb4",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-097",
+        "ACC-VOL-098"
+      ],
+      "source_commit": "de822397823ddcb0f9c6b7711647de61cf6b70b1",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-100",
+        "ACC-VOL-101",
+        "ACC-VOL-102",
+        "ACC-VOL-103"
+      ],
+      "source_commit": "515092c37d13bc67b1480ede1c8abde94cc6face",
+      "claim": "implementation-sign repaired volumes explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-200"
+      ],
+      "source_commit": "fc3b6d17c7a7509f9c2ec658564fbc0016e7a0b1",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-003"
+      ],
+      "source_commit": "24fed75d93cc80cbc478c9c3704c29217ad42df0",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-039"
+      ],
+      "source_commit": "501852240108902baf293d9ad163b851ec4c37e3",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-001"
+      ],
+      "source_commit": "49b7f43cf818f1b472c1b12ce11ccf0b238b2acc",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-020"
+      ],
+      "source_commit": "ef8ed4bb1b77a339ee300cc0d5877032b3bb43ce",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-104"
+      ],
+      "source_commit": "9699a6109af52fc35e71ba5c0504dede7f6f2d5e",
+      "claim": "implementation-sign explicitly recorded",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "not_promoted_by_anchor"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-054"
+      ],
+      "source_commit": "9fa6af86306644656afaf5ecfe0acab75b85bad1",
+      "claim": "implementation signoff signed; verification explicitly UNSIGNED; completion open",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "explicitly_unsigned",
+      "completion_state": "explicitly_open"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-021"
+      ],
+      "source_commit": "d189a6cc169efae2382a334cefa0187084a1cb5e",
+      "claim": "implementation-agent signoff explicitly recorded; verifier UNSIGNED; completion open",
+      "recovery_granularity": "implementation_signoff_commit",
+      "verification_state": "explicitly_unsigned",
+      "completion_state": "explicitly_open"
+    },
+    {
+      "record_ids": [
+        "ACC-VOL-253"
+      ],
+      "source_commit": "8d74b7d3979421780d50b23fb5c10a06204a1219",
+      "claim": "independent CI verification and canonical completion explicitly recorded",
+      "recovery_granularity": "full_signature_history",
+      "verification_signer": "github-actions:P1 Reasoning Search Stop Policy Gate",
+      "signed_at_utc": "2026-09-27T22:57:02Z",
+      "evidence_head": "ff7d3e764d81c7f80bbc698516b03bd872c04961",
+      "verification_runs": [
+        36356867896
+      ],
+      "completed_at_utc": "2026-10-04T00:48:31Z",
+      "completion_commit": "fa9b64bd9f18c596d5d27f7480f2d490cf52af7e",
+      "automatic_signature_write_authorized": false
+    }
+  ],
+  "cohorts": [
+    {
+      "name": "terminal_p1_retro_sign",
+      "source_commit": "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2",
+      "scope": {
+        "canonical_p1_primary_volumes": 107,
+        "newly_implementation_signed": 103,
+        "already_completed": [
+          "ACC-VOL-013",
+          "ACC-VOL-014",
+          "ACC-VOL-253"
+        ],
+        "already_implementation_signed": [
+          "ACC-VOL-248"
+        ],
+        "p2_deferred_untouched": 314
+      },
+      "claim": "103 previously unsigned P1 primary volumes received identity-bound implementation signoffs",
+      "verification_signatures_added": 0,
+      "completion_checkboxes_added": 0,
+      "evidence_basis": {
+        "terminal_closure": "107/107",
+        "governed_risk_obligations": "513/513",
+        "blocking_unresolved": 0,
+        "unclassified": 0
+      },
+      "recovery_limitation": "Membership is exact. This cohort authorizes implementation-signoff presence only; verification/completion require separate evidence.",
+      "membership_derivation": {
+        "execution_map_ref": "machine/ai_p1_execution_map.json@c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2",
+        "rule": "unique lanes[*].primary_volume_refs minus VOL-013,VOL-014,VOL-253,VOL-248",
+        "derived_count": 103,
+        "derived_record_ids": [
+          "ACC-VOL-000",
+          "ACC-VOL-008",
+          "ACC-VOL-009",
+          "ACC-VOL-010",
+          "ACC-VOL-011",
+          "ACC-VOL-012",
+          "ACC-VOL-015",
+          "ACC-VOL-016",
+          "ACC-VOL-017",
+          "ACC-VOL-018",
+          "ACC-VOL-023",
+          "ACC-VOL-024",
+          "ACC-VOL-025",
+          "ACC-VOL-028",
+          "ACC-VOL-029",
+          "ACC-VOL-030",
+          "ACC-VOL-031",
+          "ACC-VOL-034",
+          "ACC-VOL-035",
+          "ACC-VOL-036",
+          "ACC-VOL-037",
+          "ACC-VOL-038",
+          "ACC-VOL-040",
+          "ACC-VOL-041",
+          "ACC-VOL-042",
+          "ACC-VOL-043",
+          "ACC-VOL-044",
+          "ACC-VOL-045",
+          "ACC-VOL-046",
+          "ACC-VOL-047",
+          "ACC-VOL-048",
+          "ACC-VOL-049",
+          "ACC-VOL-050",
+          "ACC-VOL-056",
+          "ACC-VOL-057",
+          "ACC-VOL-059",
+          "ACC-VOL-060",
+          "ACC-VOL-061",
+          "ACC-VOL-062",
+          "ACC-VOL-063",
+          "ACC-VOL-064",
+          "ACC-VOL-065",
+          "ACC-VOL-066",
+          "ACC-VOL-067",
+          "ACC-VOL-068",
+          "ACC-VOL-069",
+          "ACC-VOL-075",
+          "ACC-VOL-076",
+          "ACC-VOL-077",
+          "ACC-VOL-078",
+          "ACC-VOL-079",
+          "ACC-VOL-080",
+          "ACC-VOL-082",
+          "ACC-VOL-083",
+          "ACC-VOL-084",
+          "ACC-VOL-164",
+          "ACC-VOL-165",
+          "ACC-VOL-168",
+          "ACC-VOL-170",
+          "ACC-VOL-201",
+          "ACC-VOL-202",
+          "ACC-VOL-205",
+          "ACC-VOL-207",
+          "ACC-VOL-208",
+          "ACC-VOL-251",
+          "ACC-VOL-252",
+          "ACC-VOL-254",
+          "ACC-VOL-255",
+          "ACC-VOL-256",
+          "ACC-VOL-257",
+          "ACC-VOL-258",
+          "ACC-VOL-259",
+          "ACC-VOL-318",
+          "ACC-VOL-320",
+          "ACC-VOL-321",
+          "ACC-VOL-322",
+          "ACC-VOL-323",
+          "ACC-VOL-324",
+          "ACC-VOL-325",
+          "ACC-VOL-361",
+          "ACC-VOL-362",
+          "ACC-VOL-363",
+          "ACC-VOL-369",
+          "ACC-VOL-370",
+          "ACC-VOL-381",
+          "ACC-VOL-382",
+          "ACC-VOL-385",
+          "ACC-VOL-386",
+          "ACC-VOL-390",
+          "ACC-VOL-391",
+          "ACC-VOL-392",
+          "ACC-VOL-397",
+          "ACC-VOL-398",
+          "ACC-VOL-399",
+          "ACC-VOL-403",
+          "ACC-VOL-404",
+          "ACC-VOL-405",
+          "ACC-VOL-406",
+          "ACC-VOL-409",
+          "ACC-VOL-414",
+          "ACC-VOL-415",
+          "ACC-VOL-419",
+          "ACC-VOL-420"
+        ]
+      }
+    }
+  ]
+}

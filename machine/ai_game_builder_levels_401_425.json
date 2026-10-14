@@ -1,0 +1,1584 @@
+{
+  "schema_version": "skeleton.ai_game_builder_levels_shard.v1",
+  "manifest": "machine/ai_game_builder_500_levels.json",
+  "start": 401,
+  "end": 425,
+  "count": 25,
+  "levels": [
+    {
+      "id": "GBL-401",
+      "ordinal": 401,
+      "family_id": "GB41",
+      "family": "Autonomous Playtesting",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+      "owner": "skeleton/ai/simulation/game/replay_depth/batch_replay.py",
+      "batches": [
+        "B073",
+        "B072"
+      ],
+      "metrics": [
+        "coverage",
+        "softlock detection",
+        "exploit discovery",
+        "replay fidelity"
+      ],
+      "requirements": [
+        "Specify Autonomous Playtesting: Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+        "Declare target behaviors, coverage/quality dimensions, anti-goals, invariants and acceptance fixtures.",
+        "Bind skeleton/ai/simulation/game/replay_depth/batch_replay.py and B073, B072."
+      ],
+      "adversarial": [
+        "coverage illusion",
+        "looping agent",
+        "missed softlock",
+        "nonreproducible failure",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-401 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-402",
+      "ordinal": 402,
+      "family_id": "GB41",
+      "family": "Autonomous Playtesting",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+      "owner": "skeleton/ai/simulation/game/replay_depth/batch_replay.py",
+      "batches": [
+        "B073",
+        "B072"
+      ],
+      "metrics": [
+        "coverage",
+        "softlock detection",
+        "exploit discovery",
+        "replay fidelity"
+      ],
+      "requirements": [
+        "Define typed scenario/run/defect identities, seeds, state hashes, provenance and deterministic replay representation.",
+        "Separate observed evidence from model interpretation.",
+        "Define invalid/incomplete run states."
+      ],
+      "adversarial": [
+        "coverage illusion",
+        "looping agent",
+        "missed softlock",
+        "nonreproducible failure",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-402 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-403",
+      "ordinal": 403,
+      "family_id": "GB41",
+      "family": "Autonomous Playtesting",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+      "owner": "skeleton/ai/simulation/game/replay_depth/batch_replay.py",
+      "batches": [
+        "B073",
+        "B072"
+      ],
+      "metrics": [
+        "coverage",
+        "softlock detection",
+        "exploit discovery",
+        "replay fidelity"
+      ],
+      "requirements": [
+        "Execute through canonical simulation/repair paths from ProjectDNA, canon, champion and governed evidence.",
+        "Record agent/model/tool transformations and mutation boundaries.",
+        "Retain baseline/reference runs and rollback-safe changes."
+      ],
+      "adversarial": [
+        "coverage illusion",
+        "looping agent",
+        "missed softlock",
+        "nonreproducible failure",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-403 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-404",
+      "ordinal": 404,
+      "family_id": "GB41",
+      "family": "Autonomous Playtesting",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+      "owner": "skeleton/ai/simulation/game/replay_depth/batch_replay.py",
+      "batches": [
+        "B073",
+        "B072"
+      ],
+      "metrics": [
+        "coverage",
+        "softlock detection",
+        "exploit discovery",
+        "replay fidelity"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote with rival role rotation.",
+        "Opponent actively hunts missed failures, exploit paths, unfair tuning or incomplete fixes and submits a better candidate.",
+        "Promotion requires deterministic evidence, not model confidence."
+      ],
+      "adversarial": [
+        "coverage illusion",
+        "looping agent",
+        "missed softlock",
+        "nonreproducible failure",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-404 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-405",
+      "ordinal": 405,
+      "family_id": "GB41",
+      "family": "Autonomous Playtesting",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+      "owner": "skeleton/ai/simulation/game/replay_depth/batch_replay.py",
+      "batches": [
+        "B073",
+        "B072"
+      ],
+      "metrics": [
+        "coverage",
+        "softlock detection",
+        "exploit discovery",
+        "replay fidelity"
+      ],
+      "requirements": [
+        "Verify across quests, economy, combat, world/narrative state, saves, controls, accessibility and performance.",
+        "Propagate discovered defects/repairs to coupled systems.",
+        "Reject local repair/balance wins that create long-form regressions."
+      ],
+      "adversarial": [
+        "coverage illusion",
+        "looping agent",
+        "missed softlock",
+        "nonreproducible failure",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-405 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-406",
+      "ordinal": 406,
+      "family_id": "GB41",
+      "family": "Autonomous Playtesting",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+      "owner": "skeleton/ai/simulation/game/replay_depth/batch_replay.py",
+      "batches": [
+        "B073",
+        "B072"
+      ],
+      "metrics": [
+        "coverage",
+        "softlock detection",
+        "exploit discovery",
+        "replay fidelity"
+      ],
+      "requirements": [
+        "Run deterministic scenario matrices, fuzz/property tests, autonomous playthroughs and replay validation.",
+        "Attack coverage illusion, looping agent, missed softlock, nonreproducible failure.",
+        "Persist minimized seeds/traces as permanent regressions."
+      ],
+      "adversarial": [
+        "coverage illusion",
+        "looping agent",
+        "missed softlock",
+        "nonreproducible failure",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-406 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-407",
+      "ordinal": 407,
+      "family_id": "GB41",
+      "family": "Autonomous Playtesting",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+      "owner": "skeleton/ai/simulation/game/replay_depth/batch_replay.py",
+      "batches": [
+        "B073",
+        "B072"
+      ],
+      "metrics": [
+        "coverage",
+        "softlock detection",
+        "exploit discovery",
+        "replay fidelity"
+      ],
+      "requirements": [
+        "Improve coverage, softlock detection, exploit discovery, replay fidelity plus player value, accessibility, performance and maintainability jointly.",
+        "Reject test-count inflation without meaningful state-space coverage.",
+        "Preserve champion unless gain is Pareto-safe."
+      ],
+      "adversarial": [
+        "coverage illusion",
+        "looping agent",
+        "missed softlock",
+        "nonreproducible failure",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-407 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-408",
+      "ordinal": 408,
+      "family_id": "GB41",
+      "family": "Autonomous Playtesting",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+      "owner": "skeleton/ai/simulation/game/replay_depth/batch_replay.py",
+      "batches": [
+        "B073",
+        "B072"
+      ],
+      "metrics": [
+        "coverage",
+        "softlock detection",
+        "exploit discovery",
+        "replay fidelity"
+      ],
+      "requirements": [
+        "Support scenario/repair semantic diff, rollback, migration and checkpoint resume.",
+        "Resume exact seed/canon/rival/evaluator/artifact identities.",
+        "Never lose the reproducer for a promoted repair or balance change."
+      ],
+      "adversarial": [
+        "coverage illusion",
+        "looping agent",
+        "missed softlock",
+        "nonreproducible failure",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-408 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-409",
+      "ordinal": 409,
+      "family_id": "GB41",
+      "family": "Autonomous Playtesting",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+      "owner": "skeleton/ai/simulation/game/replay_depth/batch_replay.py",
+      "batches": [
+        "B073",
+        "B072"
+      ],
+      "metrics": [
+        "coverage",
+        "softlock detection",
+        "exploit discovery",
+        "replay fidelity"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000 with exactly three stages per round and no wall-clock deadline.",
+        "Explore long-tail state spaces under bounded compute/storage/concurrency.",
+        "Detect evaluator adaptation, repeated-path bias, coverage saturation and repair churn."
+      ],
+      "adversarial": [
+        "coverage illusion",
+        "looping agent",
+        "missed softlock",
+        "nonreproducible failure",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-409 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "deep-effort exploration report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-410",
+      "ordinal": 410,
+      "family_id": "GB41",
+      "family": "Autonomous Playtesting",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Run autonomous agents through exploration, goals, adversarial behavior, stress paths and failure hunting with replayable evidence.",
+      "owner": "skeleton/ai/simulation/game/replay_depth/batch_replay.py",
+      "batches": [
+        "B073",
+        "B072"
+      ],
+      "metrics": [
+        "coverage",
+        "softlock detection",
+        "exploit discovery",
+        "replay fidelity"
+      ],
+      "requirements": [
+        "Require independent exact-head evidence that failures are reproducible and promoted fixes/tuning improve protected metrics.",
+        "Block state, accessibility, performance, rights or regression failures.",
+        "Expire qualification on material implementation/model/canon/evaluator drift."
+      ],
+      "adversarial": [
+        "coverage illusion",
+        "looping agent",
+        "missed softlock",
+        "nonreproducible failure",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-410 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "deep-effort exploration report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-411",
+      "ordinal": 411,
+      "family_id": "GB42",
+      "family": "Balance & Difficulty",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/economy_sim.py",
+      "batches": [
+        "B029",
+        "B073"
+      ],
+      "metrics": [
+        "strategy diversity",
+        "difficulty curve",
+        "fairness",
+        "degenerate-strategy resistance"
+      ],
+      "requirements": [
+        "Specify Balance & Difficulty: Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+        "Declare target behaviors, coverage/quality dimensions, anti-goals, invariants and acceptance fixtures.",
+        "Bind skeleton/ai/simulation/game/mechanics_depth/economy_sim.py and B029, B073."
+      ],
+      "adversarial": [
+        "dominant build",
+        "difficulty cliff",
+        "resource starvation",
+        "fake choice",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-411 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-412",
+      "ordinal": 412,
+      "family_id": "GB42",
+      "family": "Balance & Difficulty",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/economy_sim.py",
+      "batches": [
+        "B029",
+        "B073"
+      ],
+      "metrics": [
+        "strategy diversity",
+        "difficulty curve",
+        "fairness",
+        "degenerate-strategy resistance"
+      ],
+      "requirements": [
+        "Define typed scenario/run/defect identities, seeds, state hashes, provenance and deterministic replay representation.",
+        "Separate observed evidence from model interpretation.",
+        "Define invalid/incomplete run states."
+      ],
+      "adversarial": [
+        "dominant build",
+        "difficulty cliff",
+        "resource starvation",
+        "fake choice",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-412 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-413",
+      "ordinal": 413,
+      "family_id": "GB42",
+      "family": "Balance & Difficulty",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/economy_sim.py",
+      "batches": [
+        "B029",
+        "B073"
+      ],
+      "metrics": [
+        "strategy diversity",
+        "difficulty curve",
+        "fairness",
+        "degenerate-strategy resistance"
+      ],
+      "requirements": [
+        "Execute through canonical simulation/repair paths from ProjectDNA, canon, champion and governed evidence.",
+        "Record agent/model/tool transformations and mutation boundaries.",
+        "Retain baseline/reference runs and rollback-safe changes."
+      ],
+      "adversarial": [
+        "dominant build",
+        "difficulty cliff",
+        "resource starvation",
+        "fake choice",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-413 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-414",
+      "ordinal": 414,
+      "family_id": "GB42",
+      "family": "Balance & Difficulty",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/economy_sim.py",
+      "batches": [
+        "B029",
+        "B073"
+      ],
+      "metrics": [
+        "strategy diversity",
+        "difficulty curve",
+        "fairness",
+        "degenerate-strategy resistance"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote with rival role rotation.",
+        "Opponent actively hunts missed failures, exploit paths, unfair tuning or incomplete fixes and submits a better candidate.",
+        "Promotion requires deterministic evidence, not model confidence."
+      ],
+      "adversarial": [
+        "dominant build",
+        "difficulty cliff",
+        "resource starvation",
+        "fake choice",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-414 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-415",
+      "ordinal": 415,
+      "family_id": "GB42",
+      "family": "Balance & Difficulty",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/economy_sim.py",
+      "batches": [
+        "B029",
+        "B073"
+      ],
+      "metrics": [
+        "strategy diversity",
+        "difficulty curve",
+        "fairness",
+        "degenerate-strategy resistance"
+      ],
+      "requirements": [
+        "Verify across quests, economy, combat, world/narrative state, saves, controls, accessibility and performance.",
+        "Propagate discovered defects/repairs to coupled systems.",
+        "Reject local repair/balance wins that create long-form regressions."
+      ],
+      "adversarial": [
+        "dominant build",
+        "difficulty cliff",
+        "resource starvation",
+        "fake choice",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-415 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-416",
+      "ordinal": 416,
+      "family_id": "GB42",
+      "family": "Balance & Difficulty",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/economy_sim.py",
+      "batches": [
+        "B029",
+        "B073"
+      ],
+      "metrics": [
+        "strategy diversity",
+        "difficulty curve",
+        "fairness",
+        "degenerate-strategy resistance"
+      ],
+      "requirements": [
+        "Run deterministic scenario matrices, fuzz/property tests, autonomous playthroughs and replay validation.",
+        "Attack dominant build, difficulty cliff, resource starvation, fake choice.",
+        "Persist minimized seeds/traces as permanent regressions."
+      ],
+      "adversarial": [
+        "dominant build",
+        "difficulty cliff",
+        "resource starvation",
+        "fake choice",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-416 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-417",
+      "ordinal": 417,
+      "family_id": "GB42",
+      "family": "Balance & Difficulty",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/economy_sim.py",
+      "batches": [
+        "B029",
+        "B073"
+      ],
+      "metrics": [
+        "strategy diversity",
+        "difficulty curve",
+        "fairness",
+        "degenerate-strategy resistance"
+      ],
+      "requirements": [
+        "Improve strategy diversity, difficulty curve, fairness, degenerate-strategy resistance plus player value, accessibility, performance and maintainability jointly.",
+        "Reject test-count inflation without meaningful state-space coverage.",
+        "Preserve champion unless gain is Pareto-safe."
+      ],
+      "adversarial": [
+        "dominant build",
+        "difficulty cliff",
+        "resource starvation",
+        "fake choice",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-417 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-418",
+      "ordinal": 418,
+      "family_id": "GB42",
+      "family": "Balance & Difficulty",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/economy_sim.py",
+      "batches": [
+        "B029",
+        "B073"
+      ],
+      "metrics": [
+        "strategy diversity",
+        "difficulty curve",
+        "fairness",
+        "degenerate-strategy resistance"
+      ],
+      "requirements": [
+        "Support scenario/repair semantic diff, rollback, migration and checkpoint resume.",
+        "Resume exact seed/canon/rival/evaluator/artifact identities.",
+        "Never lose the reproducer for a promoted repair or balance change."
+      ],
+      "adversarial": [
+        "dominant build",
+        "difficulty cliff",
+        "resource starvation",
+        "fake choice",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-418 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-419",
+      "ordinal": 419,
+      "family_id": "GB42",
+      "family": "Balance & Difficulty",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/economy_sim.py",
+      "batches": [
+        "B029",
+        "B073"
+      ],
+      "metrics": [
+        "strategy diversity",
+        "difficulty curve",
+        "fairness",
+        "degenerate-strategy resistance"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000 with exactly three stages per round and no wall-clock deadline.",
+        "Explore long-tail state spaces under bounded compute/storage/concurrency.",
+        "Detect evaluator adaptation, repeated-path bias, coverage saturation and repair churn."
+      ],
+      "adversarial": [
+        "dominant build",
+        "difficulty cliff",
+        "resource starvation",
+        "fake choice",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-419 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "deep-effort exploration report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-420",
+      "ordinal": 420,
+      "family_id": "GB42",
+      "family": "Balance & Difficulty",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Simulate and tune challenge, resource curves, strategy viability, fairness, mastery and accessible difficulty options.",
+      "owner": "skeleton/ai/simulation/game/mechanics_depth/economy_sim.py",
+      "batches": [
+        "B029",
+        "B073"
+      ],
+      "metrics": [
+        "strategy diversity",
+        "difficulty curve",
+        "fairness",
+        "degenerate-strategy resistance"
+      ],
+      "requirements": [
+        "Require independent exact-head evidence that failures are reproducible and promoted fixes/tuning improve protected metrics.",
+        "Block state, accessibility, performance, rights or regression failures.",
+        "Expire qualification on material implementation/model/canon/evaluator drift."
+      ],
+      "adversarial": [
+        "dominant build",
+        "difficulty cliff",
+        "resource starvation",
+        "fake choice",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-420 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "deep-effort exploration report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-421",
+      "ordinal": 421,
+      "family_id": "GB43",
+      "family": "Defect Repair & Regression Prevention",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Localize gameplay/content defects, generate minimal repairs, validate cross-system impact and prevent recurrence.",
+      "owner": "skeleton/ai/runtime/intelligence/game_logic_repair.py",
+      "batches": [
+        "B020",
+        "B076"
+      ],
+      "metrics": [
+        "repair precision",
+        "regression escape rate",
+        "change minimality",
+        "rollback success"
+      ],
+      "requirements": [
+        "Specify Defect Repair & Regression Prevention: Localize gameplay/content defects, generate minimal repairs, validate cross-system impact and prevent recurrence.",
+        "Declare target behaviors, coverage/quality dimensions, anti-goals, invariants and acceptance fixtures.",
+        "Bind skeleton/ai/runtime/intelligence/game_logic_repair.py and B020, B076."
+      ],
+      "adversarial": [
+        "symptom-only fix",
+        "regression cascade",
+        "overbroad patch",
+        "false repair",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-421 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-422",
+      "ordinal": 422,
+      "family_id": "GB43",
+      "family": "Defect Repair & Regression Prevention",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Localize gameplay/content defects, generate minimal repairs, validate cross-system impact and prevent recurrence.",
+      "owner": "skeleton/ai/runtime/intelligence/game_logic_repair.py",
+      "batches": [
+        "B020",
+        "B076"
+      ],
+      "metrics": [
+        "repair precision",
+        "regression escape rate",
+        "change minimality",
+        "rollback success"
+      ],
+      "requirements": [
+        "Define typed scenario/run/defect identities, seeds, state hashes, provenance and deterministic replay representation.",
+        "Separate observed evidence from model interpretation.",
+        "Define invalid/incomplete run states."
+      ],
+      "adversarial": [
+        "symptom-only fix",
+        "regression cascade",
+        "overbroad patch",
+        "false repair",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-422 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-423",
+      "ordinal": 423,
+      "family_id": "GB43",
+      "family": "Defect Repair & Regression Prevention",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Localize gameplay/content defects, generate minimal repairs, validate cross-system impact and prevent recurrence.",
+      "owner": "skeleton/ai/runtime/intelligence/game_logic_repair.py",
+      "batches": [
+        "B020",
+        "B076"
+      ],
+      "metrics": [
+        "repair precision",
+        "regression escape rate",
+        "change minimality",
+        "rollback success"
+      ],
+      "requirements": [
+        "Execute through canonical simulation/repair paths from ProjectDNA, canon, champion and governed evidence.",
+        "Record agent/model/tool transformations and mutation boundaries.",
+        "Retain baseline/reference runs and rollback-safe changes."
+      ],
+      "adversarial": [
+        "symptom-only fix",
+        "regression cascade",
+        "overbroad patch",
+        "false repair",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-423 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-424",
+      "ordinal": 424,
+      "family_id": "GB43",
+      "family": "Defect Repair & Regression Prevention",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Localize gameplay/content defects, generate minimal repairs, validate cross-system impact and prevent recurrence.",
+      "owner": "skeleton/ai/runtime/intelligence/game_logic_repair.py",
+      "batches": [
+        "B020",
+        "B076"
+      ],
+      "metrics": [
+        "repair precision",
+        "regression escape rate",
+        "change minimality",
+        "rollback success"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote with rival role rotation.",
+        "Opponent actively hunts missed failures, exploit paths, unfair tuning or incomplete fixes and submits a better candidate.",
+        "Promotion requires deterministic evidence, not model confidence."
+      ],
+      "adversarial": [
+        "symptom-only fix",
+        "regression cascade",
+        "overbroad patch",
+        "false repair",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-424 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-425",
+      "ordinal": 425,
+      "family_id": "GB43",
+      "family": "Defect Repair & Regression Prevention",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Localize gameplay/content defects, generate minimal repairs, validate cross-system impact and prevent recurrence.",
+      "owner": "skeleton/ai/runtime/intelligence/game_logic_repair.py",
+      "batches": [
+        "B020",
+        "B076"
+      ],
+      "metrics": [
+        "repair precision",
+        "regression escape rate",
+        "change minimality",
+        "rollback success"
+      ],
+      "requirements": [
+        "Verify across quests, economy, combat, world/narrative state, saves, controls, accessibility and performance.",
+        "Propagate discovered defects/repairs to coupled systems.",
+        "Reject local repair/balance wins that create long-form regressions."
+      ],
+      "adversarial": [
+        "symptom-only fix",
+        "regression cascade",
+        "overbroad patch",
+        "false repair",
+        "coverage gaming",
+        "local fix damaging whole-game behavior"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "replayable evidence",
+        "no critical regression",
+        "bounded resources",
+        "cross-system consistency",
+        "rights/provenance preserved",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-425 fixture",
+        "exact-head identity",
+        "rival transcript",
+        "coverage/regression report",
+        "replay evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ]
+}

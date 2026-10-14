@@ -1,4 +1,4 @@
-.PHONY: install dev app app-preload app-setup app-install windows-installer app-check app-status app-down test smoke verify quality ci lint clean
+.PHONY: install dev app app-preload app-setup app-install windows-installer app-check app-status app-down test test-feature smoke verify quality ci lint clean
 
 install:
 	pip install -r requirements.txt
@@ -31,7 +31,10 @@ app-down:
 	python -m skeleton app down
 
 test:
-	python -m pytest skeleton/testing -v --tb=short || python -m unittest discover skeleton/testing -v
+	python -m pytest skeleton/testing -v --tb=short
+
+test-feature:
+	python scripts/run_feature_unit_tests.py --feature "$(FEATURE)"
 
 smoke:
 	bash scripts/cockpit-smoke.sh

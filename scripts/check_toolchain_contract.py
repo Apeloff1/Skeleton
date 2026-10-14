@@ -70,7 +70,7 @@ DEPENDENCY_SECURITY_MARKERS = (
     "python-sbom.cdx.json",
     "Enforce Python vulnerability policy",
     "yarn audit --groups dependencies --level high --json",
-    "anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26",
+    "anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c",
     "format: cyclonedx-json",
     "frontend-sbom.cdx.json",
     "Enforce JavaScript vulnerability policy",
@@ -398,13 +398,21 @@ def main() -> int:
     require(
         pinned_action_count(ci, "actions/checkout", "v7.0.1") > 0
         and pinned_action_count(ci, "actions/setup-python", "v7.0.0") > 0
-        and pinned_action_count(ci, "actions/setup-node", "v7.0.0") > 0,
+        and pinned_action_count(ci, "actions/setup-node", "v7.1.0") > 0,
         "CI must use immutable proven core action generations",
         failures,
     )
+    # These upstream release SHAs are immutable. Match exact identities,
+    # not merely an arbitrary 40-hex ref followed by a version comment.
     require(
-        pinned_action_count(ci, "astral-sh/setup-uv", "v10.2.0") == 3,
-        "CI must use exactly three immutable setup-uv v10.2.0 sites backed by the repository uv pin",
+        ci.count("actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0") == 1
+        and ci.count("astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0") == 3,
+        "CI Node/uv action SHA identities must match verified upstream release pins",
+        failures,
+    )
+    require(
+        pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.0") == 3,
+        "CI must use exactly three immutable setup-uv v10.3.0 sites backed by the repository uv pin",
         failures,
     )
     ruff_command = f'uvx --from "ruff=={RUFF_CI_VERSION}" ruff check . --output-format=github'

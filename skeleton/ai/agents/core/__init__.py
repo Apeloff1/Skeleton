@@ -1,6 +1,18 @@
 """Skeleton agent orchestration primitives."""
 
 from skeleton.automation.agents.mesh import AgentMesh
+from skeleton.automation.agents.agent_runtime import (
+    AGENT_RUNTIME_SCHEMA_VERSION,
+    AgentCheckpoint,
+    AgentDescriptor,
+    AgentLifecycleState,
+    AgentResourceUsage,
+    AgentRuntimeConflict,
+    AgentRuntimeDenied,
+    AgentRuntimeError,
+    DurableAgentSupervisor,
+    SQLiteAgentRuntimeStore,
+)
 
 from skeleton.automation.agents.coordination import AgentPool, Coordinator, Task, TaskStatus
 from skeleton.automation.agents.delegation_qualification import (
@@ -26,6 +38,18 @@ from skeleton.automation.agents.autonomy_control import (
     AutonomyTransitionDecision,
     TransitionDisposition,
     evaluate_autonomy_transition,
+)
+from skeleton.automation.agents.long_horizon import (
+    Checkpoint as LongHorizonCheckpoint,
+    LongHorizonConflict,
+    LongHorizonError,
+    LongRunningOperation,
+    LongRunningState,
+    OverrideDecision,
+    PersistentLongHorizonScheduler,
+    ReauthorizationRequired,
+    ResumeToken,
+    SqliteLongHorizonStore,
 )
 from skeleton.automation.agents.human_control import (
     HUMAN_CONTROL_ACCOUNTABILITY_ID,
@@ -105,6 +129,10 @@ from skeleton.automation.agents.swarm_runtime import AdmissionError, LeaseError,
 
 __all__ = [
     "AgentMesh",
+    "AGENT_RUNTIME_SCHEMA_VERSION", "AgentCheckpoint", "AgentDescriptor",
+    "AgentLifecycleState", "AgentResourceUsage", "AgentRuntimeConflict",
+    "AgentRuntimeDenied", "AgentRuntimeError", "DurableAgentSupervisor",
+    "SQLiteAgentRuntimeStore",
     "Coordinator", "AgentPool", "Task", "TaskStatus", "MeshBridge",
     "AUTONOMY_CONTROL_ACCOUNTABILITY_ID", "AUTONOMY_CONTROL_SCHEMA_VERSION",
     "AUTONOMY_CONTROL_TASK_ID", "AutonomyAuthorization", "AutonomyControlError",
@@ -114,6 +142,10 @@ __all__ = [
     "HUMAN_CONTROL_TASK_ID", "HumanControlAction", "HumanControlCommand",
     "HumanControlDecision", "HumanControlError", "HumanControlState",
     "evaluate_human_control",
+    "LongHorizonCheckpoint", "LongHorizonConflict", "LongHorizonError",
+    "LongRunningOperation", "LongRunningState", "OverrideDecision",
+    "PersistentLongHorizonScheduler", "ReauthorizationRequired",
+    "ResumeToken", "SqliteLongHorizonStore",
     "BLAST_RADIUS_ACCOUNTABILITY_ID", "BLAST_RADIUS_SCHEMA_VERSION",
     "BLAST_RADIUS_TASK_ID", "ActionRiskProfile", "AdversarialAlignmentReport",
     "BlastRadiusDecision", "BlastRadiusError", "BlastRadiusPolicy", "ImpactClass",

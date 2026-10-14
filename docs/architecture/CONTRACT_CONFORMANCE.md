@@ -1,6 +1,6 @@
 # Canonical Contract Conformance
 
-<!-- machine-git-blob: machine/contract_conformance.json@7d8c895310a299a66ecfe5157f8288c3d9f12380 -->
+<!-- machine-git-blob: machine/contract_conformance.json@babaa98f4a0029e5215c6db9ea756401a9f108a1 -->
 
 Machine authority: `machine/contract_conformance.json`
 

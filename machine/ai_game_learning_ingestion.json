@@ -1,0 +1,75 @@
+{
+  "schema_version": "skeleton.ai.game_learning_ingestion.v1",
+  "status": "implementation_candidate",
+  "owner": "skeleton/jeeves/game_learning_ingestion.py",
+  "mirror": "skeleton/ai/agents/jeeves/game_learning_ingestion.py",
+  "parent_contract": "machine/ai_game_learning.json",
+  "scope": "Bounded provider-neutral normalization of explicit user-provided game sources and exact locally gathered knowledge records under the existing Jeeves owner.",
+  "authority": "Parsing cannot confer rights. The backend verifies tenant/owner and live source rights before constructing provenance. Explicit upload rights acknowledgement is retained as an attestation; collected record claims remain untrusted evidence rather than verified fact or model weights.",
+  "supported_rom_metadata": [
+    "iNES and NES 2.0",
+    "Game Boy and Game Boy Color",
+    "SNES LoROM/HiROM/ExHiROM structural headers",
+    "Mega Drive/Genesis plain and SMD cartridge dumps",
+    "Game Boy Advance structural headers",
+    "Nintendo 64 byte-order header variants"
+  ],
+  "project_sources": [
+    "bounded data-only JSON game/project manifests",
+    "static UTF-8 source/text files",
+    "ZIP project inventories",
+    "strict bounded offline trace documents"
+  ],
+  "knowledge_adapter": "DragonGameKnowledgeAdapter reads the existing academy SQLite connection, with the academy-derived owner hash, exact dragon:<source_id>:<revision_sha256> reference, canonical family reading and currently consented lesson. Existing DragonFamilyCustodyBridge and DragonKnowledgeLedger must corroborate the review and full current evidence digest. Only exact bounded acquired observations, source URL/topics, reviewed mechanics and uncertainty semantics enter a normalized record. This does not grant copyright rights; backend actor/tenant/current rights remain mandatory. assert_current revalidates exact bundle authority before reuse. Generic exact local record normalization remains available. Neither adapter fetches URLs, starts scrapers nor treats title-only links as acquired content.",
+  "feature_grounding": "Platform and cartridge layout derive from bytes; era distinguishes hardware metadata from actual declared release year. Genre and mechanics derive only from explicit record fields or bounded lexical spans labeled as cues. Static metadata cannot prove game behavior, genre, copyright clearance, emulator compatibility or learning performance.",
+  "archive_rules": [
+    "No filesystem extraction or code execution",
+    "Reject traversal, absolute/drive paths, symlinks, encryption, duplicate normalized names and nested archives",
+    "Enforce member counts, expanded bytes and compression ratios before reading members",
+    "Source code is inspected as text only",
+    "Preflight bounded classic-ZIP central directory before ZipFile materializes entry objects; reject ZIP64 and split directories"
+  ],
+  "limits": {
+    "source_bytes": 16777216,
+    "archive_members": 96,
+    "archive_expanded_bytes": 16777216,
+    "compression_ratio": 100,
+    "source_text_file_bytes": 128000,
+    "source_text_tree_bytes": 1000000,
+    "json_nesting": 24,
+    "json_nodes": 100000,
+    "documents": 64,
+    "document_characters": 32000,
+    "document_total_characters": 512000,
+    "features_bytes": 16384,
+    "trace_transitions": 10000,
+    "trace_episode_steps": 4096,
+    "trace_actions": 32,
+    "trace_observation_features": 32,
+    "dragon_claims": 20,
+    "dragon_claim_evidence_passes": 256,
+    "dragon_source_observations": 64,
+    "dragon_list_refs": 64
+  },
+  "interfaces": [
+    "GameSourceProvenance",
+    "GameSourceBundle",
+    "GameLearningIngestor.ingest_bytes",
+    "GameLearningIngestor.ingest_dragon_record",
+    "DragonGameKnowledgeAdapter.resolve_record",
+    "DragonGameKnowledgeAdapter.resolve",
+    "DragonGameKnowledgeAdapter.list_sources",
+    "DragonGameKnowledgeAdapter.assert_current",
+    "ingest_source"
+  ],
+  "failure": "Malformed, unsupported, truncated, over-limit, ambiguous or wrongly scoped input fails with a typed ingestion error. Unsupported executable/ROM behavior is not fabricated.",
+  "validation": "User explicitly requested no added or executed tests in this implementation window. Static compile, formatting and source review only; fresh runtime qualification remains pending.",
+  "production_emulator_claim": false,
+  "masterplan_completion_authorized": false,
+  "dependencies": [
+    "skeleton/ai/webcrawler/dragon_family_custody_bridge.py",
+    "skeleton/ai/webcrawler/dragon_knowledge_ledger.py",
+    "skeleton/ai/webcrawler/dragon_family.py",
+    "backend/routes/dragon_academy.py"
+  ]
+}

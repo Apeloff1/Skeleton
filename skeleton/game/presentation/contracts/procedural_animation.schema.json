@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-12:procedural_animation:v1",
+  "title": "FLGB-12 procedural animation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "layer_id",
+    "algorithm_id",
+    "seed_digest",
+    "input_pose_digest",
+    "parameter_digest",
+    "weight_ppm"
+  ],
+  "properties": {
+    "layer_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "algorithm_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "seed_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "input_pose_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "parameter_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "weight_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    }
+  }
+}

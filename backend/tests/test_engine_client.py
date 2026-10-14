@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import httpx
 import pytest
@@ -78,7 +78,7 @@ def _context() -> ContextEnvelope:
         compiler_version="test-compiler-v1",
     )
     return ContextEnvelope(
-        context_id=str(uuid4()),
+        context_id=str(uuid5(NAMESPACE_URL, "skeleton-context:" + digest)),
         operation_id=operation_id,
         execution_id=execution_id,
         turn_id=turn_id,
@@ -1414,8 +1414,18 @@ def test_command_from_context_requires_positive_compiled_output_reserve() -> Non
         max_artifact_tokens=context.budget.max_artifact_tokens,
         max_tool_result_tokens=context.budget.max_tool_result_tokens,
     )
+    rebound_digest = context_digest_payload(
+        operation_id=context.operation_id,
+        execution_id=context.execution_id,
+        turn_id=context.turn_id,
+        tenant_id=context.tenant_id,
+        budget=zero_budget,
+        selected=context.selected_segments,
+        omitted_segment_ids=context.omitted_segment_ids,
+        compiler_version=context.compiler_version,
+    )
     rebound = ContextEnvelope(
-        context_id=context.context_id,
+        context_id=str(uuid5(NAMESPACE_URL, "skeleton-context:" + rebound_digest)),
         operation_id=context.operation_id,
         execution_id=context.execution_id,
         turn_id=context.turn_id,
@@ -1428,16 +1438,7 @@ def test_command_from_context_requires_positive_compiled_output_reserve() -> Non
         omitted_segment_ids=context.omitted_segment_ids,
         omission_reasons=context.omission_reasons,
         source_snapshot=context.source_snapshot,
-        context_digest=context_digest_payload(
-            operation_id=context.operation_id,
-            execution_id=context.execution_id,
-            turn_id=context.turn_id,
-            tenant_id=context.tenant_id,
-            budget=zero_budget,
-            selected=context.selected_segments,
-            omitted_segment_ids=context.omitted_segment_ids,
-            compiler_version=context.compiler_version,
-        ),
+        context_digest=rebound_digest,
         compiled_at=context.compiled_at,
         compiler_version=context.compiler_version,
     )

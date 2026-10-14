@@ -234,13 +234,168 @@ class ChaosCampaign:
     campaign_id: str
     faults: tuple[Fault, ...]
     rollback_ref: str
+    hypothesis: str = "bounded fault preserves recovery objective"
+    max_affected_targets: int = 1
+    max_total_fault_seconds: int = 60
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "campaign_id", _text(self.campaign_id, "campaign_id"))
         object.__setattr__(self, "rollback_ref", _text(self.rollback_ref, "rollback_ref"))
+        object.__setattr__(self, "hypothesis", _text(self.hypothesis, "hypothesis"))
         ids = [fault.fault_id for fault in self.faults]
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("chaos campaign needs unique faults")
+        for name in ("max_affected_targets", "max_total_fault_seconds"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError(f"{name} must be positive integer")
+        if len({fault.target for fault in self.faults}) > self.max_affected_targets:
+            raise ValueError("chaos campaign exceeds target blast radius")
+        if sum(fault.bounded_seconds for fault in self.faults) > self.max_total_fault_seconds:
+            raise ValueError("chaos campaign exceeds fault-time budget")
+
+    @property
+    def digest(self) -> str:
+        return sha256_json({
+            "campaign_id": self.campaign_id,
+            "hypothesis": self.hypothesis,
+            "rollback_ref": self.rollback_ref,
+            "max_affected_targets": self.max_affected_targets,
+            "max_total_fault_seconds": self.max_total_fault_seconds,
+            "faults": [
+                {
+                    "fault_id": fault.fault_id,
+                    "target": fault.target,
+                    "kind": fault.kind,
+                    "bounded_seconds": fault.bounded_seconds,
+                }
+                for fault in self.faults
+            ],
+        })
+
+
+@dataclass(frozen=True, slots=True)
+class ChaosAuthority:
+    principal_id: str
+    allowed_targets: tuple[str, ...]
+    allowed_fault_kinds: tuple[str, ...]
+    max_fault_seconds: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "principal_id", _text(self.principal_id, "principal_id"))
+        if not self.allowed_targets or len(self.allowed_targets) != len(set(self.allowed_targets)):
+            raise ValueError("allowed_targets must be unique and non-empty")
+        if not self.allowed_fault_kinds or len(self.allowed_fault_kinds) != len(set(self.allowed_fault_kinds)):
+            raise ValueError("allowed_fault_kinds must be unique and non-empty")
+        if isinstance(self.max_fault_seconds, bool) or not isinstance(self.max_fault_seconds, int) or self.max_fault_seconds < 1:
+            raise ValueError("max_fault_seconds must be positive integer")
+
+    def authorize(self, campaign: ChaosCampaign) -> None:
+        for fault in campaign.faults:
+            if fault.target not in self.allowed_targets:
+                raise PermissionError(f"chaos target not authorized: {fault.target}")
+            if fault.kind not in self.allowed_fault_kinds:
+                raise PermissionError(f"chaos fault kind not authorized: {fault.kind}")
+            if fault.bounded_seconds > self.max_fault_seconds:
+                raise PermissionError(f"chaos fault duration not authorized: {fault.fault_id}")
+
+
+@dataclass(frozen=True, slots=True)
+class ChaosObservation:
+    campaign_id: str
+    observed_at: int
+    healthy: bool
+    error_budget_remaining: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "campaign_id", _text(self.campaign_id, "campaign_id"))
+        if isinstance(self.observed_at, bool) or not isinstance(self.observed_at, int) or self.observed_at < 0:
+            raise ValueError("observed_at must be non-negative integer")
+        if not isinstance(self.healthy, bool):
+            raise TypeError("healthy must be boolean")
+        object.__setattr__(self, "error_budget_remaining", _ratio(self.error_budget_remaining, "error_budget_remaining"))
+
+
+@dataclass(frozen=True, slots=True)
+class ChaosReceipt:
+    campaign_digest: str
+    principal_id: str
+    decision: str
+    observation_digest: str
+    rollback_ref: str
+
+    def __post_init__(self) -> None:
+        for name in ("campaign_digest", "observation_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or len(value) != 64:
+                raise ValueError(f"{name} must be sha256")
+        object.__setattr__(self, "principal_id", _text(self.principal_id, "principal_id"))
+        object.__setattr__(self, "rollback_ref", _text(self.rollback_ref, "rollback_ref"))
+        if self.decision not in {"continue", "abort"}:
+            raise ValueError("decision must be continue or abort")
+
+    @property
+    def digest(self) -> str:
+        return sha256_json({
+            "campaign_digest": self.campaign_digest,
+            "principal_id": self.principal_id,
+            "decision": self.decision,
+            "observation_digest": self.observation_digest,
+            "rollback_ref": self.rollback_ref,
+        })
+
+
+class ChaosController:
+    """Admission and abort boundary. It never injects faults itself."""
+
+    def __init__(self, *, minimum_error_budget: float = 0.25) -> None:
+        self.minimum_error_budget = _ratio(minimum_error_budget, "minimum_error_budget")
+        self._decisions: dict[str, str] = {}
+
+    def evaluate(
+        self,
+        campaign: ChaosCampaign,
+        authority: ChaosAuthority,
+        observation: ChaosObservation,
+    ) -> ChaosReceipt:
+        if observation.campaign_id != campaign.campaign_id:
+            raise ValueError("observation campaign mismatch")
+        authority.authorize(campaign)
+        decision = (
+            "continue"
+            if observation.healthy and observation.error_budget_remaining >= self.minimum_error_budget
+            else "abort"
+        )
+        observation_digest = sha256_json({
+            "campaign_id": observation.campaign_id,
+            "observed_at": observation.observed_at,
+            "healthy": observation.healthy,
+            "error_budget_remaining": observation.error_budget_remaining,
+        })
+        receipt = ChaosReceipt(
+            campaign_digest=campaign.digest,
+            principal_id=authority.principal_id,
+            decision=decision,
+            observation_digest=observation_digest,
+            rollback_ref=campaign.rollback_ref,
+        )
+        prior = self._decisions.get(campaign.digest)
+        if prior is not None and prior != receipt.digest:
+            raise ValueError("non-deterministic chaos decision replay")
+        self._decisions[campaign.digest] = receipt.digest
+        return receipt
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryObjective:
+    max_recovery_seconds: int
+    max_data_loss_units: int
+
+    def __post_init__(self) -> None:
+        for name in ("max_recovery_seconds", "max_data_loss_units"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{name} must be non-negative integer")
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,19 +416,82 @@ class RecoveryDrill:
         if not isinstance(self.passed, bool):
             raise TypeError("passed must be boolean")
 
+    def verify(self, objective: RecoveryObjective) -> bool:
+        measured = (
+            self.recovery_seconds <= objective.max_recovery_seconds
+            and self.data_loss_units <= objective.max_data_loss_units
+        )
+        if self.passed != measured:
+            raise ValueError("recovery drill pass claim disagrees with measured objective")
+        return measured
+
 
 @dataclass(frozen=True, slots=True)
 class ReleaseRequirement:
     gate_id: str
     required: bool = True
+    release_classes: tuple[str, ...] = ("default",)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "gate_id", _text(self.gate_id, "gate_id"))
         if not isinstance(self.required, bool):
             raise TypeError("required must be boolean")
+        normalized = tuple(_text(item, "release_class") for item in self.release_classes)
+        if not normalized or len(normalized) != len(set(normalized)):
+            raise ValueError("release_classes must be unique and non-empty")
+        object.__setattr__(self, "release_classes", normalized)
+
+
+@dataclass(frozen=True, slots=True)
+class ReleaseWaiver:
+    gate_id: str
+    release_class: str
+    evidence_digest: str
+    approver: str
+    expires_at: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "gate_id", _text(self.gate_id, "gate_id"))
+        object.__setattr__(self, "release_class", _text(self.release_class, "release_class"))
+        object.__setattr__(self, "approver", _text(self.approver, "approver"))
+        if not isinstance(self.evidence_digest, str) or len(self.evidence_digest) != 64:
+            raise ValueError("evidence_digest must be sha256")
+        if isinstance(self.expires_at, bool) or not isinstance(self.expires_at, int) or self.expires_at < 1:
+            raise ValueError("expires_at must be positive integer")
+
+    def applies(self, gate_id: str, release_class: str, now: int) -> bool:
+        return (
+            self.gate_id == gate_id
+            and self.release_class == release_class
+            and now < self.expires_at
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class QualificationDecision:
+    release_id: str
+    release_class: str
+    qualified: bool
+    blockers: tuple[str, ...]
+    waived_gates: tuple[str, ...]
+    input_digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "release_id", _text(self.release_id, "release_id"))
+        object.__setattr__(self, "release_class", _text(self.release_class, "release_class"))
+        if not isinstance(self.qualified, bool):
+            raise TypeError("qualified must be boolean")
+        if len(self.blockers) != len(set(self.blockers)):
+            raise ValueError("blockers must be unique")
+        if len(self.waived_gates) != len(set(self.waived_gates)):
+            raise ValueError("waived_gates must be unique")
+        if not isinstance(self.input_digest, str) or len(self.input_digest) != 64:
+            raise ValueError("input_digest must be sha256")
 
 
 class ReleaseQualification:
+    _TERMINAL_SUCCESS = "success"
+
     def __init__(self, requirements: Iterable[ReleaseRequirement]) -> None:
         reqs = tuple(requirements)
         ids = [item.gate_id for item in reqs]
@@ -281,13 +499,96 @@ class ReleaseQualification:
             raise ValueError("release gate ids must be unique and non-empty")
         self.requirements = reqs
 
+    def _required_for(self, release_class: str) -> tuple[ReleaseRequirement, ...]:
+        release_class = _text(release_class, "release_class")
+        return tuple(
+            req for req in self.requirements
+            if req.required and release_class in req.release_classes
+        )
+
     def qualify(self, conclusions: Mapping[str, str]) -> tuple[bool, tuple[str, ...]]:
         blockers = []
         for req in self.requirements:
             conclusion = conclusions.get(req.gate_id)
-            if req.required and conclusion != "success":
+            if req.required and conclusion != self._TERMINAL_SUCCESS:
                 blockers.append(f"{req.gate_id}:{conclusion or 'missing'}")
         return (not blockers, tuple(sorted(blockers)))
+
+    def decide(
+        self,
+        *,
+        release_id: str,
+        release_class: str,
+        conclusions: Mapping[str, str],
+        now: int,
+        waivers: Iterable[ReleaseWaiver] = (),
+    ) -> QualificationDecision:
+        release_id = _text(release_id, "release_id")
+        release_class = _text(release_class, "release_class")
+        if isinstance(now, bool) or not isinstance(now, int) or now < 0:
+            raise ValueError("now must be non-negative integer")
+        if not isinstance(conclusions, Mapping):
+            raise TypeError("conclusions must be a mapping")
+
+        required = self._required_for(release_class)
+        if not required:
+            raise ValueError(f"no release requirements declared for class {release_class}")
+
+        waiver_rows = tuple(waivers)
+        waiver_by_gate: dict[str, ReleaseWaiver] = {}
+        for waiver in waiver_rows:
+            if not isinstance(waiver, ReleaseWaiver):
+                raise TypeError("waivers must contain ReleaseWaiver")
+            if waiver.release_class != release_class:
+                raise ValueError("cross-class release waiver is forbidden")
+            if waiver.gate_id in waiver_by_gate:
+                raise ValueError("duplicate release waiver")
+            waiver_by_gate[waiver.gate_id] = waiver
+
+        blockers: list[str] = []
+        waived: list[str] = []
+        normalized: dict[str, str] = {}
+        for req in required:
+            raw = conclusions.get(req.gate_id)
+            conclusion = raw.strip().lower() if isinstance(raw, str) and raw.strip() else "missing"
+            normalized[req.gate_id] = conclusion
+            if conclusion == self._TERMINAL_SUCCESS:
+                continue
+            waiver = waiver_by_gate.get(req.gate_id)
+            if waiver is not None and waiver.applies(req.gate_id, release_class, now):
+                waived.append(req.gate_id)
+                continue
+            blockers.append(f"{req.gate_id}:{conclusion}")
+
+        unknown_waivers = sorted(set(waiver_by_gate) - {req.gate_id for req in required})
+        if unknown_waivers:
+            raise ValueError("waiver targets non-required gate: " + ",".join(unknown_waivers))
+
+        input_digest = sha256_json({
+            "release_id": release_id,
+            "release_class": release_class,
+            "required_gates": [req.gate_id for req in required],
+            "conclusions": normalized,
+            "waivers": [
+                {
+                    "gate_id": waiver.gate_id,
+                    "release_class": waiver.release_class,
+                    "evidence_digest": waiver.evidence_digest,
+                    "approver": waiver.approver,
+                    "expires_at": waiver.expires_at,
+                }
+                for waiver in sorted(waiver_rows, key=lambda item: item.gate_id)
+            ],
+            "now": now,
+        })
+        return QualificationDecision(
+            release_id=release_id,
+            release_class=release_class,
+            qualified=not blockers,
+            blockers=tuple(sorted(blockers)),
+            waived_gates=tuple(sorted(waived)),
+            input_digest=input_digest,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -344,9 +645,33 @@ class FeatureFlag:
             raise ValueError("expires_at must be positive integer")
 
     def effective(self, now: int) -> bool:
+        if isinstance(now, bool) or not isinstance(now, int) or now < 0:
+            raise ValueError("now must be non-negative integer")
         if now >= self.expires_at:
             return False
         return self.enabled
+
+
+@dataclass(frozen=True, slots=True)
+class FeatureFlagAuthority:
+    principal_id: str
+    mutable_flags: tuple[str, ...]
+    may_enable_security_sensitive: bool = False
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "principal_id", _text(self.principal_id, "principal_id"))
+        if not self.mutable_flags or len(self.mutable_flags) != len(set(self.mutable_flags)):
+            raise ValueError("mutable_flags must be unique and non-empty")
+        if not isinstance(self.may_enable_security_sensitive, bool):
+            raise TypeError("may_enable_security_sensitive must be boolean")
+
+    def authorize(self, flag: FeatureFlag, *, enable: bool) -> None:
+        if not isinstance(enable, bool):
+            raise TypeError("enable must be boolean")
+        if flag.flag_id not in self.mutable_flags:
+            raise PermissionError("feature flag is outside principal authority")
+        if enable and flag.security_sensitive and not self.may_enable_security_sensitive:
+            raise PermissionError("security-sensitive feature flag enable is not authorized")
 
 
 @dataclass(frozen=True, slots=True)
@@ -359,12 +684,107 @@ class RollbackPlan:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "release_id", _text(self.release_id, "release_id"))
-        if not self.steps:
-            raise ValueError("rollback plan needs steps")
+        for name in ("reversible", "data_compatible", "external_effects_reconciled"):
+            if not isinstance(getattr(self, name), bool):
+                raise TypeError(f"{name} must be boolean")
+        normalized = tuple(_text(step, "rollback step") for step in self.steps)
+        if not normalized or len(normalized) != len(set(normalized)):
+            raise ValueError("rollback plan needs unique non-empty steps")
+        object.__setattr__(self, "steps", normalized)
 
     @property
     def safe(self) -> bool:
         return self.reversible and self.data_compatible and self.external_effects_reconciled
+
+    @property
+    def digest(self) -> str:
+        return sha256_json({
+            "release_id": self.release_id,
+            "reversible": self.reversible,
+            "data_compatible": self.data_compatible,
+            "external_effects_reconciled": self.external_effects_reconciled,
+            "steps": list(self.steps),
+        })
+
+
+@dataclass(frozen=True, slots=True)
+class DeploymentReceipt:
+    release_id: str
+    canary_decision: str
+    rollback_digest: str
+    flag_id: str | None
+    flag_effective: bool
+    decision: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "release_id", _text(self.release_id, "release_id"))
+        if self.canary_decision not in {"hold", "rollback", "promote"}:
+            raise ValueError("unknown canary decision")
+        if not isinstance(self.rollback_digest, str) or len(self.rollback_digest) != 64:
+            raise ValueError("rollback_digest must be sha256")
+        if self.flag_id is not None:
+            object.__setattr__(self, "flag_id", _text(self.flag_id, "flag_id"))
+        if not isinstance(self.flag_effective, bool):
+            raise TypeError("flag_effective must be boolean")
+        if self.decision not in {"hold", "rollback", "promote"}:
+            raise ValueError("unknown deployment decision")
+
+    @property
+    def digest(self) -> str:
+        return sha256_json({
+            "release_id": self.release_id,
+            "canary_decision": self.canary_decision,
+            "rollback_digest": self.rollback_digest,
+            "flag_id": self.flag_id,
+            "flag_effective": self.flag_effective,
+            "decision": self.decision,
+        })
+
+
+class DeploymentSafety:
+    """Couples canary promotion to rollback preflight and optional flag authority."""
+
+    @staticmethod
+    def decide(
+        *,
+        release_id: str,
+        canary: CanaryController,
+        observation: CanaryObservation,
+        rollback: RollbackPlan,
+        now: int,
+        flag: FeatureFlag | None = None,
+        flag_authority: FeatureFlagAuthority | None = None,
+    ) -> DeploymentReceipt:
+        release_id = _text(release_id, "release_id")
+        if rollback.release_id != release_id:
+            raise ValueError("rollback plan release mismatch")
+        canary_decision = canary.decide(observation)
+        if canary_decision == "rollback":
+            decision = "rollback"
+        elif not rollback.safe:
+            decision = "hold"
+        else:
+            decision = canary_decision
+
+        flag_id: str | None = None
+        flag_effective = False
+        if flag is not None:
+            if flag_authority is None:
+                raise PermissionError("feature flag mutation requires explicit authority")
+            flag_authority.authorize(flag, enable=flag.enabled)
+            flag_id = flag.flag_id
+            flag_effective = flag.effective(now)
+            if flag.enabled and not flag_effective and decision == "promote":
+                decision = "hold"
+
+        return DeploymentReceipt(
+            release_id=release_id,
+            canary_decision=canary_decision,
+            rollback_digest=rollback.digest,
+            flag_id=flag_id,
+            flag_effective=flag_effective,
+            decision=decision,
+        )
 
 
 @dataclass(slots=True)

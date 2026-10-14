@@ -23,6 +23,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { withScreenGuard } from './withScreenGuard';
 import theme from '../theme/tokens';
+import { LazyMount } from '../src/utils/lazyMount';
 
 interface ModalProps {
   visible:   boolean;
@@ -105,7 +106,7 @@ export function makeLazyModalRoute(
       ...(extraProps as any),
     };
     return (
-      <React.Suspense
+      <LazyMount
         fallback={
           <View style={{ flex: 1, backgroundColor: '#05070d', alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color="#A78BFA" />
@@ -113,7 +114,7 @@ export function makeLazyModalRoute(
         }
       >
         <Lazy {...(defaults as any)} />
-      </React.Suspense>
+      </LazyMount>
     );
   }
   LazyModalRouteShim.displayName = routeName;

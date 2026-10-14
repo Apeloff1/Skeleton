@@ -1,0 +1,129 @@
+name: AI Chat Cross-Plane Resilience
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "backend/core/model_router.py"
+      - "backend/tests/test_model_router.py"
+      - "skeleton/ai/compat/backend_core/model_router.py"
+      - "skeleton/ai/assistant/resilience.py"
+      - "skeleton/ai/assistant/__init__.py"
+      - "skeleton/testing/test_ai_chat_cross_plane_resilience.py"
+      - "machine/ai_chat_cross_plane_resilience.json"
+      - "machine/ai_chat_model_routing.json"
+      - "scripts/check_ai_chat_cross_plane_resilience.py"
+      - "scripts/verify_ai_chat_cross_plane_resilience.py"
+      - "scripts/check_ai_chat_model_routing.py"
+      - "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+      - ".github/workflows/ai-chat-cross-plane-resilience.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/core/model_router.py"
+      - "backend/tests/test_model_router.py"
+      - "skeleton/ai/compat/backend_core/model_router.py"
+      - "skeleton/ai/assistant/resilience.py"
+      - "skeleton/ai/assistant/__init__.py"
+      - "skeleton/testing/test_ai_chat_cross_plane_resilience.py"
+      - "machine/ai_chat_cross_plane_resilience.json"
+      - "machine/ai_chat_model_routing.json"
+      - "scripts/check_ai_chat_cross_plane_resilience.py"
+      - "scripts/verify_ai_chat_cross_plane_resilience.py"
+      - "scripts/check_ai_chat_model_routing.py"
+      - "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
+      - ".github/workflows/ai-chat-cross-plane-resilience.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-chat-cross-plane-resilience-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cross-plane-resilience:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ env.HEAD_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic>=2,<3"
+          "pydantic-settings>=2,<3"
+
+      - name: Compile resilience surfaces
+        run: >-
+          python -m compileall -q
+          backend/core/model_router.py
+          backend/tests/test_model_router.py
+          skeleton/ai/compat/backend_core/model_router.py
+          skeleton/ai/assistant/resilience.py
+          skeleton/testing/test_ai_chat_cross_plane_resilience.py
+          scripts/check_ai_chat_cross_plane_resilience.py
+          scripts/verify_ai_chat_cross_plane_resilience.py
+          scripts/check_ai_chat_model_routing.py
+
+      - name: Verify canonical routing mirror parity
+        run: cmp backend/core/model_router.py skeleton/ai/compat/backend_core/model_router.py
+
+      - name: Verify dependent plane structure
+        run: |
+          python scripts/check_ai_chat_model_routing.py
+          python scripts/check_ai_chat_tool_recovery.py
+          python scripts/check_ai_chat_attachments.py
+          python scripts/check_ai_chat_runtime.py
+
+      - name: Run focused cross-plane regressions
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_ai_chat_cross_plane_resilience.py
+          backend/tests/test_model_router.py
+          skeleton/testing/test_ai_chat_tool_recovery.py
+          skeleton/testing/test_ai_chat_attachments.py
+
+      - name: Emit cross-plane exact-head structural receipt
+        run: >-
+          python scripts/check_ai_chat_cross_plane_resilience.py
+          --head-sha "$HEAD_SHA"
+          --evidence-out /tmp/ai-chat-cross-plane-resilience.json
+          --print-evidence
+
+      - name: Independently rehash cross-plane receipt
+        run: >-
+          python scripts/verify_ai_chat_cross_plane_resilience.py
+          /tmp/ai-chat-cross-plane-resilience.json
+          --head-sha "$HEAD_SHA"
+          --evidence-out /tmp/ai-chat-cross-plane-resilience-independent.json
+          --print-evidence
+
+      - name: Re-run routing exact-head evidence after contract hardening
+        run: |
+          python scripts/check_ai_chat_model_routing.py \
+            --head-sha "$HEAD_SHA" \
+            --evidence-out /tmp/ai-chat-model-routing.json
+          python scripts/verify_ai_chat_model_routing.py \
+            /tmp/ai-chat-model-routing.json \
+            --head-sha "$HEAD_SHA"
+
+      - name: Verify governed AI file tree
+        run: python scripts/check_ai_file_tree.py

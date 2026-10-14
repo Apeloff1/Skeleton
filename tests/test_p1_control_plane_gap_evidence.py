@@ -115,13 +115,15 @@ def test_live_control_plane_batch_is_bounded_and_non_authoritative() -> None:
     )
 
 
-def test_live_masterplan_gap_strings_remain_canonical_and_present() -> None:
+def test_retired_masterplan_gaps_remain_absent_and_auditable() -> None:
     before = _master_gaps(ROOT)
     report = build_control_plane_gap_evidence(ROOT, expected_head=HEAD)
     after = _master_gaps(ROOT)
 
-    assert EXPECTED_GAPS <= before
+    assert EXPECTED_GAPS.isdisjoint(before)
     assert after == before
+    assert report["covered_retired_gap_count"] == 10
+    assert all(row["retired_historical"] is True for row in report["records"])
     assert {
         (row["volume_key"], row["statement"])
         for row in report["records"]
@@ -185,96 +187,41 @@ def test_missing_contract_marker_fails_closed(tmp_path: Path) -> None:
         build_control_plane_gap_evidence(root, expected_head=HEAD)
 
 
-def test_canonical_gap_drift_fails_closed(tmp_path: Path) -> None:
+def test_retired_gap_binding_drift_fails_closed(tmp_path: Path) -> None:
     root = _copy_repo(tmp_path)
     registry_path = root / REGISTRY
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
-    registry["records"] = [
-        row
-        for row in registry["records"]
-        if row["evidence"][0]["category"] != "control_plane_gap_closure"
-    ]
+    row = next(
+        item
+        for item in registry["records"]
+        if item["evidence"][0]["category"] == "control_plane_gap_closure"
+    )
+    row["owner_id"] = "ACC-VOL-999"
     registry_path.write_text(
         json.dumps(registry, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
-    master_path = root / MASTER
-    master = json.loads(master_path.read_text(encoding="utf-8"))
-    target = next(
-        volume for volume in master["volumes"]
-        if volume.get("key") == "VOL-056"
-    )
-    target["gaps"].remove("establish canonical gap schema")
-    master_path.write_text(
-        json.dumps(master, indent=2) + "\n",
         encoding="utf-8",
     )
 
     with pytest.raises(
         ControlPlaneGapEvidenceError,
-        match="missing canonical gap obligation",
+        match="risk registry references unknown obligations",
     ):
         build_control_plane_gap_evidence(root, expected_head=HEAD)
 
 
-def test_existing_binding_is_detected_but_not_rewritten(tmp_path: Path) -> None:
+def test_retired_bindings_are_detected_but_not_rewritten(tmp_path: Path) -> None:
     root = _copy_repo(tmp_path)
     registry_path = root / REGISTRY
-    registry = json.loads(registry_path.read_text(encoding="utf-8"))
-    registry["records"] = [
-        row
-        for row in registry["records"]
-        if row["evidence"][0]["category"] != "control_plane_gap_closure"
-    ]
-    registry_path.write_text(
-        json.dumps(registry, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
-    baseline = build_control_plane_gap_evidence(root, expected_head=HEAD)
-    assert baseline["already_bound_count"] == 0
-    assert baseline["candidate_binding_count"] == 10
-    first = baseline["records"][0]
-
-    registry = json.loads(registry_path.read_text(encoding="utf-8"))
-    registry["records"].append(
-        {
-            "obligation_id": first["obligation_id"],
-            "obligation_digest": first["obligation_digest"],
-            "owner_id": "ACC-" + first["volume_key"],
-            "severity": "high",
-            "disposition": "evidence",
-            "bound_at": "2026-09-30T12:00:00Z",
-            "review_at": "2026-10-30T12:00:00Z",
-            "evidence": [
-                {
-                    "source": "test:preexisting-binding",
-                    "digest": "b" * 64,
-                    "category": "test",
-                }
-            ],
-            "accepted_risk": None,
-        }
-    )
-    registry_path.write_text(
-        json.dumps(registry, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
     before = registry_path.read_bytes()
-    report = build_control_plane_gap_evidence(root, expected_head=HEAD)
-    after = registry_path.read_bytes()
 
+    report = build_control_plane_gap_evidence(root, expected_head=HEAD)
+
+    after = registry_path.read_bytes()
     assert before == after
-    assert report["already_bound_count"] == 1
-    assert report["candidate_binding_count"] == 9
-    row = next(
-        row
-        for row in report["records"]
-        if row["obligation_id"] == first["obligation_id"]
-    )
-    assert row["binding_present"] is True
+    assert report["already_bound_count"] == 10
+    assert report["candidate_binding_count"] == 0
+    assert report["covered_retired_gap_count"] == 10
+    assert all(row["binding_present"] is True for row in report["records"])
 
 
 def test_report_is_deterministic_for_same_head() -> None:

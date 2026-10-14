@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-15:mod_api:v1",
+  "title": "FLGB-15 mod api",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mod_id",
+    "version",
+    "api_version",
+    "capability_requests",
+    "content_digest",
+    "signer_digest"
+  ],
+  "properties": {
+    "mod_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "api_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capability_requests": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "content_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signer_digest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

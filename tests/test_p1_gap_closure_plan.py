@@ -26,12 +26,12 @@ def test_gap_closure_plan_matches_canonical_target_frontier() -> None:
     module = _module()
     report = module.build_gap_closure_plan(ROOT)
 
-    assert report["gap_blocked_volume_count"] == 84
-    assert report["gap_obligation_count"] == 168
+    assert report["gap_blocked_volume_count"] == 80
+    assert report["gap_obligation_count"] == 160
     assert report["target_counts"] == {
         "hardened": {
-            "volume_count": 70,
-            "gap_obligation_count": 140,
+            "volume_count": 66,
+            "gap_obligation_count": 132,
         },
         "production": {
             "volume_count": 14,
@@ -39,8 +39,8 @@ def test_gap_closure_plan_matches_canonical_target_frontier() -> None:
         },
     }
     assert report["lane_gap_obligation_counts"] == {
-        "P1-L1": 30,
-        "P1-L2": 54,
+        "P1-L1": 28,
+        "P1-L2": 48,
         "P1-L4": 16,
         "P1-L5": 28,
         "P1-L6": 40,
@@ -88,15 +88,15 @@ def test_gap_obligations_are_unique_and_exactly_joined_to_volumes() -> None:
             assert len(obligation["packet_digest"]) == 64
             assert obligation["available_evidence_sources"]
 
-    assert len(obligation_ids) == 168
-    assert len(set(obligation_ids)) == 168
+    assert len(obligation_ids) == 160
+    assert len(set(obligation_ids)) == 160
 
 
 def test_current_registry_preserves_existing_bindings_as_non_authoritative() -> None:
     module = _module()
     report = module.build_gap_closure_plan(ROOT)
 
-    assert report["bound_gap_obligation_count"] == 168
+    assert report["bound_gap_obligation_count"] == 160
     assert report["unbound_gap_obligation_count"] == 0
 
     for packet in report["packets"]:
@@ -111,7 +111,7 @@ def test_current_registry_preserves_existing_bindings_as_non_authoritative() -> 
         for packet in report["packets"]
         for obligation in packet["obligations"]
         if obligation["binding_present"]
-    ) == 168
+    ) == 160
 
 
 def test_resolution_paths_preserve_evidence_or_human_acceptance_boundary() -> None:

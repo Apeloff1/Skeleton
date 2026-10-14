@@ -4,14 +4,14 @@ This module is deliberately evidence-only. It compares already-produced policy
 decisions and has no capability to execute tools, mutate policy, grant
 authority, or perform external side effects.
 """
-
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
-from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Iterable, Mapping
+
 
 _DECISIONS = frozenset({"allow", "deny", "abstain"})
 
@@ -165,7 +165,9 @@ class PolicySimulation:
         counts = dict(self.transition_counts)
         expected_counts: dict[str, int] = {}
         for delta in self.deltas:
-            expected_counts[delta.transition] = expected_counts.get(delta.transition, 0) + 1
+            expected_counts[delta.transition] = (
+                expected_counts.get(delta.transition, 0) + 1
+            )
         if counts != expected_counts:
             raise PolicySimulationError("transition counts do not match deltas")
         object.__setattr__(
@@ -174,8 +176,12 @@ class PolicySimulation:
             MappingProxyType(dict(sorted(counts.items()))),
         )
 
-        expected_subjects = tuple(sorted({delta.subject_id for delta in self.deltas}))
-        expected_workloads = tuple(sorted({delta.workload_id for delta in self.deltas}))
+        expected_subjects = tuple(
+            sorted({delta.subject_id for delta in self.deltas})
+        )
+        expected_workloads = tuple(
+            sorted({delta.workload_id for delta in self.deltas})
+        )
         supplied_subjects = tuple(
             sorted({_token("affected_subject", value) for value in self.affected_subjects})
         )
@@ -272,15 +278,22 @@ def simulate_policy_change(
     baseline = _index_traces("baseline", baseline_traces)
     candidate = _index_traces("candidate", candidate_traces)
     if set(baseline) != set(candidate):
-        raise PolicySimulationError("baseline and candidate must cover the exact same trace IDs")
+        raise PolicySimulationError(
+            "baseline and candidate must cover the exact same trace IDs"
+        )
 
     deltas: list[PolicyDelta] = []
     transition_counts: dict[str, int] = {}
     for trace_id in sorted(baseline):
         before = baseline[trace_id]
         after = candidate[trace_id]
-        if before.subject_id != after.subject_id or before.workload_id != after.workload_id:
-            raise PolicySimulationError(f"trace identity drifted for {trace_id}")
+        if (
+            before.subject_id != after.subject_id
+            or before.workload_id != after.workload_id
+        ):
+            raise PolicySimulationError(
+                f"trace identity drifted for {trace_id}"
+            )
         if before.decision == after.decision:
             continue
         delta = PolicyDelta(
@@ -291,7 +304,9 @@ def simulate_policy_change(
             candidate_decision=after.decision,
         )
         deltas.append(delta)
-        transition_counts[delta.transition] = transition_counts.get(delta.transition, 0) + 1
+        transition_counts[delta.transition] = (
+            transition_counts.get(delta.transition, 0) + 1
+        )
 
     return PolicySimulation(
         simulation_id=simulation_id,

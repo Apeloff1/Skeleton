@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "backlog_version": "0.1.0",
+  "status": "closed",
+  "tasks": [
+    {
+      "task_id": "P4-FARM-01",
+      "title": "Build, eval and research farm quotas",
+      "status": "closed",
+      "lane_id": "P4-FARM-01",
+      "primary_volume_refs": [
+        "VOL-400",
+        "VOL-401",
+        "VOL-402"
+      ],
+      "depends_on": [],
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
+      "evidence_refs": [
+        "skeleton/p4/production.py",
+        "tests/flgb/test_p4_production.py",
+        "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
+      ]
+    },
+    {
+      "task_id": "P4-RIGHTS-01",
+      "title": "License and data-usage rights",
+      "status": "closed",
+      "lane_id": "P4-RIGHTS-01",
+      "primary_volume_refs": [
+        "VOL-407",
+        "VOL-408"
+      ],
+      "depends_on": [],
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
+      "evidence_refs": [
+        "skeleton/p4/production.py",
+        "tests/flgb/test_p4_production.py",
+        "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
+      ]
+    },
+    {
+      "task_id": "P4-LIFECYCLE-01",
+      "title": "Model lifecycle, deprecation and migration",
+      "status": "closed",
+      "lane_id": "P4-LIFECYCLE-01",
+      "primary_volume_refs": [
+        "VOL-411",
+        "VOL-412",
+        "VOL-413",
+        "VOL-418"
+      ],
+      "depends_on": [],
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
+      "evidence_refs": [
+        "skeleton/p4/production.py",
+        "tests/flgb/test_p4_production.py",
+        "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
+      ]
+    },
+    {
+      "task_id": "P4-SANDBOX-01",
+      "title": "Experimental sandbox and research branch isolation",
+      "status": "closed",
+      "lane_id": "P4-SANDBOX-01",
+      "primary_volume_refs": [
+        "VOL-416",
+        "VOL-417"
+      ],
+      "depends_on": [],
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
+      "evidence_refs": [
+        "skeleton/p4/production.py",
+        "tests/flgb/test_p4_production.py",
+        "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
+      ]
+    },
+    {
+      "task_id": "P4-LOCALITY-01",
+      "title": "NUMA, interconnect, tier and locality bounds",
+      "status": "closed",
+      "lane_id": "P4-LOCALITY-01",
+      "primary_volume_refs": [
+        "VOL-393",
+        "VOL-394",
+        "VOL-395",
+        "VOL-396"
+      ],
+      "depends_on": [],
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
+      "evidence_refs": [
+        "skeleton/p4/production.py",
+        "tests/flgb/test_p4_production.py",
+        "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
+      ]
+    },
+    {
+      "task_id": "P4-CACHE-01",
+      "title": "GPU memory, eviction, KV and prefix cache bounds",
+      "status": "closed",
+      "lane_id": "P4-CACHE-01",
+      "primary_volume_refs": [
+        "VOL-383",
+        "VOL-384",
+        "VOL-387",
+        "VOL-388",
+        "VOL-389"
+      ],
+      "depends_on": [],
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
+      "evidence_refs": [
+        "skeleton/p4/production.py",
+        "tests/flgb/test_p4_production.py",
+        "git-head:a7f944e067b0181f2a03d5918b1078f4006b0f85"
+      ]
+    }
+  ],
+  "summary": {
+    "task_count": 6,
+    "closed_count": 6
+  }
+}

@@ -1,0 +1,1619 @@
+{
+  "schema_version": "skeleton.ai_game_builder_levels_shard.v1",
+  "manifest": "machine/ai_game_builder_500_levels.json",
+  "start": 451,
+  "end": 475,
+  "count": 25,
+  "levels": [
+    {
+      "id": "GBL-451",
+      "ordinal": 451,
+      "family_id": "GB46",
+      "family": "Per-Pixel & Visual QA",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+      "owner": "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+      "batches": [
+        "B075",
+        "B052",
+        "B054"
+      ],
+      "metrics": [
+        "visual-defect recall",
+        "false-positive rate",
+        "temporal consistency",
+        "pixel-to-scene traceability"
+      ],
+      "requirements": [
+        "Specify Per-Pixel & Visual QA: Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+        "Declare what counts as a meaningful defect/value gain, protected qualities, anti-goals and representative fixtures.",
+        "Bind backend/gameforge/exocortex/agentic/scenebind_omni_modal.py and B075, B052, B054."
+      ],
+      "adversarial": [
+        "single-pixel corruption",
+        "temporal flicker",
+        "occlusion mistake",
+        "false perceptual alarm",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-451 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-452",
+      "ordinal": 452,
+      "family_id": "GB46",
+      "family": "Per-Pixel & Visual QA",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+      "owner": "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+      "batches": [
+        "B075",
+        "B052",
+        "B054"
+      ],
+      "metrics": [
+        "visual-defect recall",
+        "false-positive rate",
+        "temporal consistency",
+        "pixel-to-scene traceability"
+      ],
+      "requirements": [
+        "Define typed observation/defect/experience evidence with exact frame/scene/story/system/player-state identity and provenance.",
+        "Preserve atomic findings up to parent scene and whole-game context.",
+        "Separate observation from interpretation and subjective score."
+      ],
+      "adversarial": [
+        "single-pixel corruption",
+        "temporal flicker",
+        "occlusion mistake",
+        "false perceptual alarm",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-452 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-453",
+      "ordinal": 453,
+      "family_id": "GB46",
+      "family": "Per-Pixel & Visual QA",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+      "owner": "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+      "batches": [
+        "B075",
+        "B052",
+        "B054"
+      ],
+      "metrics": [
+        "visual-defect recall",
+        "false-positive rate",
+        "temporal consistency",
+        "pixel-to-scene traceability"
+      ],
+      "requirements": [
+        "Run canonical inspection/evaluation from ProjectDNA, canon, champion and governed evidence.",
+        "Record models/tools/prompts/capture conditions and evaluator versions.",
+        "Retain baseline captures/playthroughs and rollback-safe change proposals."
+      ],
+      "adversarial": [
+        "single-pixel corruption",
+        "temporal flicker",
+        "occlusion mistake",
+        "false perceptual alarm",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-453 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-454",
+      "ordinal": 454,
+      "family_id": "GB46",
+      "family": "Per-Pixel & Visual QA",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+      "owner": "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+      "batches": [
+        "B075",
+        "B052",
+        "B054"
+      ],
+      "metrics": [
+        "visual-defect recall",
+        "false-positive rate",
+        "temporal consistency",
+        "pixel-to-scene traceability"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote with role rotation.",
+        "Opponent must challenge blind spots, produce counterexamples and submit an improved artifact/evaluation.",
+        "A rival cannot validate its own aesthetic/story/fun claim without independent evidence."
+      ],
+      "adversarial": [
+        "single-pixel corruption",
+        "temporal flicker",
+        "occlusion mistake",
+        "false perceptual alarm",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-454 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-455",
+      "ordinal": 455,
+      "family_id": "GB46",
+      "family": "Per-Pixel & Visual QA",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+      "owner": "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+      "batches": [
+        "B075",
+        "B052",
+        "B054"
+      ],
+      "metrics": [
+        "visual-defect recall",
+        "false-positive rate",
+        "temporal consistency",
+        "pixel-to-scene traceability"
+      ],
+      "requirements": [
+        "Cross-check every local finding against long-form canon, gameplay systems, visual/audio language, accessibility, performance and player goals.",
+        "Propagate defect fixes to dependent scenes/assets/branches.",
+        "Block local polish that creates remote inconsistency."
+      ],
+      "adversarial": [
+        "single-pixel corruption",
+        "temporal flicker",
+        "occlusion mistake",
+        "false perceptual alarm",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-455 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-456",
+      "ordinal": 456,
+      "family_id": "GB46",
+      "family": "Per-Pixel & Visual QA",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+      "owner": "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+      "batches": [
+        "B075",
+        "B052",
+        "B054"
+      ],
+      "metrics": [
+        "visual-defect recall",
+        "false-positive rate",
+        "temporal consistency",
+        "pixel-to-scene traceability"
+      ],
+      "requirements": [
+        "Use deterministic captures, temporal sequences, narrative graph checks, autonomous/human-calibrated playtest fixtures and replay evidence as appropriate.",
+        "Attack single-pixel corruption, temporal flicker, occlusion mistake, false perceptual alarm.",
+        "Store minimized counterexamples and evaluator disagreements."
+      ],
+      "adversarial": [
+        "single-pixel corruption",
+        "temporal flicker",
+        "occlusion mistake",
+        "false perceptual alarm",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-456 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-457",
+      "ordinal": 457,
+      "family_id": "GB46",
+      "family": "Per-Pixel & Visual QA",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+      "owner": "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+      "batches": [
+        "B075",
+        "B052",
+        "B054"
+      ],
+      "metrics": [
+        "visual-defect recall",
+        "false-positive rate",
+        "temporal consistency",
+        "pixel-to-scene traceability"
+      ],
+      "requirements": [
+        "Improve visual-defect recall, false-positive rate, temporal consistency, pixel-to-scene traceability plus originality, accessibility, performance, emotional/narrative coherence and maintainability together.",
+        "Treat fun/beauty proxies as fallible evidence, not truth.",
+        "Preserve champion when evidence is ambiguous or non-Pareto."
+      ],
+      "adversarial": [
+        "single-pixel corruption",
+        "temporal flicker",
+        "occlusion mistake",
+        "false perceptual alarm",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-457 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-458",
+      "ordinal": 458,
+      "family_id": "GB46",
+      "family": "Per-Pixel & Visual QA",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+      "owner": "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+      "batches": [
+        "B075",
+        "B052",
+        "B054"
+      ],
+      "metrics": [
+        "visual-defect recall",
+        "false-positive rate",
+        "temporal consistency",
+        "pixel-to-scene traceability"
+      ],
+      "requirements": [
+        "Support evidence diff, annotation correction, evaluator recalibration, rollback and exact checkpoint resume.",
+        "Preserve source captures/transcripts and evaluator identity.",
+        "Never overwrite dissenting evidence silently."
+      ],
+      "adversarial": [
+        "single-pixel corruption",
+        "temporal flicker",
+        "occlusion mistake",
+        "false perceptual alarm",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-458 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-459",
+      "ordinal": 459,
+      "family_id": "GB46",
+      "family": "Per-Pixel & Visual QA",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+      "owner": "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+      "batches": [
+        "B075",
+        "B052",
+        "B054"
+      ],
+      "metrics": [
+        "visual-defect recall",
+        "false-positive rate",
+        "temporal consistency",
+        "pixel-to-scene traceability"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000 with exactly three stages per round and no wall-clock deadline.",
+        "Sample wide visual/story/player-state coverage under bounded compute/storage.",
+        "Detect evaluator fatigue, preference collapse, repeated critique and benchmark overfit."
+      ],
+      "adversarial": [
+        "single-pixel corruption",
+        "temporal flicker",
+        "occlusion mistake",
+        "false perceptual alarm",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-459 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "deep-effort evaluator-stability report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-460",
+      "ordinal": 460,
+      "family_id": "GB46",
+      "family": "Per-Pixel & Visual QA",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Inspect frames, regions, pixels, sprites, geometry, lighting, compositing, temporal stability and visual regressions while preserving scene context.",
+      "owner": "backend/gameforge/exocortex/agentic/scenebind_omni_modal.py",
+      "batches": [
+        "B075",
+        "B052",
+        "B054"
+      ],
+      "metrics": [
+        "visual-defect recall",
+        "false-positive rate",
+        "temporal consistency",
+        "pixel-to-scene traceability"
+      ],
+      "requirements": [
+        "Require independent exact-head whole-context evidence.",
+        "Block unresolved critical visual/narrative/player-value, accessibility, rights or state failures.",
+        "Bind verdict to exact artifact, canon, evaluator, capture/playtest and effort identities."
+      ],
+      "adversarial": [
+        "single-pixel corruption",
+        "temporal flicker",
+        "occlusion mistake",
+        "false perceptual alarm",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-460 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "deep-effort evaluator-stability report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-461",
+      "ordinal": 461,
+      "family_id": "GB47",
+      "family": "Longform Narrative QA",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+      "owner": "backend/core/narrative_vault_specialized.py",
+      "batches": [
+        "B035",
+        "B072"
+      ],
+      "metrics": [
+        "contradiction recall",
+        "setup/payoff closure",
+        "character continuity",
+        "branch consistency"
+      ],
+      "requirements": [
+        "Specify Longform Narrative QA: Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+        "Declare what counts as a meaningful defect/value gain, protected qualities, anti-goals and representative fixtures.",
+        "Bind backend/core/narrative_vault_specialized.py and B035, B072."
+      ],
+      "adversarial": [
+        "forgotten setup",
+        "knowledge contradiction",
+        "timeline break",
+        "branch convergence error",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-461 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-462",
+      "ordinal": 462,
+      "family_id": "GB47",
+      "family": "Longform Narrative QA",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+      "owner": "backend/core/narrative_vault_specialized.py",
+      "batches": [
+        "B035",
+        "B072"
+      ],
+      "metrics": [
+        "contradiction recall",
+        "setup/payoff closure",
+        "character continuity",
+        "branch consistency"
+      ],
+      "requirements": [
+        "Define typed observation/defect/experience evidence with exact frame/scene/story/system/player-state identity and provenance.",
+        "Preserve atomic findings up to parent scene and whole-game context.",
+        "Separate observation from interpretation and subjective score."
+      ],
+      "adversarial": [
+        "forgotten setup",
+        "knowledge contradiction",
+        "timeline break",
+        "branch convergence error",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-462 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-463",
+      "ordinal": 463,
+      "family_id": "GB47",
+      "family": "Longform Narrative QA",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+      "owner": "backend/core/narrative_vault_specialized.py",
+      "batches": [
+        "B035",
+        "B072"
+      ],
+      "metrics": [
+        "contradiction recall",
+        "setup/payoff closure",
+        "character continuity",
+        "branch consistency"
+      ],
+      "requirements": [
+        "Run canonical inspection/evaluation from ProjectDNA, canon, champion and governed evidence.",
+        "Record models/tools/prompts/capture conditions and evaluator versions.",
+        "Retain baseline captures/playthroughs and rollback-safe change proposals."
+      ],
+      "adversarial": [
+        "forgotten setup",
+        "knowledge contradiction",
+        "timeline break",
+        "branch convergence error",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-463 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-464",
+      "ordinal": 464,
+      "family_id": "GB47",
+      "family": "Longform Narrative QA",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+      "owner": "backend/core/narrative_vault_specialized.py",
+      "batches": [
+        "B035",
+        "B072"
+      ],
+      "metrics": [
+        "contradiction recall",
+        "setup/payoff closure",
+        "character continuity",
+        "branch consistency"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote with role rotation.",
+        "Opponent must challenge blind spots, produce counterexamples and submit an improved artifact/evaluation.",
+        "A rival cannot validate its own aesthetic/story/fun claim without independent evidence."
+      ],
+      "adversarial": [
+        "forgotten setup",
+        "knowledge contradiction",
+        "timeline break",
+        "branch convergence error",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-464 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-465",
+      "ordinal": 465,
+      "family_id": "GB47",
+      "family": "Longform Narrative QA",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+      "owner": "backend/core/narrative_vault_specialized.py",
+      "batches": [
+        "B035",
+        "B072"
+      ],
+      "metrics": [
+        "contradiction recall",
+        "setup/payoff closure",
+        "character continuity",
+        "branch consistency"
+      ],
+      "requirements": [
+        "Cross-check every local finding against long-form canon, gameplay systems, visual/audio language, accessibility, performance and player goals.",
+        "Propagate defect fixes to dependent scenes/assets/branches.",
+        "Block local polish that creates remote inconsistency."
+      ],
+      "adversarial": [
+        "forgotten setup",
+        "knowledge contradiction",
+        "timeline break",
+        "branch convergence error",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-465 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-466",
+      "ordinal": 466,
+      "family_id": "GB47",
+      "family": "Longform Narrative QA",
+      "stage": 6,
+      "stage_name": "Verification & Simulation",
+      "task_goal": "Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+      "owner": "backend/core/narrative_vault_specialized.py",
+      "batches": [
+        "B035",
+        "B072"
+      ],
+      "metrics": [
+        "contradiction recall",
+        "setup/payoff closure",
+        "character continuity",
+        "branch consistency"
+      ],
+      "requirements": [
+        "Use deterministic captures, temporal sequences, narrative graph checks, autonomous/human-calibrated playtest fixtures and replay evidence as appropriate.",
+        "Attack forgotten setup, knowledge contradiction, timeline break, branch convergence error.",
+        "Store minimized counterexamples and evaluator disagreements."
+      ],
+      "adversarial": [
+        "forgotten setup",
+        "knowledge contradiction",
+        "timeline break",
+        "branch convergence error",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-466 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-467",
+      "ordinal": 467,
+      "family_id": "GB47",
+      "family": "Longform Narrative QA",
+      "stage": 7,
+      "stage_name": "Across-the-Board Quality Frontier",
+      "task_goal": "Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+      "owner": "backend/core/narrative_vault_specialized.py",
+      "batches": [
+        "B035",
+        "B072"
+      ],
+      "metrics": [
+        "contradiction recall",
+        "setup/payoff closure",
+        "character continuity",
+        "branch consistency"
+      ],
+      "requirements": [
+        "Improve contradiction recall, setup/payoff closure, character continuity, branch consistency plus originality, accessibility, performance, emotional/narrative coherence and maintainability together.",
+        "Treat fun/beauty proxies as fallible evidence, not truth.",
+        "Preserve champion when evidence is ambiguous or non-Pareto."
+      ],
+      "adversarial": [
+        "forgotten setup",
+        "knowledge contradiction",
+        "timeline break",
+        "branch convergence error",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-467 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-468",
+      "ordinal": 468,
+      "family_id": "GB47",
+      "family": "Longform Narrative QA",
+      "stage": 8,
+      "stage_name": "Editability, Recovery & Migration",
+      "task_goal": "Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+      "owner": "backend/core/narrative_vault_specialized.py",
+      "batches": [
+        "B035",
+        "B072"
+      ],
+      "metrics": [
+        "contradiction recall",
+        "setup/payoff closure",
+        "character continuity",
+        "branch consistency"
+      ],
+      "requirements": [
+        "Support evidence diff, annotation correction, evaluator recalibration, rollback and exact checkpoint resume.",
+        "Preserve source captures/transcripts and evaluator identity.",
+        "Never overwrite dissenting evidence silently."
+      ],
+      "adversarial": [
+        "forgotten setup",
+        "knowledge contradiction",
+        "timeline break",
+        "branch convergence error",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-468 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-469",
+      "ordinal": 469,
+      "family_id": "GB47",
+      "family": "Longform Narrative QA",
+      "stage": 9,
+      "stage_name": "Deep-Effort Qualification",
+      "task_goal": "Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+      "owner": "backend/core/narrative_vault_specialized.py",
+      "batches": [
+        "B035",
+        "B072"
+      ],
+      "metrics": [
+        "contradiction recall",
+        "setup/payoff closure",
+        "character continuity",
+        "branch consistency"
+      ],
+      "requirements": [
+        "Run Forge-100/1000/10000 with exactly three stages per round and no wall-clock deadline.",
+        "Sample wide visual/story/player-state coverage under bounded compute/storage.",
+        "Detect evaluator fatigue, preference collapse, repeated critique and benchmark overfit."
+      ],
+      "adversarial": [
+        "forgotten setup",
+        "knowledge contradiction",
+        "timeline break",
+        "branch convergence error",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-469 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "deep-effort evaluator-stability report",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-470",
+      "ordinal": 470,
+      "family_id": "GB47",
+      "family": "Longform Narrative QA",
+      "stage": 10,
+      "stage_name": "Production Promotion",
+      "task_goal": "Continuously verify canon, chronology, character state, setup/payoff, branching, foreshadowing, world facts and late-game callbacks across the complete game.",
+      "owner": "backend/core/narrative_vault_specialized.py",
+      "batches": [
+        "B035",
+        "B072"
+      ],
+      "metrics": [
+        "contradiction recall",
+        "setup/payoff closure",
+        "character continuity",
+        "branch consistency"
+      ],
+      "requirements": [
+        "Require independent exact-head whole-context evidence.",
+        "Block unresolved critical visual/narrative/player-value, accessibility, rights or state failures.",
+        "Bind verdict to exact artifact, canon, evaluator, capture/playtest and effort identities."
+      ],
+      "adversarial": [
+        "forgotten setup",
+        "knowledge contradiction",
+        "timeline break",
+        "branch convergence error",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-470 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "deep-effort evaluator-stability report",
+        "independent verdict"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-471",
+      "ordinal": 471,
+      "family_id": "GB48",
+      "family": "Player Value, Fun & Experience QA",
+      "stage": 1,
+      "stage_name": "Goal Contract",
+      "task_goal": "Evaluate whether mechanics, scenes and systems are understandable, engaging, emotionally effective, respectful of player time and worth keeping.",
+      "owner": "skeleton/ai/game_builder/experience_eval.py",
+      "batches": [
+        "B040",
+        "B073"
+      ],
+      "metrics": [
+        "engagement proxy",
+        "friction detection",
+        "learning curve",
+        "player-value density"
+      ],
+      "requirements": [
+        "Specify Player Value, Fun & Experience QA: Evaluate whether mechanics, scenes and systems are understandable, engaging, emotionally effective, respectful of player time and worth keeping.",
+        "Declare what counts as a meaningful defect/value gain, protected qualities, anti-goals and representative fixtures.",
+        "Bind skeleton/ai/game_builder/experience_eval.py and B040, B073."
+      ],
+      "adversarial": [
+        "busywork disguised as depth",
+        "confusion mistaken for challenge",
+        "novelty decay",
+        "metric-gaming fun proxy",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-471 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-472",
+      "ordinal": 472,
+      "family_id": "GB48",
+      "family": "Player Value, Fun & Experience QA",
+      "stage": 2,
+      "stage_name": "Canonical Representation",
+      "task_goal": "Evaluate whether mechanics, scenes and systems are understandable, engaging, emotionally effective, respectful of player time and worth keeping.",
+      "owner": "skeleton/ai/game_builder/experience_eval.py",
+      "batches": [
+        "B040",
+        "B073"
+      ],
+      "metrics": [
+        "engagement proxy",
+        "friction detection",
+        "learning curve",
+        "player-value density"
+      ],
+      "requirements": [
+        "Define typed observation/defect/experience evidence with exact frame/scene/story/system/player-state identity and provenance.",
+        "Preserve atomic findings up to parent scene and whole-game context.",
+        "Separate observation from interpretation and subjective score."
+      ],
+      "adversarial": [
+        "busywork disguised as depth",
+        "confusion mistaken for challenge",
+        "novelty decay",
+        "metric-gaming fun proxy",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-472 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-473",
+      "ordinal": 473,
+      "family_id": "GB48",
+      "family": "Player Value, Fun & Experience QA",
+      "stage": 3,
+      "stage_name": "Builder Path",
+      "task_goal": "Evaluate whether mechanics, scenes and systems are understandable, engaging, emotionally effective, respectful of player time and worth keeping.",
+      "owner": "skeleton/ai/game_builder/experience_eval.py",
+      "batches": [
+        "B040",
+        "B073"
+      ],
+      "metrics": [
+        "engagement proxy",
+        "friction detection",
+        "learning curve",
+        "player-value density"
+      ],
+      "requirements": [
+        "Run canonical inspection/evaluation from ProjectDNA, canon, champion and governed evidence.",
+        "Record models/tools/prompts/capture conditions and evaluator versions.",
+        "Retain baseline captures/playthroughs and rollback-safe change proposals."
+      ],
+      "adversarial": [
+        "busywork disguised as depth",
+        "confusion mistaken for challenge",
+        "novelty decay",
+        "metric-gaming fun proxy",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-473 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-474",
+      "ordinal": 474,
+      "family_id": "GB48",
+      "family": "Player Value, Fun & Experience QA",
+      "stage": 4,
+      "stage_name": "Dual-Rival Contest",
+      "task_goal": "Evaluate whether mechanics, scenes and systems are understandable, engaging, emotionally effective, respectful of player time and worth keeping.",
+      "owner": "skeleton/ai/game_builder/experience_eval.py",
+      "batches": [
+        "B040",
+        "B073"
+      ],
+      "metrics": [
+        "engagement proxy",
+        "friction detection",
+        "learning curve",
+        "player-value density"
+      ],
+      "requirements": [
+        "Run construct -> attack/improve -> reconcile/promote with role rotation.",
+        "Opponent must challenge blind spots, produce counterexamples and submit an improved artifact/evaluation.",
+        "A rival cannot validate its own aesthetic/story/fun claim without independent evidence."
+      ],
+      "adversarial": [
+        "busywork disguised as depth",
+        "confusion mistaken for challenge",
+        "novelty decay",
+        "metric-gaming fun proxy",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-474 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    },
+    {
+      "id": "GBL-475",
+      "ordinal": 475,
+      "family_id": "GB48",
+      "family": "Player Value, Fun & Experience QA",
+      "stage": 5,
+      "stage_name": "Continuity & Integration",
+      "task_goal": "Evaluate whether mechanics, scenes and systems are understandable, engaging, emotionally effective, respectful of player time and worth keeping.",
+      "owner": "skeleton/ai/game_builder/experience_eval.py",
+      "batches": [
+        "B040",
+        "B073"
+      ],
+      "metrics": [
+        "engagement proxy",
+        "friction detection",
+        "learning curve",
+        "player-value density"
+      ],
+      "requirements": [
+        "Cross-check every local finding against long-form canon, gameplay systems, visual/audio language, accessibility, performance and player goals.",
+        "Propagate defect fixes to dependent scenes/assets/branches.",
+        "Block local polish that creates remote inconsistency."
+      ],
+      "adversarial": [
+        "busywork disguised as depth",
+        "confusion mistaken for challenge",
+        "novelty decay",
+        "metric-gaming fun proxy",
+        "atomic finding detached from parent context",
+        "evaluator consensus masking shared blind spot"
+      ],
+      "effort_rounds": [
+        100,
+        1000,
+        10000
+      ],
+      "cycle": [
+        "construct",
+        "attack_and_improve",
+        "reconcile_and_promote"
+      ],
+      "gates": [
+        "atomic-to-global traceability",
+        "no unresolved critical inconsistency",
+        "evaluator identity retained",
+        "rights/provenance protected",
+        "bounded resources",
+        "independent promotion"
+      ],
+      "evidence": [
+        "GBL-475 fixture",
+        "exact-head artifact/evaluator identity",
+        "rival transcript",
+        "atomic-to-global QA report",
+        "rights/continuity report",
+        "capture/playtest evidence",
+        "quality delta",
+        "effort evidence",
+        "gap ledger"
+      ],
+      "status": "planned",
+      "signed": false
+    }
+  ]
+}

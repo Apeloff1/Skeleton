@@ -40,7 +40,12 @@ def test_capsule_is_deterministic_and_verifiable():
     second = RuntimeIntegrityCapsule.capture(_snapshot(ledger), ledger)
     assert first == second
     assert first.root_decision_id == "s1:orient"
-    assert first.selected_policy_decision_id is None
+    assert first.selected_policy_decision_id == "s1:orient"
+    assert first.evidence_root == ledger.evidence_root
+    assert first.ledger_identity == ledger.ledger_identity
+    assert first.session_record_hashes == tuple(
+        record.record_hash for record in ledger.session("s1")
+    )
     assert first.verify(ledger).valid
 
 

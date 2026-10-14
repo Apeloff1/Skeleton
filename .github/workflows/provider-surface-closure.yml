@@ -13,6 +13,9 @@ on:
       - "skeleton/intelligence/**"
       - "skeleton/api/**"
       - "skeleton/ai/runtime/**"
+      - "skeleton/ai/build/automation/chatgpt_adapter.py"
+      - "skeleton/ai/build/automation/free_model.py"
+      - "skeleton/ai/build/shift_supervisor/model_gateway.py"
       - "backend/core/ai_provider_compat.py"
       - "backend/core/engine_text.py"
       - "backend/core/engine_chat.py"
@@ -528,7 +531,7 @@ jobs:
 
       - name: Upload provider live qualification evidence
         if: steps.live_qualification.outputs.produced == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: provider-live-qualified-${{ github.run_id }}
           path: .provider-live-qualified.json

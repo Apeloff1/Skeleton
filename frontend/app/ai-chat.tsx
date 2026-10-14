@@ -1,10 +1,11 @@
-import React from 'react';
-import { useLocalSearchParams } from 'expo-router';
-import ChatWorkspace from '../features/Jeeves/ChatWorkspace';
+/** Compatibility entrypoint for the governed AI chat workstream.
+ * Route renders the current canonical workspace, not the divergent draft UI.
+ * Keep it lazily loaded so Expo Router cold-start remains bounded.
+ */
+import { makeLazyModalRoute } from '../components/SafeModalRoute';
 
-export default function AIChatRoute() {
-  const params = useLocalSearchParams<{ thread?: string | string[] }>();
-  const raw = Array.isArray(params.thread) ? params.thread[0] : params.thread;
-  const thread = typeof raw === 'string' && /^[0-9a-f-]{36}$/i.test(raw) ? raw : undefined;
-  return <ChatWorkspace initialThreadId={thread} />;
-}
+export default makeLazyModalRoute(
+  () => import('../features/Jeeves/ChatWorkspace'),
+  'AIChatRoute',
+  'default',
+);

@@ -151,8 +151,8 @@ jobs:
               raise SystemExit("Stage-5 implementation handoff is not closed")
           if closure_entry.get("closure_decision") != "closed":
               raise SystemExit("Stage-5 closure decision is not closed")
-          if closure_entry.get("implementation_state") != "closed":
-              raise SystemExit("Stage-5 implementation state is not closed")
+          if closure_entry.get("implementation_state") != "complete":
+              raise SystemExit("Stage-5 implementation state is not complete")
           if closure_entry.get("outstanding_evidence"):
               raise SystemExit("Stage-5 closure still has outstanding evidence")
           if closure_entry.get("blockers"):

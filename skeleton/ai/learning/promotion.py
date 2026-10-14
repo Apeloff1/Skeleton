@@ -60,6 +60,19 @@ def _positive_int(name: str, value: object) -> int:
     return result
 
 
+def _schema_version(value: object, *, context: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value != SCHEMA_VERSION:
+        raise FeedbackPromotionError(f"unsupported {context} schema")
+    return value
+
+
+def _sha(name: str, value: object) -> str:
+    text = _text(name, value, maximum=64).lower()
+    if len(text) != 64 or any(ch not in "0123456789abcdef" for ch in text):
+        raise FeedbackPromotionError(f"{name} must be lowercase sha256")
+    return text
+
+
 def _canonical(value: object) -> str:
     try:
         return json.dumps(
@@ -167,8 +180,11 @@ class ExperimentAssignment:
         object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id))
         if self.variant not in {"baseline", "candidate", "holdout"}:
             raise FeedbackPromotionError("variant is invalid")
-        if len(self.spec_digest) != 64:
-            raise FeedbackPromotionError("spec_digest must be sha256")
+        object.__setattr__(
+            self,
+            "spec_digest",
+            _sha("spec_digest", self.spec_digest),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,10 +217,16 @@ class FeedbackEvent:
             raise FeedbackPromotionError(
                 "feedback cannot be retained without explicit consent"
             )
-        if len(self.spec_digest) != 64:
-            raise FeedbackPromotionError("spec_digest must be sha256")
-        if self.schema_version != SCHEMA_VERSION:
-            raise FeedbackPromotionError("unsupported feedback schema")
+        object.__setattr__(
+            self,
+            "spec_digest",
+            _sha("spec_digest", self.spec_digest),
+        )
+        object.__setattr__(
+            self,
+            "schema_version",
+            _schema_version(self.schema_version, context="feedback"),
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -344,8 +366,11 @@ class EvaluationReceipt:
             "evaluated_at",
             _non_negative_int("evaluated_at", self.evaluated_at),
         )
-        if self.schema_version != SCHEMA_VERSION:
-            raise FeedbackPromotionError("unsupported evaluation receipt schema")
+        object.__setattr__(
+            self,
+            "schema_version",
+            _schema_version(self.schema_version, context="evaluation receipt"),
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -376,6 +401,33 @@ class PromotionReceipt:
     rollback: bool = False
     reason: str = ""
     schema_version: int = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        for name in ("experiment_id", "from_version", "to_version"):
+            object.__setattr__(self, name, _text(name, getattr(self, name)))
+        if self.from_version == self.to_version:
+            raise FeedbackPromotionError("promotion receipt must change active version")
+        object.__setattr__(
+            self,
+            "evaluation_digest",
+            _sha("evaluation_digest", self.evaluation_digest),
+        )
+        object.__setattr__(
+            self,
+            "promoted_at",
+            _non_negative_int("promoted_at", self.promoted_at),
+        )
+        if not isinstance(self.rollback, bool):
+            raise FeedbackPromotionError("rollback must be boolean")
+        if self.rollback:
+            object.__setattr__(self, "reason", _text("reason", self.reason))
+        elif self.reason != "":
+            raise FeedbackPromotionError("non-rollback promotion cannot carry rollback reason")
+        object.__setattr__(
+            self,
+            "schema_version",
+            _schema_version(self.schema_version, context="promotion receipt"),
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -426,6 +478,13 @@ class FeedbackPromotionPipeline:
                 "promotion requires positive evaluated improvement"
             )
 
+        if any(not isinstance(event, FeedbackEvent) for event in events):
+            raise TypeError("events must contain FeedbackEvent values")
+        event_ids = [event.event_id for event in events]
+        if len(event_ids) != len(set(event_ids)):
+            raise FeedbackPromotionError(
+                "promotion input contains duplicate feedback event ids"
+            )
         by_id = {event.event_id: event for event in events}
         selected: list[FeedbackEvent] = []
         for event_id in receipt.event_ids:
@@ -456,32 +515,66 @@ class FeedbackPromotionPipeline:
                 )
             selected.append(event)
 
-        counts = {
-            "baseline": sum(event.variant == "baseline" for event in selected),
-            "candidate": sum(event.variant == "candidate" for event in selected),
-        }
-        if min(counts.values()) < spec.min_variant_samples:
+        if any(event.observed_at > receipt.evaluated_at for event in selected):
             raise FeedbackPromotionError(
-                "evaluation does not meet minimum variant sample count"
+                "evaluation predates one or more referenced feedback events"
+            )
+
+        subject_ids = [event.subject_id for event in selected]
+        if len(subject_ids) != len(set(subject_ids)):
+            raise FeedbackPromotionError(
+                "evaluation contains repeated subject evidence"
+            )
+        unique_subject_counts = {
+            "baseline": len(
+                {event.subject_id for event in selected if event.variant == "baseline"}
+            ),
+            "candidate": len(
+                {event.subject_id for event in selected if event.variant == "candidate"}
+            ),
+        }
+        if min(unique_subject_counts.values()) < spec.min_variant_samples:
+            raise FeedbackPromotionError(
+                "evaluation does not meet minimum unique-subject variant sample count"
             )
 
         current = self.active_version(spec)
         if current not in {spec.baseline_version, spec.candidate_version}:
             raise FeedbackPromotionError("active version is outside experiment")
+        history = self._receipts.get(spec.experiment_id, [])
         if current == spec.candidate_version:
-            prior = self._receipts.get(spec.experiment_id, [])
-            if prior and prior[-1].evaluation_digest == receipt.digest:
-                return prior[-1]
+            if history and history[-1].evaluation_digest == receipt.digest:
+                return history[-1]
             raise FeedbackPromotionError(
                 "candidate is already active under different evaluation"
             )
+
+        promotion_time = _non_negative_int("promoted_at", promoted_at)
+        if promotion_time < receipt.evaluated_at:
+            raise FeedbackPromotionError(
+                "promotion timestamp cannot precede evaluation"
+            )
+        if history and history[-1].rollback:
+            rollback_receipt = history[-1]
+            if receipt.digest == rollback_receipt.evaluation_digest:
+                raise FeedbackPromotionError(
+                    "rollback requires a fresh evaluation before re-promotion"
+                )
+            if receipt.evaluated_at <= rollback_receipt.promoted_at:
+                raise FeedbackPromotionError(
+                    "re-promotion evaluation must postdate rollback"
+                )
+            if any(event.observed_at <= rollback_receipt.promoted_at for event in selected):
+                raise FeedbackPromotionError(
+                    "re-promotion requires feedback collected after rollback"
+                )
 
         result = PromotionReceipt(
             experiment_id=spec.experiment_id,
             from_version=spec.baseline_version,
             to_version=spec.candidate_version,
             evaluation_digest=receipt.digest,
-            promoted_at=_non_negative_int("promoted_at", promoted_at),
+            promoted_at=promotion_time,
         )
         self._active[spec.experiment_id] = spec.candidate_version
         self._receipts.setdefault(spec.experiment_id, []).append(result)
@@ -499,12 +592,17 @@ class FeedbackPromotionPipeline:
         history = self._receipts.get(spec.experiment_id, [])
         if not history:
             raise FeedbackPromotionError("promotion receipt is unavailable")
+        rollback_time = _non_negative_int("rolled_back_at", rolled_back_at)
+        if rollback_time < history[-1].promoted_at:
+            raise FeedbackPromotionError(
+                "rollback timestamp cannot precede active promotion"
+            )
         result = PromotionReceipt(
             experiment_id=spec.experiment_id,
             from_version=spec.candidate_version,
             to_version=spec.baseline_version,
             evaluation_digest=history[-1].evaluation_digest,
-            promoted_at=_non_negative_int("rolled_back_at", rolled_back_at),
+            promoted_at=rollback_time,
             rollback=True,
             reason=_text("reason", reason),
         )
@@ -514,6 +612,56 @@ class FeedbackPromotionPipeline:
 
     def receipts(self, experiment_id: str) -> tuple[PromotionReceipt, ...]:
         return tuple(self._receipts.get(_text("experiment_id", experiment_id), ()))
+
+    def assert_history_integrity(self, spec: ExperimentSpec) -> None:
+        """Validate causal ordering and state transitions for one experiment."""
+
+        if not isinstance(spec, ExperimentSpec):
+            raise TypeError("spec must be ExperimentSpec")
+        history = self._receipts.get(spec.experiment_id, [])
+        expected = spec.baseline_version
+        last_timestamp = -1
+        for receipt in history:
+            if receipt.experiment_id != spec.experiment_id:
+                raise FeedbackPromotionError(
+                    "promotion history contains another experiment"
+                )
+            if receipt.promoted_at < last_timestamp:
+                raise FeedbackPromotionError(
+                    "promotion history timestamps are not monotonic"
+                )
+            if receipt.from_version != expected:
+                raise FeedbackPromotionError(
+                    "promotion history version chain is broken"
+                )
+            if receipt.rollback:
+                if (
+                    receipt.from_version != spec.candidate_version
+                    or receipt.to_version != spec.baseline_version
+                ):
+                    raise FeedbackPromotionError(
+                        "rollback receipt has invalid version transition"
+                    )
+            elif (
+                receipt.from_version != spec.baseline_version
+                or receipt.to_version != spec.candidate_version
+            ):
+                raise FeedbackPromotionError(
+                    "promotion receipt has invalid version transition"
+                )
+            expected = receipt.to_version
+            last_timestamp = receipt.promoted_at
+
+        if self.active_version(spec) != expected:
+            raise FeedbackPromotionError(
+                "active version does not match promotion history"
+            )
+
+    def receipt_chain_digest(self, spec: ExperimentSpec) -> str:
+        self.assert_history_integrity(spec)
+        return _digest(
+            [receipt.as_dict() for receipt in self._receipts.get(spec.experiment_id, [])]
+        )
 
 
 __all__ = [

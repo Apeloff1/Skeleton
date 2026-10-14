@@ -10,6 +10,8 @@ APIs, local models, image/audio backends, tests, and future engines.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import threading
 import time
@@ -17,6 +19,11 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any, Iterable, Mapping
 
+from skeleton.ai.assistant.turn_runtime import (
+    BudgetGovernor,
+    ExecutionBudget,
+    TurnSnapshot,
+)
 from skeleton.intelligence.admission import ResourceBudget
 from skeleton.vault.governance_registry import GovernanceContext
 
@@ -82,6 +89,8 @@ class ModelEndpoint:
     output_cost_per_million: float = 0.0
     nominal_latency_ms: float = 1000.0
     privacy_ceiling: PrivacyLevel = PrivacyLevel.PUBLIC
+    jurisdiction: str | None = None
+    receipt_capable: bool = True
     local: bool = False
     enabled: bool = True
     metadata: Mapping[str, Any] = field(default_factory=dict)
@@ -119,6 +128,16 @@ class ModelEndpoint:
         if self.local and ceiling < PrivacyLevel.LOCAL_ONLY:
             ceiling = PrivacyLevel.LOCAL_ONLY
         object.__setattr__(self, "privacy_ceiling", ceiling)
+        jurisdiction = (
+            None
+            if self.jurisdiction is None
+            else str(self.jurisdiction).strip().lower()
+        )
+        if jurisdiction == "":
+            raise ValueError("jurisdiction must be non-empty when provided")
+        if not isinstance(self.receipt_capable, bool):
+            raise ValueError("receipt_capable must be boolean")
+        object.__setattr__(self, "jurisdiction", jurisdiction)
         object.__setattr__(self, "metadata", dict(self.metadata))
 
     def estimated_cost(self, input_tokens: int, output_tokens: int) -> float:
@@ -142,6 +161,10 @@ class RouteRequest:
     excluded_endpoints: frozenset[str] = field(default_factory=frozenset)
     minimum_reliability: float = 0.0
     minimum_quality: float = 0.0
+    minimum_observations: int = 0
+    max_telemetry_age_s: float | None = None
+    allowed_jurisdictions: frozenset[str] = field(default_factory=frozenset)
+    require_provider_receipt: bool = False
     governance_record_ids: tuple[str, ...] = field(default_factory=tuple)
     governance_tenant_id: str | None = None
     governance_purpose: str | None = None
@@ -152,7 +175,7 @@ class RouteRequest:
         task_type: str,
         governance: GovernanceContext,
         *,
-        budget: ResourceBudget | None = None,
+        budget: ResourceBudget | ExecutionBudget | None = None,
         context_tokens: int = 0,
         expected_output_tokens: int | None = None,
         **kwargs: Any,
@@ -174,6 +197,15 @@ class RouteRequest:
             "governance_tenant_id": governance.tenant_id,
             "governance_purpose": governance.purpose,
         }
+        if isinstance(budget, ExecutionBudget):
+            return cls.from_turn_budget(
+                task_type,
+                budget,
+                context_tokens=context_tokens,
+                expected_output_tokens=expected_output_tokens,
+                **governed,
+                **kwargs,
+            )
         if budget is not None:
             return cls.from_resource_budget(
                 task_type,
@@ -225,6 +257,140 @@ class RouteRequest:
             **kwargs,
         )
 
+    @classmethod
+    def from_turn_budget(
+        cls,
+        task_type: str,
+        budget: ExecutionBudget,
+        *,
+        context_tokens: int = 0,
+        expected_output_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> "RouteRequest":
+        """Bind one durable AI-chat execution budget into routing constraints."""
+
+        if not isinstance(budget, ExecutionBudget):
+            raise TypeError("budget must be an ExecutionBudget")
+        output_tokens = (
+            budget.max_output_tokens
+            if expected_output_tokens is None
+            else min(expected_output_tokens, budget.max_output_tokens)
+        )
+        if "latency_budget_ms" in kwargs or "cost_budget" in kwargs:
+            raise ValueError(
+                "turn budget owns latency_budget_ms and cost_budget"
+            )
+        return cls(
+            task_type=task_type,
+            context_tokens=context_tokens,
+            expected_output_tokens=output_tokens,
+            latency_budget_ms=budget.max_wall_seconds * 1000.0,
+            cost_budget=budget.max_cost_usd,
+            **kwargs,
+        )
+
+    @classmethod
+    def from_turn_snapshot(
+        cls,
+        task_type: str,
+        snapshot: TurnSnapshot,
+        *,
+        context_tokens: int = 0,
+        expected_output_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> "RouteRequest":
+        """Project only the durable turn's remaining authority into routing.
+
+        Retry and failover callers must not reuse the original ExecutionBudget:
+        doing so would silently restore wall-time, output-token, call, or cost
+        authority that the turn has already consumed.
+        """
+
+        if not isinstance(snapshot, TurnSnapshot):
+            raise TypeError("snapshot must be a TurnSnapshot")
+        if snapshot.terminal:
+            raise ValueError("terminal turn cannot acquire model routing authority")
+        remaining = BudgetGovernor.assess(snapshot.budget, snapshot.usage)
+        if not remaining.allowed:
+            raise ValueError("turn usage exceeds durable execution budget")
+        values = remaining.remaining
+        if int(values["model_calls"]) < 1:
+            raise ValueError("model-call budget exhausted")
+        if (
+            isinstance(context_tokens, bool)
+            or not isinstance(context_tokens, int)
+            or context_tokens < 0
+        ):
+            raise ValueError("context_tokens must be a non-negative integer")
+        if context_tokens > int(values["input_tokens"]):
+            raise ValueError("context exceeds remaining input-token budget")
+        if expected_output_tokens is not None:
+            if (
+                isinstance(expected_output_tokens, bool)
+                or not isinstance(expected_output_tokens, int)
+                or expected_output_tokens < 0
+            ):
+                raise ValueError(
+                    "expected_output_tokens must be a non-negative integer"
+                )
+            if expected_output_tokens > int(values["output_tokens"]):
+                raise ValueError(
+                    "expected output exceeds remaining output-token budget"
+                )
+        remaining_budget = ExecutionBudget(
+            max_wall_seconds=float(values["wall_seconds"]),
+            max_input_tokens=int(values["input_tokens"]),
+            max_output_tokens=int(values["output_tokens"]),
+            max_model_calls=int(values["model_calls"]),
+            max_tool_calls=int(values["tool_calls"]),
+            max_agent_depth=int(values["agent_depth"]),
+            max_parallel_workers=int(values["parallel_workers"]),
+            max_retrieval_queries=int(values["retrieval_queries"]),
+            max_external_writes=int(values["external_writes"]),
+            max_cost_usd=float(values["cost_usd"]),
+        )
+        return cls.from_turn_budget(
+            task_type,
+            remaining_budget,
+            context_tokens=context_tokens,
+            expected_output_tokens=expected_output_tokens,
+            **kwargs,
+        )
+
+    def constraint_dict(self) -> dict[str, Any]:
+        return {
+            "task_type": self.task_type,
+            "required_capabilities": sorted(self.required_capabilities),
+            "required_modalities": sorted(self.required_modalities),
+            "context_tokens": self.context_tokens,
+            "expected_output_tokens": self.expected_output_tokens,
+            "privacy": self.privacy.name.lower(),
+            "latency_budget_ms": self.latency_budget_ms,
+            "cost_budget": self.cost_budget,
+            "preferred_providers": list(self.preferred_providers),
+            "excluded_endpoints": sorted(self.excluded_endpoints),
+            "minimum_reliability": self.minimum_reliability,
+            "minimum_quality": self.minimum_quality,
+            "minimum_observations": self.minimum_observations,
+            "max_telemetry_age_s": self.max_telemetry_age_s,
+            "allowed_jurisdictions": sorted(self.allowed_jurisdictions),
+            "require_provider_receipt": self.require_provider_receipt,
+            "governance_record_ids": list(self.governance_record_ids),
+            "governance_tenant_id": self.governance_tenant_id,
+            "governance_purpose": self.governance_purpose,
+        }
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.constraint_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
+
     def __post_init__(self) -> None:
         task_type = self.task_type.strip().lower()
         if not task_type:
@@ -272,6 +438,28 @@ class RouteRequest:
             "minimum_quality",
             _unit_interval(self.minimum_quality, "minimum_quality"),
         )
+        if (
+            isinstance(self.minimum_observations, bool)
+            or not isinstance(self.minimum_observations, int)
+            or self.minimum_observations < 0
+        ):
+            raise ValueError("minimum_observations must be a non-negative integer")
+        if self.max_telemetry_age_s is not None:
+            object.__setattr__(
+                self,
+                "max_telemetry_age_s",
+                _finite_nonnegative(
+                    self.max_telemetry_age_s,
+                    "max_telemetry_age_s",
+                ),
+            )
+        object.__setattr__(
+            self,
+            "allowed_jurisdictions",
+            _names(self.allowed_jurisdictions),
+        )
+        if not isinstance(self.require_provider_receipt, bool):
+            raise ValueError("require_provider_receipt must be boolean")
         governed_ids = tuple(
             dict.fromkeys(
                 str(value).strip()
@@ -374,6 +562,37 @@ class EndpointTelemetry:
 
 
 @dataclass(frozen=True)
+class EndpointQuarantine:
+    endpoint_id: str
+    reason_code: str
+    quarantined_at: float
+    expires_at: float | None = None
+
+    def __post_init__(self) -> None:
+        endpoint_id = str(self.endpoint_id).strip()
+        reason = str(self.reason_code).strip()
+        if not endpoint_id or not reason:
+            raise ValueError("endpoint quarantine requires identity and reason")
+        quarantined_at = _finite_nonnegative(
+            self.quarantined_at,
+            "quarantined_at",
+        )
+        expires_at = self.expires_at
+        if expires_at is not None:
+            expires_at = _finite_nonnegative(expires_at, "expires_at")
+            if expires_at <= quarantined_at:
+                raise ValueError("quarantine expiry must follow quarantine time")
+        object.__setattr__(self, "endpoint_id", endpoint_id)
+        object.__setattr__(self, "reason_code", reason)
+        object.__setattr__(self, "quarantined_at", quarantined_at)
+        object.__setattr__(self, "expires_at", expires_at)
+
+    def active_at(self, timestamp: float) -> bool:
+        timestamp = _finite_nonnegative(timestamp, "timestamp")
+        return self.expires_at is None or timestamp < self.expires_at
+
+
+@dataclass(frozen=True)
 class RouteCandidate:
     endpoint_id: str
     score: float
@@ -407,9 +626,34 @@ class RouteDecision:
     def fallback_endpoint_ids(self) -> tuple[str, ...]:
         return tuple(candidate.endpoint_id for candidate in self.candidates[1:])
 
+    @property
+    def request_digest(self) -> str:
+        return self.request.digest
+
+    @property
+    def digest(self) -> str:
+        payload = {
+            "request_digest": self.request_digest,
+            "selected": self.selected.endpoint_id,
+            "fallbacks": list(self.fallback_endpoint_ids),
+            "candidates": [candidate.as_dict() for candidate in self.candidates],
+            "rejected": {key: list(value) for key, value in sorted(self.rejected.items())},
+            "routed_at": self.routed_at,
+        }
+        raw = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "task_type": self.request.task_type,
+            "request_digest": self.request_digest,
+            "decision_digest": self.digest,
             "selected": self.selected.endpoint_id,
             "fallbacks": list(self.fallback_endpoint_ids),
             "candidates": [candidate.as_dict() for candidate in self.candidates],
@@ -461,6 +705,7 @@ class ModelRouter:
         self._lock = threading.RLock()
         self._endpoints: dict[str, ModelEndpoint] = {}
         self._telemetry: dict[str, EndpointTelemetry] = {}
+        self._quarantine: dict[str, EndpointQuarantine] = {}
 
     def register(self, endpoint: ModelEndpoint, *, replace: bool = False) -> None:
         if not isinstance(endpoint, ModelEndpoint):
@@ -474,6 +719,7 @@ class ModelRouter:
             # Never let historical measurements silently cross that identity boundary.
             if exists and replace:
                 self._telemetry[endpoint.endpoint_id] = EndpointTelemetry()
+                self._quarantine.pop(endpoint.endpoint_id, None)
             else:
                 self._telemetry.setdefault(endpoint.endpoint_id, EndpointTelemetry())
 
@@ -482,7 +728,35 @@ class ModelRouter:
         with self._lock:
             removed = self._endpoints.pop(endpoint_id, None)
             self._telemetry.pop(endpoint_id, None)
+            self._quarantine.pop(endpoint_id, None)
             return removed is not None
+
+    def quarantine(
+        self,
+        endpoint_id: str,
+        *,
+        reason_code: str,
+        observed_at: float | None = None,
+        expires_at: float | None = None,
+    ) -> EndpointQuarantine:
+        endpoint_id = str(endpoint_id).strip()
+        timestamp = time.time() if observed_at is None else float(observed_at)
+        quarantine = EndpointQuarantine(
+            endpoint_id=endpoint_id,
+            reason_code=reason_code,
+            quarantined_at=timestamp,
+            expires_at=expires_at,
+        )
+        with self._lock:
+            if endpoint_id not in self._endpoints:
+                raise KeyError(f"unknown endpoint: {endpoint_id}")
+            self._quarantine[endpoint_id] = quarantine
+        return quarantine
+
+    def clear_quarantine(self, endpoint_id: str) -> bool:
+        endpoint_id = str(endpoint_id).strip()
+        with self._lock:
+            return self._quarantine.pop(endpoint_id, None) is not None
 
     def observe(
         self,
@@ -521,12 +795,28 @@ class ModelRouter:
         endpoint: ModelEndpoint,
         telemetry: EndpointTelemetry,
         request: RouteRequest,
+        *,
+        routed_at: float,
+        quarantine: EndpointQuarantine | None,
     ) -> list[str]:
         reasons: list[str] = []
         if not endpoint.enabled:
             reasons.append("disabled")
         if endpoint.endpoint_id.lower() in request.excluded_endpoints:
             reasons.append("excluded")
+        if quarantine is not None and quarantine.active_at(routed_at):
+            reasons.append("quarantined:" + quarantine.reason_code)
+        if request.allowed_jurisdictions:
+            if endpoint.jurisdiction is None:
+                reasons.append("jurisdiction unknown")
+            elif endpoint.jurisdiction not in request.allowed_jurisdictions:
+                reasons.append(
+                    "jurisdiction "
+                    + endpoint.jurisdiction
+                    + " not allowed"
+                )
+        if request.require_provider_receipt and not endpoint.receipt_capable:
+            reasons.append("provider receipt capability required")
 
         missing_capabilities = request.required_capabilities - endpoint.capabilities
         if missing_capabilities:
@@ -566,6 +856,22 @@ class ModelRouter:
         if request.cost_budget is not None and cost > request.cost_budget:
             reasons.append(f"cost {cost:.8f} exceeds budget {request.cost_budget:.8f}")
 
+        if telemetry.observations < request.minimum_observations:
+            reasons.append(
+                f"observations {telemetry.observations} below minimum "
+                f"{request.minimum_observations}"
+            )
+        if request.max_telemetry_age_s is not None:
+            if telemetry.last_observed_at is None:
+                reasons.append("telemetry missing")
+            elif telemetry.last_observed_at > routed_at:
+                reasons.append("telemetry timestamp is in the future")
+            elif routed_at - telemetry.last_observed_at > request.max_telemetry_age_s:
+                reasons.append(
+                    f"telemetry age {routed_at - telemetry.last_observed_at:.2f} "
+                    f"exceeds maximum {request.max_telemetry_age_s:.2f}"
+                )
+
         if telemetry.reliability_ewma < request.minimum_reliability:
             reasons.append(
                 f"reliability {telemetry.reliability_ewma:.4f} below minimum "
@@ -578,9 +884,16 @@ class ModelRouter:
             )
         return reasons
 
-    def route(self, request: RouteRequest) -> RouteDecision:
+    def route(
+        self,
+        request: RouteRequest,
+        *,
+        routed_at: float | None = None,
+    ) -> RouteDecision:
         if not isinstance(request, RouteRequest):
             raise TypeError("request must be a RouteRequest")
+        route_time = time.time() if routed_at is None else float(routed_at)
+        route_time = _finite_nonnegative(route_time, "routed_at")
 
         # Endpoints and telemetry are immutable values. Copying both registries under
         # the same lock gives this route one coherent view while allowing later
@@ -591,6 +904,14 @@ class ModelRouter:
                 endpoint_id: self._telemetry.get(endpoint_id, EndpointTelemetry())
                 for endpoint_id in endpoints
             }
+            expired = [
+                endpoint_id
+                for endpoint_id, quarantine in self._quarantine.items()
+                if not quarantine.active_at(route_time)
+            ]
+            for endpoint_id in expired:
+                self._quarantine.pop(endpoint_id, None)
+            quarantines = dict(self._quarantine)
 
         rejected: dict[str, tuple[str, ...]] = {}
         candidates: list[RouteCandidate] = []
@@ -602,7 +923,13 @@ class ModelRouter:
 
         for endpoint_id, endpoint in endpoints.items():
             stats = telemetry[endpoint_id]
-            reasons = self._hard_rejections(endpoint, stats, request)
+            reasons = self._hard_rejections(
+                endpoint,
+                stats,
+                request,
+                routed_at=route_time,
+                quarantine=quarantines.get(endpoint_id),
+            )
             if reasons:
                 rejected[endpoint_id] = tuple(reasons)
                 continue
@@ -681,13 +1008,14 @@ class ModelRouter:
             selected=endpoints[candidates[0].endpoint_id],
             candidates=tuple(candidates),
             rejected=rejected,
-            routed_at=time.time(),
+            routed_at=route_time,
         )
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             endpoints = sorted(self._endpoints.values(), key=lambda row: row.endpoint_id)
             telemetry = dict(self._telemetry)
+            quarantines = dict(self._quarantine)
 
         return {
             "endpoints": [
@@ -699,8 +1027,19 @@ class ModelRouter:
                     "modalities": sorted(endpoint.modalities),
                     "max_context_tokens": endpoint.max_context_tokens,
                     "privacy_ceiling": endpoint.privacy_ceiling.name.lower(),
+                    "jurisdiction": endpoint.jurisdiction,
+                    "receipt_capable": endpoint.receipt_capable,
                     "local": endpoint.local,
                     "enabled": endpoint.enabled,
+                    "quarantine": (
+                        None
+                        if endpoint.endpoint_id not in quarantines
+                        else {
+                            "reason_code": quarantines[endpoint.endpoint_id].reason_code,
+                            "quarantined_at": quarantines[endpoint.endpoint_id].quarantined_at,
+                            "expires_at": quarantines[endpoint.endpoint_id].expires_at,
+                        }
+                    ),
                     "telemetry": telemetry.get(
                         endpoint.endpoint_id, EndpointTelemetry()
                     ).snapshot(),
@@ -708,3 +1047,17 @@ class ModelRouter:
                 for endpoint in endpoints
             ]
         }
+
+
+__all__ = [
+    "EndpointQuarantine",
+    "EndpointTelemetry",
+    "ModelEndpoint",
+    "ModelRouter",
+    "NoRoute",
+    "PrivacyLevel",
+    "RouteCandidate",
+    "RouteDecision",
+    "RouteRequest",
+    "RoutingError",
+]

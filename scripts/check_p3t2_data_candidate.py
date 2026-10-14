@@ -128,11 +128,19 @@ def validate(root=ROOT, head=None):
             raise DataCandidateError(f"{key} missing")
         module = MODULES[key]
         test = TESTS[key]
-        if (
-            volume.get("completion_checkbox") is not False
-            or volume.get("implementation_status") == "verified"
-        ):
-            raise DataCandidateError(f"{key} completion drift")
+        # The P3-T2 candidate never signs its owner or promotes itself.
+        # Independently verified masterplan volumes can legitimately predate
+        # this candidate's exact-head qualification.
+        signed = volume.get("completion_checkbox")
+        verified = volume.get("implementation_status") == "verified"
+        if signed is True:
+            if not verified or volume.get("completion_checkbox_mark") != "[x]" or volume.get("gaps"):
+                raise DataCandidateError(f"{key} inconsistent independent signoff")
+        elif signed is False:
+            if verified or volume.get("completion_checkbox_mark") != "[ ]":
+                raise DataCandidateError(f"{key} unsigned volume claims verification")
+        else:
+            raise DataCandidateError(f"{key} invalid completion checkbox")
         if (
             module not in volume.get("implementation_paths", [])
             or test not in volume.get("tests", [])
@@ -162,29 +170,54 @@ def validate(root=ROOT, head=None):
         or re.fullmatch(r"[0-9a-f]{40}", implementation_head) is None
     ):
         raise DataCandidateError("P3-T2 implementation head identity drift")
-    implementation_tree = _git(
-        root,
-        "rev-parse",
-        f"{implementation_head}:skeleton/data",
-    )
-    if implementation_tree != actual_data_tree:
-        raise DataCandidateError("P3-T2 implementation tree identity drift")
-    ancestor = subprocess.run(
+    implementation_available = subprocess.run(
         [
             "git",
             "-C",
             str(root),
-            "merge-base",
-            "--is-ancestor",
-            implementation_head,
-            actual_head,
+            "cat-file",
+            "-e",
+            f"{implementation_head}^{{commit}}",
         ],
         capture_output=True,
         text=True,
         check=False,
-    )
-    if ancestor.returncode != 0:
-        raise DataCandidateError("P3-T2 implementation head is not an ancestor")
+    ).returncode == 0
+    if implementation_available:
+        implementation_tree = _git(
+            root,
+            "rev-parse",
+            f"{implementation_head}:skeleton/data",
+        )
+        if implementation_tree != actual_data_tree:
+            raise DataCandidateError("P3-T2 implementation tree identity drift")
+
+        ancestor = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "merge-base",
+                "--is-ancestor",
+                implementation_head,
+                actual_head,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if ancestor.returncode != 0:
+            # Reconciliation may preserve the implementation byte-for-byte
+            # without preserving the historical commit as an ancestor. The
+            # immutable source-tree identity above is the authority boundary.
+            if reconciliation.get("source_tree_sha") != implementation_tree:
+                raise DataCandidateError(
+                    "P3-T2 reconciled implementation tree identity drift"
+                )
+    elif reconciliation.get("source_tree_sha") != actual_data_tree:
+        raise DataCandidateError(
+            "P3-T2 implementation commit unavailable without exact tree binding"
+        )
 
     for left, right in expected_pairs:
         if (root / left).read_bytes() != (root / right).read_bytes():

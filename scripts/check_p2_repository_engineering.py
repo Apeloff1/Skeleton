@@ -85,6 +85,7 @@ def validate(root=ROOT):
         elif t["status"]=="in_progress":expected_state="in_progress"
         elif t["status"]=="blocked":expected_state="blocked"
         elif t["status"]=="ready":expected_state="not_started"
+        elif t["status"]=="closed":expected_state="verified_complete"
         else:raise Error(f"{tid} unsupported P2 task status {t['status']!r}")
         if r["derived_state"]!=expected_state:raise Error(f"{tid} completion derived-state drift")
     bids={x["backlog_id"] for x in rows}

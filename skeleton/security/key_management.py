@@ -4,14 +4,13 @@ This module models identifiers, lifecycle metadata, and rotation evidence only.
 It never stores, derives, unwraps, encrypts with, decrypts with, or otherwise
 handles cryptographic key material.
 """
-
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
-from collections.abc import Iterable
-from dataclasses import dataclass
-from itertools import pairwise
+from typing import Iterable
+
 
 _STATES = frozenset({"active", "retired", "revoked"})
 
@@ -267,7 +266,7 @@ def validate_key_history(
     if ordered[0].version != 1 or ordered[0].predecessor_digest is not None:
         raise KeyManagementError("key history must start at version 1")
 
-    for previous, current in pairwise(ordered):
+    for previous, current in zip(ordered, ordered[1:]):
         if current.version != previous.version + 1:
             raise KeyManagementError("key history versions must be contiguous")
         if current.predecessor_digest != previous.digest:
@@ -280,11 +279,14 @@ def validate_key_history(
     if len({item.rotation_id for item in rotation_rows}) != len(rotation_rows):
         raise KeyManagementError("key rotation IDs must be unique")
 
-    by_transition = {(item.from_version, item.to_version): item for item in rotation_rows}
+    by_transition = {
+        (item.from_version, item.to_version): item
+        for item in rotation_rows
+    }
     if len(by_transition) != len(rotation_rows):
         raise KeyManagementError("key history rotation transitions must be unique")
 
-    for previous, current in pairwise(ordered):
+    for previous, current in zip(ordered, ordered[1:]):
         rotation = by_transition.get((previous.version, current.version))
         if rotation is None:
             raise KeyManagementError("key history is missing rotation evidence")
@@ -303,7 +305,7 @@ def validate_key_history(
             "versions": [item.digest for item in ordered],
             "rotations": [
                 by_transition[(previous.version, current.version)].digest
-                for previous, current in pairwise(ordered)
+                for previous, current in zip(ordered, ordered[1:])
             ],
         }
     )

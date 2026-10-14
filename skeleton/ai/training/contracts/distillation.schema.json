@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-07:distillation:v1",
+  "title": "FLGB-07 distillation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "teacher_digest",
+    "student_base_digest",
+    "dataset_revision_digest",
+    "objective_digest",
+    "output_kind"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "teacher_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "student_base_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dataset_revision_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "objective_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "output_kind": {
+      "const": "candidate-only"
+    }
+  }
+}

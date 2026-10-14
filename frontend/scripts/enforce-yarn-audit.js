@@ -43,7 +43,7 @@ const allowedMitigatedAdvisories = new Map([
   [
     'image-size',
     new Set([
-      // No patched npm release; parser progress is patched and behavior-tested.
+      // Metro 0.83.x requires image-size 1.x; parser progress is locally patched and behavior-tested.
       'GHSA-5p2g-fcmc-qvqq',
       'GHSA-w3rx-r6r6-pgpr',
     ]),

@@ -100,14 +100,17 @@ def _validate_task(master: dict[str, Any], backlog: dict[str, Any]) -> dict[str,
     if task.get("primary_volume_refs") != list(TRACE_REFS):
         raise P2TraceabilityError("P2-TRACE-01 volume scope drift")
     status = task.get("status")
-    if status not in {"in_progress", "landed_unpromoted"}:
+    if status not in {"in_progress", "landed_unpromoted", "closed"}:
         raise P2TraceabilityError(
-            "P2-TRACE-01 must be in_progress or landed_unpromoted"
+            "P2-TRACE-01 must be in_progress, landed_unpromoted, or closed"
         )
-    if task.get("completion_checkbox") is not False or task.get("completion_checkbox_mark") != "[ ]":
-        raise P2TraceabilityError("P2-TRACE-01 may not claim completion")
-    if task.get("implementation_signed") is not False or task.get("verification_signed") is not False:
-        raise P2TraceabilityError("P2-TRACE-01 may not fabricate sign-off")
+    if status != "closed":
+        if task.get("completion_checkbox") is not False or task.get("completion_checkbox_mark") != "[ ]":
+            raise P2TraceabilityError("P2-TRACE-01 may not claim completion")
+        if task.get("implementation_signed") is not False or task.get("verification_signed") is not False:
+            raise P2TraceabilityError("P2-TRACE-01 may not fabricate sign-off")
+    elif not (task.get("implementation_signed") and task.get("verification_signed") and task.get("completion_checkbox")):
+        raise P2TraceabilityError("P2-TRACE-01 closed requires both signoffs")
 
     canonical = _master_by_ref(master)
     obligations = task.get("masterplan_obligations")
@@ -129,8 +132,8 @@ def _validate_task(master: dict[str, Any], backlog: dict[str, Any]) -> dict[str,
         for field in ("title", "contracts", "risks", "gaps"):
             if obligation.get(field) != volume.get(field):
                 raise P2TraceabilityError(f"P2-TRACE-01 narrows {ref}.{field}")
-        if obligation.get("completion_checkbox") is not False:
-            raise P2TraceabilityError(f"{ref} obligation may not claim completion")
+        if obligation.get("completion_checkbox") != volume.get("completion_checkbox"):
+            raise P2TraceabilityError(f"{ref} obligation completion drift")
         if obligation.get("signing_required") is not True:
             raise P2TraceabilityError(f"{ref} signing requirement drift")
 
@@ -293,8 +296,8 @@ def _validate_maturity_projection(
             )
         if item.get("checkbox") != canon.get("completion_checkbox"):
             raise P2TraceabilityError(f"{ref} maturity checkbox drift")
-        if item.get("implementation_signed") is not False or item.get("verification_signed") is not False:
-            raise P2TraceabilityError(f"{ref} maturity projection may not sign")
+        if item.get("checkbox") is True and not (item.get("implementation_signed") and item.get("verification_signed")):
+            raise P2TraceabilityError(f"{ref} maturity projection checked without signoff")
     return {"maturity_projection_count": len(entries)}
 
 

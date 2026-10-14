@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-02:tokenization:v1",
+  "title": "FLGB-02 tokenization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tokenizer_digest",
+    "token_ids",
+    "source_text_digest"
+  ],
+  "properties": {
+    "tokenizer_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "token_ids": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647
+      }
+    },
+    "source_text_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

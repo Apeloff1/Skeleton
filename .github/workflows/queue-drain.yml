@@ -3,10 +3,10 @@ name: Drain superseded Actions queue
 on:
   workflow_dispatch:
   workflow_run:
-    # Wake on terminal critical validation runs as well as the canonical merge
-    # gate. The drainer independently proves every cancellation candidate, so
-    # extra wakeups improve recovery latency without weakening fail-closed rules.
-    workflows: ["Merge Readiness", "CI/CD", "Backend Quality", "Frontier Contracts"]
+    # One canonical validation completion is enough to wake recovery. The
+    # five-minute schedule catches missed wakes without multiplying queued
+    # drainer runs for every CI/CD, Backend Quality, and Frontier completion.
+    workflows: ["Merge Readiness"]
     types: [completed]
     branches: [main]
   schedule:
@@ -16,10 +16,10 @@ on:
     branches: [main]
     paths: ['.github/workflows/queue-drain.yml']
 
-# v3 escapes the queued v2 recovery generation while keeping one live run plus
-# one coalesced pending run. Future triggers remain non-preemptive.
+# v5 escapes provider-stuck v4 recovery. Bound every sweep so future v5
+# signals share one non-preemptive worker and one coalesced pending run.
 concurrency:
-  group: queue-drain-v3-${{ github.repository }}
+  group: queue-drain-v5-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -37,9 +37,10 @@ jobs:
     permissions:
       actions: write
       contents: read
-    # Queue recovery must not depend on the scarcer ARM lane it may be trying
-    # to recover when repository-wide workflow fanout is saturated.
-    runs-on: ubuntu-latest
+    # Place the Python-only cleanup worker on the ARM recovery pool instead
+    # of competing with broad x64 PR validation. Safety comes from the
+    # exact-head and stale-PR guards, not runner architecture.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
@@ -69,6 +70,10 @@ jobs:
               'User-Agent': 'skeleton-queue-drainer',
           }
           retryable = frozenset({0, 429, 500, 502, 503, 504})
+          max_cancellation_attempts = 80
+          deadline = time.monotonic() + 450
+          cancellation_attempts = 0
+          budget_exhausted = False
 
           # These workflows form the branch-flow / queue-recovery control plane.
           # They are designed either to follow a moving main, provide canonical
@@ -100,10 +105,24 @@ jobs:
                   method=method,
               )
               try:
-                  with urllib.request.urlopen(req, timeout=30) as response:
+                  with urllib.request.urlopen(req, timeout=15) as response:
                       raw = response.read()
                       return response.status, json.loads(raw) if raw else None
               except urllib.error.HTTPError as exc:
+                  # GitHub installation quota exhaustion can return 403 as
+                  # well as 429; distinguish it from permission failures.
+                  if exc.code in {403, 429}:
+                      try:
+                          detail = json.loads(exc.read().decode('utf-8'))
+                      except (ValueError, UnicodeDecodeError):
+                          detail = {}
+                      message = str(detail.get('message') or '').casefold()
+                      if (
+                          exc.code == 429
+                          or 'rate limit' in message
+                          or 'abuse detection' in message
+                      ):
+                          return 429, None
                   return exc.code, None
               except urllib.error.URLError:
                   return 0, None
@@ -112,7 +131,7 @@ jobs:
               status = 0
               for attempt in range(3):
                   status, _ = request(path, method='POST')
-                  if status not in retryable:
+                  if status not in retryable or status == 429:
                       return status
                   if attempt < 2:
                       time.sleep(2 ** attempt)
@@ -126,13 +145,32 @@ jobs:
                   and payload.get('status') == 'completed'
               )
 
-          def cancel(run_id):
+          def security_lane(run):
+              # Rejected ordinary cancellation is not evidence that forced
+              # termination of security/provenance checks is acceptable.
+              name = str(run.get('name') or '').casefold()
+              workflow_path = str(run.get('path') or '').casefold()
+              sensitive = (
+                  'malware', 'secret', 'security', 'codeql', 'provenance',
+                  'artifact policy', 'dependency', 'repository hygiene',
+                  'workflow input', 'github-advanced-security',
+              )
+              return (
+                  any(term in name for term in sensitive)
+                  or any(term in workflow_path for term in sensitive)
+              )
+
+          def cancel(run_id, security_lane=False):
               status = post_with_retry(
                   f'/repos/{repo}/actions/runs/{run_id}/cancel'
               )
               if status in {200, 202, 404}:
                   return status
+              if status == 429:
+                  return status
               if status in {409, 422} and run_completed(run_id):
+                  return status
+              if security_lane:
                   return status
               if status in {409, 422} or status in retryable:
                   forced = post_with_retry(
@@ -379,11 +417,18 @@ jobs:
           }
           pass_lines = []
           latest_main = ''
+          rate_limit_hit = False
 
           # Four passes catch GitHub-managed fanout that arrives seconds after a
           # push. Each pass resolves main again, so the drainer follows the live
           # repository rather than a stale workflow-event SHA.
           for pass_no in range(1, 5):
+              if rate_limit_hit or budget_exhausted:
+                  break
+              if time.monotonic() >= deadline:
+                  budget_exhausted = True
+                  print('Queue drain time budget reached before pass; deferring remaining runs.')
+                  break
               head = main_sha()
               latest_main = head
               head_runs = list_runs(head_sha=head)
@@ -527,8 +572,20 @@ jobs:
 
               accepted = moved = deferred = failed = 0
               for run in selected:
+                  if cancellation_attempts >= max_cancellation_attempts or time.monotonic() >= deadline:
+                      budget_exhausted = True
+                      print('Queue drain write/time budget reached; deferring remaining runs.')
+                      break
                   run_id = int(run['id'])
-                  status = cancel(run_id)
+                  cancellation_attempts += 1
+                  status = cancel(run_id, security_lane=security_lane(run))
+                  if status == 429:
+                      # Retain the rest of this inventory for a later sweep;
+                      # additional API calls cannot cure installation limits.
+                      rate_limit_hit = True
+                      deferred += 1
+                      print('GitHub API rate limit reached; ending mutation sweep.')
+                      break
                   if status in {200, 202}:
                       attempted.add(run_id)
                       transient.discard(run_id)
@@ -582,7 +639,7 @@ jobs:
               )
               print(line)
               pass_lines.append(line)
-              if pass_no < 4:
+              if pass_no < 4 and not rate_limit_hit and not budget_exhausted:
                   time.sleep(8)
 
           summary = os.environ.get('GITHUB_STEP_SUMMARY')
@@ -590,6 +647,9 @@ jobs:
               with open(summary, 'a', encoding='utf-8') as handle:
                   handle.write('## Actions queue drain\n')
                   handle.write(f'- Latest live main SHA: `{latest_main}`\n')
+                  handle.write(f'- API rate-limit backpressure: {rate_limit_hit}\n')
+                  handle.write(f'- Cancellation attempt budget: {cancellation_attempts}/{max_cancellation_attempts}\n')
+                  handle.write(f'- Time or cancellation budget exhausted: {budget_exhausted}\n')
                   handle.write('- Sweep passes: 4 over ~24 seconds\n')
                   handle.write(
                       '- Branch control-plane observations preserved: '
@@ -673,10 +733,30 @@ jobs:
           REPO: ${{ github.repository }}
           HOUSEKEEPING_WORKFLOW: actions-housekeeping-cli.yml
           HOUSEKEEPING_WAKE_STALE_MINUTES: '1440'
-          HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '360'
+          HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '90'
         shell: bash
         run: |
           set -euo pipefail
+
+          # Do not spend the exhausted installation API budget trying to
+          # launch additional recovery runs. A rate-limited observation has
+          # unknown state, so it must never authorize a dispatch.
+          api_json() {
+            local path="$1" output="$2" error_file="$RUNNER_TEMP/housekeeping-api-error.txt"
+            if gh api "/repos/${REPO}/${path}" > "$output" 2>"$error_file"; then
+              return 0
+            fi
+            if grep -Eqi '(rate.limit|abuse detection)' "$error_file"; then
+              {
+                echo '## Housekeeping wake'
+                echo '- Dispatch: no'
+                echo '- Reason: GitHub installation API capacity exhausted; deferred without mutation'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo '::error::Housekeeping API observation failed; fail closed.'
+            exit 1
+          }
 
           cutoff=$(date -u -d "${HOUSEKEEPING_WAKE_STALE_MINUTES} minutes ago" +%s)
           stale_candidate=''
@@ -684,7 +764,7 @@ jobs:
 
           for page in $(seq 1 10); do
             page_json="$RUNNER_TEMP/housekeeping-wake-queued-${page}.json"
-            gh api "/repos/${REPO}/actions/runs?status=queued&per_page=100&page=${page}" > "$page_json"
+            api_json "actions/runs?status=queued&per_page=100&page=${page}" "$page_json"
             count=$(jq -r '.workflow_runs | length' "$page_json")
             [[ "$count" =~ ^[0-9]+$ ]] || {
               echo '::error::Housekeeping wake received malformed queued-run inventory.'
@@ -733,7 +813,9 @@ jobs:
           housekeeping_live=0
           housekeeping_status=''
           for status_name in requested waiting pending queued in_progress; do
-            status_count=$(gh api "/repos/${REPO}/actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=${status_name}&per_page=1" --jq '.total_count')
+            status_file="$RUNNER_TEMP/housekeeping-${status_name}.json"
+            api_json "actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=${status_name}&per_page=1" "$status_file"
+            status_count=$(jq -r '.total_count // "invalid"' "$status_file")
             if ! [[ "$status_count" =~ ^[0-9]+$ ]]; then
               echo "::error::Housekeeping wake received invalid ${status_name} run count."
               exit 1
@@ -755,9 +837,9 @@ jobs:
             exit 0
           fi
 
-          recent_success=$(gh api \
-            "/repos/${REPO}/actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=completed&per_page=20" \
-            --jq '[.workflow_runs[] | select(.conclusion == "success") | .updated_at][0] // ""')
+          history_file="$RUNNER_TEMP/housekeeping-recent-completed.json"
+          api_json "actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=completed&per_page=20" "$history_file"
+          recent_success=$(jq -r '[.workflow_runs[] | select(.conclusion == "success") | .updated_at][0] // ""' "$history_file")
           if [[ -n "$recent_success" ]]; then
             recent_epoch=$(date -u -d "$recent_success" +%s)
             cooldown_cutoff=$(date -u -d "${HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES} minutes ago" +%s)

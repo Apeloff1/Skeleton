@@ -236,6 +236,92 @@ def _mapping_covers_planned_source(mapping: object, planned_source: str) -> bool
     return planned_source.startswith(source.rstrip("/") + "/")
 
 
+def _path_within(path_value: str, root_value: str) -> bool:
+    root = root_value.rstrip("/")
+    return path_value == root or path_value.startswith(root + "/")
+
+
+def _owned_mapping_for_implementation_path(
+    mappings: list[object],
+    implementation_path: str,
+) -> dict[str, object] | None:
+    """Return the most-specific governed mapping owning one implementation path."""
+    candidates: list[tuple[int, str, dict[str, object]]] = []
+    for raw in mappings:
+        if not isinstance(raw, dict):
+            continue
+        source = raw.get("source")
+        destination = raw.get("destination")
+        mapping_id = raw.get("id")
+        if not isinstance(source, str) or not isinstance(destination, str) or not isinstance(mapping_id, str):
+            continue
+        if _path_within(implementation_path, source) or _path_within(implementation_path, destination):
+            specificity = max(len(source.rstrip("/")), len(destination.rstrip("/")))
+            candidates.append((specificity, mapping_id, raw))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return candidates[0][2]
+
+def _owned_native_ai_path(
+    native_owners: list[object],
+    implementation_path: str,
+) -> dict[str, object] | None:
+    """Return the most-specific canonical AI-native owner for one path."""
+    candidates: list[tuple[int, str, dict[str, object]]] = []
+    for raw in native_owners:
+        if not isinstance(raw, dict):
+            continue
+        path = raw.get("path")
+        owner_id = raw.get("id")
+        kind = raw.get("kind")
+        if not isinstance(path, str) or not isinstance(owner_id, str):
+            continue
+        matches = implementation_path == path if kind == "file" else (
+            kind == "tree" and _path_within(implementation_path, path)
+        )
+        if matches:
+            candidates.append((len(path.rstrip("/")), owner_id, raw))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return candidates[0][2]
+
+
+def _native_owner_covers_path(native_owners: list[object], path_value: str) -> bool:
+    """Return whether a validated native-owner declaration covers one AI path."""
+    for raw in native_owners:
+        if not isinstance(raw, dict):
+            continue
+        owned_path = raw.get("path")
+        kind = raw.get("kind")
+        if not isinstance(owned_path, str):
+            continue
+        if kind == "file" and path_value == owned_path:
+            return True
+        if kind == "tree" and _path_within(path_value, owned_path):
+            return True
+    return False
+
+
+def _mapping_declares_overlay(mappings: list[object], path_value: str) -> bool:
+    """Return whether path_value is explicitly carved out as a mapping overlay."""
+    for raw in mappings:
+        if not isinstance(raw, dict):
+            continue
+        destination = raw.get("destination")
+        overlays = raw.get("overlay_children")
+        if not isinstance(destination, str) or not isinstance(overlays, list):
+            continue
+        for overlay in overlays:
+            if not isinstance(overlay, str) or not overlay:
+                continue
+            overlay_path = f"{destination.rstrip('/')}/{overlay}"
+            if path_value == overlay_path or _path_within(path_value, overlay_path):
+                return True
+    return False
+
+
 def _mappings_cover_planned_source(
     mappings: list[object],
     planned_source: str,
@@ -307,6 +393,9 @@ def validate() -> list[str]:
     mappings = data.get("mappings")
     if not isinstance(mappings, list) or len(mappings) < 10:
         return errors + ["mappings must contain the governed consolidation set"]
+    native_owner_declarations = data.get("native_ai_owners", [])
+    if not isinstance(native_owner_declarations, list):
+        native_owner_declarations = []
 
     move_tag_contract = data.get("move_tag_contract")
     if not isinstance(move_tag_contract, dict):
@@ -518,9 +607,14 @@ def validate() -> list[str]:
                             for other in declared_sources
                             if other != src
                         )
+                        native_governed = _native_owner_covers_path(
+                            native_owner_declarations,
+                            full_destination,
+                        )
                         if (
                             full_destination not in declared_destinations
                             and not source_governed
+                            and not native_governed
                         ):
                             errors.append(
                                 f"{mid}: overlay child is not independently governed: "
@@ -575,6 +669,212 @@ def validate() -> list[str]:
 
         has_jeeves |= src == "skeleton/jeeves" and dst == "skeleton/ai/agents/jeeves"
         has_build |= src == "skeleton/automation/shift_supervisor" and dst == "skeleton/ai/build/shift_supervisor"
+
+    native_owners = data.get("native_ai_owners")
+    if not isinstance(native_owners, list) or not native_owners:
+        errors.append("native_ai_owners must be a non-empty list")
+        native_owners = []
+
+    # Current-state summary fields are part of the machine contract, not
+    # historical prose. Keep them derived from the live governed collections
+    # so automation and human signoff cannot reason about different trees.
+    readiness = data.get("pre_move_readiness")
+    if not isinstance(readiness, dict):
+        errors.append("pre_move_readiness must be an object")
+    else:
+        if readiness.get("governed_mapping_count") != len(mappings):
+            errors.append(
+                "pre_move_readiness governed_mapping_count must equal live mappings"
+            )
+        if readiness.get("native_ai_owner_count") != len(native_owners):
+            errors.append(
+                "pre_move_readiness native_ai_owner_count must equal live native owners"
+            )
+        live_batch_counts: dict[str, int] = {}
+        for mapping in mappings:
+            if isinstance(mapping, dict) and isinstance(mapping.get("move_batch"), str):
+                move_batch = mapping["move_batch"]
+                live_batch_counts[move_batch] = live_batch_counts.get(move_batch, 0) + 1
+        if readiness.get("batch_counts") != live_batch_counts:
+            errors.append(
+                "pre_move_readiness batch_counts must equal live mapping batches"
+            )
+
+    object_audit = data.get("object_audit")
+    if not isinstance(object_audit, dict):
+        errors.append("object_audit must be an object")
+    elif object_audit.get("current_mapping_count") != len(mappings):
+        errors.append("object_audit current_mapping_count must equal live mappings")
+
+    validation_state = data.get("validation_state")
+    expected_state_prefix = f"{len(mappings)}_mapping_plus_{len(native_owners)}_native_owner_"
+    if not isinstance(validation_state, str) or not validation_state.startswith(
+        expected_state_prefix
+    ):
+        errors.append(
+            "validation_state must encode live mapping and native-owner counts"
+        )
+
+    known_volume_keys = {
+        volume.get("key")
+        for volume in master_plan.get("volumes", [])
+        if isinstance(master_plan, dict)
+        and isinstance(volume, dict)
+        and isinstance(volume.get("key"), str)
+    }
+    seen_native_ids: set[str] = set()
+    seen_native_paths: set[str] = set()
+    for item in native_owners:
+        if not isinstance(item, dict):
+            errors.append("native AI owner must be an object")
+            continue
+        owner_id = item.get("id")
+        path_value = item.get("path")
+        kind = item.get("kind")
+        residual_only = item.get("residual_only")
+        if not isinstance(owner_id, str) or not owner_id.startswith("AIFT-NATIVE-"):
+            errors.append(f"invalid native AI owner id: {owner_id!r}")
+            continue
+        if owner_id in seen_native_ids or owner_id in seen_ids:
+            errors.append(f"duplicate native AI owner id: {owner_id}")
+        seen_native_ids.add(owner_id)
+        if not isinstance(path_value, str) or (path_value != "skeleton/ai" and not path_value.startswith("skeleton/ai/")):
+            errors.append(f"{owner_id}: native path must stay under skeleton/ai")
+            continue
+        if path_value in seen_native_paths:
+            errors.append(f"{owner_id}: duplicate native path {path_value}")
+        seen_native_paths.add(path_value)
+        if item.get("ownership_mode") != "canonical_native":
+            errors.append(f"{owner_id}: ownership_mode must be canonical_native")
+        if kind not in {"file", "tree"}:
+            errors.append(f"{owner_id}: kind must be file or tree")
+            continue
+        if not isinstance(residual_only, bool):
+            errors.append(f"{owner_id}: residual_only must be bool")
+            continue
+        native_path = ROOT / path_value
+        if kind == "file" and not native_path.is_file():
+            errors.append(f"{owner_id}: native file missing: {path_value}")
+        if kind == "tree" and not native_path.is_dir():
+            errors.append(f"{owner_id}: native tree missing: {path_value}")
+        if kind == "file" and residual_only:
+            errors.append(f"{owner_id}: file owner cannot be residual_only")
+        overlaps_mapping = any(
+            _path_within(path_value, destination)
+            for destination in declared_destinations
+        )
+        if overlaps_mapping and not _mapping_declares_overlay(mappings, path_value):
+            errors.append(f"{owner_id}: native owner overlaps a more-authoritative mapping destination")
+        mapped_children = [
+            destination
+            for destination in declared_destinations
+            if _path_within(destination, path_value) and destination != path_value
+        ]
+        if mapped_children and not residual_only:
+            errors.append(
+                f"{owner_id}: native tree contains mapped descendants but residual_only is false"
+            )
+        refs = item.get("volume_refs")
+        if not isinstance(refs, list) or not refs:
+            errors.append(f"{owner_id}: volume_refs must be a non-empty list")
+        else:
+            if len(refs) != len(set(refs)):
+                errors.append(f"{owner_id}: duplicate volume_refs")
+            for ref in refs:
+                if not isinstance(ref, str) or not re.fullmatch(r"VOL-\d{3}", ref):
+                    errors.append(f"{owner_id}: invalid volume ref {ref!r}")
+                elif ref not in known_volume_keys:
+                    errors.append(f"{owner_id}: unknown volume ref {ref}")
+
+    try:
+        tracked_ai = subprocess.run(
+            ["git", "ls-files", "-z", "skeleton/ai"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.split("\0")
+    except (OSError, subprocess.CalledProcessError) as exc:
+        errors.append(f"cannot enumerate tracked AI-tree files for ownership audit: {exc}")
+        tracked_ai = []
+
+    unowned_ai_files = []
+    for repo_relative in tracked_ai:
+        if not repo_relative:
+            continue
+        mapping_owned = any(
+            _path_within(repo_relative, destination)
+            for destination in declared_destinations
+        )
+        native_owned = _owned_native_ai_path(native_owners, repo_relative) is not None
+        if not mapping_owned and not native_owned:
+            unowned_ai_files.append(repo_relative)
+    if unowned_ai_files:
+        errors.append(
+            "tracked AI-tree files lack governed ownership: "
+            + ", ".join(sorted(unowned_ai_files)[:25])
+        )
+
+    mature_volume_states = {"implemented", "hardened", "verified", "complete", "completed"}
+    volumes = master_plan.get("volumes", []) if isinstance(master_plan, dict) else []
+    if not isinstance(volumes, list):
+        errors.append("master plan volumes must be a list for AI-tree traceability")
+        volumes = []
+    mapping_by_id = {
+        item.get("id"): item
+        for item in mappings
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    native_by_id = {
+        item.get("id"): item
+        for item in native_owners
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    for volume in volumes:
+        if not isinstance(volume, dict) or volume.get("implementation_status") not in mature_volume_states:
+            continue
+        volume_key = volume.get("key")
+        if not isinstance(volume_key, str) or not re.fullmatch(r"VOL-\d{3}", volume_key):
+            errors.append(f"mature masterplan volume has invalid key: {volume_key!r}")
+            continue
+        owner_ids: set[tuple[str, str]] = set()
+        implementation_paths = volume.get("implementation_paths", [])
+        if not isinstance(implementation_paths, list):
+            errors.append(f"{volume_key}: implementation_paths must be a list")
+            continue
+        for implementation_path in implementation_paths:
+            if not isinstance(implementation_path, str) or implementation_path.startswith("planned:"):
+                continue
+            if not implementation_path.startswith(("skeleton/", "backend/")):
+                continue
+            owner = _owned_mapping_for_implementation_path(mappings, implementation_path)
+            if owner is not None:
+                owner_id = owner.get("id")
+                if isinstance(owner_id, str):
+                    owner_ids.add(("mapping", owner_id))
+                continue
+            native_owner = _owned_native_ai_path(native_owners, implementation_path)
+            if native_owner is not None:
+                owner_id = native_owner.get("id")
+                if isinstance(owner_id, str):
+                    owner_ids.add(("native", owner_id))
+                continue
+            if (
+                implementation_path.startswith("skeleton/ai/")
+                and implementation_path != data.get("canonical_root")
+            ):
+                errors.append(
+                    "mature AI-native implementation path lacks governed ownership: "
+                    f"{volume_key} -> {implementation_path}"
+                )
+        for owner_kind, owner_id in sorted(owner_ids):
+            owner = mapping_by_id.get(owner_id) if owner_kind == "mapping" else native_by_id.get(owner_id)
+            refs = owner.get("volume_refs", []) if isinstance(owner, dict) else []
+            if not isinstance(refs, list) or volume_key not in refs:
+                errors.append(
+                    "mature implementation path lacks AI-tree volume traceability: "
+                    f"{volume_key} -> {owner_id}"
+                )
 
     if not has_jeeves:
         errors.append("Jeeves engine mapping is mandatory")
@@ -879,6 +1179,19 @@ def validate() -> list[str]:
         errors.append("relocation must not create completion authority")
 
     impl = data.get("implementation_signoff", {})
+    if not isinstance(impl, dict):
+        errors.append("implementation_signoff must be an object")
+        impl = {}
+    elif not impl.get("signed"):
+        pending_statement = impl.get("statement")
+        expected_mapping_label = f"{len(mappings)}-mapping"
+        if (
+            not isinstance(pending_statement, str)
+            or expected_mapping_label not in pending_statement
+        ):
+            errors.append(
+                "pending implementation signoff statement must reference live mapping count"
+            )
     if impl.get("signed"):
         if impl.get("signature_method") not in ALLOWED_SIGNATURE_METHODS:
             errors.append("implementation signoff uses an unbound signature method")

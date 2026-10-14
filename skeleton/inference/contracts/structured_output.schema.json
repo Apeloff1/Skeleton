@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-01:structured_output:v1",
+  "title": "FLGB-01 Structured Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {}
+}

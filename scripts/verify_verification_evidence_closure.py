@@ -376,9 +376,9 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
             errors.append(
                 "closed verification gap requires closed closure decision"
             )
-        if closure_impl_state != "closed":
+        if closure_impl_state != "complete":
             errors.append(
-                "closed verification gap requires closed closure implementation state"
+                "closed verification gap requires complete closure implementation state"
             )
         if closure_gap_status != "closed":
             errors.append(

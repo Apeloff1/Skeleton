@@ -26,6 +26,8 @@ COPY --chown=appuser:appuser machine/ai_capabilities.json ./machine/ai_capabilit
 COPY --chown=appuser:appuser machine/ai_runtime_schemas.json ./machine/ai_runtime_schemas.json
 COPY --chown=appuser:appuser machine/ai_implementation_handoff.json ./machine/ai_implementation_handoff.json
 COPY --chown=appuser:appuser machine/ai_closure_evidence.json ./machine/ai_closure_evidence.json
+COPY --chown=appuser:appuser machine/enterprise_ai_superiority.json ./machine/enterprise_ai_superiority.json
+COPY --chown=appuser:appuser machine/enterprise_ai_implementation_notes_index.json ./machine/enterprise_ai_implementation_notes_index.json
 COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md
 
 # The installer toolchain is build-time only. pip 26.2+ also carries vendored

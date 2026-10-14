@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-13:behavior_tree:v1",
+  "title": "FLGB-13 behavior tree",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "node_id",
+    "kind",
+    "children"
+  ],
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "kind": {
+      "enum": [
+        "sequence",
+        "selector",
+        "condition",
+        "action"
+      ]
+    },
+    "children": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  }
+}

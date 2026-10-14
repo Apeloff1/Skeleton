@@ -34,6 +34,8 @@ class ProfileEvidence:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be non-empty")
+            if value != value.strip():
+                raise ValueError(f"{name} must be canonical text")
         for name in (
             "sample_count",
             "reference_median_ns",

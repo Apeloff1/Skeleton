@@ -8,10 +8,12 @@ training framework.
 
 from __future__ import annotations
 
+from collections.abc import Mapping as MappingABC
 from dataclasses import dataclass, field
 from fractions import Fraction
 import hashlib
 import json
+from types import MappingProxyType
 from typing import Mapping, Sequence
 
 
@@ -58,6 +60,30 @@ def _positive_int(name: str, value: object) -> int:
     return value
 
 
+def _freeze_json(value: object) -> object:
+    if value is None or isinstance(value, (str, bool, int, float)):
+        _stable_json(value)
+        return value
+    if isinstance(value, MappingABC):
+        frozen: dict[str, object] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise TrainingLineageError("metadata object keys must be strings")
+            frozen[key] = _freeze_json(item)
+        return MappingProxyType(dict(sorted(frozen.items())))
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_json(item) for item in value)
+    raise TrainingLineageError("metadata contains non-JSON value")
+
+
+def _thaw_json(value: object) -> object:
+    if isinstance(value, MappingABC):
+        return {key: _thaw_json(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_json(item) for item in value]
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class SourceRecord:
     source_id: str
@@ -88,6 +114,10 @@ class SourceRecord:
             "policy_refs": list(self.policy_refs),
             "synthetic_parent_refs": list(self.synthetic_parent_refs),
         }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +152,10 @@ class DatasetShardManifest:
             "sample_count": self.sample_count,
             "source_ids": list(self.source_ids),
         }
+
+    @property
+    def digest(self) -> str:
+        return _digest(self.as_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,11 +194,13 @@ class MixtureManifest:
         object.__setattr__(self, "mixture_id", _text("mixture_id", self.mixture_id))
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise TrainingLineageError("seed must be an integer")
-        if not self.components:
+        components = tuple(self.components)
+        if not components:
             raise TrainingLineageError("mixture requires at least one component")
-        if any(not isinstance(item, MixtureComponent) for item in self.components):
+        if any(not isinstance(item, MixtureComponent) for item in components):
             raise TypeError("components must contain MixtureComponent values")
-        ids = [item.dataset_id for item in self.components]
+        object.__setattr__(self, "components", components)
+        ids = [item.dataset_id for item in components]
         if len(ids) != len(set(ids)):
             raise TrainingLineageError("mixture dataset_ids must be unique")
         if sum((item.weight for item in self.components), Fraction()) <= 0:
@@ -182,19 +218,7 @@ class MixtureManifest:
     def digest(self) -> str:
         return _digest(self.as_dict())
 
-    def dataset_schedule(self, *, draws: int) -> tuple[str, ...]:
-        """Return an exact deterministic weighted round-robin schedule.
-
-        The algorithm converts rational weights to integer tickets and advances
-        a deficit counter.  It uses no floating-point arithmetic, so schedule
-        identity is stable across runtimes.
-        """
-
-        if isinstance(draws, bool) or not isinstance(draws, int) or draws < 0:
-            raise TrainingLineageError("draws must be a non-negative integer")
-        if draws == 0:
-            return ()
-
+    def _ticket_state(self) -> tuple[tuple[int, ...], int, tuple[int, ...]]:
         denominators = [item.weight.denominator for item in self.components]
         common = 1
         for denominator in denominators:
@@ -203,17 +227,32 @@ class MixtureManifest:
                 a, b = b, a % b
             common = common * denominator // a
 
-        tickets = [
+        tickets = tuple(
             item.weight.numerator * (common // item.weight.denominator)
             for item in self.components
-        ]
+        )
         total = sum(tickets)
         if total <= 0:
             raise TrainingLineageError("mixture ticket total must be positive")
 
-        # Seed only rotates tie-breaking order; identical manifests remain exact.
         offset = self.seed % len(self.components)
         order = tuple(range(offset, len(self.components))) + tuple(range(0, offset))
+        return tickets, total, order
+
+    @staticmethod
+    def _validate_draws(draws: object) -> int:
+        if isinstance(draws, bool) or not isinstance(draws, int) or draws < 0:
+            raise TrainingLineageError("draws must be a non-negative integer")
+        return draws
+
+    def dataset_schedule(self, *, draws: int) -> tuple[str, ...]:
+        """Return an exact deterministic weighted round-robin schedule."""
+
+        draws = self._validate_draws(draws)
+        if draws == 0:
+            return ()
+
+        tickets, total, order = self._ticket_state()
         deficits = [0] * len(self.components)
         schedule: list[str] = []
         for _ in range(draws):
@@ -223,6 +262,26 @@ class MixtureManifest:
             deficits[winner] -= total
             schedule.append(self.components[winner].dataset_id)
         return tuple(schedule)
+
+    def dataset_draw_counts(self, *, draws: int) -> dict[str, int]:
+        """Return exact per-dataset draw counts without replaying full epochs."""
+
+        draws = self._validate_draws(draws)
+        tickets, total, order = self._ticket_state()
+        cycles, remainder = divmod(draws, total)
+        counts = [cycles * ticket for ticket in tickets]
+        if remainder:
+            deficits = [0] * len(self.components)
+            for _ in range(remainder):
+                for index, ticket in enumerate(tickets):
+                    deficits[index] += ticket
+                winner = max(order, key=lambda index: deficits[index])
+                deficits[winner] -= total
+                counts[winner] += 1
+        return {
+            component.dataset_id: counts[index]
+            for index, component in enumerate(self.components)
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,18 +296,22 @@ class TrainingDataManifest:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "manifest_id", _text("manifest_id", self.manifest_id))
-        if not self.sources:
+        sources = tuple(self.sources)
+        shards = tuple(self.shards)
+        if not sources:
             raise TrainingLineageError("training manifest requires sources")
-        if not self.shards:
+        if not shards:
             raise TrainingLineageError("training manifest requires shards")
-        if any(not isinstance(item, SourceRecord) for item in self.sources):
+        if any(not isinstance(item, SourceRecord) for item in sources):
             raise TypeError("sources must contain SourceRecord values")
-        if any(not isinstance(item, DatasetShardManifest) for item in self.shards):
+        if any(not isinstance(item, DatasetShardManifest) for item in shards):
             raise TypeError("shards must contain DatasetShardManifest values")
+        object.__setattr__(self, "sources", sources)
+        object.__setattr__(self, "shards", shards)
         if not isinstance(self.mixture, MixtureManifest):
             raise TypeError("mixture must be MixtureManifest")
 
-        source_ids = [item.source_id for item in self.sources]
+        source_ids = [item.source_id for item in sources]
         if len(source_ids) != len(set(source_ids)):
             raise TrainingLineageError("source ids must be unique")
         source_set = set(source_ids)
@@ -279,9 +342,9 @@ class TrainingDataManifest:
                 raise TrainingLineageError(f"{field_name} must be unique")
             object.__setattr__(self, field_name, values)
 
-        frozen = dict(self.metadata)
-        _stable_json(frozen)
-        object.__setattr__(self, "metadata", frozen)
+        raw_metadata = dict(self.metadata)
+        _stable_json(raw_metadata)
+        object.__setattr__(self, "metadata", _freeze_json(raw_metadata))
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -300,12 +363,15 @@ class TrainingDataManifest:
             "mixture": self.mixture.as_dict(),
             "transform_refs": list(self.transform_refs),
             "holdout_refs": list(self.holdout_refs),
-            "metadata": dict(self.metadata),
+            "metadata": _thaw_json(self.metadata),
         }
 
     @property
     def root_digest(self) -> str:
         return _digest(self.as_dict())
+
+    def expected_dataset_offsets(self, *, draw_index: int) -> dict[str, int]:
+        return dict(self.mixture.dataset_draw_counts(draws=draw_index))
 
     def checkpoint_cursor(
         self,
@@ -313,11 +379,21 @@ class TrainingDataManifest:
         draw_index: int,
         dataset_offsets: Mapping[str, int],
     ) -> "TrainingCursor":
-        return TrainingCursor(
+        cursor = TrainingCursor(
             manifest_root=self.root_digest,
             mixture_digest=self.mixture.digest,
             draw_index=draw_index,
             dataset_offsets=dict(dataset_offsets),
+        )
+        cursor.assert_compatible(self)
+        return cursor
+
+    def derived_checkpoint_cursor(self, *, draw_index: int) -> "TrainingCursor":
+        return TrainingCursor(
+            manifest_root=self.root_digest,
+            mixture_digest=self.mixture.digest,
+            draw_index=draw_index,
+            dataset_offsets=self.expected_dataset_offsets(draw_index=draw_index),
         )
 
 
@@ -342,28 +418,44 @@ class TrainingCursor:
         offsets: dict[str, int] = {}
         for dataset_id, raw in self.dataset_offsets.items():
             key = _text("dataset_id", dataset_id)
+            if key in offsets:
+                raise TrainingLineageError(
+                    "dataset offset identities collide after normalization"
+                )
             if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
                 raise TrainingLineageError("dataset offsets must be non-negative integers")
             offsets[key] = raw
-        object.__setattr__(self, "dataset_offsets", dict(sorted(offsets.items())))
+        object.__setattr__(
+            self,
+            "dataset_offsets",
+            MappingProxyType(dict(sorted(offsets.items()))),
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": "skeleton.training_cursor.v1",
+            "manifest_root": self.manifest_root,
+            "mixture_digest": self.mixture_digest,
+            "draw_index": self.draw_index,
+            "dataset_offsets": dict(self.dataset_offsets),
+        }
 
     @property
     def digest(self) -> str:
-        return _digest(
-            {
-                "schema_version": "skeleton.training_cursor.v1",
-                "manifest_root": self.manifest_root,
-                "mixture_digest": self.mixture_digest,
-                "draw_index": self.draw_index,
-                "dataset_offsets": dict(self.dataset_offsets),
-            }
-        )
+        return _digest(self.as_dict())
 
     def assert_compatible(self, manifest: TrainingDataManifest) -> None:
+        if not isinstance(manifest, TrainingDataManifest):
+            raise TypeError("manifest must be TrainingDataManifest")
         if self.manifest_root != manifest.root_digest:
             raise TrainingLineageError("checkpoint data manifest root mismatch")
         if self.mixture_digest != manifest.mixture.digest:
             raise TrainingLineageError("checkpoint mixture identity mismatch")
+        expected = manifest.expected_dataset_offsets(draw_index=self.draw_index)
+        if dict(self.dataset_offsets) != expected:
+            raise TrainingLineageError(
+                "checkpoint dataset offsets do not match deterministic mixture schedule"
+            )
 
 
 __all__ = [

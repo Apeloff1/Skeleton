@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-10:fixed_timestep:v1",
+  "title": "FLGB-10 fixed timestep",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "step_ns",
+    "max_catchup_ticks"
+  ],
+  "properties": {
+    "step_ns": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_catchup_ticks": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1024
+    }
+  }
+}

@@ -6,6 +6,7 @@ from scripts.pr_obsolete_run_drain import (
     COMMIT_PULLS_PAGE_SIZE,
     PR_COMMITS_PAGE_SIZE,
     RUN_PAGE_SIZE,
+    MAX_RUN_PAGES,
     CancelResult,
     DrainContext,
     belongs_to_pr,
@@ -415,3 +416,25 @@ def test_malformed_run_sha_is_not_attributed_without_explicit_pr_link() -> None:
         known_pr_shas={HEAD_SHA},
         commit_link_cache={},
     )
+
+
+def test_live_run_listing_scans_beyond_legacy_thousand_run_ceiling() -> None:
+    legacy_pages = 10
+
+    def handler(method: str, path: str):
+        assert method == "GET"
+        page = int(path.rsplit("page=", 1)[1])
+        if page <= legacy_pages:
+            start = (page - 1) * RUN_PAGE_SIZE
+            return 200, {
+                "workflow_runs": [
+                    {"id": start + offset + 1}
+                    for offset in range(RUN_PAGE_SIZE)
+                ]
+            }, {}
+        return 200, {"workflow_runs": [{"id": legacy_pages * RUN_PAGE_SIZE + 1}]}, {}
+
+    runs = list_runs(FakeApi(handler), REPO, "queued")
+    assert len(runs) == legacy_pages * RUN_PAGE_SIZE + 1
+    assert runs[-1]["id"] == 1001
+    assert MAX_RUN_PAGES > legacy_pages

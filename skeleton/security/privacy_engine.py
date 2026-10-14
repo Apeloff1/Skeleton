@@ -3,13 +3,13 @@
 This module evaluates declared technical policy only. It does not infer legal
 requirements, perform data export, mutate stored data, or grant authority.
 """
-
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
-from collections.abc import Iterable
-from dataclasses import dataclass
+from typing import Iterable
+
 
 _LEVELS = {
     "public": 0,
@@ -80,7 +80,9 @@ class PrivacyLabel:
         object.__setattr__(self, "label_id", _token("label_id", self.label_id))
         classification = _token("classification", self.classification)
         if classification not in _LEVELS:
-            raise PrivacyEngineError("classification must be public, internal, confidential, or restricted")
+            raise PrivacyEngineError(
+                "classification must be public, internal, confidential, or restricted"
+            )
         object.__setattr__(self, "classification", classification)
         object.__setattr__(
             self,
@@ -100,7 +102,9 @@ class PrivacyLabel:
             or any(character not in "0123456789abcdef" for character in value)
             for value in parent_digests
         ):
-            raise PrivacyEngineError("parent_label_digests must contain lowercase sha256 digests")
+            raise PrivacyEngineError(
+                "parent_label_digests must contain lowercase sha256 digests"
+            )
         object.__setattr__(self, "parent_label_digests", parent_digests)
 
     @property
@@ -194,7 +198,9 @@ class PrivacyDecision:
             _non_negative_int("evaluated_at_ns", self.evaluated_at_ns),
         )
         if self.external_side_effects is not False:
-            raise PrivacyEngineError("privacy decisions cannot perform external side effects")
+            raise PrivacyEngineError(
+                "privacy decisions cannot perform external side effects"
+            )
 
     @property
     def digest(self) -> str:
@@ -238,9 +244,13 @@ def derive_privacy_label(
         purposes.intersection_update(item.allowed_purposes)
         jurisdictions.intersection_update(item.jurisdiction_scopes)
     if not purposes:
-        raise PrivacyEngineError("parent labels have no common allowed purpose")
+        raise PrivacyEngineError(
+            "parent labels have no common allowed purpose"
+        )
     if not jurisdictions:
-        raise PrivacyEngineError("parent labels have no common jurisdiction scope")
+        raise PrivacyEngineError(
+            "parent labels have no common jurisdiction scope"
+        )
 
     return PrivacyLabel(
         label_id=label_id,
@@ -248,7 +258,9 @@ def derive_privacy_label(
         allowed_purposes=tuple(sorted(purposes)),
         jurisdiction_scopes=tuple(sorted(jurisdictions)),
         source_ref=source_ref,
-        parent_label_digests=tuple(sorted({item.digest for item in parent_rows})),
+        parent_label_digests=tuple(
+            sorted({item.digest for item in parent_rows})
+        ),
     )
 
 

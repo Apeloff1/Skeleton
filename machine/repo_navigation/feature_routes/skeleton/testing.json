@@ -1,0 +1,1 @@
+{"features":[{"file_shards":["skeleton/testing"],"files":1670,"name":"skeleton/testing","zones":{"tests":1670}},{"file_shards":["skeleton/testing"],"files":1,"name":"skeleton/testing/data","zones":{"tests":1}},{"file_shards":["skeleton/testing"],"files":3,"name":"skeleton/testing/fixtures","zones":{"tests":3}}],"schema":"skeleton.repository-navigation.v1"}

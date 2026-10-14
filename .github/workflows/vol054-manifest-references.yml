@@ -1,0 +1,150 @@
+name: VOL-054 Machine Architecture Manifests
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/manifest_reference_policy.json"
+      - "machine/architecture_rule_registry.json"
+      - "machine/**"
+      - "docs/architecture/**"
+      - "docs/adr/README.md"
+      - "scripts/check_architecture_manifest_references.py"
+      - "scripts/verify_vol054_manifest_references.py"
+      - "tests/test_architecture_manifest_references.py"
+      - "tests/test_vol054_manifest_references_independent.py"
+      - ".github/workflows/vol054-manifest-references.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/manifest_reference_policy.json"
+      - "machine/architecture_rule_registry.json"
+      - "machine/**"
+      - "docs/architecture/**"
+      - "docs/adr/README.md"
+      - "scripts/check_architecture_manifest_references.py"
+      - "scripts/verify_vol054_manifest_references.py"
+      - "tests/test_architecture_manifest_references.py"
+      - "tests/test_vol054_manifest_references_independent.py"
+      - ".github/workflows/vol054-manifest-references.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol054-manifest-references-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  manifest-reference-behavior:
+    name: Canonical manifest-reference behavior
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+      - name: Compile VOL-054 surfaces
+        run: >-
+          python -m compileall -q
+          scripts/check_architecture_manifest_references.py
+          scripts/verify_vol054_manifest_references.py
+          tests/test_architecture_manifest_references.py
+          tests/test_vol054_manifest_references_independent.py
+      - name: Execute canonical manifest-reference validator
+        run: python scripts/check_architecture_manifest_references.py --json
+      - name: Run canonical manifest-reference regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_architecture_manifest_references.py
+
+  manifest-reference-independent:
+    name: Independent exact-head VOL-054 verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+      - name: Run independent VOL-054 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol054_manifest_references_independent.py
+      - name: Emit independent exact-head receipt
+        run: >-
+          python scripts/verify_vol054_manifest_references.py
+          --evidence-out .vol054-manifest-references.json
+          --print-evidence
+      - name: Assert exact-head receipt identity and coverage
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol054-manifest-references.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("VOL-054 receipt does not bind exact head")
+          if receipt.get("volume") != "VOL-054":
+              raise SystemExit("VOL-054 verifier bound wrong volume")
+          if receipt.get("verifier") != "independent-vol054-manifest-references-v1":
+              raise SystemExit("unexpected VOL-054 verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent VOL-054 verification failed")
+          policy = receipt.get("policy_binding") or {}
+          if policy.get("reference_group_count", 0) < 5:
+              raise SystemExit("VOL-054 reference-group coverage is too small")
+          if policy.get("checked_reference_count", 0) <= 0:
+              raise SystemExit("VOL-054 reference resolution coverage is empty")
+          if policy.get("doc_binding_count", 0) < 5:
+              raise SystemExit("VOL-054 document digest coverage is too small")
+          registry = receipt.get("registry_binding") or {}
+          if registry.get("rule_id") != "ARCH-MANIFEST-REFERENCES":
+              raise SystemExit("VOL-054 architecture rule binding is missing")
+          if registry.get("waivable") is not False:
+              raise SystemExit("VOL-054 manifest-reference rule became waivable")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("VOL-054 receipt digest is invalid")
+          print(
+              "VOL-054 independent exact-head receipt:",
+              expected,
+              receipt["receipt_digest"],
+          )
+          PY

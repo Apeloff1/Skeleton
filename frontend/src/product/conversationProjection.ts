@@ -32,10 +32,23 @@ export function validateConversationProjection<TMessage extends CanonicalMessage
     || !Array.isArray(sourceMessages) || sourceMessages.length > 10000) {
     throw new ConversationProjectionError('Canonical conversation projection is invalid.', { code: 'invalid_projection' });
   }
+  // Validate before sorting: a malformed/null element must produce a stable
+  // projection error rather than throwing from the comparator.
+  for (const message of sourceMessages) {
+    if (!message || typeof message !== 'object') {
+      throw new ConversationProjectionError('Canonical message must be an object.', { code: 'invalid_message' });
+    }
+    if (!Number.isSafeInteger(message.sequence) || message.sequence < 1) {
+      throw new ConversationProjectionError('Conversation projection contains an invalid sequence.', { code: 'invalid_sequence' });
+    }
+  }
   const messages = [...sourceMessages].sort((left, right) => left.sequence - right.sequence);
   const ids = new Set<string>();
   let previous = 0;
   for (const message of messages) {
+    if (!message || typeof message !== 'object') {
+      throw new ConversationProjectionError('Canonical message must be an object.', { code: 'invalid_message' });
+    }
     if (message.thread_id !== thread.thread_id) {
       throw new ConversationProjectionError('Conversation projection contains a foreign thread message.', { code: 'foreign_thread' });
     }

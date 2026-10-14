@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass, field
 import json
 import re
-from collections.abc import Iterable
-from dataclasses import dataclass, field
+from typing import Iterable
 
 from .backlog_reader import Document
 

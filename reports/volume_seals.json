@@ -1,0 +1,11 @@
+{
+  "organ_lines": 3329408,
+  "masterplan_lines": 15302600,
+  "x10_lines": 153003200,
+  "x100_shard_lines": 7650009,
+  "x100_projection_200": 1530001800,
+  "header_gap": 30200,
+  "stored_prose": 0,
+  "clip": 1.1,
+  "trees_in_git": false
+}

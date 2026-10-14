@@ -1,0 +1,177 @@
+name: Pre-E2E Evidence and Massive Offline Journeys
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/e2e_evidence.py"
+      - "scripts/e2e_advanced_parse.py"
+      - "scripts/e2e_merge_evidence.py"
+      - "machine/e2e_suites.json"
+      - "tests/test_e2e_evidence_preflight.py"
+      - ".github/workflows/pre-e2e-evidence.yml"
+  workflow_dispatch:
+    inputs:
+      run_offline:
+        description: "Explicitly execute all bounded offline E2E shards"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: pre-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  preflight:
+    name: Static E2E preparation and advanced parse
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      E2E_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - name: Collect suite manifest and preflight evidence
+        run: python scripts/e2e_evidence.py --mode preflight --output-dir .e2e-evidence
+      - name: Advanced AST and workflow inspection
+        if: always()
+        run: python scripts/e2e_advanced_parse.py --output-dir .e2e-evidence
+      - name: Harness self-tests without executing product journeys
+        if: always()
+        run: python -m unittest discover -s tests -p test_e2e_evidence_preflight.py -v
+      - name: Upload complete preflight evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .e2e-evidence/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 90
+
+  offline-e2e:
+    name: Offline E2E / ${{ matrix.suite }}
+    needs: preflight
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_offline == true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - suite: stage7-engine
+            language: python
+          - suite: stage7-cross-service
+            language: python
+          - suite: stage7-browser
+            language: node
+          - suite: frontend-product
+            language: node
+          - suite: backend-local-ai-chat
+            language: python
+          - suite: native-runtime
+            language: python
+          - suite: app-cli-forge
+            language: python
+    env:
+      E2E_HEAD_SHA: ${{ github.sha }}
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Checkout exact dispatch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+      - name: Install focused Python runtime
+        if: matrix.language == 'python'
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev,local-inference]"
+          "httpx==0.28.1"
+          "PyJWT==2.14.0"
+          "python-dotenv==1.2.3"
+          "bcrypt==4.3.0"
+      - name: Setup Node
+        if: matrix.language == 'node'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Install pinned headless Godot for the forge playtest
+        if: matrix.suite == 'app-cli-forge'
+        run: |
+          godot_archive_path="$RUNNER_TEMP/godot-4.4.1.zip"
+          curl --fail --location --retry 2 --connect-timeout 15 --max-time 180 \
+            'https://downloads.godotengine.org/?version=4.4.1&flavor=stable&slug=linux.x86_64.zip' \
+            --output "$godot_archive_path"
+          printf '%s  %s\n' 'd6e382fb531019f85630c1f485a561a0d20c4a2344b6c3847735cfee7da812aa' "$godot_archive_path" | sha256sum --check
+          unzip -q "$godot_archive_path" -d "$RUNNER_TEMP/skeleton-godot"
+          chmod +x "$RUNNER_TEMP/skeleton-godot/Godot_v4.4.1-stable_linux.x86_64"
+          echo "SKELETON_GODOT_BIN=$RUNNER_TEMP/skeleton-godot/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Install locked frontend contract dependencies
+        if: matrix.suite == 'frontend-product'
+        working-directory: frontend
+        run: |
+          corepack enable
+          yarn install --frozen-lockfile
+      - name: Execute bounded offline suite, capture and classify failures
+        env:
+          SELECTED_SUITE: ${{ matrix.suite }}
+        run: python scripts/e2e_evidence.py --mode offline-e2e --suite "$SELECTED_SUITE" --output-dir .e2e-evidence
+      - name: Upload diagnostics for each shard regardless of result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .e2e-evidence/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 90
+
+  aggregate-e2e:
+    name: Aggregate all offline E2E evidence and open issues
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.run_offline == true }}
+    needs: [preflight, offline-e2e]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact dispatch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Download all shard evidence including failed jobs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: e2e-*
+          path: .e2e-shards
+          merge-multiple: false
+      - name: Build fail-closed cross-shard issue ledger
+        run: python scripts/e2e_merge_evidence.py --artifacts .e2e-shards --output-dir .e2e-aggregate
+      - name: Preserve consolidated results even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .e2e-aggregate/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 90

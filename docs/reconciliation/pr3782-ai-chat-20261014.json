@@ -1,0 +1,1248 @@
+{
+  "schema": "skeleton.draft_conflict_reconciliation.v1",
+  "pull_request": 3782,
+  "original_head": "c160a14dcb588400925a6adc44e3a5894eefffde",
+  "merge_base": "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2",
+  "main_head": "7b844e724ff37db997ae7388c0c63509a8adbb73",
+  "rule": "main wins overlapping changes; unchanged-main edits and absent-main additions retained; new workflows withheld pending security review",
+  "counts": {
+    "clean_add": 92,
+    "safe_edit": 53,
+    "already_integrated": 7,
+    "conflict_main": 93,
+    "withheld_workflow": 1
+  },
+  "resolutions": [
+    {
+      "path": ".github/workflows/ai-training-resume.yml",
+      "status": "added",
+      "resolution": "withheld_workflow"
+    },
+    {
+      "path": ".machine/repository.toml",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/core/chat_attachments.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "backend/core/conversations.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/core/engine_chat.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/core/engine_client.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/core/engine_text.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "backend/core/model_catalog.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "backend/core/routes_registry.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/requirements.txt",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/routes/ai.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/routes/chat_attachments.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "backend/routes/conversations.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "backend/tests/test_engine_chat.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "docs/plan/AI_CHAT_IMPLEMENTATION_2026-10-13.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/plan/AI_CHAT_OPERATOR_SETUP.md",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "docs/plan/AI_MASTERPLAN_IMPLEMENTATION_2026-10-04.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/plan/GOVERNED_LOCAL_MODEL_DEVELOPMENT.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/plan/MASTERPLAN_CONTINUATION_FRONTIER_2026-10-03.md",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "docs/plan/MASTER_INDEX.md",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/app/ai-chat.tsx",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/features/Jeeves/ChatAttachments.tsx",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/ChatExport.ts",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/ChatWorkspace.styles.ts",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/ChatWorkspace.tsx",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/features/Jeeves/MessageContent.tsx",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "frontend/features/Jeeves/chatFiles.ts",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "frontend/src/product/aiChatClient.ts",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/src/product/chatController.ts",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/src/product/chatErrors.ts",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/src/product/conversationClient.ts",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/src/product/conversationProjection.ts",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/src/product/productCatalog.ts",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/src/product/useChatController.ts",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/tsconfig.jeeves.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/ai_app_construction.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/ai_chat_application.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_chat_attachments.json",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/ai_chat_conversation_management.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_chat_model_catalog.json",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "machine/ai_chat_operator_setup.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_chat_product_client.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_chat_streaming.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_engine_handoff_recovery.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_engine_local_provider_binding.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_engine_provider_inventory.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_file_tree.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/ai_governed_training_cli.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_governed_training_data.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_governed_training_state_cli.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_local_data_parallel_training.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_local_elastic_training.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_local_preference_training.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_local_provider_activation.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_master_plan.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/ai_measured_local_verifier.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_measured_model_rollout.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_model_lifecycle_persistence.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_multimodal_content_retrieval.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_multimodal_media_validation.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_multimodal_temporal_execution.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_multimodal_training_projection.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_neural_training_resume_contract.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_p3_learning_task_backlog.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/ai_p3_training_task_backlog.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/ai_post_training_execution.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_training_checkpoint_archive.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_training_observability.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_training_pipeline.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/ai_training_resume_contract.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/capability_interfaces.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/state_topology.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "pyproject.toml",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "scripts/check_ai_training_pipeline.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "scripts/check_ai_training_resume.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "scripts/configure_ai_chat.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "scripts/verify_provider_protocol_closure.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/automation/backlog_index.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/__init__.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/builder.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/catalog.py",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/cli.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/context.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/coordination.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/execution_plan.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/impact.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/manifest.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/navigation.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/planner.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/query.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/retrieval.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/shards.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/build/repo_machine/workgraph.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/api/engine_routes.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/api/engine_runtime.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/api/engine_service.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/inference/__init__.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/inference/artifact.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/inference/local.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/inference/neural.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/intelligence/admission.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/intelligence/admission_runtime.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/intelligence/execution_runtime.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/intelligence/quota.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/intelligence/quota_sqlite.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/intelligence/shared_pressure.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/__init__.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/content_retrieval.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/learning.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/lifecycle.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/lifecycle_repository.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/multimodal.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/rollout.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/temporal.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/learning_foundation/training.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/multimodal/__init__.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/multimodal/intake.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/multimodal/media_validation.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/runtime/observability/cardinality_control.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/observability/cost_governor.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/observability/efficiency_metrics.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/observability/error_budget_policy.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/observability/latency_budget.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/observability/profile_records.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/observability/slo.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/observability/trace_model.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/persistence/conversation_repository.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/persistence/execution_repository.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/provider_runtime.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/runtime/security/data_deletion.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/security/key_management.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/security/policy_simulation.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/security/privacy_engine.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/security/secret_handles.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/__init__.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/checkpoint_archive.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/cli.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/control.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/data.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/distributed_trainer.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/elastic_trainer.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/evaluation.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/evaluation_store.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/learning_pipeline.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/neural_trainer.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/observability.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/post_training.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/preference_trainer.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/state_cli.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/trainer.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/runtime/training/verifier.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/api/engine_routes.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/api/engine_runtime.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/api/engine_service.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/automation/backlog_index.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/intelligence/admission.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/intelligence/admission_runtime.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/intelligence/execution_runtime.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/intelligence/quota.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/intelligence/quota_sqlite.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/intelligence/shared_pressure.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/observability/cardinality_control.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/observability/cost_governor.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/observability/efficiency_metrics.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/observability/error_budget_policy.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/observability/latency_budget.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/observability/profile_records.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/observability/slo.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/observability/trace_model.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/persistence/conversation_repository.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/persistence/execution_repository.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/provider_runtime.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/repo_machine/__init__.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/repo_machine/builder.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/repo_machine/cli.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/repo_machine/context.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/repo_machine/coordination.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/repo_machine/execution_plan.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/repo_machine/impact.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/repo_machine/manifest.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/repo_machine/navigation.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/repo_machine/planner.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/repo_machine/query.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/repo_machine/retrieval.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/repo_machine/shards.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/repo_machine/workgraph.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/security/data_deletion.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/security/key_management.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/security/policy_simulation.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/security/privacy_engine.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/security/secret_handles.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/testing/test_ai_app_construction.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/testing/test_ai_file_tree.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/testing/test_cost_governor.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/testing/test_cost_governor_admission_intent_recovery.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/testing/test_cost_governor_recovery.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/testing/test_elastic_training_recovery.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/testing/test_engine_execution_coordinator.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/testing/test_engine_handoff_recovery.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_engine_local_provider_binding.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_engine_routes.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/testing/test_error_budgets.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/testing/test_governed_checkpoint_recovery.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_governed_model_engine_acceptance.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_governed_multimodal_model_lifecycle.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_governed_training_cli.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_governed_training_data.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_governed_training_extensions.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_governed_training_state_cli.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_local_inference.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/testing/test_local_inference_cancellation.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_local_model_artifact_intake.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_local_model_deployment.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/testing/test_local_preference_training.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_local_provider_runtime_guards.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_measured_local_verifier.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_measured_model_rollout.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_measured_model_rollout_fences.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_measured_verifier_fences.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_measured_verifier_runtime_identity.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_multimodal_media_validation.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_learning_foundation_acceptance.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/testing/test_p3_learning_programs.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/testing/test_p3_live_speech_execution.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_local_data_parallel_training.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_model_lifecycle.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/testing/test_p3_model_lifecycle_persistence.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_model_migration.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_multimodal_integrity.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_multimodal_training_projection.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_neural_training_resume.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_post_training_execution.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_training_evidence_integrity.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_training_lifecycle_acceptance.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_training_resume.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_p3_video_evidence_fusion.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_training_checkpoint_archive.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_training_observability.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/testing/test_training_observability_lock_order.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/testing/test_training_restore_scope.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_masterplan_continuation.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_training_pipeline_contract.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_training_resume_contract.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_provider_protocol_independent_verifier.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "tests/test_repo_machine_live_taxonomy.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    }
+  ],
+  "warning": "This Git merge reconciles file-level conflicts; it does not establish feature/CI correctness or certify full parent-draft capability."
+}

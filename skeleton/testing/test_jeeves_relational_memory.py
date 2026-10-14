@@ -7,6 +7,7 @@ from skeleton.jeeves.agent.memory import MemoryManager, MemoryNamespace
 from skeleton.jeeves.agent.memory_game import MemoryGameIndex
 from skeleton.jeeves.agent.relational_memory import (
     RelationKind,
+    RelationStore,
     RelationalMemoryIndex,
     RelationalMemoryPolicy,
 )
@@ -190,3 +191,45 @@ def test_semantic_pair_is_tagged_as_hypothesis_not_evidence_promotion():
     )
     assert trace.metadata["semantic_hypothesis"] is True
     assert trace.kind is RelationKind.JUXTAPOSITION
+
+
+def test_relation_store_touching_and_predictions_never_scan_global_values() -> None:
+    _, ns, cards, relations = _fixture()
+    other = MemoryNamespace("tenant", "other-user", session_id="session")
+    source = cards.capture_interaction(ns, "source")
+    target = cards.capture_interaction(ns, "target")
+    relations.link(ns, RelationKind.SUCCESSION, (source.card_id, target.card_id))
+
+    for number in range(40):
+        left = cards.capture_interaction(other, f"other-left-{number}")
+        right = cards.capture_interaction(other, f"other-right-{number}")
+        relations.link(
+            other,
+            RelationKind.SUCCESSION,
+            (left.card_id, right.card_id),
+        )
+
+    class _NoGlobalValues(dict):
+        def values(self):
+            raise AssertionError("relational lookup scanned global relation values")
+
+    relations.store._relations = _NoGlobalValues(relations.store._relations)
+    touching = relations.store.touching(ns, (source.card_id,))
+    predictions = relations.predictions(ns, source.card_id)
+
+    assert len(touching) == 1
+    assert predictions[0].target_card_id == target.card_id
+
+
+def test_relation_store_reindexing_keeps_card_lookup_exact() -> None:
+    store = RelationStore(max_relations=10)
+    _, ns, cards, relations = _fixture()
+    a = cards.capture_interaction(ns, "alpha")
+    b = cards.capture_interaction(ns, "beta")
+    trace = relations.link(ns, RelationKind.ADJACENCY, (a.card_id, b.card_id))
+
+    store.put(trace)
+    store.put(trace)
+
+    assert store.touching(ns, (a.card_id,)) == (trace,)
+    assert store.list_namespace(ns) == (trace,)

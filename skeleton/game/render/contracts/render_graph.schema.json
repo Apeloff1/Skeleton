@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:render_graph:v1",
+  "title": "FLGB-11 render graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "pass_id",
+    "reads",
+    "writes",
+    "dependencies"
+  ],
+  "properties": {
+    "pass_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "reads": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "writes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  }
+}

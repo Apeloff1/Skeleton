@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 import hashlib
+import hmac
 import json
 import math
 from typing import Any, Iterable
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 
 CONTEXT_SCHEMA_VERSION = 1
@@ -394,6 +395,57 @@ class ContextEnvelope:
             raise ContextContractError("selected segment tenant mismatch")
         if sum(segment.token_estimate for segment in selected) != self.selected_tokens_estimate:
             raise ContextContractError("selected token estimate does not match segments")
+        # The compiler records original candidate sources. Compaction creates a
+        # derived selected ID, so it must refer to snapshot-backed originals
+        # rather than masquerading as a direct source.
+        snapshot_ids = [segment_id for segment_id, _ in self.source_snapshot]
+        if len(snapshot_ids) != len(set(snapshot_ids)):
+            raise ContextContractError("source_snapshot segment ids must be unique")
+        snapshot = dict(self.source_snapshot)
+        for value in snapshot.values():
+            if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value):
+                raise ContextContractError("source_snapshot digest must be lowercase sha256")
+
+        selected_ids = set(ids)
+        omitted_ids = set(self.omitted_segment_ids)
+        if selected_ids & omitted_ids:
+            raise ContextContractError("selected and omitted segment ids must be disjoint")
+        reason_ids = [item[0] for item in self.omission_reasons]
+        if len(reason_ids) != len(set(reason_ids)) or set(reason_ids) != omitted_ids:
+            raise ContextContractError("omission_reasons must exactly cover omitted segments")
+
+        source_ids = set()
+        for segment in selected:
+            if segment.segment_id in snapshot:
+                if snapshot[segment.segment_id] != segment.content_digest:
+                    raise ContextContractError("source_snapshot does not bind selected segments")
+                source_ids.add(segment.segment_id)
+            else:
+                if not segment.derived_from or any(source not in snapshot for source in segment.derived_from):
+                    raise ContextContractError("derived segment lacks snapshot-backed sources")
+                source_ids.update(segment.derived_from)
+        expected_candidate_ids = source_ids | omitted_ids
+        if set(snapshot) != expected_candidate_ids:
+            raise ContextContractError("source_snapshot must exactly cover candidate segments")
+        if tuple(sorted(self.source_snapshot)) != self.source_snapshot:
+            raise ContextContractError("source_snapshot must be canonical order")
+
+        digest = context_digest_payload(
+            operation_id=self.operation_id,
+            execution_id=self.execution_id,
+            turn_id=self.turn_id,
+            tenant_id=self.tenant_id,
+            budget=self.budget,
+            selected=selected,
+            omitted_segment_ids=self.omitted_segment_ids,
+            compiler_version=self.compiler_version,
+        )
+        if not hmac.compare_digest(self.context_digest, digest):
+            raise ContextContractError("context_digest does not match envelope")
+        expected_id = str(uuid5(NAMESPACE_URL, "skeleton-context:" + digest))
+        if self.context_id != expected_id:
+            raise ContextContractError("context_id does not match context_digest")
+
 
     @property
     def selected_segments(self) -> tuple[ContextSegment, ...]:

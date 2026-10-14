@@ -1,0 +1,186 @@
+name: VOL-003 Contract Conformance Closure
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/contract_conformance.json"
+      - "machine/ai_runtime_schemas.json"
+      - "machine/capability_interfaces.json"
+      - "machine/ai_master_plan.json"
+      - "skeleton/contracts/**"
+      - "skeleton/ai/runtime/contracts/**"
+      - "scripts/check_architecture_contract_conformance.py"
+      - "scripts/verify_vol003_contract_conformance.py"
+      - "tests/test_architecture_contract_conformance.py"
+      - "tests/test_vol003_contract_conformance_independent.py"
+      - "skeleton/testing/test_contract_serialization_edges.py"
+      - "skeleton/testing/test_contract_compatibility.py"
+      - "skeleton/testing/test_contract_unicode_edges.py"
+      - ".github/workflows/vol003-contract-conformance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/contract_conformance.json"
+      - "machine/ai_runtime_schemas.json"
+      - "machine/capability_interfaces.json"
+      - "machine/ai_master_plan.json"
+      - "skeleton/contracts/**"
+      - "skeleton/ai/runtime/contracts/**"
+      - "scripts/check_architecture_contract_conformance.py"
+      - "scripts/verify_vol003_contract_conformance.py"
+      - "tests/test_architecture_contract_conformance.py"
+      - "tests/test_vol003_contract_conformance_independent.py"
+      - "skeleton/testing/test_contract_serialization_edges.py"
+      - "skeleton/testing/test_contract_compatibility.py"
+      - "skeleton/testing/test_contract_unicode_edges.py"
+      - ".github/workflows/vol003-contract-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol003-contract-conformance-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  contract-conformance:
+    name: Canonical contract conformance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install canonical contract test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          .
+          "pytest>=8,<9"
+
+      - name: Compile contract closure surfaces
+        run: >-
+          python -m compileall -q
+          scripts/check_architecture_contract_conformance.py
+          scripts/verify_vol003_contract_conformance.py
+          skeleton/contracts/canonical.py
+          skeleton/ai/runtime/contracts/canonical.py
+
+      - name: Validate canonical producer-consumer inventory and vectors
+        run: python scripts/check_architecture_contract_conformance.py --json
+
+      - name: Require canonical serializer mirror parity
+        run: cmp skeleton/contracts/canonical.py skeleton/ai/runtime/contracts/canonical.py
+
+      - name: Run canonical contract regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_architecture_contract_conformance.py
+          skeleton/testing/test_contract_serialization_edges.py
+          skeleton/testing/test_contract_compatibility.py
+          skeleton/testing/test_contract_unicode_edges.py
+
+      - name: Validate masterplan consistency
+        run: python scripts/check_ai_master_plan.py
+
+  contract-conformance-independent:
+    name: Independent exact-head contract verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol003_contract_conformance_independent.py
+
+      - name: Emit independent exact-head contract receipt
+        run: >-
+          python scripts/verify_vol003_contract_conformance.py
+          --evidence-out .vol003-contract-conformance-independent.json
+          --print-evidence
+
+      - name: Assert exact-head receipt identity and coverage
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol003-contract-conformance-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("VOL-003 receipt does not bind exact head")
+          if receipt.get("verifier") != "independent-vol003-contract-conformance-v1":
+              raise SystemExit("unexpected VOL-003 verifier identity")
+          if receipt.get("volume") != "VOL-003":
+              raise SystemExit("contract verifier bound wrong masterplan volume")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent VOL-003 verification failed")
+          if receipt.get("contract_count") != 40:
+              raise SystemExit("VOL-003 contract inventory coverage is incomplete")
+          if receipt.get("override_count") != 3:
+              raise SystemExit("VOL-003 reviewed override count drifted")
+          if receipt.get("executed_vector_count") != 18:
+              raise SystemExit("VOL-003 vector execution coverage is incomplete")
+          if len(receipt.get("vector_ids") or []) != 18:
+              raise SystemExit("VOL-003 vector identity coverage is incomplete")
+          if len(receipt.get("source_digests") or {}) != 3:
+              raise SystemExit("VOL-003 source digest coverage is incomplete")
+          mirror = receipt.get("serializer_mirror") or {}
+          if len(mirror.get("canonical") or "") != 64:
+              raise SystemExit("VOL-003 serializer digest is missing")
+          if mirror.get("canonical") != mirror.get("mirror"):
+              raise SystemExit("VOL-003 serializer mirror parity is broken")
+          binding = receipt.get("volume_binding") or {}
+          if len(binding.get("binding_digest") or "") != 64:
+              raise SystemExit("VOL-003 masterplan binding digest is missing")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("VOL-003 receipt digest is invalid")
+          print(
+              "VOL-003 independent exact-head receipt:",
+              expected,
+              receipt["receipt_digest"],
+          )
+          PY

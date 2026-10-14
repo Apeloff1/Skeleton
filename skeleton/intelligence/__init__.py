@@ -74,6 +74,8 @@ from skeleton.intelligence.strategy_registry import (
     REASONING_POLICY_ACCOUNTABILITY_ID,
     REASONING_POLICY_SCHEMA_VERSION,
     REASONING_POLICY_TASK_ID,
+    CognitiveControlDecision,
+    ReasoningBudgetSnapshot,
     ReasoningPolicy,
     ReasoningPolicyError,
     ReasoningPolicyRegistry,
@@ -83,9 +85,13 @@ from skeleton.intelligence.strategy_registry import (
     StopDisposition,
     StoppingDecision,
     StrategyCandidate,
+    StrategyReservation,
     StrategySelection,
+    evaluate_cognitive_control,
     evaluate_stopping,
+    reasoning_budget_snapshot,
     select_strategy,
+    verify_cognitive_control_chain,
 )
 from skeleton.intelligence.plan_verifier import (
     PLAN_VERIFIER_ACCOUNTABILITY_ID,
@@ -173,6 +179,11 @@ from skeleton.intelligence.shared_pressure import (
     SharedQueueTicket,
     SqliteSharedPressureLedger,
 )
+from skeleton.intelligence.router_registry import (
+    REGISTRY_SCHEMA_VERSION,
+    RouterRegistry,
+    RouterRegistrySnapshot,
+)
 from skeleton.intelligence.quests import (
     QuestObjective,
     QuestProgress,
@@ -239,6 +250,8 @@ __all__ = [
     "REASONING_POLICY_ACCOUNTABILITY_ID",
     "REASONING_POLICY_SCHEMA_VERSION",
     "REASONING_POLICY_TASK_ID",
+    "CognitiveControlDecision",
+    "ReasoningBudgetSnapshot",
     "ReasoningPolicy",
     "ReasoningPolicyError",
     "ReasoningPolicyRegistry",
@@ -248,9 +261,13 @@ __all__ = [
     "StopDisposition",
     "StoppingDecision",
     "StrategyCandidate",
+    "StrategyReservation",
     "StrategySelection",
+    "evaluate_cognitive_control",
     "evaluate_stopping",
+    "reasoning_budget_snapshot",
     "select_strategy",
+    "verify_cognitive_control_chain",
     "PLAN_VERIFIER_ACCOUNTABILITY_ID",
     "PLAN_VERIFIER_SCHEMA_VERSION",
     "PLAN_VERIFIER_TASK_ID",
@@ -323,4 +340,7 @@ __all__ = [
     "SharedPressureSnapshot",
     "SharedQueueTicket",
     "SqliteSharedPressureLedger",
+    "REGISTRY_SCHEMA_VERSION",
+    "RouterRegistry",
+    "RouterRegistrySnapshot",
 ]

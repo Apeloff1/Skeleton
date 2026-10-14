@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-16:asset_import:v1",
+  "title": "FLGB-16 asset import",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asset_id",
+    "source_digest",
+    "importer_id",
+    "importer_version",
+    "output_digest",
+    "provenance_digest"
+  ],
+  "properties": {
+    "asset_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "importer_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "importer_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "output_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "provenance_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

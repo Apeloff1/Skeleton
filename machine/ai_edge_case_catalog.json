@@ -19,7 +19,7 @@
       "type": "historical",
       "title": "General Problem Solver",
       "domain": "reasoning/planning",
-      "lesson": "Early means-ends analysis showed the value—and brittleness—of explicit problem reduction.",
+      "lesson": "Early means-ends analysis showed the value\u2014and brittleness\u2014of explicit problem reduction.",
       "mapped_volumes": [
         1,
         13,
@@ -45,10 +45,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-002",
@@ -88,10 +88,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-HIST-AI-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-003",
@@ -122,10 +122,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-004",
@@ -159,10 +159,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-005",
@@ -198,10 +198,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-006",
@@ -236,10 +236,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-007",
@@ -273,10 +273,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-HIST-AI-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-008",
@@ -310,10 +310,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-009",
@@ -348,10 +348,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-HIST-AI-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-010",
@@ -382,10 +382,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-011",
@@ -419,10 +419,10 @@
         "WP-W28"
       ],
       "accountability_id": "ACC-HIST-AI-011",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-012",
@@ -458,10 +458,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-012",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-013",
@@ -497,17 +497,17 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-014",
       "type": "historical",
       "title": "BDI agents",
       "domain": "multi-agent",
-      "lesson": "Belief–desire–intention separation is useful when distinguishing world knowledge, objectives and committed plans.",
+      "lesson": "Belief\u2013desire\u2013intention separation is useful when distinguishing world knowledge, objectives and committed plans.",
       "mapped_volumes": [
         1,
         12,
@@ -535,10 +535,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-014",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-015",
@@ -570,10 +570,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-015",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-016",
@@ -605,10 +605,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-016",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-017",
@@ -640,10 +640,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-017",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-018",
@@ -678,10 +678,10 @@
         "WP-W28"
       ],
       "accountability_id": "ACC-HIST-AI-018",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-019",
@@ -717,10 +717,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-HIST-AI-019",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-020",
@@ -752,10 +752,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-021",
@@ -786,10 +786,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-021",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-022",
@@ -821,10 +821,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-HIST-AI-022",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-023",
@@ -857,10 +857,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-HIST-AI-023",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-024",
@@ -892,10 +892,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-024",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-025",
@@ -927,10 +927,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-025",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-026",
@@ -964,10 +964,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-AI-026",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-027",
@@ -1002,10 +1002,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-027",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-028",
@@ -1036,10 +1036,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-028",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-029",
@@ -1070,10 +1070,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-029",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-030",
@@ -1105,10 +1105,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-030",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-031",
@@ -1140,10 +1140,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-031",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-032",
@@ -1176,10 +1176,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-032",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-033",
@@ -1215,10 +1215,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-033",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-034",
@@ -1250,10 +1250,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-034",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-035",
@@ -1288,10 +1288,10 @@
         "WP-W28"
       ],
       "accountability_id": "ACC-HIST-AI-035",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-036",
@@ -1324,10 +1324,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-HIST-AI-036",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-037",
@@ -1363,10 +1363,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-037",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-038",
@@ -1400,10 +1400,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-038",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-039",
@@ -1436,10 +1436,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-039",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-AI-040",
@@ -1474,10 +1474,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-AI-040",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-001",
@@ -1514,10 +1514,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-002",
@@ -1552,10 +1552,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-003",
@@ -1590,10 +1590,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-HIST-SYS-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-004",
@@ -1626,10 +1626,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-005",
@@ -1661,10 +1661,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-HIST-SYS-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-006",
@@ -1696,10 +1696,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-HIST-SYS-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-007",
@@ -1731,10 +1731,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-008",
@@ -1763,10 +1763,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-009",
@@ -1802,10 +1802,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-010",
@@ -1841,10 +1841,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-011",
@@ -1877,10 +1877,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-011",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-012",
@@ -1913,10 +1913,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-012",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-013",
@@ -1950,10 +1950,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-HIST-SYS-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-014",
@@ -1985,10 +1985,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-014",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-015",
@@ -2017,10 +2017,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-015",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-016",
@@ -2055,10 +2055,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-016",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-017",
@@ -2087,10 +2087,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-017",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-018",
@@ -2122,10 +2122,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-HIST-SYS-018",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-019",
@@ -2178,15 +2178,15 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-HIST-SYS-019",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-020",
       "type": "historical",
-      "title": "Saltzer–Schroeder principles",
+      "title": "Saltzer\u2013Schroeder principles",
       "domain": "security",
       "lesson": "Least privilege, fail-safe defaults, complete mediation and economy of mechanism remain central AI-tool security lessons.",
       "mapped_volumes": [
@@ -2236,10 +2236,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-HIST-SYS-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-021",
@@ -2286,10 +2286,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-HIST-SYS-021",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-022",
@@ -2318,10 +2318,10 @@
         "WP-W02"
       ],
       "accountability_id": "ACC-HIST-SYS-022",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-023",
@@ -2351,10 +2351,10 @@
         "WP-W13"
       ],
       "accountability_id": "ACC-HIST-SYS-023",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-024",
@@ -2384,10 +2384,10 @@
         "WP-W23"
       ],
       "accountability_id": "ACC-HIST-SYS-024",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-025",
@@ -2421,10 +2421,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-HIST-SYS-025",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-026",
@@ -2457,10 +2457,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-026",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-027",
@@ -2492,10 +2492,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-027",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-028",
@@ -2527,10 +2527,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-028",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-029",
@@ -2559,10 +2559,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-029",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "HIST-SYS-030",
@@ -2593,10 +2593,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-HIST-SYS-030",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-001",
@@ -2639,10 +2639,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-002",
@@ -2672,10 +2672,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-003",
@@ -2706,10 +2706,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-004",
@@ -2739,10 +2739,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-005",
@@ -2774,10 +2774,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-006",
@@ -2806,10 +2806,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-007",
@@ -2842,10 +2842,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-008",
@@ -2878,10 +2878,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-009",
@@ -2938,10 +2938,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-010",
@@ -3001,10 +3001,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-011",
@@ -3040,10 +3040,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-011",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-012",
@@ -3073,10 +3073,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-012",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-013",
@@ -3107,10 +3107,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-014",
@@ -3140,10 +3140,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-014",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-015",
@@ -3173,10 +3173,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-015",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-016",
@@ -3207,10 +3207,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-016",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-017",
@@ -3244,10 +3244,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-017",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-018",
@@ -3276,10 +3276,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-018",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-019",
@@ -3311,10 +3311,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-019",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-CONTRACT-020",
@@ -3362,10 +3362,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-CONTRACT-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-001",
@@ -3398,10 +3398,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-002",
@@ -3435,10 +3435,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-003",
@@ -3469,10 +3469,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-004",
@@ -3505,10 +3505,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-005",
@@ -3538,10 +3538,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-DIST-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-006",
@@ -3573,10 +3573,10 @@
         "WP-W19"
       ],
       "accountability_id": "ACC-EDGE-DIST-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-007",
@@ -3607,10 +3607,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-008",
@@ -3641,17 +3641,17 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-009",
       "type": "edge_case",
       "title": "ABA state change",
       "domain": "concurrency",
-      "lesson": "A value changes A→B→A and naive equality misses that history changed.",
+      "lesson": "A value changes A\u2192B\u2192A and naive equality misses that history changed.",
       "mapped_volumes": [
         5,
         30,
@@ -3674,10 +3674,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-010",
@@ -3712,10 +3712,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-011",
@@ -3751,10 +3751,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-DIST-011",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-012",
@@ -3787,10 +3787,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-012",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-013",
@@ -3821,10 +3821,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-014",
@@ -3853,10 +3853,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-014",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-015",
@@ -3884,10 +3884,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-015",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-016",
@@ -3917,10 +3917,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-016",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-017",
@@ -3952,10 +3952,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-DIST-017",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-018",
@@ -3983,10 +3983,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-018",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-019",
@@ -4016,10 +4016,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-019",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-020",
@@ -4056,10 +4056,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-021",
@@ -4096,10 +4096,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-021",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-022",
@@ -4130,10 +4130,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-022",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-023",
@@ -4162,10 +4162,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-DIST-023",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-024",
@@ -4194,10 +4194,10 @@
         "WP-W18"
       ],
       "accountability_id": "ACC-EDGE-DIST-024",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-025",
@@ -4229,10 +4229,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-025",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-026",
@@ -4264,10 +4264,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-026",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-027",
@@ -4299,10 +4299,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-027",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-028",
@@ -4333,10 +4333,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-DIST-028",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-029",
@@ -4367,10 +4367,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-DIST-029",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DIST-030",
@@ -4402,10 +4402,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-EDGE-DIST-030",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-001",
@@ -4452,10 +4452,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-AI-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-002",
@@ -4501,10 +4501,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-AI-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-003",
@@ -4552,10 +4552,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-AI-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-004",
@@ -4585,10 +4585,10 @@
         "WP-W23"
       ],
       "accountability_id": "ACC-EDGE-AI-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-005",
@@ -4620,10 +4620,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-EDGE-AI-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-006",
@@ -4655,10 +4655,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-EDGE-AI-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-007",
@@ -4688,10 +4688,10 @@
         "WP-W10"
       ],
       "accountability_id": "ACC-EDGE-AI-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-008",
@@ -4722,10 +4722,10 @@
         "WP-W17"
       ],
       "accountability_id": "ACC-EDGE-AI-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-009",
@@ -4755,10 +4755,10 @@
         "WP-W17"
       ],
       "accountability_id": "ACC-EDGE-AI-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-010",
@@ -4788,10 +4788,10 @@
         "WP-W08"
       ],
       "accountability_id": "ACC-EDGE-AI-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-011",
@@ -4823,10 +4823,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-AI-011",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-012",
@@ -4857,10 +4857,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-AI-012",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-013",
@@ -4915,10 +4915,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-AI-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-014",
@@ -4951,10 +4951,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-AI-014",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-015",
@@ -4985,10 +4985,10 @@
         "WP-W18"
       ],
       "accountability_id": "ACC-EDGE-AI-015",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-016",
@@ -5020,10 +5020,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-AI-016",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-017",
@@ -5054,10 +5054,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-EDGE-AI-017",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-018",
@@ -5090,10 +5090,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-AI-018",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-019",
@@ -5126,10 +5126,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-AI-019",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-020",
@@ -5162,10 +5162,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-AI-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-021",
@@ -5211,10 +5211,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-AI-021",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-022",
@@ -5246,10 +5246,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-AI-022",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-023",
@@ -5283,10 +5283,10 @@
         "WP-W17"
       ],
       "accountability_id": "ACC-EDGE-AI-023",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-024",
@@ -5320,10 +5320,10 @@
         "WP-W17"
       ],
       "accountability_id": "ACC-EDGE-AI-024",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-025",
@@ -5358,10 +5358,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-EDGE-AI-025",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-026",
@@ -5392,10 +5392,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-EDGE-AI-026",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-027",
@@ -5428,10 +5428,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-EDGE-AI-027",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-028",
@@ -5465,10 +5465,10 @@
         "WP-W28"
       ],
       "accountability_id": "ACC-EDGE-AI-028",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-029",
@@ -5499,10 +5499,10 @@
         "WP-W23"
       ],
       "accountability_id": "ACC-EDGE-AI-029",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-030",
@@ -5547,10 +5547,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-EDGE-AI-030",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-031",
@@ -5581,10 +5581,10 @@
         "WP-W14"
       ],
       "accountability_id": "ACC-EDGE-AI-031",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-032",
@@ -5620,10 +5620,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-AI-032",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-033",
@@ -5657,10 +5657,10 @@
         "WP-W28"
       ],
       "accountability_id": "ACC-EDGE-AI-033",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-034",
@@ -5695,10 +5695,10 @@
         "WP-W28"
       ],
       "accountability_id": "ACC-EDGE-AI-034",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-035",
@@ -5731,10 +5731,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-AI-035",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-036",
@@ -5766,10 +5766,10 @@
         "WP-W28"
       ],
       "accountability_id": "ACC-EDGE-AI-036",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-037",
@@ -5800,10 +5800,10 @@
         "WP-W17"
       ],
       "accountability_id": "ACC-EDGE-AI-037",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-038",
@@ -5834,10 +5834,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-AI-038",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-039",
@@ -5869,10 +5869,10 @@
         "WP-W19"
       ],
       "accountability_id": "ACC-EDGE-AI-039",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-AI-040",
@@ -5905,10 +5905,10 @@
         "WP-W19"
       ],
       "accountability_id": "ACC-EDGE-AI-040",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-001",
@@ -5952,10 +5952,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-EDGE-SEC-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-002",
@@ -5997,10 +5997,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-SEC-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-003",
@@ -6044,10 +6044,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-SEC-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-004",
@@ -6095,10 +6095,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-SEC-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-005",
@@ -6142,10 +6142,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-EDGE-SEC-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-006",
@@ -6191,10 +6191,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-EDGE-SEC-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-007",
@@ -6239,10 +6239,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-EDGE-SEC-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-008",
@@ -6277,10 +6277,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-SEC-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-009",
@@ -6315,10 +6315,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-EDGE-SEC-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-010",
@@ -6350,10 +6350,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-SEC-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-011",
@@ -6397,10 +6397,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-SEC-011",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-012",
@@ -6443,10 +6443,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-SEC-012",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-013",
@@ -6488,10 +6488,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-SEC-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-014",
@@ -6534,10 +6534,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-SEC-014",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-015",
@@ -6608,10 +6608,10 @@
         "WP-W21"
       ],
       "accountability_id": "ACC-EDGE-SEC-015",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-016",
@@ -6664,10 +6664,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-SEC-016",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-017",
@@ -6708,10 +6708,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-SEC-017",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-018",
@@ -6756,10 +6756,10 @@
         "WP-W24"
       ],
       "accountability_id": "ACC-EDGE-SEC-018",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-019",
@@ -6811,10 +6811,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-SEC-019",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-SEC-020",
@@ -6845,10 +6845,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-SEC-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DATA-001",
@@ -6879,10 +6879,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-DATA-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DATA-002",
@@ -6917,10 +6917,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-DATA-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DATA-003",
@@ -6952,10 +6952,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-DATA-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DATA-004",
@@ -6985,10 +6985,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-DATA-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DATA-005",
@@ -7023,10 +7023,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-DATA-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DATA-006",
@@ -7059,10 +7059,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-DATA-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DATA-007",
@@ -7097,10 +7097,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-DATA-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DATA-008",
@@ -7130,10 +7130,10 @@
         "WP-W12"
       ],
       "accountability_id": "ACC-EDGE-DATA-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DATA-009",
@@ -7178,10 +7178,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-EDGE-DATA-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-DATA-010",
@@ -7233,10 +7233,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-DATA-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-HW-001",
@@ -7268,10 +7268,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-HW-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-HW-002",
@@ -7304,10 +7304,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-HW-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-HW-003",
@@ -7339,10 +7339,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-HW-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-HW-004",
@@ -7370,10 +7370,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-HW-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-HW-005",
@@ -7403,10 +7403,10 @@
         "WP-W21"
       ],
       "accountability_id": "ACC-EDGE-HW-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-HW-006",
@@ -7443,10 +7443,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-HW-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-HW-007",
@@ -7478,10 +7478,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-HW-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-HW-008",
@@ -7510,10 +7510,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-HW-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-HW-009",
@@ -7545,10 +7545,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-HW-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-HW-010",
@@ -7581,10 +7581,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-HW-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-UX-001",
@@ -7613,10 +7613,10 @@
         "WP-W23"
       ],
       "accountability_id": "ACC-EDGE-UX-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-UX-002",
@@ -7648,10 +7648,10 @@
         "WP-W23"
       ],
       "accountability_id": "ACC-EDGE-UX-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-UX-003",
@@ -7684,10 +7684,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-EDGE-UX-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-UX-004",
@@ -7717,10 +7717,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-EDGE-UX-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-UX-005",
@@ -7749,10 +7749,10 @@
         "WP-W25"
       ],
       "accountability_id": "ACC-EDGE-UX-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-UX-006",
@@ -7783,10 +7783,10 @@
         "WP-W23"
       ],
       "accountability_id": "ACC-EDGE-UX-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-UX-007",
@@ -7814,10 +7814,10 @@
         "WP-W23"
       ],
       "accountability_id": "ACC-EDGE-UX-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-UX-008",
@@ -7847,10 +7847,10 @@
         "WP-W23"
       ],
       "accountability_id": "ACC-EDGE-UX-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-UX-009",
@@ -7881,10 +7881,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-EDGE-UX-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "EDGE-UX-010",
@@ -7913,10 +7913,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-EDGE-UX-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-001",
@@ -7952,10 +7952,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-001",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-002",
@@ -7986,10 +7986,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-OBSCURE-002",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-003",
@@ -8018,10 +8018,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-OBSCURE-003",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-004",
@@ -8053,10 +8053,10 @@
         "WP-W19"
       ],
       "accountability_id": "ACC-OBSCURE-004",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-005",
@@ -8091,10 +8091,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-OBSCURE-005",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-006",
@@ -8127,10 +8127,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-006",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-007",
@@ -8161,10 +8161,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-OBSCURE-007",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-008",
@@ -8194,10 +8194,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-008",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-009",
@@ -8229,10 +8229,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-OBSCURE-009",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-010",
@@ -8268,10 +8268,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-OBSCURE-010",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-011",
@@ -8302,10 +8302,10 @@
         "WP-W27"
       ],
       "accountability_id": "ACC-OBSCURE-011",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-012",
@@ -8340,10 +8340,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-OBSCURE-012",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-013",
@@ -8375,10 +8375,10 @@
         "WP-W22"
       ],
       "accountability_id": "ACC-OBSCURE-013",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-014",
@@ -8413,10 +8413,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-014",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-015",
@@ -8448,10 +8448,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-015",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-016",
@@ -8485,10 +8485,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-016",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-017",
@@ -8519,10 +8519,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-OBSCURE-017",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-018",
@@ -8575,10 +8575,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-018",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-019",
@@ -8613,10 +8613,10 @@
         "WP-W26"
       ],
       "accountability_id": "ACC-OBSCURE-019",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-020",
@@ -8648,10 +8648,10 @@
         "WP-W17"
       ],
       "accountability_id": "ACC-OBSCURE-020",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-021",
@@ -8682,10 +8682,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-021",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-022",
@@ -8715,10 +8715,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-OBSCURE-022",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-023",
@@ -8753,10 +8753,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-023",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-024",
@@ -8805,10 +8805,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-OBSCURE-024",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-025",
@@ -8868,10 +8868,10 @@
         "WP-W20"
       ],
       "accountability_id": "ACC-OBSCURE-025",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-026",
@@ -8900,10 +8900,10 @@
         "WP-W16"
       ],
       "accountability_id": "ACC-OBSCURE-026",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-027",
@@ -8935,10 +8935,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-OBSCURE-027",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-028",
@@ -8969,10 +8969,10 @@
         "WP-W29"
       ],
       "accountability_id": "ACC-OBSCURE-028",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-029",
@@ -9008,10 +9008,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-029",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     },
     {
       "id": "OBSCURE-030",
@@ -9046,10 +9046,10 @@
         "WP-W30"
       ],
       "accountability_id": "ACC-OBSCURE-030",
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "signing_required": true,
-      "accountability_status": "planned"
+      "accountability_status": "verified"
     }
   ],
   "execution_metadata": {

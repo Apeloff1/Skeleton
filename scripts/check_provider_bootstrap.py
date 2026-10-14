@@ -124,13 +124,17 @@ def _sdk_root(name: str) -> str:
     return name.split(".", 1)[0]
 
 
-@lru_cache(maxsize=16_384)
+@lru_cache(maxsize=128)
 def _cached_python_tree(
     path_text: str,
     mtime_ns: int,
     size: int,
 ) -> ast.AST | None:
-    """Parse one unchanged Python file once per validator process."""
+    """Reuse recent parses without retaining thousands of full module ASTs.
+
+    Eviction changes parsing cost, never provider isolation decisions. Compact
+    import summaries retain their separate larger cache for repeated scans.
+    """
 
     del mtime_ns, size  # Cache-key material; content is read only on cache miss.
     try:
@@ -151,7 +155,7 @@ def _python_tree(path: Path) -> ast.AST | None:
     )
 
 
-@lru_cache(maxsize=16_384)
+@lru_cache(maxsize=128)
 def _cached_source(
     path_text: str,
     mtime_ns: int,
@@ -178,7 +182,7 @@ def _python_source(path: Path) -> str:
     )
 
 
-@lru_cache(maxsize=16_384)
+@lru_cache(maxsize=65_536)
 def _cached_imported_modules(path_text: str, mtime_ns: int, size: int) -> tuple[str, ...]:
     """Share immutable import analysis without retaining another tree cache."""
     tree = _cached_python_tree(path_text, mtime_ns, size)
@@ -323,16 +327,20 @@ def _credential_environment_reads(path: Path) -> list[str]:
 
     return sorted(hits)
 
-def _credential_markers(path: Path) -> list[str]:
-    """Return credential edges from real environment reads or declared key slots.
+@lru_cache(maxsize=65_536)
+def _cached_credential_markers(path_text: str, mtime_ns: int, size: int) -> tuple[str, ...]:
+    """Cache compact credential findings, never the full module tree.
 
-    AST-based assignment detection keeps comments/docstrings harmless while still
-    classifying modules that explicitly own a provider credential variable.
+    The inventory, isolation validation and evidence writer scan the same
+    40,000-module tree. Retain immutable summaries across those passes; source
+    metadata changes invalidate the findings before a later scan.
     """
+    del mtime_ns, size
+    path = Path(path_text)
     hits = set(_credential_environment_reads(path))
     tree = _python_tree(path)
     if tree is None:
-        return sorted(hits)
+        return tuple(sorted(hits))
 
     for node in ast.walk(tree):
         if (
@@ -341,7 +349,18 @@ def _credential_markers(path: Path) -> list[str]:
             and node.id in _AI_CREDENTIAL_MARKERS
         ):
             hits.add(node.id)
-    return sorted(hits)
+    return tuple(sorted(hits))
+
+
+def _credential_markers(path: Path) -> list[str]:
+    """Return a fresh result list for an unchanged source identity."""
+    try:
+        metadata = path.stat()
+    except OSError:
+        return []
+    return list(_cached_credential_markers(
+        str(path.resolve()), int(metadata.st_mtime_ns), int(metadata.st_size)
+    ))
 
 
 def _is_non_runtime_provider_mirror(relative: str) -> bool:
@@ -616,6 +635,8 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
         "COPY --chown=appuser:appuser machine/ai_capabilities.json ./machine/ai_capabilities.json",
         "COPY --chown=appuser:appuser machine/ai_implementation_handoff.json ./machine/ai_implementation_handoff.json",
         "COPY --chown=appuser:appuser machine/ai_closure_evidence.json ./machine/ai_closure_evidence.json",
+        "COPY --chown=appuser:appuser machine/enterprise_ai_superiority.json ./machine/enterprise_ai_superiority.json",
+        "COPY --chown=appuser:appuser machine/enterprise_ai_implementation_notes_index.json ./machine/enterprise_ai_implementation_notes_index.json",
         "COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md",
     )
     for image_label, image_path in (

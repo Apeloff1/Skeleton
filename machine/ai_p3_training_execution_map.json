@@ -1,7 +1,7 @@
 {
   "schema_version": "skeleton.ai.p3.training_execution_map.v1",
   "map_version": "0.1.0",
-  "status": "active",
+  "status": "closed",
   "phase": "P3-T2",
   "phase_objective": "Extend the sealed P3-T1 frontier into a provider-independent native data, training, evaluation and post-training plane without re-owning earlier P3 volumes.",
   "prerequisite": {
@@ -489,7 +489,7 @@
     "in_progress_count": 0,
     "ready_count": 0,
     "blocked_count": 0,
-    "landed_unpromoted_count": 4,
+    "landed_unpromoted_count": 0,
     "scheduled_volume_count": 19,
     "queued_volume_count": 178,
     "source_volume_count": 197

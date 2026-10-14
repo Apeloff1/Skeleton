@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-11:particle_vfx:v1",
+  "title": "FLGB-11 particle vfx",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "emitter_id",
+    "seed_digest",
+    "rate_milli_per_second",
+    "max_particles",
+    "lifetime_ms"
+  ],
+  "properties": {
+    "emitter_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "seed_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rate_milli_per_second": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_particles": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000000
+    },
+    "lifetime_ms": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

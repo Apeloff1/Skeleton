@@ -1,0 +1,144 @@
+name: Oct 2026 Engineering Standards
+
+on:
+  pull_request:
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_file_tree.json"
+      - "machine/ai_oct2026_engineering_standards_candidate.json"
+      - "skeleton/ai/governance/**"
+      - "skeleton/ai/providers/provider_risk.py"
+      - "skeleton/ai/providers/failover.py"
+      - "skeleton/ai/providers/offline_mode.py"
+      - "skeleton/ai/runtime/deployment_profiles.py"
+      - "skeleton/security/air_gap.py"
+      - "skeleton/security/identity_federation.py"
+      - "skeleton/ai/runtime/security/air_gap.py"
+      - "skeleton/ai/runtime/security/identity_federation.py"
+      - "skeleton/testing/test_model_cards.py"
+      - "skeleton/testing/test_dataset_cards.py"
+      - "skeleton/testing/test_tool_cards.py"
+      - "skeleton/testing/test_agent_cards.py"
+      - "skeleton/testing/test_component_health_scorecard.py"
+      - "skeleton/testing/test_dependency_health.py"
+      - "skeleton/testing/test_provider_risk.py"
+      - "skeleton/testing/test_provider_failover.py"
+      - "skeleton/testing/test_offline_mode.py"
+      - "skeleton/testing/test_air_gapped_profile.py"
+      - "skeleton/testing/test_edge_deployment.py"
+      - "skeleton/testing/test_enterprise_deployment.py"
+      - "skeleton/testing/test_identity_federation.py"
+      - "skeleton/testing/test_administration_plane.py"
+      - "skeleton/testing/test_engineering_standards_review.py"
+      - "scripts/check_ai_oct2026_engineering_standards.py"
+      - "tests/test_ai_oct2026_engineering_standards.py"
+      - "docs/plan/OCT2026_ENGINEERING_STANDARDS_221_234.md"
+      - ".github/workflows/oct2026-engineering-standards.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_file_tree.json"
+      - "machine/ai_oct2026_engineering_standards_candidate.json"
+      - "skeleton/ai/governance/**"
+      - "skeleton/ai/providers/**"
+      - "skeleton/ai/runtime/deployment_profiles.py"
+      - "skeleton/security/air_gap.py"
+      - "skeleton/security/identity_federation.py"
+      - "scripts/check_ai_oct2026_engineering_standards.py"
+      - ".github/workflows/oct2026-engineering-standards.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oct2026-engineering-standards-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      OPENAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GOOGLE_API_KEY: ""
+      XAI_API_KEY: ""
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pydantic==2.13.5"
+          "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
+
+      - name: Compile standards surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/ai/governance
+          skeleton/ai/providers/provider_risk.py
+          skeleton/ai/providers/failover.py
+          skeleton/ai/providers/offline_mode.py
+          skeleton/ai/runtime/deployment_profiles.py
+          skeleton/security/air_gap.py
+          skeleton/security/identity_federation.py
+          skeleton/ai/runtime/security/air_gap.py
+          skeleton/ai/runtime/security/identity_federation.py
+          scripts/check_ai_oct2026_engineering_standards.py
+
+      - name: Validate masterplan and AI ownership
+        run: |
+          python scripts/check_ai_master_plan.py
+          python scripts/check_ai_file_tree.py
+
+      - name: Validate exact-head standards candidate
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          python scripts/check_ai_oct2026_engineering_standards.py --head "$HEAD_SHA" --json
+
+      - name: Validate candidate contract
+        run: python -m pytest -q --noconftest tests/test_ai_oct2026_engineering_standards.py
+
+      - name: Run VOL-221 through VOL-234 primary regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_model_cards.py
+          skeleton/testing/test_dataset_cards.py
+          skeleton/testing/test_tool_cards.py
+          skeleton/testing/test_agent_cards.py
+          skeleton/testing/test_component_health_scorecard.py
+          skeleton/testing/test_dependency_health.py
+          skeleton/testing/test_provider_risk.py
+          skeleton/testing/test_provider_failover.py
+          skeleton/testing/test_offline_mode.py
+          skeleton/testing/test_air_gapped_profile.py
+          skeleton/testing/test_edge_deployment.py
+          skeleton/testing/test_enterprise_deployment.py
+          skeleton/testing/test_identity_federation.py
+          skeleton/testing/test_administration_plane.py
+          skeleton/testing/test_engineering_standards_review.py
+
+      - name: Run cross-plane security and provider regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_provider_contract.py
+          skeleton/testing/test_provider_context_binding.py
+          skeleton/testing/test_artifact_trust.py
+          skeleton/testing/test_sbom.py
+          skeleton/testing/test_security_boundaries.py

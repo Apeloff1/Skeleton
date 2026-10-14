@@ -8,20 +8,18 @@ A cheaper fallback is attempted only for declared resource-budget failures.
 Concurrency, queue, deadline, shared-pressure, identity, and accounting
 failures are never bypassed by fallback.
 """
-
 from __future__ import annotations
 
+from dataclasses import dataclass, replace
 import hashlib
 import json
 import math
+from pathlib import Path
 import sqlite3
 import threading
-from collections.abc import Iterable
-from dataclasses import dataclass, replace
-from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
-from skeleton.ai.runtime.observability.budget_accounting import (
+from skeleton.observability.budget_accounting import (
     BudgetAccountingDecision,
     qualify_budget_accounting,
 )
@@ -60,6 +58,7 @@ from skeleton.intelligence.shared_pressure import (
     SharedPressureLease,
     SqliteSharedPressureLedger,
 )
+
 
 _SAFE_FALLBACK_REASON_PREFIXES = (
     "input_token_budget_exceeded",
@@ -124,7 +123,9 @@ def _canonical_json_text(value: object) -> str:
             allow_nan=False,
         )
     except (TypeError, ValueError) as exc:
-        raise CostGovernorError("cost-governor evidence must be canonical JSON") from exc
+        raise CostGovernorError(
+            "cost-governor evidence must be canonical JSON"
+        ) from exc
 
 
 def _canonical_digest(value: object) -> str:
@@ -135,7 +136,10 @@ def _canonical_digest(value: object) -> str:
 def _usage_payload(usage: UsageEstimate) -> dict[str, int | float]:
     if not isinstance(usage, UsageEstimate):
         raise TypeError("usage must be UsageEstimate")
-    return {field: getattr(usage, field) for field in _USAGE_FIELDS}
+    return {
+        field: getattr(usage, field)
+        for field in _USAGE_FIELDS
+    }
 
 
 def _usage_from_payload(value: object) -> UsageEstimate:
@@ -153,7 +157,9 @@ def _usage_from_payload(value: object) -> UsageEstimate:
             storage_bytes=int(value["storage_bytes"]),
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise CostGovernorError("usage journal payload is invalid") from exc
+        raise CostGovernorError(
+            "usage journal payload is invalid"
+        ) from exc
 
 
 def _budget_from_payload(value: object) -> ResourceBudget:
@@ -173,7 +179,9 @@ def _budget_from_payload(value: object) -> ResourceBudget:
             max_queue_depth=int(value["max_queue_depth"]),
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise CostGovernorError("budget journal payload is invalid") from exc
+        raise CostGovernorError(
+            "budget journal payload is invalid"
+        ) from exc
 
 
 def _effective_terminal_actual(
@@ -257,21 +265,28 @@ def _completion_digest(completion: QuotaCompletion | None) -> str | None:
 
 
 def _fallback_reason_allowed(reason: str, allowed: tuple[str, ...]) -> bool:
-    return any(reason == prefix or reason.startswith(prefix) for prefix in allowed)
+    return any(
+        reason == prefix or reason.startswith(prefix)
+        for prefix in allowed
+    )
 
 
 def _validated_evidence_refs(
     values: Iterable[EvidenceRef],
 ) -> tuple[EvidenceRef, ...]:
     if isinstance(values, (str, bytes)):
-        raise CostGovernorError("evidence_refs must contain EvidenceRef values")
+        raise CostGovernorError(
+            "evidence_refs must contain EvidenceRef values"
+        )
     refs = tuple(values)
     if not refs:
         raise CostGovernorError("evidence_refs must be non-empty")
     normalized: dict[tuple[str, str, str], EvidenceRef] = {}
     for item in refs:
         if not isinstance(item, EvidenceRef):
-            raise CostGovernorError("evidence_refs must contain EvidenceRef values")
+            raise CostGovernorError(
+                "evidence_refs must contain EvidenceRef values"
+            )
         source = _token("evidence source", item.source)
         digest = _sha256("evidence digest", item.digest)
         category = _token("evidence category", item.category)
@@ -318,11 +333,15 @@ class SafeCostFallback:
             raise CostGovernorError("estimate must be UsageEstimate")
         reasons = tuple(sorted(set(self.allowed_failure_reasons)))
         if not reasons:
-            raise CostGovernorError("allowed_failure_reasons must be non-empty")
+            raise CostGovernorError(
+                "allowed_failure_reasons must be non-empty"
+            )
         for reason in reasons:
             clean = _token("allowed_failure_reason", reason)
             if clean not in _SAFE_FALLBACK_REASON_PREFIXES:
-                raise CostGovernorError(f"unsafe fallback failure reason:{clean}")
+                raise CostGovernorError(
+                    f"unsafe fallback failure reason:{clean}"
+                )
         object.__setattr__(self, "allowed_failure_reasons", reasons)
 
     @property
@@ -332,7 +351,9 @@ class SafeCostFallback:
                 "fallback_id": self.fallback_id,
                 "capability": self.capability,
                 "estimate": _usage_payload(self.estimate),
-                "allowed_failure_reasons": list(self.allowed_failure_reasons),
+                "allowed_failure_reasons": list(
+                    self.allowed_failure_reasons
+                ),
             }
         )
 
@@ -402,9 +423,13 @@ class CostReservation:
                 _token("fallback_reason", self.fallback_reason),
             )
             if self.requested_capability == self.selected_capability:
-                raise CostGovernorError("fallback must select a distinct declared capability")
+                raise CostGovernorError(
+                    "fallback must select a distinct declared capability"
+                )
         elif self.fallback_id is not None or self.fallback_reason is not None:
-            raise CostGovernorError("non-fallback reservation cannot carry fallback metadata")
+            raise CostGovernorError(
+                "non-fallback reservation cannot carry fallback metadata"
+            )
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -457,7 +482,9 @@ class CostCharge:
             _sha256("quota_event_digest", self.quota_event_digest),
         )
         if not isinstance(self.resolved_unknown_usage, bool):
-            raise CostGovernorError("resolved_unknown_usage must be boolean")
+            raise CostGovernorError(
+                "resolved_unknown_usage must be boolean"
+            )
 
     @property
     def digest(self) -> str:
@@ -524,24 +551,40 @@ class CostDecision:
             raise CostGovernorError("accepted must be boolean")
         reasons = tuple(sorted(set(self.reasons)))
         if any(not isinstance(item, str) or not item for item in reasons):
-            raise CostGovernorError("reasons must contain non-empty strings")
+            raise CostGovernorError(
+                "reasons must contain non-empty strings"
+            )
         object.__setattr__(self, "reasons", reasons)
         if self.state == "released_unspent":
             if self.completion_digest is not None:
-                raise CostGovernorError("released reservation cannot carry completion")
+                raise CostGovernorError(
+                    "released reservation cannot carry completion"
+                )
             if self.accounting_decision_digest is not None:
-                raise CostGovernorError("released reservation cannot carry accounting decision")
+                raise CostGovernorError(
+                    "released reservation cannot carry accounting decision"
+                )
             if self.accepted:
-                raise CostGovernorError("released reservation is not completed cost evidence")
+                raise CostGovernorError(
+                    "released reservation is not completed cost evidence"
+                )
         else:
             if self.completion_digest is None:
-                raise CostGovernorError("completed decision requires completion digest")
+                raise CostGovernorError(
+                    "completed decision requires completion digest"
+                )
             if self.accounting_decision_digest is None:
-                raise CostGovernorError("completed decision requires accounting qualification")
+                raise CostGovernorError(
+                    "completed decision requires accounting qualification"
+                )
             if self.accepted != (not reasons):
-                raise CostGovernorError("accepted state must match terminal reasons")
+                raise CostGovernorError(
+                    "accepted state must match terminal reasons"
+                )
         if self.promotion_authority is not False:
-            raise CostGovernorError("cost governor has no promotion authority")
+            raise CostGovernorError(
+                "cost governor has no promotion authority"
+            )
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -575,12 +618,16 @@ def _quota_usage_from_payload(value: object) -> QuotaUsage:
             storage_bytes=int(value["storage_bytes"]),
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise CostGovernorError("quota usage journal payload is invalid") from exc
+        raise CostGovernorError(
+            "quota usage journal payload is invalid"
+        ) from exc
 
 
 def _quota_reservation_from_payload(value: object) -> QuotaReservation:
     if not isinstance(value, dict):
-        raise CostGovernorError("quota reservation journal payload is invalid")
+        raise CostGovernorError(
+            "quota reservation journal payload is invalid"
+        )
     try:
         return QuotaReservation(
             reservation_id=str(value["reservation_id"]),
@@ -591,7 +638,9 @@ def _quota_reservation_from_payload(value: object) -> QuotaReservation:
             reserved_at=float(value["reserved_at"]),
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise CostGovernorError("quota reservation journal payload is invalid") from exc
+        raise CostGovernorError(
+            "quota reservation journal payload is invalid"
+        ) from exc
 
 
 def _cost_reservation_from_payload(value: object) -> CostReservation:
@@ -614,7 +663,9 @@ def _cost_reservation_from_payload(value: object) -> CostReservation:
             fallback_reason=value.get("fallback_reason"),
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise CostGovernorError("cost reservation journal payload is invalid") from exc
+        raise CostGovernorError(
+            "cost reservation journal payload is invalid"
+        ) from exc
 
 
 def _cost_decision_from_payload(value: object) -> CostDecision:
@@ -627,7 +678,9 @@ def _cost_decision_from_payload(value: object) -> CostDecision:
             state=value["state"],
             reservation_digest=value["reservation_digest"],
             completion_digest=value.get("completion_digest"),
-            accounting_decision_digest=value.get("accounting_decision_digest"),
+            accounting_decision_digest=value.get(
+                "accounting_decision_digest"
+            ),
             accepted=value["accepted"],
             reasons=tuple(value["reasons"]),
             promotion_authority=value.get(
@@ -636,7 +689,9 @@ def _cost_decision_from_payload(value: object) -> CostDecision:
             ),
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise CostGovernorError("cost decision journal payload is invalid") from exc
+        raise CostGovernorError(
+            "cost decision journal payload is invalid"
+        ) from exc
 
 
 def _evidence_digest(refs: tuple[EvidenceRef, ...]) -> str:
@@ -658,7 +713,9 @@ def _shared_pressure_lease_payload(
     if lease is None:
         return None
     if not isinstance(lease, SharedPressureLease):
-        raise TypeError("shared_pressure_lease must be SharedPressureLease")
+        raise TypeError(
+            "shared_pressure_lease must be SharedPressureLease"
+        )
     return {
         "lease_id": lease.lease_id,
         "scope": lease.scope,
@@ -677,7 +734,9 @@ def _shared_pressure_lease_from_payload(
     if value is None:
         return None
     if not isinstance(value, dict):
-        raise CostGovernorError("shared pressure lease journal payload is invalid")
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        )
     try:
         raw_priority = value["priority"]
         raw_acquired_at = value["acquired_at"]
@@ -697,7 +756,9 @@ def _shared_pressure_lease_from_payload(
             value["owner_id"],
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise CostGovernorError("shared pressure lease journal payload is invalid") from exc
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        ) from exc
     if (
         isinstance(raw_priority, bool)
         or not isinstance(raw_priority, int)
@@ -707,7 +768,9 @@ def _shared_pressure_lease_from_payload(
         or isinstance(raw_expires_at, bool)
         or not isinstance(raw_expires_at, (int, float))
     ):
-        raise CostGovernorError("shared pressure lease journal payload is invalid")
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        )
     priority = raw_priority
     acquired_at = float(raw_acquired_at)
     expires_at = float(raw_expires_at)
@@ -717,7 +780,9 @@ def _shared_pressure_lease_from_payload(
         or not math.isfinite(expires_at)
         or expires_at <= acquired_at
     ):
-        raise CostGovernorError("shared pressure lease journal payload is invalid")
+        raise CostGovernorError(
+            "shared pressure lease journal payload is invalid"
+        )
     return SharedPressureLease(
         lease_id=lease_id,
         scope=scope,
@@ -746,7 +811,9 @@ class _RuntimeLeaseJournal:
             "reason_code": self.reason_code,
             "remaining": dict(self.remaining),
             "admitted_at": self.admitted_at,
-            "shared_pressure_lease": _shared_pressure_lease_payload(self.shared_pressure_lease),
+            "shared_pressure_lease": _shared_pressure_lease_payload(
+                self.shared_pressure_lease
+            ),
         }
 
 
@@ -765,7 +832,9 @@ def _runtime_lease_journal(
             or not math.isfinite(float(value))
             or float(value) < 0
         ):
-            raise CostGovernorError("runtime lease remaining budget is invalid")
+            raise CostGovernorError(
+                "runtime lease remaining budget is invalid"
+            )
         remaining.append((clean_key, value))
     admitted_at = float(lease.admitted_at)
     if not math.isfinite(admitted_at) or admitted_at < 0:
@@ -790,10 +859,14 @@ def _runtime_lease_journal_from_payload(
     value: object,
 ) -> _RuntimeLeaseJournal:
     if not isinstance(value, dict):
-        raise CostGovernorError("runtime lease journal payload is invalid")
+        raise CostGovernorError(
+            "runtime lease journal payload is invalid"
+        )
     remaining_raw = value.get("remaining")
     if not isinstance(remaining_raw, dict):
-        raise CostGovernorError("runtime lease remaining payload is invalid")
+        raise CostGovernorError(
+            "runtime lease remaining payload is invalid"
+        )
     remaining: list[tuple[str, int | float]] = []
     for key, item in sorted(remaining_raw.items()):
         clean_key = _token("remaining key", key)
@@ -803,27 +876,37 @@ def _runtime_lease_journal_from_payload(
             or not math.isfinite(float(item))
             or float(item) < 0
         ):
-            raise CostGovernorError("runtime lease remaining payload is invalid")
+            raise CostGovernorError(
+                "runtime lease remaining payload is invalid"
+            )
         remaining.append((clean_key, item))
     try:
         admitted_at = float(value["admitted_at"])
     except (KeyError, TypeError, ValueError) as exc:
-        raise CostGovernorError("runtime lease admitted_at payload is invalid") from exc
+        raise CostGovernorError(
+            "runtime lease admitted_at payload is invalid"
+        ) from exc
     if not math.isfinite(admitted_at) or admitted_at < 0:
-        raise CostGovernorError("runtime lease admitted_at payload is invalid")
+        raise CostGovernorError(
+            "runtime lease admitted_at payload is invalid"
+        )
     try:
         lease_id = value["lease_id"]
         decision_id = value["decision_id"]
         reason_code = value["reason_code"]
     except KeyError as exc:
-        raise CostGovernorError("runtime lease journal payload is invalid") from exc
+        raise CostGovernorError(
+            "runtime lease journal payload is invalid"
+        ) from exc
     return _RuntimeLeaseJournal(
         lease_id=_token("lease_id", lease_id),
         decision_id=_token("admission_decision_id", decision_id),
         reason_code=_token("admission_reason_code", reason_code),
         remaining=tuple(remaining),
         admitted_at=admitted_at,
-        shared_pressure_lease=_shared_pressure_lease_from_payload(value.get("shared_pressure_lease")),
+        shared_pressure_lease=_shared_pressure_lease_from_payload(
+            value.get("shared_pressure_lease")
+        ),
     )
 
 
@@ -858,7 +941,9 @@ class _AdmissionIntentJournal:
             "fallback_reason": self.fallback_reason,
             "decision_id": self.decision_id,
             "reason_code": self.reason_code,
-            "remaining": (None if self.remaining is None else dict(self.remaining)),
+            "remaining": (
+                None if self.remaining is None else dict(self.remaining)
+            ),
             "admitted_at": self.admitted_at,
         }
 
@@ -867,7 +952,9 @@ def _admission_intent_from_payload(
     value: object,
 ) -> _AdmissionIntentJournal:
     if not isinstance(value, dict):
-        raise CostGovernorError("admission intent journal payload is invalid")
+        raise CostGovernorError(
+            "admission intent journal payload is invalid"
+        )
     try:
         operation_id = _token("operation_id", value["operation_id"])
         tenant_id = _token("tenant_id", value["tenant_id"])
@@ -885,9 +972,13 @@ def _admission_intent_from_payload(
         )
         fallback_used = value["fallback_used"]
     except (KeyError, TypeError, ValueError) as exc:
-        raise CostGovernorError("admission intent journal payload is invalid") from exc
+        raise CostGovernorError(
+            "admission intent journal payload is invalid"
+        ) from exc
     if not isinstance(fallback_used, bool):
-        raise CostGovernorError("admission intent fallback_used must be boolean")
+        raise CostGovernorError(
+            "admission intent fallback_used must be boolean"
+        )
 
     fallback_id_raw = value.get("fallback_id")
     fallback_reason_raw = value.get("fallback_reason")
@@ -899,7 +990,9 @@ def _admission_intent_from_payload(
         )
     else:
         if fallback_id_raw is not None or fallback_reason_raw is not None:
-            raise CostGovernorError("non-fallback admission intent carries fallback metadata")
+            raise CostGovernorError(
+                "non-fallback admission intent carries fallback metadata"
+            )
         fallback_id = None
         fallback_reason = None
 
@@ -919,7 +1012,9 @@ def _admission_intent_from_payload(
         remaining = None
         admitted_at = None
     elif any(item is None for item in decision_fields):
-        raise CostGovernorError("admission intent decision payload is incomplete")
+        raise CostGovernorError(
+            "admission intent decision payload is incomplete"
+        )
     else:
         decision_id = _token(
             "admission_decision_id",
@@ -930,7 +1025,9 @@ def _admission_intent_from_payload(
             reason_code_raw,
         )
         if not isinstance(remaining_raw, dict):
-            raise CostGovernorError("admission intent remaining payload is invalid")
+            raise CostGovernorError(
+                "admission intent remaining payload is invalid"
+            )
         remaining_items: list[tuple[str, int | float]] = []
         for key, item in sorted(remaining_raw.items()):
             clean_key = _token("remaining key", key)
@@ -940,13 +1037,22 @@ def _admission_intent_from_payload(
                 or not math.isfinite(float(item))
                 or float(item) < 0
             ):
-                raise CostGovernorError("admission intent remaining payload is invalid")
+                raise CostGovernorError(
+                    "admission intent remaining payload is invalid"
+                )
             remaining_items.append((clean_key, item))
-        if isinstance(admitted_at_raw, bool) or not isinstance(admitted_at_raw, (int, float)):
-            raise CostGovernorError("admission intent admitted_at payload is invalid")
+        if (
+            isinstance(admitted_at_raw, bool)
+            or not isinstance(admitted_at_raw, (int, float))
+        ):
+            raise CostGovernorError(
+                "admission intent admitted_at payload is invalid"
+            )
         admitted_at = float(admitted_at_raw)
         if not math.isfinite(admitted_at) or admitted_at < 0:
-            raise CostGovernorError("admission intent admitted_at payload is invalid")
+            raise CostGovernorError(
+                "admission intent admitted_at payload is invalid"
+            )
         remaining = tuple(remaining_items)
 
     return _AdmissionIntentJournal(
@@ -976,7 +1082,9 @@ def _completion_intent_from_payload(
     value: object,
 ) -> _CostCompletionIntent:
     if not isinstance(value, dict):
-        raise CostGovernorError("completion intent journal payload is invalid")
+        raise CostGovernorError(
+            "completion intent journal payload is invalid"
+        )
     try:
         evidence = _sha256(
             "completion intent evidence_digest",
@@ -988,7 +1096,9 @@ def _completion_intent_from_payload(
             evidence_digest=evidence,
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise CostGovernorError("completion intent journal payload is invalid") from exc
+        raise CostGovernorError(
+            "completion intent journal payload is invalid"
+        ) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -1045,18 +1155,24 @@ class _SqliteCostGovernorJournal:
             conn.execute(self._INTENT_SCHEMA)
             columns = {
                 str(row["name"])
-                for row in conn.execute("PRAGMA table_info(cost_governor_journal)").fetchall()
+                for row in conn.execute(
+                    "PRAGMA table_info(cost_governor_journal)"
+                ).fetchall()
             }
             if "completion_intent_json" not in columns:
-                conn.execute("""
+                conn.execute(
+                    """
                     ALTER TABLE cost_governor_journal
                     ADD COLUMN completion_intent_json TEXT
-                    """)
+                    """
+                )
             if "runtime_lease_json" not in columns:
-                conn.execute("""
+                conn.execute(
+                    """
                     ALTER TABLE cost_governor_journal
                     ADD COLUMN runtime_lease_json TEXT
-                    """)
+                    """
+                )
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.path), isolation_level=None)
@@ -1071,7 +1187,9 @@ class _SqliteCostGovernorJournal:
         try:
             value = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise CostGovernorError(f"{field} journal value is invalid") from exc
+            raise CostGovernorError(
+                f"{field} journal value is invalid"
+            ) from exc
         if not isinstance(value, dict):
             raise CostGovernorError(f"{field} journal value is invalid")
         return value
@@ -1081,12 +1199,16 @@ class _SqliteCostGovernorJournal:
         terminal = (
             None
             if row["terminal_json"] is None
-            else _cost_decision_from_payload(cls._decode_json(row["terminal_json"], "terminal"))
+            else _cost_decision_from_payload(
+                cls._decode_json(row["terminal_json"], "terminal")
+            )
         )
         return _CostJournalRecord(
             operation_id=str(row["operation_id"]),
             tenant_id=str(row["tenant_id"]),
-            requested_request_digest=str(row["requested_request_digest"]),
+            requested_request_digest=str(
+                row["requested_request_digest"]
+            ),
             reservation=_cost_reservation_from_payload(
                 cls._decode_json(row["reservation_json"], "reservation")
             ),
@@ -1098,7 +1220,11 @@ class _SqliteCostGovernorJournal:
             ),
             state=str(row["state"]),
             terminal=terminal,
-            evidence_digest=(None if row["evidence_digest"] is None else str(row["evidence_digest"])),
+            evidence_digest=(
+                None
+                if row["evidence_digest"] is None
+                else str(row["evidence_digest"])
+            ),
             completion_intent=(
                 None
                 if row["completion_intent_json"] is None
@@ -1149,7 +1275,9 @@ class _SqliteCostGovernorJournal:
         intent: _AdmissionIntentJournal,
     ) -> _AdmissionIntentJournal:
         if not isinstance(intent, _AdmissionIntentJournal):
-            raise TypeError("intent must be _AdmissionIntentJournal")
+            raise TypeError(
+                "intent must be _AdmissionIntentJournal"
+            )
         payload = _canonical_json_text(intent.as_dict())
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
@@ -1183,7 +1311,9 @@ class _SqliteCostGovernorJournal:
                         # Never rebind it, even before a decision exists:
                         # another process may have observed the intent and
                         # may be about to persist authority derived from it.
-                        raise CostGovernorConflict("admission intent replayed with different inputs")
+                        raise CostGovernorConflict(
+                            "admission intent replayed with different inputs"
+                        )
                 conn.execute("COMMIT")
             except Exception:
                 conn.execute("ROLLBACK")
@@ -1203,7 +1333,9 @@ class _SqliteCostGovernorJournal:
         if not isinstance(decision, AdmissionDecision):
             raise TypeError("decision must be AdmissionDecision")
         if not decision.admitted:
-            raise CostGovernorConflict("admission intent can only persist admitted decisions")
+            raise CostGovernorConflict(
+                "admission intent can only persist admitted decisions"
+            )
         if (
             isinstance(admitted_at, bool)
             or not isinstance(admitted_at, (int, float))
@@ -1224,7 +1356,9 @@ class _SqliteCostGovernorJournal:
                     (operation,),
                 ).fetchone()
                 if row is None:
-                    raise CostGovernorError("admission decision requires durable intent")
+                    raise CostGovernorError(
+                        "admission decision requires durable intent"
+                    )
                 existing = _admission_intent_from_payload(
                     self._decode_json(
                         row["payload_json"],
@@ -1234,10 +1368,15 @@ class _SqliteCostGovernorJournal:
                 if (
                     decision.operation_id != existing.operation_id
                     or decision.tenant_id != existing.tenant_id
-                    or decision.capability != existing.selected_capability
+                    or decision.capability
+                    != existing.selected_capability
                 ):
-                    raise CostGovernorConflict("admission decision does not match intent identity")
-                remaining = tuple(sorted(decision.remaining.items()))
+                    raise CostGovernorConflict(
+                        "admission decision does not match intent identity"
+                    )
+                remaining = tuple(
+                    sorted(decision.remaining.items())
+                )
                 updated = replace(
                     existing,
                     decision_id=decision.decision_id,
@@ -1246,11 +1385,17 @@ class _SqliteCostGovernorJournal:
                     admitted_at=float(admitted_at),
                 )
                 # Validate the exact serialized form before it becomes durable.
-                validated = _admission_intent_from_payload(updated.as_dict())
+                validated = _admission_intent_from_payload(
+                    updated.as_dict()
+                )
                 if validated != updated:
-                    raise CostGovernorConflict("admission decision intent changed during normalization")
+                    raise CostGovernorConflict(
+                        "admission decision intent changed during normalization"
+                    )
                 if existing.has_decision and existing != updated:
-                    raise CostGovernorConflict("admission decision replayed with different inputs")
+                    raise CostGovernorConflict(
+                        "admission decision replayed with different inputs"
+                    )
                 conn.execute(
                     """
                     UPDATE cost_governor_admission_intent
@@ -1268,7 +1413,9 @@ class _SqliteCostGovernorJournal:
                 raise
         loaded = self.load_admission_intent(operation)
         if loaded is None:
-            raise CostGovernorError("admission decision journal write was lost")
+            raise CostGovernorError(
+                "admission decision journal write was lost"
+            )
         return loaded
 
     def clear_admission_intent(
@@ -1330,12 +1477,18 @@ class _SqliteCostGovernorJournal:
                     (operation,),
                 ).fetchone()
                 if row is None:
-                    raise CostGovernorError("release requires active cost journal")
+                    raise CostGovernorError(
+                        "release requires active cost journal"
+                    )
                 existing = self._record(row)
                 if existing.reservation != reservation:
-                    raise CostGovernorConflict("release journal receipt mismatch")
+                    raise CostGovernorConflict(
+                        "release journal receipt mismatch"
+                    )
                 if existing.completion_intent is not None:
-                    raise CostGovernorConflict("completion intent cannot be released as unspent")
+                    raise CostGovernorConflict(
+                        "completion intent cannot be released as unspent"
+                    )
                 if existing.state == "active":
                     conn.execute(
                         """
@@ -1346,7 +1499,9 @@ class _SqliteCostGovernorJournal:
                         (operation,),
                     )
                 elif existing.state != "release_pending":
-                    raise CostGovernorConflict("terminal cost journal cannot enter release")
+                    raise CostGovernorConflict(
+                        "terminal cost journal cannot enter release"
+                    )
                 conn.execute("COMMIT")
             except Exception:
                 conn.execute("ROLLBACK")
@@ -1372,7 +1527,9 @@ class _SqliteCostGovernorJournal:
                     (operation,),
                 ).fetchone()
                 if row is None:
-                    raise CostGovernorError("release rollback requires cost journal")
+                    raise CostGovernorError(
+                        "release rollback requires cost journal"
+                    )
                 existing = self._record(row)
                 if existing.state == "release_pending":
                     conn.execute(
@@ -1384,7 +1541,9 @@ class _SqliteCostGovernorJournal:
                         (operation,),
                     )
                 elif existing.state != "active":
-                    raise CostGovernorConflict("terminal cost journal cannot roll back release")
+                    raise CostGovernorConflict(
+                        "terminal cost journal cannot roll back release"
+                    )
                 conn.execute("COMMIT")
             except Exception:
                 conn.execute("ROLLBACK")
@@ -1413,7 +1572,9 @@ class _SqliteCostGovernorJournal:
             runtime_lease,
             shared_pressure_lease,
         )
-        runtime_lease_json = _canonical_json_text(runtime_lease_record.as_dict())
+        runtime_lease_json = _canonical_json_text(
+            runtime_lease_record.as_dict()
+        )
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
@@ -1447,14 +1608,18 @@ class _SqliteCostGovernorJournal:
                 else:
                     existing = self._record(row)
                     if existing.state != "active":
-                        raise CostGovernorConflict("operation already has terminal cost journal state")
+                        raise CostGovernorConflict(
+                            "operation already has terminal cost journal state"
+                        )
                     if (
                         existing.requested_request_digest != requested
                         or existing.reservation != reservation
                         or existing.quota_reservation != quota_reservation
                         or existing.runtime_lease != runtime_lease_record
                     ):
-                        raise CostGovernorConflict("active cost journal replayed with different inputs")
+                        raise CostGovernorConflict(
+                            "active cost journal replayed with different inputs"
+                        )
                 conn.execute("COMMIT")
             except Exception:
                 conn.execute("ROLLBACK")
@@ -1496,10 +1661,14 @@ class _SqliteCostGovernorJournal:
                     (operation,),
                 ).fetchone()
                 if row is None:
-                    raise CostGovernorError("completion intent requires active cost journal")
+                    raise CostGovernorError(
+                        "completion intent requires active cost journal"
+                    )
                 existing = self._record(row)
                 if existing.state != "active":
-                    raise CostGovernorConflict("terminal cost journal cannot accept completion intent")
+                    raise CostGovernorConflict(
+                        "terminal cost journal cannot accept completion intent"
+                    )
                 requested = _CostCompletionIntent(
                     actual=actual,
                     budget=budget,
@@ -1515,7 +1684,9 @@ class _SqliteCostGovernorJournal:
                         (payload, operation),
                     )
                 elif existing.completion_intent != requested:
-                    raise CostGovernorConflict("completion intent replayed with different inputs")
+                    raise CostGovernorConflict(
+                        "completion intent replayed with different inputs"
+                    )
                 conn.execute("COMMIT")
             except Exception:
                 conn.execute("ROLLBACK")
@@ -1541,10 +1712,14 @@ class _SqliteCostGovernorJournal:
                     (operation,),
                 ).fetchone()
                 if row is None:
-                    raise CostGovernorError("completion intent clear requires cost journal")
+                    raise CostGovernorError(
+                        "completion intent clear requires cost journal"
+                    )
                 existing = self._record(row)
                 if existing.terminal is not None:
-                    raise CostGovernorConflict("terminal cost journal cannot clear completion intent")
+                    raise CostGovernorConflict(
+                        "terminal cost journal cannot clear completion intent"
+                    )
                 conn.execute(
                     """
                     UPDATE cost_governor_journal
@@ -1568,7 +1743,11 @@ class _SqliteCostGovernorJournal:
         *,
         evidence_digest: str | None,
     ) -> _CostJournalRecord:
-        evidence = None if evidence_digest is None else _sha256("evidence_digest", evidence_digest)
+        evidence = (
+            None
+            if evidence_digest is None
+            else _sha256("evidence_digest", evidence_digest)
+        )
         terminal_json = _canonical_json_text(decision.as_dict())
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
@@ -1581,11 +1760,17 @@ class _SqliteCostGovernorJournal:
                     (decision.operation_id,),
                 ).fetchone()
                 if row is None:
-                    raise CostGovernorError("terminal cost journal requires active reservation")
+                    raise CostGovernorError(
+                        "terminal cost journal requires active reservation"
+                    )
                 existing = self._record(row)
                 allowed_transition = (
-                    existing.state in {"active", "release_pending"} and decision.state == "completed"
-                ) or (existing.state == "release_pending" and decision.state == "released_unspent")
+                    existing.state in {"active", "release_pending"}
+                    and decision.state == "completed"
+                ) or (
+                    existing.state == "release_pending"
+                    and decision.state == "released_unspent"
+                )
                 if allowed_transition:
                     conn.execute(
                         """
@@ -1606,7 +1791,9 @@ class _SqliteCostGovernorJournal:
                     or existing.terminal != decision
                     or existing.evidence_digest != evidence
                 ):
-                    raise CostGovernorConflict("terminal cost journal replayed with different inputs")
+                    raise CostGovernorConflict(
+                        "terminal cost journal replayed with different inputs"
+                    )
                 conn.execute("COMMIT")
             except Exception:
                 conn.execute("ROLLBACK")
@@ -1654,9 +1841,11 @@ class CostGovernor:
         shared_pressure_ledger: SqliteSharedPressureLedger | None = None,
         shared_pressure_scope: str | None = None,
         shared_pressure_owner_id: str | None = None,
-    ) -> CostGovernor:
+    ) -> "CostGovernor":
         if not isinstance(default_tenant_quota, TenantQuota):
-            raise TypeError("default_tenant_quota must be TenantQuota")
+            raise TypeError(
+                "default_tenant_quota must be TenantQuota"
+            )
         ledger = SqliteTenantQuotaLedger(path)
         runtime = AdmissionRuntime(
             quota_ledger=ledger,
@@ -1690,7 +1879,9 @@ class CostGovernor:
             admission_decision_id=lease.decision.decision_id,
             lease_id=lease.lease_id,
             quota_reservation_digest=_quota_reservation_digest(reservation),
-            selected_estimate_digest=_canonical_digest(_usage_payload(selected.estimate)),
+            selected_estimate_digest=_canonical_digest(
+                _usage_payload(selected.estimate)
+            ),
             fallback_used=fallback is not None,
             fallback_id=None if fallback is None else fallback.fallback_id,
             fallback_reason=fallback_reason,
@@ -1702,7 +1893,9 @@ class CostGovernor:
         fallback: SafeCostFallback,
     ) -> AdmissionRequest:
         if fallback.capability == requested.capability:
-            raise CostGovernorError("fallback must declare a distinct reduced capability")
+            raise CostGovernorError(
+                "fallback must declare a distinct reduced capability"
+            )
         if not _strictly_cheaper(
             requested.estimate,
             fallback.estimate,
@@ -1725,9 +1918,13 @@ class CostGovernor:
         receipt = record.reservation
         if receipt.fallback_used:
             if fallback is None:
-                raise CostGovernorConflict("durable fallback reservation requires original fallback")
+                raise CostGovernorConflict(
+                    "durable fallback reservation requires original fallback"
+                )
             if fallback.fallback_id != receipt.fallback_id:
-                raise CostGovernorConflict("durable fallback identity does not match replay")
+                raise CostGovernorConflict(
+                    "durable fallback identity does not match replay"
+                )
             selected = CostGovernor._fallback_request(
                 request,
                 fallback,
@@ -1737,9 +1934,12 @@ class CostGovernor:
 
         if (
             selected.capability != receipt.selected_capability
-            or _request_digest(selected) != receipt.selected_request_digest
+            or _request_digest(selected)
+            != receipt.selected_request_digest
         ):
-            raise CostGovernorConflict("durable selected request does not match replay")
+            raise CostGovernorConflict(
+                "durable selected request does not match replay"
+            )
         return selected
 
     @staticmethod
@@ -1749,12 +1949,21 @@ class CostGovernor:
     ) -> AdmissionLease:
         metadata = record.runtime_lease
         if metadata is None:
-            raise CostGovernorError("legacy active cost journal lacks runtime lease recovery metadata")
+            raise CostGovernorError(
+                "legacy active cost journal lacks runtime lease recovery metadata"
+            )
         receipt = record.reservation
-        if metadata.lease_id != receipt.lease_id or metadata.decision_id != receipt.admission_decision_id:
-            raise CostGovernorConflict("runtime lease journal identity does not match reservation receipt")
+        if (
+            metadata.lease_id != receipt.lease_id
+            or metadata.decision_id != receipt.admission_decision_id
+        ):
+            raise CostGovernorConflict(
+                "runtime lease journal identity does not match reservation receipt"
+            )
         if metadata.reason_code != "within_budget":
-            raise CostGovernorConflict("runtime lease journal admission reason is invalid")
+            raise CostGovernorConflict(
+                "runtime lease journal admission reason is invalid"
+            )
 
         remaining = dict(metadata.remaining)
         required_remaining = {
@@ -1770,7 +1979,9 @@ class CostGovernor:
             "queue_depth",
         }
         if set(remaining) != required_remaining:
-            raise CostGovernorError("runtime lease journal remaining-budget fields are invalid")
+            raise CostGovernorError(
+                "runtime lease journal remaining-budget fields are invalid"
+            )
 
         concurrency_remaining = remaining["concurrency"]
         queue_remaining = remaining["queue_depth"]
@@ -1784,10 +1995,18 @@ class CostGovernor:
             or queue_remaining < 1
             or queue_remaining > selected.budget.max_queue_depth
         ):
-            raise CostGovernorConflict("runtime lease journal pressure remainder is invalid")
+            raise CostGovernorConflict(
+                "runtime lease journal pressure remainder is invalid"
+            )
         original_pressure = RuntimePressure(
-            active_operations=(selected.budget.max_concurrency - concurrency_remaining),
-            queue_depth=(selected.budget.max_queue_depth - queue_remaining),
+            active_operations=(
+                selected.budget.max_concurrency
+                - concurrency_remaining
+            ),
+            queue_depth=(
+                selected.budget.max_queue_depth
+                - queue_remaining
+            ),
         )
         evaluated_request = replace(
             selected,
@@ -1799,7 +2018,9 @@ class CostGovernor:
             "within_budget",
         )
         if metadata.decision_id != expected_decision_id:
-            raise CostGovernorConflict("runtime lease journal decision identity is invalid")
+            raise CostGovernorConflict(
+                "runtime lease journal decision identity is invalid"
+            )
 
         decision = AdmissionDecision(
             decision_id=metadata.decision_id,
@@ -1834,11 +2055,11 @@ class CostGovernor:
             selected_request_digest=_request_digest(selected),
             selected_capability=selected.capability,
             fallback_used=fallback_used,
-            fallback_id=(None if fallback is None else fallback.fallback_id),
+            fallback_id=(
+                None if fallback is None else fallback.fallback_id
+            ),
             fallback_reason=(
-                None
-                if fallback is None
-                else _token(
+                None if fallback is None else _token(
                     "fallback_reason",
                     fallback_reason,
                 )
@@ -1852,12 +2073,18 @@ class CostGovernor:
         intent: _AdmissionIntentJournal,
     ) -> AdmissionRequest:
         if _request_digest(request) != intent.requested_request_digest:
-            raise CostGovernorConflict("admission intent requested inputs do not match replay")
+            raise CostGovernorConflict(
+                "admission intent requested inputs do not match replay"
+            )
         if intent.fallback_used:
             if fallback is None:
-                raise CostGovernorConflict("admission intent requires original fallback")
+                raise CostGovernorConflict(
+                    "admission intent requires original fallback"
+                )
             if fallback.fallback_id != intent.fallback_id:
-                raise CostGovernorConflict("admission intent fallback identity does not match replay")
+                raise CostGovernorConflict(
+                    "admission intent fallback identity does not match replay"
+                )
             selected = CostGovernor._fallback_request(
                 request,
                 fallback,
@@ -1866,9 +2093,12 @@ class CostGovernor:
             selected = request
         if (
             selected.capability != intent.selected_capability
-            or _request_digest(selected) != intent.selected_request_digest
+            or _request_digest(selected)
+            != intent.selected_request_digest
         ):
-            raise CostGovernorConflict("admission intent selected request does not match replay")
+            raise CostGovernorConflict(
+                "admission intent selected request does not match replay"
+            )
         return selected
 
     @staticmethod
@@ -1882,9 +2112,13 @@ class CostGovernor:
             or intent.remaining is None
             or intent.admitted_at is None
         ):
-            raise CostGovernorError("durable admission intent lacks admitted decision")
+            raise CostGovernorError(
+                "durable admission intent lacks admitted decision"
+            )
         if intent.reason_code != "within_budget":
-            raise CostGovernorConflict("durable admission intent reason is invalid")
+            raise CostGovernorConflict(
+                "durable admission intent reason is invalid"
+            )
         remaining = dict(intent.remaining)
         required_remaining = {
             "input_tokens",
@@ -1899,7 +2133,9 @@ class CostGovernor:
             "queue_depth",
         }
         if set(remaining) != required_remaining:
-            raise CostGovernorError("durable admission intent remaining-budget fields are invalid")
+            raise CostGovernorError(
+                "durable admission intent remaining-budget fields are invalid"
+            )
         concurrency_remaining = remaining["concurrency"]
         queue_remaining = remaining["queue_depth"]
         if (
@@ -1912,10 +2148,18 @@ class CostGovernor:
             or queue_remaining < 1
             or queue_remaining > selected.budget.max_queue_depth
         ):
-            raise CostGovernorConflict("durable admission intent pressure remainder is invalid")
+            raise CostGovernorConflict(
+                "durable admission intent pressure remainder is invalid"
+            )
         original_pressure = RuntimePressure(
-            active_operations=(selected.budget.max_concurrency - concurrency_remaining),
-            queue_depth=(selected.budget.max_queue_depth - queue_remaining),
+            active_operations=(
+                selected.budget.max_concurrency
+                - concurrency_remaining
+            ),
+            queue_depth=(
+                selected.budget.max_queue_depth
+                - queue_remaining
+            ),
         )
         evaluated = replace(
             selected,
@@ -1927,7 +2171,9 @@ class CostGovernor:
             "within_budget",
         )
         if intent.decision_id != expected:
-            raise CostGovernorConflict("durable admission intent decision identity is invalid")
+            raise CostGovernorConflict(
+                "durable admission intent decision identity is invalid"
+            )
         return AdmissionDecision(
             decision_id=intent.decision_id,
             status=AdmissionStatus.ADMIT,
@@ -1951,10 +2197,14 @@ class CostGovernor:
         if ledger is None:
             return None
         if scope is None or owner is None:
-            raise CostGovernorError("shared pressure recovery runtime is incomplete")
+            raise CostGovernorError(
+                "shared pressure recovery runtime is incomplete"
+            )
         finder = getattr(ledger, "lease_for_operation", None)
         if not callable(finder):
-            raise CostGovernorError("shared pressure ledger does not support admission recovery")
+            raise CostGovernorError(
+                "shared pressure ledger does not support admission recovery"
+            )
         try:
             lease = finder(
                 scope,
@@ -1962,7 +2212,9 @@ class CostGovernor:
                 now=now_wall,
             )
         except SharedPressureError as exc:
-            raise CostGovernorError("shared pressure admission recovery lookup failed") from exc
+            raise CostGovernorError(
+                "shared pressure admission recovery lookup failed"
+            ) from exc
         if lease is None:
             return None
         if (
@@ -1972,7 +2224,9 @@ class CostGovernor:
             or lease.owner_id != owner
             or lease.priority != selected.priority
         ):
-            raise CostGovernorConflict("shared pressure admission recovery identity mismatch")
+            raise CostGovernorConflict(
+                "shared pressure admission recovery identity mismatch"
+            )
         return lease
 
     def _clear_failed_admission_intent(
@@ -1986,19 +2240,27 @@ class CostGovernor:
             return
         ledger = self.runtime.quota_ledger
         if ledger is None:
-            raise CostGovernorError("admission intent recovery requires quota ledger")
+            raise CostGovernorError(
+                "admission intent recovery requires quota ledger"
+            )
         reader = getattr(ledger, "recovery_state_for_operation", None)
         if not callable(reader):
-            raise CostGovernorError("quota ledger does not support admission recovery")
+            raise CostGovernorError(
+                "quota ledger does not support admission recovery"
+            )
         try:
             quota_state = reader(
                 request.tenant_id,
                 request.operation_id,
             )
         except QuotaError as exc:
-            raise CostGovernorError("admission intent quota recovery lookup failed") from exc
+            raise CostGovernorError(
+                "admission intent quota recovery lookup failed"
+            ) from exc
         if quota_state is not None:
-            raise CostGovernorConflict("failed admission retained durable quota authority")
+            raise CostGovernorConflict(
+                "failed admission retained durable quota authority"
+            )
 
         pressure = self._shared_pressure_for_recovery(
             request,
@@ -2026,26 +2288,36 @@ class CostGovernor:
 
         ledger = self.runtime.quota_ledger
         if ledger is None:
-            raise CostGovernorError("authority preflight requires quota ledger")
+            raise CostGovernorError(
+                "authority preflight requires quota ledger"
+            )
         reader = getattr(ledger, "recovery_state_for_operation", None)
         if not callable(reader):
-            raise CostGovernorError("quota ledger does not support authority preflight")
+            raise CostGovernorError(
+                "quota ledger does not support authority preflight"
+            )
         try:
             quota_state = reader(
                 request.tenant_id,
                 request.operation_id,
             )
         except QuotaError as exc:
-            raise CostGovernorError("authority preflight quota lookup failed") from exc
+            raise CostGovernorError(
+                "authority preflight quota lookup failed"
+            ) from exc
         if quota_state is not None:
-            raise CostGovernorConflict("unjournaled durable quota authority already exists")
+            raise CostGovernorConflict(
+                "unjournaled durable quota authority already exists"
+            )
 
         pressure = self._shared_pressure_for_recovery(
             request,
             now_wall=now_wall,
         )
         if pressure is not None:
-            raise CostGovernorConflict("unjournaled shared pressure authority already exists")
+            raise CostGovernorConflict(
+                "unjournaled shared pressure authority already exists"
+            )
 
     def _recover_admission_intent(
         self,
@@ -2057,7 +2329,9 @@ class CostGovernor:
     ) -> CostReservation | None:
         journal = self._journal
         if journal is None:
-            raise CostGovernorError("admission intent recovery requires durable journal")
+            raise CostGovernorError(
+                "admission intent recovery requires durable journal"
+            )
         selected = self._selected_request_for_intent(
             request,
             fallback,
@@ -2065,17 +2339,23 @@ class CostGovernor:
         )
         ledger = self.runtime.quota_ledger
         if ledger is None:
-            raise CostGovernorError("admission intent recovery requires quota ledger")
+            raise CostGovernorError(
+                "admission intent recovery requires quota ledger"
+            )
         reader = getattr(ledger, "recovery_state_for_operation", None)
         if not callable(reader):
-            raise CostGovernorError("quota ledger does not support admission recovery")
+            raise CostGovernorError(
+                "quota ledger does not support admission recovery"
+            )
         try:
             quota_state = reader(
                 selected.tenant_id,
                 selected.operation_id,
             )
         except QuotaError as exc:
-            raise CostGovernorError("admission intent quota recovery lookup failed") from exc
+            raise CostGovernorError(
+                "admission intent quota recovery lookup failed"
+            ) from exc
 
         pressure = self._shared_pressure_for_recovery(
             selected,
@@ -2096,14 +2376,19 @@ class CostGovernor:
             return None
 
         if not intent.has_decision:
-            raise CostGovernorConflict("durable quota authority exists without admitted decision intent")
+            raise CostGovernorConflict(
+                "durable quota authority exists without admitted decision intent"
+            )
         reservation, _unresolved = quota_state
         decision = self._decision_from_admission_intent(
             selected,
             intent,
         )
 
-        if self.runtime.shared_pressure_ledger is not None and pressure is None:
+        if (
+            self.runtime.shared_pressure_ledger is not None
+            and pressure is None
+        ):
             # The admission never reached the active Cost Governor journal, so
             # callers never received authority to begin work. If the global
             # pressure lease has expired/disappeared, abandon the untouched
@@ -2113,10 +2398,16 @@ class CostGovernor:
             try:
                 ledger.release(reservation.reservation_id)
             except QuotaConflict as exc:
-                raise CostGovernorConflict("orphan admission quota cannot be safely abandoned") from exc
+                raise CostGovernorConflict(
+                    "orphan admission quota cannot be safely abandoned"
+                ) from exc
             except QuotaError as exc:
-                raise CostGovernorError("orphan admission quota abandonment failed") from exc
-            journal.clear_admission_intent(request.operation_id)
+                raise CostGovernorError(
+                    "orphan admission quota abandonment failed"
+                ) from exc
+            journal.clear_admission_intent(
+                request.operation_id
+            )
             return None
 
         lease = AdmissionLease(
@@ -2126,7 +2417,11 @@ class CostGovernor:
             ),
             decision=decision,
             quota_reservation=reservation,
-            admitted_at=(intent.admitted_at if intent.admitted_at is not None else reservation.reserved_at),
+            admitted_at=(
+                intent.admitted_at
+                if intent.admitted_at is not None
+                else reservation.reserved_at
+            ),
         )
         try:
             self.runtime.reattach(
@@ -2140,7 +2435,9 @@ class CostGovernor:
         except AdmissionRuntimeError as exc:
             raise CostGovernorError(str(exc)) from exc
 
-        active_fallback = fallback if intent.fallback_used else None
+        active_fallback = (
+            fallback if intent.fallback_used else None
+        )
         receipt = self._receipt(
             requested=request,
             selected=selected,
@@ -2183,6 +2480,13 @@ class CostGovernor:
         admission_intent: _AdmissionIntentJournal | None = None
 
         with self._lock:
+            try:
+                self.runtime.ensure_tenant_quota(request.tenant_id)
+            except AdmissionRuntimeError as exc:
+                raise CostGovernorError(
+                    "tenant_quota_unavailable"
+                ) from exc
+
             current = self._active.get(request.operation_id)
             if current is not None:
                 if current.requested_request_digest != requested_digest:
@@ -2193,19 +2497,25 @@ class CostGovernor:
 
             if self._journal is not None:
                 persisted = self._journal.load(request.operation_id)
-                admission_intent = self._journal.load_admission_intent(request.operation_id)
+                admission_intent = self._journal.load_admission_intent(
+                    request.operation_id
+                )
                 if persisted is not None:
                     if persisted.requested_request_digest != requested_digest:
                         raise CostGovernorConflict(
                             "durable operation replayed with different requested inputs"
                         )
                     if persisted.state == "release_pending":
-                        raise CostGovernorConflict("operation has release pending recovery")
+                        raise CostGovernorConflict(
+                            "operation has release pending recovery"
+                        )
                     if persisted.state in {
                         "completed",
                         "released_unspent",
                     }:
-                        raise CostGovernorConflict("operation already has terminal cost journal state")
+                        raise CostGovernorConflict(
+                            "operation already has terminal cost journal state"
+                        )
 
                     selected = self._selected_request_for_replay(
                         request,
@@ -2225,7 +2535,9 @@ class CostGovernor:
                         self.runtime.reattach(
                             selected,
                             lease,
-                            shared_pressure_lease=(metadata.shared_pressure_lease),
+                            shared_pressure_lease=(
+                                metadata.shared_pressure_lease
+                            ),
                             now_wall=now_wall,
                         )
                     except AdmissionRuntimeConflict as exc:
@@ -2233,13 +2545,17 @@ class CostGovernor:
                     except AdmissionRuntimeError as exc:
                         raise CostGovernorError(str(exc)) from exc
                     receipt = persisted.reservation
-                    self._active[request.operation_id] = _ActiveCostReservation(
-                        requested_request_digest=requested_digest,
-                        receipt=receipt,
-                        budget=request.budget,
+                    self._active[request.operation_id] = (
+                        _ActiveCostReservation(
+                            requested_request_digest=requested_digest,
+                            receipt=receipt,
+                            budget=request.budget,
+                        )
                     )
                     if admission_intent is not None:
-                        self._journal.clear_admission_intent(request.operation_id)
+                        self._journal.clear_admission_intent(
+                            request.operation_id
+                        )
                     return receipt
 
                 if admission_intent is not None:
@@ -2266,7 +2582,9 @@ class CostGovernor:
                     fallback=None,
                     fallback_reason=None,
                 )
-                self._journal.begin_admission_intent(direct_intent)
+                self._journal.begin_admission_intent(
+                    direct_intent
+                )
 
                 def decision_sink(
                     decision: AdmissionDecision,
@@ -2319,7 +2637,9 @@ class CostGovernor:
                         fallback=fallback,
                         fallback_reason=reason,
                     )
-                    self._journal.begin_admission_intent(fallback_intent)
+                    self._journal.begin_admission_intent(
+                        fallback_intent
+                    )
 
                     def fallback_sink(
                         decision: AdmissionDecision,
@@ -2331,7 +2651,6 @@ class CostGovernor:
                             decision,
                             admitted_at,
                         )
-
                 try:
                     lease = self.runtime.admit(
                         selected,
@@ -2373,12 +2692,11 @@ class CostGovernor:
                 if quota_reservation is None:
                     try:
                         self.runtime.release(lease.operation_id)
-                    except (AdmissionRuntimeError, QuotaError, sqlite3.Error) as exc:
-                        raise CostGovernorError(
-                            "durable cost governor requires quota reservation; "
-                            "admission lease cleanup failed"
-                        ) from exc
-                    raise CostGovernorError("durable cost governor requires quota reservation")
+                    except Exception:
+                        pass
+                    raise CostGovernorError(
+                        "durable cost governor requires quota reservation"
+                    )
                 try:
                     self._journal.record_active(
                         requested_request_digest=requested_digest,
@@ -2386,20 +2704,21 @@ class CostGovernor:
                         quota_reservation=quota_reservation,
                         runtime_lease=lease,
                         shared_pressure_lease=(
-                            self.runtime.shared_pressure_lease_for_operation(lease.operation_id)
+                            self.runtime.shared_pressure_lease_for_operation(
+                                lease.operation_id
+                            )
                         ),
                     )
-                except Exception as persistence_error:
+                except Exception:
                     if persisted is None:
                         try:
                             self.runtime.release(lease.operation_id)
-                        except (AdmissionRuntimeError, QuotaError, sqlite3.Error) as cleanup_error:
-                            persistence_error.add_note(
-                                "admission lease cleanup failed: "
-                                f"{type(cleanup_error).__name__}: {cleanup_error}"
-                            )
+                        except Exception:
+                            pass
                     raise
-                self._journal.clear_admission_intent(request.operation_id)
+                self._journal.clear_admission_intent(
+                    request.operation_id
+                )
 
             self._active[request.operation_id] = _ActiveCostReservation(
                 requested_request_digest=requested_digest,
@@ -2424,7 +2743,9 @@ class CostGovernor:
             raise TypeError("delta must be UsageEstimate")
         with self._lock:
             if operation not in self._active:
-                raise CostGovernorError("operation has no active cost reservation")
+                raise CostGovernorError(
+                    "operation has no active cost reservation"
+                )
             try:
                 recorded = self.runtime.record_usage_event(
                     operation,
@@ -2443,7 +2764,9 @@ class CostGovernor:
             operation_id=operation,
             event_id=event,
             category=recorded.category,
-            usage_digest=_canonical_digest(_usage_payload(delta)),
+            usage_digest=_canonical_digest(
+                _usage_payload(delta)
+            ),
             quota_event_digest=_usage_event_digest(recorded),
         )
 
@@ -2459,7 +2782,9 @@ class CostGovernor:
         operation = _token("operation_id", operation_id)
         with self._lock:
             if operation not in self._active:
-                raise CostGovernorError("operation has no active cost reservation")
+                raise CostGovernorError(
+                    "operation has no active cost reservation"
+                )
             try:
                 return self.runtime.mark_usage_unknown(
                     operation,
@@ -2487,7 +2812,9 @@ class CostGovernor:
             raise TypeError("delta must be UsageEstimate")
         with self._lock:
             if operation not in self._active:
-                raise CostGovernorError("operation has no active cost reservation")
+                raise CostGovernorError(
+                    "operation has no active cost reservation"
+                )
             try:
                 recorded = self.runtime.resolve_unknown_usage(
                     operation,
@@ -2505,7 +2832,9 @@ class CostGovernor:
             operation_id=operation,
             event_id=event,
             category=recorded.category,
-            usage_digest=_canonical_digest(_usage_payload(delta)),
+            usage_digest=_canonical_digest(
+                _usage_payload(delta)
+            ),
             quota_event_digest=_usage_event_digest(recorded),
             resolved_unknown_usage=True,
         )
@@ -2523,13 +2852,21 @@ class CostGovernor:
     ) -> CostDecision:
         ledger = self.runtime.quota_ledger
         if ledger is None:
-            raise CostGovernorError("cost completion requires quota ledger")
+            raise CostGovernorError(
+                "cost completion requires quota ledger"
+            )
         if quota_reservation.operation_id != operation_id:
-            raise CostGovernorConflict("cost journal reservation operation mismatch")
+            raise CostGovernorConflict(
+                "cost journal reservation operation mismatch"
+            )
         if quota_completion.operation_id != operation_id:
-            raise CostGovernorConflict("cost completion operation mismatch")
+            raise CostGovernorConflict(
+                "cost completion operation mismatch"
+            )
         if quota_completion.reservation_id != quota_reservation.reservation_id:
-            raise CostGovernorConflict("cost completion reservation mismatch")
+            raise CostGovernorConflict(
+                "cost completion reservation mismatch"
+            )
         snapshot = ledger.snapshot(quota_completion.tenant_id)
         accounting: BudgetAccountingDecision = qualify_budget_accounting(
             tenant_id=quota_completion.tenant_id,
@@ -2541,9 +2878,15 @@ class CostGovernor:
         )
         reasons = list(accounting.reasons)
         if quota_completion.overrun:
-            reasons.append("cost-overrun:" + ",".join(quota_completion.overrun_dimensions))
+            reasons.append(
+                "cost-overrun:"
+                + ",".join(quota_completion.overrun_dimensions)
+            )
         if operation_overrun_dimensions:
-            reasons.append("operation-budget-overrun:" + ",".join(operation_overrun_dimensions))
+            reasons.append(
+                "operation-budget-overrun:"
+                + ",".join(operation_overrun_dimensions)
+            )
         reasons.extend(extra_reasons)
         normalized = tuple(sorted(set(reasons)))
         return CostDecision(
@@ -2564,8 +2907,15 @@ class CostGovernor:
         now_wall: float | None = None,
     ) -> None:
         metadata = record.runtime_lease
-        pressure = None if metadata is None else metadata.shared_pressure_lease
-        if pressure is None and self.runtime.shared_pressure_ledger is None:
+        pressure = (
+            None
+            if metadata is None
+            else metadata.shared_pressure_lease
+        )
+        if (
+            pressure is None
+            and self.runtime.shared_pressure_ledger is None
+        ):
             return
         try:
             self.runtime.settle_shared_pressure_recovery(
@@ -2591,40 +2941,60 @@ class CostGovernor:
         evidence = _evidence_digest(refs)
         journal = self._journal
         if journal is None:
-            raise CostGovernorError("completed recovery requires durable cost journal")
+            raise CostGovernorError(
+                "completed recovery requires durable cost journal"
+            )
 
         with self._lock:
             record = journal.load(operation)
             if record is None:
-                raise CostGovernorError("operation has no durable cost journal record")
+                raise CostGovernorError(
+                    "operation has no durable cost journal record"
+                )
             if record.state == "released_unspent":
-                raise CostGovernorConflict("released reservation cannot be recovered as completed")
+                raise CostGovernorConflict(
+                    "released reservation cannot be recovered as completed"
+                )
             if record.terminal is not None:
                 if record.state != "completed":
-                    raise CostGovernorConflict("terminal cost journal state is inconsistent")
+                    raise CostGovernorConflict(
+                        "terminal cost journal state is inconsistent"
+                    )
                 if record.evidence_digest != evidence:
-                    raise CostGovernorConflict("completed recovery replayed with different evidence")
+                    raise CostGovernorConflict(
+                        "completed recovery replayed with different evidence"
+                    )
                 self._active.pop(operation, None)
                 return record.terminal
 
             ledger = self.runtime.quota_ledger
             if ledger is None:
-                raise CostGovernorError("completed recovery requires quota ledger")
+                raise CostGovernorError(
+                    "completed recovery requires quota ledger"
+                )
             finder = getattr(ledger, "completion_for_operation", None)
             if not callable(finder):
-                raise CostGovernorError("quota ledger does not support completion recovery")
+                raise CostGovernorError(
+                    "quota ledger does not support completion recovery"
+                )
             try:
                 completion = finder(record.tenant_id, operation)
             except QuotaError as exc:
-                raise CostGovernorError("durable completion lookup failed") from exc
+                raise CostGovernorError(
+                    "durable completion lookup failed"
+                ) from exc
 
             intent = record.completion_intent
             if intent is not None and intent.evidence_digest != evidence:
-                raise CostGovernorConflict("completed recovery replayed with different evidence")
+                raise CostGovernorConflict(
+                    "completed recovery replayed with different evidence"
+                )
 
             if completion is None:
                 if intent is None:
-                    raise CostGovernorError("operation has no durable completed accounting")
+                    raise CostGovernorError(
+                        "operation has no durable completed accounting"
+                    )
                 try:
                     completion = ledger.complete(
                         record.quota_reservation.reservation_id,
@@ -2635,11 +3005,15 @@ class CostGovernor:
                         raise CostGovernorError(str(exc)) from exc
                     raise CostGovernorConflict(str(exc)) from exc
                 except QuotaError as exc:
-                    raise CostGovernorError("durable completion recovery failed") from exc
+                    raise CostGovernorError(
+                        "durable completion recovery failed"
+                    ) from exc
 
             if intent is None:
                 overrun_dimensions: tuple[str, ...] = ()
-                recovery_reasons = ("operation-budget-recovery-intent-missing",)
+                recovery_reasons = (
+                    "operation-budget-recovery-intent-missing",
+                )
             else:
                 effective_actual = _effective_terminal_actual(
                     intent.actual,
@@ -2688,7 +3062,9 @@ class CostGovernor:
         with self._lock:
             active = self._active.get(operation)
             if active is None:
-                raise CostGovernorError("operation has no active cost reservation")
+                raise CostGovernorError(
+                    "operation has no active cost reservation"
+                )
             journal = self._journal
             if journal is not None:
                 journal.record_completion_intent(
@@ -2723,14 +3099,18 @@ class CostGovernor:
                 quota_completion = completion.quota_completion
                 quota_reservation = completion.lease.quota_reservation
                 if quota_completion is None or quota_reservation is None:
-                    raise CostGovernorError("cost completion requires durable quota accounting")
+                    raise CostGovernorError(
+                        "cost completion requires durable quota accounting"
+                    )
                 decision = self._completed_decision(
                     operation_id=operation,
                     receipt=active.receipt,
                     quota_reservation=quota_reservation,
                     quota_completion=quota_completion,
                     refs=refs,
-                    operation_overrun_dimensions=(completion.operation_overrun_dimensions),
+                    operation_overrun_dimensions=(
+                        completion.operation_overrun_dimensions
+                    ),
                 )
                 if journal is not None:
                     journal.record_terminal(
@@ -2741,7 +3121,9 @@ class CostGovernor:
             except CostGovernorError:
                 raise
             except Exception as exc:
-                raise CostGovernorError("terminal_accounting_qualification_failed") from exc
+                raise CostGovernorError(
+                    "terminal_accounting_qualification_failed"
+                ) from exc
 
     def recover_released(
         self,
@@ -2754,37 +3136,55 @@ class CostGovernor:
         operation = _token("operation_id", operation_id)
         journal = self._journal
         if journal is None:
-            raise CostGovernorError("release recovery requires durable cost journal")
+            raise CostGovernorError(
+                "release recovery requires durable cost journal"
+            )
 
         with self._lock:
             record = journal.load(operation)
             if record is None:
-                raise CostGovernorError("operation has no durable cost journal record")
+                raise CostGovernorError(
+                    "operation has no durable cost journal record"
+                )
             if record.terminal is not None:
                 if record.state != "released_unspent":
-                    raise CostGovernorConflict("completed reservation cannot be recovered as released")
+                    raise CostGovernorConflict(
+                        "completed reservation cannot be recovered as released"
+                    )
                 self._active.pop(operation, None)
                 return record.terminal
             if record.state != "release_pending":
-                raise CostGovernorConflict("operation has no release pending recovery")
+                raise CostGovernorConflict(
+                    "operation has no release pending recovery"
+                )
 
             ledger = self.runtime.quota_ledger
             if ledger is None:
-                raise CostGovernorError("release recovery requires quota ledger")
+                raise CostGovernorError(
+                    "release recovery requires quota ledger"
+                )
             finder = getattr(ledger, "completion_for_operation", None)
             if callable(finder):
                 completion = finder(record.tenant_id, operation)
                 if completion is not None:
-                    raise CostGovernorConflict("completed accounting cannot be recovered as unspent release")
+                    raise CostGovernorConflict(
+                        "completed accounting cannot be recovered as unspent release"
+                    )
 
-            if journal.quota_reservation_exists(record.quota_reservation):
+            if journal.quota_reservation_exists(
+                record.quota_reservation
+            ):
                 try:
-                    ledger.release(record.quota_reservation.reservation_id)
+                    ledger.release(
+                        record.quota_reservation.reservation_id
+                    )
                 except QuotaConflict as exc:
                     journal.revert_release_pending(operation)
                     raise CostGovernorConflict(str(exc)) from exc
                 except QuotaError as exc:
-                    raise CostGovernorError("durable release recovery failed") from exc
+                    raise CostGovernorError(
+                        "durable release recovery failed"
+                    ) from exc
 
             self._settle_recovered_shared_pressure(
                 record,
@@ -2816,7 +3216,9 @@ class CostGovernor:
         with self._lock:
             active = self._active.get(operation)
             if active is None:
-                raise CostGovernorError("operation has no active cost reservation")
+                raise CostGovernorError(
+                    "operation has no active cost reservation"
+                )
             journal = self._journal
             if journal is not None:
                 journal.mark_release_pending(

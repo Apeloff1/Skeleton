@@ -1,17 +1,6 @@
-import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 import api, { type ApiResult } from '../utils/apiClient';
 import { validateConversationProjection } from './conversationProjection';
-import { authHeaders } from '../auth/gameforgeAuth';
-import { ChatClientError, chatApiError } from './chatErrors';
-
-export type ConversationRequestOptions = {
-  signal?: AbortSignal;
-  headers?: Record<string, string>;
-};
-
-function requestOptions(input: ConversationRequestOptions = {}) {
-  return { signal: input.signal, headers: authHeaders(input.headers), retries: 0 };
-}
+import { chatApiError } from './chatErrors';
 
 export type ConversationThreadState = 'active' | 'archived' | 'deleting' | 'deleted';
 export type ConversationAuthorType = 'user' | 'assistant' | 'tool' | 'system-derived';
@@ -69,14 +58,12 @@ async function requireData<T>(promise: Promise<ApiResult<T>>, message: string): 
 export async function createConversation(input: {
   title?: string;
   dataClass?: ConversationThread['data_class'];
-  signal?: AbortSignal;
-  headers?: Record<string, string>;
 } = {}): Promise<ConversationThread> {
   const data = await requireData(
     api.post<{ thread: ConversationThread }>('/api/v1/conversations', {
       title: input.title || 'New conversation',
       data_class: input.dataClass || 'confidential',
-    }, requestOptions(input)),
+    }),
     'Could not create conversation.',
   );
   return data.thread;
@@ -85,29 +72,22 @@ export async function createConversation(input: {
 export async function listConversations(input: {
   includeArchived?: boolean;
   limit?: number;
-  query?: string;
-  cursor?: string;
-  signal?: AbortSignal;
-  headers?: Record<string, string>;
 } = {}): Promise<ConversationThread[]> {
   const params = new URLSearchParams();
   if (input.includeArchived) params.set('include_archived', 'true');
   if (input.limit) params.set('limit', String(input.limit));
-  if (input.query) params.set('q', input.query);
-  if (input.cursor) params.set('cursor', input.cursor);
   const suffix = params.toString() ? '?' + params.toString() : '';
   const data = await requireData(
-    api.get<{ threads: ConversationThread[] }>('/api/v1/conversations' + suffix, requestOptions(input)),
+    api.get<{ threads: ConversationThread[] }>('/api/v1/conversations' + suffix),
     'Could not load conversations.',
   );
   return data.threads;
 }
 
-export async function getConversation(threadId: string, input: ConversationRequestOptions = {}): Promise<ConversationThread> {
+export async function getConversation(threadId: string): Promise<ConversationThread> {
   const data = await requireData(
     api.get<{ thread: ConversationThread }>(
       '/api/v1/conversations/' + encodeURIComponent(threadId),
-      requestOptions(input),
     ),
     'Could not load conversation.',
   );
@@ -116,7 +96,7 @@ export async function getConversation(threadId: string, input: ConversationReque
 
 export async function listConversationMessages(
   threadId: string,
-  input: { afterSequence?: number; limit?: number; activeOnly?: boolean } & ConversationRequestOptions = {},
+  input: { afterSequence?: number; limit?: number; activeOnly?: boolean } = {},
 ): Promise<{
   messages: ConversationMessage[];
   nextAfterSequence: number | null;
@@ -132,7 +112,6 @@ export async function listConversationMessages(
       next_after_sequence: number | null;
     }>(
       '/api/v1/conversations/' + encodeURIComponent(threadId) + '/messages' + suffix,
-      requestOptions(input),
     ),
     'Could not load conversation messages.',
   );
@@ -151,40 +130,23 @@ export type ConversationSnapshot = {
 
 export async function reconstructConversation(
   threadId: string,
-  input: ConversationRequestOptions = {},
 ): Promise<ConversationSnapshot> {
-  // A branch or append during pagination invalidates the entire projection.
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const thread = await getConversation(threadId, input);
-    const messages: ConversationMessage[] = [];
-    let afterSequence = 0;
-    let transcriptCharacters = 0;
-    while (true) {
-      const page = await listConversationMessages(threadId, {
-        ...input, activeOnly: true, limit: 500, afterSequence,
-      });
-      if (messages.length + page.messages.length > 10000) {
-        throw new ChatClientError('This conversation exceeds the supported transcript size.', {
-          kind: 'validation', code: 'projection_limit',
-        });
-      }
-      transcriptCharacters += page.messages.reduce((total, message) => total + (message.content?.length ?? 0), 0);
-      if (transcriptCharacters > 8 * 1024 * 1024) throw new ChatClientError('Conversation transcript exceeds the supported size.', { kind: 'validation', code: 'projection_limit' });
-      messages.push(...page.messages);
-      if (page.nextAfterSequence === null) break;
-      if (!Number.isSafeInteger(page.nextAfterSequence) || page.nextAfterSequence <= afterSequence) {
-        throw new ChatClientError('Conversation pagination did not advance.', { code: 'invalid_cursor' });
-      }
-      afterSequence = page.nextAfterSequence;
-    }
-    const current = await getConversation(threadId, input);
-    if (current.version !== thread.version || current.active_branch_id !== thread.active_branch_id) continue;
-    const projection = validateConversationProjection(current, messages);
-    return { thread: current, messages: projection.messages, lastSequence: projection.lastSequence };
-  }
-  throw new ChatClientError('Conversation changed while loading. Refresh to try again.', {
-    kind: 'conflict', code: 'projection_changed', retryable: true,
-  });
+  const [thread, page] = await Promise.all([
+    getConversation(threadId),
+    listConversationMessages(threadId, {
+      activeOnly: true,
+      limit: 500,
+    }),
+  ]);
+  const projection = validateConversationProjection(
+    thread,
+    page.messages,
+  );
+  return {
+    thread,
+    messages: projection.messages,
+    lastSequence: projection.lastSequence,
+  };
 }
 
 export async function appendConversationMessage(
@@ -195,8 +157,6 @@ export async function appendConversationMessage(
     parentMessageId?: string;
     attachmentRefs?: string[];
     dataClass?: ConversationMessage['data_class'];
-    signal?: AbortSignal;
-    headers?: Record<string, string>;
   },
 ): Promise<{ thread: ConversationThread; message: ConversationMessage }> {
   return requireData(
@@ -210,7 +170,6 @@ export async function appendConversationMessage(
         attachment_refs: input.attachmentRefs || [],
         data_class: input.dataClass || thread.data_class,
       },
-      { ...requestOptions(input), idempotencyKey: input.idempotencyKey },
     ),
     'Could not append conversation message.',
   );
@@ -219,7 +178,7 @@ export async function appendConversationMessage(
 export async function editConversationMessage(
   thread: ConversationThread,
   messageId: string,
-  input: { content: string; idempotencyKey: string } & ConversationRequestOptions,
+  input: { content: string; idempotencyKey: string },
 ): Promise<{ thread: ConversationThread; message: ConversationMessage }> {
   return requireData(
     api.post<{ thread: ConversationThread; message: ConversationMessage }>(
@@ -230,7 +189,6 @@ export async function editConversationMessage(
         idempotency_key: input.idempotencyKey,
         expected_thread_version: thread.version,
       },
-      { ...requestOptions(input), idempotencyKey: input.idempotencyKey },
     ),
     'Could not edit conversation message.',
   );
@@ -240,7 +198,7 @@ export async function editConversationMessage(
 export async function regenerateConversationMessage(
   thread: ConversationThread,
   messageId: string,
-  input: { idempotencyKey: string; providerId?: string; modelId?: string } & ConversationRequestOptions,
+  input: { idempotencyKey: string },
 ): Promise<{
   thread: ConversationThread;
   message: ConversationMessage;
@@ -264,11 +222,8 @@ export async function regenerateConversationMessage(
         + '/messages/' + encodeURIComponent(messageId) + '/regenerate',
       {
         idempotency_key: input.idempotencyKey,
-        provider_id: input.providerId,
-        model_id: input.modelId,
         expected_thread_version: thread.version,
       },
-      { ...requestOptions(input), idempotencyKey: input.idempotencyKey },
     ),
     'Could not regenerate conversation message.',
   );
@@ -286,7 +241,6 @@ export async function regenerateConversationMessage(
 export async function updateConversationState(
   thread: ConversationThread,
   state: 'active' | 'archived' | 'deleting',
-  input: ConversationRequestOptions = {},
 ): Promise<ConversationThread> {
   const data = await requireData(
     api.patch<{ thread: ConversationThread }>(
@@ -295,7 +249,6 @@ export async function updateConversationState(
         state,
         expected_thread_version: thread.version,
       },
-      requestOptions(input),
     ),
     'Could not update conversation state.',
   );
@@ -304,12 +257,11 @@ export async function updateConversationState(
 
 export async function requestConversationDeletion(
   thread: ConversationThread,
-  input: ConversationRequestOptions = {},
 ): Promise<ConversationThread> {
   const path = '/api/v1/conversations/' + encodeURIComponent(thread.thread_id)
     + '?expected_thread_version=' + encodeURIComponent(String(thread.version));
   const data = await requireData(
-    api.delete<{ thread: ConversationThread }>(path, requestOptions(input)),
+    api.delete<{ thread: ConversationThread }>(path),
     'Could not request conversation deletion.',
   );
   return data.thread;
@@ -326,7 +278,6 @@ export type ConversationTurnMemoryPolicy = {
 export type ConversationTurn = {
   success: boolean;
   accepted?: boolean;
-  server_resume_available?: boolean;
   terminal?: boolean;
   state?: string;
   cancellation_requested?: boolean;
@@ -371,12 +322,6 @@ export async function startConversationTurn(
     memoryPolicy?: ConversationTurnMemoryPolicy;
     signal?: AbortSignal;
     deferred?: boolean;
-    headers?: Record<string, string>;
-    providerId?: string;
-    modelId?: string;
-    attachmentRefs?: string[];
-    maxOutputTokens?: number;
-    temperature?: number;
   },
 ): Promise<ConversationTurn> {
   const data = await requireData(
@@ -389,15 +334,10 @@ export async function startConversationTurn(
         expected_thread_version: thread.version,
         context: input.context,
         memory_policy: input.memoryPolicy,
-        provider_id: input.providerId,
-        model_id: input.modelId,
-        attachment_refs: input.attachmentRefs ?? [],
-        max_output_tokens: input.maxOutputTokens,
-        temperature: input.temperature,
         response_mode: input.deferred === false ? 'wait' : 'deferred',
       },
       {
-        ...requestOptions(input),
+        signal: input.signal,
         // The body also carries this key; the transport header makes retries
         // explicitly idempotent at generic HTTP/circuit-breaker layers too.
         idempotencyKey: input.idempotencyKey,
@@ -419,7 +359,7 @@ export async function startConversationTurn(
 export async function getConversationTurn(
   threadId: string,
   idempotencyKey: string,
-  input: ConversationRequestOptions = {},
+  input: { signal?: AbortSignal } = {},
 ): Promise<ConversationTurn> {
   const data = await requireData(
     api.get<ConversationTurn>(
@@ -428,7 +368,7 @@ export async function getConversationTurn(
         + '?idempotency_key='
         + encodeURIComponent(idempotencyKey),
       {
-        ...requestOptions(input),
+        signal: input.signal,
         timeoutMs: 20_000,
       },
     ),
@@ -443,23 +383,12 @@ export async function getConversationTurn(
   return data;
 }
 
-export async function resumeConversationTurn(
-  threadId: string, idempotencyKey: string, input: ConversationRequestOptions = {},
-): Promise<ConversationTurn> {
-  return requireData(api.post<ConversationTurn>(
-    '/api/ai/chat/turns/' + encodeURIComponent(threadId) + '/resume',
-    { idempotency_key: idempotencyKey },
-    { ...requestOptions(input), idempotencyKey, timeoutMs: 20000 },
-  ), 'Could not resume saved conversation turn.');
-}
-
 export async function cancelConversationTurn(
   threadId: string,
   idempotencyKey: string,
   input: {
     reason?: string;
     signal?: AbortSignal;
-    headers?: Record<string, string>;
   } = {},
 ): Promise<ConversationTurn> {
   return requireData(
@@ -472,7 +401,7 @@ export async function cancelConversationTurn(
         reason: input.reason || 'user_cancelled',
       },
       {
-        ...requestOptions(input),
+        signal: input.signal,
         idempotencyKey: idempotencyKey + ':cancel',
         timeoutMs: 20_000,
       },
@@ -534,117 +463,4 @@ export async function followConversationTurn(
     }
     await waitForConversationTurnPoll(pollMs, input.signal);
   }
-}
-
-export type ConversationPage = {
-  threads: ConversationThread[];
-  nextCursor: string | null;
-};
-
-export async function listConversationPage(input: {
-  includeArchived?: boolean; limit?: number; query?: string; cursor?: string;
-} & ConversationRequestOptions = {}): Promise<ConversationPage> {
-  const params = new URLSearchParams();
-  if (input.includeArchived) params.set('include_archived', 'true');
-  params.set('limit', String(input.limit ?? 50));
-  if (input.query) params.set('q', input.query);
-  if (input.cursor) params.set('cursor', input.cursor);
-  const data = await requireData(api.get<{
-    threads: ConversationThread[]; next_cursor?: string | null;
-  }>('/api/v1/conversations?' + params.toString(), requestOptions(input)), 'Could not load conversations.');
-  if (!Array.isArray(data.threads) || data.threads.length > 200) {
-    throw new ChatClientError('Conversation list is invalid.', { code: 'invalid_projection' });
-  }
-  return { threads: data.threads, nextCursor: data.next_cursor ?? null };
-}
-
-export async function renameConversation(
-  thread: ConversationThread, title: string, input: ConversationRequestOptions = {},
-): Promise<ConversationThread> {
-  if (!title.trim() || title.trim().length > 200) {
-    throw new ChatClientError('Conversation title must contain 1 to 200 characters.', { kind: 'validation' });
-  }
-  const data = await requireData(api.patch<{ thread: ConversationThread }>(
-    '/api/v1/conversations/' + encodeURIComponent(thread.thread_id),
-    { title: title.trim(), expected_thread_version: thread.version },
-    requestOptions(input),
-  ), 'Could not rename conversation.');
-  return data.thread;
-}
-
-export type ConversationRecovery = {
-  thread: ConversationThread;
-  messages: ConversationMessage[];
-  last_sequence: number;
-  next_before_message_id: string | null;
-  regeneration_requests?: { message_id: string; idempotency_key: string; state?: string }[];
-  pending_turn: {
-    message_id: string;
-    idempotency_key: string;
-    sequence: number;
-    attachment_refs: string[];
-  } | null;
-};
-
-export async function getConversationRecovery(
-  threadId: string, input: ConversationRequestOptions = {},
-): Promise<ConversationRecovery> {
-  const data = await requireData(api.get<ConversationRecovery>(
-    '/api/v1/conversations/' + encodeURIComponent(threadId) + '/recovery?limit=100',
-    requestOptions(input),
-  ), 'Could not recover conversation.');
-  if (data.thread.thread_id !== threadId
-    || data.messages.some(message => message.thread_id !== threadId)) {
-    throw new ChatClientError('Recovery returned a different conversation.', { code: 'foreign_thread' });
-  }
-  validateConversationProjection(data.thread, data.messages);
-  return data;
-}
-
-
-export type ConversationExport = {
-  filename: string;
-  mimeType: string;
-  content: string;
-  contentDigest: string;
-  snapshotVersion: number;
-  messageCount: number;
-  scope: 'canonical_active_lineage';
-};
-
-export async function getConversationExport(
-  thread: ConversationThread, format: 'json' | 'markdown', input: ConversationRequestOptions = {},
-): Promise<ConversationExport> {
-  const data = await requireData(api.get<{
-    thread_id: string; snapshot_version: number; scope: string; format: string;
-    filename: string; media_type: string; content: string; content_digest: string;
-    message_count: number; attachments_embedded: boolean;
-  }>('/api/v1/conversations/' + encodeURIComponent(thread.thread_id) + '/export'
-    + '?format=' + format + '&expected_thread_version=' + thread.version,
-  { ...requestOptions(input), timeoutMs: 30000 }), 'Could not export conversation.');
-  if (input.signal?.aborted) throw new ChatClientError('Export detached.', { kind: 'cancelled' });
-  if (data.thread_id !== thread.thread_id || data.snapshot_version !== thread.version
-    || data.scope !== 'canonical_active_lineage' || data.format !== format
-    || data.attachments_embedded !== false || typeof data.content !== 'string'
-    || typeof data.media_type !== 'string'
-    || typeof data.filename !== 'string' || !data.filename || data.filename.length > 200
-    || data.filename.includes('/') || data.filename.includes('\\')
-    || !Number.isSafeInteger(data.message_count) || data.message_count < 0 || data.message_count > 10000
-    || typeof data.content_digest !== 'string' || !/^[0-9a-f]{64}$/.test(data.content_digest)) {
-    throw new ChatClientError('Export returned an invalid canonical identity.', { code: 'invalid_export' });
-  }
-  let bytes = 0;
-  for (const character of data.content) {
-    const point = character.codePointAt(0)!;
-    bytes += point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4;
-    if (bytes > 8 * 1024 * 1024) throw new ChatClientError('Export exceeds the supported file size.', { code: 'export_limit' });
-  }
-  const measuredDigest = await digestStringAsync(CryptoDigestAlgorithm.SHA256, data.content);
-  if (input.signal?.aborted) throw new ChatClientError('Export detached.', { kind: 'cancelled' });
-  if (measuredDigest !== data.content_digest) throw new ChatClientError('Export content digest does not match.', { code: 'invalid_export' });
-  const expectedMime = format === 'json' ? 'application/json' : 'text/markdown';
-  if (!data.media_type.startsWith(expectedMime)) throw new ChatClientError('Export media type is invalid.', { code: 'invalid_export' });
-  return { filename: data.filename, mimeType: data.media_type, content: data.content,
-    contentDigest: measuredDigest, snapshotVersion: data.snapshot_version,
-    messageCount: data.message_count, scope: 'canonical_active_lineage' };
 }

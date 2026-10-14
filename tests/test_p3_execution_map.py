@@ -83,7 +83,14 @@ class P3ExecutionMapTests(unittest.TestCase):
     def test_rejects_self_signoff(self) -> None:
         root = self._fixture()
         path, payload = self._load(root, "machine/ai_p3_task_backlog.json")
-        payload["tasks"][0]["verification_signed"] = True
+        # Current source task is legitimately closed/signed. Construct a
+        # non-closed task before trying to forge a verification signature.
+        task = payload["tasks"][0]
+        task["status"] = "in_progress"
+        task["completion_checkbox"] = False
+        task["completion_checkbox_mark"] = "[ ]"
+        task["implementation_signed"] = False
+        task["verification_signed"] = True
         path.write_text(json.dumps(payload), encoding="utf-8")
         with self.assertRaisesRegex(P3ValidationError, "self-complete or self-sign"):
             validate(root)
@@ -101,12 +108,18 @@ class P3ExecutionMapTests(unittest.TestCase):
             for item in payload["tasks"]
             if item["task_id"] == "P3-DOMAIN-INTELLIGENCE-01"
         )
-        dependency["status"] = "in_progress"
-        task["status"] = "ready"
+        # Sign-offs are only valid for closed tasks; clear both in the
+        # downgraded fixture so dependency checking is the first violation.
+        for row, status in ((dependency, "in_progress"), (task, "ready")):
+            row["status"] = status
+            row["completion_checkbox"] = False
+            row["completion_checkbox_mark"] = "[ ]"
+            row["implementation_signed"] = False
+            row["verification_signed"] = False
         payload["summary"]["ready_count"] = 1
         payload["summary"]["in_progress_count"] = 1
-        payload["summary"]["landed_unpromoted_count"] = 2
-        payload["summary"]["blocked_count"] = 2
+        payload["summary"]["landed_unpromoted_count"] = 0
+        payload["summary"]["blocked_count"] = 0
         path.write_text(json.dumps(payload), encoding="utf-8")
         with self.assertRaisesRegex(P3ValidationError, "unresolved dependencies"):
             validate(root)

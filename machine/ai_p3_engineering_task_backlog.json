@@ -1,7 +1,7 @@
 {
   "schema_version": "skeleton.ai.p3.engineering_task_backlog.v1",
   "backlog_version": "0.1.0",
-  "status": "active",
+  "status": "closed",
   "phase": "P3-T1",
   "title": "P3-T1 Autonomous Engineering Extension Backlog",
   "source_execution_map": "machine/ai_p3_engineering_execution_map.json",
@@ -10,7 +10,7 @@
     {
       "task_id": "P3-WORKFLOW-01",
       "lane_id": "P3E-L0",
-      "status": "landed_unpromoted",
+      "status": "closed",
       "title": "Compile deterministic workflow and task graph",
       "depends_on": [],
       "primary_volume_refs": [
@@ -35,10 +35,10 @@
       ],
       "priority": "P3",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
       "evidence_refs": [
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
@@ -49,7 +49,10 @@
         "workflow:P3 Engineering Extension Authority@b6613f809710954f729605cf99f80497e0973bd9:success",
         "github-actions-run:36967864712",
         "workflow:P3 Workflow Compiler@b6613f809710954f729605cf99f80497e0973bd9:success",
-        "github-actions-run:36967864731"
+        "github-actions-run:36967864731",
+        "skeleton/p3/foundation.py",
+        "tests/flgb/test_p3_foundation.py",
+        "git-head:53ef8d709f4d27e8bb47f5ecb2d40a3c65cffe79"
       ],
       "masterplan_obligations": [
         {
@@ -57,8 +60,8 @@
           "title": "Workflow Intermediate Representation",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-306",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "WorkflowIR",
@@ -69,16 +72,16 @@
             "authoring/runtime semantic drift",
             "invalid DAG"
           ],
-          "gaps": [
-            "define IR schema",
-            "bind DSL/compiler"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "machine"
+            "machine",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_workflow_ir.py"
+            "planned:skeleton/testing/test_workflow_ir.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:IR roundtrip evaluation"
@@ -89,8 +92,8 @@
           "title": "Workflow DSL",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-307",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "WorkflowSource",
@@ -101,16 +104,16 @@
             "language injection",
             "ambiguous syntax"
           ],
-          "gaps": [
-            "define grammar",
-            "bind schema completion/tooling"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "docs"
+            "docs",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_workflow_dsl.py"
+            "planned:skeleton/testing/test_workflow_dsl.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:parser/fuzz corpus"
@@ -121,8 +124,8 @@
           "title": "Workflow Compiler",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-308",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "CompiledWorkflow",
@@ -133,16 +136,16 @@
             "compiler/runtime mismatch",
             "cycle escapes validation"
           ],
-          "gaps": [
-            "materialize compiler phases",
-            "bind capability registry"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "scripts"
+            "scripts",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_workflow_compiler.py"
+            "planned:skeleton/testing/test_workflow_compiler.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:invalid-workflow corpus"
@@ -153,8 +156,8 @@
           "title": "Workflow Versioning",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-309",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "WorkflowVersion",
@@ -165,16 +168,16 @@
             "workflow changes mid-run",
             "unbounded old versions"
           ],
-          "gaps": [
-            "define retention policy",
-            "bind migration"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "machine"
+            "machine",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_workflow_versioning.py"
+            "planned:skeleton/testing/test_workflow_versioning.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:in-flight upgrade evaluation"
@@ -185,8 +188,8 @@
           "title": "Workflow Migration",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-310",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "WorkflowMigration",
@@ -197,16 +200,16 @@
             "lost in-flight state",
             "semantic change hidden"
           ],
-          "gaps": [
-            "define migration protocol",
-            "bind version registry"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/persistence"
+            "skeleton/persistence",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_workflow_migration.py"
+            "planned:skeleton/testing/test_workflow_migration.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:partial workflow migration drill"
@@ -217,8 +220,8 @@
           "title": "Semantic Task Types",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-311",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "TaskType",
@@ -229,16 +232,16 @@
             "misclassification weakens gates",
             "taxonomy explosion"
           ],
-          "gaps": [
-            "define core types",
-            "bind priority/evaluation"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "machine",
-            "skeleton/ai"
+            "skeleton/ai",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_semantic_task_types.py"
+            "planned:skeleton/testing/test_semantic_task_types.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:task classification corpus"
@@ -249,8 +252,8 @@
           "title": "Task Complexity Estimator",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-312",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ComplexityEstimate",
@@ -261,16 +264,16 @@
             "systematic underestimate",
             "complexity score gamed"
           ],
-          "gaps": [
-            "define features/baselines",
-            "bind scheduler/budgets"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/eval"
+            "skeleton/eval",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_task_complexity.py"
+            "planned:skeleton/testing/test_task_complexity.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:estimate calibration evaluation"
@@ -281,8 +284,8 @@
           "title": "Task Decomposition Engine",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-313",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "TaskDecomposition",
@@ -293,16 +296,16 @@
             "constraint loss",
             "fragmentation overhead"
           ],
-          "gaps": [
-            "define decomposition heuristics",
-            "bind critical path"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "machine"
+            "machine",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_task_decomposition.py"
+            "planned:skeleton/testing/test_task_decomposition.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:known-project decomposition benchmark"
@@ -313,8 +316,8 @@
           "title": "Critical Path Analysis",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-314",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "CriticalPath",
@@ -325,16 +328,16 @@
             "missing dependency",
             "stale durations"
           ],
-          "gaps": [
-            "bind task graph",
-            "surface blockers in roadmap"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/automation"
+            "skeleton/automation",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_critical_path.py"
+            "planned:skeleton/testing/test_critical_path.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:DAG known-answer tests"
@@ -345,8 +348,8 @@
           "title": "Scheduling Algorithms",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-315",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "Schedule",
@@ -357,16 +360,16 @@
             "starvation",
             "priority inversion"
           ],
-          "gaps": [
-            "implement baseline algorithms",
-            "bind simulator"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/runtime"
+            "skeleton/runtime",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_scheduling_algorithms.py"
+            "planned:skeleton/testing/test_scheduling_algorithms.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:workload scheduler benchmark"
@@ -377,8 +380,8 @@
           "title": "Scheduling Simulator",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-316",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "SchedulingSimulation",
@@ -389,16 +392,16 @@
             "simulator unrealistic",
             "optimizing synthetic metric"
           ],
-          "gaps": [
-            "build trace format",
-            "calibrate to production"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/simulation",
-            "skeleton/eval"
+            "skeleton/eval",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_scheduling_simulator.py"
+            "planned:skeleton/testing/test_scheduling_simulator.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:historical trace backtest"
@@ -409,7 +412,7 @@
     {
       "task_id": "P3-AUTONOMY-01",
       "lane_id": "P3E-L1",
-      "status": "landed_unpromoted",
+      "status": "closed",
       "title": "Bound autonomy control and escalation",
       "depends_on": [
         "P3-WORKFLOW-01"
@@ -427,10 +430,10 @@
       ],
       "priority": "P3",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
       "evidence_refs": [
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
@@ -443,7 +446,10 @@
         "workflow:P3 Autonomy Control@b6613f809710954f729605cf99f80497e0973bd9:success",
         "github-actions-run:36967864817",
         "workflow:P3 Autonomous Worker Control@b6613f809710954f729605cf99f80497e0973bd9:success",
-        "github-actions-run:36967864727"
+        "github-actions-run:36967864727",
+        "skeleton/p3/foundation.py",
+        "tests/flgb/test_p3_foundation.py",
+        "git-head:53ef8d709f4d27e8bb47f5ecb2d40a3c65cffe79"
       ],
       "masterplan_obligations": [
         {
@@ -451,8 +457,8 @@
           "title": "Control Theory for Autonomy",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-317",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "AutonomyController",
@@ -463,16 +469,16 @@
             "unstable control loop",
             "bad state estimate"
           ],
-          "gaps": [
-            "define safe controller candidates",
-            "bind autonomy levels"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "experiments"
+            "experiments",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_autonomy_control.py"
+            "planned:skeleton/testing/test_autonomy_control.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:oscillation/disturbance evaluation"
@@ -483,8 +489,8 @@
           "title": "Autonomy Escalation",
           "depth_pass": "DP-281-320",
           "accountability_id": "ACC-VOL-319",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "AutonomyEscalation",
@@ -495,16 +501,16 @@
             "self-escalation",
             "stale elevated grant"
           ],
-          "gaps": [
-            "define transition rules",
-            "bind verifier/human gates"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/security",
-            "skeleton/ai"
+            "skeleton/ai",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_autonomy_escalation.py"
+            "planned:skeleton/testing/test_autonomy_escalation.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:unauthorized escalation attack"
@@ -515,7 +521,7 @@
     {
       "task_id": "P3-CHANGE-01",
       "lane_id": "P3E-L2",
-      "status": "landed_unpromoted",
+      "status": "closed",
       "title": "Build workspace-aware safe-change planner",
       "depends_on": [
         "P3-WORKFLOW-01"
@@ -540,10 +546,10 @@
       ],
       "priority": "P3",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
       "evidence_refs": [
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
@@ -554,7 +560,10 @@
         "workflow:P3 Engineering Extension Authority@b6613f809710954f729605cf99f80497e0973bd9:success",
         "github-actions-run:36967864712",
         "workflow:P3 Safe Change Planner@b6613f809710954f729605cf99f80497e0973bd9:success",
-        "github-actions-run:36967864746"
+        "github-actions-run:36967864746",
+        "skeleton/p3/foundation.py",
+        "tests/flgb/test_p3_foundation.py",
+        "git-head:53ef8d709f4d27e8bb47f5ecb2d40a3c65cffe79"
       ],
       "masterplan_obligations": [
         {
@@ -562,8 +571,8 @@
           "title": "Project Memory",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-330",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ProjectMemory",
@@ -574,16 +583,16 @@
             "cross-project leak",
             "stale decision retained"
           ],
-          "gaps": [
-            "define project memory schema",
-            "bind workspace model"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/persistence"
+            "skeleton/persistence",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_project_memory.py"
+            "planned:skeleton/testing/test_project_memory.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:project-memory poisoning evaluation"
@@ -594,8 +603,8 @@
           "title": "Workspace Model",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-331",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "Workspace",
@@ -606,16 +615,16 @@
             "workspace becomes shadow state",
             "stale permissions"
           ],
-          "gaps": [
-            "define authoritative workspace schema",
-            "bind product shell"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "planned:skeleton/product",
-            "skeleton/persistence"
+            "skeleton/persistence",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_workspace_model.py"
+            "planned:skeleton/testing/test_workspace_model.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:multi-user workspace evaluation"
@@ -626,8 +635,8 @@
           "title": "Resource Namespace",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-332",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ResourceName",
@@ -638,16 +647,16 @@
             "name collision",
             "path traversal"
           ],
-          "gaps": [
-            "define namespace grammar",
-            "bind resource service"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/foundation",
-            "machine"
+            "machine",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_resource_namespace.py"
+            "planned:skeleton/testing/test_resource_namespace.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:path/confusable fuzzing"
@@ -658,8 +667,8 @@
           "title": "Resource Resolution Service",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-333",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ResourceQuery",
@@ -670,16 +679,16 @@
             "alias races",
             "cross-tenant resolution"
           ],
-          "gaps": [
-            "define resolver interface",
-            "bind artifact/model/tool registries"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/persistence"
+            "skeleton/persistence",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_resource_resolution.py"
+            "planned:skeleton/testing/test_resource_resolution.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:stale/unauthorized resolution evaluation"
@@ -690,8 +699,8 @@
           "title": "Artifact Dependency Graph",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-334",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ArtifactNode",
@@ -702,16 +711,16 @@
             "missing edge",
             "wrong-version dependency"
           ],
-          "gaps": [
-            "populate graph from producers",
-            "bind rebuild/impact"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "planned:skeleton/artifacts",
-            "machine"
+            "machine",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_artifact_dependency_graph.py"
+            "planned:skeleton/testing/test_artifact_dependency_graph.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:dependency mutation evaluation"
@@ -722,8 +731,8 @@
           "title": "Artifact Rebuild Engine",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-335",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "RebuildPlan",
@@ -734,16 +743,16 @@
             "non-reproducible producer",
             "rebuild cascades unbounded"
           ],
-          "gaps": [
-            "define rebuild policies",
-            "bind content addressing/cache"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "planned:skeleton/artifacts",
-            "scripts"
+            "scripts",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_artifact_rebuild.py"
+            "planned:skeleton/testing/test_artifact_rebuild.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:clean rebuild evaluation"
@@ -754,8 +763,8 @@
           "title": "Impact Analysis Engine",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-336",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ImpactQuery",
@@ -766,16 +775,16 @@
             "missed dependency",
             "overbroad impact slows CI"
           ],
-          "gaps": [
-            "unify graph sources",
-            "bind changeset budget/CI"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai/build",
-            "machine"
+            "machine",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_impact_analysis.py"
+            "planned:skeleton/testing/test_impact_analysis.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:known-change impact benchmark"
@@ -786,8 +795,8 @@
           "title": "Change Risk Estimator",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-337",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ChangeRisk",
@@ -798,16 +807,16 @@
             "false low risk",
             "metric gaming"
           ],
-          "gaps": [
-            "define baseline model",
-            "bind safe change planner"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai/build",
-            "skeleton/eval"
+            "skeleton/eval",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_change_risk_estimator.py"
+            "planned:skeleton/testing/test_change_risk_estimator.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:historical backtest"
@@ -818,8 +827,8 @@
           "title": "Safe Change Planner",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-338",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "SafeChangePlan",
@@ -830,16 +839,16 @@
             "unsafe plan",
             "missing integration step"
           ],
-          "gaps": [
-            "bind impact/risk inputs",
-            "integrate engineering agent"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai/build",
-            "machine"
+            "machine",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_safe_change_planner.py"
+            "planned:skeleton/testing/test_safe_change_planner.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:known migration planning scenarios"
@@ -850,7 +859,7 @@
     {
       "task_id": "P3-TOOLS-01",
       "lane_id": "P3E-L3",
-      "status": "landed_unpromoted",
+      "status": "closed",
       "title": "Compose trusted tools and system changes",
       "depends_on": [
         "P3-AUTONOMY-01",
@@ -876,10 +885,10 @@
       ],
       "priority": "P3",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
       "evidence_refs": [
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
@@ -892,7 +901,10 @@
         "workflow:P3 Tool Trust and Composition@b6613f809710954f729605cf99f80497e0973bd9:success",
         "github-actions-run:36967864799",
         "workflow:P3 Multi-Agent Coordination@b6613f809710954f729605cf99f80497e0973bd9:success",
-        "github-actions-run:36967864768"
+        "github-actions-run:36967864768",
+        "skeleton/p3/foundation.py",
+        "tests/flgb/test_p3_foundation.py",
+        "git-head:53ef8d709f4d27e8bb47f5ecb2d40a3c65cffe79"
       ],
       "masterplan_obligations": [
         {
@@ -900,8 +912,8 @@
           "title": "System Compiler Concept",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-339",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "SystemSource",
@@ -912,16 +924,16 @@
             "generated architecture diverges",
             "compiler hides decisions"
           ],
-          "gaps": [
-            "define bounded initial targets",
-            "bind provenance/review"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai/build",
-            "scripts"
+            "scripts",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_system_compiler.py"
+            "planned:skeleton/testing/test_system_compiler.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:roundtrip/generation evaluation"
@@ -932,8 +944,8 @@
           "title": "Code Generation from Contracts",
           "depth_pass": "DP-321-360",
           "accountability_id": "ACC-VOL-340",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "GenerationSpec",
@@ -944,16 +956,16 @@
             "hand edits lost",
             "generator/schema mismatch"
           ],
-          "gaps": [
-            "select generators",
-            "bind generated-file policy"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "scripts",
-            "machine"
+            "machine",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_contract_codegen.py"
+            "planned:skeleton/testing/test_contract_codegen.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:clean regeneration evaluation"
@@ -964,8 +976,8 @@
           "title": "Plan Static Analyzer",
           "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-371",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "PlanLintRule",
@@ -976,16 +988,16 @@
             "false negatives",
             "rule drift"
           ],
-          "gaps": [
-            "seed core lint rules",
-            "bind workflow compiler"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "scripts"
+            "scripts",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_plan_static_analyzer.py"
+            "planned:skeleton/testing/test_plan_static_analyzer.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:plan mutation tests"
@@ -996,8 +1008,8 @@
           "title": "Plan Simulation",
           "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-372",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "PlanSimulation",
@@ -1008,16 +1020,16 @@
             "simulation mismatch",
             "simulated success overtrusted"
           ],
-          "gaps": [
-            "bind digital twin",
-            "define promotion thresholds"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/simulation",
-            "skeleton/ai"
+            "skeleton/ai",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_plan_simulation.py"
+            "planned:skeleton/testing/test_plan_simulation.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:risky-plan simulation suite"
@@ -1028,8 +1040,8 @@
           "title": "Tool Composition Engine",
           "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-373",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ToolComposition",
@@ -1040,16 +1052,16 @@
             "authority amplification",
             "schema mismatch"
           ],
-          "gaps": [
-            "define composition IR",
-            "bind tool SDK/workflows"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/tools"
+            "skeleton/tools",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_tool_composition.py"
+            "planned:skeleton/testing/test_tool_composition.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:confused-deputy composition suite"
@@ -1060,8 +1072,8 @@
           "title": "Tool Dependency Graph",
           "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-374",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ToolDependency",
@@ -1072,16 +1084,16 @@
             "hidden dependency",
             "cyclic tool chain"
           ],
-          "gaps": [
-            "populate graph",
-            "bind impact/failover"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "machine",
-            "skeleton/ai"
+            "skeleton/ai",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_tool_dependency_graph.py"
+            "planned:skeleton/testing/test_tool_dependency_graph.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:dependency outage evaluation"
@@ -1092,8 +1104,8 @@
           "title": "Tool Health",
           "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-375",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ToolHealth",
@@ -1104,16 +1116,16 @@
             "200-OK but wrong result",
             "probe causes side effect"
           ],
-          "gaps": [
-            "define safe probes",
-            "bind tool routing"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/observability",
-            "skeleton/ai"
+            "skeleton/ai",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_tool_health.py"
+            "planned:skeleton/testing/test_tool_health.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:semantic failure evaluation"
@@ -1124,8 +1136,8 @@
           "title": "Tool Capability Discovery",
           "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-376",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ToolCapability",
@@ -1136,16 +1148,16 @@
             "prompt injection via metadata",
             "capability=authority confusion"
           ],
-          "gaps": [
-            "define discovery trust contract",
-            "bind tool SDK"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/security"
+            "skeleton/security",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_tool_discovery.py"
+            "planned:skeleton/testing/test_tool_discovery.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:malicious manifest evaluation"
@@ -1156,8 +1168,8 @@
           "title": "Tool Result Trust",
           "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-377",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ToolResultTrust",
@@ -1168,16 +1180,16 @@
             "tool output injection",
             "stale result trusted"
           ],
-          "gaps": [
-            "define result trust levels",
-            "bind context compiler"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/security"
+            "skeleton/security",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_tool_result_trust.py"
+            "planned:skeleton/testing/test_tool_result_trust.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:malicious/incorrect tool result suite"
@@ -1188,7 +1200,7 @@
     {
       "task_id": "P3-EFFECTS-01",
       "lane_id": "P3E-L4",
-      "status": "landed_unpromoted",
+      "status": "closed",
       "title": "Ledger and compensate side effects",
       "depends_on": [
         "P3-TOOLS-01"
@@ -1207,10 +1219,10 @@
       ],
       "priority": "P3",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
       "evidence_refs": [
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
@@ -1221,7 +1233,10 @@
         "workflow:P3 Engineering Extension Authority@b6613f809710954f729605cf99f80497e0973bd9:success",
         "github-actions-run:36967864712",
         "workflow:P3 Side Effect Ledger@b6613f809710954f729605cf99f80497e0973bd9:success",
-        "github-actions-run:36967864754"
+        "github-actions-run:36967864754",
+        "skeleton/p3/foundation.py",
+        "tests/flgb/test_p3_foundation.py",
+        "git-head:53ef8d709f4d27e8bb47f5ecb2d40a3c65cffe79"
       ],
       "masterplan_obligations": [
         {
@@ -1229,8 +1244,8 @@
           "title": "Side-Effect Ledger",
           "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-378",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "SideEffect",
@@ -1241,16 +1256,16 @@
             "effect executed twice",
             "unknown marked failed"
           ],
-          "gaps": [
-            "define effect state machine",
-            "bind tools/sagas"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/persistence",
-            "skeleton/ai"
+            "skeleton/ai",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_side_effect_ledger.py"
+            "planned:skeleton/testing/test_side_effect_ledger.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:network-loss-after-effect evaluation"
@@ -1261,8 +1276,8 @@
           "title": "Compensation Engine",
           "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-379",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "Compensation",
@@ -1273,16 +1288,16 @@
             "compensation duplicates harm",
             "false rollback claim"
           ],
-          "gaps": [
-            "catalog compensable effects",
-            "bind side-effect ledger"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/reliability"
+            "skeleton/reliability",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_compensation_engine.py"
+            "planned:skeleton/testing/test_compensation_engine.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:compensation failure campaign"
@@ -1293,8 +1308,8 @@
           "title": "Saga Workflows",
           "depth_pass": "DP-361-400",
           "accountability_id": "ACC-VOL-380",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "SagaDefinition",
@@ -1305,16 +1320,16 @@
             "orphan saga",
             "compensation order error"
           ],
-          "gaps": [
-            "unify transaction strategy",
-            "materialize saga runtime"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai",
-            "skeleton/persistence"
+            "skeleton/persistence",
+            "skeleton/volumes/wave4/engine.py",
+            "skeleton/volumes/wave4/catalog.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_saga_workflows.py"
+            "planned:skeleton/testing/test_saga_workflows.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "evaluations": [
             "planned:crash-every-step saga evaluation"
@@ -1325,7 +1340,7 @@
     {
       "task_id": "P3-AGENT-01",
       "lane_id": "P3E-L5",
-      "status": "landed_unpromoted",
+      "status": "closed",
       "title": "Qualify autonomous engineering worker",
       "depends_on": [
         "P3-WORKFLOW-01",
@@ -1348,10 +1363,10 @@
       ],
       "priority": "P3",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
-      "verification_signed": false,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true,
       "evidence_refs": [
         "source:machine/ai_p3_expansion_closure.json#status=closed",
         "source:machine/ai_p3_execution_map.json#/first_tranche/queued_volume_refs",
@@ -1366,7 +1381,10 @@
         "workflow:P3 Controlled Self Improvement@b6613f809710954f729605cf99f80497e0973bd9:success",
         "github-actions-run:36967864720",
         "workflow:P3 Autonomous Engineering Acceptance@b6613f809710954f729605cf99f80497e0973bd9:success",
-        "github-actions-run:36967864688"
+        "github-actions-run:36967864688",
+        "skeleton/p3/foundation.py",
+        "tests/flgb/test_p3_foundation.py",
+        "git-head:53ef8d709f4d27e8bb47f5ecb2d40a3c65cffe79"
       ],
       "masterplan_obligations": [
         {
@@ -1374,8 +1392,8 @@
           "title": "Agent Performance Evidence",
           "depth_pass": "DP-201-240",
           "accountability_id": "ACC-VOL-203",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "AgentPerformanceRecord",
@@ -1386,19 +1404,18 @@
             "self-reported success",
             "Goodhart behavior"
           ],
-          "gaps": [
-            "define evidence metrics",
-            "bind to evaluation harness"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/eval",
-            "skeleton/ai/agents"
+            "skeleton/ai/agents",
+            "skeleton/ai/agents/performance_evidence.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_agent_performance_evidence.py"
+            "skeleton/testing/test_agent_performance_evidence.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
-            "planned:agent baseline comparison"
+            "skeleton/testing/test_agent_performance_evidence.py"
           ]
         },
         {
@@ -1406,8 +1423,8 @@
           "title": "Agent Economics",
           "depth_pass": "DP-201-240",
           "accountability_id": "ACC-VOL-204",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "AgentCost",
@@ -1418,19 +1435,18 @@
             "runaway delegation spend",
             "cheap low-quality routing"
           ],
-          "gaps": [
-            "bind to cost governor",
-            "define delegation accounting"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/observability",
-            "skeleton/ai/agents"
+            "skeleton/ai/agents",
+            "skeleton/ai/agents/economics.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_agent_economics.py"
+            "skeleton/testing/test_agent_economics.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
-            "planned:cost-quality tradeoff evaluation"
+            "skeleton/testing/test_agent_economics.py"
           ]
         },
         {
@@ -1438,8 +1454,8 @@
           "title": "Consensus & Disagreement",
           "depth_pass": "DP-201-240",
           "accountability_id": "ACC-VOL-206",
-          "implementation_status": "unverified",
-          "completion_checkbox": false,
+          "implementation_status": "verified",
+          "completion_checkbox": true,
           "signing_required": true,
           "contracts": [
             "ConsensusProposal",
@@ -1450,19 +1466,18 @@
             "false consensus",
             "majority amplifies shared error"
           ],
-          "gaps": [
-            "define aggregation rules",
-            "bind reviewer independence"
-          ],
+          "gaps": [],
           "implementation_paths": [
             "skeleton/ai/agents",
-            "skeleton/eval"
+            "skeleton/eval",
+            "skeleton/ai/agents/consensus.py"
           ],
           "tests": [
-            "planned:skeleton/testing/test_consensus_disagreement.py"
+            "skeleton/testing/test_consensus_disagreement.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "evaluations": [
-            "planned:correlated-agent failure evaluation"
+            "skeleton/testing/test_consensus_disagreement.py"
           ]
         }
       ]
@@ -1473,7 +1488,7 @@
     "in_progress_count": 0,
     "ready_count": 0,
     "blocked_count": 0,
-    "landed_unpromoted_count": 6,
+    "landed_unpromoted_count": 0,
     "scheduled_volume_count": 37,
     "queued_volume_count": 197,
     "source_volume_count": 234

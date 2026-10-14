@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-16:memory_budget:v1",
+  "title": "FLGB-16 memory budget",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "pool_id",
+    "maximum_bytes",
+    "reserve_bytes"
+  ],
+  "properties": {
+    "pool_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "maximum_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reserve_bytes": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

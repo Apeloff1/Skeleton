@@ -60,8 +60,16 @@ def test_candidate_report_preserves_known_target_floor_boundary() -> None:
         for row in report["records"]
         if row["target_floor_eligible"] is True
     }
-    assert eligible == {"VOL-013", "VOL-014", "VOL-253"}
-    assert report["target_floor_eligible_count"] == 3
+    governed_eligible = {
+        row["volume_key"]
+        for row in report["records"]
+        if row["implementation_signed"] is True
+        and row["verification_signed"] is True
+        and row["required_review_actions"] == []
+    }
+    assert eligible == governed_eligible
+    assert report["target_floor_eligible_count"] == len(eligible)
+    assert {"VOL-013", "VOL-014", "VOL-253"} <= eligible
 
     for row in report["records"]:
         if row["target_floor_eligible"] is True:

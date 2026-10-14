@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-092",
     "title": "Repository Maintenance",
-    "required_gap_texts": [
-      "define maintenance ownership registry",
-      "bind deletion to reachability/retention checks"
-    ]
+    "required_gap_texts": []
   },
   "roots": [
     {

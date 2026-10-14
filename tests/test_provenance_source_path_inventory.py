@@ -25,6 +25,8 @@ LIVE_EXAMPLES = (
     ("scripts/check_architecture_boundaries.py", "first-party"),
     ("tests/test_architecture_boundaries.py", "first-party"),
     ("docs/CANONICAL_MODULE_BOUNDARIES.md", "first-party"),
+    ("design/art/visual_identity.md", "first-party"),
+    ("design/art/visual_identity_tokens.json", "first-party"),
     (".github/workflows/provenance-policy.yml", "first-party"),
     (".cursor/rules/architecture.mdc", "first-party"),
     (".machine/README.md", "first-party"),
@@ -88,6 +90,12 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("frontend/node_modules/react/index.js"), "vendor")
         self.assertEqual(policy.classify_path("skeleton/vendor/third.py"), "vendor")
         self.assertEqual(policy.classify_path("backend/third_party/lib.py"), "vendor")
+
+    def test_volume_forge_is_first_party_not_canonical(self) -> None:
+        self.assertEqual(policy.classify_path("volume_forge/__init__.py"), "first-party")
+        self.assertEqual(policy.classify_path("volume_forge/assembly.py"), "first-party")
+        self.assertEqual(policy.classify_path("volume_forge/subdir/manifest.json"), "first-party")
+        self.assertEqual(policy.classify_path("volume_forge_not_owned/x.py"), "unknown")
 
     def test_skeleton_build_package_is_canonical_not_generated(self) -> None:
         self.assertEqual(

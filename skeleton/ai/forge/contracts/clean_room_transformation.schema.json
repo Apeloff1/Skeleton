@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-17:clean_room_transformation:v1",
+  "title": "FLGB-17 clean room transformation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "transformation_id",
+    "source_fingerprint_digest",
+    "instruction_digest",
+    "output_digest",
+    "similarity_ppm",
+    "verifier_digest"
+  ],
+  "properties": {
+    "transformation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source_fingerprint_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "instruction_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "output_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "similarity_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "verifier_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

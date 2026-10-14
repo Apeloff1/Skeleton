@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-01:cancellation:v1",
+  "title": "FLGB-01 Cancellation Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operation_id",
+    "cancelled",
+    "reason"
+  ],
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "cancelled": {
+      "type": "boolean"
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    }
+  }
+}

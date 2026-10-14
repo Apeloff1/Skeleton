@@ -38,7 +38,8 @@ FROM nginx:1.31-alpine-slim@sha256:f761b94f2cb9e8e05e2943d5f773609596113ef69b54e
 # The official image starts as root so it can prepare runtime directories.
 # Grant the nginx user access to the real /run directory used for nginx.pid,
 # then permanently drop privileges for the production process.
-RUN chown nginx:nginx /run \
+RUN apk add --no-cache --upgrade "pcre2=10.49-r0" \
+    && chown nginx:nginx /run \
     && chown -R nginx:nginx /var/cache/nginx /etc/nginx/conf.d /usr/share/nginx/html
 COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html

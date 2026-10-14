@@ -4,13 +4,12 @@ The contracts in this module intentionally never carry secret material.
 They describe references, scoped grants, and use receipts only. Secret
 resolution remains outside this evidence surface.
 """
-
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
-from collections.abc import Iterable
-from dataclasses import dataclass
+from typing import Iterable
 
 
 class SecretSecurityError(ValueError):
@@ -141,7 +140,11 @@ class SecretUseReceipt:
             object.__setattr__(self, name, _token(name, getattr(self, name)))
         if not isinstance(self.allowed, bool):
             raise SecretSecurityError("allowed must be boolean")
-        if isinstance(self.used_at_ns, bool) or not isinstance(self.used_at_ns, int) or self.used_at_ns < 0:
+        if (
+            isinstance(self.used_at_ns, bool)
+            or not isinstance(self.used_at_ns, int)
+            or self.used_at_ns < 0
+        ):
             raise SecretSecurityError("used_at_ns must be a non-negative integer")
         if self.secret_material_present is not False:
             raise SecretSecurityError("secret use receipts cannot carry secret material")
@@ -213,18 +216,16 @@ def evaluate_secret_use(
 
 
 _REDACTED = "[REDACTED]"
-_SENSITIVE_KEYS = frozenset(
-    {
-        "authorization",
-        "credential",
-        "credentials",
-        "password",
-        "secret",
-        "token",
-        "api_key",
-        "private_key",
-    }
-)
+_SENSITIVE_KEYS = frozenset({
+    "authorization",
+    "credential",
+    "credentials",
+    "password",
+    "secret",
+    "token",
+    "api_key",
+    "private_key",
+})
 _SENSITIVE_SUFFIXES = (
     "_credential",
     "_credentials",
@@ -270,7 +271,9 @@ def sanitize_secret_metadata(
                 sanitized: dict[str, object] = {}
                 for key, child in item.items():
                     if not isinstance(key, str) or not key:
-                        raise SecretSecurityError("secret metadata keys must be non-empty strings")
+                        raise SecretSecurityError(
+                            "secret metadata keys must be non-empty strings"
+                        )
                     child_path = f"{path}.{key}"
                     if _is_sensitive_key(key):
                         sanitized[key] = _REDACTED
@@ -286,10 +289,15 @@ def sanitize_secret_metadata(
                 raise SecretSecurityError("secret metadata cannot contain cycles")
             active.add(identity)
             try:
-                return [walk(child, f"{path}[{index}]", depth + 1) for index, child in enumerate(item)]
+                return [
+                    walk(child, f"{path}[{index}]", depth + 1)
+                    for index, child in enumerate(item)
+                ]
             finally:
                 active.remove(identity)
-        raise SecretSecurityError("secret metadata must contain only JSON-like values")
+        raise SecretSecurityError(
+            "secret metadata must contain only JSON-like values"
+        )
 
     return walk(value, "$", 0), tuple(sorted(findings))
 

@@ -1,0 +1,140 @@
+name: VOL-052 Internal Python Architecture
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/python_package_layers.json"
+      - "machine/architecture_rule_registry.json"
+      - "scripts/check_architecture_package_layers.py"
+      - "scripts/verify_vol052_python_architecture.py"
+      - "tests/test_architecture_package_layers.py"
+      - "tests/test_vol052_python_architecture_independent.py"
+      - ".github/workflows/vol052-python-architecture.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/python_package_layers.json"
+      - "machine/architecture_rule_registry.json"
+      - "scripts/check_architecture_package_layers.py"
+      - "scripts/verify_vol052_python_architecture.py"
+      - "tests/test_architecture_package_layers.py"
+      - "tests/test_vol052_python_architecture_independent.py"
+      - ".github/workflows/vol052-python-architecture.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol052-python-architecture-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python-architecture:
+    name: Canonical Python package-layer behavior
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+      - name: Compile VOL-052 surfaces
+        run: >-
+          python -m compileall -q
+          scripts/check_architecture_package_layers.py
+          scripts/verify_vol052_python_architecture.py
+          tests/test_architecture_package_layers.py
+          tests/test_vol052_python_architecture_independent.py
+      - name: Execute canonical package-layer validator
+        run: python scripts/check_architecture_package_layers.py --json
+      - name: Run canonical package-layer regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_architecture_package_layers.py
+
+  python-architecture-independent:
+    name: Independent exact-head VOL-052 verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install focused test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+      - name: Run independent VOL-052 regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol052_python_architecture_independent.py
+      - name: Emit independent exact-head receipt
+        run: >-
+          python scripts/verify_vol052_python_architecture.py
+          --evidence-out .vol052-python-architecture.json
+          --print-evidence
+      - name: Assert exact-head receipt identity and coverage
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".vol052-python-architecture.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("VOL-052 receipt does not bind exact head")
+          if receipt.get("volume") != "VOL-052":
+              raise SystemExit("VOL-052 verifier bound wrong volume")
+          if receipt.get("verifier") != "independent-vol052-python-architecture-v1":
+              raise SystemExit("unexpected VOL-052 verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent VOL-052 verification failed")
+          layers = receipt.get("layer_binding") or {}
+          if layers.get("layer_count") != 5:
+              raise SystemExit("VOL-052 package-layer coverage drifted")
+          if layers.get("classified_path_count", 0) < 10:
+              raise SystemExit("VOL-052 classified path coverage is too small")
+          registry = receipt.get("registry_binding") or {}
+          if registry.get("rule_id") != "ARCH-PYTHON-LAYERS":
+              raise SystemExit("VOL-052 architecture rule binding missing")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("VOL-052 receipt digest is invalid")
+          print(
+              "VOL-052 independent exact-head receipt:",
+              expected,
+              receipt["receipt_digest"],
+          )
+          PY

@@ -1,0 +1,143 @@
+name: VOL-020 Multimodal Closure
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/multimodal/**"
+      - "skeleton/ai/runtime/multimodal/**"
+      - "skeleton/testing/test_vol020_multimodal_contracts.py"
+      - "skeleton/testing/test_vol020_multimodal_sanitize.py"
+      - "skeleton/testing/test_vol020_multimodal_ingest.py"
+      - "backend/tests/test_ai_provider_media.py"
+      - "scripts/verify_vol020_multimodal.py"
+      - "tests/test_vol020_multimodal_independent.py"
+      - ".github/workflows/vol020-multimodal.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/multimodal/**"
+      - "skeleton/ai/runtime/multimodal/**"
+      - "skeleton/testing/test_vol020_multimodal_contracts.py"
+      - "skeleton/testing/test_vol020_multimodal_sanitize.py"
+      - "skeleton/testing/test_vol020_multimodal_ingest.py"
+      - "backend/tests/test_ai_provider_media.py"
+      - "scripts/verify_vol020_multimodal.py"
+      - "tests/test_vol020_multimodal_independent.py"
+      - ".github/workflows/vol020-multimodal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vol020-multimodal-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  multimodal-contract:
+    name: Canonical multimodal trust boundary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install multimodal test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          .
+          "pytest>=8,<9"
+      - name: Compile VOL-020 surfaces
+        run: >-
+          python -m compileall -q
+          skeleton/multimodal
+          skeleton/ai/runtime/multimodal
+          scripts/verify_vol020_multimodal.py
+      - name: Require multimodal source mirror parity
+        run: |
+          cmp skeleton/multimodal/contracts.py skeleton/ai/runtime/multimodal/contracts.py
+          cmp skeleton/multimodal/sanitize.py skeleton/ai/runtime/multimodal/sanitize.py
+          cmp skeleton/multimodal/ingest.py skeleton/ai/runtime/multimodal/ingest.py
+          cmp skeleton/multimodal/__init__.py skeleton/ai/runtime/multimodal/__init__.py
+      - name: Run multimodal behavioral regressions
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_vol020_multimodal_contracts.py
+          skeleton/testing/test_vol020_multimodal_sanitize.py
+          skeleton/testing/test_vol020_multimodal_ingest.py
+
+  multimodal-independent:
+    name: Independent exact-head multimodal verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - name: Install independent verifier test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+      - name: Run independent verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_vol020_multimodal_independent.py
+      - name: Emit independent exact-head receipt
+        run: >-
+          python scripts/verify_vol020_multimodal.py
+          --evidence-out .vol020-multimodal-independent.json
+          --print-evidence
+      - name: Assert exact-head receipt identity
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          receipt = json.loads(Path(".vol020-multimodal-independent.json").read_text())
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("VOL-020 receipt does not bind exact head")
+          if receipt.get("verifier") != "independent-vol020-multimodal-v1":
+              raise SystemExit("unexpected VOL-020 verifier identity")
+          if receipt.get("volume") != "VOL-020":
+              raise SystemExit("VOL-020 verifier bound wrong volume")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent VOL-020 verification failed")
+          if receipt.get("modality_count") != 5:
+              raise SystemExit("VOL-020 modality coverage is incomplete")
+          if receipt.get("checked_invariant_count", 0) < 25:
+              raise SystemExit("VOL-020 invariant coverage is incomplete")
+          if len(receipt.get("source_digests") or {}) != 4:
+              raise SystemExit("VOL-020 source digest coverage is incomplete")
+          if len(receipt.get("mirror_digests") or {}) != 4:
+              raise SystemExit("VOL-020 mirror digest coverage is incomplete")
+          if len((receipt.get("volume_binding") or {}).get("binding_digest") or "") != 64:
+              raise SystemExit("VOL-020 plan binding digest is missing")
+          if len(receipt.get("receipt_digest") or "") != 64:
+              raise SystemExit("VOL-020 receipt digest is invalid")
+          print("VOL-020 independent exact-head receipt:", expected, receipt["receipt_digest"])
+          PY

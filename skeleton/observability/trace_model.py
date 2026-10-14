@@ -4,33 +4,31 @@ The existing distributed tracer remains the collection mechanism. This module
 adds stable cross-boundary identity, causal links, and sanitized snapshots for
 evidence correlation. Trace evidence is never authoritative runtime state.
 """
-
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
 import math
 import re
-from collections.abc import Mapping
-from dataclasses import dataclass
+from typing import Mapping
 
-from skeleton.ai.runtime.observability.distributed_tracing import Span
+from skeleton.observability.distributed_tracing import Span
+
 
 _HEX_RE = re.compile(r"^[0-9a-f]{16,64}$")
-_SENSITIVE_KEYS = frozenset(
-    {
-        "authorization",
-        "credential",
-        "credentials",
-        "password",
-        "secret",
-        "token",
-        "api_key",
-        "private_key",
-        "prompt",
-        "user_content",
-    }
-)
+_SENSITIVE_KEYS = frozenset({
+    "authorization",
+    "credential",
+    "credentials",
+    "password",
+    "secret",
+    "token",
+    "api_key",
+    "private_key",
+    "prompt",
+    "user_content",
+})
 _SENSITIVE_SUFFIXES = (
     "_credential",
     "_credentials",
@@ -108,7 +106,9 @@ def sanitize_trace_attributes(
     for key, value in attributes.items():
         clean_key = _token("attribute key", key)
         if _is_sensitive_key(clean_key):
-            raise TraceModelError(f"sensitive trace attribute is forbidden:{clean_key}")
+            raise TraceModelError(
+                f"sensitive trace attribute is forbidden:{clean_key}"
+            )
         rows.append(
             (
                 clean_key,
@@ -218,7 +218,11 @@ class SpanEvidence:
             raise TraceModelError("span end cannot predate span start")
         if not isinstance(self.attributes, tuple):
             raise TraceModelError("attributes must be an immutable tuple")
-        keys = [item[0] for item in self.attributes if isinstance(item, tuple) and len(item) == 2]
+        keys = [
+            item[0]
+            for item in self.attributes
+            if isinstance(item, tuple) and len(item) == 2
+        ]
         if len(keys) != len(self.attributes):
             raise TraceModelError("attributes must contain key/value pairs")
         if len(keys) != len(set(keys)):

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-05:sandbox_boundary:v1",
+  "title": "FLGB-05 sandbox boundary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "boundary_id",
+    "writable_roots",
+    "network_mode",
+    "allow_process_spawn"
+  ],
+  "properties": {
+    "boundary_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "writable_roots": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^/"
+      }
+    },
+    "network_mode": {
+      "enum": [
+        "deny",
+        "allowlisted-read",
+        "allowlisted"
+      ]
+    },
+    "allow_process_spawn": {
+      "type": "boolean"
+    }
+  }
+}

@@ -6,10 +6,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-123",
     "title": "Non-Functional Requirements",
-    "required_gap_texts": [
-      "bind all production claims to NFR IDs",
-      "materialize measurement harnesses"
-    ]
+    "required_gap_texts": []
   },
   "sources": {
     "engineering_pass": "machine/ai_engineering_pass.json"

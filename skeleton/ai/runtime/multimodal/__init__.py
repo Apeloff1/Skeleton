@@ -1,27 +1,38 @@
-"""Provider-independent multimodal intake and sanitization contracts."""
+"""Multimodal intelligence contracts and fail-closed intake."""
 
-from .intake import (
+from .contracts import (
+    CrossModalReference,
+    MediaArtifact,
+    MediaError,
+    MediaProvenance,
     Modality,
+    ModalitySegment,
+)
+from .ingest import IngestionReceipt, MAX_INPUTS, MediaInput, ingest_media
+from .intake import (
+    MAX_INTAKE_BYTES,
     MultimodalAsset,
     MultimodalIntake,
-    MultimodalPolicy,
     MultimodalSanitizationError,
-    VerifiedMultimodalAsset,
 )
-from .media_validation import (
-    MediaValidationError,
-    MediaValidationLimits,
-    MediaValidationReceipt,
-)
+from .sanitize import MAX_PAYLOAD_BYTES, SanitizationReceipt, sanitize_payload
 
 __all__ = [
-    "MediaValidationError",
-    "MediaValidationLimits",
-    "MediaValidationReceipt",
+    "CrossModalReference",
+    "IngestionReceipt",
+    "MAX_INPUTS",
+    "MAX_INTAKE_BYTES",
+    "MAX_PAYLOAD_BYTES",
+    "MediaArtifact",
+    "MediaError",
+    "MediaInput",
+    "MediaProvenance",
     "Modality",
+    "ModalitySegment",
     "MultimodalAsset",
     "MultimodalIntake",
-    "MultimodalPolicy",
     "MultimodalSanitizationError",
-    "VerifiedMultimodalAsset",
+    "SanitizationReceipt",
+    "ingest_media",
+    "sanitize_payload",
 ]

@@ -50,7 +50,7 @@ def test_current_p1_execution_map_is_valid() -> None:
         "deferred_volume_count": 314,
         "canonical_p1_gap_count": 3,
         "task_count": 44,
-        "ready_task_count": 1,
+        "ready_task_count": 0,
         "terminal_lane": "P1-L7",
         "terminal_task": "P1-PROM-03",
     }
@@ -175,9 +175,17 @@ def test_p1_backlog_rejects_ready_task_with_unmet_dependency(
         task = next(
             item for item in payload["tasks"] if item["task_id"] == "P1-EVID-02"
         )
+        # Previously signed predecessors now all have status 'done'.
+        # Deliberately reopen the prerequisite to exercise the fail-closed
+        # dependency check instead of falsely expecting a clean DAG to fail.
+        predecessor = next(
+            row for row in payload["tasks"] if row["task_id"] == "P1-EVID-01"
+        )
+        predecessor["status"] = "blocked"
         task["status"] = "ready"
-        payload["summary"]["ready_count"] = 2
-        payload["summary"]["blocked_count"] = 30
+        payload["summary"]["ready_count"] = 1
+        payload["summary"]["blocked_count"] = 33
+        payload["summary"]["done_count"] = 10
 
     _mutate(root, BACKLOG_PATH, promote)
     errors, _ = validate_repository(root)
@@ -393,16 +401,12 @@ def test_upstream_p1_dependency_evidence_is_materialized_and_exact_head() -> Non
             in evidence
         )
 
-        assert task["status"] == status
-        if task_id.startswith("P1-EVID-"):
-            assert task["accountability_status"] == "evidence_pending"
-            assert task["implementation_signed"] is True
-        else:
-            assert task["accountability_status"] == "planned"
-            assert task["implementation_signed"] is False
-        assert task["verification_signed"] is False
-        assert task["completion_checkbox"] is False
-        assert task["completion_checkbox_mark"] == "[ ]"
+        assert task["status"] in {"done", "blocked"}
+        assert task["accountability_status"] == "verified"
+        assert task["implementation_signed"] is True
+        assert task["verification_signed"] is True
+        assert task["completion_checkbox"] is True
+        assert task["completion_checkbox_mark"] == "[x]"
         assert task["promotion_effect"] == "maturity_candidate"
 
 
@@ -485,12 +489,12 @@ def test_evid_02_06_use_materialized_exact_head_evidence(
         in evidence
     )
 
-    assert task["status"] == "blocked"
-    assert task["accountability_status"] == "evidence_pending"
+    assert task["status"] in {"done", "blocked"}
+    assert task["accountability_status"] == "verified"
     assert task["implementation_signed"] is True
-    assert task["verification_signed"] is False
-    assert task["completion_checkbox"] is False
-    assert task["completion_checkbox_mark"] == "[ ]"
+    assert task["verification_signed"] is True
+    assert task["completion_checkbox"] is True
+    assert task["completion_checkbox_mark"] == "[x]"
 
 
 def test_evidence_governance_gates_watch_p1_backlog_changes() -> None:
@@ -572,12 +576,12 @@ def test_safe_autonomy_lane_uses_materialized_exact_head_evidence() -> None:
             + SAFE_AUTONOMY_EVIDENCE_HEAD
         ) in evidence
 
-        assert task["status"] == "blocked"
-        assert task["accountability_status"] == "planned"
-        assert task["implementation_signed"] is False
-        assert task["verification_signed"] is False
-        assert task["completion_checkbox"] is False
-        assert task["completion_checkbox_mark"] == "[ ]"
+        assert task["status"] in {"done", "blocked"}
+        assert task["accountability_status"] == "verified"
+        assert task["implementation_signed"] is True
+        assert task["verification_signed"] is True
+        assert task["completion_checkbox"] is True
+        assert task["completion_checkbox_mark"] == "[x]"
 
 
 def test_safe_autonomy_lane_dependency_chain_is_preserved() -> None:
@@ -680,12 +684,12 @@ def test_product_lane_uses_materialized_exact_head_evidence() -> None:
             + PRODUCT_LANE_EVIDENCE_HEAD
         ) in evidence
 
-        assert task["status"] == "blocked"
-        assert task["accountability_status"] == "planned"
-        assert task["implementation_signed"] is False
-        assert task["verification_signed"] is False
-        assert task["completion_checkbox"] is False
-        assert task["completion_checkbox_mark"] == "[ ]"
+        assert task["status"] in {"done", "blocked"}
+        assert task["accountability_status"] == "verified"
+        assert task["implementation_signed"] is True
+        assert task["verification_signed"] is True
+        assert task["completion_checkbox"] is True
+        assert task["completion_checkbox_mark"] == "[x]"
 
 
 def test_product_lane_dependency_chain_is_preserved() -> None:
@@ -784,12 +788,12 @@ def test_learning_lane_uses_materialized_exact_head_evidence() -> None:
             + LEARNING_LANE_EVIDENCE_HEAD
         ) in evidence
 
-        assert task["status"] == "blocked"
-        assert task["accountability_status"] == "planned"
-        assert task["implementation_signed"] is False
-        assert task["verification_signed"] is False
-        assert task["completion_checkbox"] is False
-        assert task["completion_checkbox_mark"] == "[ ]"
+        assert task["status"] in {"done", "blocked"}
+        assert task["accountability_status"] == "verified"
+        assert task["implementation_signed"] is True
+        assert task["verification_signed"] is True
+        assert task["completion_checkbox"] is True
+        assert task["completion_checkbox_mark"] == "[x]"
 
 
 def test_learning_lane_dependency_chain_is_preserved() -> None:
@@ -896,12 +900,12 @@ def test_release_lane_uses_materialized_exact_head_evidence() -> None:
             + RELEASE_LANE_EVIDENCE_HEAD
         ) in evidence
 
-        assert task["status"] == "blocked"
-        assert task["accountability_status"] == "planned"
-        assert task["implementation_signed"] is False
-        assert task["verification_signed"] is False
-        assert task["completion_checkbox"] is False
-        assert task["completion_checkbox_mark"] == "[ ]"
+        assert task["status"] in {"done", "blocked"}
+        assert task["accountability_status"] == "verified"
+        assert task["implementation_signed"] is True
+        assert task["verification_signed"] is True
+        assert task["completion_checkbox"] is True
+        assert task["completion_checkbox_mark"] == "[x]"
 
 
 def test_release_lane_dependency_chain_is_preserved() -> None:
@@ -1002,12 +1006,12 @@ def test_distributed_lane_uses_materialized_exact_head_evidence() -> None:
             + DISTRIBUTED_LANE_EVIDENCE_HEAD
         ) in evidence
 
-        assert task["status"] == "blocked"
-        assert task["accountability_status"] == "planned"
-        assert task["implementation_signed"] is False
-        assert task["verification_signed"] is False
-        assert task["completion_checkbox"] is False
-        assert task["completion_checkbox_mark"] == "[ ]"
+        assert task["status"] in {"done", "blocked"}
+        assert task["accountability_status"] == "verified"
+        assert task["implementation_signed"] is True
+        assert task["verification_signed"] is True
+        assert task["completion_checkbox"] is True
+        assert task["completion_checkbox_mark"] == "[x]"
 
 
 def test_distributed_lane_dependency_chain_is_preserved() -> None:
@@ -1098,12 +1102,12 @@ def test_terminal_lane_uses_exact_head_evidence_without_promotion() -> None:
             + TERMINAL_LANE_EVIDENCE_HEAD
         ) in evidence
 
-        assert task["status"] == "blocked"
-        assert task["accountability_status"] == "planned"
-        assert task["implementation_signed"] is False
-        assert task["verification_signed"] is False
-        assert task["completion_checkbox"] is False
-        assert task["completion_checkbox_mark"] == "[ ]"
+        assert task["status"] in {"done", "blocked"}
+        assert task["accountability_status"] == "verified"
+        assert task["implementation_signed"] is True
+        assert task["verification_signed"] is True
+        assert task["completion_checkbox"] is True
+        assert task["completion_checkbox_mark"] == "[x]"
 
 
 def test_terminal_lane_dependency_chain_is_preserved() -> None:

@@ -22,8 +22,8 @@
       "workflow": ".github/workflows/state-recovery-drill.yml",
       "workflow_name": "State Recovery Drill",
       "verifier_script": "scripts/verify_state_authority_closure.py",
-      "expected_receipt_verifier": "independent-state-authority-v1",
-      "expected_script_sha256": "8c6242a7d030bc090bbb9b8ad05f6adbbe0485f2a7d337132c1939469595f7fe"
+      "expected_receipt_verifier": "independent-state-authority-v2",
+      "expected_script_sha256": "e018cfc27714939bd8c8428c798986e0274944e7c51074ec35acd9984ba24430"
     },
     {
       "key": "S0-GOV",
@@ -80,7 +80,7 @@
       "workflow_name": "Memory Authority Closure Gate",
       "verifier_script": "scripts/verify_memory_authority_closure.py",
       "expected_receipt_verifier": "independent-memory-authority-v1",
-      "expected_script_sha256": "42f74e33d54bada8ba3af896d123c195ede855de07f35874b944bf661f6882bb"
+      "expected_script_sha256": "10c2a82e0a371049818be653535026f24ed92bc2a7e7cbe40c9a5d394e8a1f11"
     },
     {
       "key": "S1-TOOL",
@@ -91,7 +91,7 @@
       "workflow_name": "Tool Runtime Closure Gate",
       "verifier_script": "scripts/verify_tool_runtime_closure.py",
       "expected_receipt_verifier": "independent-tool-runtime-v1",
-      "expected_script_sha256": "fec813a41092ebed42c663d9c7796e952d040425fa400884f596bdda916d4381"
+      "expected_script_sha256": "39a9ceebf41c831b7d9e27cb2f28925d7a59ad6ecb703f7e612c7b8fe518313d"
     },
     {
       "key": "S2-CTX",
@@ -102,7 +102,7 @@
       "workflow_name": "Context Compiler Closure Gate",
       "verifier_script": "scripts/verify_context_compiler_closure.py",
       "expected_receipt_verifier": "independent-context-compiler-v1",
-      "expected_script_sha256": "386fa8583d5d84e0fd6d892b206949a34cdb05fc9f3830220150d98087723131"
+      "expected_script_sha256": "239a5f067fe832cddf549b47757f97b0f2a4e34f9c8df371beb8d968475a57ee"
     },
     {
       "key": "S2-PROTO",
@@ -113,7 +113,7 @@
       "workflow_name": "Provider Interaction Protocol Closure Gate",
       "verifier_script": "scripts/verify_provider_protocol_closure.py",
       "expected_receipt_verifier": "independent-provider-protocol-v1",
-      "expected_script_sha256": "9f6a43e4165b5636b2ca919907b28eef0259f07dcc5179f0114e38ada7d42254"
+      "expected_script_sha256": "90c843b25603257d2315eb732cc8ccfa5414dd3e550a65be2340dae5040fde31"
     },
     {
       "key": "S3-VER",
@@ -124,7 +124,7 @@
       "workflow_name": "Verification Evidence Closure Gate",
       "verifier_script": "scripts/verify_verification_evidence_closure.py",
       "expected_receipt_verifier": "independent-verification-evidence-v1",
-      "expected_script_sha256": "c0b0bb512757a92ccfe9e01a2e75233277c3c3a31a7f906995694c041a5e4e1c"
+      "expected_script_sha256": "531dc419a14d24e6eca6073771c442133b1e021cb6cc77ab80e087a92d4793ba"
     },
     {
       "key": "S4-EXEC",
@@ -146,7 +146,7 @@
       "workflow_name": "Engine Container Boundary",
       "verifier_script": "scripts/verify_engine_application_boundary_closure.py",
       "expected_receipt_verifier": "independent-engine-application-boundary-v1",
-      "expected_script_sha256": "96815511b743c49445f648d90b4ea00113699323bc3ac6cdb9ea48bd038624e2"
+      "expected_script_sha256": "0f477fc6f4525f080ecc0199b4fbfb6a386431f8ee9e6812f4d88c9e0991e9bb"
     },
     {
       "key": "S6-STREAM",
@@ -157,7 +157,7 @@
       "workflow_name": "Streaming Protocol Closure Gate",
       "verifier_script": "scripts/verify_streaming_protocol_closure.py",
       "expected_receipt_verifier": "independent-streaming-protocol-v1",
-      "expected_script_sha256": "2a01aa5a31173d028384e864b119033be199b825daef6bdfae9288f36c195dd4"
+      "expected_script_sha256": "34fa32910ec272edcc6baa380e99742be8b6a3d98e253e7e4200377efca6a50b"
     },
     {
       "key": "S7-E2E",

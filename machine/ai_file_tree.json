@@ -477,7 +477,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "6285331ae16af1a246cece822838dc6bf8074b69",
+      "source_git_object_sha": "5b5a3aa7e4209b7fdba23ff1f3437660afdbba58",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -832,7 +832,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "56d1f3e52a4c65a5674b0c26f0f75ec05009bb7e",
+      "source_git_object_sha": "ed5f01f4f582622ad18448fdc128dee50bc92371",
       "role": "AI runtime observability, telemetry, audit, provenance-bound explainability, and executable operations runbook plane",
       "work_package_refs": [
         "WP-W00",
@@ -937,7 +937,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "44cecc1c1f9b291e053b8c3d1cf48af7f27be628",
+      "source_git_object_sha": "0b3b07eaeb8f67e02597d5e2147ceacdf7fc1d4b",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -1731,7 +1731,7 @@
       "source": "skeleton/data",
       "destination": "skeleton/ai/runtime/data",
       "kind": "tree",
-      "source_git_object_sha": "5c39deb49b2195a62896759b1185123f5365754e",
+      "source_git_object_sha": "05ef7871a6c3da51f4f4e6d10291e7f2420aa449",
       "role": "Cache, event bus, schema evolution, migrations, and lineage helpers are governed runtime data/state infrastructure.",
       "work_package_refs": [
         "WP-W03",
@@ -5693,8 +5693,14 @@
         "promotion_lifecycle.py",
         "resource_admission.py",
         "shadow_candidate_gate.py",
+        "shadow_idle_training.py",
+        "shadow_native_trainer.py",
+        "shadow_training_handoff.py",
+        "shadow_weight_intake.py",
+        "shadow_weight_ledger.py",
         "shadow_weight_pipeline.py",
         "shadow_weight_store.py",
+        "shadow_weights.py",
         "sparse_capability.py",
         "temporal_abstention.py",
         "temporal_admission.py",
@@ -6044,7 +6050,7 @@
       "source": "skeleton/supply_chain",
       "destination": "skeleton/ai/runtime/extensions/supply_chain",
       "kind": "tree",
-      "source_git_object_sha": "9e6703dc1d07b7a1b6a2ea109e527d29ac8c5000",
+      "source_git_object_sha": "3a05ca7cf8a9652b7f5abff1f4086e4111674214",
       "role": "Model BOM, provenance, dependency, and supply-chain evidence contracts supporting governed AI artifact and model release qualification.",
       "work_package_refs": [
         "WP-W20",
@@ -6083,7 +6089,7 @@
       "source": "skeleton/multimodal",
       "destination": "skeleton/ai/runtime/multimodal",
       "kind": "tree",
-      "source_git_object_sha": "749fcccb8e312baf5b50b7bb006984e806bb3e04",
+      "source_git_object_sha": "63a2962e366b9f4ea565ca6200b0edc099994db9",
       "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
       "work_package_refs": [
         "WP-W28",
@@ -7508,8 +7514,8 @@
       "policy": "Refresh exact Git object identities and aggregate mapping counts after P3T2 storage and subsequent current-main merges; this metadata repair grants no cutover, completion, promotion, implementation signoff, or independent verification authority."
     },
     "p3t2_data_candidate": {
-      "implementation_head_sha": "6ea2f5bb41bd6f0fe01e2ed35d6cc21e0a3239c5",
-      "source_tree_sha": "5c39deb49b2195a62896759b1185123f5365754e",
+      "implementation_head_sha": "31c555861eeb0d895a50a6ea6f4cd03b1d73f147",
+      "source_tree_sha": "05ef7871a6c3da51f4f4e6d10291e7f2420aa449",
       "task_id": "P3T2-DATA-01",
       "volume_refs": [
         "VOL-137",
@@ -7519,7 +7525,10 @@
         "VOL-141",
         "VOL-142"
       ],
-      "policy": "Applied after current-main global mapping reconciliation; preserves existing mapping identities while binding the hardened P3-T2 data implementation tree, adversarial validation, and exact mirror evidence without granting closure authority."
+      "policy": "Applied after current-main global mapping reconciliation; preserves existing mapping identities while binding the hardened P3-T2 data implementation tree, adversarial validation, and exact mirror evidence without granting closure authority.",
+      "previous_implementation_head_sha": "6ea2f5bb41bd6f0fe01e2ed35d6cc21e0a3239c5",
+      "previous_source_tree_sha": "5c39deb49b2195a62896759b1185123f5365754e",
+      "reconciliation_kind": "current-main source-tree identity refresh; candidate remains unsigned"
     },
     "masterplan_completion_ai_tree_reconciliation_2026_10_05": {
       "base_main_sha": "03a5ff12967a0d597784112a1208c73718098d5b",
@@ -7945,45 +7954,6 @@
         ]
       },
       "policy": "Replace stale or shorthand mature-volume implementation paths with current repository owners and bind newly exposed governed AI owners without changing runtime behavior, cutover authority, implementation maturity, completion signatures, or independent verification."
-    },
-    "p3t2_global_contract_reconciliation": {
-      "base_head_sha": "1fc8bb703f4f6829f5fe512ab0298e41909402f1",
-      "status": "implementation_candidate",
-      "refreshed_mapping_ids": [
-        "AIFT-INTELLIGENCE",
-        "AIFT-AUTOMATION",
-        "AIFT-OBSERVABILITY",
-        "AIFT-SECURITY",
-        "AIFT-REPO-MACHINE"
-      ],
-      "source_tree_shas": {
-        "AIFT-INTELLIGENCE": "b9bf6a0395e1b0886fceb05ea4729e82447c390a",
-        "AIFT-AUTOMATION": "cb61fec5409f6ebc40553bd0ca082ae352e23a18",
-        "AIFT-OBSERVABILITY": "d651dee7fed319154d8d242a2f081e500cb813cc",
-        "AIFT-SECURITY": "b20021abdf17e1390dae474248b3662c73367e0f",
-        "AIFT-REPO-MACHINE": "f0a8beb312683bed1100557c30892424aa3daa3e"
-      },
-      "promotion_authority": false,
-      "policy": "Reconcile existing canonical and staged AI owners after current-main admission/recovery/planning fixes, preserve destination-only bounded observability/security extensions as matching canonical source members, and repair bounded repository context, transitive dependency metrics, normalized path analysis and metadata retrieval in both governed paths. Preserve provider compatibility facades, all cutover constraints, and every unclosed masterplan obligation. Staged Git object identities describe source content only and grant no completion, maturity, signatures, cutover, or production promotion authority.",
-      "lint_reconciliation": "Canonical sources and their declared mirrors pass scoped Ruff after import/annotation and equivalent collection cleanup; malformed manifest types remain rejected, quota/governance/lease and cleanup error fences remain enforced. Source content identities refreshed after executable regression verification; no closure or signature authority.",
-      "requires_current_main_revalidation": true,
-      "current_main_file_identity_at_reconciliation": "5440c130337605527365cbe68cbfb43a3f628e7b"
-    },
-    "local_provider_activation_reconciliation": {
-      "base_head_sha": "1fc8bb703f4f6829f5fe512ab0298e41909402f1",
-      "status": "implementation_candidate",
-      "refreshed_mapping_ids": [
-        "AIFT-PROVIDER-RUNTIME",
-        "AIFT-ENGINE-API"
-      ],
-      "source_object_shas": {
-        "AIFT-PROVIDER-RUNTIME": "b86e31459b7d61b0e0725b7c911d976725ea5fcc",
-        "AIFT-ENGINE-API": "85b593462de761c761829d9dfaf059bb247e07a4"
-      },
-      "promotion_authority": false,
-      "policy": "Bind the existing canonical provider owner to explicit optional local artifact activation with mandatory architecture receipt, conservative governance, exact bounded local input admission, actual-usage reconciliation and cooperative cancellation. Preserve the provider facades and legacy byte mirror. Bind the existing engine API source tree to cancellation drain with the same governed mirror. These content identities grant no owner cutover, model promotion, closure or implementation/verification signatures.",
-      "requires_current_main_revalidation": true,
-      "current_main_file_identity_at_reconciliation": "5440c130337605527365cbe68cbfb43a3f628e7b"
     }
   },
   "native_ai_owners": [

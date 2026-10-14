@@ -61,6 +61,24 @@ def test_gated_workflow_runs_all_checks_without_credentials(monkeypatch) -> None
         assert kwargs["stderr"] == subprocess.PIPE
 
 
+def test_expensive_secret_scan_has_bounded_extended_timeout(monkeypatch) -> None:
+    calls: dict[str, int] = {}
+
+    def fake_run(args, **kwargs):
+        calls[Path(args[1]).name] = kwargs["timeout"]
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(security.subprocess, "run", fake_run)
+    security.run_bot_activation_security_baseline()
+
+    assert calls["check_secret_hygiene.py"] == 180
+    assert all(timeout <= 180 for timeout in calls.values())
+    assert {
+        timeout for name, timeout in calls.items()
+        if name != "check_secret_hygiene.py"
+    } == {90}
+
+
 def test_gated_workflow_fails_closed_without_leaking_checker_output(monkeypatch) -> None:
     monkeypatch.setenv("GITHUB_WORKFLOW", "Autonomous Studio Night Shift")
     monkeypatch.setenv("GITHUB_SHA", "b" * 40)

@@ -1,0 +1,66 @@
+name: Masterplan Overlay Union
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/masterplan_overlay_registry.json"
+      - "machine/*100*.json"
+      - "machine/*200*.json"
+      - "machine/*300*.json"
+      - "machine/*400*.json"
+      - "machine/*500*.json"
+      - "machine/*1000*.json"
+      - "docs/plan/MASTER_PLAN.md"
+      - "docs/plan/MASTER_INDEX.md"
+      - "scripts/check_masterplan_overlay_union.py"
+      - "tests/test_masterplan_overlay_union.py"
+      - ".github/workflows/masterplan-overlay-union.yml"
+  push:
+    branches: [main]
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/masterplan_overlay_registry.json"
+      - "machine/*100*.json"
+      - "machine/*200*.json"
+      - "machine/*300*.json"
+      - "machine/*400*.json"
+      - "machine/*500*.json"
+      - "machine/*1000*.json"
+      - "docs/plan/MASTER_PLAN.md"
+      - "docs/plan/MASTER_INDEX.md"
+      - "scripts/check_masterplan_overlay_union.py"
+      - "tests/test_masterplan_overlay_union.py"
+      - ".github/workflows/masterplan-overlay-union.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: masterplan-overlay-union-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - run: python -m pip install --disable-pip-version-check --no-input "pytest>=8,<9"
+      - run: python -m py_compile scripts/check_masterplan_overlay_union.py tests/test_masterplan_overlay_union.py
+      - run: python scripts/check_masterplan_overlay_union.py
+      - run: python -m pytest -q --noconftest tests/test_masterplan_overlay_union.py
+      - name: Exact-head identity
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"

@@ -1,0 +1,56 @@
+{
+  "schema_version": "skeleton.ai.game_studio_continuation.v1",
+  "status": "implementation_candidate",
+  "parent": "machine/ai_game_learning.json",
+  "owners": {
+    "scene_graph": "skeleton/jeeves/game_console_graph.py",
+    "review": "skeleton/jeeves/game_studio_review.py",
+    "review_application": "backend/core/game_studio_review.py",
+    "review_api": "backend/routes/game_studio_review.py",
+    "agent_application": "backend/core/game_studio_agent.py",
+    "agent_api": "backend/routes/game_studio_agent.py"
+  },
+  "authority": "Same scoped application/core workspace, existing canonical Jeeves/Dragon/runtime owners and engine/provider interface; no new service, runtime root, store, provider or credential surface",
+  "interfaces": [
+    "Scene/animation/event/rule authored graphs consumed by supported simulation/export, exact bounded typed CAS",
+    "Completed current-source compiled ROM artifact admitted for actual approved-core user/AI play and learner jobs",
+    "Actual temporal/pixel/layout/performance review findings retain source/frame/controller evidence",
+    "Campaigns use bounded curriculum/objective vectors and learned proposal selection; measured held-out and adversarial results protect champion publication",
+    "Jeeves studio goals discover/plan current scoped app operations through canonical EngineChat; typed execution receipts and existing app authority constrain every action"
+  ],
+  "failure": "Source/core/producer/teacher/code/lease/deadline/cursor/grant mismatch fails explicitly; no metadata-only play, synthetic progress or automatic production mutation",
+  "automated_tests_requested": false,
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "studio_goal": {
+    "schema": "skeleton.game.studio_goal.v1",
+    "decision_schema": "skeleton.game.studio_decision.v1",
+    "store": "Existing game_learning_revisions, scope-closed kindstudio_agent_goal journals; no additional collection",
+    "execution": "Bounded request-driven advance, canonical EngineChat text planner plus strict typed existing application command owners; no direct model/provider transport",
+    "source_authority": "Current project/tree every step; all previous source/teacher dependencies reauthorized before model/context reuse; own committed edits recover only by exact issued editor receipt and committed source identity",
+    "bounds": {
+      "steps": 16,
+      "model_calls": 8,
+      "jobs": 4,
+      "grant_seconds": 3600,
+      "goal_journal_bytes": 8388608,
+      "planner_prompt_bytes": 262144,
+      "decision_bytes": 131072,
+      "advance_requests": 128,
+      "control_requests": 64,
+      "lease_seconds": 90,
+      "goals_per_project": 64
+    },
+    "idempotency": "Frozen canonical model prompt/key and exact typed action/key persisted before dispatch; completed advance/control keys retained without eviction; retry of own edits checks exact application revision receipt",
+    "stop": "Pause/cancel owner-only including withdrawn-source projects, at already-issued operation boundary; expiry checked before model and before next action",
+    "models_unavailable": "Explicit studio_planner_unavailable; never fabricate plans, execution receipts or provider lineage",
+    "jobs": "Queue receipts are not completed work; exact issued job identity retained before result compaction; only actual terminal status permits subsequent action; agent-created campaigns disable auto_continue",
+    "compiled_execution": "Host discovers exact completed artifactIDs/digests before compaction, routes artifact.inspect/admit/train/play to existing approved owners. Agent AIplay forces admittedpolicy+controllerai, <=256frames, counts againstjobbudget, and joins actualplayterminal status beforeplanninganother action.",
+    "history_policy_authority": "Bounded exactsnapshot parent/generation/review policy pins rechecked through existing64ancestor admission; historicalmode bypasses only current tree equality, never sources/teachers/core/producer/sourcecontent/code",
+    "discovery": "Exact Pydantic model schemas+realtypededitoropfields+graphrecordexamples;128KiBdecisions; sourceinspector1500Unicodecharacters, record/section/array paging1..32. Promptfeedbackretains realartifact/policy/session/metric identities with digests oflargeoutputs.",
+    "bounded_waiting": "GETpolls consume no executionrequestbudget. Explicit advances<=128pergoal, issued noactionwaitreturns recordedreceipt; interrupted jobs/play block withactualrecoverable receipt. Alreadyissuedjobs/play retain their owncontrols."
+  },
+  "related_contracts": [
+    "machine/ai_game_studio_review.json"
+  ]
+}

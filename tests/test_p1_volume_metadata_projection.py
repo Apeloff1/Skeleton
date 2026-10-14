@@ -168,7 +168,7 @@ def test_projection_eliminates_primary_volume_metadata_blockers() -> None:
     report = module.reconcile_repository(ROOT)
 
     assert report["volume_count"] == 107
-    assert report["target_floor_eligible_count"] == 3
+    assert report["target_floor_eligible_count"] == 20
 
     forbidden = (
         "must contain materialized references",
@@ -196,7 +196,28 @@ def test_projection_does_not_self_promote_primary_volumes() -> None:
         for row in report["records"]
         if row["target_floor_eligible"] is True
     }
-    assert eligible == {"VOL-013", "VOL-014", "VOL-253"}
+    assert eligible == {
+        "VOL-000",
+        "VOL-013",
+        "VOL-014",
+        "VOL-015",
+        "VOL-016",
+        "VOL-017",
+        "VOL-034",
+        "VOL-035",
+        "VOL-036",
+        "VOL-037",
+        "VOL-038",
+        "VOL-056",
+        "VOL-057",
+        "VOL-059",
+        "VOL-078",
+        "VOL-079",
+        "VOL-080",
+        "VOL-248",
+        "VOL-253",
+        "VOL-420",
+    }
 
     for row in report["records"]:
         if row["volume_key"] in eligible:

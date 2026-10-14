@@ -101,12 +101,14 @@ def test_ac20_binding_matches_live_adversarial_obligation() -> None:
 def test_governed_frontier_is_497_resolved_16_adversarial() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["binding_count"] == 513
-    assert report["resolved_count"] == 513
+    expected_total = _load(ROOT / POLICY)["inventory_expectations"]["total_obligation_count"]
+    assert report["inventory"]["total_obligation_count"] == expected_total
+    assert report["binding_count"] == expected_total
+    assert report["resolved_count"] == expected_total
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
     assert report["disposition_counts"] == {
-        "evidence": 513,
+        "evidence": expected_total,
 
     }
 

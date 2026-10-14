@@ -1,0 +1,17 @@
+{
+  "schema_version": "skeleton.ai.game_demonstrations.v1",
+  "status": "implementation_candidate",
+  "canonical_owner": "skeleton/jeeves/game_learning_demonstrations.py",
+  "mirror": "skeleton/ai/agents/jeeves/game_learning_demonstrations.py",
+  "parent_contract": "machine/ai_game_policy_learning.json",
+  "authority": "Existing authenticated application admits exact human/session/input/consent lineage; module creates no rights receipt or credential boundary",
+  "trace": "Canonical skeleton.game.trace.v1 complete action/observation/component-reward chain. Human authored collection can begin from a supplied exact environment snapshot; the validator restores/replays actual actions and verifies every observation/reward/terminal/native transition identity.",
+  "learning": "Actual sparse state/action demonstration counts form a behavioral imitation prior used in control selection, then real offline Q updates use measured environment components. Human preference feedback is a separate authored action-preference prior, not invented environment reward or success.",
+  "snapshot": "Policy schema skeleton.jeeves.game_learning_policy.v2 adds full bounded imitation counts/strength and source receipt digests in the SAME snapshot, surviving resume/fork separately from Q update/visit counters. Existing runtime code identity fences remain strict; old runtime snapshots require an explicit separately declared migration.",
+  "failure": "Foreign environment/session/input, malformed or discontinuous trace, rehashed forged observations/rewards, unsupported non-policy controller actions, absent terminal collection reason and exceeded replay/state/count/byte bounds fail explicitly before an episode commit.",
+  "bounds": {"demonstrations": 256, "steps_per_demonstration": 4096, "imitation_states": 16384, "imitation_observations": 1048576, "trace_bytes": 8388608, "feedback_weight": 16},
+  "limits": "Imitation learns authored action preferences; it does not prove task optimality or general game mastery. Consent/source rights are rechecked by application authority at commit, and imported issuer labels grant no trusted provenance.",
+  "automated_tests_authorized": false,
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false
+}

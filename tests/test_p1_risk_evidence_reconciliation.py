@@ -91,21 +91,33 @@ def _evidence_record(obligation, *, owner: str = "owner:test") -> dict:
 def test_live_p1_risk_inventory_is_deterministic_and_non_authoritative() -> None:
     report = reconcile_repository(ROOT, evaluated_at=NOW)
 
-    assert report["inventory"] == {
-        "p1_primary_volume_count": 107,
-        "volume_risk_count": 281,
-        "volume_gap_count": 208,
-        "applicable_adversarial_axis_count": 24,
-        "total_obligation_count": 513,
-    }
-    assert report["binding_count"] == 513
-    assert report["resolved_count"] == 513
+    # The historical gap inventory is pinned by a separate governed policy.
+    # Closed canonical gaps reduce the live set without erasing retired
+    # evidence. Assert accounting identities instead of obsolete snapshots.
+    policy = _load(ROOT, POLICY)["inventory_expectations"]
+    assert report["inventory"] == policy
+    assert report["live_inventory"]["p1_primary_volume_count"] == 107
+    assert report["live_inventory"]["volume_risk_count"] == policy["volume_risk_count"]
+    assert report["live_inventory"]["applicable_adversarial_axis_count"] == policy["applicable_adversarial_axis_count"]
+    assert report["live_inventory"]["total_obligation_count"] == len(report["records"])
+    assert report["historical_binding_count"] == report["binding_count"]
+    assert report["binding_count"] == policy["total_obligation_count"]
+    assert report["live_binding_count"] == report["live_inventory"]["total_obligation_count"]
+    assert report["retired_expected_count"] == (
+        policy["total_obligation_count"] - report["live_inventory"]["total_obligation_count"]
+    )
+    assert report["retired_binding_count"] == report["retired_expected_count"]
+    assert len(report["retired_obligation_ids"]) == report["retired_expected_count"]
+    assert all(
+        item.startswith("P1-GAP-VOL-")
+        for item in report["retired_obligation_ids"]
+    )
+    assert report["resolved_count"] == report["binding_count"]
+    assert report["live_resolved_count"] == report["live_binding_count"]
+    assert report["historical_resolved_count"] == report["historical_binding_count"]
     assert report["unresolved_blocking_count"] == 0
     assert report["unclassified_count"] == 0
-    assert report["disposition_counts"] == {
-        "evidence": 513,
-
-    }
+    assert report["disposition_counts"] == {"evidence": report["binding_count"]}
     assert report["non_authoritative"] is True
     assert report["source_mutation_detected"] is False
     assert len(report["report_digest"]) == 64
@@ -167,7 +179,7 @@ def test_inventory_drift_fails_closed(
 
     with pytest.raises(
         RiskReconciliationError,
-        match="risk obligation inventory drift",
+        match="risk obligation inventory drift|historical retired-gap inventory",
     ):
         reconcile_repository(root, evaluated_at=NOW)
 
@@ -232,8 +244,18 @@ def test_one_real_binding_changes_only_its_own_resolution(tmp_path: Path) -> Non
 
     assert report["binding_count"] == 1
     assert report["resolved_count"] == 1
-    assert report["unresolved_blocking_count"] == 512
-    assert report["unclassified_count"] == 280
+    # Every unresolved blocking and unclassified row must be accounted for,
+    # even as independently closed gaps alter the absolute obligation count.
+    assert report["unresolved_blocking_count"] == sum(
+        row["evaluation"]["blocking"] and not row["evaluation"]["resolved"]
+        for row in report["records"]
+    )
+    assert report["unclassified_count"] == sum(
+        row["evaluation"]["severity"] == "unclassified"
+        for row in report["records"]
+    )
+    assert report["unresolved_blocking_count"] > 0
+    assert report["unclassified_count"] > 0
 
 
 def test_stale_binding_review_remains_unresolved(tmp_path: Path) -> None:

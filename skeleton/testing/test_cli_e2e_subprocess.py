@@ -80,7 +80,6 @@ class ModuleStdoutContractTests(unittest.TestCase):
         self.assertTrue(docs)
         self.assertTrue(all(d == docs[0] for d in docs))
 
-    @unittest.expectedFailure
     def test_json_flag_emits_single_document(self):
         # BUG: commands print their own JSON, then skeleton/__main__.py prints the
         # returned mapping again, so `--json` stdout is two concatenated documents
@@ -90,7 +89,6 @@ class ModuleStdoutContractTests(unittest.TestCase):
         proc = run_module(["doctor", "--gates", "--json"])
         json.loads(proc.stdout)
 
-    @unittest.expectedFailure
     def test_help_does_not_print_status_mapping(self):
         # BUG: `python -m skeleton dev --help` prints {"status": "help_shown"}
         # after the help text (skeleton.developer.cli.main suppresses it; the

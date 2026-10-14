@@ -7,5 +7,8 @@ def test_current_t2_authority_is_valid():
     assert r["scheduled_volume_count"]==32
     assert r["queued_volume_count"]==165
     assert r["task_count"]==6
-    assert r["in_progress_count"]==1
-    assert r["landed_unpromoted_count"]==5
+    # The authoritative P3-T2 backlog now marks all six tasks closed.
+    assert r["in_progress_count"] == 0
+    assert r["landed_unpromoted_count"] == 0
+    assert r["ready_count"] == 0
+    assert r["blocked_count"] == 0

@@ -165,3 +165,50 @@ def test_independent_tool_runtime_verifier_rejects_ai_mirror_drift(
         in error
         for error in receipt["errors"]
     )
+
+
+def test_independent_tool_runtime_verifier_rejects_saga_boundary_loss(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    saga = root / "skeleton" / "skills" / "tool_saga.py"
+    saga.write_text(
+        saga.read_text(encoding="utf-8").replace(
+            "# ToolSagaInDoubt\n",
+            "",
+        ),
+        encoding="utf-8",
+    )
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "skeleton/skills/tool_saga.py lost tool-runtime token: ToolSagaInDoubt"
+        in error
+        for error in receipt["errors"]
+    )
+
+
+def test_independent_tool_runtime_verifier_rejects_saga_mirror_drift(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    mirror = (
+        root
+        / "skeleton"
+        / "ai"
+        / "runtime"
+        / "skills"
+        / "tool_saga.py"
+    )
+    mirror.write_text("# saga drift\n", encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "canonical AI mirror drift: skeleton/skills/tool_saga.py"
+        in error
+        for error in receipt["errors"]
+    )

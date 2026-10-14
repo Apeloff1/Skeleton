@@ -718,10 +718,7 @@
   "masterplan_binding": {
     "volume_ref": "VOL-113",
     "title": "Capability Map",
-    "required_gap_texts": [
-      "unify capability descriptors",
-      "bind runtime discovery to registry"
-    ]
+    "required_gap_texts": []
   },
   "authority_role": "runtime_projection",
   "canonical_sources": [

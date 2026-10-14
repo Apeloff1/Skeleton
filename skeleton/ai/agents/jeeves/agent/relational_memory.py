@@ -10,10 +10,11 @@ never upgrade an interpretation into evidence.
 
 from __future__ import annotations
 
+import heapq
 import math
 import threading
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Callable, Mapping, Sequence
@@ -320,28 +321,74 @@ class RelationStore:
     def __init__(self, *, max_relations: int = 200_000) -> None:
         self.max_relations = positive_int("max_relations", max_relations, maximum=10_000_000)
         self._relations: dict[str, RelationTrace] = {}
+        self._namespace_to_relations: dict[str, set[str]] = defaultdict(set)
+        self._relations_by_card: dict[tuple[str, str], set[str]] = defaultdict(set)
         self._lock = threading.RLock()
+
+    def _index(self, trace: RelationTrace) -> None:
+        self._namespace_to_relations[trace.namespace.key].add(trace.relation_id)
+        for card_id in trace.card_ids:
+            self._relations_by_card[(trace.namespace.key, card_id)].add(
+                trace.relation_id
+            )
+
+    def _deindex(self, trace: RelationTrace) -> None:
+        namespace_bucket = self._namespace_to_relations.get(trace.namespace.key)
+        if namespace_bucket is not None:
+            namespace_bucket.discard(trace.relation_id)
+            if not namespace_bucket:
+                self._namespace_to_relations.pop(trace.namespace.key, None)
+        for card_id in trace.card_ids:
+            key = (trace.namespace.key, card_id)
+            bucket = self._relations_by_card.get(key)
+            if bucket is None:
+                continue
+            bucket.discard(trace.relation_id)
+            if not bucket:
+                self._relations_by_card.pop(key, None)
 
     def put(self, trace: RelationTrace) -> RelationTrace:
         if not isinstance(trace, RelationTrace):
             raise TypeError("trace must be RelationTrace")
         with self._lock:
-            if trace.relation_id not in self._relations and len(self._relations) >= self.max_relations:
+            existing = self._relations.get(trace.relation_id)
+            if existing is None and len(self._relations) >= self.max_relations:
                 self._evict_one()
+            elif existing is not None:
+                self._deindex(existing)
             self._relations[trace.relation_id] = trace
+            self._index(trace)
             return trace
 
     def get(self, relation_id: str) -> RelationTrace | None:
         with self._lock:
             return self._relations.get(require_id("relation_id", relation_id))
 
-    def list_namespace(self, namespace: MemoryNamespace, *, include_parent: bool = True) -> tuple[RelationTrace, ...]:
+    def list_namespace(
+        self,
+        namespace: MemoryNamespace,
+        *,
+        include_parent: bool = True,
+    ) -> tuple[RelationTrace, ...]:
         keys = {namespace.key}
         if include_parent and namespace.session_id is not None:
             keys.add(namespace.parent().key)
         with self._lock:
-            rows = [trace for trace in self._relations.values() if trace.namespace.key in keys]
-        return tuple(sorted(rows, key=lambda item: (item.updated_at, item.relation_id), reverse=True))
+            relation_ids: set[str] = set()
+            for key in keys:
+                relation_ids.update(self._namespace_to_relations.get(key, ()))
+            rows = [
+                self._relations[relation_id]
+                for relation_id in relation_ids
+                if relation_id in self._relations
+            ]
+        return tuple(
+            sorted(
+                rows,
+                key=lambda item: (item.updated_at, item.relation_id),
+                reverse=True,
+            )
+        )
 
     def touching(
         self,
@@ -353,10 +400,27 @@ class RelationStore:
         seeds = {require_id("card_id", item) for item in card_ids}
         if not seeds:
             return ()
+        keys = {namespace.key}
+        if include_parent and namespace.session_id is not None:
+            keys.add(namespace.parent().key)
+        with self._lock:
+            relation_ids: set[str] = set()
+            for key in keys:
+                for card_id in seeds:
+                    relation_ids.update(
+                        self._relations_by_card.get((key, card_id), ())
+                    )
+            rows = [
+                self._relations[relation_id]
+                for relation_id in relation_ids
+                if relation_id in self._relations
+            ]
         return tuple(
-            trace
-            for trace in self.list_namespace(namespace, include_parent=include_parent)
-            if seeds.intersection(trace.card_ids)
+            sorted(
+                rows,
+                key=lambda item: (item.updated_at, item.relation_id),
+                reverse=True,
+            )
         )
 
     def count(self) -> int:
@@ -379,6 +443,7 @@ class RelationStore:
             ),
         )
         self._relations.pop(victim.relation_id, None)
+        self._deindex(victim)
 
 
 class RelationalMemoryIndex:
@@ -402,26 +467,46 @@ class RelationalMemoryIndex:
 
     @staticmethod
     def _tokens(text: str) -> Counter[str]:
-        token = ""
+        token_chars: list[str] = []
         result: Counter[str] = Counter()
         for char in (text or "").casefold():
             if char.isalnum() or char in _TOKEN_CHARS:
-                token += char
-            elif token:
-                result[token] += 1
-                token = ""
-        if token:
-            result[token] += 1
+                token_chars.append(char)
+            elif token_chars:
+                result["".join(token_chars)] += 1
+                token_chars.clear()
+        if token_chars:
+            result["".join(token_chars)] += 1
         return result
 
     @staticmethod
-    def _cosine(left: Counter[str], right: Counter[str]) -> float:
-        if not left or not right:
+    def _counter_norm(tokens: Counter[str]) -> float:
+        return (
+            math.sqrt(sum(value * value for value in tokens.values()))
+            if tokens
+            else 0.0
+        )
+
+    @staticmethod
+    def _cosine_precomputed(
+        left: Counter[str],
+        left_norm: float,
+        right: Counter[str],
+        right_norm: float,
+    ) -> float:
+        if not left or not right or not left_norm or not right_norm:
             return 0.0
         dot = sum(count * right.get(token, 0) for token, count in left.items())
-        ln = math.sqrt(sum(value * value for value in left.values()))
-        rn = math.sqrt(sum(value * value for value in right.values()))
-        return 0.0 if not ln or not rn else max(0.0, min(1.0, dot / (ln * rn)))
+        return max(0.0, min(1.0, dot / (left_norm * right_norm)))
+
+    @classmethod
+    def _cosine(cls, left: Counter[str], right: Counter[str]) -> float:
+        return cls._cosine_precomputed(
+            left,
+            cls._counter_norm(left),
+            right,
+            cls._counter_norm(right),
+        )
 
     def _card(self, card_id: str) -> InteractionCard:
         card = self.cards.store.get(card_id)
@@ -531,7 +616,11 @@ class RelationalMemoryIndex:
         limit = positive_int("prediction limit", limit, maximum=1000)
         outgoing = [
             trace
-            for trace in self.store.list_namespace(namespace, include_parent=include_parent)
+            for trace in self.store.touching(
+                namespace,
+                (source,),
+                include_parent=include_parent,
+            )
             if trace.kind is RelationKind.SUCCESSION and trace.card_ids[0] == source
         ]
         if not outgoing:
@@ -556,8 +645,17 @@ class RelationalMemoryIndex:
             )
             for trace, p in probs
         ]
-        result.sort(key=lambda item: (-item.probability, -item.support_count, item.target_card_id))
-        return tuple(result[:limit])
+        return tuple(
+            heapq.nsmallest(
+                limit,
+                result,
+                key=lambda item: (
+                    -item.probability,
+                    -item.support_count,
+                    item.target_card_id,
+                ),
+            )
+        )
 
     def transition_probability(
         self,
@@ -918,7 +1016,12 @@ class RelationalMemoryIndex:
         seeds = tuple(hit.card.card_id for hit in seed_hits[: self.policy.maximum_seed_cards])
         seed_set = set(seeds)
         query_tokens = self._tokens(query)
-        requested_tags = {str(tag).strip().casefold() for tag in context_tags if str(tag).strip()}
+        query_norm = self._counter_norm(query_tokens)
+        requested_tags = {
+            str(tag).strip().casefold()
+            for tag in context_tags
+            if str(tag).strip()
+        }
         kind_set = None if relation_kinds is None else {
             kind if isinstance(kind, RelationKind) else RelationKind(str(kind)) for kind in relation_kinds
         }
@@ -937,14 +1040,20 @@ class RelationalMemoryIndex:
                 continue
             cue_match = len(seed_set.intersection(trace.card_ids)) / len(trace.card_ids)
             content, evidence = self._relation_text(trace)
-            lexical = self._cosine(query_tokens, self._tokens(content))
+            content_tokens = self._tokens(content)
+            lexical = self._cosine_precomputed(
+                query_tokens,
+                query_norm,
+                content_tokens,
+                self._counter_norm(content_tokens),
+            )
             support = min(1.0, math.log1p(trace.support_weight) / math.log(17.0))
             transition = 0.0
             if trace.kind is RelationKind.SUCCESSION and trace.card_ids[0] in transition_cache:
                 transition = transition_cache[trace.card_ids[0]].get(trace.card_ids[1], 0.0)
-            trace_tags = set(trace.context_tags)
             context_match = (
-                len(requested_tags & trace_tags) / len(requested_tags)
+                len(requested_tags.intersection(trace.context_tags))
+                / len(requested_tags)
                 if requested_tags
                 else 0.5
             )
@@ -986,17 +1095,19 @@ class RelationalMemoryIndex:
                     evidence_ids=evidence,
                 )
             )
-        rows.sort(
-            key=lambda hit: (
-                hit.score,
-                hit.transition_probability,
-                hit.support,
-                hit.trace.updated_at,
-                hit.trace.relation_id,
-            ),
-            reverse=True,
+        return tuple(
+            heapq.nlargest(
+                maximum,
+                rows,
+                key=lambda hit: (
+                    hit.score,
+                    hit.transition_probability,
+                    hit.support,
+                    hit.trace.updated_at,
+                    hit.trace.relation_id,
+                ),
+            )
         )
-        return tuple(rows[:maximum])
 
     def register_semantic_pair(
         self,

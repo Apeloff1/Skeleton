@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:skeleton:flgb-04:sandbox_execution:v1",
+  "title": "FLGB-04 sandbox execution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operation_id",
+    "tool_name",
+    "tool_version",
+    "input_digest",
+    "requested_capabilities",
+    "authority_digest",
+    "sandbox_policy_digest"
+  ],
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "tool_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "tool_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "requested_capabilities": {
+      "type": "array",
+      "maxItems": 1024,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "authority_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sandbox_policy_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

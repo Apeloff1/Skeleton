@@ -1,0 +1,1895 @@
+{
+  "schema_version": 1,
+  "authority": "candidate_classification_only",
+  "record_count": 170,
+  "independent_evidence_candidate_count": 26,
+  "implementation_only_blocked_count": 144,
+  "records": [
+    {
+      "record_id": "ACC-AIQ-S0-COST-01",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-AIQ-S0-GOV-01",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-AIQ-S0-GOV-02",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-AIQ-S0-GOV-03",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-AIQ-S0-STATE-01",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-AIQ-S0-STATE-02",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "669b1398d00c9d37ae95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-01",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-02",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-03",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-04",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-05",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-P1-EVID-06",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "08874cbc93a8014d53a95ee2022181579098bd265"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-000",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-001",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "49b7f43cf818f1b472c1b12ce11ccf0b238b2acc"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-003",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "24fed75d93cc80cbc478c9c3704c29217ad42df0"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-006",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-008",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-009",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-010",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-011",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-012",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-013",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-014",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "58b5868e083646e0dbbc6326d0dca3f3e4e9e7b6"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-015",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-016",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-017",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "23a97e9d9e73ff08d8885bfa791ac353bedd628a",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-018",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-019",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-020",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "ef8ed4bb1b77a339ee300cc0d5877032b3bb43ce"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-021",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "d189a6cc169efae2382a334cefa0187084a1cb5e"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-022",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-023",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-024",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-025",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-026",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-028",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-029",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-030",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-031",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-032",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "704b8f519cc7525441bb31c612b2d790bcde3eb4"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-034",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-035",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-036",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-037",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-038",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-039",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "501852240108902baf293d9ad163b851ec4c37e3"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-040",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-041",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-042",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-043",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-044",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-045",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-046",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-047",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-048",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-049",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-050",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-054",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "9fa6af86306644656afaf5ecfe0acab75b85bad1"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-056",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-057",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-059",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "49f6454cd20dd3b24a60b1a41fb809bf854a62e8",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-060",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-061",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-062",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-063",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-064",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-065",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-066",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-067",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-068",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-069",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-070",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-071",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-072",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-075",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-076",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-077",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-078",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-079",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-080",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-082",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-083",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-084",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-093",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-097",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "de822397823ddcb0f9c6b7711647de61cf6b70b1"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-098",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "de822397823ddcb0f9c6b7711647de61cf6b70b1"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-099",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-100",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "515092c37d13bc67b1480ede1c8abde94cc6face"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-101",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "515092c37d13bc67b1480ede1c8abde94cc6face"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-102",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "515092c37d13bc67b1480ede1c8abde94cc6face"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-103",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "515092c37d13bc67b1480ede1c8abde94cc6face"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-104",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "9699a6109af52fc35e71ba5c0504dede7f6f2d5e"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-105",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-106",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-107",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-108",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-109",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-111",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-143",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-144",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-145",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-146",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-147",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-148",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-149",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-150",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-151",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-152",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-153",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-154",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-155",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-156",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-157",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-158",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-161",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-162",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-164",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-165",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-168",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-170",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-171",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-179",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "6f2cc7d07feba38ec2be19e9a8082981306f98e8"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-196",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "704b8f519cc7525441bb31c612b2d790bcde3eb4"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-200",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "fc3b6d17c7a7509f9c2ec658564fbc0016e7a0b1"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-201",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-202",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-205",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-207",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-208",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-248",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "d06925c181862f46cd6c87bdfa5401efe8f2e472"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-251",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-252",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-253",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": false,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "8d74b7d3979421780d50b23fb5c10a06204a1219"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-254",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-255",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-256",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-257",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-258",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-259",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-318",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-320",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-321",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-322",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-323",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-324",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-325",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-361",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-362",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-363",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-369",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-370",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-381",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-382",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-385",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-386",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-390",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-391",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-392",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-397",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-398",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-399",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-403",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-404",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-405",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-406",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-409",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-414",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-415",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-419",
+      "state": "implementation_only_blocked",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": false,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    },
+    {
+      "record_id": "ACC-VOL-420",
+      "state": "independent_evidence_review_candidate",
+      "implementation_evidence_recovered": true,
+      "independent_evidence_anchor_recovered": true,
+      "verification_signature_authorized": false,
+      "completion_authorized": false,
+      "sources": [
+        "1f37192640454a439cde23c211788f185a379b81",
+        "c0d24a59a5a4a8fff95dceeeb4a59522bcb75ee2"
+      ]
+    }
+  ]
+}

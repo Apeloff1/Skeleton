@@ -18,13 +18,15 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../src/utils/apiClient';
+import { validBuildId } from '../src/product/journeyCatalog';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
 export default function ZipExport() {
   const router = useRouter();
   const params = useLocalSearchParams<{ build?: string; game?: string }>();
-  const buildId = String(params?.build || params?.game || 'demo_build');
+  const rawId = params?.build ?? params?.game;
+  const buildId = validBuildId(Array.isArray(rawId) ? rawId[0] : rawId);
 
   const [arts, setArts] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -32,35 +34,61 @@ export default function ZipExport() {
   const [status, setStatus] = React.useState<string>('');
 
   const load = React.useCallback(async () => {
-    const r = await api.get<any>(`/api/binary/artifacts/${encodeURIComponent(buildId)}`, { timeoutMs: 12000 });
-    if (r.ok && r.data?.artifacts) setArts(r.data.artifacts.filter((a: any) => a.kind === 'zip'));
-    setLoading(false);
+    if (!buildId) { setArts([]); setLoading(false); return; }
+    setLoading(true);
+    try {
+      const r = await api.get<any>(`/api/binary/artifacts/${encodeURIComponent(buildId)}`, { timeoutMs: 12000 });
+      if (r.ok && Array.isArray(r.data?.artifacts)) {
+        setArts(r.data.artifacts.filter((a: any) => a?.kind === 'zip'));
+      } else { setStatus('Could not load package details. Refresh or retry when the service is available.'); }
+    } catch { setStatus('Cannot reach the package service. Retry when connected.'); }
+    finally { setLoading(false); }
   }, [buildId]);
 
   React.useEffect(() => { load(); }, [load]);
 
   const packageZip = React.useCallback(async () => {
-    if (packing) return;
-    setPacking(true); setStatus('📦 Packaging gamefiles into a ZIP…');
-    const r = await api.post<any>('/api/binary/package', { build_id: buildId, kinds: ['zip'] }, { timeoutMs: 90000 });
-    if (r.ok && r.data && !r.data.error) {
-      setStatus('✅ ZIP ready — tap Download below.');
-      await load();
-    } else {
-      setStatus(`❌ ${r.data?.error || r.data?.detail || 'Packaging failed — build not found?'}`);
-    }
-    setPacking(false);
+    if (packing || !buildId) return;
+    setPacking(true); setStatus('Packaging gamefiles into a ZIP…');
+    try {
+      const r = await api.post<any>('/api/binary/package', { build_id: buildId, kinds: ['zip'] }, { timeoutMs: 90000 });
+      if (r.ok && r.data && !r.data.error) {
+        setStatus('Packaging request accepted. Checking for a downloadable ZIP…');
+        await load();
+      } else {
+        setStatus('Packaging did not succeed. Check the build and retry.');
+      }
+    } catch { setStatus('Packaging service is unavailable. Your build has not been replaced.'); }
+    finally { setPacking(false); }
   }, [buildId, packing, load]);
 
   const downloadPackaged = React.useCallback(() => {
-    Linking.openURL(`${BACKEND}/api/binary/download/${encodeURIComponent(buildId)}/zip`);
+    if (!buildId) return;
+    void Linking.openURL(`${BACKEND}/api/binary/download/${encodeURIComponent(buildId)}/zip`)
+      .catch(() => setStatus('Could not open the ZIP download. Try again.'));
   }, [buildId]);
 
   const downloadRaw = React.useCallback(() => {
-    Linking.openURL(`${BACKEND}/api/galaxy-studio/vault-gdd/${encodeURIComponent(buildId)}/gamefiles.zip`);
+    if (!buildId) return;
+    void Linking.openURL(`${BACKEND}/api/galaxy-studio/vault-gdd/${encodeURIComponent(buildId)}/gamefiles.zip`)
+      .catch(() => setStatus('Could not open raw gamefiles. Check that a vault exists.'));
   }, [buildId]);
 
   const hasZip = arts.length > 0;
+
+  if (!buildId) {
+    return (
+      <SafeAreaView style={s.root} testID="zip-missing-build">
+        <View style={{ padding: 24, gap: 12 }}>
+          <Text style={s.title}>Choose a build to export</Text>
+          <Text style={s.cardSub}>No valid build was supplied. Packaging never runs against a demo or guessed project.</Text>
+          <TouchableOpacity testID="zip-pick-build" accessibilityRole="button" onPress={() => router.replace('/my-builds' as never)} style={s.primary}>
+            <Text style={s.primaryTxt}>Open My Builds</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={s.root}>

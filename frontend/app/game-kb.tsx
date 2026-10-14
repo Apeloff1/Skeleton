@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
+import { watchBuildJob } from '../src/product/buildJobLifecycle';
+import { validBuildId } from '../src/product/journeyCatalog';
+import { confirmedApprovalCount, parseEditableKnowledge } from '../src/product/knowledgeExperience';
 
 const FORGEABLE: Record<string, string> = {
   spec: 'spec', world: 'world', narrative: 'narrative', mechanics: 'mechanics',
@@ -24,9 +27,13 @@ const APPROVABLE = new Set(['spec', 'world', 'narrative', 'mechanics', 'procedur
 export default function GameKB() {
   const router = useRouter();
   const params = useLocalSearchParams<{ game?: string }>();
-  const gameId = params?.game ? String(params.game) : '';
+  const gameId = validBuildId(params?.game);
 
   const [kb, setKb] = React.useState<any>(null);
+  const [loadState, setLoadState] = React.useState<'loading' | 'ready' | 'error'>('loading');
+  const [loadError, setLoadError] = React.useState('');
+  const [jobStatus, setJobStatus] = React.useState('');
+  const jobController = React.useRef<AbortController | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
   const [open, setOpen] = React.useState<Record<string, boolean>>({});
   const [forging, setForging] = React.useState<string | null>(null);
@@ -39,6 +46,7 @@ export default function GameKB() {
   // Iterate & Refine loop
   const [approvals, setApprovals] = React.useState<Record<string, any>>({});
   const [approveBusy, setApproveBusy] = React.useState<string | null>(null);
+  const [approveStatus, setApproveStatus] = React.useState('');
   const [refineStage, setRefineStage] = React.useState<string | null>(null);
   const [refineDraft, setRefineDraft] = React.useState('');
   const [refineBusy, setRefineBusy] = React.useState<string | null>(null);
@@ -46,101 +54,168 @@ export default function GameKB() {
 
   const load = React.useCallback(async () => {
     if (!gameId) return;
-    const r = await api.get<any>(`/api/pipeline/${gameId}/kb`, { timeoutMs: 12000 });
-    if (r.ok && r.data && !r.data.error) { setKb(r.data); setApprovals(r.data.approvals || {}); }
+    setLoadError('');
+    try {
+      const result = await api.get<any>(`/api/pipeline/${encodeURIComponent(gameId)}/kb`,
+        { timeoutMs: 12_000, retries: 0 });
+      if (!result.ok || !result.data || result.data.error) {
+        setLoadError('Could not read this knowledge base. Check your connection and retry.');
+        setLoadState('error');
+        return;
+      }
+      setKb(result.data);
+      setApprovals(result.data.approvals || {});
+      setLoadState('ready');
+    } catch {
+      setLoadError('The knowledge service is unavailable. Retry to read saved artifacts.');
+      setLoadState('error');
+    }
   }, [gameId]);
 
+  React.useEffect(() => {
+    setKb(null);
+    setLoadState('loading');
+    setOpen({});
+    void load();
+    return () => {
+      // Client monitoring is cancellable. Backend execution is not cancelled.
+      jobController.current?.abort();
+      jobController.current = null;
+    };
+  }, [load]);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try { await load(); }
+    finally { setRefreshing(false); }
+  }, [load]);
+
+  const runJob = React.useCallback(async (
+    endpoint: string, setFeedback: React.Dispatch<React.SetStateAction<string>>,
+    payload: Record<string, unknown> = {},
+  ): Promise<boolean> => {
+    if (jobController.current || !gameId) return false;
+    const controller = new AbortController();
+    jobController.current = controller;
+    setFeedback('Submitting to the build service…');
+    try {
+      const result = await api.post<any>(endpoint, payload, { timeoutMs: 15_000, signal: controller.signal, retries: 0 });
+      const jobId = result.data?.job_id;
+      if (!result.ok || typeof jobId !== 'string' || !jobId) {
+        setFeedback('Could not start this operation. Your existing knowledge was not confirmed changed.');
+        return false;
+      }
+      const outcome = await watchBuildJob(
+        () => api.get<any>(`/api/playable/job/${encodeURIComponent(jobId)}`,
+          { timeoutMs: 12_000, retries: 0, signal: controller.signal }),
+        {
+          signal: controller.signal,
+          intervalMs: 3_000,
+          maxChecks: 120,
+          onPending: () => setFeedback('Job is queued or running. Waiting for confirmed completion…'),
+        },
+      );
+      if (controller.signal.aborted) return false;
+      setFeedback(outcome.message);
+      if (outcome.phase !== 'completed') return false;
+      await load();
+      return true;
+    } catch {
+      if (!controller.signal.aborted) setFeedback('Status is unavailable. Refresh before retrying to avoid duplicate work.');
+      return false;
+    } finally {
+      if (jobController.current === controller) jobController.current = null;
+    }
+  }, [gameId, load]);
+
   const toggleApprove = React.useCallback(async (stage: string) => {
-    if (!gameId || approveBusy) return;
+    if (!gameId || approveBusy || jobController.current) return;
     const next = !(approvals[stage] && approvals[stage].approved);
     setApproveBusy(stage);
-    const r = await api.post<any>(`/api/pipeline/${gameId}/approve/${stage}`,
-      { approved: next }, { timeoutMs: 12000 });
-    if (r.ok && r.data?.ok) setApprovals(r.data.approvals || {});
-    setApproveBusy(null);
+    setApproveStatus('');
+    try {
+      const result = await api.post<any>(`/api/pipeline/${encodeURIComponent(gameId)}/approve/${encodeURIComponent(stage)}`,
+        { approved: next }, { timeoutMs: 12_000, retries: 0 });
+      if (result.ok && result.data?.ok) {
+        setApprovals(result.data.approvals || {});
+        setApproveStatus('Approval state saved by the game knowledge service.');
+      } else {
+        setApproveStatus('Approval was not saved. Check your connection before retrying.');
+      }
+    } catch { setApproveStatus('Approval service unavailable; no change confirmed.'); }
+    finally { setApproveBusy(null); }
   }, [gameId, approveBusy, approvals]);
 
   const submitRefine = React.useCallback(async (stage: string) => {
     const note = refineDraft.trim();
-    if (!gameId || !note || refineBusy) return;
-    setRefineBusy(stage); setRefineStatus('Submitting refinement…');
-    const r = await api.post<any>(`/api/pipeline/${gameId}/refine/${stage}/async`,
-      { instruction: note }, { timeoutMs: 15000 });
-    if (!r.ok || !r.data?.job_id) { setRefineStatus(`❌ ${r.data?.error || 'could not start'}`); setRefineBusy(null); return; }
-    const jid = r.data.job_id; const t0 = Date.now();
-    for (let i = 0; i < 50; i++) {
-      await new Promise(res => setTimeout(res, 4000));
-      const jr = await api.get<any>(`/api/playable/job/${jid}`, { timeoutMs: 12000 });
-      const d = jr.data || {};
-      if (d.job_status === 'error') { setRefineStatus(`❌ ${d.error || 'refine failed'}`); break; }
-      if (d.job_status === 'done') {
-        setRefineStatus(d.ok ? `✅ Refined ${d.artifact} — ${d.summary || ''}` : `⚠️ ${d.error || 'kept previous'}`);
-        setRefineStage(null); setRefineDraft(''); await load(); break;
+    if (!gameId || !note || refineBusy || jobController.current) return;
+    setRefineBusy(stage);
+    try {
+      const success = await runJob(
+        `/api/pipeline/${encodeURIComponent(gameId)}/refine/${encodeURIComponent(stage)}/async`,
+        setRefineStatus, { instruction: note });
+      if (success) {
+        setRefineStage(null);
+        setRefineDraft('');
       }
-      setRefineStatus(`💬 Refining from your note… ${Math.round((Date.now() - t0) / 1000)}s`);
-    }
-    setRefineBusy(null);
-  }, [gameId, refineDraft, refineBusy, load]);
+    } finally { setRefineBusy(null); }
+  }, [gameId, refineDraft, refineBusy, runJob]);
 
-  const beginEdit = React.useCallback((name: string, raw: any) => {
+  const beginEdit = React.useCallback((name: string, raw: unknown) => {
     setEditErr(''); setEditing(name); setDraft(JSON.stringify(raw, null, 2));
   }, []);
 
   const saveEdit = React.useCallback(async (name: string) => {
-    let parsed: any;
-    try { parsed = JSON.parse(draft); } catch { setEditErr('Invalid JSON — check syntax.'); return; }
-    if (typeof parsed !== 'object' || Array.isArray(parsed)) { setEditErr('Top level must be a JSON object.'); return; }
-    setSaving(true); setEditErr('');
-    const r = await api.put<any>(`/api/pipeline/${gameId}/kb/${name}`, { data: parsed }, { timeoutMs: 12000 });
-    setSaving(false);
-    if (r.ok && r.data?.ok) { setEditing(null); await load(); }
-    else setEditErr(r.data?.error || 'Save failed.');
-  }, [draft, gameId, load]);
+    if (!gameId || saving || approveBusy || jobController.current) return;
+    let parsed: Record<string, unknown>;
+    try { parsed = parseEditableKnowledge(draft); }
+    catch (error) {
+      setEditErr(error instanceof Error ? error.message : 'Invalid knowledge JSON.');
+      return;
+    }
+    setSaving(true);
+    setEditErr('');
+    try {
+      const result = await api.put<any>(`/api/pipeline/${encodeURIComponent(gameId)}/kb/${encodeURIComponent(name)}`,
+        { data: parsed }, { timeoutMs: 12_000, retries: 0 });
+      if (result.ok && result.data?.ok) {
+        setEditing(null);
+        await load();
+      } else {
+        setEditErr('Save was not confirmed. Your draft is still available for correction.');
+      }
+    } catch { setEditErr('Save service unavailable. Your unsaved draft remains in the editor.'); }
+    finally { setSaving(false); }
+  }, [draft, gameId, saving, approveBusy, load]);
 
   const applyKB = React.useCallback(async () => {
-    if (applying) return;
-    setApplying(true); setApplyStatus('Submitting…');
-    const r = await api.post<any>(`/api/playable/${gameId}/apply-kb/async`, {}, { timeoutMs: 15000 });
-    if (!r.ok || !r.data?.job_id) { setApplyStatus(`❌ ${r.data?.error || 'could not start'}`); setApplying(false); return; }
-    const jid = r.data.job_id; const t0 = Date.now();
-    for (let i = 0; i < 60; i++) {
-      await new Promise(res => setTimeout(res, 4000));
-      const jr = await api.get<any>(`/api/playable/job/${jid}`, { timeoutMs: 12000 });
-      const d = jr.data || {};
-      if (d.job_status === 'error') { setApplyStatus(`❌ ${d.error || 'sync failed'}`); break; }
-      if (d.job_status === 'done') {
-        setApplyStatus(d.applied ? `✅ Game synced with KB → v${d.version} (${(d.synced || []).join(', ')})`
-                                 : `⚠️ Could not apply cleanly (${d.error || 'kept original'}).`);
-        await load(); break;
-      }
-      setApplyStatus(`⚙️ Retuning game from KB… ${Math.round((Date.now() - t0) / 1000)}s`);
-    }
-    setApplying(false);
-  }, [applying, gameId, load]);
-
-  React.useEffect(() => { load(); }, [load]);
-
-  const onRefresh = React.useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+    if (!gameId || applying || jobController.current) return;
+    setApplying(true);
+    try {
+      await runJob(`/api/playable/${encodeURIComponent(gameId)}/apply-kb/async`, setApplyStatus);
+    } finally { setApplying(false); }
+  }, [gameId, applying, runJob]);
 
   const forge = React.useCallback(async (stage: string) => {
-    if (!gameId || forging) return;
+    if (!gameId || forging || jobController.current) return;
     setForging(stage);
-    const r = await api.post<any>(`/api/pipeline/${gameId}/forge/${stage}/async`, {}, { timeoutMs: 15000 });
-    if (r.ok && r.data?.job_id) {
-      const jid = r.data.job_id;
-      for (let i = 0; i < 40; i++) {
-        await new Promise(res => setTimeout(res, 3500));
-        const jr = await api.get<any>(`/api/playable/job/${jid}`, { timeoutMs: 12000 });
-        if (jr.data?.job_status === 'done' || jr.data?.job_status === 'error') break;
-      }
-      await load();
-    }
-    setForging(null);
-  }, [gameId, forging, load]);
+    try {
+      await runJob(`/api/pipeline/${encodeURIComponent(gameId)}/forge/${encodeURIComponent(stage)}/async`, setJobStatus);
+    } finally { setForging(null); }
+  }, [gameId, forging, runJob]);
 
   if (!gameId) {
     return (
-      <SafeAreaView style={s.safe}><Text style={s.empty}>No game specified.</Text></SafeAreaView>
+      <SafeAreaView style={s.safe} testID="kb-choose-build">
+        <View style={{ padding: 24, gap: 12 }}>
+          <Text style={s.title}>Choose a game to inspect</Text>
+          <Text style={s.empty}>A game knowledge base requires a real build ID. No demo or unrelated project will be substituted.</Text>
+          <TouchableOpacity accessibilityRole="button" testID="kb-select-build"
+            style={s.applyKbBtn} onPress={() => router.replace('/my-builds' as never)}>
+            <Text style={s.applyKbTxt}>Browse My Builds</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -153,18 +228,55 @@ export default function GameKB() {
           <Text style={s.backTxt}>‹ Back</Text>
         </TouchableOpacity>
         <Text style={s.title}>🗄️ Knowledge Base</Text>
-        <View style={{ width: 54 }} />
+        <TouchableOpacity testID="kb-guided-journeys" accessibilityRole="button"
+          accessibilityLabel="Continue guided workflow with this game's knowledge"
+          onPress={() => router.push(`/journeys?game=${encodeURIComponent(gameId)}&workflow=knowledge-iteration` as never)}
+          style={s.backBtn}>
+          <Text style={s.backTxt}>Journey ›</Text>
+        </TouchableOpacity>
       </View>
 
-      {!kb ? (
-        <View style={s.center}><ActivityIndicator color="#60A5FA" /></View>
+      {!kb && loadState === 'loading' ? (
+        <View style={s.center}><ActivityIndicator color="#60A5FA" accessibilityLabel="Loading game knowledge" /></View>
+      ) : !kb ? (
+        <View testID="kb-error" style={{ padding: 22, gap: 12 }}>
+          <Text style={s.empty}>{loadError || 'Game knowledge is not yet available.'}</Text>
+          <TouchableOpacity accessibilityRole="button" testID="kb-retry" style={s.applyKbBtn}
+            onPress={() => { setLoadState('loading'); void load(); }}>
+            <Text style={s.applyKbTxt}>Retry knowledge load</Text>
+          </TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/studio?game=${encodeURIComponent(gameId)}` as never)}
+            style={s.forgeBtn}>
+            <Text style={s.forgeTxt}>Return to Studio</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <ScrollView style={s.body} contentContainerStyle={{ paddingBottom: 48 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#60A5FA" />}>
-          <Text style={s.sub}>{kb.present_count}/{kb.total} artifacts forged · {Object.keys(approvals).length} approved{kb.title ? ` · ${kb.title}` : ''}</Text>
+          <Text style={s.sub}>{kb.present_count}/{kb.total} artifacts forged · {confirmedApprovalCount(approvals)} confirmed approved{kb.title ? ` · ${kb.title}` : ''}</Text>
+          {!!loadError && <Text testID="kb-stale-warning" style={s.editErr}>Refresh failed. Showing the last successful response; retry before applying changes.</Text>}
+          <TouchableOpacity testID="kb-open-studio" accessibilityRole="button"
+            onPress={() => router.push(`/studio?game=${encodeURIComponent(gameId)}` as never)}
+            style={s.forgeBtn}>
+            <Text style={s.forgeTxt}>Continue this game in Studio →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity testID="kb-world-workbench" accessibilityRole="button"
+            accessibilityLabel="Open World Workbench for this game"
+            onPress={() => router.push(`/world-workbench?game=${encodeURIComponent(gameId)}` as never)}
+            style={[s.forgeBtn, s.reforgeBtn]}>
+            <Text style={s.forgeTxt}>Explore world, mechanics and assets →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity testID="kb-design-review" accessibilityRole="button"
+            onPress={() => router.push(`/design-review?game=${encodeURIComponent(gameId)}` as never)}
+            style={[s.forgeBtn, s.reforgeBtn]}>
+            <Text style={s.forgeTxt}>Review gameplay and design coherence →</Text>
+          </TouchableOpacity>
+          {!!jobStatus && <Text testID="kb-forge-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{jobStatus}</Text>}
+          {!!approveStatus && <Text testID="kb-approve-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{approveStatus}</Text>}
+          {!!refineStatus && <Text testID="kb-refine-status" accessibilityLiveRegion="polite" style={s.applyStatus}>{refineStatus}</Text>}
 
-          <TouchableOpacity testID="kb-apply-btn" onPress={applyKB} disabled={applying || kb.present_count === 0}
-            style={[s.applyKbBtn, (applying || kb.present_count === 0) && s.btnDisabled]} activeOpacity={0.9}>
+          <TouchableOpacity testID="kb-apply-btn" onPress={applyKB} disabled={applying || !!jobController.current || loadState === 'error' || kb.present_count === 0}
+            style={[s.applyKbBtn, (applying || !!jobController.current || loadState === 'error' || kb.present_count === 0) && s.btnDisabled]} activeOpacity={0.9}>
             {applying ? <ActivityIndicator size="small" color="#fff" /> : (
               <Text style={s.applyKbTxt}>⚙️ Apply Knowledge Base to game</Text>
             )}
@@ -197,7 +309,7 @@ export default function GameKB() {
                       multiline style={s.editInput} placeholderTextColor="#475569" autoCapitalize="none" autoCorrect={false} />
                     {!!editErr && <Text style={s.editErr}>{editErr}</Text>}
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                      <TouchableOpacity testID={`kb-save-${a.name}`} onPress={() => saveEdit(a.name)} disabled={saving}
+                      <TouchableOpacity testID={`kb-save-${a.name}`} onPress={() => saveEdit(a.name)} disabled={saving || !!jobController.current || loadState === 'error'}
                         style={[s.saveBtn, saving && s.btnDisabled]} activeOpacity={0.9}>
                         {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.forgeTxt}>💾 Save</Text>}
                       </TouchableOpacity>
@@ -225,7 +337,7 @@ export default function GameKB() {
                       {!!refineStatus && <Text style={s.refineStatus}>{refineStatus}</Text>}
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                         <TouchableOpacity testID={`kb-refine-submit-${a.stage}`} onPress={() => submitRefine(a.stage)}
-                          disabled={!!refineBusy || !refineDraft.trim()} style={[s.saveBtn, (!!refineBusy || !refineDraft.trim()) && s.btnDisabled]} activeOpacity={0.9}>
+                          disabled={!!refineBusy || !!jobController.current || loadState === 'error' || !refineDraft.trim()} style={[s.saveBtn, (!!refineBusy || !refineDraft.trim()) && s.btnDisabled]} activeOpacity={0.9}>
                           {refineBusy === a.stage ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.forgeTxt}>💬 Refine</Text>}
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => { setRefineStage(null); setRefineDraft(''); setRefineStatus(''); }} style={s.cancelBtn} activeOpacity={0.9}>
@@ -243,7 +355,7 @@ export default function GameKB() {
 
                 {/* Iterate & Refine — human approval gate */}
                 {APPROVABLE.has(a.stage) && (
-                  <TouchableOpacity testID={`kb-approve-${a.stage}`} onPress={() => toggleApprove(a.stage)} disabled={approveBusy === a.stage}
+                  <TouchableOpacity testID={`kb-approve-${a.stage}`} onPress={() => toggleApprove(a.stage)} disabled={!!approveBusy || !!jobController.current || loadState === 'error'}
                     style={[s.approveBtn, approvals[a.stage]?.approved ? s.approvedOn : s.approveOff, approveBusy === a.stage && s.btnDisabled]} activeOpacity={0.85}>
                     {approveBusy === a.stage ? <ActivityIndicator size="small" color="#fff" /> : (
                       <Text style={[s.approveTxt, approvals[a.stage]?.approved && s.approvedTxtOn]}>
@@ -255,7 +367,7 @@ export default function GameKB() {
 
                 {canForge ? (
                   <TouchableOpacity testID={`kb-forge-${a.stage}`} onPress={() => forge(canForge)}
-                    disabled={!!forging} style={[s.forgeBtn, a.present && s.reforgeBtn, !!forging && s.btnDisabled]} activeOpacity={0.9}>
+                    disabled={!!forging || !!jobController.current || loadState === 'error'} style={[s.forgeBtn, a.present && s.reforgeBtn, !!forging && s.btnDisabled]} activeOpacity={0.9}>
                     {forging === canForge ? <ActivityIndicator size="small" color="#fff" /> : (
                       <Text style={s.forgeTxt}>{a.present ? '↻ Re-forge' : '⚒ Forge'}</Text>
                     )}

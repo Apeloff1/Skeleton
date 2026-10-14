@@ -7,7 +7,6 @@ inside Python.
 """
 from __future__ import annotations
 
-import atexit
 import math
 import os
 import queue
@@ -785,25 +784,28 @@ class JvmBroadPhaseAccelerator:
         return f"{message}; java stderr: {' | '.join(self._stderr_tail)}"
 
 
-_default_lock = threading.Lock()
-_default_accelerator: JvmBroadPhaseAccelerator | None = None
-
-
 def get_default_broadphase_accelerator() -> JvmBroadPhaseAccelerator:
-    global _default_accelerator
-    with _default_lock:
-        if _default_accelerator is None:
-            _default_accelerator = JvmBroadPhaseAccelerator()
-        return _default_accelerator
+    """Return the physics helper owned by the canonical JVM registry."""
+    from skeleton.native.jvm_registry import (
+        JvmAcceleratorRegistryError,
+        get_default_jvm_registry,
+    )
+
+    try:
+        accelerator = get_default_jvm_registry().get_selected("physics")
+    except JvmAcceleratorRegistryError as exc:
+        raise JvmBroadPhaseUnavailable(
+            "physics JVM accelerator is not profile-selected"
+        ) from exc
+    if not isinstance(accelerator, JvmBroadPhaseAccelerator):
+        raise JvmBroadPhaseUnavailable(
+            "canonical JVM registry returned wrong physics type"
+        )
+    return accelerator
 
 
 def close_default_broadphase_accelerator() -> None:
-    global _default_accelerator
-    with _default_lock:
-        accelerator = _default_accelerator
-        _default_accelerator = None
-    if accelerator is not None:
-        accelerator.close()
+    """Retire only the physics helper from the canonical JVM registry."""
+    from skeleton.native.jvm_registry import close_default_jvm_accelerator
 
-
-atexit.register(close_default_broadphase_accelerator)
+    close_default_jvm_accelerator("physics")

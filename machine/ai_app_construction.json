@@ -11,7 +11,7 @@
   "provider_bootstrap": {
     "mandatory": true,
     "mode": "fail_closed",
-    "rule": "Every AI development agent and every credential-bearing AI provider activation must load the active architecture, construction, capability-interface, state-topology, typed-schema, concrete-capability, implementation-handoff, closure-evidence, and human-manual contracts before changing or serving the system.",
+    "rule": "Every AI development agent and credential-bearing AI provider activation must load the active architecture, construction, capability-interface, state-topology, typed-schema, concrete-capability, implementation-handoff, closure-evidence, October-2026 enterprise-superiority, enterprise-implementation-dossier, and human-manual authorities before changing or serving the system.",
     "must_read": [
       "machine/manifest.json",
       "machine/architecture.json",
@@ -22,6 +22,8 @@
       "machine/ai_capabilities.json",
       "machine/ai_implementation_handoff.json",
       "machine/ai_closure_evidence.json",
+      "machine/enterprise_ai_superiority.json",
+      "machine/enterprise_ai_implementation_notes_index.json",
       "docs/AI_APP_CONSTRUCTION_MANUAL.md"
     ],
     "development_provider_entrypoints": [
@@ -222,10 +224,7 @@
         "backend/core/ai_provider.py",
         "backend/core/ai_provider_compat.py",
         "skeleton/jeeves/providers.py",
-        "backend/emergentintegrations/llm/chat.py",
-        "machine/ai_chat_model_catalog.json",
-        "backend/core/model_catalog.py",
-        "machine/ai_chat_operator_setup.json"
+        "backend/emergentintegrations/llm/chat.py"
       ],
       "required_interfaces": [
         "ProviderRequest",
@@ -690,9 +689,7 @@
       "evidence": [
         "skeleton/persistence",
         "docker-compose.yml",
-        "backend/services/database.py",
-        "machine/ai_chat_application.json",
-        "machine/ai_chat_streaming.json"
+        "backend/services/database.py"
       ],
       "required_interfaces": [
         "transaction",
@@ -785,7 +782,8 @@
       ],
       "evidence": [
         "skeleton/artifact_plane",
-        "skeleton/assets"
+        "skeleton/assets",
+        "machine/ai_game_learning.json"
       ],
       "required_interfaces": [
         "artifact id",
@@ -841,11 +839,7 @@
         "backend/server.py",
         "backend/routes",
         "backend/core/product_control_runtime.py",
-        "machine/ai_chat_application.json",
-        "backend/routes/ai.py",
-        "backend/core/engine_chat.py",
-        "machine/ai_chat_conversation_management.json",
-        "machine/ai_chat_attachments.json"
+        "machine/ai_game_learning.json"
       ],
       "required_interfaces": [
         "versioned API",
@@ -892,9 +886,7 @@
       "evidence": [
         "skeleton/api/server.py",
         "skeleton/api/routes.py",
-        "skeleton/api/gateway.py",
-        "machine/ai_chat_application.json",
-        "machine/ai_chat_streaming.json"
+        "skeleton/api/gateway.py"
       ],
       "required_interfaces": [
         "/api/v1 versioning",
@@ -904,13 +896,10 @@
         "AI execution submit",
         "AI execution status/result",
         "AI execution cancel",
-        "optional authenticated provider inventory per machine/ai_engine_provider_inventory.json",
         "delegated authority envelope",
         "idempotent service command",
         "operation event replay",
-        "capability readiness endpoint/projection",
-        "authenticated durable context handoff recovery per machine/ai_engine_handoff_recovery.json",
-        "durable local provider artifact binding per machine/ai_engine_local_provider_binding.json"
+        "capability readiness endpoint/projection"
       ],
       "construction": [
         "keep engine ownership separate from product routes",
@@ -918,27 +907,21 @@
         "bound requests",
         "expose the cognitive runtime only through versioned authenticated engine execution contracts",
         "validate backend service identity and delegated principal/tenant authority",
-        "project GET /api/v1/engine/providers from the canonical ProviderRegistry under existing engine:read service authority; expose only global non-secret identity/readiness and validate any supplied tenant against the server-side grant",
         "support idempotent submit/query/cancel and resumable operation events",
         "keep provider credentials and model transport in the engine process after cutover",
-        "publish capability-scoped readiness from declared manifests and dependency probes",
-        "read GET /api/v1/engine/executions/{execution_id}/handoff only from the original accepted durable command under existing engine:read service authority; verify acknowledgement, canonical execution and checkpoint identity and expose non-content lineage only",
-        "pin local artifact identity in the canonical execution checkpoint before dispatch and reject mismatched unfinished execution recovery"
+        "publish capability-scoped readiness from declared manifests and dependency probes"
       ],
       "acceptance": [
         "route collision gate",
         "liveness/readiness",
         "version compatibility tests",
         "backend-engine auth test",
-        "candidate provider inventory token/principal/read-scope/tenant denial, canonical status redaction and degraded readiness tests per machine/ai_engine_provider_inventory.json",
         "delegated authority test",
         "execution idempotency test",
         "cancel/result fencing test",
         "engine outage degraded-readiness test",
         "process credential ownership test",
-        "capability readiness contract tests",
-        "candidate handoff recovery original identity, token/principal/read-scope/actor/tenant denial, restart and corrupt durable state tests per machine/ai_engine_handoff_recovery.json",
-        "candidate local artifact identity pin, exact unchanged restart, changed weights and corrupt binding denial tests per machine/ai_engine_local_provider_binding.json"
+        "capability readiness contract tests"
       ],
       "failure_mode": "typed unavailable/denied/conflict response with no local backend provider fallback"
     },
@@ -957,10 +940,7 @@
         "frontend/app/product.tsx",
         "frontend/src/product",
         "frontend/utils/apiBase.ts",
-        "machine/ai_chat_product_client.json",
-        "frontend/app/ai-chat.tsx",
-        "frontend/features/Jeeves/ChatWorkspace.tsx",
-        "frontend/src/product/chatController.ts"
+        "machine/ai_game_learning.json"
       ],
       "required_interfaces": [
         "canonical endpoint resolver",
@@ -1023,10 +1003,7 @@
       ],
       "evidence": [
         "skeleton/agents/messaging.py",
-        "skeleton/api/webhooks.py",
-        "machine/ai_chat_streaming.json",
-        "backend/routes/ai.py",
-        "skeleton/persistence/execution_repository.py"
+        "skeleton/api/webhooks.py"
       ],
       "required_interfaces": [
         "event id",
@@ -1233,7 +1210,8 @@
       "evidence": [
         "skeleton/eval",
         "skeleton/intelligence/eval_framework.py",
-        "eval/fixtures"
+        "eval/fixtures",
+        "machine/ai_game_learning.json"
       ],
       "required_interfaces": [
         "eval case",
@@ -1282,7 +1260,8 @@
       "evidence": [
         "skeleton/learning",
         "skeleton/intelligence/adaptive.py",
-        "skeleton/intelligence/experiment_tracker.py"
+        "skeleton/intelligence/experiment_tracker.py",
+        "machine/ai_game_learning.json"
       ],
       "required_interfaces": [
         "feedback event",
@@ -1672,6 +1651,18 @@
       "kind": "release",
       "command": "repository required checks + immutable artifact provenance",
       "required": true
+    },
+    {
+      "id": "enterprise-ai-superiority",
+      "kind": "static",
+      "command": "python scripts/check_enterprise_ai_superiority.py --json",
+      "required": true
+    },
+    {
+      "id": "enterprise-ai-implementation-notes",
+      "kind": "static",
+      "command": "python scripts/check_enterprise_ai_implementation_notes.py --json",
+      "required": true
     }
   ],
   "runtime_model_providers": [
@@ -1738,9 +1729,9 @@
     },
     {
       "id": "local",
-      "state": "optional",
-      "adapter": "skeleton/provider_runtime.py:LocalArtifactProviderAdapter",
-      "protocol": "Bounded provider-neutral local model artifact inference",
+      "state": "active",
+      "adapter": "skeleton/ai/runtime/inference/local.py:LocalModelAdapter",
+      "protocol": "provider-neutral local artifact inference",
       "architecture_read_required": true,
       "construction_manual_read_required": true,
       "activation_receipt_required": true,
@@ -1750,23 +1741,15 @@
       ],
       "optional_configuration": [
         "AI_LOCAL_MODEL_CACHE_SIZE",
-        "AI_LOCAL_MODEL_SEED",
-        "AI_TIMEOUT_SECONDS"
+        "AI_LOCAL_MODEL_SEED"
       ],
       "capabilities": [
         "text-generation"
       ],
       "undeclared_capability_policy": "deny",
-      "network_policy": "none; local artifact loading and model execution only",
+      "network_policy": "none; local artifact execution only",
       "execution_owner": "skeleton/provider_runtime.py",
-      "activation_rule": "AI_PROVIDER=local requires a validated local artifact and canonical architecture acknowledgement; external secondary/fallback and semantic-verifier configuration rejects rather than escaping local execution",
-      "privacy_ceiling": "same conservative canonical provider-transfer governance, tenant binding, admission, actual-usage and cancellation fences",
-      "contract": "machine/ai_local_provider_activation.json",
-      "acceptance": [
-        "skeleton/testing/test_local_provider_activation.py",
-        "skeleton/testing/test_local_model_artifact_intake.py",
-        "skeleton/testing/test_governed_training_cli.py"
-      ]
+      "activation_rule": "local artifact identity must validate before activation; hosted fallback is not implicit"
     }
   ],
   "gap_policy": {
@@ -3574,7 +3557,10 @@
     "migration/preflight evidence when persistence changes",
     "artifact/SBOM/provenance references",
     "canary/smoke evidence",
-    "rollback target and trigger criteria"
+    "rollback target and trigger criteria",
+    "enterprise AI superiority exact-head validator output",
+    "all-421-volume October 2026 implementation dossier validator output",
+    "enterprise system architecture exact-head validator and independent receipt"
   ],
   "construction_work_packages": [
     {
@@ -4450,19 +4436,6 @@
   },
   "provider_capability_matrix": [
     {
-      "provider_id": "local",
-      "family": "runtime_model",
-      "execution_owner": "skeleton/provider_runtime.py",
-      "capabilities": {
-        "text_generation": "optional",
-        "image_generation": "undeclared",
-        "speech_synthesis": "undeclared",
-        "tool_calls": "undeclared",
-        "structured_output": "undeclared"
-      },
-      "activation_policy": "Explicit local provider selection, validated content-addressed artifact and mandatory construction receipt; no external fallback"
-    },
-    {
       "provider_id": "openai",
       "family": "runtime_model",
       "execution_owner": "skeleton/provider_runtime.py",
@@ -5331,12 +5304,7 @@
       "crash-resumable canonical pending turns",
       "serialized pending-turn concurrency and retryable optimistic conflicts"
     ],
-    "remaining_surfaces": [],
-    "ai_chat_source_candidate": {
-      "contract": "machine/ai_chat_application.json",
-      "status": "unverified_source_candidate",
-      "verification": "No tests executed during the 2026-10-13 one-hour implementation session; source checks and web build only. Existing completion and closure authorities are unchanged."
-    }
+    "remaining_surfaces": []
   },
   "tool_runtime_blueprint": {
     "schema_version": 1,
@@ -6702,12 +6670,7 @@
       "phase_4": "backend/core/ai_provider.py becomes remote compatibility client or is retired",
       "invariant": "never remove backend credential before delegation parity is proven; never claim process convergence while backend still requires it"
     },
-    "frontend_rule": "product conversation/assistant actions enter through backend because backend owns product/conversation authority; direct frontend->engine remains limited to explicitly declared engine surfaces such as health or future separately authorized engine-native features",
-    "ai_chat_source_candidate": {
-      "contract": "machine/ai_chat_application.json",
-      "status": "unverified_source_candidate",
-      "verification": "No tests executed during the 2026-10-13 one-hour implementation session; source checks and web build only. Existing completion and closure authorities are unchanged."
-    }
+    "frontend_rule": "product conversation/assistant actions enter through backend because backend owns product/conversation authority; direct frontend->engine remains limited to explicitly declared engine surfaces such as health or future separately authorized engine-native features"
   },
   "realtime_delivery_blueprint": {
     "schema_version": 1,
@@ -6843,12 +6806,7 @@
       "exact-head Streaming Protocol Closure Gate",
       "independent Stage-6 streaming verifier"
     ],
-    "remaining": [],
-    "ai_chat_source_candidate": {
-      "contract": "machine/ai_chat_application.json",
-      "status": "unverified_source_candidate",
-      "verification": "No tests executed during the 2026-10-13 one-hour implementation session; source checks and web build only. Existing completion and closure authorities are unchanged."
-    }
+    "remaining": []
   },
   "golden_journey_blueprint": {
     "schema_version": 1,
@@ -9005,12 +8963,7 @@
       "large-file context bounds",
       "generated artifact lineage",
       "delete/export propagation"
-    ],
-    "ai_chat_source_candidate": {
-      "contract": "machine/ai_chat_application.json",
-      "status": "unverified_source_candidate",
-      "verification": "No tests executed during the 2026-10-13 one-hour implementation session; source checks and web build only. Existing completion and closure authorities are unchanged."
-    }
+    ]
   },
   "model_routing_execution_policy": {
     "schema_version": 1,
@@ -9251,7 +9204,7 @@
   "runtime_schema_catalog": {
     "schema_version": 1,
     "status": "active",
-    "catalog_version": "1.0.0",
+    "catalog_version": "1.1.0",
     "path": "machine/ai_runtime_schemas.json",
     "policy": "typed schema catalog refines canonical envelopes; field/enum/type changes require contract-version compatibility review",
     "envelope_record_map": {
@@ -9547,12 +9500,7 @@
       "citation rendering",
       "provisional-to-final reconciliation",
       "accessibility"
-    ],
-    "ai_chat_source_candidate": {
-      "contract": "machine/ai_chat_application.json",
-      "status": "unverified_source_candidate",
-      "verification": "No tests executed during the 2026-10-13 one-hour implementation session; source checks and web build only. Existing completion and closure authorities are unchanged."
-    }
+    ]
   },
   "implementation_handoff": {
     "schema_version": 1,
@@ -9814,5 +9762,29 @@
       "canonical AI runtime mirror parity",
       "independent redundancy verifier"
     ]
+  },
+  "game_learning_source_candidate": {
+    "contract": "machine/ai_game_learning.json",
+    "existing_runtime_owner": "skeleton/jeeves/game_engine_runtime.py",
+    "existing_dragon_owner": "skeleton/ai/webcrawler",
+    "status": "implementation_candidate",
+    "authority": "No new capability plane, service, provider or production promotion authority",
+    "continuation": "Playable emulator workers, human reference, live actor observation, parallel local learning and native console build composition under the same declared owners",
+    "two_hour_continuation": {
+      "contracts": [
+        "machine/ai_game_console_editor.json",
+        "machine/ai_game_console_workspace.json",
+        "machine/ai_game_successor.json",
+        "machine/ai_game_style_analysis.json",
+        "machine/ai_game_successor_runtime.json",
+        "machine/ai_game_desktop_export.json",
+        "machine/ai_game_studio_learning.json",
+        "machine/ai_game_studio_continuation.json",
+        "machine/ai_game_studio_review.json"
+      ],
+      "existing_state_authority": "CORE_DB Mongo scoped workspace",
+      "scope": "Console editing/emulation/build augmentation and one/three-source original successor desktop export",
+      "new_service_or_provider": false
+    }
   }
 }

@@ -1,6 +1,6 @@
 # Python Package Layers
 
-<!-- machine-git-blob: machine/python_package_layers.json@49f16db1c5bf6a7cf136994eb5699bbccc11dbb1 -->
+<!-- machine-git-blob: machine/python_package_layers.json@0e45458a3c4cc50b56b5039fe1469fedf5937626 -->
 
 Machine authority: `machine/python_package_layers.json`
 

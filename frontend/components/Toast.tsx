@@ -22,6 +22,12 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withSpring,
 } from 'react-native-reanimated';
+import { useReduceMotion } from '../src/hooks/useReduceMotion';
+import {
+  accessibleButtonProps,
+  accessibleStatusProps,
+} from '../src/accessibility/runtime';
+import { useI18n } from '../src/i18n';
 
 export type ToastVariant = 'info' | 'success' | 'warn' | 'error';
 
@@ -97,16 +103,23 @@ const VARIANT_STYLE: Record<ToastVariant, { bg: string; border: string; fg: stri
 
 function ToastRow({ entry }: { entry: ToastEntry }) {
   const v = VARIANT_STYLE[entry.variant];
+  const reduceMotion = useReduceMotion();
+  const { t } = useI18n();
   const ty = useSharedValue(40);
   const op = useSharedValue(0);
 
   useEffect(() => {
+    if (reduceMotion) {
+      ty.value = 0;
+      op.value = 1;
+      return () => { op.value = 0; };
+    }
     ty.value = withSpring(0,  { damping: 16, stiffness: 180 });
     op.value = withTiming(1,  { duration: 160 });
     return () => {
       op.value = withTiming(0, { duration: 140 });
     };
-  }, [entry.id]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entry.id, reduceMotion]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: ty.value }],
@@ -114,19 +127,40 @@ function ToastRow({ entry }: { entry: ToastEntry }) {
   }));
 
   return (
-    <Animated.View style={[styles.row, { backgroundColor: v.bg, borderColor: v.border }, animStyle]}>
-      <Ionicons name={v.icon} size={18} color={v.border} />
-      <Text style={[styles.msg, { color: v.fg }]} numberOfLines={2}>{entry.message}</Text>
+    <Animated.View
+      style={[styles.row, { backgroundColor: v.bg, borderColor: v.border }, animStyle]}
+    >
+      <Ionicons name={v.icon} size={18} color={v.border} accessible={false} />
+      <Text
+        style={[styles.msg, { color: v.fg }]}
+        numberOfLines={2}
+        allowFontScaling
+        {...accessibleStatusProps(
+          entry.variant === 'error'
+            ? 'Error notification: ' + entry.message
+            : 'Notification: ' + entry.message,
+          { assertive: entry.variant === 'error' },
+        )}
+      >
+        {entry.message}
+      </Text>
       {entry.action ? (
         <Pressable
           onPress={() => { try { entry.action!.onPress(); } catch { /* swallow */ } toast.dismiss(entry.id); }}
           hitSlop={8}
+          style={styles.control}
+          {...accessibleButtonProps(entry.action.label)}
         >
           <Text style={[styles.actionText, { color: v.border }]}>{entry.action.label}</Text>
         </Pressable>
       ) : (
-        <Pressable onPress={() => toast.dismiss(entry.id)} hitSlop={8}>
-          <Ionicons name="close" size={16} color={v.fg} />
+        <Pressable
+          onPress={() => toast.dismiss(entry.id)}
+          hitSlop={8}
+          style={styles.control}
+          {...accessibleButtonProps(t('notification.dismiss'))}
+        >
+          <Ionicons name="close" size={16} color={v.fg} accessible={false} />
         </Pressable>
       )}
     </Animated.View>
@@ -180,6 +214,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
+  },
+  control: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionText: {
     fontSize: 12,
