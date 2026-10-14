@@ -101,3 +101,27 @@ def test_mirror_rejects_unreviewed_imbalanced_or_duplicate_holdouts():
                 "f",controls[2].article,controls[2].video,
                 controls[2].update,controls[2].shared_terms,True,"b"*64)),
             reviewed_holdout=True,independent_reviewer=True)
+
+
+@pytest.mark.parametrize("fields", (
+    {"article": ""},
+    {"video": "x" * 2049},
+    {"update": ""},
+    {"shared_terms": ()},
+    {"shared_terms": ("memory", "memory")},
+    {"shared_terms": ("../secrets",)},
+    {"shared_terms": ("a" * 41,)},
+))
+def test_holdout_requires_bounded_passages_and_canonical_unique_terms(fields):
+    kwargs = dict(
+        case_id="bounded-source",
+        article="Game memory is supported.",
+        video="Game memory is unsupported.",
+        update="Memory changed in revision 2.",
+        shared_terms=("memory",),
+        expected_polarity_conflict=True,
+        reviewer_evidence_digest="b" * 64,
+    )
+    kwargs.update(fields)
+    with pytest.raises(ValueError, match="bounded"):
+        HoldoutCase(**kwargs)
