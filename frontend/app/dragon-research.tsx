@@ -74,7 +74,7 @@ type FamilyHistory = {
   training_authorized: boolean;
 };
 const ID = /^source-[0-9a-f]{64}$/;
-const LANES: ReadonlyArray<{ lane: Lane; label: string; activity: string }> = [
+const LANES: readonly { lane: Lane; label: string; activity: string }[] = [
   { lane: 'article', label: '📖 Article hatchling', activity: 'Exact web article citations' },
   { lane: 'video', label: '🎬 Video hatchling', activity: 'Timecoded licensed transcripts' },
   { lane: 'updates', label: '🔎 Update hatchling', activity: 'Changed-source comparisons' },

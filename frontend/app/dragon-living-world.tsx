@@ -85,7 +85,7 @@ type TemporalPlan={
     bfs:{steps:string[];actual_turns:number;expanded:number;waiting_turns:number};
     astar:{steps:string[];actual_turns:number;expanded:number;waiting_turns:number}};
   shifting_topology:{distinct_topologies:number;
-    phases:Array<{phase:number;links:Array<{at:number[];open:string[]}>}>};
+    phases:{phase:number;links:{at:number[];open:string[]}[]}[]};
   scope:string;
 };
 

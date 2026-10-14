@@ -41,10 +41,10 @@ type AtlasPreview={
       regional_climates_verified:boolean;
       guarantee_scope:string;
     };
-    regional:Array<{
+    regional:{
       index:number;rooms:number;deadends:number;secrets:number;
       scenic_tours:number;maze_digest:string;
-    }>;
+    }[];
   };
   player:GameState;native_claim:string;
 };

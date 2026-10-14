@@ -119,7 +119,7 @@ function Creator(){
     biome:string;visible_landmark:string;
     core_loop_viable:boolean;underbuilt_reasons:string[];
     living_world_actual_route_actions:string[];
-    replayed_journeys:Array<{intent:string;actions:string[];trace_digest:string}>;
+    replayed_journeys:{intent:string;actions:string[];trace_digest:string}[];
     release_blockers:string[];proof_digest:string;
     native_binary_built:boolean;independently_published:boolean;
   }|null>(null);
@@ -206,7 +206,7 @@ function Creator(){
           biome:string;visible_landmark:string;
           core_loop_viable:boolean;underbuilt_reasons:string[];
           living_world_actual_route_actions:string[];
-          replayed_journeys:Array<{intent:string;actions:string[];trace_digest:string}>;
+          replayed_journeys:{intent:string;actions:string[];trace_digest:string}[];
           release_blockers:string[];proof_digest:string;
           native_binary_built:boolean;independently_published:boolean;
         };
