@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from dataclasses import replace
+import logging
 import hashlib
 import json
 import math
@@ -215,6 +216,50 @@ class MongoConversationAuthority:
             governance_engine_target_executor
         )
         self.governance_retention_planner = governance_retention_planner
+        # Installed only through the trusted application lifespan.
+        self.dragon_projection = None
+
+    async def dragon_context_segments(
+        self, thread: ConversationThread, query: str
+    ) -> tuple:
+        """Return only currently consented, untrusted Dragon context evidence."""
+        projection = self.dragon_projection
+        if projection is None:
+            return ()
+        try:
+            return await projection.context_segments(thread, query)
+        except Exception:
+            # Advisory memory must never bypass or prevent canonical chat.
+            logging.getLogger(__name__).exception(
+                "Dragon projection retrieval unavailable thread=%s", thread.thread_id
+            )
+            return ()
+
+    async def _after_dragon_commit(self, thread: ConversationThread) -> None:
+        """Checkpoint only exact ten-step committed windows, when configured."""
+        projection = self.dragon_projection
+        if projection is None or thread.message_sequence < 10 or thread.message_sequence % 10:
+            return
+        try:
+            window = await self.list_messages(
+                thread.thread_id,
+                tenant_id=thread.tenant_id,
+                owner_id=thread.owner_id,
+                after_sequence=thread.message_sequence - 10,
+                limit=10,
+            )
+            if (
+                len(window) == 10
+                and all(message.branch_id == thread.active_branch_id for message in window)
+            ):
+                await projection.after_commit(thread, window)
+        except Exception:
+            # This is derived, optional state. The canonical Mongo commit is final.
+            # Log the failure for a scoped retention/recovery repair, never retry
+            # the user message or change its committed identity.
+            logging.getLogger(__name__).exception(
+                "Dragon derived checkpoint unavailable thread=%s", thread.thread_id
+            )
 
     @staticmethod
     def _governed_conversation_location(
@@ -1417,6 +1462,7 @@ class MongoConversationAuthority:
         )
         if committed.message_sequence < message.sequence:
             raise ConversationConflict("conversation append did not reach commit point")
+        await self._after_dragon_commit(committed)
         return committed, message
 
     async def append_user_message(
