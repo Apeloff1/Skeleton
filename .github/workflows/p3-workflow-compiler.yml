@@ -1,19 +1,6 @@
 name: P3 Workflow Compiler
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/runtime/autonomous_engineering/**"
-      - "skeleton/testing/test_p3_workflow_compiler.py"
-      - ".github/workflows/p3-workflow-compiler.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-autonomous-engineering-frontier
-    paths:
-      - "skeleton/ai/runtime/autonomous_engineering/**"
-      - "skeleton/testing/test_p3_workflow_compiler.py"
-      - ".github/workflows/p3-workflow-compiler.yml"
   workflow_dispatch:
 
 permissions:

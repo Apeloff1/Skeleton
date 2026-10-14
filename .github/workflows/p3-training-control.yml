@@ -1,19 +1,5 @@
 name: P3 Training Control
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/runtime/learning_foundation/data.py"
-      - "skeleton/ai/runtime/learning_foundation/training.py"
-      - "skeleton/testing/test_p3_training_control.py"
-      - ".github/workflows/p3-training-control.yml"
-  push:
-    branches: [main, feat/p3-learning-multimodal-t2]
-    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
-    paths:
-      - "skeleton/ai/runtime/learning_foundation/data.py"
-      - "skeleton/ai/runtime/learning_foundation/training.py"
-      - "skeleton/testing/test_p3_training_control.py"
-      - ".github/workflows/p3-training-control.yml"
   workflow_dispatch:
 permissions:
   contents: read

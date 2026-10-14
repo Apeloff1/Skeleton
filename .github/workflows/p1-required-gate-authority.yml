@@ -17,7 +17,6 @@ on:
       - "skeleton/testing/test_promotion_gates.py"
       - "tests/test_p1_required_gate_authority.py"
       - ".github/workflows/p1-required-gate-authority.yml"
-      - ".github/workflows/*.yml"
   workflow_dispatch:
 
 permissions:

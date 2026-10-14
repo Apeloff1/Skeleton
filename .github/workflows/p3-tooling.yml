@@ -1,20 +1,6 @@
 name: P3 Tool Trust and Composition
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/runtime/autonomous_engineering/tooling.py"
-      - "skeleton/ai/runtime/autonomous_engineering/__init__.py"
-      - "skeleton/testing/test_p3_tooling.py"
-      - ".github/workflows/p3-tooling.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-autonomous-engineering-frontier
-    paths:
-      - "skeleton/ai/runtime/autonomous_engineering/tooling.py"
-      - "skeleton/testing/test_p3_tooling.py"
-      - ".github/workflows/p3-tooling.yml"
   workflow_dispatch:
 
 permissions:

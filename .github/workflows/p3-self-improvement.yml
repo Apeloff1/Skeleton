@@ -1,20 +1,6 @@
 name: P3 Controlled Self Improvement
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/runtime/autonomous_engineering/improvement.py"
-      - "skeleton/ai/runtime/autonomous_engineering/__init__.py"
-      - "skeleton/testing/test_p3_improvement.py"
-      - ".github/workflows/p3-self-improvement.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-autonomous-engineering-frontier
-    paths:
-      - "skeleton/ai/runtime/autonomous_engineering/improvement.py"
-      - "skeleton/testing/test_p3_improvement.py"
-      - ".github/workflows/p3-self-improvement.yml"
   workflow_dispatch:
 
 permissions:
