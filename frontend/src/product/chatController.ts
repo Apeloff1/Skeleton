@@ -375,8 +375,9 @@ export class ChatController {
       throw new ChatClientError('Wait for this reply or stop it before sending another message.', { kind: 'conflict' });
     }
     if (!message.trim() || message.length > 100000) throw new ChatClientError('Enter a message of up to 100,000 characters.', { kind: 'validation' });
-    if ((options.context?.length ?? 0) > 100000 || (options.attachmentRefs?.length ?? 0) > 256
-      || options.attachmentRefs?.some(ref => !ref || ref.length > 2048)
+    if ((options.context?.length ?? 0) > 100000 || (options.attachmentRefs?.length ?? 0) > 4
+      || new Set(options.attachmentRefs ?? []).size !== (options.attachmentRefs?.length ?? 0)
+      || options.attachmentRefs?.some(ref => !/^chat-attachment:\/\/[0-9a-f-]{36}$/.test(ref))
       || (options.maxOutputTokens !== undefined && (!Number.isSafeInteger(options.maxOutputTokens) || options.maxOutputTokens < 1))
       || (options.temperature !== undefined && (!Number.isFinite(options.temperature) || options.temperature < 0 || options.temperature > 2))) {
       throw new ChatClientError('Context, attachment references or generation settings are invalid.', { kind: 'validation' });
