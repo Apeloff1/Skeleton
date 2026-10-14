@@ -38,3 +38,10 @@ results using pytest's built-in output. Existing dedicated `tests/run_unit.py`
 and focused CI test lists remain independent and unchanged.
 
 Timeouts return exit code 124; pytest start failures return 126. Exit statuses are never mapped to success. The default timeout is disabled, so use a cap for large or potentially blocking suites.
+
+
+## Capability alias coverage
+
+Feature selection uses whole underscore-delimited filename tokens, not substring matches. For example, Dragon also selects `webcrawler` modules, game-building includes `forge` and `dialogue`, and application includes `app` and `deployment`. A file may legitimately match several capabilities, but is executed only once per invocation. For multiple requested features, each selector must find at least one file; otherwise the command fails with exit code 2 instead of reporting a misleading successful partial suite.
+
+Symlinks for individual test files and test-root directories are not followed; test paths resolving outside their root are excluded. These guards only validate discovery and do not constitute runtime sandboxing. The feature mapping remains a heuristic rather than an assertion that every test in a capability has been discovered.

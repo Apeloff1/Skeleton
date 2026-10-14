@@ -19,17 +19,17 @@ TEST_ROOTS = ("tests", "skeleton/testing", "backend/tests")
 
 # Keywords refer to test module filenames, not production files or imported code.
 FEATURE_MARKERS: dict[str, tuple[str, ...]] = {
-    "ai": ("ai", "inference", "model_routing"),
-    "jeeves": ("jeeves", "cortex"),
-    "game-builder": ("game_builder", "game_forge", "story_canon"),
-    "dragon": ("dragon", "crawler"),
-    "physics": ("physics", "simulation"),
-    "security": ("security", "sandbox", "auth", "isolation"),
-    "shell": ("shell", "process_safety"),
-    "memory": ("memory", "retrieval", "rag"),
-    "agents": ("agent", "swarm", "supervisor"),
-    "provider": ("provider", "model_routing"),
-    "app": ("app_assembly", "application", "installation"),
+    "ai": ("ai", "inference", "model_routing", "transformer", "tokenizer", "embedding"),
+    "jeeves": ("jeeves", "cortex", "llm"),
+    "game-builder": ("game_builder", "game_forge", "story_canon", "forge", "world_builder", "dialogue"),
+    "dragon": ("dragon", "crawler", "webcrawler"),
+    "physics": ("physics", "simulation", "collision", "rigid_body", "broadphase"),
+    "security": ("security", "sandbox", "auth", "authentication", "authorization", "isolation", "sast", "secret", "malware"),
+    "shell": ("shell", "process_safety", "command", "terminal"),
+    "memory": ("memory", "retrieval", "rag", "embedding", "vector", "chunker", "reranker"),
+    "agents": ("agent", "agents", "swarm", "supervisor", "worker", "scheduler", "autonomous"),
+    "provider": ("provider", "providers", "model_routing"),
+    "app": ("app_assembly", "application", "installation", "app", "installer", "deployment"),
     "backend": (),  # All backend/tests test modules.
     "all": (),  # All three test roots, except opt-in integration categories.
 }
@@ -71,10 +71,13 @@ def discover_tests(
     matches: set[str] = set()
     for test_root in TEST_ROOTS:
         directory = root / test_root
-        if not directory.is_dir():
+        if not directory.is_dir() or directory.is_symlink():
             continue
+        canonical_root = directory.resolve()
         for path in directory.rglob("test_*.py"):
-            if not path.is_file() or path.is_symlink():
+            # A symlinked intermediate directory must never escape the test root.
+            if (not path.is_file() or path.is_symlink()
+                    or not path.resolve().is_relative_to(canonical_root)):
                 continue
             stem = path.stem.lower()
             relative_path = path.relative_to(root)
@@ -144,6 +147,11 @@ def main(argv: list[str] | None = None) -> int:
     if not paths:
         print("ERROR: no matching test files; refusing a false-green run", file=sys.stderr)
         return 2
+    # A valid feature with zero tests must not borrow another selector's green result.
+    for feature in sorted(set(args.feature) - {"all"}):
+        if not discover_tests(ROOT, (feature,), include_integration=args.include_integration):
+            print(f"ERROR: no matching test files for {feature}; refusing a false-green run", file=sys.stderr)
+            return 2
     if args.list:
         print("\n".join(paths))
         print(f"SELECTED {len(paths)} test files", file=sys.stderr)

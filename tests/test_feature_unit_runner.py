@@ -172,3 +172,55 @@ def test_invalid_timeout_is_rejected(monkeypatch, tmp_path: Path) -> None:
     with pytest.raises(SystemExit) as exc:
         runner.main(["--feature", "ai", "--timeout-seconds", "-5"])
     assert exc.value.code == 2
+
+
+def test_each_requested_feature_needs_its_own_test(tmp_path: Path, monkeypatch, capsys) -> None:
+    _touch(tmp_path, "tests/test_ai.py")
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    assert runner.main(["--feature", "ai", "--feature", "dragon", "--list"]) == 2
+    assert "no matching test files for dragon" in capsys.readouterr().err
+
+
+def test_duplicate_selected_feature_does_not_false_fail(tmp_path: Path, monkeypatch) -> None:
+    _touch(tmp_path, "tests/test_ai.py")
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    assert runner.main(["--feature", "ai", "--feature", "ai", "--list"]) == 0
+
+
+def test_symlinked_test_root_cannot_escape_checkout(tmp_path: Path) -> None:
+    import pytest
+
+    elsewhere = tmp_path.parent / "external-test-bundle"
+    elsewhere.mkdir(exist_ok=True)
+    _touch(elsewhere, "test_ai.py")
+    try:
+        (tmp_path / "tests").symlink_to(elsewhere, target_is_directory=True)
+    except (NotImplementedError, OSError):
+        pytest.skip("directory symlinks unavailable")
+    assert runner.discover_tests(tmp_path, ["ai"]) == []
+
+
+def test_feature_aliases_cover_actual_repository_naming_conventions(tmp_path: Path) -> None:
+    examples = {
+        "ai": "test_consumer_transformer_acceleration.py",
+        "jeeves": "test_llm_router.py",
+        "game-builder": "test_dialogue_and_forge_gates.py",
+        "dragon": "test_ai_webcrawler_advanced_admission.py",
+        "physics": "test_rigid_body_constraints.py",
+        "security": "test_secret_scanning_workflow_contract.py",
+        "shell": "test_command_contracts.py",
+        "memory": "test_embedding_cosine.py",
+        "agents": "test_ai_dragon_worker_leases.py",
+        "provider": "test_ai_webcrawler_providers.py",
+        "app": "test_app_offline_chat_cli.py",
+    }
+    for feature, filename in examples.items():
+        _touch(tmp_path, f"tests/{filename}")
+        assert f"tests/{filename}" in runner.discover_tests(tmp_path, [feature]), feature
+
+
+def test_ordinary_substrings_still_do_not_match(tmp_path: Path) -> None:
+    _touch(tmp_path, "tests/test_email.py")
+    _touch(tmp_path, "tests/test_fake_appetite.py")
+    assert runner.discover_tests(tmp_path, ["ai"]) == []
+    assert runner.discover_tests(tmp_path, ["app"]) == []
