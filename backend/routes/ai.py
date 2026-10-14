@@ -300,6 +300,11 @@ class AIChatRequest(BaseModel):
     )
 
 
+class AIChatResumeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    idempotency_key: str = Field(..., min_length=1, max_length=1024)
+
+
 class AIChatCancelRequest(BaseModel):
     idempotency_key: str = Field(
         ...,
@@ -2666,6 +2671,35 @@ async def get_ai_chat_turn_events(
         frames(), media_type="text/event-stream",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/chat/turns/{thread_id}/resume")
+async def resume_ai_chat_turn(
+    thread_id: str,
+    body: AIChatResumeRequest,
+    user=Depends(require_role("viewer")),
+) -> Dict[str, Any]:
+    """Observe accepted engine work without re-submitting the original prompt.
+
+    A not-yet-admitted request cannot be safely reconstructed here without its
+    stored exact execution command. Return an explicit failure rather than
+    guessing model choices or executing a different request.
+    """
+    try:
+        state = await get_ai_chat_turn(
+            thread_id, idempotency_key=body.idempotency_key, user=user,
+        )
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "original_request_required",
+                    "message": "The original admitted command is unavailable. Refresh and retry from the saved request.",
+                },
+            ) from exc
+        raise
+    return {**state, "server_resume_available": False}
 
 
 @router.post("/chat/turns/{thread_id}/cancel")
