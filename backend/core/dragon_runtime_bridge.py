@@ -89,6 +89,13 @@ def mount_configured_dragon_runtime(app, conversation_authority):
     # choose a database file, reviewer signer or owner. Never synthesize a
     # research coordinator when canonical capture/nest stores are absent.
     research = getattr(app.state, "dragon_research_coordinator", None)
+    # The current application may already have installed a typed dashboard
+    # during module bootstrap. Reuse that exact authority instead of opening
+    # a second vault and rejecting the independently configured instance.
+    installed_dashboard = getattr(app.state, "dragon_research_dashboard", None)
+    if research is None and installed_dashboard is not None:
+        research = installed_dashboard
+        app.state.dragon_research_coordinator = research
     # Explicit opt-in only. Use the same canonical knowledge and signed-nest
     # stores already configured for Dragon Academy. Never create DBs on GET.
     if research is None:
