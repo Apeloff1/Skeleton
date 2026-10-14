@@ -2623,16 +2623,21 @@
         ],
         "gaps": [],
         "tests": [
-          "planned:skeleton/testing/test_python_layering.py",
-          "planned:skeleton/testing/test_import_side_effects.py"
+          "tests/test_architecture_package_layers.py",
+          "tests/test_vol052_python_architecture_independent.py",
+          "tests/flgb/test_masterplan_closure.py"
         ],
         "evaluations": [
-          "planned:dependency-cycle scan",
-          "planned:cold-import determinism evaluation"
+          "scripts/check_architecture_package_layers.py",
+          "scripts/verify_vol052_python_architecture.py",
+          ".github/workflows/vol052-python-architecture.yml"
         ],
         "existing_evidence": [
           "skeleton/masterplan/closure.py",
-          "tests/flgb/test_masterplan_closure.py"
+          "tests/flgb/test_masterplan_closure.py",
+          "scripts/check_architecture_package_layers.py",
+          "scripts/verify_vol052_python_architecture.py",
+          ".github/workflows/vol052-python-architecture.yml"
         ]
       },
       "implementation_levels": [
