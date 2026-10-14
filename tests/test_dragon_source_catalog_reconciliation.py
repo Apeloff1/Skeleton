@@ -76,3 +76,20 @@ def test_untrusted_catalog_cannot_promote_leads_or_forge_custody():
     bad_lineage["sources"][0]["discoveries"][0]["catalog_id"] = "catalog-" + "e" * 40
     with pytest.raises(ValueError, match="lineage"):
         merge_catalogs([bad_lineage])
+
+
+def test_manifest_custody_rejects_unknown_fields_and_noncanonical_links():
+    from copy import deepcopy
+
+    base = extract_catalog(
+        "https://example.com/reference", catalog_url="https://example.org/index",
+        blob_sha=BLOB, observed_at=STAMP,
+    )
+    extra_authority = deepcopy(base)
+    extra_authority["manifest"]["source_authorized"] = True
+    with pytest.raises(ValueError, match="manifest fields"):
+        merge_catalogs([extra_authority])
+    alias = deepcopy(base)
+    alias["manifest"]["url"] = "https://EXAMPLE.org/index?utm_campaign=forged"
+    with pytest.raises(ValueError, match="not canonical"):
+        merge_catalogs([alias])
