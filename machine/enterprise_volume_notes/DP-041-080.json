@@ -3047,7 +3047,7 @@
       "title": "Machine Architecture Manifests",
       "depth_pass": "DP-041-080",
       "october_2026_standard": "skeleton.enterprise_ai.2026-10",
-      "legacy_implementation_status": "verified",
+      "legacy_implementation_status": "implemented",
       "enterprise_grade_state": "designed",
       "enterprise_grade_target": "enterprise_qualified",
       "implementation_summary": {
@@ -3077,7 +3077,9 @@
           "dangling path/reference",
           "schema downgrade"
         ],
-        "gaps": [],
+        "gaps": [
+          "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
+        ],
         "tests": [
           "tests/test_architecture_manifest_references.py",
           "tests/test_architecture_rule_registry.py",
