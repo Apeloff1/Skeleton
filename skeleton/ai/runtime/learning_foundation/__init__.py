@@ -93,3 +93,33 @@ __all__ = [
     "DatasetTransactionReceipt",
     "IngestionRecord",
 ]
+
+
+# Preserve stable P3 multimodal evidence and measured-rollout APIs from the
+# reconciled source modules without eagerly loading optional runtime backends.
+_LAZY_EXPORTS = {
+    "content_retrieval": frozenset({
+        "ContentSignalIndex", "ContentFeatureReceipt", "ContentSimilarityHit",
+    }),
+    "rollout": frozenset({
+        "MeasuredModelRollout", "MeasuredRolloutError", "RolloutPlan",
+        "RolloutGatePolicy", "RolloutMeasurementReceipt", "RolloutStageReceipt",
+        "RolloutActionReceipt", "LocalUsageTariff",
+    }),
+    "temporal": frozenset({
+        "LiveSpeechExecution", "SpeechFrameEvidence", "SpeechExecutionReceipt",
+        "VideoEvidenceIndex", "TimedMediaFragment", "VideoFragmentEvidence",
+        "VideoTimelineReceipt", "VideoFusionHit",
+    }),
+}
+
+
+def __getattr__(name: str):
+    for module_name, names in _LAZY_EXPORTS.items():
+        if name in names:
+            from importlib import import_module
+
+            value = getattr(import_module("." + module_name, __name__), name)
+            globals()[name] = value
+            return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
