@@ -61,7 +61,7 @@ def extract_catalog(content: str, *, catalog_url: str, blob_sha: str,
     if not isinstance(blob_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", blob_sha):
         raise ValueError("retrieved Git blob identity required")
     encoded = content.encode("utf-8")
-    verified_blob = sha1(b"blob " + str(len(encoded)).encode("ascii") + b"\\0" + encoded).hexdigest()
+    verified_blob = sha1(b"blob " + str(len(encoded)).encode("ascii") + b"\0" + encoded).hexdigest()
     if blob_sha != verified_blob:
         raise ValueError("catalog bytes do not match claimed Git blob identity")
     catalog_id = "catalog-" + blob_sha
