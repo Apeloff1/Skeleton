@@ -78,8 +78,9 @@ export async function submitChatTurn(thread: ConversationThread, input: ChatTurn
   if (!input.message.trim() || input.message.length > 100000 || (input.context?.length ?? 0) > 100000) {
     throw new ChatClientError('Message or context is empty or too large.', { kind: 'validation' });
   }
-  if ((input.attachmentRefs?.length ?? 0) > 256
-    || input.attachmentRefs?.some(ref => typeof ref !== 'string' || !ref || ref.length > 2048)) {
+  if ((input.attachmentRefs?.length ?? 0) > 4
+    || new Set(input.attachmentRefs ?? []).size !== (input.attachmentRefs?.length ?? 0)
+    || input.attachmentRefs?.some(ref => typeof ref !== 'string' || !/^chat-attachment:\/\/[0-9a-f-]{36}$/.test(ref))) {
     throw new ChatClientError('Attachment references are invalid.', { kind: 'validation' });
   }
   if (input.model && (!input.model.selectable || !input.model.available)) {
