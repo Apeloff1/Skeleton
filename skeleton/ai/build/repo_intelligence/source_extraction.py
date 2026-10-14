@@ -29,7 +29,12 @@ def _specs(src:SourceFile)->tuple[str,...]:
   out=[]
   for n in ast.walk(tree):
    if isinstance(n,ast.Import):out.extend(x.name for x in n.names)
-   elif isinstance(n,ast.ImportFrom) and n.module:out.append(n.module)
+   elif isinstance(n,ast.ImportFrom):
+    # Preserve relative level: 'from .. import b' is pkg/b, not a
+    # missing or top-level import. Never invent edges for wildcard names.
+    prefix="."*n.level
+    if n.module:out.append(prefix+n.module)
+    elif n.level:out.extend(prefix+a.name for a in n.names if a.name!="*")
   return tuple(sorted(set(out)))
  patterns={
  "javascript":r"(?:from\s+|require\s*\(\s*)['\"]([^'\"]+)['\"]",
@@ -44,6 +49,8 @@ def _resolve(source:str,spec:str,paths:set[str])->str|None:
  if spec.startswith("."):
   depth=len(spec)-len(spec.lstrip("."))
   remainder=spec[depth:]
+  # Python relative imports cannot ascend beyond their package.
+  if source.endswith(".py") and depth>len(base.parts):return None
   root=base
   for _ in range(max(0,depth-1)):root=root.parent
   rel=remainder.replace(".","/").lstrip("/")
