@@ -850,7 +850,16 @@ def render_native_project(*,title:str,target_id:str,style:str,
         raise ValueError("native project source exceeds platform-specific budget")
     from .dragon_hardware_budget import analyze_project_budget
     from dataclasses import asdict as _asdict
-    hardware=_asdict(analyze_project_budget(target_id,files))
+    # README.md from some source emitters is deliberately replaced below.
+    # Freeze the audited source inventory to precisely the files that
+    # validate_native_source will independently reconstruct later. This
+    # prevents a legitimate source release from failing its own attestation.
+    # Source files and real assets remain inside the budget; no bypass of
+    # asset, RAM, sprite, file-size, or source-hash requirements is allowed.
+    budget_inputs={name:content for name,content in files.items()
+                   if name not in ("README.md","dragon-hardware-budget.json",
+                                   "dragon-native-manifest.json")}
+    hardware=_asdict(analyze_project_budget(target_id,budget_inputs))
     files["dragon-hardware-budget.json"]=json.dumps(
         hardware,sort_keys=True,indent=2)+"\n"
     implemented={Mechanic.MOVEMENT,Mechanic.EXPLORATION}

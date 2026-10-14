@@ -73,7 +73,12 @@ def mutate_original_world(world:World,*,seed:int)->World:
         # All positive numbers stay within the original graph schema caps.
         edges.append(replace(
             edge,
-            minutes=max(1,min(1440,edge.minutes+digest[0]%19-9)),
+            # Real multi-year generation-ship legs must survive seeded
+            # recombination. Only ordinary short hops get local jitter;
+            # reducing a decades-long journey to one day falsifies the game
+            # clock and contradicts the bounded source witness.
+            minutes=(edge.minutes if edge.minutes>1440 else
+                     max(1,min(1440,edge.minutes+digest[0]%19-9))),
             danger=min(100,max(0,edge.danger+digest[1]%9-4)),
             spectacle=min(100,max(0,edge.spectacle+digest[2]%13-6)),
         ))

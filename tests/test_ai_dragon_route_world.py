@@ -244,7 +244,7 @@ def test_illegal_provenance_impossible_edges_and_forged_secrets_fail_closed(bad_
 @pytest.mark.parametrize("condition",[
     ("objective","secret_punishment"),
     ("minimum_minutes",-1),
-    ("minimum_minutes",999999),
+    ("minimum_minutes",26_280_001),
     ("expansion_cap",10),
     ("requires",("shape:unknown_shape",)),
     ("requires",("family:copyrighted_world",)),
@@ -346,3 +346,20 @@ def test_original_world_clock_preserves_minutes_after_multiple_game_years():
     assert before["remaining_fuel"]==35
     assert any(x["edge"]=="deep_space_crossing" and x["available"]
                for x in before["options"])
+
+
+def test_original_variant_preserves_decades_long_route_durations():
+    from skeleton.ai.webcrawler.dragon_route_world_variants import mutate_original_world
+    world, hero = make_frontier(seed=1947)
+    for seed in (1, 5, 1947, 2026):
+        source = {edge.id: edge.minutes for edge in world.connections}
+        derived = mutate_original_world(world, seed=seed)
+        durations = {edge.id: edge.minutes for edge in derived.connections}
+        for edge in ("generation_ship_voyage", "deep_space_crossing"):
+            assert source[edge] > 1440
+            assert durations[edge] == source[edge]
+        journey = replay(derived, (
+            "spaceport_access", "shuttle_to_orbit", "generation_ship_voyage",
+            "deep_space_crossing", "stellar_return",
+        ), hero, objective="impractical")
+        assert journey.success and journey.elapsed_minutes > 25 * 365 * 24 * 60
