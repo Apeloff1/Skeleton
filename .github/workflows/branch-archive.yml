@@ -97,22 +97,26 @@ jobs:
               [[ -n "$branch" ]] || continue
               open_heads["$branch"]=1
             done < "$heads_file"
-            while IFS= read -r br          load_archive_candidates() {
+            while IFS= read -r branch; do
+              [[ -n "$branch" && "$branch" != main ]] || continue
+              open_bases["$branch"]=1
+            done < "$bases_file"
+          }
+
+          load_archive_candidates() {
             local kind branch tip pr merged_at key candidates_file
             candidates_file="$RUNNER_TEMP/branch-archive-closed-candidates.tsv"
             archive_pr=()
             stacked_merged_pr=()
             stacked_merged_at=()
 
-            # One fail-closed paginated read inventories both closed-unmerged
-            # heads and stacked PRs merged into non-main target branches.
+            # Single fail-closed history snapshot for unmerged and stacked PRs.
             if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
               --jq ".[] | select(.head.repo.full_name == .base.repo.full_name) | select((.merged_at == null and .closed_at != null and .closed_at <= \"$cutoff\") or (.merged_at != null and .merged_at <= \"$stacked_cutoff\" and .base.ref != \"main\")) | [(if .merged_at == null then \"closed\" else \"stacked\" end), .head.ref, .head.sha, (.number|tostring), (.merged_at // \"none\")] | @tsv" \
               > "$candidates_file"; then
               echo '::error::Closed PR history unavailable; refusing branch archive mutations.'
               return 1
             fi
-
             while IFS=$'\t' read -r kind branch tip pr merged_at; do
               [[ -n "$branch" && -n "$tip" && -n "$pr" ]] || continue
               key="${branch}:${tip}"
@@ -124,11 +128,6 @@ jobs:
                   ;;
                 *) echo '::error::Unrecognized archived PR candidate type.'; return 1 ;;
               esac
-            done < "$candidates_file"
-          }
-
- [[ -n "$branch" && -n "$tip" && -n "$pr" ]] || continue
-              archive_pr["${branch}:${tip}"]="$pr"
             done < "$candidates_file"
           }
 
