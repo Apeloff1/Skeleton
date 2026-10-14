@@ -1101,13 +1101,17 @@ async def ai_chat(
         raise HTTPException(status_code=422, detail="Select both provider and model")
     if len(set(request.attachment_refs)) != len(request.attachment_refs):
         raise HTTPException(status_code=422, detail="Duplicate attachment references")
+    # All governed chat turns require the canonical engine, including the
+    # automatic model route. Reject before persisting a user message when
+    # admission cannot possibly succeed. The compatibility call_llm facade
+    # also requires this exact engine and cannot rescue an unconfigured turn.
+    try:
+        configured_engine = EngineClient.from_env()
+    except EngineClientError as exc:
+        raise HTTPException(status_code=503, detail="AI engine configuration is unavailable") from exc
+    if configured_engine is None:
+        raise HTTPException(status_code=503, detail="A configured AI engine is required")
     if explicit_options or request.attachment_refs:
-        try:
-            configured_engine = EngineClient.from_env()
-        except EngineClientError as exc:
-            raise HTTPException(status_code=503, detail="AI engine configuration is unavailable") from exc
-        if configured_engine is None:
-            raise HTTPException(status_code=503, detail="A configured AI engine is required")
         if explicit_options:
             inventory = await model_catalog(
                 configured_engine, actor_id=owner_id, tenant_id=tenant_id,
