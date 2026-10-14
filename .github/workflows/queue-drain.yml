@@ -75,11 +75,9 @@ jobs:
           cancellation_attempts = 0
           budget_exhausted = False
 
-          # These workflows form the branch-flow / queue-recovery control plane.
-          # They are designed either to follow a moving main, provide canonical
-          # post-merge evidence, or reclaim stale queue capacity. They must never
-          # be garbage-collected as stale workload merely because a newer commit
-          # appears while they are queued.
+          # Preserve privileged controllers and per-event receipts from broad
+          # last-main supersession. Only explicitly idempotent, queued sweeps
+          # may be coalesced when a newer live sweep is independently verified.
           control_plane_paths = frozenset({
               '.github/workflows/actions-housekeeping-cli.yml',
               '.github/workflows/branch-clean.yml',
@@ -93,6 +91,34 @@ jobs:
               '.github/workflows/p1-risk-evidence-binding.yml',
               '.github/workflows/p1-reproducibility-bundle.yml',
               '.github/workflows/p1-scope-freeze.yml',
+              '.github/workflows/automerge-control-plane.yml',
+              '.github/workflows/repair-intake.yml',
+              '.github/workflows/automation-traffic-manager.yml',
+              '.github/workflows/bot-manager.yml',
+              '.github/workflows/repo-bots.yml',
+              '.github/workflows/idle-security-bot.yml',
+              '.github/workflows/security-watch-bot.yml',
+              '.github/workflows/ci-failure-bot.yml',
+              '.github/workflows/shift-supervisor-control.yml',
+              '.github/workflows/shift-supervisor-watchdog.yml',
+              '.github/workflows/supervisor.yml',
+              '.github/workflows/pr-churn-control.yml',
+          })
+          # These periodic controllers always inventory the *current* repo,
+          # unlike the privileged Auto-Merge / Repair Intake workflow_run
+          # consumers, whose events are unique and MUST NOT be coalesced.
+          coalescible_control_plane_paths = frozenset({
+              '.github/workflows/queue-drain.yml',
+              '.github/workflows/branch-clean.yml',
+              '.github/workflows/actions-housekeeping-cli.yml',
+              '.github/workflows/branch-flow.yml',
+              '.github/workflows/automation-traffic-manager.yml',
+              '.github/workflows/bot-manager.yml',
+              '.github/workflows/repo-bots.yml',
+              '.github/workflows/idle-security-bot.yml',
+              '.github/workflows/shift-supervisor-control.yml',
+              '.github/workflows/shift-supervisor-watchdog.yml',
+              '.github/workflows/pr-churn-control.yml',
           })
 
           def request(path, *, method='GET'):
@@ -372,6 +398,33 @@ jobs:
           def is_control_plane(run):
               return path(run) in control_plane_paths
 
+          def periodic_controller_key(run):
+              workflow_path = path(run)
+              event = run.get('event')
+              if workflow_path not in coalescible_control_plane_paths:
+                  return None
+              if event == 'schedule':
+                  pass
+              elif event == 'workflow_run':
+                  if workflow_path not in {
+                      '.github/workflows/queue-drain.yml',
+                      '.github/workflows/branch-clean.yml',
+                  }:
+                      return None
+              elif event == 'push':
+                  # A workflow-file self-update is a replaceable full sweep,
+                  # but only for these idempotent recovery controllers.
+                  if workflow_path not in {
+                      '.github/workflows/queue-drain.yml',
+                      '.github/workflows/branch-clean.yml',
+                      '.github/workflows/actions-housekeeping-cli.yml',
+                  }:
+                      return None
+              else:
+                  # Never coalesce explicit dispatches or unique PR events.
+                  return None
+              return (workflow_path, run.get('head_branch') or '')
+
           def workflow_event_key(run):
               return (int(run.get('workflow_id') or 0), run.get('event') or '')
 
@@ -394,6 +447,7 @@ jobs:
               'queued_seen': 0,
               'active_seen': 0,
               'control_plane_preserved': 0,
+              'coalesced_control_plane_queued': 0,
               'obsolete_main': 0,
               'obsolete_main_active': 0,
               'duplicates': 0,
@@ -437,8 +491,26 @@ jobs:
                   for run in head_runs
                   if usable_replacement(run)
               }
-              queued = list_runs(run_status='queued')
+              # Pending and waiting also occupy Actions admission slots.
+              # Deduplicate by immutable run ID before classifying.
+              queued_by_id = {}
+              for status_name in ('queued', 'pending', 'waiting'):
+                  for observed in list_runs(run_status=status_name):
+                      observed_id = int(observed.get('id') or 0)
+                      if observed_id:
+                          queued_by_id[observed_id] = observed
+              queued = list(queued_by_id.values())
               active = list_runs(run_status='in_progress')
+              # The highest run ID is the newest live sweep of this exact
+              # controller lane. No completed/failed/non-live replacement can
+              # authorize retiring a still-queued controller.
+              latest_controllers = {}
+              for observed in (*queued, *active):
+                  key = periodic_controller_key(observed)
+                  if key is not None:
+                      prior = latest_controllers.get(key)
+                      if prior is None or int(observed['id']) > int(prior['id']):
+                          latest_controllers[key] = observed
               open_pr_heads, open_pr_numbered_heads = list_open_pr_heads()
               live_ids = {
                   int(run.get('id') or 0)
@@ -485,6 +557,20 @@ jobs:
                       selected.append(run)
                       totals['orphaned_main_queued'] += 1
                       local['orphaned_main_queued'] += 1
+                      continue
+                  periodic_key = periodic_controller_key(run)
+                  latest = latest_controllers.get(periodic_key) if periodic_key else None
+                  if (
+                      latest is not None
+                      and int(latest['id']) > run_id
+                      and (run.get('head_sha') or '') != head
+                  ):
+                      # Only a queued, superseded full-repository sweep. Do
+                      # not interrupt a running controller or an explicit
+                      # request, and always retain the newest live sweep.
+                      selected.append(run)
+                      totals['coalesced_control_plane_queued'] += 1
+                      local['coalesced_control_plane_queued'] += 1
                       continue
                   if is_control_plane(run):
                       totals['control_plane_preserved'] += 1
@@ -639,6 +725,7 @@ jobs:
                   f'pass={pass_no} main={head} queued={len(queued)} '
                   f'active={len(active)} selected={len(selected)} '
                   f'control_plane_preserved={local["control_plane_preserved"]} '
+                  f'coalesced_control_plane_queued={local["coalesced_control_plane_queued"]} '
                   f'obsolete_main={local["obsolete_main"]} '
                   f'obsolete_main_active={local["obsolete_main_active"]} '
                   f'obsolete_pr_queued={local["obsolete_pr_queued"]} '
@@ -673,6 +760,10 @@ jobs:
                   handle.write(
                       '- Branch control-plane observations preserved: '
                       f'{totals["control_plane_preserved"]}\n'
+                  )
+                  handle.write(
+                      '- Superseded queued periodic-controller sweeps: '
+                      f'{totals["coalesced_control_plane_queued"]}\n'
                   )
                   handle.write(
                       f'- Obsolete main selections: {totals["obsolete_main"]}\n'

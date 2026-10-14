@@ -4,7 +4,7 @@ on:
   schedule:
     # Bounded canonical refresh cadence. Queue pressure is checked before any
     # checkout, model call, or plan mutation.
-    - cron: '2,32 * * * *'
+    - cron: '2 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -199,7 +199,7 @@ jobs:
         run: |
           set -euo pipefail
           role='secretary'
-          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_NAME" == 'push' || "$EVENT_SCHEDULE" == '2,32 * * * *' ]]; then
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_NAME" == 'push' || "$EVENT_SCHEDULE" == '2 * * * *' ]]; then
             role='both'
           fi
 

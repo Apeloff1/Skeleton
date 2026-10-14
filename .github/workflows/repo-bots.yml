@@ -15,7 +15,7 @@ on:
   # Keep automatic proposals on four staggered daily sweeps; manual dispatch
   # remains available for urgent CI/security review.
   schedule:
-    - cron: "43 1,7,13,19 * * *"
+    - cron: "43 7,19 * * *"
 
 concurrency:
   group: repo-bots-${{ github.ref }}
@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       # Bound simultaneous model-backed proposals on busy GitHub runners.
-      max-parallel: 2
+      max-parallel: 1
       matrix:
         bot: [triage, ci, security, cleanup]
     steps:

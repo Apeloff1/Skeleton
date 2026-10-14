@@ -294,11 +294,11 @@ def _workflow_findings(text: str) -> list[Finding]:
             )
         )
 
-    if "AUTOMERGE_DISPATCH_POST_MERGE: \"true\"" not in reconcile:
+    if "AUTOMERGE_DISPATCH_POST_MERGE: \"false\"" not in reconcile:
         findings.append(
             Finding(
-                "post-merge-evidence",
-                "post-merge workflow dispatch must be enabled",
+                "post-merge-fanout",
+                "post-merge dispatch must be disabled; main push and periodic queue drain own recovery",
                 rel,
             )
         )

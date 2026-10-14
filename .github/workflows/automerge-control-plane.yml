@@ -123,11 +123,12 @@ jobs:
       AUTOMERGE_ALLOW_OWNER_WITHOUT_OPT_IN: "true"
       AUTOMERGE_ALLOW_DEPENDABOT_WITHOUT_OPT_IN: "true"
       AUTOMERGE_ALLOW_STACK_CHILD_MERGE: "true"
-      AUTOMERGE_DISPATCH_POST_MERGE: "true"
+      AUTOMERGE_DISPATCH_POST_MERGE: "false"
       AUTOMERGE_STOP_AFTER_STACK_MUTATION: "true"
       AUTOMERGE_FAIL_ON_GRAPH_ERROR: "true"
-      # Main push already starts canonical Merge Readiness; dispatch only cleanup.
-      AUTOMERGE_POST_MERGE_WORKFLOWS: "queue-drain.yml"
+      # Main push triggers the canonical checks, and the five-minute drain
+      # schedule recovers missed wakeups. No per-merge cleanup dispatch.
+      AUTOMERGE_POST_MERGE_WORKFLOWS: ""
       AUTOMERGE_LEDGER_PATH: ".automerge/ledger.jsonl"
       AUTOMERGE_REPORT_PATH: ".automerge/report.json"
     steps:
