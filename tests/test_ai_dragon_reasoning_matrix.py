@@ -87,7 +87,7 @@ def test_evidence_expiry_rejects_untyped_or_non_finite_values(value: object) -> 
         EvidenceFact("checked", Truth.TRUE, "evidence://primary", value)
 
 
-@pytest.mark.parametrize("value", [None, "now", [], 7, True, -1.0, float("nan"), float("inf")])
+@pytest.mark.parametrize("value", [None, "now", [], True, -1.0, float("nan"), float("inf")])
 def test_evaluator_rejects_untyped_timestamps(value: object) -> None:
     with pytest.raises(ValueError):
         evaluate_matrix(MatrixRule("g", all_of=("x",)), (), {}, now=value,
@@ -121,3 +121,11 @@ def test_exception_retries_are_strictly_bounded() -> None:
     assert exception_action("unsupported", 0) == ("stop_operator_review", False)
     with pytest.raises(ValueError):
         exception_action("transient_network", True)
+
+
+def test_integer_clock_values_are_valid() -> None:
+    result = evaluate_matrix(MatrixRule("typed", all_of=("x",)),
+                             (_fact("x", Truth.TRUE),), {}, now=7,
+                             genre="rpg", era="2026", engine="native")
+    assert result.truth is Truth.TRUE
+    assert result.eligible is True
