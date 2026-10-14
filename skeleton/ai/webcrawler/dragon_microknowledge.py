@@ -116,8 +116,13 @@ class DragonMicroKnowledge:
                 or isinstance(now, bool) or not isinstance(now, (int, float))
                 or not isfinite(now) or now < 0):
             raise ValueError("invalid microknowledge query")
-        if (not isinstance(plan, ResourcePlan) or not 0 <= plan.retrieval_candidates <= 256
-                or not 0 <= plan.context_bytes <= 65536 or not 1 <= plan.chunk_bytes <= 4096):
+        if (not isinstance(plan, ResourcePlan)
+                or type(plan.retrieval_candidates) is not int
+                or type(plan.context_bytes) is not int
+                or type(plan.chunk_bytes) is not int
+                or not 0 <= plan.retrieval_candidates <= 256
+                or not 0 <= plan.context_bytes <= 65536
+                or not 1 <= plan.chunk_bytes <= 4096):
             raise ValueError("invalid retrieval plan")
         terms = _terms(query)[:16]
         if not terms or not plan.retrieval_candidates or not plan.context_bytes:
