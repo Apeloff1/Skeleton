@@ -570,6 +570,11 @@ jobs:
                       totals['stale_dynamic_active'] += 1
                       local['stale_dynamic_active'] += 1
 
+              # Select lanes newest-first above so every unreplaced lane
+              # retains its most recent validation. Once eligibility has
+              # been proved, reclaim the *oldest* selected tombstones first
+              # to release long-blocked capacity before newer cancellations.
+              selected.sort(key=lambda run: run.get('created_at') or '')
               accepted = moved = deferred = failed = 0
               for run in selected:
                   if cancellation_attempts >= max_cancellation_attempts or time.monotonic() >= deadline:
