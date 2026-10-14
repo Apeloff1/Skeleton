@@ -151,8 +151,8 @@ def test_queue_drain_has_one_recovery_worker_and_independent_housekeeping() -> N
         / ".github/workflows/actions-housekeeping-cli.yml"
     ).read_text(encoding="utf-8")
 
-    assert "  drain:\\n" in workflow
-    assert "  wake-housekeeping:\\n" not in workflow
+    assert "  drain:\n" in workflow
+    assert "  wake-housekeeping:\n" not in workflow
     assert "runs-on: ubuntu-24.04-arm" in workflow
     assert "gh workflow run actions-housekeeping-cli.yml" not in workflow
     assert "schedule:" in housekeeping
@@ -201,7 +201,7 @@ def test_queue_drain_backpressure_stops_exhausted_mutation_sweeps() -> None:
     assert "if status not in retryable or status == 429:" in workflow
     assert "if status == 429:" in workflow
     assert "rate_limit_hit = True" in workflow
-    assert "if rate_limit_hit:" in workflow
+    assert "if rate_limit_hit or budget_exhausted:" in workflow
     assert "if pass_no < 4 and not rate_limit_hit and not budget_exhausted:" in workflow
 
 
