@@ -717,7 +717,7 @@ jobs:
           REPO: ${{ github.repository }}
           HOUSEKEEPING_WORKFLOW: actions-housekeeping-cli.yml
           HOUSEKEEPING_WAKE_STALE_MINUTES: '1440'
-          HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '360'
+          HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '90'
         shell: bash
         run: |
           set -euo pipefail
