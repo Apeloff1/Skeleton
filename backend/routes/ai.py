@@ -2530,17 +2530,17 @@ async def get_ai_chat_turn_events(
                 record, sort_keys=True, separators=(",", ":"),
                 ensure_ascii=False, allow_nan=False,
             )
-            yield f"id: {event.sequence}\\nevent: engine.{event.kind}\\ndata: {data}\\n\\n"
+            yield f"id: {event.sequence}\nevent: engine.{event.kind}\ndata: {data}\n\n"
         if final is not None and final.get("terminal") is True:
             data = json.dumps(
                 final, sort_keys=True, separators=(",", ":"),
                 ensure_ascii=False, allow_nan=False, default=str,
             )
-            yield f"event: chat.final\\ndata: {data}\\n\\n"
+            yield f"event: chat.final\ndata: {data}\n\n"
         else:
             # A completed bounded page is a detached observation, not a failed
             # or re-submitted engine command. The client reopens from its cursor.
-            yield 'event: chat.detach\\ndata: {"reason":"page_complete"}\\n\\n'
+            yield 'event: chat.detach\ndata: {"reason":"page_complete"}\n\n'
 
     return StreamingResponse(
         frames(), media_type="text/event-stream",
