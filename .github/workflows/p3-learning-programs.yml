@@ -7,6 +7,11 @@ on:
       - ".github/workflows/p3-learning-programs.yml"
   push:
     branches: [main, feat/p3-learning-multimodal-t2]
+    # Run only for this subsystem; avoid every unrelated main push.
+    paths:
+      - "skeleton/ai/runtime/learning_foundation/learning.py"
+      - "skeleton/testing/test_p3_learning_programs.py"
+      - ".github/workflows/p3-learning-programs.yml"
   workflow_dispatch:
 permissions:
   contents: read

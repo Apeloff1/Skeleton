@@ -8,6 +8,12 @@ on:
       - ".github/workflows/p3-multimodal-foundation.yml"
   push:
     branches: [main, feat/p3-learning-multimodal-t2]
+    # Run only for this subsystem; avoid every unrelated main push.
+    paths:
+      - "skeleton/ai/runtime/learning_foundation/multimodal.py"
+      - "skeleton/ai/runtime/multimodal/intake.py"
+      - "skeleton/testing/test_p3_multimodal_foundation.py"
+      - ".github/workflows/p3-multimodal-foundation.yml"
   workflow_dispatch:
 permissions:
   contents: read
