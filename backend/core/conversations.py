@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from dataclasses import replace
 import hashlib
 import json
+import math
 import re
 from typing import Any, Awaitable, Callable, Mapping
 from uuid import uuid4
@@ -1950,6 +1951,162 @@ class MongoConversationAuthority:
                     return requests[:32], True
         return requests, len(rows) == 64
 
+
+    async def export_thread(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        format: str = "json",
+        expected_thread_version: int | None = None,
+    ) -> Mapping[str, Any]:
+        """Export only a coherent owned active lineage after live governance admission."""
+        if format not in {"json", "markdown"}:
+            raise ValueError("conversation export format is invalid")
+        initial = await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        if initial.state not in {ConversationThreadState.ACTIVE, ConversationThreadState.ARCHIVED}:
+            raise ConversationConflict("conversation is unavailable for export")
+        if expected_thread_version is not None and initial.version != expected_thread_version:
+            raise ConversationConflict("thread version conflict")
+        messages = [
+            message.as_dict()
+            for message in await self.active_transcript(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        ]
+        if _storage_bytes(messages) > 8 * 1024 * 1024:
+            raise ConversationConflict("conversation export exceeds its bounded transcript size")
+        reader = self.governance_inventory_reader
+        if reader is None:
+            raise ConversationStorageUnavailable("conversation governed export authority is unavailable")
+        try:
+            inventory = await reader(tenant_id=tenant_id)
+        except Exception as exc:
+            raise ConversationStorageUnavailable(
+                "conversation governed export authority is unavailable"
+            ) from exc
+        if (
+            not isinstance(inventory, Mapping)
+            or inventory.get("tenant_id") != tenant_id
+            or not isinstance(inventory.get("records"), list)
+        ):
+            raise ConversationStorageUnavailable("conversation governed export inventory is malformed")
+        expected = {thread_id: "conversation-thread://" + thread_id}
+        expected.update(
+            {
+                message["message_id"]: "conversation-message://" + thread_id + "/" + message["message_id"]
+                for message in messages
+            }
+        )
+        admitted: set[str] = set()
+        now = _utcnow()
+        for record in inventory["records"]:
+            if not isinstance(record, Mapping) or record.get("record_id") not in expected:
+                continue
+            retention = record.get("retention_until")
+            if (
+                record.get("tenant_id") != tenant_id
+                or record.get("owner_plane") != "conversation"
+                or record.get("source_ref") != expected[record["record_id"]]
+                or record.get("state") != "active"
+                or record.get("exportable") is not True
+                or (
+                    retention is not None
+                    and (
+                        type(retention) not in {int, float}
+                        or not math.isfinite(retention)
+                        or retention <= now.timestamp()
+                    )
+                )
+            ):
+                raise ConversationConflict("conversation content is not currently exportable")
+            if record["record_id"] in admitted:
+                raise ConversationStorageUnavailable(
+                    "conversation governed export inventory has duplicate identities"
+                )
+            admitted.add(record["record_id"])
+        if admitted != set(expected):
+            raise ConversationStorageUnavailable("conversation governed export records are incomplete")
+        current = await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        if current.version != initial.version or current.state != initial.state:
+            raise ConversationConflict("conversation changed during export; refresh before retry")
+        timestamp = now.isoformat()
+        if format == "json":
+            content = json.dumps(
+                {
+                    "schema_version": "skeleton.conversation.transcript_export.v1",
+                    "exported_at": timestamp,
+                    "thread": initial.as_dict(),
+                    "projection": "active",
+                    "messages": messages,
+                    "attachments_embedded": False,
+                },
+                sort_keys=True,
+                indent=2,
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+            media_type, extension = "application/json", "json"
+        else:
+            sections = [
+                "# " + initial.title,
+                f"Conversation: {thread_id}",
+                f"Version: {initial.version}",
+                "Projection: canonical active lineage",
+                "",
+            ]
+            for message in messages:
+                sections.extend(
+                    [
+                        f"## {message['author_type']} — {message['created_at']}",
+                        f"Message: {message['message_id']} | branch: {message['branch_id']} | sequence: {message['sequence']}",
+                        "",
+                    ]
+                )
+                if message.get("content") is not None:
+                    sections.append(message["content"])
+                elif message.get("content_ref"):
+                    sections.append("Content reference: " + message["content_ref"])
+                for name in (
+                    "parent_message_id",
+                    "supersedes_message_id",
+                    "causal_user_message_id",
+                    "operation_id",
+                    "ai_result_id",
+                    "context_id",
+                    "context_digest",
+                ):
+                    if message.get(name):
+                        sections.append(name + ": " + str(message[name]))
+                for name in (
+                    "attachment_refs",
+                    "provider_receipt_refs",
+                    "tool_receipt_refs",
+                    "memory_refs",
+                    "citation_refs",
+                    "artifact_refs",
+                ):
+                    if message.get(name):
+                        sections.append(name + ": " + json.dumps(message[name], ensure_ascii=False))
+                sections.append("")
+            content = "\n\n".join(sections)
+            media_type, extension = "text/markdown", "md"
+        encoded = content.encode("utf-8")
+        if len(encoded) > 8 * 1024 * 1024:
+            raise ConversationConflict("conversation export exceeds its response size bound")
+        return {
+            "schema_version": "skeleton.conversation.export.v1",
+            "thread_id": thread_id,
+            "snapshot_version": initial.version,
+            "scope": "canonical_active_lineage",
+            "format": format,
+            "filename": "conversation_" + thread_id + "." + extension,
+            "media_type": media_type,
+            "content": content,
+            "content_digest": hashlib.sha256(encoded).hexdigest(),
+            "exported_at": timestamp,
+            "message_count": len(messages),
+            "attachments_embedded": False,
+        }
 
     async def set_state(
         self,
