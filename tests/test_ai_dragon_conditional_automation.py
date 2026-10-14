@@ -1,8 +1,7 @@
 """Dragon conditional research admission rejects unknown and vetoed facts."""
-from dataclasses import replace
 import pytest
 from skeleton.ai.webcrawler.dragon_conditional_automation import (
-    ConditionalRule, SHADOW_RULE, PROMOTION_RULE, VETOES,
+    ConditionalRule, SHADOW_RULE, PROMOTION_RULE,
     evaluate_trigger,
 )
 
