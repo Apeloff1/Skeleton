@@ -79,6 +79,10 @@ jobs:
   backend-product-kernel:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
+    # Backend tests run from backend/ with --noconftest; the root-level
+    # skeleton package is not otherwise importable without PYTHONPATH.
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     defaults:
       run:
         working-directory: backend
