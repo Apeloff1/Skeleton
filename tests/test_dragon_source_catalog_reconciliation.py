@@ -8,8 +8,18 @@ import pytest
 from skeleton.ai.game_builder.dragon_source_catalog import (
     canonical_source_url, extract_catalog, merge_catalogs,
 )
+from skeleton.ai.game_builder.contracts import canonical_digest
 
 STAMP = "2026-10-12T12:00:00Z"
+
+
+def reseal_extraction(catalog: dict) -> dict:
+    """Recalculate an untrusted receipt to reach the independent shape guards."""
+    catalog["catalog_digest"] = canonical_digest({
+        key: catalog[key]
+        for key in ("manifest", "sources", "rejected_url_count")
+    })
+    return catalog
 
 
 def git_blob(content: str) -> str:
@@ -80,7 +90,7 @@ def test_untrusted_catalog_cannot_promote_leads_or_forge_custody():
     bad_lineage = deepcopy(base)
     bad_lineage["sources"][0]["discoveries"][0]["catalog_id"] = "catalog-" + "e" * 40
     with pytest.raises(ValueError, match="lineage"):
-        merge_catalogs([bad_lineage])
+        merge_catalogs([reseal_extraction(bad_lineage)])
 
 
 def test_manifest_custody_rejects_unknown_fields_and_noncanonical_links():
@@ -88,11 +98,11 @@ def test_manifest_custody_rejects_unknown_fields_and_noncanonical_links():
     extra_authority = deepcopy(base)
     extra_authority["manifest"]["source_authorized"] = True
     with pytest.raises(ValueError, match="manifest fields"):
-        merge_catalogs([extra_authority])
+        merge_catalogs([reseal_extraction(extra_authority)])
     alias = deepcopy(base)
     alias["manifest"]["url"] = "https://EXAMPLE.org/index?utm_campaign=forged"
     with pytest.raises(ValueError, match="not canonical"):
-        merge_catalogs([alias])
+        merge_catalogs([reseal_extraction(alias)])
 
 
 def test_incompatible_observation_cannot_rebind_one_git_blob():
@@ -101,3 +111,27 @@ def test_incompatible_observation_cannot_rebind_one_git_blob():
     forged["manifest"]["observed_at"] = "2026-10-13T00:00:00Z"
     with pytest.raises(ValueError, match="conflicting catalog identity"):
         merge_catalogs([base, forged])
+
+
+def test_catalog_extraction_receipt_detects_mutated_sources_and_custody():
+    base = read_catalog("https://example.com/reference")
+    assert base["catalog_digest"] == canonical_digest({
+        key: base[key] for key in ("manifest", "sources", "rejected_url_count")
+    })
+    forged = deepcopy(base)
+    forged["sources"][0]["discoveries"][0]["line"] = 90
+    with pytest.raises(ValueError, match="extraction receipt"):
+        merge_catalogs([forged])
+    extra = deepcopy(base)
+    extra["sources"][0]["approved"] = True
+    with pytest.raises(ValueError, match="extraction receipt"):
+        merge_catalogs([extra])
+    # A recomputed untrusted digest still cannot grant rights or permissions.
+    clearance = deepcopy(base)
+    clearance["sources"][0]["training_authorized"] = True
+    with pytest.raises(ValueError, match="cannot carry approvals"):
+        merge_catalogs([reseal_extraction(clearance)])
+    unknown = deepcopy(base)
+    unknown["sources"][0]["external_ranking_claim"] = 1
+    with pytest.raises(ValueError, match="source fields"):
+        merge_catalogs([reseal_extraction(unknown)])
