@@ -507,6 +507,7 @@ def _compile_chat_context(
     request_context: str | None,
     budget: ContextBudget = CHAT_CONTEXT_BUDGET,
     attachment_segments: tuple[ContextSegment, ...] = (),
+    dragon_segments: tuple[ContextSegment, ...] = (),
 ) -> ContextEnvelope:
     """Compile the one authoritative immutable context snapshot for a chat turn."""
 
@@ -563,6 +564,9 @@ def _compile_chat_context(
             )
         )
 
+    # Derived Dragon snapshots are strictly untrusted and filtered through
+    # the canonical context compiler; they never become system instructions.
+    segments.extend(dragon_segments)
     segments.extend(attachment_segments)
     return ContextCompiler().compile(
         operation_id=operation_id,
@@ -1251,6 +1255,11 @@ async def ai_chat(
         transcript,
         before_sequence=user_message.sequence,
     )
+    dragon_context_reader = getattr(conversation_authority, "dragon_context_segments", None)
+    dragon_segments = (
+        () if dragon_context_reader is None
+        else await dragon_context_reader(thread, request.message)
+    )
     context_envelope = _compile_chat_context(
         thread=thread,
         transcript=transcript,
@@ -1260,6 +1269,7 @@ async def ai_chat(
         execution_id=execution_id,
         request_context=request.context,
         budget=dragon_context_budget(CHAT_CONTEXT_BUDGET),
+        dragon_segments=dragon_segments,
     )
     try:
         chat_turn = await chat_turn_lifecycle.advance(
