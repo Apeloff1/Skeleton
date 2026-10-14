@@ -1,5 +1,6 @@
 import api, { type ApiResult } from '../utils/apiClient';
 import { validateConversationProjection } from './conversationProjection';
+import { chatApiError } from './chatErrors';
 
 export type ConversationThreadState = 'active' | 'archived' | 'deleting' | 'deleted';
 export type ConversationAuthorType = 'user' | 'assistant' | 'tool' | 'system-derived';
@@ -50,7 +51,7 @@ export type ConversationMessage = {
 
 async function requireData<T>(promise: Promise<ApiResult<T>>, message: string): Promise<T> {
   const result = await promise;
-  if (!result.ok || result.data === null) throw new Error(message);
+  if (!result.ok || result.data === null) throw chatApiError(result, message);
   return result.data;
 }
 
