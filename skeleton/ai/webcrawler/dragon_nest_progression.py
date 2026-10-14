@@ -67,6 +67,7 @@ class NestChange:
     subject: str
     improvement: str
     previous_digest: str
+    state_digest: str
     digest: str
 
 
@@ -109,6 +110,25 @@ class AcquiredKnowledge:
     kind: str = "article"
 
 
+def _state_digest(state: DragonNest) -> str:
+    """Commit the entire user-visible reducer state, not only the event prose."""
+    return _digest({
+        "owner": state.owner,
+        "focus_tags": state.focus_tags,
+        "adjacent_tags": state.adjacent_tags,
+        "source_ids": state.source_ids,
+        "catalog_digest": state.catalog_digest,
+        "consumed": state.consumed,
+        "level": state.level,
+        "stage": state.stage,
+        "children": [
+            {"lane": child.lane, "stage": child.stage,
+             "level": child.level, "evidence": child.evidence}
+            for child in state.children
+        ],
+    })
+
+
 def _record(state: DragonNest, *, at: str, action: str,
             subject: str, improvement: str) -> DragonNest:
     timestamp = _iso(at)
@@ -117,9 +137,12 @@ def _record(state: DragonNest, *, at: str, action: str,
     if len(state.changes) >= 40000:
         raise ValueError("nest history capacity exceeded")
     sequence = len(state.changes) + 1
-    fields = (state.owner, sequence, timestamp, action, subject, improvement, state.head)
+    state_digest = _state_digest(state)
+    fields = (state.owner, sequence, timestamp, action, subject, improvement,
+              state.head, state_digest)
     digest = _digest(fields)
-    entry = NestChange(sequence, timestamp, action, subject, improvement, state.head, digest)
+    entry = NestChange(sequence, timestamp, action, subject, improvement,
+                       state.head, state_digest, digest)
     return replace(state, changes=state.changes + (entry,), head=digest)
 
 
@@ -249,12 +272,18 @@ def verify_change_history(state: DragonNest) -> bool:
                 return False
         except ValueError:
             return False
+        if not isinstance(entry.state_digest, str) or _HEX.fullmatch(entry.state_digest) is None:
+            return False
         expected = _digest((state.owner, number, entry.at, entry.action,
-                            entry.subject, entry.improvement, previous))
+                            entry.subject, entry.improvement, previous,
+                            entry.state_digest))
         if expected != entry.digest:
             return False
         previous = entry.digest
-    return previous == state.head and bool(state.changes)
+    return (
+        previous == state.head and bool(state.changes)
+        and state.changes[-1].state_digest == _state_digest(state)
+    )
 
 
 def nest_snapshot(state: DragonNest) -> dict:
