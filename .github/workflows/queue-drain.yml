@@ -37,10 +37,9 @@ jobs:
     permissions:
       actions: write
       contents: read
-    # Queue recovery must not depend on the scarcer ARM lane it may be trying
-    # to recover when repository-wide workflow fanout is saturated.
-    # Keep obsolete-run recovery off the congested default x64 runner pool.
-    # This step uses only standard Python and the Actions API and is ARM-safe.
+    # Place the Python-only cleanup worker on the ARM recovery pool instead
+    # of competing with broad x64 PR validation. Safety comes from the
+    # exact-head and stale-PR guards, not runner architecture.
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     env:
