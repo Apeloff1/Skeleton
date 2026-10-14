@@ -78,6 +78,30 @@ def test_rejects_mirror_drift(tmp_path:Path):
     with pytest.raises(StorageCandidateError,match="storage mirror parity drift"):
         validate(root)
 
+def test_unsigned_volume_cannot_claim_independent_verification(tmp_path:Path):
+    root=_fixture(tmp_path)
+    path=root/"machine/ai_master_plan.json"
+    payload=_load(path)
+    volume=next(v for v in payload["volumes"] if v["key"]=="VOL-133")
+    assert volume["implementation_status"]=="verified"
+    volume["completion_checkbox"]=False
+    volume["completion_checkbox_mark"]="[ ]"
+    _store(path,payload)
+    with pytest.raises(StorageCandidateError,match="unsigned volume claims verification"):
+        validate(root)
+
+
+def test_signed_volume_must_not_keep_unresolved_gaps(tmp_path:Path):
+    root=_fixture(tmp_path)
+    path=root/"machine/ai_master_plan.json"
+    payload=_load(path)
+    volume=next(v for v in payload["volumes"] if v["key"]=="VOL-135")
+    volume["gaps"].append("unresolved independent check")
+    _store(path,payload)
+    with pytest.raises(StorageCandidateError,match="inconsistent independent signoff"):
+        validate(root)
+
+
 def test_rejects_invalid_reported_head():
     with pytest.raises(StorageCandidateError,match="reported exact head"):
         validate(ROOT,head="not-a-sha")
