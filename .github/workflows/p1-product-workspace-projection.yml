@@ -1,21 +1,6 @@
 name: P1 Product Workspace Projection Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "backend/core/product_shell_projection.py"
-      - "machine/ai_p1_task_backlog.json"
-      - "backend/core/operation_projection.py"
-      - "backend/tests/test_product_shell_projection.py"
-      - "backend/tests/test_operation_projection.py"
-      - "frontend/services/productProjection.ts"
-      - "frontend/services/operationStreamReducer.ts"
-      - "frontend/scripts/test-product-projection.mjs"
-      - "frontend/scripts/test-operation-stream-reducer.mjs"
-      - "frontend/package.json"
-      - ".github/workflows/p1-product-workspace-projection.yml"
   workflow_dispatch:
 
 permissions:

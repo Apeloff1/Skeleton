@@ -1,18 +1,6 @@
 name: P1 Volume Accountability Candidate Gate
 
 on:
-  push:
-    branches: [main]
-    # Candidate projection is advisory; validate on main, not every feature PR.
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_build_accountability.json"
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/ai_p1_execution_map.json"
-      - "scripts/build_p1_volume_accountability_candidates.py"
-      - "scripts/reconcile_p1_maturity.py"
-      - "tests/test_p1_volume_accountability_candidates.py"
-      - ".github/workflows/p1-volume-accountability-candidates.yml"
   workflow_dispatch:
 
 permissions:

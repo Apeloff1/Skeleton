@@ -1,22 +1,6 @@
 name: P1 Gap Closure Planning Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - p1/release-lane-materialize-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/p1_risk_evidence_policy.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - "scripts/build_p1_gap_closure_plan.py"
-      - "scripts/build_p1_volume_accountability_candidates.py"
-      - "scripts/reconcile_p1_risk_evidence.py"
-      - "tests/test_p1_gap_closure_plan.py"
-      - ".github/workflows/p1-gap-closure-planning.yml"
   workflow_dispatch:
 
 permissions:

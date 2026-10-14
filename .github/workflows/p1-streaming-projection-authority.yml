@@ -2,20 +2,6 @@ name: P1 Streaming Projection Authority Gate
 # Current-head gate: durable store import is canonical.
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "backend/core/operation_projection.py"
-      - "machine/ai_p1_task_backlog.json"
-      - "backend/core/operation_stream_transport.py"
-      - "backend/routes/operation_stream.py"
-      - "backend/tests/test_operation_projection.py"
-      - "backend/tests/test_operation_stream_transport.py"
-      - "backend/tests/test_operation_stream_route.py"
-      - "skeleton/frontier/operation_stream.py"
-      - "skeleton/frontier/runtime/operation_stream.py"
-      - ".github/workflows/p1-streaming-projection-authority.yml"
   workflow_dispatch:
 
 permissions:

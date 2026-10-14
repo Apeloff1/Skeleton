@@ -1,24 +1,6 @@
 name: P1 Failure Knowledge Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/eval/failure_knowledge.py"
-      - "skeleton/ai/evaluation/failure_knowledge.py"
-      - "skeleton/eval/regression_corpus.py"
-      - "skeleton/contracts/risk_evidence.py"
-      - "skeleton/eval/__init__.py"
-      - "skeleton/ai/evaluation/__init__.py"
-      - "skeleton/testing/test_failure_knowledge.py"
-      - "machine/p1_failure_knowledge.json"
-      - "machine/p1_regression_corpus.json"
-      - "scripts/check_p1_failure_knowledge.py"
-      - "scripts/check_p1_regression_corpus.py"
-      - "tests/test_p1_failure_knowledge.py"
-      - ".github/workflows/p1-failure-knowledge.yml"
   workflow_dispatch:
 
 permissions:

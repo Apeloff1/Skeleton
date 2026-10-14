@@ -1,17 +1,6 @@
 name: P1 Volume Metadata Projection Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/ai_p1_execution_map.json"
-      - "scripts/reconcile_p1_volume_metadata.py"
-      - "scripts/reconcile_p1_maturity.py"
-      - "tests/test_p1_volume_metadata_projection.py"
-      - ".github/workflows/p1-volume-metadata-projection.yml"
   workflow_dispatch:
 
 permissions:

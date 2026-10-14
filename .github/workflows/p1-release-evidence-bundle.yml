@@ -1,23 +1,6 @@
 name: P1 Release Evidence Bundle Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/release/evidence.py"
-      - "skeleton/release/qualification.py"
-      - "skeleton/release/__init__.py"
-      - "skeleton/contracts/reproducibility.py"
-      - "skeleton/app/assembly.py"
-      - "skeleton/app/installer.py"
-      - "packaging/windows/**"
-      - "backend/core/tenant_storage_boundary.py"
-      - "skeleton/agents/safe_autonomy.py"
-      - "skeleton/eval/champion_registry.py"
-      - "skeleton/testing/test_release_qualification.py"
-      - ".github/workflows/p1-release-evidence-bundle.yml"
   workflow_dispatch:
 
 permissions:

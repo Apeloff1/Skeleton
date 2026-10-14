@@ -1,21 +1,6 @@
 name: P1 Operator Control Projection Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "backend/core/operator_control_projection.py"
-      - "machine/ai_p1_task_backlog.json"
-      - "backend/core/workspace_projection.py"
-      - "backend/tests/test_user_control_receipts.py"
-      - "backend/tests/test_workspace_projection.py"
-      - "frontend/src/product/operatorControlProjection.ts"
-      - "frontend/src/product/workspaceProjection.ts"
-      - "frontend/scripts/test-operator-control-projection.mjs"
-      - "skeleton/agents/human_control.py"
-      - "skeleton/contracts/operation.py"
-      - ".github/workflows/p1-operator-control-projection.yml"
   workflow_dispatch:
 
 permissions:

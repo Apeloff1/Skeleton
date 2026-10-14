@@ -1,16 +1,6 @@
 name: P1 Workspace Projection Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "backend/core/operation_projection.py"
-      - "backend/core/workspace_projection.py"
-      - "backend/tests/test_operation_projection.py"
-      - "backend/tests/test_workspace_projection.py"
-      - "frontend/src/product/workspaceProjection.ts"
-      - ".github/workflows/p1-workspace-projection.yml"
   workflow_dispatch:
 
 permissions:
