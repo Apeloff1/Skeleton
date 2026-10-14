@@ -33,7 +33,7 @@ def test_watchdog_only_marks_a_run_after_rerun_started() -> None:
     rerun = text.index('if gh run rerun "$id" --repo "$REPO"; then')
     success_marker = text.index('run:${id}', rerun)
     assert success_marker > rerun
-    assert "could not rerun candidate:${id}" in text
+    assert "could not rerun transient timed_out candidate:${id}" in text
 
 
 def test_watchdog_parses_each_run_as_a_json_record() -> None:
@@ -63,3 +63,19 @@ def test_watchdog_reuses_and_keeps_machine_ledger_closed() -> None:
     assert "select(.title == $title)" in text
     assert 'repos/${REPO}/issues/${issue}' in text
     assert '-f state=closed' in text
+
+
+def test_watchdog_does_not_resurrect_cancelled_pr_generations() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "[[ \"$conclusion\" == 'timed_out' ]] || continue" in text
+    assert "[[ \"$conclusion\" == 'cancelled' ||" not in text
+    assert "Only successful" in text or "Only successful" in text.lower()
+
+
+def test_watchdog_does_not_send_issue_alerts_for_failed_retry_attempts() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    retries = text.split('if gh run rerun "$id" --repo "$REPO"; then', 1)[1]
+    assert 'gh issue comment "$issue" --repo "$REPO" --body "CI watchdog retrying' in retries
+    failed = retries.split("else", 1)[1].split("fi", 1)[0]
+    assert "gh issue comment" not in failed
+    assert "echo \"::warning::CI watchdog could not rerun" in failed
