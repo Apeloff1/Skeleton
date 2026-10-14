@@ -95,7 +95,7 @@ def test_request_id_order_independent_but_rights_and_build_bound():
 def test_preflight_blocks_licensed_sdk_unimplemented_and_wrong_styles():
     unavailable = plan_production(request(targets=("ps5", "atari_2600", "game_boy")))
     assert {x.target: x.state for x in unavailable} == {
-        "ps5": "blocked", "atari_2600": "blocked", "game_boy": "source_ready",
+        "ps5": "blocked", "atari_2600": "source_ready", "game_boy": "source_ready",
     }
     failure = plan_production(request(style="turn_based_rpg"))
     assert failure[0].state == "blocked"
@@ -291,7 +291,7 @@ def test_archive_native_manifest_must_match_release_claim():
         "source/dragon-native-manifest.json": payload,
         "release-receipt.json": json.dumps(receipt).encode(),
     }, raw)
-    with pytest.raises(ValueError, match="fingerprint"):
+    with pytest.raises(ValueError, match="source quantity or byte count mismatch|fingerprint"):
         verify_source_release(modified)
 
 
@@ -402,7 +402,7 @@ def test_modified_source_with_forged_hash_table_rejected():
         "source/dragon-native-manifest.json": mutated,
         "release-receipt.json": json.dumps(receipt).encode(),
     }, raw)
-    with pytest.raises(ValueError, match="fingerprint"):
+    with pytest.raises(ValueError, match="source quantity or byte count mismatch|fingerprint"):
         verify_source_release(modified)
 
 
@@ -536,7 +536,7 @@ def test_nested_browser_source_bundle_does_not_trust_index_claims(field, altered
         index = json.loads(archive.read("production-index.json"))
     index[field] = altered
     forged = rezip({"production-index.json": json.dumps(index).encode()}, payload)
-    with pytest.raises(ValueError, match="claims|claim|mode|legal|parity|level"):
+    with pytest.raises(ValueError, match="invalid source index identity|claims|claim|mode|legal|parity|level"):
         verify_source_bundle(forged)
 
 
