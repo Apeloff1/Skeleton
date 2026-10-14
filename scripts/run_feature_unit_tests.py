@@ -43,6 +43,15 @@ FEATURE_DIRS: dict[str, tuple[str, ...]] = {
 INTEGRATION_MARKERS = ("e2e", "integration", "live")
 
 
+def _is_integration_case(relative: Path) -> bool:
+    """Reject explicitly integration-designated files *and* directories."""
+    return any(
+        _has_marker(component.lower(), marker)
+        for component in relative.with_suffix("").parts
+        for marker in INTEGRATION_MARKERS
+    )
+
+
 def _has_marker(stem: str, marker: str) -> bool:
     """Match complete underscore-delimited tokens (avoid ai in 'mail')."""
     return re.search(rf"(?:^|_){re.escape(marker)}(?:_|$)", stem) is not None
@@ -65,13 +74,12 @@ def discover_tests(
         if not directory.is_dir():
             continue
         for path in directory.rglob("test_*.py"):
-            if not path.is_file():
+            if not path.is_file() or path.is_symlink():
                 continue
             stem = path.stem.lower()
-            relative = path.relative_to(root).as_posix()
-            if not include_integration and any(
-                _has_marker(stem, marker) for marker in INTEGRATION_MARKERS
-            ):
+            relative_path = path.relative_to(root)
+            relative = relative_path.as_posix()
+            if not include_integration and _is_integration_case(relative_path):
                 continue
             if (
                 "all" in selected
@@ -110,16 +118,27 @@ def main(argv: list[str] | None = None) -> int:
         "--feature", action="append", required=True, choices=sorted(FEATURE_MARKERS),
         help="Select a feature; repeat to combine features.",
     )
-    parser.add_argument("--list", action="store_true", help="List selected files without executing.")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--list", action="store_true", help="List files without importing tests.")
+    modes.add_argument(
+        "--collect-only", action="store_true",
+        help="Ask pytest to collect tests without executing them.",
+    )
     parser.add_argument(
         "--include-integration", action="store_true",
         help="Opt in to files named e2e/integration/live (excluded by default).",
     )
     parser.add_argument("--maxfail", type=int, default=1, help="Stop after N failures (0=all).")
+    parser.add_argument(
+        "--timeout-seconds", type=int, default=0,
+        help="Limit subprocess wall time in seconds (0=no timeout).",
+    )
     parser.add_argument("--junitxml", help="Write pytest JUnit XML to this path.")
     args = parser.parse_args(argv)
     if args.maxfail < 0:
         parser.error("--maxfail must be >= 0")
+    if args.timeout_seconds < 0:
+        parser.error("--timeout-seconds must be >= 0")
 
     paths = discover_tests(ROOT, args.feature, include_integration=args.include_integration)
     if not paths:
@@ -137,8 +156,20 @@ def main(argv: list[str] | None = None) -> int:
         filter(None, [str(ROOT), str(ROOT / "backend"), env.get("PYTHONPATH", "")])
     )
     command = build_command(paths, maxfail=args.maxfail, junitxml=args.junitxml)
+    if args.collect_only:
+        command.append("--collect-only")
     print(f"SELECTED {len(paths)} test files", flush=True)
-    return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
+    kwargs = {"cwd": ROOT, "env": env, "check": False}
+    if args.timeout_seconds:
+        kwargs["timeout"] = args.timeout_seconds
+    try:
+        return subprocess.run(command, **kwargs).returncode
+    except subprocess.TimeoutExpired:
+        print("ERROR: pytest exceeded the wall-time limit", file=sys.stderr)
+        return 124
+    except OSError as exc:
+        print(f"ERROR: pytest could not start: {exc}", file=sys.stderr)
+        return 126
 
 
 if __name__ == "__main__":
