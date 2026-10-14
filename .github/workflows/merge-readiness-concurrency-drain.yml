@@ -1,17 +1,17 @@
 name: Merge Readiness Legacy Concurrency Drain
 
 on:
-  # Historical six-SHA concurrency tombstone is an explicit recovery tool,
-  # not a current-main validation gate. Do not fan out six obsolete jobs when
-  # the definition is edited; operators can still dispatch it deliberately.
   workflow_dispatch:
+  # One-shot recovery wake when this bounded tombstone inventory changes.
+  # Never run on ordinary application pushes.
+  push:
+    branches: [main]
+    paths: ['.github/workflows/merge-readiness-concurrency-drain.yml']
 
 permissions: {}
 
+# Separate recovery lane; old SHA identities are retired at the job level.
 concurrency:
-  # Keep this one-shot tombstone workflow isolated from active Merge Readiness
-  # groups while still giving the repository-wide concurrency audit an explicit
-  # top-level identity.
   group: merge-readiness-legacy-drain-${{ github.ref }}
   cancel-in-progress: false
 
@@ -20,31 +20,154 @@ jobs:
     name: Retire legacy Merge Readiness ${{ matrix.sha }}
     strategy:
       fail-fast: false
-      max-parallel: 6
+      # Keep tiny recovery jobs bounded; concurrency evicts matching obsolete
+      # SHA-scoped workflow runs even when the old runner is slow or stuck.
+      max-parallel: 32
       matrix:
         sha:
-          - 4cdb341dafaf1749f331f9896a2aace28a0acfa7
-          - cdd4b94c0061600fe7f596f8a6416d73aa6804cf
-          - 90c96d1a907bd5d946cfea6257d995fc965da00c
-          - 86886dbc615ac4c8fff72a4afcf64025324ff7f9
-          - a544262c57baaabc4c8f1c4cf0c0ee36f2515a2a
-          - b8e9c40e115c6001ee76dab65ef7520c42d19eb8
+          - 002fe8f86b5b6086566fecbbfad92b4d7b7f1f4a
+          - 01bd0e86aba6b7229c6ab7d0a44e275c49ebc161
+          - 0318b58d6e8931af6d87018a8da489082f390825
+          - 03ef32bdcca07a3dc93db9939ab891c99b5375f1
+          - 064c57ccc40de8d90e8987054a6948198c3304f6
+          - 078a5c073b8b623459f7dc92c1115574a8f34af4
+          - 07c19fc081a71b9b1a2866a92276ff3d65d73a91
+          - 089c3a7d028fedfdcabdde33de8e929787264074
+          - 08e74560bf31bf960c66489183de95528fc9a1e3
+          - 0aa2328cb66fe765f62cb25d2d24fd396d4606dd
+          - 0c5f5c809f8ae547b09ce1e89d9b73fffcaf7425
+          - 0ce37dc40d02f18c83d2e736a41fe8136bea8c81
+          - 0db02b99b1fabc6ce1ea08eb53708bade023d76b
+          - 0f19446334f66136ff04a265cdf4889656f93dc9
+          - 0f239360f3d087fcff1968d0d1280cd559a8f569
+          - 122907f0c81624159a8fd69252b002f712f2e008
+          - 153ed1e06cab05be09da93c02770d321e2f21b5e
+          - 15fc483683807475aa745d2f705934b43897e6fb
+          - 16619cf2dd9b3502e5e3499d9acf3ff2baa76f26
+          - 19381d9e434b88e49d51216b3ba44e4f51fcd509
+          - 193b1d9807b1b53f86565ad66cc2153d5d952744
+          - 197258cf28b65fcfbaef81ff2038ece4345de290
+          - 1b16cf4eba706d3ea6d799473d640cedbf3d9e63
+          - 1d7ffe161a38265f1818cf2a4c6dfb989fdda8eb
+          - 26437538abf90a0b68c0d654622f1a2a6abb1755
+          - 27d34d208cc1dc4b014e439a7c9b6419933d369d
+          - 283566f970c13e329ec8f7ca91ede548a354ee9c
+          - 2938aa0b815799b39ee246f1ddebeec8e3245249
+          - 2a77f5e0a09e9d2d685cfeaf8ee67710928ce2d2
+          - 2f1f4d7951e1fdcbbaa87ba858a41db1a52aff1c
+          - 31c555861eeb0d895a50a6ea6f4cd03b1d73f147
+          - 399ce1ccfc435ccfc83c28a95a82215478967f3d
+          - 3a77e32f2c1d1b2c2503192d693f29741412a5a9
+          - 3b5df2706b2f467f724f76d2ad69a586ce5caaee
+          - 3d9169f6e02f16886482cf7029b2be7ab269ef3b
+          - 3eefe5fe2746d11d6c52f027f5a800ea840bf72a
+          - 4195ed7366ad4bf81040eea515f113ed2b58966f
+          - 41bc7f4aeeaa1687a1bc5c0c1611d722a8296f5a
+          - 43604d63628115fc39fdd8ea5e75a0c6cbd33534
+          - 45d100e0624b567eccbc0dcc8c28e57531f13f41
+          - 47c8b59e1381d4b229af256ba747166226c8a31f
+          - 48d16b6d7898442e82d1ae8981a74eb3ee810884
+          - 499a9867838bc24b631eefd36083568bb5e2d728
+          - 4d8ff5b4ce35d7496ff3c8ef11ffc53039822dfc
+          - 4f6651d59b3bb9973deb3176b119fcb595168f76
+          - 4f851847d5cf838e0de7eae168bd0edc41572530
+          - 527d431281198583b0339caa86281b5fd12a5876
+          - 53d6ff62b742f42a0035bff3ae617971f29554c2
+          - 58c75ba2e4197c6f27e7fb1a24592d7bf84358f2
+          - 5a31f67418132222f2942f1d8b8e544cac771f0d
+          - 5c50f9be7d6b1173617f88ebe8727be5704757fd
+          - 61e0d172d9641922d7c19a21c3f139ec1901c030
+          - 635371e094045eed55f519ac65c36bdecfd9a3d0
+          - 64a158587efafd9131d35330ae0d37f0c24394dc
+          - 66895f7cf3b9540d5101ab267606fc69b9ed34b8
+          - 68415ced4ceb31ea356fdcb88a006ec7effc1511
+          - 68bb2fecb4ada2f65bf05fe27e94f38030d68918
+          - 6ae89af701cf0cc04bc2c7fc810ba64d1aaf6eb8
+          - 6c63ed2968b3a4ef919c4c33f72014969a041491
+          - 6d7f347b2a64fd6ddfb9c593f508aa0c6d02fa40
+          - 6f46fdda88f0b88c58616d0020f318668eaa6247
+          - 729df7f334f5f10f7f7c704c335be39eeb1b9297
+          - 73a71e0ab51719b8645ced9c26a44ff7caf818b7
+          - 76bee1e869a6bc072e5968636bfeaac5fcabe309
+          - 78a5a75de2925a303118a5ddc1b4ec9c6d3485f4
+          - 78f7692c158d293bd74e5b0e3ec2203fd014f8d8
+          - 7994fb1d4ee5c249c7742e154571f134aed49642
+          - 7b844e724ff37db997ae7388c0c63509a8adbb73
+          - 7fb903273b3a9c63149ae356620c34dc1e04ec9a
+          - 7fce81d1085adb5f4157713537c824120b8aa12e
+          - 80c6b2d3e8bda07d907828b341c9d53c1027ea6c
+          - 851d01efd84a2c6c1928b7c3eb84de5b1cded799
+          - 8531bddfc88cbfe85160940b09ae1ceea288eb89
+          - 85fc199019fbe406b71bd9b09ccae1791b5398a5
+          - 86e071a1a72bfb1d0b6db08a0297f2a63ad618d6
+          - 8a211071cd1a30cf1dfada1f705f74d732fd3e3e
+          - 8ad8c01053ce7601b76705e3d7aaa3c9ac850be3
+          - 8b148493aefd4c03b428feac9e0075fb1da71b05
+          - 8c8ae7496f57f2f5923c744a0eb4e7bee3d277be
+          - 909caeaf1a42087a952c8ffed5f2c26af94a57a4
+          - 98f4bb1b58b8e9cde16cbc7e2438940d957633c9
+          - 9912f87be018279dba5756eb52aa4d8ad97be855
+          - 9affc2011cfe5fab84d2d6e550f71d8bd95ad4d9
+          - 9c31c091e169c3915325f413e3be94f693139e2b
+          - 9d262a65a8d8bceebd2321474850d5b845f03764
+          - a457fd949cf9e9250f3a6aef232dc9be5446a9b1
+          - a46815f623fdf2d9df00a59baca5b90f2c537a2e
+          - a5835a13004b74480b5e858c0d04569fa8b6ce96
+          - a86f6b8a65c6d0418c49467863e10fd8809e86df
+          - af52c7533019723bab2d0600f718d71c192031e7
+          - b022234ec9732efbf38211f5709be939cae791a3
+          - b083360107ed64ceb1f80b2f654e4e300eb6703d
+          - b42934c4b175447b00af7a152f48a658b14b99be
+          - b4693d5518f70aa76b341ea9ec1be74610ca5296
+          - b8397311c886ea644c1e616dfecfe7bb8859a2fa
+          - b8fe165be56a90ce747ad28e3f3857bdddd985f8
+          - b92fa5bf226467dd30e27b5067d8a1b5e1e3e209
+          - b9937cbacc264df6c476e90686362a9bb56a60e8
+          - ba4ed4a95087f6575c36c90740ecaf0bc743cfe4
+          - bb207deac40176c4de817b66a2764b4a7e57f0dd
+          - bb70465e1c16fece508bb18f461aeb9034f88a00
+          - bff01362f5a2c3837419274d9ab28f7d223e8ebc
+          - c0a62169518705591ff047f03b95dfcb26e69eb4
+          - c0ecd4c1f5b309f8d77afbbba0e3e2e5d91cfd3e
+          - c192b928abe5bf3b6b1afa90c5585c1486174194
+          - c4074a6b35af11f146818370d2024c8e2f54d108
+          - c4a6acc671d3a37467f590ff314d3ce4659b39e0
+          - c89e37208a8ca6f42c560748215dc23d606bea12
+          - ce802490d33a524b00a83a3375361f24c3bfc66e
+          - d12ceeb65711b24f4196d4ff8d1989a945fcc61a
+          - d7cdd745ee7f93470b1552a43278808eed04cbf2
+          - dc0f0cd6848546facc10c93068d85120a475505e
+          - de8819159a6b8f388862905e31ea48e3ca946506
+          - e399010d1fe0d8076d0aa9c4862fe7aaa4914132
+          - e3ed31d9166dcb2f048d189b1208041a56e46b78
+          - e73de9b9df598ec736eb967b0f2ba0f5acaa2217
+          - e8f0492e3bb38244ff7f80bdf16cde9bd5842757
+          - ed17133848716e0d2eaef7ee902c471202894886
+          - ee3900e73d5ba7a351dcbb982d30e8e81c68ba50
+          - f44b623d826048e6de3130130fdee63874f2b16c
+          - f59fd9603f50191e43e514d483989a6a07438faf
+          - f8e4faadaa5bfe9f923c68a99a19e2437fce3395
+          - fa18b28d7166394f35a94c2f02600e10636094cd
+          - fce1733ba6fdcf1a982ba1156da3fef1611b22d4
+          - fe8409e1c5eb50d5ed2bae4ac5076ca186ffd886
     concurrency:
-      # Intentionally matches the pre-#1203 SHA-scoped Merge Readiness group.
-      # The current ref-scoped group is not present in this matrix.
+      # Intentionally matches pre-coalescing SHA-scoped Merge Readiness runs.
+      # No current main-head SHA and no PR-number group is admitted.
       group: merge-readiness-${{ matrix.sha }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Confirm bounded tombstone identity
+      - name: Verify retired SHA cannot be the current integration HEAD
         env:
           LEGACY_SHA: ${{ matrix.sha }}
-          CURRENT_MAIN_SHA: ca257df6a2b4170cc9bdca501a96a5ae57d31bdd
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$LEGACY_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$CURRENT_MAIN_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$LEGACY_SHA" != "$CURRENT_MAIN_SHA" ]]
-          printf 'retired legacy Merge Readiness concurrency group for %s\n' "$LEGACY_SHA"
+          current=$(gh api "/repos/${REPO}/branches/main" --jq '.commit.sha')
+          [[ "$current" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$LEGACY_SHA" != "$current" ]]
+          printf 'Retired superseded Merge Readiness concurrency group for %s\n' "$LEGACY_SHA"
