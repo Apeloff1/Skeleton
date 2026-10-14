@@ -5,7 +5,6 @@ on:
     # Bounded canonical refresh cadence. Queue pressure is checked before any
     # checkout, model call, or plan mutation.
     - cron: '2,32 * * * *'
-    - cron: '17,47 * * * *'
   workflow_dispatch:
 
 concurrency:

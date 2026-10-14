@@ -2,7 +2,7 @@ name: Automation Traffic Manager
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "17,47 * * * *"
   workflow_dispatch:
     inputs:
       force:

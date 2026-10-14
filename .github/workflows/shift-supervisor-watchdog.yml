@@ -4,7 +4,7 @@ on:
   # Low-frequency recovery check. Event-driven PR Automation Index completion
   # used to create dozens of watchdog workflow runs during CI churn.
   schedule:
-    - cron: '12,42 * * * *'
+    - cron: '12 * * * *'
   workflow_dispatch:
 
 concurrency:
