@@ -83,9 +83,13 @@ def mutate_original_world(world:World,*,seed:int)->World:
             spectacle=min(100,max(0,edge.spectacle+digest[2]%13-6)),
         ))
     sites={node.id for node in world.places}
+    # Derived worlds may already carry optional routes. Recombination must
+    # preserve unique graph edge identity instead of appending a second copy
+    # of the same source-authored option under a new procedural seed.
+    used={edge.id for edge in edges}
     for option in OPTIONS:
         name,a,b,mode,minutes,price,fatigue,danger,scenery,shapes,keys,weather=option
-        if a not in sites or b not in sites:continue
+        if name in used or a not in sites or b not in sites:continue
         digest=_hash(seed,name)
         if digest[0]%4==0:continue
         secret=name=="moon_dream_shortcut"
