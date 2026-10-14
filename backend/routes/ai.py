@@ -20,6 +20,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.model_catalog import model_catalog
 from core.chat_turn_lifecycle import ChatTurnLifecycle
 from core.chat_turns import chat_turn_authority
 from core.conversations import ConversationStorageUnavailable, conversation_authority
@@ -2722,6 +2723,17 @@ async def cancel_ai_chat_turn(
         "timestamp": _utcnow(),
     }
 
+
+
+@router.get("/models")
+async def get_ai_models(user=Depends(require_role("viewer"))) -> Dict[str, Any]:
+    """Read a scoped model catalog, failing closed without engine tenant authority."""
+    tenant_id, owner_id = _chat_identity(user)
+    try:
+        client = EngineClient.from_env()
+    except EngineClientError:
+        client = None
+    return await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
 
 
 @router.get("/providers")
