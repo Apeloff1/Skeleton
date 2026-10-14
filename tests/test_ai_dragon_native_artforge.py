@@ -205,7 +205,10 @@ def test_cartridge_art_auditor_does_not_accept_inert_hero_animation(target,anima
     name="src/main.s" if target=="nes" else "src/main.asm"
     files[name]=files[name].replace(animation_label,animation_label[:-1]+"Fake:",1)
     _,port=_adapt_portable_design(game,target)
-    with pytest.raises(ValueError,match="animation source"):
+    # The release verifier deliberately uses one generic fail-closed message
+    # for invalid native art and motion, without disclosing which internal
+    # byte sequence failed during independent reconstruction.
+    with pytest.raises(ValueError,match="cannot be independently reconstructed"):
         verify_original_art(files,port,"arcade_score_attack")
 
 
