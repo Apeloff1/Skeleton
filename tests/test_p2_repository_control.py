@@ -30,7 +30,10 @@ class P2RepositoryControlTests(unittest.TestCase):
         self.assertEqual(result["work_package_count"], 31)
         self.assertEqual(result["aiq_task_count"], 42)
         self.assertEqual(result["wave_count"], 8)
-        self.assertEqual(result["debt_count"], 24)
+        self.assertEqual(
+            result["debt_count"],
+            len(MODULE._load(ROOT, "machine/technical_debt_ledger.json")["items"]),
+        )
         self.assertTrue(
             result["completion_rollup"]["strong_completion_blocked"]
         )
