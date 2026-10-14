@@ -26,7 +26,7 @@ def test_queue_drain_does_not_self_thrash_on_main_pushes() -> None:
 def test_queue_drain_keeps_recovery_safety_boundary() -> None:
     workflow = _workflow_text()
 
-    assert "runs-on: ubuntu-latest" in workflow
+    assert "runs-on: ubuntu-24.04-arm" in workflow
     assert "actions: write" in workflow
     assert "contents: read" in workflow
     assert "permissions: {}" in workflow
@@ -174,7 +174,7 @@ def test_housekeeping_wake_is_independent_arm_job() -> None:
     wake = workflow[wake_start:]
 
     assert "Wake exact stale-PR housekeeping when needed" not in drain
-    assert "runs-on: ubuntu-latest" in drain
+    assert "runs-on: ubuntu-24.04-arm" in drain
     assert "Wake exact stale-PR housekeeping when needed" in wake
     assert "runs-on: ubuntu-24.04-arm" in wake
     assert "timeout-minutes: 3" in wake
@@ -254,3 +254,13 @@ def test_housekeeping_wake_cooldown_recovers_persistent_old_queue() -> None:
     assert "HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '90'" in workflow
     assert "HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '360'" not in workflow
     assert "for status_name in requested waiting pending queued in_progress; do" in workflow
+
+
+def test_drain_recovery_arm_lane_keeps_control_plane_safeguards() -> None:
+    workflow = _workflow_text()
+    drain = workflow[workflow.index("  drain:\n"):workflow.index("  wake-housekeeping:\n")]
+    assert "runs-on: ubuntu-24.04-arm" in drain
+    assert "cancel-in-progress: false" in workflow
+    assert "if stale_pr_run(run, open_pr_heads):" in drain
+    assert "if security_lane:" in drain
+    assert "if status == 429:" in drain
