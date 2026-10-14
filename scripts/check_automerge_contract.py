@@ -237,6 +237,14 @@ def _workflow_findings(text: str) -> list[Finding]:
             )
 
     validate = _line_block(text, "validate:")
+    if "github.event.workflow_run.conclusion == 'success'" not in validate:
+        findings.append(
+            Finding(
+                "success-admission",
+                "auto-merge must not run validation/reconciliation on failed or cancelled PR checks",
+                rel,
+            )
+        )
     if "contents: read" not in validate:
         findings.append(
             Finding(
