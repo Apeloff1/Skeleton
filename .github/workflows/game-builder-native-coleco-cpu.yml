@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: native-coleco-cpu-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   real-coleco-z80-gameplay:

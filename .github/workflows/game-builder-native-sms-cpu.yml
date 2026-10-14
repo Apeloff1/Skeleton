@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: native-sms-cpu-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   actually-run-original-master-system-z80:
