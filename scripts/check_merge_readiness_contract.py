@@ -32,8 +32,8 @@ PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_runner_v2_engine.py",
     "tests/test_required_checks_policy.py",
 )
-CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
-CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
+CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.ref }}"
+CANCEL_POLICY = "cancel-in-progress: true"
 READINESS_GUARD = (
     "if: ${{ !cancelled() && (github.event_name != 'pull_request' || "
     "(!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
@@ -88,22 +88,17 @@ def main() -> int:
     require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
     require(
         CONCURRENCY_GROUP in text,
-        "merge-readiness concurrency must deduplicate PRs while preserving each main head SHA",
+        "merge-readiness must deduplicate PRs and supersede stale main runs",
         failures,
     )
     require(
         CANCEL_POLICY in text,
-        "only superseded pull-request merge-readiness runs may be cancelled",
+        "superseded PR and main readiness runs must be cancellable",
         failures,
     )
     require(
-        "cancel-in-progress: true" not in text,
-        "unconditional merge-readiness cancellation can erase canonical main verification evidence",
-        failures,
-    )
-    require(
-        "github.event.pull_request.number || github.ref" not in text,
-        "branch-ref merge-readiness grouping can starve main verification during rapid merges",
+        "github.event.pull_request.number || github.sha" not in text,
+        "SHA-scoped main readiness causes unbounded redundant runs",
         failures,
     )
     require(
@@ -258,7 +253,7 @@ def main() -> int:
 
     print(
         "Merge-readiness contract passed: stable aggregate, exact toolchain, PR-safe supersession, "
-        "non-cancelling main verification, quarantine/security/secret gates, focused PR automation "
+        "latest-head main verification, quarantine/security/secret gates, focused PR automation "
         "contracts, and explicit fail-closed result aggregation are aligned."
     )
     return 0

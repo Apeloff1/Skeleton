@@ -16,10 +16,10 @@ on:
     branches: [main]
     paths: ['.github/workflows/queue-drain.yml']
 
-# v5 escapes provider-stuck v4 recovery. Bound every sweep so future v5
-# signals share one non-preemptive worker and one coalesced pending run.
+# v6 isolates improved main supersession recovery from the old queue lane.
+# One worker and one pending wake coalesce future triggers.
 concurrency:
-  group: queue-drain-v5-${{ github.repository }}
+  group: queue-drain-v6-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -86,12 +86,10 @@ jobs:
               '.github/workflows/branch-archive.yml',
               '.github/workflows/branch-flow.yml',
               '.github/workflows/branch-repair-100.yml',
-              '.github/workflows/merge-readiness.yml',
               '.github/workflows/pr-obsolete-run-drain.yml',
               '.github/workflows/queue-drain.yml',
               '.github/workflows/p1-evidence-identity.yml',
               '.github/workflows/p1-maturity-reconciliation.yml',
-              '.github/workflows/p1-required-gate-authority.yml',
               '.github/workflows/p1-risk-evidence-binding.yml',
               '.github/workflows/p1-reproducibility-bundle.yml',
               '.github/workflows/p1-scope-freeze.yml',
@@ -397,6 +395,7 @@ jobs:
               'active_seen': 0,
               'control_plane_preserved': 0,
               'obsolete_main': 0,
+              'obsolete_main_active': 0,
               'duplicates': 0,
               'stale_dynamic_active': 0,
               'closed_dynamic_ai_queued': 0,
@@ -560,6 +559,20 @@ jobs:
                       totals['control_plane_preserved'] += 1
                       local['control_plane_preserved'] += 1
                       continue
+                  # A newer canonical main-head run replaces older main
+                  # Merge Readiness work, including already running jobs.
+                  # Other running policy/security gates are not preempted.
+                  if (
+                      path(run) == '.github/workflows/merge-readiness.yml'
+                      and run.get('event') == 'push'
+                      and run.get('head_branch') == 'main'
+                      and run.get('head_sha') != head
+                      and workflow_event_key(run) in replacement_keys
+                  ):
+                      selected.append(run)
+                      totals['obsolete_main_active'] += 1
+                      local['obsolete_main_active'] += 1
+                      continue
                   if (
                       (run.get('head_branch') or '') == 'main'
                       and (run.get('head_sha') or '') != head
@@ -627,6 +640,7 @@ jobs:
                   f'active={len(active)} selected={len(selected)} '
                   f'control_plane_preserved={local["control_plane_preserved"]} '
                   f'obsolete_main={local["obsolete_main"]} '
+                  f'obsolete_main_active={local["obsolete_main_active"]} '
                   f'obsolete_pr_queued={local["obsolete_pr_queued"]} '
                   f'obsolete_pr_active={local["obsolete_pr_active"]} '
                   f'obsolete_dynamic_pr_queued={local["obsolete_dynamic_pr_queued"]} '
@@ -702,12 +716,12 @@ jobs:
                   )
                   handle.write(
                       '- Safety: `actions-housekeeping-cli.yml`, `branch-clean.yml`, `branch-flow.yml`, '
-                      '`branch-repair-100.yml`, `merge-readiness.yml`, '
+                      '`branch-repair-100.yml`, '
                       '`pr-obsolete-run-drain.yml`, and `queue-drain.yml` are '
                       'never cancellation targets unless a pull_request run is proven '
                       'obsolete against the fresh same-repository open-PR head map; '
                       'current main, authoritative open-PR heads, cross-repository PRs, '
-                      'and the newest path-filtered validation without a live-head '
+                      'the current main Merge Readiness run, and the newest path-filtered validation without a live-head '
                       'replacement are preserved.\n\n'
                   )
                   handle.write('### Passes\n')

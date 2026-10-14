@@ -15,14 +15,12 @@ on:
 permissions:
   contents: read
 
-# Merge Readiness validates the repository's current integration state while
-# preserving one canonical result for every main head SHA. Superseded PR runs
-# may cancel, but a newer main push must not erase verification evidence for an
-# older main head. Secret/malware/provenance workflows retain their separate
-# evidence policies.
+# Each PR retains an isolated merge-critical required check. Main pushes share
+# one integration lane, so superseded commits cannot accumulate stale runs.
+# Independent security/provenance checks remain unchanged.
 concurrency:
-  group: merge-readiness-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   PYTHON_VERSION: "3.11.16"
