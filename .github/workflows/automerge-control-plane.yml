@@ -10,7 +10,9 @@ on:
       - "*"
       - "**"
   schedule:
-    - cron: "4-59/5 * * * *"
+    # Merge Readiness completion remains the immediate event-driven wake;
+    # the scheduled fallback catches missed events without five-minute churn.
+    - cron: "8,23,38,53 * * * *"
   push:
     branches:
       - main
