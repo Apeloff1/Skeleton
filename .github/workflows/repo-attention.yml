@@ -5,10 +5,14 @@ on:
   schedule:
     - cron: '17 5 * * *'
   issues:
-    types: [edited, reopened, closed, assigned, unassigned, milestoned, demilestoned, locked, unlocked]
+    # Reconcile administrative metadata on the existing daily sweep;
+    # keep human edits/reopens/closes event-driven.
+    types: [edited, reopened, closed]
   issue_comment:
     types: [created, edited]
   pull_request:
+    # Metadata-only assignment, milestone, lock and auto-merge toggles are
+    # recovered by the daily sweep instead of spawning skipped run records.
     types:
       - synchronize
       - edited
@@ -16,16 +20,8 @@ on:
       - closed
       - ready_for_review
       - converted_to_draft
-      - assigned
-      - unassigned
-      - milestoned
-      - demilestoned
       - review_requested
       - review_request_removed
-      - locked
-      - unlocked
-      - auto_merge_enabled
-      - auto_merge_disabled
   pull_request_review:
     types: [submitted, edited]
   pull_request_review_comment:
