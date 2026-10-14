@@ -17,6 +17,8 @@ The browser is a cache/projection. Provider history is never authoritative.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from dataclasses import replace
+import hashlib
 import json
 from typing import Any, Awaitable, Callable, Mapping
 from uuid import uuid4
@@ -1001,6 +1003,52 @@ class MongoConversationAuthority:
                 "conversation storage is unavailable"
             ) from exc
         return tuple(_thread_from_doc(doc) for doc in docs)
+
+    async def rename_thread(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        expected_version: int,
+        title: str,
+    ) -> ConversationThread:
+        if type(expected_version) is not int or expected_version < 1:
+            raise ValueError("expected_version must be a positive integer")
+        if not isinstance(title, str):
+            raise ValueError("conversation title must be text")
+        initial = await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+        if initial.version != expected_version:
+            raise ConversationConflict("thread version conflict")
+        if initial.state not in {ConversationThreadState.ACTIVE, ConversationThreadState.ARCHIVED}:
+            raise ConversationConflict("thread metadata is not writable")
+        candidate = replace(initial, title=title.strip(), updated_at=_utcnow(), version=initial.version + 1)
+        await self._admit_storage(
+            tenant_id=tenant_id,
+            resource_id="conversation-thread-metadata",
+            write_id=f"rename:{thread_id}:{expected_version}:"
+            + hashlib.sha256(candidate.title.encode()).hexdigest(),
+            payload={"thread_id": thread_id, "expected_version": expected_version, "title": candidate.title},
+        )
+        try:
+            updated = await self.threads.find_one_and_update(
+                {
+                    **self._authorized_filter(thread_id, tenant_id=tenant_id, owner_id=owner_id),
+                    "version": expected_version,
+                    "state": {"$in": ["active", "archived"]},
+                },
+                {
+                    "$set": {"title": candidate.title, "updated_at": candidate.updated_at},
+                    "$inc": {"version": 1},
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable("conversation metadata is unavailable") from exc
+        if updated is None:
+            await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
+            raise ConversationConflict("thread version changed during rename")
+        return _thread_from_doc(updated)
 
     async def _message_by_idempotency(
         self,
