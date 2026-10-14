@@ -100,8 +100,13 @@ def extract_catalog(content: str, *, catalog_url: str, blob_sha: str,
                 "independence": "not_assessed", "training_authorized": False})
             if provenance not in row["discoveries"]:
                 row["discoveries"].append(provenance)
-    return {"manifest": manifest, "sources": sorted(rows.values(), key=lambda x: x["source_id"]),
-            "rejected_url_count": rejected}
+    extracted = {
+        "manifest": manifest,
+        "sources": sorted(rows.values(), key=lambda x: x["source_id"]),
+        "rejected_url_count": rejected,
+    }
+    # Tamper-evident extraction receipt, not a signature or source authority.
+    return {**extracted, "catalog_digest": canonical_digest(extracted)}
 
 
 def merge_catalogs(catalogs: list[dict]) -> dict:
@@ -112,6 +117,19 @@ def merge_catalogs(catalogs: list[dict]) -> dict:
     for catalog in catalogs:
         if not isinstance(catalog, dict) or not isinstance(catalog.get("manifest"), dict):
             raise ValueError("typed retrieved catalog required")
+        if set(catalog) != {"manifest", "sources", "rejected_url_count", "catalog_digest"}:
+            raise ValueError("catalog extraction fields are invalid")
+        if type(catalog["rejected_url_count"]) is not int or catalog["rejected_url_count"] < 0:
+            raise ValueError("catalog rejection count is invalid")
+        recorded = catalog["catalog_digest"]
+        extraction = {name: catalog[name] for name in (
+            "manifest", "sources", "rejected_url_count",
+        )}
+        if (
+            not isinstance(recorded, str)
+            or canonical_digest(extraction) != recorded
+        ):
+            raise ValueError("catalog extraction receipt does not match its contents")
         manifest = catalog["manifest"]
         if set(manifest) != {
             "catalog_id", "url", "git_blob_sha", "content_sha256",
@@ -135,8 +153,11 @@ def merge_catalogs(catalogs: list[dict]) -> dict:
         if not isinstance(items, list) or len(items) > 100_000:
             raise ValueError("bounded catalog sources required")
         for item in items:
-            if not isinstance(item, dict):
-                raise ValueError("typed catalog source required")
+            if not isinstance(item, dict) or set(item) != {
+                "source_id", "url", "host", "kind", "discoveries",
+                "availability", "rights", "independence", "training_authorized",
+            }:
+                raise ValueError("typed catalog source fields required")
             url = canonical_source_url(item.get("url"))
             identity = "source-" + sha256(url.encode()).hexdigest()
             host = urlsplit(url).hostname
