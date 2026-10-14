@@ -148,7 +148,7 @@ def test_queue_drain_wakes_housekeeping_only_for_old_eligible_pr_backlog() -> No
     assert "Wake exact stale-PR housekeeping when needed" in workflow
     assert "HOUSEKEEPING_WORKFLOW: actions-housekeeping-cli.yml" in workflow
     assert "HOUSEKEEPING_WAKE_STALE_MINUTES: '1440'" in workflow
-    assert 'actions/runs?status=queued&per_page=100&page=${page}' in workflow
+    assert 'api_json "actions/runs?status=queued&per_page=100&page=${page}" "$page_json"' in workflow
     assert '[[ "$event" == \'pull_request\' ]] || continue' in workflow
     assert "*Malware*|*Secret*|*Security*|*CodeQL*|*Provenance*" in workflow
     assert "for page in $(seq 1 10)" in workflow
@@ -159,7 +159,7 @@ def test_queue_drain_does_not_duplicate_live_housekeeping() -> None:
     workflow = _workflow_text()
 
     assert "for status_name in requested waiting pending queued in_progress; do" in workflow
-    assert '/actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=${status_name}&per_page=1' in workflow
+    assert 'api_json "actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=${status_name}&per_page=1"' in workflow
     assert "existing Housekeeping run is ${housekeeping_status}" in workflow
     assert 'gh workflow run "$HOUSEKEEPING_WORKFLOW" --repo "$REPO" --ref main' in workflow
     assert "Housekeeping independently re-proves PR/run identity before any cancellation." in workflow
@@ -207,3 +207,16 @@ def test_queue_drain_reclaims_only_closed_pr_ghas_ai_runs() -> None:
     assert "state = str(payload.get('state') or '')" in helper
     assert "and head_repo == repo" in helper
     assert "and head_ref == branch" in helper
+
+
+def test_housekeeping_api_limits_defer_without_dispatch_or_silent_admission() -> None:
+    workflow = _workflow_text()
+    wake = workflow[workflow.index("  wake-housekeeping:\n"):]
+    assert "api_json() {" in wake
+    assert 'grep -Eqi \'(rate.limit|abuse detection)\'' in wake
+    assert "GitHub installation API capacity exhausted; deferred without mutation" in wake
+    assert "Housekeeping API observation failed; fail closed." in wake
+    assert wake.index("api_json() {") < wake.index("for page in $(seq 1 10)")
+    assert wake.index("api_json \"actions/workflows/") < wake.index(
+        'gh workflow run "$HOUSEKEEPING_WORKFLOW"'
+    )

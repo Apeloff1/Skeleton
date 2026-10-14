@@ -10,7 +10,7 @@ This document is a deterministic projection of machine authority. It has no comp
 
 | Source | Git blob SHA-1 |
 | --- | --- |
-| `machine/ai_master_plan.json` | `1733c3843d7dfe3e1bb609b65e1dee5686285942` |
+| `machine/ai_master_plan.json` | `69f2be498502387429927e251185ff49c438920b` |
 | `machine/ai_p2_execution_map.json` | `85f22876166ad284af7f1f05dff0532d43a60753` |
 | `machine/ai_p2_task_backlog.json` | `91b610d9dfdecfe655f3e250d0920f561555d0c1` |
 
@@ -48,7 +48,7 @@ This document is a deterministic projection of machine authority. It has no comp
 | `VOL-051` | Repository Architecture | `verified` |
 | `VOL-052` | Internal Python Architecture | `verified` |
 | `VOL-053` | Import Architecture | `verified` |
-| `VOL-054` | Machine Architecture Manifests | `verified` |
+| `VOL-054` | Machine Architecture Manifests | `implemented` |
 | `VOL-055` | Architecture Linter | `verified` |
 | `VOL-058` | ADR Program | `verified` |
 | `VOL-116` | Architecture Fitness Functions | `verified` |
@@ -95,10 +95,10 @@ This document is a deterministic projection of machine authority. It has no comp
 | `VOL-104` | Acceptance: Functional AI | `verified` |
 | `VOL-132` | Consistency Model | `verified` |
 | `VOL-134` | Outbox / Inbox Patterns | `verified` |
-| `VOL-167` | Threat Model | `verified` |
-| `VOL-169` | Security Boundaries | `verified` |
-| `VOL-172` | Egress Control | `verified` |
-| `VOL-175` | Tenant Isolation | `verified` |
+| `VOL-167` | Threat Model | `implemented` |
+| `VOL-169` | Security Boundaries | `implemented` |
+| `VOL-172` | Egress Control | `implemented` |
+| `VOL-175` | Tenant Isolation | `implemented` |
 
 ## Authority boundary
 

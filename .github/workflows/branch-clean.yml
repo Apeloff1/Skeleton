@@ -336,12 +336,17 @@ jobs:
               fi
             done < <(git for-each-ref --format='%(objectname) %(refname:strip=3)' refs/remotes/origin | sort -k2,2)
 
-            # Do not act on ancestry calculated against an old main tip.
-            git fetch --quiet --no-tags --filter=blob:none origin '+refs/heads/main:refs/remotes/origin/main'
-            current_main=$(git rev-parse "$main_ref")
-            if [[ "$current_main" != "$classified_main" ]]; then
+            # Classifications against an earlier main remain sound if current
+          # main is a *descendant*. Reject a rewritten/divergent main, not an
+          # ordinary fast-forward from an unrelated parallel merge.
+          git fetch --quiet --no-tags --filter=blob:none origin '+refs/heads/main:refs/remotes/origin/main'
+          current_main=$(git rev-parse "$main_ref")
+          if [[ "$current_main" != "$classified_main" ]]; then
+            if git merge-base --is-ancestor "$classified_main" "$current_main"; then
+              echo "- round $round/$max_rounds: main fast-forwarded; original ancestor/tree evidence is still reachable." >> "$GITHUB_STEP_SUMMARY"
+            else
               {
-                echo "- round $round/$max_rounds deferred: main moved from \`$classified_main\` to \`$current_main\`; no refs deleted."
+                echo "- round $round/$max_rounds deferred: main was rewritten/diverged from \u0060$classified_main\u0060 to \u0060$current_main\u0060; no refs deleted."
               } >> "$GITHUB_STEP_SUMMARY"
               if (( round < max_rounds )); then
                 sleep 1
@@ -349,13 +354,13 @@ jobs:
               fi
               {
                 echo
-                echo '## Branch cleanup remains live'
-                echo "- main moved during all $max_rounds in-run classification attempts."
-                echo '- No stale ancestry result was used for deletion.'
-                echo '- The queued/scheduled cleanup run will retry.'
+                echo '## Branch cleanup deferred'
+                echo '- Main history was not a fast-forward during all classification attempts.'
+                echo '- No refs were deleted using stale ancestry.'
               } >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
+          fi
 
             # A PR opened during classification wins over cleanup. Fail closed
             # if late revalidation cannot re-establish both head and base refs.
@@ -389,6 +394,17 @@ jobs:
             deleted=0
             raced_or_blocked=0
             for ((offset=0; offset<${#safe_delete_branches[@]}; offset+=delete_batch_size)); do
+              # A fast-forward remains safe even during main churn. A history
+              # rewrite, or failure to refresh main, stops all remaining writes.
+              if ! git fetch --quiet --no-tags --filter=blob:none origin '+refs/heads/main:refs/remotes/origin/main'; then
+                echo '::warning::Main refresh failed before deletion batch; stopping without further deletes.'
+                exit 0
+              fi
+              live_main=$(git rev-parse "$main_ref")
+              if ! git merge-base --is-ancestor "$classified_main" "$live_main"; then
+                echo '::warning::Main was rewritten while pruning; stopping without further deletes.'
+                exit 0
+              fi
               batch_branches=("${safe_delete_branches[@]:offset:delete_batch_size}")
               batch_tips=("${safe_delete_tips[@]:offset:delete_batch_size}")
               lease_args=()
