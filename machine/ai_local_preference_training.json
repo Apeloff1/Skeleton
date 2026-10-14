@@ -1,0 +1,65 @@
+{
+  "schema_version": "skeleton.ai.local_preference_training.v1",
+  "status": "implemented_unpromoted",
+  "claim_scope": "bounded_single_worker_native_recurrent_dpo_candidate_training",
+  "masterplan_refs": ["VOL-149", "VOL-150"],
+  "canonical_owner": "skeleton/ai/runtime/training/control.py:TrainingRepository",
+  "implementation_path": "skeleton/ai/runtime/training/preference_trainer.py",
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "algorithm": {
+    "id": "numpy-recurrent-byte-dpo-v1",
+    "objective": "-log sigmoid(beta * ((log policy(chosen|prompt)-log policy(rejected|prompt))-(log reference(chosen|prompt)-log reference(rejected|prompt))))",
+    "likelihood": "sum of completion UTF-8 byte and EOS log probabilities, prompt targets masked; recurrent gradients still propagate through the conditioning prompt",
+    "optimizer": "plain float64 SGD with one global gradient norm clip per governed preference pair",
+    "reference": "full frozen weights from an existing completed single-worker native neural training run in the same training/dataset authority",
+    "ordering": "epochs and registered preference documents in exact order, hidden state reset for each chosen/rejected sequence",
+    "randomness": "no stochastic updates, dropout, shuffling, reward sampling or scalar reward-to-weight fabrication"
+  },
+  "data": {
+    "document_schema": "skeleton.preference_pair.v1",
+    "fields": ["schema_version", "prompt", "chosen", "rejected"],
+    "representation": "canonical JSON preference documents in the exact registered materialized dataset train split",
+    "authority": "existing DatasetRegistry quality, materialized bytes, training rights and dataset authority epoch",
+    "preference_source": "explicit chosen/rejected text; no acceptance of scalar reward-only records"
+  },
+  "lineage": {
+    "experiment": "PostTrainingExperiment binds preference dataset, parent model, exact objective/algorithm/configuration and planned evaluation suite; candidate-only evidence",
+    "parent": "manifest/base model, full parent checkpoint, immutable parent execution binding and live parent dataset authority are checked before updates, checkpoint commits and artifact reload",
+    "candidate": "distinct run/model identity; frozen reference unchanged; no production registry or promotion write"
+  },
+  "persistence": {
+    "binding_schema": "skeleton.preference_training_binding.v1",
+    "payload_schema": "skeleton.preference_training_resume.v1",
+    "authority": "existing TrainingRepository execution binding and checkpoint/payload tables",
+    "full_state": "policy/reference weights, optimizer, exact pair/epoch cursor, cumulative usage, initial/final loss and chosen/rejected margin observations, experiment and parent identity",
+    "commit": "one complete pair update and full payload in existing current-worker-fenced transaction, serialized against preference and parent dataset authority changes",
+    "recovery": "validate all model/schema/config/parent/pair identities, advance worker epoch, resume exact next pair; finished checkpoint terminalizes without another update"
+  },
+  "limits": {
+    "world_size": 1,
+    "hidden_size": 64,
+    "pair_document_bytes": 4096,
+    "prompt_bytes": 1024,
+    "completion_bytes": 1024,
+    "corpus_bytes": 1048576,
+    "preference_pairs": 1024,
+    "epochs": 128,
+    "pair_updates": 65536,
+    "sequence_targets": 16777216,
+    "checkpoint_payload_bytes": 16777216
+  },
+  "budget_keys": ["max_steps", "max_tokens", "max_updates", "max_pairs", "max_documents", "max_training_bytes", "max_epochs", "max_corpus_bytes"],
+  "usage_scope": "training usage includes all four policy/reference likelihood passes per pair update plus initial and final objective observations; repeated read-only admission/reload validation recomputations are outside this training counter and no total lifetime compute accounting is claimed",
+  "failure_rules": [
+    "training and restore require a distinct single-worker candidate; the registered native neural parent must itself be single-worker before its weights can be loaded",
+    "unmaterialized, reordered, substituted or revoked preference documents fail before model work",
+    "parent checkpoint/config/model/code/environment or live authority drift fails closed",
+    "unknown payload/binding fields, nonfinite weights/objective/gradients and cumulative usage tampering prevent resume",
+    "stale workers cannot checkpoint, emit telemetry or complete replacement work",
+    "restart preserves cumulative budgets and exact full numerical state",
+    "candidate comparisons and experiment lineage never grant production promotion"
+  ],
+  "tests": ["skeleton/testing/test_local_preference_training.py"],
+  "scope_limitations": ["bounded local byte-level recurrent DPO experiment", "single native neural parent and worker", "same existing dataset and training stores", "fresh database checkpoint recovery requires the exact native neural parent to be restored and completed before its preference candidate", "no on-policy RL environment optimization claim", "no remote/distributed preference optimization", "no production promotion, masterplan closure or signoff"]
+}

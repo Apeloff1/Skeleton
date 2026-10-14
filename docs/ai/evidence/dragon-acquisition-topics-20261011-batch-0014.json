@@ -1,0 +1,845 @@
+{
+  "schema": "skeleton.dragon.acquisition_topic_triage.v1",
+  "registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "source_range": {
+    "start_inclusive": 416,
+    "end_exclusive": 448
+  },
+  "checked_at": "2026-10-11T16:19:02.000Z",
+  "topics": [
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "F"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1733f1f864767fdb84cbfa940b30d0790231568000a4b896284018366ebf352f",
+          "url": "https://github.com/bryanedds/Nu",
+          "representation_sha256": "a885021f3e23c4e854e6c7e99e5a14ea2c8919b11becc3f28d557fa41dc6ddc6",
+          "source_revision": "f70c1921afb711a1c11139377c6de52eef4fc96a",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Nu's selected-revision license permits noncommercial purposes subject to a noncompete restriction and required notices; it is not an unrestricted open-source grant.",
+            "span": "License.md at f70c1921afb711a1c11139377c6de52eef4fc96a",
+            "limitations": "The custom terms require qualified legal review before any reuse, distribution or competitive product work.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Writing"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-174a693eabf99a5dc3e3ba4d622cf3a6506b3dbe48461c8b57d1ae5161d34962",
+          "url": "https://emshort.blog/",
+          "representation_sha256": "cf891ea4a10b183a42a29f99ccc837216a24be9260640c516141c6a3def73716",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn174view0",
+          "observation": {
+            "statement": "Emily Short describes filtering a larger dialogue pool by player traits, wardrobe and situation, then using a crafting-like interface for players to form investigative questions and hypotheses.",
+            "span": "lines 14-38",
+            "limitations": "This is a designer's account of one shipped narrative system, not a controlled comparison or general causal result.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Code**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-175583e9e8720858c5d53791dae21dc802a9796fb8e7e61509f06f6e7cb1c9bc",
+          "url": "https://coffeebraingames.wordpress.com/2020/04/05/one-million-sprites-more-than-120fps-dots-not-required/",
+          "representation_sha256": "1c0f0df8f887a694e6e70d97950f23009e7e33fda5d6b3bab03b7e9dfd255d38",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn176view0",
+          "observation": {
+            "statement": "Coffee Brain Games describes a Unity sprite-rendering approach that sends transforms, UVs and colors through structured buffers to a shader.",
+            "span": "lines 3-46",
+            "limitations": "The headline performance claim was not reproduced, and hardware, scene complexity and feature parity were not validated.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-176831227e8a39bfa3e3719687aa487cec41b0901e34ecba4f01c22c5b8bcc07",
+          "url": "https://medium.com/mighty-bear-games/a-gentle-introduction-to-ai-8d7efaea12cc",
+          "representation_sha256": "74fc7dee341031119eb0e7d8929f31a2157b3d0ca900bc35511a170a9701096d",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn176view1",
+          "observation": {
+            "statement": "Geir Ove Alnes describes scoping offline Butter Royale bots by mind-mapping player actions, strategies and event reactions before selecting an implementation.",
+            "span": "lines 37-77",
+            "limitations": "This is a single-team retrospective; match quality, latency and player-response outcomes were not independently measured.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-17c786f3992e4db8f7eee8e9a0eccc5d0fc214438f6dcfacf381e4aac3b54880",
+          "url": "https://github.com/0xFA11/GameNetworkingResources",
+          "representation_sha256": "8433f3d806e262bcf2e537804f3db8d24dcc5a36e4670c8e59d6358bb8764408",
+          "source_revision": "67736c77254fe13495523ce58156dfc6f796682d",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "MultiplayerNetworkingResources is a curated discovery list about latency, jitter, loss, prediction, compensation, reconciliation and interpolation.",
+            "span": "README.md at 67736c77254fe13495523ce58156dfc6f796682d",
+            "limitations": "No root license-like file was captured, and linked resources add no independent approval until individually reviewed.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-18098a6feae51d0539d11cd700dab308ac473f917313eb15efcbb4ad73703bb1",
+          "url": "https://randygaul.github.io/math/2022/09/18/Game-Math-101-Writing-your-Own-2D-Math-in-CPP.html",
+          "representation_sha256": "4e36bfdac4bb58983898c6c2de5939935d44b02d6d2d1685b3a370f41de066b9",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn175view7",
+          "observation": {
+            "statement": "Randy Gaul's Game Math 101 builds 2D demonstrations from C/C++ fundamentals through vectors, transforms, raycasting and basic collision detection.",
+            "span": "lines 6-44",
+            "limitations": "Code and mathematical explanations were not compiled, formally verified or benchmarked.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-181aab5ce3889912eb23cdc6eec33e262621ebd2d5e584def5dd0fd9334c6ce1",
+          "url": "https://github.com/redorav/public_source_engines",
+          "representation_sha256": "029699f7298df22fb923c7395c00031fa432f2df9f13e5f42bd711ef42b82743",
+          "source_revision": "7113bb4ef220503ee66b3db2eebd3ff1c8515b6d",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "public_source_engines explicitly distinguishes source visibility from open/free use and warns that every listed engine has separate licensing or commercial conditions.",
+            "span": "README.md at 7113bb4ef220503ee66b3db2eebd3ff1c8515b6d",
+            "limitations": "The list is discovery-only; no linked engine inherits rights or approval from inclusion.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Design**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-17665c689addf7d1df814c8b7f0523266a9c3318a1aeef73cf975d1910e155db",
+          "url": "https://youtu.be/if_hvgLC5cM",
+          "representation_sha256": "b6ba004b1c63f160cff177be7bb64f0eb03773c775b22ef3ec2ca1d4743bf00a",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view2",
+          "observation": null
+        },
+        {
+          "source_id": "source-17d075b203b08ed58569da91276baccd88a8dc8cfb0e69aaf4d817770e27f2fc",
+          "url": "http://www.gamasutra.com/view/feature/129948/the_chemistry_of_game_design.php",
+          "representation_sha256": "f0d2c4b8b14f3737e7c17abecf8cd55bb27570e2320195ca25b9fa57a3156414",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view10",
+          "observation": null
+        },
+        {
+          "source_id": "source-18a768eae7426f58046ad0686bc8f1e3aafa50b1b137c1d4d3dfd4ae8cd3811c",
+          "url": "http://www.gamasutra.com/view/feature/3675/the_pursuit_of_games_designing_.php",
+          "representation_sha256": "9363ff66992277e32230418e2324f5f774413e6b4738aeba26465ed5a180c674",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view21",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-17665c689addf7d1df814c8b7f0523266a9c3318a1aeef73cf975d1910e155db",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        },
+        {
+          "source_id": "source-17d075b203b08ed58569da91276baccd88a8dc8cfb0e69aaf4d817770e27f2fc",
+          "finding": "redirect_to_non_target_index",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        },
+        {
+          "source_id": "source-18a768eae7426f58046ad0686bc8f1e3aafa50b1b137c1d4d3dfd4ae8cd3811c",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Native",
+        "RPG"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-176802f66eb6ebffc6ed14bc127eb0a4ef8dd919a94d51a0e71ec5851906029c",
+          "url": "https://github.com/jwvhewitt/dmeternal",
+          "representation_sha256": "80bef3fac3abb1aca50629015132ddbf4c4bc0477a9637a5b2ad717c78449581",
+          "source_revision": "bb09f2d497daf9b40dd8cfee10c55be55fb7c3cb",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The legacy dmeternal README describes a Python 2/Pygame party roguelike with procedural quests and worlds; the repository root license names GearHead Caramel, Apache-2.0 code and mostly CC-BY assets.",
+            "span": "old_game/README.md and LICENSE at bb09f2d497daf9b40dd8cfee10c55be55fb7c3cb",
+            "limitations": "The root license's named-project scope may not clearly govern every legacy old_game file or asset; credits and lineage remain pending.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Programming"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-176999eaf742836644e5915f15c0005f6da9f68867cafd7d024de91addf2abe9",
+          "url": "https://laroldsjubilantjunkyard.com/tutorials/how-to-make-a-gameboy-game/",
+          "representation_sha256": "d642db460be4b9cb37fa09694964a87d32ee9a4c4e6f399f7d5f01d9e4cf967e",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn175view2",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-176999eaf742836644e5915f15c0005f6da9f68867cafd7d024de91addf2abe9",
+          "finding": "redirect_to_related_index",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Computer Graphics"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-176e4858fc0790d2cb8356e5154dd5dc05db77d17253007b580841c52e59e198",
+          "url": "https://www.udacity.com/course/interactive-3d-graphics--cs291",
+          "representation_sha256": "3e13ff8056a86ed133bda8ddd694a17ed28daa3a7a3c61342565da650e366d2b",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn175view3",
+          "observation": {
+            "statement": "Udacity's course outline covers points, vectors, meshes, materials, transforms, matrices, lights, cameras, textures, reflections, shaders, interaction and animation across 22 lessons.",
+            "span": "lines 18-51",
+            "limitations": "Course quality, currency, exercises and completion outcomes were not independently evaluated.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Art**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1789e1b1813053feafba17d2551483d679937c286e2f4544c403e7a1928434c3",
+          "url": "https://storiedcolors.com/browse/",
+          "representation_sha256": "ed7a40d3dbab8f3d5821067dd287d06a008897fb733077c274cc8905fe2be83c",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn175view4",
+          "observation": {
+            "statement": "Storied Colors exposes a catalog of 252 color specimens with era, hue, status, source and lightfastness filters, while the retrieved page reports only the first 60 entries loaded.",
+            "span": "lines 12-56",
+            "limitations": "Catalog methodology, individual historical claims, color values and reuse rights require specimen-level review.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-17d14184319542eb1dadde8cc182c7c673073e5c56be1397d397bfbd786e8518",
+          "url": "https://80.lv/articles/environment-design-style-over-function/",
+          "representation_sha256": "d4abf8310672cf5817a93e63aebc2b464aed7d0bb2c6cc5d2c54c21454b4f497",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn176view3",
+          "observation": {
+            "statement": "Robert Hodri's interview emphasizes gameplay readability before visual detail, fast iteration on feedback and selective modularity to preserve level-design flexibility.",
+            "span": "lines 68-119",
+            "limitations": "This is professional practice guidance from one interview, not a controlled production study.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Modules",
+        "Godot 3"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-17a2e8571b526cc7faa902f00ed9cc8111fc929a17a77f747670f428dd289f31",
+          "url": "https://discord.com/developers/docs/game-sdk/sdk-starter-guide",
+          "representation_sha256": "390d1a5bb2112f6112e5d030dfc06bce23b983405fbb6466522b4486b0d772d7",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn176view2",
+          "observation": {
+            "statement": "Discord labels the Game SDK archived, recommends the Social SDK for new projects and says existing Game SDK projects continue to work; the page also links developer policy and terms.",
+            "span": "lines 140-166",
+            "limitations": "Current service behavior, binaries and migration compatibility were not tested; downloads were not accessed.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "JavaScript"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-17cc5bf6f93b52327e711725e1bab25e2ad00257c3cea5d28a2a858440bb2f7b",
+          "url": "https://ambiera.com/copperlicht/",
+          "representation_sha256": "76949adbf3e816f414219b93d92bb3522ff6d2237e604a9699643506337e183f",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view8",
+          "observation": null
+        },
+        {
+          "source_id": "source-1894e3e6f2caff5c3159be258b182f4f901f1b4bad009570f7345a1441540cd4",
+          "url": "https://github.com/Tonejs/Tone.js",
+          "representation_sha256": "4abf1743fd1e0ff3db77b6d011fd4e067347e35aeef779a4675d6f438a8e32f9",
+          "source_revision": "de9df332ca7573b90a9aaca10c0729a3091dda0a",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "Tone.js describes a Web Audio framework with transport scheduling, synthesizers, effects and lower-level control blocks; its root license is MIT.",
+            "span": "README.md and LICENSE.md at de9df332ca7573b90a9aaca10c0729a3091dda0a",
+            "limitations": "Audio behavior, browser compatibility, samples and dependencies were not independently reviewed.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-18a4c085bd903f34a1cec6edf3c30ba64c10f1ec2ae2de8a8bcdc664cf3987b3",
+          "url": "https://doc.mapeditor.org/en/stable/",
+          "representation_sha256": "e5aaace828e38352dd8115ee4a973afc7cd17dfd3d37f4a5dc4be6d80984c91f",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn175view10",
+          "observation": {
+            "statement": "Tiled 1.12.2 documentation indexes map orientations, layers, tile and terrain editing, collision, animation, custom properties and templates.",
+            "span": "lines 3-60",
+            "limitations": "This is feature documentation, not proof of target-engine export compatibility or content rights.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-17cc5bf6f93b52327e711725e1bab25e2ad00257c3cea5d28a2a858440bb2f7b",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Strategy"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-17cfb07f93118933104231bc0da7f0778a361b399e1665c07d29d75d27780f44",
+          "url": "http://www.adityaravishankar.com/projects/games/command-and-conquer/",
+          "representation_sha256": "52400b79f1d560706ae8c182e69cdb2368532d99f4c4a0d0beee840eae3b45e3",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view9",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-17cfb07f93118933104231bc0da7f0778a361b399e1665c07d29d75d27780f44",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Browser-Based",
+        "Arcade"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-17e3926963f79d1352531af132d4e4942a72252965929a4fccfe4cb7387b2325",
+          "url": "https://github.com/AdamAtomic/GraveRobbers",
+          "representation_sha256": "d7d24a5758b5ac29fdfb83ae42e333cc6d99fbb9a0f739a725ad7afc85e026b3",
+          "source_revision": "a5e442b2b4dd6f16d6f2775220e87b3d9020f69c",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "The selected GraveRobbers source file identifies a Flixel game configured for a 1024×768 stage and forced debugger mode.",
+            "span": "src/GraveRobbers.as at a5e442b2b4dd6f16d6f2775220e87b3d9020f69c",
+            "limitations": "No README or root license-like file was found at tested paths; the code was not built or executed.",
+            "state": "unreviewed_reference_observation"
+          }
+        },
+        {
+          "source_id": "source-187c14433601683f7cf273e4e9e02fc83331f6ea32e7fb5f25cd7cbe89eea45e",
+          "url": "http://hughsk.io/ludum-dare-27/",
+          "representation_sha256": "424e2fbdb4a366560d8049ef92fe469bf0aab3461932d928cf216d6cef6bfcbb",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view17",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-187c14433601683f7cf273e4e9e02fc83331f6ea32e7fb5f25cd7cbe89eea45e",
+          "finding": "metadata_shell_only",
+          "scope": "Target identity was visible but no substantive body was returned; no content analysis or rights conclusion."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "GDScript/C# editor support"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-181d80a46245c999b4b9a321bc7beb440276d20f60aa0d47fce79c6882f7bdcf",
+          "url": "https://github.com/beefsack/GDScript-sublime",
+          "representation_sha256": "cdfa9cf6d3de7c129cb48bb21ebf2bdfa3637e31bcce3dbb84df66c2b073401c",
+          "source_revision": "7838e1665362eb213717f6b4d7665122acdcabfe",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "GDScript-sublime states that it is no longer maintained and is archived; its selected root license is MIT.",
+            "span": "README.md and LICENSE.txt at 7838e1665362eb213717f6b4d7665122acdcabfe",
+            "limitations": "Archived status is not abandonment, public-domain status or evidence about current Godot editor compatibility.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Game Engine Development [![Awesome](https://awesome.re/badge-flat.svg)](https://github.com/sindresorhus/awesome#readme)",
+        "Libraries",
+        "Go"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-181e7b8dcbc3b684d79abd690897ab974cba5e84f156a068e3bf14e7f381e3bc",
+          "url": "https://github.com/faiface/pixel-examples",
+          "representation_sha256": "b361955dcb2a1db23169144a4dc3092a3e68e84254af05c72ac64dd20d770cba",
+          "source_revision": "93f9cd5359db4c9dba723ad631434138ebe0ac31",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "pixel-examples contains runnable Go examples for lights, platforming, smoke, typewriter, raycaster and starfield demonstrations under MIT.",
+            "span": "README.md and LICENSE at 93f9cd5359db4c9dba723ad631434138ebe0ac31",
+            "limitations": "Examples were not executed; dependency and embedded-media rights remain separately gated.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Postmortems**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1823f5d484727ea04f3f95643b87792087aa5e886e8d800ea1a08efdd8dc0b27",
+          "url": "https://www.gamasutra.com/blogs/ShazYousaf/20200409/360899/The_Likelihood_of_Making_at_Least_10000_in_the_First_30_days_of_Launch_on_Steam.php",
+          "representation_sha256": "408cd5c877400ddf0ac931d15631800691c683cecd1299d70d6767de24a33732",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view13",
+          "observation": null
+        },
+        {
+          "source_id": "source-18b71a8fbf54c164a020637c3fe68ee438d2fe6610d6688d675e4565f87b16ff",
+          "url": "http://gamasutra.com/blogs/LindseyHandley/20140930/226640/Lessons_Learned_in_a_Successful_Indie_Game_Kickstarter_Campaign_How_CodeSpells_Raised_120K.php",
+          "representation_sha256": "064f9b4cf25124e4e8f7bc4ab9058b467dfc7a1e9d329156365feeae7464bed5",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view22",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1823f5d484727ea04f3f95643b87792087aa5e886e8d800ea1a08efdd8dc0b27",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        },
+        {
+          "source_id": "source-18b71a8fbf54c164a020637c3fe68ee438d2fe6610d6688d675e4565f87b16ff",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Spritesheet Tools"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-18297bb0527234b051fb092f9a7bf42cd2cdc9ffcf41b588f0368d5b129c1939",
+          "url": "https://github.com/libgdx/libgdx/wiki/Texture-packer",
+          "representation_sha256": "e196a7e185676492a898ef558d60bafa753e6dd74aaa4ef7f7272a1dfbf908f7",
+          "source_revision": "c941e9bc85450d9939a7dc3598a2ff35ba6d60a2",
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view14",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-18297bb0527234b051fb092f9a7bf42cd2cdc9ffcf41b588f0368d5b129c1939",
+          "finding": "redirect_to_non_target_index",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Learn Gamedev [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Marketing and Business"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-18324bca9c54013d42f4800a975d3157721c90819257fced22f30b05dbfa49ad",
+          "url": "https://www.derek-lieu.com/blog/",
+          "representation_sha256": "8971d5ac8b50e381759c77c7fcaaf6583b27b5de011e1bd5ea7c4e399121cdbc",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn175view8",
+          "observation": {
+            "statement": "Derek Lieu's blog indexes trailer reviews and case studies involving mechanic readability, gameplay-story framing, early asset planning and editing choices.",
+            "span": "lines 21-57",
+            "limitations": "These are qualitative professional reviews and case studies, not causal marketing experiments.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Awesome Godot [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)",
+        "Plugins and scripts",
+        "Godot 3"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-184e5537636257ac4c6291b08ebe8e09bb4f7d0cc69073571f24192a0095f1f7",
+          "url": "https://github.com/3ddelano/discord.gd",
+          "representation_sha256": "364d06bac909e964546c6812531fc6771797365faa94d3382bde9978c16588ed",
+          "source_revision": "b870f8c1b4227492be376bfcab408bb296737053",
+          "kind": "attributable_reference_observation",
+          "citation_ref": null,
+          "observation": {
+            "statement": "discord.gd describes a GDScript Godot 4 plugin for the Discord Bot API with a Godot 3 branch; its root license is MIT.",
+            "span": "README.md and LICENSE.md at b870f8c1b4227492be376bfcab408bb296737053",
+            "limitations": "API-policy compliance, credentials, network safety and current Discord compatibility were not tested.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Localization**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-18692230ee231e43f0a218f54129ed07559475fb159990b8de6dda466344fb48",
+          "url": "https://medium.com/@shaigreenbergtm/on-translating-portal-and-other-games-fa146a514484",
+          "representation_sha256": "2a915e594979c920f0a279d4b1bda35d7c3fdc9dbe206cbb4921ca68eb350838",
+          "source_revision": null,
+          "kind": "attributable_reference_observation",
+          "citation_ref": "turn175view9",
+          "observation": {
+            "statement": "Shai Greenberg describes an open-sourced technical solution for Hebrew subtitles in Source-engine games that was also applied to Arabic and other localizations.",
+            "span": "lines 54-60",
+            "limitations": "The linked code and its license were not acquired; claims about supported games and languages were not reproduced.",
+            "state": "unreviewed_reference_observation"
+          }
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "Table of Contents",
+        "Assets/Placeholders"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-1887f74b14bb5e937402cf58b27c8e639b81ad7efef80fb0c13b84a6a26873e1",
+          "url": "http://oryxdesignlab.com/",
+          "representation_sha256": "cc198588ac5a6858d33fb0450327b5b3434b61ea4eb6ef753526b33f5720493d",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view18",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-1887f74b14bb5e937402cf58b27c8e639b81ad7efef80fb0c13b84a6a26873e1",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    },
+    {
+      "topic_path": [
+        "**Unity**"
+      ],
+      "identity_scope": "acquisition-side header identity; canonical topic ID belongs to existing owner",
+      "source_evidence": [
+        {
+          "source_id": "source-18a2521c2ff27651359fb36ea3fc2160b692f95c6fec9047e3f220705dff20c3",
+          "url": "https://www.youtube.com/playlist?list=PLcRSafycjWFceHTT-m5wU51oVlJySCJbr",
+          "representation_sha256": "dd371b87ccc4f80950f1663fc5e4b6c327d897a154199e14396f4fe39eb3bc41",
+          "source_revision": null,
+          "kind": "availability_and_identity_metadata_only",
+          "citation_ref": "turn174view19",
+          "observation": null
+        }
+      ],
+      "ai_hypotheses": [],
+      "measured_findings": [],
+      "negative_results": [
+        {
+          "source_id": "source-18a2521c2ff27651359fb36ea3fc2160b692f95c6fec9047e3f220705dff20c3",
+          "finding": "retrieval_failed",
+          "scope": "This authorized channel and check time only; not global unavailability, abandonment, ownership or rights expiry."
+        }
+      ],
+      "prototype_lessons": [],
+      "product_lessons": [],
+      "rights": {
+        "state": "pending"
+      },
+      "admission": "unreviewed_acquisition_index"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": "skeleton.ai.governed_training_state_cli.v1",
+  "status": "implementation_candidate",
+  "canonical_owner": "skeleton/ai/runtime/training/state_cli.py",
+  "entrypoint": "skeleton-governed-training-state",
+  "scope": "Bounded local operator access to existing training observability and governed checkpoint archive authorities",
+  "boundaries": {
+    "new_service": false,
+    "new_provider_transport": false,
+    "new_runtime_root": false,
+    "production_promotion": false,
+    "masterplan_signoff": false
+  },
+  "commands": {
+    "inspect": "Read an exact run's committed, semantically validated observation snapshot without training or exposing source documents or model weights",
+    "archive": "Validate current dataset authority, then publish a complete checkpoint and admitted operator request to tenant/trust-bound CAS and atomically emit its bounded receipt",
+    "recover": "Validate the supplied archive receipt against the retained DatasetRegistry and committed CAS proof before registering the exact manifest, execution binding and fenced checkpoint in a fresh training database",
+    "retain": "Apply protected archive retention to the existing training database; retain CAS blobs and latest or pinned checkpoints"
+  },
+  "limits": {
+    "max_receipt_bytes": 65536,
+    "max_retained_count": 1024
+  },
+  "failures": [
+    "Reject missing or nonregular dataset databases; archive and inspect require an existing training database",
+    "Reject symlinks, input/output/database aliases and hard-link conflicts before opening state or replacing receipts",
+    "Reject unknown receipt fields, duplicate JSON keys, nonfinite values and oversized receipt files",
+    "Revoked, deleted or drifted source authority, invalid model payloads, missing CAS commit proof, tenant/trust mismatch and conflicting current target state fail closed",
+    "Recovery does not reconstruct revoked source content or erase a newer target checkpoint"
+  ],
+  "rollback": "Remove the operator entrypoint while retaining existing dataset/training databases, CAS objects and receipt files; neither report nor archive creation promotes a model",
+  "tests": [
+    "skeleton/testing/test_governed_training_state_cli.py"
+  ]
+}

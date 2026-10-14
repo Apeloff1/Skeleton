@@ -1,0 +1,1666 @@
+{
+  "schema": "skeleton.dragon.source_discovery_supplement.v1",
+  "recorded_at": "2026-10-12T02:12:11Z",
+  "baseline_registry_digest": "e3c39bd464960e220fcf0adbcdf6c3a855ab2d688f2c5d8d0089f19c5e2769cf",
+  "baseline_urls": 4405,
+  "requested_total_urls": 44050,
+  "target_interpretation": "10 times the original 4,405 URL snapshot; URLs are not independent sources.",
+  "status": "partial_raw_discovery_only_not_ingested_into_canonical_queue",
+  "catalogs": [
+    {
+      "source_offset": 736,
+      "repository": "Ardour/ardour",
+      "path": "README-GITHUB.txt",
+      "commit_sha": "26d2e03b793f7553165518ddd5906ad9bdae6ce3",
+      "api_git_blob_sha": "680377fb74ac9bcd02f56ab6c307138055d7d592",
+      "url": "https://github.com/Ardour/ardour/blob/26d2e03b793f7553165518ddd5906ad9bdae6ce3/README-GITHUB.txt",
+      "content_sha256": "86772a7d6316d8386202fc780de736efd09ece3f4c0f2f024b15ed6f35dc76bc",
+      "byte_length": 580,
+      "role": "identity_or_discovery_file"
+    },
+    {
+      "source_offset": 737,
+      "repository": "ajhager/engi",
+      "path": "README.md",
+      "commit_sha": "ec911cc4c51074656c2645456c165974c9241343",
+      "api_git_blob_sha": "18ea3c0604ea76fde8f2c95506de2cdf48198a84",
+      "url": "https://github.com/ajhager/engi/blob/ec911cc4c51074656c2645456c165974c9241343/README.md",
+      "content_sha256": "007ffa644aaa6f2b0abc815ec9949aad246f74231f38ab41fc8aec826e0e21e9",
+      "byte_length": 1354,
+      "role": "identity_or_discovery_file"
+    },
+    {
+      "source_offset": 748,
+      "repository": "biou/DrugsNRock",
+      "path": "README.md",
+      "commit_sha": "dd266743fc5df8ed818b898dc5f9d8551df4825f",
+      "api_git_blob_sha": "9a3f8fcec7bd2a15888bcff0a36c498ec056c552",
+      "url": "https://github.com/biou/DrugsNRock/blob/dd266743fc5df8ed818b898dc5f9d8551df4825f/README.md",
+      "content_sha256": "c62369b5d22006180c6c82c95fc9742ff5b62439759bca994a881f5abf72261c",
+      "byte_length": 1809,
+      "role": "identity_or_discovery_file"
+    },
+    {
+      "source_offset": 752,
+      "repository": "dfranx/SHADERed",
+      "path": "README.md",
+      "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+      "api_git_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+      "url": "https://github.com/dfranx/SHADERed/blob/780e96791fd8ac48f1f656309211660d78ff9095/README.md",
+      "content_sha256": "b8e9b791707e87cf45a36f1dfa0d8b0e2e73f4f5d84ecc6143861ab647148d9c",
+      "byte_length": 8967,
+      "role": "identity_or_discovery_file"
+    },
+    {
+      "source_offset": 755,
+      "repository": "zgrossbart/bridges",
+      "path": "README.md",
+      "commit_sha": "65cd0bbc33d26b2f2e65ebcf83fdda354ae58469",
+      "api_git_blob_sha": "8676442e873e66d6b0b965fe0f52511c9686a3ab",
+      "url": "https://github.com/zgrossbart/bridges/blob/65cd0bbc33d26b2f2e65ebcf83fdda354ae58469/README.md",
+      "content_sha256": "37bda53af6a25b3dd6c36c4354031299aa828c34113bbedf7bb18d808493a718",
+      "byte_length": 3717,
+      "role": "identity_or_discovery_file"
+    },
+    {
+      "source_offset": 756,
+      "repository": "alicevision/Meshroom",
+      "path": "README.md",
+      "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+      "api_git_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+      "url": "https://github.com/alicevision/Meshroom/blob/a69dcc4df6ea24edf08ed912e3d049f785be5d7b/README.md",
+      "content_sha256": "e0ccea4b85dbb77e599f31d29d6014098ac090dd440449cb48ae7c62b2ec5855",
+      "byte_length": 9038,
+      "role": "identity_or_discovery_file"
+    },
+    {
+      "source_offset": 763,
+      "repository": "wellcaffeinated/PhysicsJS",
+      "path": "README.md",
+      "commit_sha": "b9eca1634b6db222571e7e820a09404513fe2e46",
+      "api_git_blob_sha": "b88f3fefa1b5300df5c31da2af76b3bd21e8d164",
+      "url": "https://github.com/wellcaffeinated/PhysicsJS/blob/b9eca1634b6db222571e7e820a09404513fe2e46/README.md",
+      "content_sha256": "cb0072240bbe7bf791d68675ed501d3d816a8e4857b13d501f2a7a562a6bec06",
+      "byte_length": 2974,
+      "role": "identity_or_discovery_file"
+    },
+    {
+      "source_offset": 767,
+      "repository": "jarneson/godot-ply",
+      "path": "README.md",
+      "commit_sha": "4457a19e0316aeabcf81badfb7e0b906410a97b9",
+      "api_git_blob_sha": "da7a2f08aa6a809868ac11175bd3744c507294b3",
+      "url": "https://github.com/jarneson/godot-ply/blob/4457a19e0316aeabcf81badfb7e0b906410a97b9/README.md",
+      "content_sha256": "dcb69929e5fb7dc56b24dc6d75d42464e2d961c2f2e8b82cdb647462c81b7c83",
+      "byte_length": 5382,
+      "role": "identity_or_discovery_file"
+    }
+  ],
+  "normalization": "Lowercase scheme/host; remove fragments and common tracking parameters; preserve path case and substantive query. Mirror/content identity remains unresolved.",
+  "counts": {
+    "new_raw_candidate_urls": 81,
+    "excluded_media_badges_or_activity_links": 18,
+    "raw_provisional_total_urls": 5519,
+    "canonical_unique_source_count": null,
+    "prior_reported_raw_provisional_total_urls": 5438,
+    "prior_normalized_candidate_union": 1026
+  },
+  "candidates": [
+    {
+      "url": "http://ajhager.com/engi",
+      "source_id": "source-b027924cdcb8b2baa5373eb1a516b37f32233c26c12f7eaf6606779dc7ad7ce9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "ajhager/engi",
+          "commit_sha": "ec911cc4c51074656c2645456c165974c9241343",
+          "readme_path": "README.md",
+          "readme_blob_sha": "18ea3c0604ea76fde8f2c95506de2cdf48198a84",
+          "line": 1,
+          "exact_url": "http://ajhager.com/engi"
+        }
+      ]
+    },
+    {
+      "url": "http://alicevision.github.io/",
+      "source_id": "source-f2a574185c5524ddd44ad19a446925416f8569a8a868203e1966d5fadef0481e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 64,
+          "exact_url": "http://alicevision.github.io/#photogrammetry"
+        }
+      ]
+    },
+    {
+      "url": "http://alicevision.org/",
+      "source_id": "source-cb5ba38753d4b2fcab54c394b7be7298fdc3f7072fca868c6a19cb27638b25ff",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 58,
+          "exact_url": "http://alicevision.org"
+        }
+      ]
+    },
+    {
+      "url": "http://brm.io/matter-js",
+      "source_id": "source-d5b1b8677bc90c279a3f4766333e72d6869ee3c4c3759064178ee748f8fa41a1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "wellcaffeinated/PhysicsJS",
+          "commit_sha": "b9eca1634b6db222571e7e820a09404513fe2e46",
+          "readme_path": "README.md",
+          "readme_blob_sha": "b88f3fefa1b5300df5c31da2af76b3bd21e8d164",
+          "line": 3,
+          "exact_url": "http://brm.io/matter-js"
+        }
+      ]
+    },
+    {
+      "url": "http://en.wikipedia.org/wiki/Euler",
+      "source_id": "source-b73caabfd907dbf03bcfb45314796d47e3008489baafa5603d90000d00b4f40d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "zgrossbart/bridges",
+          "commit_sha": "65cd0bbc33d26b2f2e65ebcf83fdda354ae58469",
+          "readme_path": "README.md",
+          "readme_blob_sha": "8676442e873e66d6b0b965fe0f52511c9686a3ab",
+          "line": 8,
+          "exact_url": "http://en.wikipedia.org/wiki/Euler"
+        }
+      ]
+    },
+    {
+      "url": "http://en.wikipedia.org/wiki/Seven_Bridges_of_K%C3%B6nigsberg",
+      "source_id": "source-931326927390a1860fd5f34faead0caa43ecc6c963aed47f09508c9cd072c8ac",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "zgrossbart/bridges",
+          "commit_sha": "65cd0bbc33d26b2f2e65ebcf83fdda354ae58469",
+          "readme_path": "README.md",
+          "readme_blob_sha": "8676442e873e66d6b0b965fe0f52511c9686a3ab",
+          "line": 6,
+          "exact_url": "http://en.wikipedia.org/wiki/Seven_Bridges_of_K%C3%B6nigsberg"
+        }
+      ]
+    },
+    {
+      "url": "http://github.com/neelance/gopherjs",
+      "source_id": "source-78bb48c5bed0fd1a03b08b467b0732ec904982510f374ba4d9a3a21d0773f215",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "ajhager/engi",
+          "commit_sha": "ec911cc4c51074656c2645456c165974c9241343",
+          "readme_path": "README.md",
+          "readme_blob_sha": "18ea3c0604ea76fde8f2c95506de2cdf48198a84",
+          "line": 22,
+          "exact_url": "http://github.com/neelance/gopherjs"
+        }
+      ]
+    },
+    {
+      "url": "http://globalgamejam.org/2013-6",
+      "source_id": "source-a0671d614a9ab2ca16fd7d644af5e07a4cd76bd496a9bdf0e83341f71a895aaf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "biou/DrugsNRock",
+          "commit_sha": "dd266743fc5df8ed818b898dc5f9d8551df4825f",
+          "readme_path": "README.md",
+          "readme_blob_sha": "9a3f8fcec7bd2a15888bcff0a36c498ec056c552",
+          "line": 16,
+          "exact_url": "http://globalgamejam.org/2013-6"
+        }
+      ]
+    },
+    {
+      "url": "http://godoc.org/github.com/ajhager/engi",
+      "source_id": "source-9fd8ddf6b3f533c31e1fb3937121217d509fcadf20852f4358dd52b0c8995d23",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "ajhager/engi",
+          "commit_sha": "ec911cc4c51074656c2645456c165974c9241343",
+          "readme_path": "README.md",
+          "readme_blob_sha": "18ea3c0604ea76fde8f2c95506de2cdf48198a84",
+          "line": 38,
+          "exact_url": "http://godoc.org/github.com/ajhager/engi"
+        }
+      ]
+    },
+    {
+      "url": "http://gruntjs.com/",
+      "source_id": "source-b3e38d85ff5acdd1b0bed4089ee2c0393509ae1337857c5bebce9b009644294b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "wellcaffeinated/PhysicsJS",
+          "commit_sha": "b9eca1634b6db222571e7e820a09404513fe2e46",
+          "readme_path": "README.md",
+          "readme_blob_sha": "b88f3fefa1b5300df5c31da2af76b3bd21e8d164",
+          "line": 24,
+          "exact_url": "http://gruntjs.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://kstenerud.github.com/ObjectAL-for-iPhone/",
+      "source_id": "source-6c846f9174e6bffdf0f881b0fa0a76794b64ad9208bb1c4a13262858e30761d3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "biou/DrugsNRock",
+          "commit_sha": "dd266743fc5df8ed818b898dc5f9d8551df4825f",
+          "readme_path": "README.md",
+          "readme_blob_sha": "9a3f8fcec7bd2a15888bcff0a36c498ec056c552",
+          "line": 42,
+          "exact_url": "http://kstenerud.github.com/ObjectAL-for-iPhone/"
+        }
+      ]
+    },
+    {
+      "url": "http://sketchfab.com/AliceVision",
+      "source_id": "source-72c3cda42a7505316c17d3b9b5e11f44fa1504148d01c64f241d28d875132764",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 64,
+          "exact_url": "http://sketchfab.com/AliceVision"
+        }
+      ]
+    },
+    {
+      "url": "http://tdm-gcc.tdragon.net/download",
+      "source_id": "source-8d293094f47bd79532ca9c0b792342b0be5993fed2efc5cf156afad20c1a9c1c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "ajhager/engi",
+          "commit_sha": "ec911cc4c51074656c2645456c165974c9241343",
+          "readme_path": "README.md",
+          "readme_blob_sha": "18ea3c0604ea76fde8f2c95506de2cdf48198a84",
+          "line": 18,
+          "exact_url": "http://tdm-gcc.tdragon.net/download"
+        }
+      ]
+    },
+    {
+      "url": "http://thewogos.com/",
+      "source_id": "source-7be232b899a7740dee5fc44515fdf7d0d7c13b343bf234a0d4a7d0bacf5783a8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 102,
+          "exact_url": "http://theWogos.com/"
+        }
+      ]
+    },
+    {
+      "url": "http://wellcaffeinated.net/PhysicsJS/",
+      "source_id": "source-4c3852358bf618da9e183b1d0ec6196e554296392bee5549cb269d1d29b96ee0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "wellcaffeinated/PhysicsJS",
+          "commit_sha": "b9eca1634b6db222571e7e820a09404513fe2e46",
+          "readme_path": "README.md",
+          "readme_blob_sha": "b88f3fefa1b5300df5c31da2af76b3bd21e8d164",
+          "line": 13,
+          "exact_url": "http://wellcaffeinated.net/PhysicsJS/"
+        },
+        {
+          "repository": "wellcaffeinated/PhysicsJS",
+          "commit_sha": "b9eca1634b6db222571e7e820a09404513fe2e46",
+          "readme_path": "README.md",
+          "readme_blob_sha": "b88f3fefa1b5300df5c31da2af76b3bd21e8d164",
+          "line": 66,
+          "exact_url": "http://wellcaffeinated.net/PhysicsJS/"
+        }
+      ]
+    },
+    {
+      "url": "http://www.cocos2d-iphone.org/",
+      "source_id": "source-4a15862746107c26ba5b94762e8d8d72fa160ae5c8cdb93d98ef701a4b2107e4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "biou/DrugsNRock",
+          "commit_sha": "dd266743fc5df8ed818b898dc5f9d8551df4825f",
+          "readme_path": "README.md",
+          "readme_blob_sha": "9a3f8fcec7bd2a15888bcff0a36c498ec056c552",
+          "line": 41,
+          "exact_url": "http://www.cocos2d-iphone.org/"
+        }
+      ]
+    },
+    {
+      "url": "http://youtu.be/BcsKIuzFHMI",
+      "source_id": "source-f20b410b38494a6d11555b8207de3251d9bce8e5aa56a3885c26ac29d0732487",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "biou/DrugsNRock",
+          "commit_sha": "dd266743fc5df8ed818b898dc5f9d8551df4825f",
+          "readme_path": "README.md",
+          "readme_blob_sha": "9a3f8fcec7bd2a15888bcff0a36c498ec056c552",
+          "line": 18,
+          "exact_url": "http://youtu.be/BcsKIuzFHMI"
+        }
+      ]
+    },
+    {
+      "url": "http://zgrossbart.github.io/bridges/",
+      "source_id": "source-ba738c5bb6cd8d63fd60175c0a2e276882206dd4ea0691ef82dc3969d57ce930",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "zgrossbart/bridges",
+          "commit_sha": "65cd0bbc33d26b2f2e65ebcf83fdda354ae58469",
+          "readme_path": "README.md",
+          "readme_blob_sha": "8676442e873e66d6b0b965fe0f52511c9686a3ab",
+          "line": 4,
+          "exact_url": "http://zgrossbart.github.io/bridges/"
+        }
+      ]
+    },
+    {
+      "url": "https://alyamkin.com/",
+      "source_id": "source-3cafae913ecc9a9d332f3033cfd1a96f457c53c61f18074c7ee4d84861cb7c8e",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 101,
+          "exact_url": "https://alyamkin.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://csprance.com/",
+      "source_id": "source-f82c1f54d33534d71552cd43d6b2f1fe46399c8328cedd56da7a0d5edfbcba17",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 106,
+          "exact_url": "https://csprance.com"
+        }
+      ]
+    },
+    {
+      "url": "https://discord.gg/4JBkykG",
+      "source_id": "source-963b2c8e97fc19642724ccaaeb10158db4aee39089b7091d30efb26348c14b32",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "jarneson/godot-ply",
+          "commit_sha": "4457a19e0316aeabcf81badfb7e0b906410a97b9",
+          "readme_path": "README.md",
+          "readme_blob_sha": "da7a2f08aa6a809868ac11175bd3744c507294b3",
+          "line": 118,
+          "exact_url": "https://discord.gg/4JBkykG"
+        }
+      ]
+    },
+    {
+      "url": "https://discord.gg/zQdTkeb6TC",
+      "source_id": "source-962d31ce16963cf27d5a8075700ef5e79b6b15be7925fb6890f2c8ea456219fe",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "jarneson/godot-ply",
+          "commit_sha": "4457a19e0316aeabcf81badfb7e0b906410a97b9",
+          "readme_path": "README.md",
+          "readme_blob_sha": "da7a2f08aa6a809868ac11175bd3744c507294b3",
+          "line": 10,
+          "exact_url": "https://discord.gg/zQdTkeb6TC"
+        }
+      ]
+    },
+    {
+      "url": "https://embark-studios.com/",
+      "source_id": "source-0d749f3533698685964bcf735097563bed00fec77c6c63deb17b06819bc10da6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 94,
+          "exact_url": "https://embark-studios.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://flathub.org/apps/details/org.shadered.SHADERed",
+      "source_id": "source-e02100c8bb6439d530d5175f418d594c09114a371ca4c641d6d063bc91c893fb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 129,
+          "exact_url": "https://flathub.org/apps/details/org.shadered.SHADERed"
+        }
+      ]
+    },
+    {
+      "url": "https://flathub.org/repo/flathub.flatpakrepo",
+      "source_id": "source-f3eeafad5173a9e8f09247627271e4caab2d2913f59154f6301dfff8c92ea713",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 133,
+          "exact_url": "https://flathub.org/repo/flathub.flatpakrepo"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/ajhager/srvi",
+      "source_id": "source-79745d374b15bc18afa64144fac46a28c159379413cbd865d073b08b01079f2d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "ajhager/engi",
+          "commit_sha": "ec911cc4c51074656c2645456c165974c9241343",
+          "readme_path": "README.md",
+          "readme_blob_sha": "18ea3c0604ea76fde8f2c95506de2cdf48198a84",
+          "line": 24,
+          "exact_url": "https://github.com/ajhager/srvi"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/alicevision/meshroom/releases",
+      "source_id": "source-4dec84f682fac8712cad4956441d8c1cc260417c59a066dd152677e6dd835ec0",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 17,
+          "exact_url": "https://github.com/alicevision/meshroom/releases"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/alicevision/meshroom/wiki",
+      "source_id": "source-b984b4a027b03c4e36a1d66cf863eee9a72724778aef397a2f1a1a68b8d6f944",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 51,
+          "exact_url": "https://github.com/alicevision/meshroom/wiki"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/alicevision/MeshroomMicMac",
+      "source_id": "source-286517dc5ccb31009a4a19caeec7f3c64f34a984d67539aa63ee0f4e047e0647",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 105,
+          "exact_url": "https://github.com/alicevision/MeshroomMicMac"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/Ardour/ardour/releases",
+      "source_id": "source-530177f8ba02b7238d363522808f3d5cadc06e0daaa4b5411ac0c00b46c48f69",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Ardour/ardour",
+          "commit_sha": "26d2e03b793f7553165518ddd5906ad9bdae6ce3",
+          "readme_path": "README-GITHUB.txt",
+          "readme_blob_sha": "680377fb74ac9bcd02f56ab6c307138055d7d592",
+          "line": 5,
+          "exact_url": "https://github.com/Ardour/ardour/releases"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/BalazsJako/ImGuiColorTextEdit",
+      "source_id": "source-029d0e8988fd2f9a24ab011d3d2c2ff479292d6f0a1bc4a1f565322d1fe3d55f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 232,
+          "exact_url": "https://github.com/BalazsJako/ImGuiColorTextEdit"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/benhoyt/inih",
+      "source_id": "source-0d7a637ce6bf421c9a5a65f5d05ca6cac9f5b3f4b402ddfc417ec1a370efa474",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 233,
+          "exact_url": "https://github.com/benhoyt/inih"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/dfranx/dds",
+      "source_id": "source-097ff66e63cbd65b673b9192fefccfe9d2cbbeb88d6d02a6e80a7b0b8f2fde94",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 241,
+          "exact_url": "https://github.com/dfranx/dds"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/dfranx/ImFileDialog",
+      "source_id": "source-ab774337d3e3c494100272bfe7119fd432763dfbd7d9211821ec69b614e9221a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 240,
+          "exact_url": "https://github.com/dfranx/ImFileDialog"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/dfranx/SHADERed.git",
+      "source_id": "source-60525c1e21003a8e9e94a37504a428ff157c256df904dcfb87254847180b33ee",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 144,
+          "exact_url": "https://github.com/dfranx/SHADERed.git"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/dfranx/SHADERed/issues/8)!",
+      "source_id": "source-5a9b0c582dc67707a8e9e643eae75cc66be33ded8843febe88513989086ac749",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 224,
+          "exact_url": "https://github.com/dfranx/SHADERed/issues/8)!"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/dfranx/SHADERed/releases",
+      "source_id": "source-50bfb9d175ef426da39e1916419cf0f27003bc6916ee47aaf02355034d1ff07f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 115,
+          "exact_url": "https://github.com/dfranx/SHADERed/releases"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/dfranx/ShaderExpressionParser",
+      "source_id": "source-75f8a913ad96249628a168f0c6a85726dcde33e0ec434d88958ecccf97666a87",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 235,
+          "exact_url": "https://github.com/dfranx/ShaderExpressionParser"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/dfranx/SPIRV-VM",
+      "source_id": "source-ff8bf5f6f23c6accaa2a48d9c9d58b4a7f5751970f8513db943cd41cfb1b2abf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 237,
+          "exact_url": "https://github.com/dfranx/SPIRV-VM"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/flathub/org.shadered.SHADERed/issues",
+      "source_id": "source-86010c6f4d57b8b87205e03df657cdea52b805a6f2709ad2b298f24d841cacba",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 139,
+          "exact_url": "https://github.com/flathub/org.shadered.SHADERed/issues"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/juliettef/imgui_markdown",
+      "source_id": "source-18f8843ed310a9985077c5f3c8a4e08257618b59831180408fd3d5f50c047187",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 231,
+          "exact_url": "https://github.com/juliettef/imgui_markdown"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/KhronosGroup/glslang",
+      "source_id": "source-365b1e1be4ded7adfb3a91bd8cdab4058bcdcabdf0698d0c354713fbfd9eae3b",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 229,
+          "exact_url": "https://github.com/KhronosGroup/glslang"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/KhronosGroup/SPIRV-Cross",
+      "source_id": "source-26a82e9cd22be234b61e6daa87c1ded063097a3cebfbef82ef75ee2038d61837",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 236,
+          "exact_url": "https://github.com/KhronosGroup/SPIRV-Cross"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/meshroomHub",
+      "source_id": "source-3843025d609eae9035e9c1a883ceb8462c27a6c1f136195666301954eedeb0da",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 79,
+          "exact_url": "https://github.com/meshroomHub"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/meshroomHub/MeshroomResearch",
+      "source_id": "source-117b142fb4b6f2f693df842aa1299dab95d48e9b9e05758ce40216ad690274fa",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 99,
+          "exact_url": "https://github.com/meshroomHub/MeshroomResearch"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/meshroomHub/mrDepthEstimation",
+      "source_id": "source-6e0bbff3809c99210bb2667d1cc4ac5a05de9a7616cfb9970510048e205a7830",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 83,
+          "exact_url": "https://github.com/meshroomHub/mrDepthEstimation"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/meshroomHub/mrGeolocation",
+      "source_id": "source-f74a835c39ac30829d76db39100ba3205a4dd32f575583c8441c3f81b7d5dc78",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 111,
+          "exact_url": "https://github.com/meshroomHub/mrGeolocation"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/meshroomHub/mrGSplat",
+      "source_id": "source-239cf7a98be680f658ebe9f529571a5425d82fbb831c8666cd1cfcecdd1143ea",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 94,
+          "exact_url": "https://github.com/meshroomHub/mrGSplat"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/meshroomHub/mrRoma",
+      "source_id": "source-92c9f947100c07e717090f50ba09ee3d9194169070a93f21e7804222cb9dd1c6",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 88,
+          "exact_url": "https://github.com/meshroomHub/mrRoma"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/meshroomHub/mrSegmentation",
+      "source_id": "source-af2752cc54be192a82773bfcef0660936c71a51eb6ae4d6b308b4d44cc478899",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 74,
+          "exact_url": "https://github.com/meshroomHub/mrSegmentation"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/ocornut/imgui/tree/docking",
+      "source_id": "source-53425a5895779bc0f6950d042450668a7c0ce978d92b993a39e835c6bf0d7c19",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 230,
+          "exact_url": "https://github.com/ocornut/imgui/tree/docking"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/rAzoR8/SpvGenTwo",
+      "source_id": "source-f8a3dd26ba24fa44df8e39d3b557b5644daedfe05ccf179b9397054085c0ffb8",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 238,
+          "exact_url": "https://github.com/rAzoR8/SpvGenTwo"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/zeux/pugixml",
+      "source_id": "source-eb496674f74d16598ad2f11e6bb211f3688abe1b02daad0fcb91012349ca9ad9",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 234,
+          "exact_url": "https://github.com/zeux/pugixml"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/zgrossbart/bridges/wiki/Level-Specification",
+      "source_id": "source-5e026025a47de5ecabafd839591224c6b22b92794426d411697370a16dfa9fc1",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "zgrossbart/bridges",
+          "commit_sha": "65cd0bbc33d26b2f2e65ebcf83fdda354ae58469",
+          "readme_path": "README.md",
+          "readme_blob_sha": "8676442e873e66d6b0b965fe0f52511c9686a3ab",
+          "line": 24,
+          "exact_url": "https://github.com/zgrossbart/bridges/wiki/Level-Specification"
+        }
+      ]
+    },
+    {
+      "url": "https://groups.google.com/g/alicevision",
+      "source_id": "source-d7cc9f8f93641d1d81b56169c4731daaafc052600e54499dd398d521adad935d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 139,
+          "exact_url": "https://groups.google.com/g/alicevision"
+        }
+      ]
+    },
+    {
+      "url": "https://hugo.pro/",
+      "source_id": "source-21e7cb3d194b51a5cc9dda171ebdb092070b88f6e925f07ae2b41cfc94dda26a",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 100,
+          "exact_url": "https://hugo.pro"
+        }
+      ]
+    },
+    {
+      "url": "https://maps.google.com/maps?q=Kaliningrad,+Russia&hl=en&ie=UTF8&ll=54.704615,20.515723&spn=0.01246,0.033023&sll=42.036922,-71.683501&sspn=4.140734,3.416748&hnear=Kaliningrad,+%D1%82.%D0%BF.%D0%B3.+%D0%9A%D0%B0%D0%BB%D0%B8%D0%BD%D0%B8%D0%BD%D0%B3%D1%80%D0%B0%D0%B4,+Kaliningrad+Oblast,+Russia&t=m&z=16",
+      "source_id": "source-150c1be087fb5503d949faaa285c4a76f30f2390650c89b31948d6aaef695930",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "zgrossbart/bridges",
+          "commit_sha": "65cd0bbc33d26b2f2e65ebcf83fdda354ae58469",
+          "readme_path": "README.md",
+          "readme_blob_sha": "8676442e873e66d6b0b965fe0f52511c9686a3ab",
+          "line": 6,
+          "exact_url": "https://maps.google.com/maps?q=Kaliningrad,+Russia&hl=en&ie=UTF8&ll=54.704615,20.515723&spn=0.01246,0.033023&sll=42.036922,-71.683501&sspn=4.140734,3.416748&hnear=Kaliningrad,+%D1%82.%D0%BF.%D0%B3.+%D0%9A%D0%B0%D0%BB%D0%B8%D0%BD%D0%B8%D0%BD%D0%B3%D1%80%D0%B0%D0%B4,+Kaliningrad+Oblast,+Russia&t=m&z=16"
+        }
+      ]
+    },
+    {
+      "url": "https://meshroom-manual.readthedocs.io/",
+      "source_id": "source-d4792b54f4eca2013dc5266a22f64f07e83344ed51dc1c181da65075e212abad",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "alicevision/Meshroom",
+          "commit_sha": "a69dcc4df6ea24edf08ed912e3d049f785be5d7b",
+          "readme_path": "README.md",
+          "readme_blob_sha": "f639012294c43ae63d0d31f24e83c0d32dec95cc",
+          "line": 50,
+          "exact_url": "https://meshroom-manual.readthedocs.io"
+        }
+      ]
+    },
+    {
+      "url": "https://scoop.sh/",
+      "source_id": "source-76452af8247139f723358a93fd25f373283671062f0788869d0103278cac3161",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 119,
+          "exact_url": "https://scoop.sh"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/",
+      "source_id": "source-3de84b8d70dde4ef9f50231aae892f3c439f9b6fe68c49b7ebdddba5970c4d48",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 115,
+          "exact_url": "https://shadered.org/"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/addons",
+      "source_id": "source-c8fd3b88af0e3fbb208d9063aeef12a0fc2bfee46236c7ae8f374419df0a04ee",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 56,
+          "exact_url": "https://shadered.org/addons"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/blog?id=9](https://shadered.org/blog?id=9",
+      "source_id": "source-b1c06503142a9dfe18772f7237621b3e172f1efca5832c237963334b5fa4406d",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 36,
+          "exact_url": "https://shadered.org/blog?id=9](https://shadered.org/blog?id=9"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/docs/index.html",
+      "source_id": "source-60be854a307afb3544fef22bd4325edfb7ea7193145259076d39b3ad2c4d33ce",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 214,
+          "exact_url": "https://shadered.org/docs/index.html"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/plugin?id=CPP",
+      "source_id": "source-866639d245d417dea390e980f3d5260b33ebe22f15229b7fedfcefb2b8dd1ce4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 64,
+          "exact_url": "https://shadered.org/plugin?id=CPP"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/plugin?id=gifcapture",
+      "source_id": "source-a3f2bd89a962684e43b90c0513d7b6fdd6c223e07af5ffbcabcc17d8b1ceffd7",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 61,
+          "exact_url": "https://shadered.org/plugin?id=gifcapture"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/plugin?id=godotshaders",
+      "source_id": "source-f6e2f123af6b5e6291af53fc6bac4efc15d1db25ec8804327820fd05803ec3fb",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 59,
+          "exact_url": "https://shadered.org/plugin?id=godotshaders"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/plugin?id=Rust",
+      "source_id": "source-3db5480333f49a4e9e637f7d92cd838a3309d0e03b6c738e85603080c2a1feb3",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 63,
+          "exact_url": "https://shadered.org/plugin?id=Rust"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/plugin?id=shadertoyimport",
+      "source_id": "source-e7e237fff3f2a010e9de0043aa69ba17b6a9139297b5b06d41b01598f3116f8f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 60,
+          "exact_url": "https://shadered.org/plugin?id=shadertoyimport"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/plugin?id=slang",
+      "source_id": "source-0515b8b26e1b8ba4cb081ebd1ae0fa6e9807f46c6973426a32ca6ee52008d3ff",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 62,
+          "exact_url": "https://shadered.org/plugin?id=slang"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/plugin?id=Terminal",
+      "source_id": "source-e03eb01ae0f5ea6e50dea80843a5adea468d9070ae45ee755903b47fc82444cf",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 65,
+          "exact_url": "https://shadered.org/plugin?id=Terminal"
+        }
+      ]
+    },
+    {
+      "url": "https://shadered.org/template",
+      "source_id": "source-a9211ce9155aba0a0567b30f6d4cb8371f8a8297466262d268b5e916297e8c95",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 4,
+          "exact_url": "https://shadered.org/template"
+        }
+      ]
+    },
+    {
+      "url": "https://snow.llc/",
+      "source_id": "source-d7081d9b558879495c79bb5bc905e4ad85e822aa945ad1c3afdb438428fb4a1f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 103,
+          "exact_url": "https://snow.llc"
+        }
+      ]
+    },
+    {
+      "url": "https://soundcloud.com/b1ou/sets/3-drugs-and-rocknroll",
+      "source_id": "source-49e6704c13038d86c85da428a28dbbf153ea49984f3ac2cec06b146c0e1b0860",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "biou/DrugsNRock",
+          "commit_sha": "dd266743fc5df8ed818b898dc5f9d8551df4825f",
+          "readme_path": "README.md",
+          "readme_blob_sha": "9a3f8fcec7bd2a15888bcff0a36c498ec056c552",
+          "line": 19,
+          "exact_url": "https://soundcloud.com/b1ou/sets/3-drugs-and-rocknroll"
+        }
+      ]
+    },
+    {
+      "url": "https://tracker.ardour.org/view.php?id=7328",
+      "source_id": "source-b1be9332cf52470123a40c7ab37551db5fef2ff5020a8eda66655dded81d1153",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "Ardour/ardour",
+          "commit_sha": "26d2e03b793f7553165518ddd5906ad9bdae6ce3",
+          "readme_path": "README-GITHUB.txt",
+          "readme_blob_sha": "680377fb74ac9bcd02f56ab6c307138055d7d592",
+          "line": 12,
+          "exact_url": "https://tracker.ardour.org/view.php?id=7328"
+        }
+      ]
+    },
+    {
+      "url": "https://twitter.com/liamdon",
+      "source_id": "source-ffb5d4c88c9c10b47a705f6c76e4d1b6d9311f88c436c1d8bfec3e1ce2b4dbe4",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 105,
+          "exact_url": "https://twitter.com/liamdon"
+        }
+      ]
+    },
+    {
+      "url": "https://www.digitalocean.com/",
+      "source_id": "source-399f1c951f7294deb9f1126dac6645317590a67b2723e2940a0727b8ad682566",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 96,
+          "exact_url": "https://www.digitalocean.com/?utm_medium=opensource&utm_source=SHADERed"
+        }
+      ]
+    },
+    {
+      "url": "https://www.moralesfx.com/",
+      "source_id": "source-1fbdd922c0cabeb3b784dc7cd2dc74f3bd1a5220df13770f8a52a0b38547f22c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 104,
+          "exact_url": "https://www.moralesfx.com/"
+        }
+      ]
+    },
+    {
+      "url": "https://www.patreon.com/dfranx",
+      "source_id": "source-d3f667d22ac0f7188beb816dccd4bc319bb3b617c828ab27e13d610352827c63",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 109,
+          "exact_url": "https://www.patreon.com/dfranx"
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/channel/UCcAlTqd9zID6aNX3TzwxJXg",
+      "source_id": "source-35bf26557a95b659ff2c03b5131dfa7146191d8e5ccf115a0336966d57967a2f",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 220,
+          "exact_url": "https://www.youtube.com/channel/UCcAlTqd9zID6aNX3TzwxJXg"
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/channel/UCf1IV6ABf3a4nW1wEyPwmMQ",
+      "source_id": "source-abd090553f276ccfa797584698720ef888cbe97a85d9923b91e75801c72e9497",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "jarneson/godot-ply",
+          "commit_sha": "4457a19e0316aeabcf81badfb7e0b906410a97b9",
+          "readme_path": "README.md",
+          "readme_blob_sha": "da7a2f08aa6a809868ac11175bd3744c507294b3",
+          "line": 8,
+          "exact_url": "https://www.youtube.com/channel/UCf1IV6ABf3a4nW1wEyPwmMQ"
+        }
+      ]
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=vuJLpnL73As&list=PLK0EO-cKorzRAEfwHoJFiIldiyiyDR3-2",
+      "source_id": "source-c997b58c858ae885f67d4f733a574386ad90b5ab173d4022b5fcfb2306cd307c",
+      "availability": "not_checked",
+      "rights": "not_assessed",
+      "training_authorized": false,
+      "canonical_admission": false,
+      "independence": "not_assessed",
+      "discoveries": [
+        {
+          "repository": "dfranx/SHADERed",
+          "commit_sha": "780e96791fd8ac48f1f656309211660d78ff9095",
+          "readme_path": "README.md",
+          "readme_blob_sha": "a828b00c73fb4973bbb984d5a100f46ebc995bda",
+          "line": 216,
+          "exact_url": "https://www.youtube.com/watch?v=vuJLpnL73As&list=PLK0EO-cKorzRAEfwHoJFiIldiyiyDR3-2"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Not 10× complete.",
+    "Raw provisional URLs are not a canonical unique-source count.",
+    "README links are discovery leads, not approval.",
+    "Repository licenses do not license linked destinations.",
+    "Staged canonical importer/policy jobs were not executed.",
+    "Identity, mirror, edition, provider and publisher clustering remain incomplete.",
+    "The durable raw provisional total is additive across reviewed supplements; normalized candidate-union size is reported separately and is not substituted for the prior durable total."
+  ]
+}
