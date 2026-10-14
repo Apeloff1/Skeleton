@@ -31,6 +31,7 @@ from core.engine_client import (
     EngineUnavailableError,
     command_from_context,
 )
+from core.model_catalog import model_catalog
 from routes.gameforge_auth import require_role
 from skeleton.contracts.context import (
     ContextBudget,
@@ -2722,6 +2723,21 @@ async def cancel_ai_chat_turn(
         "timestamp": _utcnow(),
     }
 
+
+
+@router.get("/models")
+async def get_ai_models(user=Depends(require_role("viewer"))) -> Dict[str, Any]:
+    """Expose only the authenticated tenant's engine-owned model inventory.
+
+    This never instantiates a model, discloses credentials, or claims a provider
+    is available when the canonical engine cannot be queried.
+    """
+    tenant_id, owner_id = _chat_identity(user)
+    try:
+        client = EngineClient.from_env()
+    except EngineClientError:
+        client = None
+    return await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
 
 
 @router.get("/providers")
