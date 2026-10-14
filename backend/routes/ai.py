@@ -504,6 +504,8 @@ def _compile_chat_context(
     operation_id: str,
     execution_id: str,
     request_context: str | None,
+    budget: ContextBudget = CHAT_CONTEXT_BUDGET,
+    attachment_segments: tuple[ContextSegment, ...] = (),
 ) -> ContextEnvelope:
     """Compile the one authoritative immutable context snapshot for a chat turn."""
 
@@ -560,13 +562,14 @@ def _compile_chat_context(
             )
         )
 
+    segments.extend(attachment_segments)
     return ContextCompiler().compile(
         operation_id=operation_id,
         execution_id=execution_id,
         turn_id=user_message.message_id,
         tenant_id=tenant_id,
         purpose=purpose,
-        budget=CHAT_CONTEXT_BUDGET,
+        budget=budget,
         segments=segments,
         tools_enabled=False,
         compiled_at=user_message.created_at,
