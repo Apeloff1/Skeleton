@@ -94,7 +94,7 @@ def test_json_mode_reports_auditable_scope(tmp_path: Path, capsys) -> None:
     assert result["schema_version"] == 1
     assert result["scope"] == "worktree-schedule-config-only"
     assert result["known_nominal_daily_wakes"] == 1
-    assert "not Actions execution telemetry" not in str(result["caveat"])
+    assert "actual completed runs" in result["caveat"]
 
 
 def test_invalid_top_limit_fails_closed(tmp_path: Path) -> None:
