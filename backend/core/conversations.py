@@ -235,6 +235,20 @@ class MongoConversationAuthority:
             )
             return ()
 
+    async def _delete_dragon_projection(
+        self, *, tenant_id: str, owner_id: str, thread_id: str
+    ) -> None:
+        """Erase the optional derived store before canonical deletion advances."""
+        projection = self.dragon_projection
+        if projection is None:
+            return
+        try:
+            await projection.delete_thread(tenant_id, owner_id, thread_id)
+        except Exception as exc:
+            raise ConversationStorageUnavailable(
+                "Dragon derived conversation deletion could not be confirmed"
+            ) from exc
+
     async def _after_dragon_commit(self, thread: ConversationThread) -> None:
         """Checkpoint only exact ten-step committed windows, when configured."""
         projection = self.dragon_projection
@@ -456,6 +470,9 @@ class MongoConversationAuthority:
         )
         if initial.version != expected_thread_version:
             raise ConversationConflict("thread version conflict")
+        await self._delete_dragon_projection(
+            tenant_id=tenant_id, owner_id=owner_id, thread_id=thread_id
+        )
         record_ids = await self.governed_record_ids_for_thread(
             thread_id,
             tenant_id=tenant_id,
@@ -575,6 +592,16 @@ class MongoConversationAuthority:
     ) -> Mapping[str, Any]:
         """Execute one tenant retention plan across engine and conversation owners."""
 
+        # Expire Dragon's tenant-scoped derived summaries even when the
+        # canonical governance plan has no parent records due in this sweep.
+        projection = self.dragon_projection
+        if projection is not None:
+            try:
+                await projection.expire_tenant(str(tenant_id))
+            except Exception as exc:
+                raise ConversationStorageUnavailable(
+                    "Dragon derived retention sweep could not be confirmed"
+                ) from exc
         planner = self.governance_retention_planner
         if planner is None:
             raise ConversationStorageUnavailable(
