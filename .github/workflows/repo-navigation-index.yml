@@ -2,7 +2,6 @@ name: Repository Navigation Index
 on:
   push:
     branches: [main]
-    paths-ignore: ['machine/repo_navigation/**']
     # Scope validation to owning files; scheduled/manual runs stay unfiltered.
     paths:
       - "scripts/build_repo_navigation.py"
