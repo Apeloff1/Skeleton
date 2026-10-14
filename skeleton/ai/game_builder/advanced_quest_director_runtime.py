@@ -271,6 +271,10 @@ def _emit(state,config,kind,site,events,*,actor="player"):
     if (len(state["quests"])<min(config["active_quests"],12)
         and state["next_quest"]<12
         and kind in EVENTS
+        # event_rules is the number of enabled causal rule families.
+        # In particular, a witnessed discovery (index 2) must not mint a
+        # quest when only the first help rule is enabled.
+        and EVENTS.index(kind)<config["event_rules"]
         and len(witnesses)>=config["witnesses_required"]):
         # Only a source observed by enough real witnesses becomes a quest.
         # Editor supports many procedural causal rule alternatives, while
