@@ -172,6 +172,68 @@ async def rename_conversation(
     return {"thread": thread.as_dict()}
 
 
+@router.get("/{thread_id}/snapshot")
+async def get_conversation_snapshot(
+    thread_id: str,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    before_message_id: Annotated[str | None, Query(max_length=64)] = None,
+    expected_thread_version: Annotated[int | None, Query(ge=1)] = None,
+    user=Depends(require_role("viewer")),
+):
+    tenant_id, owner_id = _identity(user)
+    try:
+        return dict(
+            await conversation_authority.conversation_snapshot(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                limit=limit,
+                before_message_id=before_message_id,
+                expected_thread_version=expected_thread_version,
+            )
+        )
+    except Exception as exc:
+        raise _translate(exc) from exc
+
+
+@router.get("/{thread_id}/recovery")
+async def recover_conversation_snapshot(thread_id: str, user=Depends(require_role("viewer"))):
+    """Reconstruct committed state; existing chat turn API owns engine resume/status."""
+    tenant_id, owner_id = _identity(user)
+    try:
+        return dict(
+            await conversation_authority.conversation_snapshot(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+        )
+    except Exception as exc:
+        raise _translate(exc) from exc
+
+
+@router.get("/{thread_id}/export")
+async def export_conversation(
+    thread_id: str,
+    format: Literal["json", "markdown"] = "json",
+    expected_thread_version: Annotated[int | None, Query(ge=1)] = None,
+    user=Depends(require_role("viewer")),
+):
+    tenant_id, owner_id = _identity(user)
+    try:
+        return dict(
+            await conversation_authority.export_thread(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                format=format,
+                expected_thread_version=expected_thread_version,
+            )
+        )
+    except Exception as exc:
+        raise _translate(exc) from exc
+
+
 @router.get("/{thread_id}")
 async def get_conversation(
     thread_id: str,
