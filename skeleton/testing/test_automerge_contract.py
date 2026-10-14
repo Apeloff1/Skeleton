@@ -94,9 +94,16 @@ def test_stack_mutation_forces_fresh_reconciliation():
     assert 'AUTOMERGE_STOP_AFTER_STACK_MUTATION: "true"' in reconcile
 
 
-def test_post_merge_dispatch_is_enabled():
+def test_post_merge_dispatch_is_coalesced_into_canonical_recovery():
     reconcile = _line_block(_workflow_text(), "reconcile:")
-    assert 'AUTOMERGE_DISPATCH_POST_MERGE: "true"' in reconcile
+    assert 'AUTOMERGE_DISPATCH_POST_MERGE: "false"' in reconcile
+    assert 'AUTOMERGE_POST_MERGE_WORKFLOWS: ""' in reconcile
+
+
+def test_auto_merge_wakes_only_on_successful_pr_validation():
+    validate = _line_block(_workflow_text(), "validate:")
+    assert "github.event.workflow_run.event == 'pull_request'" in validate
+    assert "github.event.workflow_run.conclusion == 'success'" in validate
 
 
 def test_workflow_retains_tamper_evidence_artifact():
