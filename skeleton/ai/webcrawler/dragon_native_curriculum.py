@@ -66,6 +66,8 @@ MILESTONES=(
                        ("nes",),"Z80 VRAM sprites and Sega VDP",83,"cartridge_8bit"),
   CurriculumMilestone("gg_handheld","game_gear","arcade_score_attack",
                        ("game_boy_color",),"handheld VDP and 12-bit CRAM",82,"handheld_8bit"),
+  CurriculumMilestone("lynx_native","lynx","arcade_score_attack",
+                       ("game_boy","nes"),"65C02 Lynx cartridge, input and display basics",80,"handheld_8bit"),
   CurriculumMilestone("gba_native","game_boy_advance","arcade_score_attack",
                        ("game_boy_color",),"ARM framebuffer and native 4bpp art",79,"handheld_32bit"),
   CurriculumMilestone("genesis_vdp","genesis","arcade_score_attack",
@@ -139,7 +141,10 @@ class DragonNativeCurriculum:
                 continue
             # Prefer a genuinely new capability over farming 8 near-duplicates.
             score=step.weight-16*count
-            if step.target in built:score-=8
+            # A new genre/mechanic on proven hardware is a new capability,
+            # not an eight-point repeat penalty. Only penalize a previously
+            # attempted target+genre; existing count penalty still applies.
+            if step.target in built and count > 0:score-=8
             recommendations.append(CurriculumRecommendation(
                 step.target,step.genre,step.milestone_id,
                 ("New hardware/genre acquisition" if count==0 else
