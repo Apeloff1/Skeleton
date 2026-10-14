@@ -532,5 +532,18 @@
     "Existing auth/Mongo/storage/Dragon custody and approved tooling remain required"
   ],
   "canonical_jeeves_source_git_tree": "bd3d135bd3d3b01e034623bbe15c7b8baf1ed673",
-  "publication": "Source candidate for existing draft PR3816; no merge or production deployment"
+  "publication": "Source candidate for existing draft PR3816; no merge or production deployment",
+  "additional_eight_actor_learning": {
+    "algorithm": "frozen_batch_local_actor_q_v1",
+    "committed_episodes": 64,
+    "policy_digest": "6fb4cc996dffa96f9f94ced37d846574b0bea5b7544351743b9737985ec58e29",
+    "policy_file": "/workspace/scratch/jeeves-studio-eight-actor-policy.json",
+    "production_promotion": false,
+    "status": "candidate_trained",
+    "updates": 8192,
+    "workers": 8,
+    "policy_artifact_sha256": "39a25fbfe79b735cf7d5277b7099fe432bd567d10426a0565714554b48e6a5bd",
+    "peak_sampled_live_actor_processes": 6,
+    "process_sample_scope": "A late bounded sample observed6live actor processes; this is not asserted as the true peak.64 completed episodes from the8-worker job are recorded by the actual learner."
+  }
 }

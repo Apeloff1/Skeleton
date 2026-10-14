@@ -146,7 +146,8 @@ local work from configured budgets and historical evidence.
   The resulting NES and Game Boy cartridges each executed 150 real controller
   steps in FCEUmm/Gambatte and produced captured native frames.
 - An original NES cartridge trained for eight episodes on two actual emulator
-  workers, committing 1,024 Q updates.
+  workers, committing 1,024 Q updates. A final eight-worker job on the editor-bound
+  cartridge committed64episodes and8,192Q updates with a durable policy artifact.
 - The first triangle workload executed editor, successor and native-ROM rounds,
   retaining complete actual reports and lessons. Final checkpoint/resume workload
   totals are recorded in the machine evidence.
