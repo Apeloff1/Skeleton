@@ -260,7 +260,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
     landed = {
         task_id
         for task_id, task in tasks.items()
-        if task.get("status") == "landed_unpromoted"
+        if task.get("status") in {"landed_unpromoted", "closed"}
     }
     allowed_status = {"blocked", "ready", "in_progress", "landed_unpromoted", "closed"}
     for task_id, task in tasks.items():

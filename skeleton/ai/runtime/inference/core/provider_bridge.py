@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from enum import Enum
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 from typing import Any, Iterable
@@ -11,6 +12,10 @@ from .session import InferenceContractError, InferenceSession, InferenceUsage, M
 
 def _plain(v:Any):
     if isinstance(v,Enum): return v.value
+    if isinstance(v,datetime):
+        if v.tzinfo is None or v.utcoffset() is None:
+            raise InferenceContractError("provider timestamp must be timezone-aware")
+        return v.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
     if is_dataclass(v): return _plain(asdict(v))
     if isinstance(v,dict): return {str(k):_plain(x) for k,x in sorted(v.items(),key=lambda p:str(p[0]))}
     if isinstance(v,(list,tuple)): return [_plain(x) for x in v]
