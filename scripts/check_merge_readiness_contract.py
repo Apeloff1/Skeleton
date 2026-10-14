@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/merge-readiness.yml"
@@ -65,6 +66,25 @@ def main() -> int:
         raise SystemExit(f"merge-readiness contract: cannot read workflow: {exc}")
 
     require("workflow_dispatch:" in text, "merge-readiness must support explicit current-head verification", failures)
+    # Both focused Python installs must resolve the same audited Mongo driver
+    # version as the canonical build manifest; stale per-workflow pins otherwise
+    # produce false-negative runtime/contract results on required merge gates.
+    try:
+        manifest = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        mongo_specs = [
+            value for value in manifest["project"]["dependencies"]
+            if isinstance(value, str) and value.startswith("pymongo==")
+        ]
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError) as exc:
+        print(f"cannot read canonical PyMongo pin: {exc}")
+        mongo_specs = []
+    require(len(mongo_specs) == 1, "canonical PyMongo version must be exactly pinned", failures)
+    if len(mongo_specs) == 1:
+        require(
+            text.count('"' + mongo_specs[0] + '"') == 2,
+            "both Merge Readiness Python dependency installs must use canonical PyMongo pin",
+            failures,
+        )
     require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
     require(
         CONCURRENCY_GROUP in text,
