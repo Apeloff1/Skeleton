@@ -3,14 +3,14 @@ name: Drain superseded Actions queue
 on:
   workflow_dispatch:
   workflow_run:
-    # Non-cancelled main validation plus a ten-minute fallback recovers old
-    # queue entries without multiplying workers on superseded main pushes.
+    # Non-cancelled main validation wakes immediately. A half-hour fallback
+    # avoids polling persistent provider-conflict runs too aggressively.
     workflows: ["Merge Readiness", "Prune redundant branches safely"]
     types: [completed]
     branches: [main]
   schedule:
-    # Avoid self-inflicted recovery congestion; bounded ten-minute fallback.
-    - cron: "2-52/10 * * * *"
+    # Recover periodically without starting six idle workers an hour.
+    - cron: "2,32 * * * *"
   push:
     branches: [main]
     paths: ['.github/workflows/queue-drain.yml']
@@ -436,6 +436,20 @@ jobs:
           def is_control_plane(run):
               return path(run) in control_plane_paths
 
+          def obsolete_main_observer(run, current_head):
+              # Auto-merge requires a successful PR source and feedback
+              # requires a PR source. A stale main workflow_run cannot do
+              # either. Preserve repair intake and signed evidence consumers.
+              return (
+                  run.get('event') == 'workflow_run'
+                  and run.get('head_branch') == 'main'
+                  and run.get('head_sha') != current_head
+                  and path(run) in {
+                      '.github/workflows/automerge-control-plane.yml',
+                      '.github/workflows/autonomous-build-feedback.yml',
+                  }
+              )
+
           def periodic_controller_key(run):
               workflow_path = path(run)
               event = run.get('event')
@@ -488,6 +502,7 @@ jobs:
               'active_seen': 0,
               'control_plane_preserved': 0,
               'coalesced_control_plane_queued': 0,
+              'obsolete_main_observers_queued': 0,
               'provider_conflicts_backed_off': 0,
               'obsolete_main': 0,
               'obsolete_main_active': 0,
@@ -602,6 +617,11 @@ jobs:
                       selected.append(run)
                       totals['orphaned_main_queued'] += 1
                       local['orphaned_main_queued'] += 1
+                      continue
+                  if obsolete_main_observer(run, head):
+                      selected.append(run)
+                      totals['obsolete_main_observers_queued'] += 1
+                      local['obsolete_main_observers_queued'] += 1
                       continue
                   periodic_key = periodic_controller_key(run)
                   latest = latest_controllers.get(periodic_key) if periodic_key else None
@@ -771,6 +791,7 @@ jobs:
                   f'active={len(active)} selected={len(selected)} '
                   f'control_plane_preserved={local["control_plane_preserved"]} '
                   f'coalesced_control_plane_queued={local["coalesced_control_plane_queued"]} '
+                  f'obsolete_main_observers_queued={local["obsolete_main_observers_queued"]} '
                   f'provider_conflicts_backed_off={local["provider_conflicts_backed_off"]} '
                   f'obsolete_main={local["obsolete_main"]} '
                   f'obsolete_main_active={local["obsolete_main_active"]} '
@@ -810,6 +831,10 @@ jobs:
                   handle.write(
                       '- Superseded queued periodic-controller sweeps: '
                       f'{totals["coalesced_control_plane_queued"]}\n'
+                  )
+                  handle.write(
+                      '- Stale, no-op main observers selected for cleanup: '
+                      f'{totals["obsolete_main_observers_queued"]}\n'
                   )
                   handle.write(
                       '- Provider 409 conflict run observations backed off until Oct 22: '

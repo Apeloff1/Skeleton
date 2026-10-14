@@ -13,9 +13,9 @@ on:
       # Validate only successful source conclusions before allocating runners.
       - "!main"
   schedule:
-    # PR validation completions remain the immediate wake; the hourly
-    # fallback covers missed events and workflow-only updates without fanout.
-    - cron: "8 * * * *"
+    # Successful PR checks still wake immediately. The recovery sweep is
+    # every two hours to reduce no-demand controller runs.
+    - cron: "8 */2 * * *"
 
 concurrency:
   group: automerge-control-plane-${{ github.repository }}

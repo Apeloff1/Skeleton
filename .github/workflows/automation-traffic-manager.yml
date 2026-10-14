@@ -2,7 +2,9 @@ name: Automation Traffic Manager
 
 on:
   schedule:
-    - cron: "17 * * * *"
+    # Preserve explicit admission and hard queue-pressure checks while
+    # halving no-demand periodic supervisor admission runs.
+    - cron: "17 */2 * * *"
   workflow_dispatch:
     inputs:
       force:
