@@ -95,18 +95,28 @@ class PythonPackageLayerTests(unittest.TestCase):
         root = self._fixture()
         path = root / "machine/python_package_layers.json"
         data = json.loads(path.read_text(encoding="utf-8"))
-        data["masterplan_bindings"][0]["required_gap_texts"].pop()
-        path.write_text(json.dumps(data), encoding="utf-8")
+        # Current signed volume legitimately has no open gap entries.
+        # Reopen a cloned volume without updating the manifest to prove the
+        # declared binding cannot silently lose obligations.
         master_path = root / "machine/ai_master_plan.json"
         master = json.loads(master_path.read_text(encoding="utf-8"))
         volume = next(v for v in master["volumes"] if v["key"] == "VOL-052")
-        volume["gaps"].append("unexpected future gap")
+        volume["completion_checkbox"] = False
+        volume["completion_checkbox_mark"] = "[ ]"
+        volume["implementation_status"] = "implemented"
+        volume["gaps"] = ["define package layer manifest"]
         master_path.write_text(json.dumps(master), encoding="utf-8")
-        # Existing bound gaps still validate, but the manifest may not claim a different title/ref.
-        data = json.loads(path.read_text(encoding="utf-8"))
-        data["masterplan_bindings"][0]["title"] = "Wrong title"
-        path.write_text(json.dumps(data), encoding="utf-8")
-        with self.assertRaisesRegex(MODULE.PackageLayerError, "title drift"):
+        with self.assertRaisesRegex(MODULE.PackageLayerError, "gap drift"):
+            MODULE.validate(root)
+
+    def test_rejects_signed_volume_with_reopened_gap(self) -> None:
+        root = self._fixture()
+        master_path = root / "machine/ai_master_plan.json"
+        master = json.loads(master_path.read_text(encoding="utf-8"))
+        volume = next(v for v in master["volumes"] if v["key"] == "VOL-052")
+        volume["gaps"].append("new unresolved verification work")
+        master_path.write_text(json.dumps(master), encoding="utf-8")
+        with self.assertRaisesRegex(MODULE.PackageLayerError, "inconsistent signed closure"):
             MODULE.validate(root)
 
 
