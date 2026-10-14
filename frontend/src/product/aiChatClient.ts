@@ -279,6 +279,7 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let final: ConversationTurn | null = null;
     let expectedDetach = false;
+    let pageAdvanced = false;
     try {
       const headers = authHeaders({ Accept: 'text/event-stream', ...input.headers });
       if (cursor) headers['Last-Event-ID'] = String(cursor);
@@ -381,6 +382,7 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
         while (seen.size > 256) seen.delete(seen.keys().next().value!);
         cursor = sequence;
         cursorDigest = digest;
+        pageAdvanced = true;
         input.onCursor?.(cursor);
         retries = 0;
       };
@@ -402,16 +404,23 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
         for (const frame of frames.splice(0)) await applyFrame(frame);
       }
       if (final) return final;
-      if (expectedDetach && cursor > 0) {
-        // A completed bounded page does not prove the journal is exhausted.
-        // Reopen from the exact verified digest before accepting terminal
-        // status; probing now could skip the remaining immutable events.
+      if (pageAdvanced) {
+        // Even a severed response may have more durable events. Continue
+        // from the exact chain digest instead of trusting a terminal probe
+        // that might skip a remaining bounded journal page.
         retries = 0;
         continue;
       }
       const turn = await probe();
       if (turn.terminal) return turn;
-      retries += 1;
+      if (expectedDetach) {
+        // An empty completed page is normal while inference is running.
+        // Avoid reconnect loops and do not exhaust transport retries.
+        retries = 0;
+        retryMs = Math.max(retryMs, 1000);
+      } else {
+        retries += 1;
+      }
     } catch (error) {
       if (input.signal?.aborted) throw chatAbortError();
       const failure = asChatError(error);
