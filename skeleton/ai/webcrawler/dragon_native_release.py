@@ -10,7 +10,7 @@ from __future__ import annotations
 from argparse import ArgumentParser
 from dataclasses import asdict,dataclass
 from hashlib import sha256
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from time import monotonic
 from zipfile import ZIP_DEFLATED,ZipFile,ZipInfo
 import json,os,platform,shutil,subprocess,sys
@@ -106,9 +106,17 @@ def build_native_release(root:Path,*,title:str="Original Dragon Puzzle Quest")->
     written=emit_native_puzzle(seed=seed,stages=4,difficulty=4)
     root.mkdir(parents=True,exist_ok=True)
     for name,body in written.items():
-        candidate=root/name
-        if candidate.is_absolute() or ".." in Path(name).parts or not isinstance(body,str):
+        # Validate the emitter-owned *member*, never the joined output path:
+        # root is normally absolute, but each source name must be relative.
+        if (not isinstance(name, str) or not name or "\\" in name or ":" in name
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in name)
+                or not isinstance(body, str)):
             raise ValueError("unsafe native release source entry")
+        member = PurePosixPath(name)
+        if (member.is_absolute() or any(part in (".", "..") for part in name.split("/"))
+                or "" in name.split("/") or member.as_posix() != name):
+            raise ValueError("unsafe native release source entry")
+        candidate = root.joinpath(*member.parts)
         candidate.parent.mkdir(parents=True,exist_ok=True)
         candidate.write_text(body,encoding="utf-8")
     source_fingerprint=sha256(json.dumps(
