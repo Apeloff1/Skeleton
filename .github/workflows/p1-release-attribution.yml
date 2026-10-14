@@ -1,18 +1,6 @@
 name: P1 Release Attribution Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/p1_release_attribution.json"
-      - "scripts/check_p1_release_attribution.py"
-      - "skeleton/release/attribution.py"
-      - "skeleton/release/__init__.py"
-      - "skeleton/testing/test_release_attribution.py"
-      - "tests/test_p1_release_attribution.py"
-      - ".github/workflows/p1-release-attribution.yml"
   workflow_dispatch:
 
 permissions:

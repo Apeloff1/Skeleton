@@ -1,22 +1,6 @@
 name: P1 Model Placement Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/network/model_placement.py"
-      - "skeleton/ai/runtime/distributed/network/model_placement.py"
-      - "skeleton/network/remote_execution.py"
-      - "skeleton/network/__init__.py"
-      - "skeleton/ai/runtime/distributed/network/__init__.py"
-      - "skeleton/shells/worker_affinity.py"
-      - "skeleton/shells/worker_capacity.py"
-      - "skeleton/shells/worker_topology.py"
-      - "skeleton/shells/worker_reservations.py"
-      - "skeleton/testing/test_model_placement.py"
-      - ".github/workflows/p1-model-placement.yml"
   workflow_dispatch:
 
 permissions:

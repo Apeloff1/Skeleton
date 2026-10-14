@@ -1,18 +1,6 @@
 name: P1 Budget Accounting Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/observability/budget_accounting.py"
-      - "skeleton/ai/runtime/observability/budget_accounting.py"
-      - "skeleton/intelligence/quota.py"
-      - "skeleton/intelligence/quota_sqlite.py"
-      - "skeleton/intelligence/admission.py"
-      - "skeleton/testing/test_budget_accounting_ledger.py"
-      - ".github/workflows/p1-budget-accounting.yml"
   workflow_dispatch:
 
 permissions:

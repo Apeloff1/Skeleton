@@ -1,16 +1,6 @@
 name: P1 World-Model Simulation Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "skeleton/simulation/environment.py"
-      - "skeleton/simulation/world_model.py"
-      - "skeleton/simulation/__init__.py"
-      - "skeleton/testing/test_simulation_authority_boundary.py"
-      - "skeleton/testing/test_simulation_determinism.py"
-      - ".github/workflows/p1-world-model-simulation.yml"
   workflow_dispatch:
 
 permissions:

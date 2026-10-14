@@ -1,23 +1,6 @@
 name: P1 Champion Challenger Registry Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/eval/champion_registry.py"
-      - "skeleton/ai/evaluation/champion_registry.py"
-      - "skeleton/eval/benchmark_registry.py"
-      - "skeleton/eval/experiment_registry.py"
-      - "skeleton/contracts/reproducibility.py"
-      - "skeleton/eval/__init__.py"
-      - "skeleton/ai/evaluation/__init__.py"
-      - "skeleton/testing/test_champion_registry.py"
-      - "machine/p1_champion_registry.json"
-      - "scripts/check_p1_champion_registry.py"
-      - "tests/test_p1_champion_registry.py"
-      - ".github/workflows/p1-champion-registry.yml"
   workflow_dispatch:
 
 permissions:

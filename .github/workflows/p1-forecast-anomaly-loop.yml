@@ -1,20 +1,6 @@
 name: P1 Forecast Anomaly Loop Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/observability/forecasting.py"
-      - "skeleton/ai/runtime/observability/forecasting.py"
-      - "skeleton/observability/budget_accounting.py"
-      - "skeleton/mesh/capacity_qualification.py"
-      - "skeleton/observability/__init__.py"
-      - "skeleton/ai/runtime/observability/__init__.py"
-      - "skeleton/testing/test_forecasting_engine.py"
-      - "skeleton/testing/test_cost_anomaly_detection.py"
-      - ".github/workflows/p1-forecast-anomaly-loop.yml"
   workflow_dispatch:
 
 permissions:

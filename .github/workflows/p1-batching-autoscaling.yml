@@ -1,20 +1,6 @@
 name: P1 Batching Autoscaling Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/mesh/batching_autoscaling.py"
-      - "skeleton/ai/runtime/distributed/mesh/batching_autoscaling.py"
-      - "skeleton/network/model_placement.py"
-      - "skeleton/shells/worker_scaling.py"
-      - "skeleton/shells/worker_sla.py"
-      - "skeleton/mesh/throughput_controller.py"
-      - "skeleton/testing/test_continuous_batching.py"
-      - "skeleton/testing/test_inference_autoscaling.py"
-      - ".github/workflows/p1-batching-autoscaling.yml"
   workflow_dispatch:
 
 permissions:

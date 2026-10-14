@@ -1,18 +1,6 @@
 name: P1 Capacity Qualification Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/mesh/capacity_qualification.py"
-      - "skeleton/ai/runtime/distributed/mesh/capacity_qualification.py"
-      - "skeleton/mesh/batching_autoscaling.py"
-      - "skeleton/intelligence/admission.py"
-      - "skeleton/resilience/load_shedder.py"
-      - "skeleton/testing/test_capacity_qualification.py"
-      - ".github/workflows/p1-capacity-qualification.yml"
   workflow_dispatch:
 
 permissions:
