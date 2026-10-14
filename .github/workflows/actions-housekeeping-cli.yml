@@ -506,9 +506,13 @@ jobs:
             accessed_epoch=$(date -u -d "$accessed" +%s)
             size=${size:-0}
             if (( accessed_epoch < cutoff && deleted < MAX_CACHE_DELETES )); then
-              if gh api --method DELETE "/repos/${REPO}/actions/caches/${id}" >/dev/null 2>&1; then
+              delete_error="$RUNNER_TEMP/cache-delete-error.txt"
+              if gh api --method DELETE "/repos/${REPO}/actions/caches/${id}" >/dev/null 2>"$delete_error"; then
                 deleted=$((deleted + 1))
                 reclaimed=$((reclaimed + size))
+              elif grep -Eqi '(rate.limit|abuse detection)' "$delete_error"; then
+                echo '::warning::Cache cleanup deferred: GitHub API rate limit reached.'
+                break
               else
                 failed=$((failed + 1))
               fi
@@ -564,8 +568,12 @@ jobs:
             [[ -n "${id:-}" && -n "${created:-}" ]] || continue
             created_epoch=$(date -u -d "$created" +%s)
             if [[ "$expired" == 'true' || "$created_epoch" -lt "$cutoff" ]]; then
-              if gh api --method DELETE "/repos/${REPO}/actions/artifacts/${id}" >/dev/null 2>&1; then
+              delete_error="$RUNNER_TEMP/artifact-delete-error.txt"
+              if gh api --method DELETE "/repos/${REPO}/actions/artifacts/${id}" >/dev/null 2>"$delete_error"; then
                 deleted=$((deleted + 1))
+              elif grep -Eqi '(rate.limit|abuse detection)' "$delete_error"; then
+                echo '::warning::Artifact cleanup deferred: GitHub API rate limit reached.'
+                break
               else
                 failed=$((failed + 1))
               fi
@@ -631,7 +639,8 @@ jobs:
           deleted=0
           failed=0
           kept=0
-          while IFS=$'\t' read -r id created conclusion name; do
+          rate_limited=false
+          while IFS=
             [[ -n "${id:-}" && -n "${created:-}" ]] || continue
             [[ "$id" != "$GITHUB_RUN_ID" ]] || continue
             created_epoch=$(date -u -d "$created" +%s)
@@ -642,8 +651,51 @@ jobs:
               kept=$((kept + 1))
               continue
             fi
-            if gh run delete "$id" --repo "$REPO"; then
+            # A rate-limited installation must not burn the rest of its API
+            # budget on hundreds of doomed deletions. Preserve the remainder
+            # for the next scheduled housekeeping sweep.
+            delete_error="$RUNNER_TEMP/old-run-delete-error.txt"
+            if gh run delete "$id" --repo "$REPO" 2>"$delete_error"; then
               deleted=$((deleted + 1))
+            elif grep -Eqi '(rate.limit|abuse detection)' "$delete_error"; then
+              rate_limited=true
+              echo '::warning::Old-run cleanup deferred: GitHub API rate limit reached.'
+              break
+            else
+              failed=$((failed + 1))
+            fi
+          done < "$inventory"
+
+          {
+            echo "- Old unsuccessful runs deleted: $deleted"
+            echo "- Recent/over-cap unsuccessful runs preserved: $kept"
+            echo "- Run deletion failures: $failed"
+            echo "- Rate-limit backpressure activated: $rate_limited"
+            echo "- Unsuccessful-run retention threshold: ${FAILED_RUN_RETENTION_DAYS} days"
+            echo "- Per-sweep run deletion cap: ${MAX_RUN_DELETES}"
+            echo "- Server-side stale-run cutoff: <${cutoff_iso}"
+          } >> "$GITHUB_STEP_SUMMARY"
+\t' read -r id created conclusion name; do
+            [[ -n "${id:-}" && -n "${created:-}" ]] || continue
+            [[ "$id" != "$GITHUB_RUN_ID" ]] || continue
+            created_epoch=$(date -u -d "$created" +%s)
+            # Keep a local age guard even though the server query is already
+            # bounded, so malformed or unexpectedly broad results cannot delete
+            # a recent run.
+            if (( created_epoch >= cutoff || deleted >= MAX_RUN_DELETES )); then
+              kept=$((kept + 1))
+              continue
+            fi
+            # A rate-limited installation must not burn the rest of its API
+            # budget on hundreds of doomed deletions. Preserve the remainder
+            # for the next scheduled housekeeping sweep.
+            delete_error="$RUNNER_TEMP/old-run-delete-error.txt"
+            if gh run delete "$id" --repo "$REPO" 2>"$delete_error"; then
+              deleted=$((deleted + 1))
+            elif grep -Eqi '(rate.limit|abuse detection)' "$delete_error"; then
+              rate_limited=true
+              echo '::warning::Old-run cleanup deferred: GitHub API rate limit reached.'
+              break
             else
               failed=$((failed + 1))
             fi
