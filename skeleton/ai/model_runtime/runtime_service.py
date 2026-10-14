@@ -278,7 +278,11 @@ class NativeModelService:
                         terminal_reason="cancelled",
                         events=events,
                     )
-                if self._now_ns() >= deadline_ns:
+                # Admission and prompt are one non-output envelope. Preserve
+                # both immutable evidence events once admitted; a deadline
+                # between them still prevents model execution because the
+                # runtime checks interrupt() before the next decoding step.
+                if event.kind != "admitted" and self._now_ns() >= deadline_ns:
                     return self._terminal(
                         request,
                         prompt=prompt,
