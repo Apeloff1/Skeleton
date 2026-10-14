@@ -141,10 +141,13 @@ class ObservableNESBus:
         self.button_state=buttons[name]
 
 
+_STAGE_BG_NOT_SUPPLIED = object()
+
+
 def verify_original_nes_6502_boot(
     rom_path: str | Path, *, expected_sha256: str,
     instruction_budget: int = _MAX_INSTRUCTIONS,
-    expected_stage_zero_bg_sha256: str | None = None,
+    expected_stage_zero_bg_sha256: str | None | object = _STAGE_BG_NOT_SUPPLIED,
 ) -> dict[str, object]:
     """Execute the actual compiled 6502 reset path and observe PPU/OAM writes.
 
@@ -158,7 +161,8 @@ def verify_original_nes_6502_boot(
         c not in "0123456789abcdef" for c in expected_sha256
     ):
         raise NES6502BootError("pinned NES binary digest missing")
-    if expected_stage_zero_bg_sha256 is not None and (
+    # Explicit null is not a verified digest. Only omission disables this optional check.
+    if expected_stage_zero_bg_sha256 is not _STAGE_BG_NOT_SUPPLIED and (
         not isinstance(expected_stage_zero_bg_sha256,str)
         or len(expected_stage_zero_bg_sha256)!=64
         or any(c not in "0123456789abcdef" for c in expected_stage_zero_bg_sha256)
@@ -190,7 +194,7 @@ def verify_original_nes_6502_boot(
         if (bus.palette_writes>=32 and bus.nametable_writes>=960
             and bus.oam_dma_count>=1 and bus.ppu_reads>=2):
             actual_stage_bg_sha256=sha256(bus.nametable[:960]).hexdigest()
-            if (expected_stage_zero_bg_sha256 is not None
+            if (expected_stage_zero_bg_sha256 is not _STAGE_BG_NOT_SUPPLIED
                 and actual_stage_bg_sha256 != expected_stage_zero_bg_sha256):
                 raise NES6502BootError(
                     "real 6502 PPU stage-zero map differs from original authored world"
