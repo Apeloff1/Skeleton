@@ -95,3 +95,38 @@ def test_rest_timestamps_retain_stale_queue_age():
         issues=(),
     )
     assert manager._queued_age_seconds(snapshot, snapshot.workflow_runs[0]) == 1200
+
+def test_status_inventory_pages_beyond_100_queued_runs(monkeypatch):
+    """Queue relief must see older runs hidden beyond GitHub's first page."""
+    requests: list[str] = []
+
+    def fake_gh_json(args: list[str]):
+        url = args[1]
+        requests.append(url)
+        if "status=queued" in url and "page=1" in url:
+            return [_row(number) for number in range(1, 101)]
+        if "status=queued" in url and "page=2" in url:
+            return [_row(number) for number in range(101, 183)]
+        return []
+
+    monkeypatch.setattr(manager, "_gh_json", fake_gh_json)
+    rows = manager._observe_runs("Apeloff1/Skeleton")
+    assert len(rows) == 182
+    assert len({row["databaseId"] for row in rows}) == 182
+    assert len([url for url in requests if "status=queued" in url]) == 2
+    assert rows[-1]["databaseId"] == 182
+
+
+def test_excessive_status_page_count_fails_closed(monkeypatch):
+    """Never infer spare capacity from a truncated saturated inventory."""
+    def fake_gh_json(args: list[str]):
+        if "status=queued" in args[1]:
+            return [_row(number) for number in range(1, 101)]
+        return []
+
+    monkeypatch.setattr(manager, "_gh_json", fake_gh_json)
+    with pytest.raises(
+        manager.TrafficManagerError,
+        match="exceeded bounded active page limit",
+    ):
+        manager._observe_runs("Apeloff1/Skeleton")
