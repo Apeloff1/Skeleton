@@ -12,6 +12,9 @@ on:
     branches:
       - "*"
       - "**"
+      # The feedback job requires a pull_request source run. Main pushes
+      # produce only skipped fan-out; exclude them at event admission.
+      - "!main"
 
 # Preserve one feedback stream per source gate while coalescing retries and
 # superseded attempts for the same immutable workflow-run + source-workflow identity.
