@@ -71,6 +71,11 @@ class ThreadStateRequest(BaseModel):
     expected_thread_version: int = Field(ge=1)
 
 
+class RenameConversationRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    expected_thread_version: int = Field(ge=1, strict=True)
+
+
 class RegenerateMessageRequest(BaseModel):
     idempotency_key: str = Field(min_length=1, max_length=1024)
     expected_thread_version: int = Field(ge=1)
@@ -132,6 +137,24 @@ async def list_conversations(
     except Exception as exc:
         raise _translate(exc) from exc
     return {"threads": [thread.as_dict() for thread in threads], "count": len(threads)}
+
+
+@router.patch("/{thread_id}")
+async def rename_conversation(
+    thread_id: str, body: RenameConversationRequest, user=Depends(require_role("viewer"))
+):
+    tenant_id, owner_id = _identity(user)
+    try:
+        thread = await conversation_authority.rename_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            expected_version=body.expected_thread_version,
+            title=body.title,
+        )
+    except Exception as exc:
+        raise _translate(exc) from exc
+    return {"thread": thread.as_dict()}
 
 
 @router.get("/{thread_id}")
