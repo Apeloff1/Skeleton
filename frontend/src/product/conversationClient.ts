@@ -320,11 +320,6 @@ export async function startConversationTurn(
     idempotencyKey: string;
     context?: string;
     memoryPolicy?: ConversationTurnMemoryPolicy;
-    attachmentRefs?: string[];
-    providerId?: string;
-    modelId?: string;
-    maxOutputTokens?: number;
-    temperature?: number;
     signal?: AbortSignal;
     deferred?: boolean;
   },
@@ -339,11 +334,6 @@ export async function startConversationTurn(
         expected_thread_version: thread.version,
         context: input.context,
         memory_policy: input.memoryPolicy,
-        attachment_refs: input.attachmentRefs ?? [],
-        provider_id: input.providerId ?? null,
-        model_id: input.modelId ?? null,
-        max_output_tokens: input.maxOutputTokens ?? null,
-        temperature: input.temperature ?? null,
         response_mode: input.deferred === false ? 'wait' : 'deferred',
       },
       {
