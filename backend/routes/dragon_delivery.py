@@ -89,11 +89,11 @@ def delivery_overview(request: Request, response: Response,
     result["practice_storage_ready"] = bool(
         path and path.is_absolute() and not path.is_symlink() and path.is_file()
     )
-    # Explicitly not a production-generation claim: the delivery source
-    # dispatch endpoint is not wired here.
-    result["resource_runtime_ready"] = False
+    # Native source emission is gated by the existing shared resource pool;
+    # this is not a claim of a compiled artifact or authorized release.
+    result["resource_runtime_ready"] = isinstance(pool, DragonExecutionPool)
     result["resource_runtime_configured"] = isinstance(pool, DragonExecutionPool)
-    result["generation_available"] = False
+    result["generation_available"] = isinstance(pool, DragonExecutionPool)
     return result
 
 
@@ -140,3 +140,178 @@ def delivery_brief(body: DeliveryBriefRequest, response: Response,
         return _project(lambda: delivery.brief(
             owner, design, body.query, now=_clock(), authorized=True
         ))
+
+
+class DeliveryGenerateRequest(DeliveryBriefRequest):
+    approved: bool
+    plan_digest: str = Field(min_length=64, max_length=64, pattern=r"^[a-f0-9]{64}$")
+    prepared_at: int = Field(ge=0, le=4_102_444_800)
+    request_id: str = Field(min_length=16, max_length=80, pattern=r"^[A-Za-z0-9_-]{16,80}$")
+
+
+def _native_session():
+    """Use the same owner-isolated practice repository as Dragon Academy."""
+    from routes.dragon_academy import _lab
+    return _lab()
+
+
+def _canonical_brief(delivery: DragonDelivery, owner: str,
+                     body: DeliveryGenerateRequest) -> tuple[object, dict]:
+    try:
+        design = parse_design(body.design)
+        brief = delivery.brief(owner, design, body.query, now=_clock(),
+                               authorized=True, prepared_at=body.prepared_at)
+    except (ValueError, TypeError, LookupError, StopIteration):
+        raise HTTPException(status_code=409,
+                            detail="Delivery evidence or design has changed") from None
+    if (brief["plan_digest"] != body.plan_digest
+            or not brief["ready_for_source_generation"]):
+        raise HTTPException(status_code=409,
+                            detail="Delivery brief is stale or cannot be admitted")
+    return design, brief
+
+
+def _existing_delivery(native, owner: str, request_id: str):
+    from skeleton.ai.webcrawler.dragon_native_projects import digest
+    attempt_id = digest([owner, "delivery", request_id])
+    try:
+        native.project(owner, attempt_id, authorized=True)
+    except LookupError:
+        return None
+    return attempt_id
+
+
+@router.post("/generate")
+def delivery_generate(body: DeliveryGenerateRequest, request: Request,
+                      response: Response,
+                      owner: str = Depends(
+                          __import__("routes.dragon_academy", fromlist=["_native_source_editor"])._native_source_editor
+                      )) -> dict:
+    """Generate an original SOURCE project only after fresh reviewed evidence.
+
+    A shared owner scheduler reserves resources before durable generation;
+    retries read the prior artifact without another resource charge.
+    """
+    from dataclasses import asdict
+    from routes.dragon_academy import _lab
+    from skeleton.ai.game_builder.resource_governor import ResourceDelta
+    from skeleton.ai.webcrawler.dragon_chunk_executor import ChunkResult
+    from skeleton.ai.webcrawler.dragon_resource_session import SessionTask
+    from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
+
+    _private(response)
+    if body.approved is not True:
+        raise HTTPException(status_code=403, detail="Explicit native-source consent required")
+    pool = getattr(request.app.state, "dragon_execution_pool", None)
+    if not isinstance(pool, DragonExecutionPool):
+        raise HTTPException(status_code=503,
+                            detail="Shared Dragon resource runtime not configured")
+    with _delivery() as delivery:
+        design, brief = _canonical_brief(delivery, owner, body)
+        with _lab() as (practice, _):
+            native = DragonNativePracticeLab(practice.db, practice)
+            stable = _existing_delivery(native, owner, body.request_id)
+            try:
+                if stable is not None:
+                    # Re-check the exact stored owner-bound brief on every replay.
+                    attempt = native.generate(
+                        owner, target_id=design.target, style=design.genre,
+                        now=time.time(), authorized=True, consent=True,
+                        design=design, source_context=brief,
+                        request_id=body.request_id,
+                    )
+                    execution = {"done": True, "reason": "durable_replay",
+                                 "completed_chunks": 0}
+                else:
+                    worker = pool.executor(owner)
+                    task = SessionTask(
+                        task_id="delivery-" + body.request_id, lane="user",
+                        memory_bytes=8 * 1024 * 1024, cpu_units=1, io_tokens=1,
+                    )
+                    reserved = ResourceDelta(artifact_bytes=250000)
+
+                    def generate_source(plan, should_stop):
+                        if should_stop():
+                            raise ValueError("Native source generation stopped before admission")
+                        generated = native.generate(
+                            owner, target_id=design.target, style=design.genre,
+                            now=time.time(), authorized=True, consent=True,
+                            design=design, source_context=brief,
+                            request_id=body.request_id,
+                        )
+                        project = native.project(owner, generated.attempt_id,
+                                                 authorized=True)
+                        from json import dumps
+                        usage = len(dumps(project, sort_keys=True).encode("utf-8"))
+                        return ChunkResult(True, generated.attempt_id,
+                                           ResourceDelta(artifact_bytes=usage))
+
+                    run = worker.run(task, generate_source, authorized=True,
+                                     consent=True, max_chunks=1,
+                                     reserved_usage=reserved)
+                    if not run.done:
+                        return {"ok": True, "delivery_state": "deferred",
+                                "plan_digest": brief["plan_digest"],
+                                "created_native": None,
+                                "resource_execution": asdict(run),
+                                "compiled": False, "gameplay_verified": False,
+                                "release_authorized": False,
+                                "training_authorized": False}
+                    attempt_id = run.checkpoints[-1]
+                    attempt = next((item for item in native.list(owner, authorized=True)
+                                    if item.attempt_id == attempt_id), None)
+                    if attempt is None:
+                        raise HTTPException(status_code=503,
+                                            detail="Native source receipt not recoverable")
+                    execution = asdict(run)
+            except PermissionError:
+                raise HTTPException(status_code=403,
+                                    detail="Approved native practice lesson required") from None
+            except ValueError:
+                raise HTTPException(status_code=409,
+                                    detail="Native source request conflicts with durable evidence or quota") from None
+            except (sqlite3.DatabaseError, OSError):
+                raise HTTPException(status_code=503, detail="Native practice storage unavailable") from None
+
+            learning = None
+            recovery = False
+            try:
+                learning = delivery.record_project_learning(
+                    owner, native, attempt.attempt_id, authorized=True)
+            except (ValueError, LookupError, OSError, sqlite3.DatabaseError):
+                recovery = True
+            return {"ok": True, "delivery_state": "source_generated",
+                    "created_native": asdict(attempt),
+                    "resource_execution": execution,
+                    "plan_digest": brief["plan_digest"],
+                    "project_learning": learning,
+                    "learning_recovery_required": recovery,
+                    "compiled": False, "gameplay_verified": False,
+                    "release_authorized": False, "training_authorized": False}
+
+
+@router.post("/{attempt_id}/learning")
+def recover_delivery_learning(attempt_id: str, response: Response,
+                              owner: str = Depends(
+                                  __import__("routes.dragon_academy", fromlist=["_native_source_editor"])._native_source_editor
+                              )) -> dict:
+    """Re-project a committed source artifact, never generate a second one."""
+    from routes.dragon_academy import _lab
+    from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
+    _private(response)
+    if not _TOPIC.fullmatch(attempt_id):
+        raise HTTPException(status_code=422, detail="Invalid artifact identity")
+    with _delivery() as delivery:
+        with _lab() as (practice, _):
+            native = DragonNativePracticeLab(practice.db, practice)
+            try:
+                result = delivery.record_project_learning(owner, native,
+                                                          attempt_id, authorized=True)
+            except LookupError:
+                raise HTTPException(status_code=404, detail="Native source not found") from None
+            except (ValueError, sqlite3.DatabaseError, OSError):
+                raise HTTPException(status_code=409,
+                                    detail="Source lineage cannot be reconciled") from None
+    return {"ok": True, "new_source_generated": False,
+            "project_learning": result,
+            "training_authorized": False, "release_authorized": False}
