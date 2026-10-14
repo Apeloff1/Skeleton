@@ -190,3 +190,34 @@ def test_stage_levels_bounded_under_continuous_novel_evidence():
     assert dragon.children[0].stage == "adult"
     assert len(dragon.children[0].evidence) == 202
     assert verify_change_history(dragon)
+
+
+def test_change_history_commits_final_state_not_only_change_prose():
+    dragon = grow(adult())
+    assert verify_change_history(dragon)
+    assert len(dragon.changes[-1].state_digest) == 64
+    changes = (
+        replace(dragon, consumed=()),
+        replace(dragon, level=0),
+        replace(dragon, stage="egg"),
+        replace(dragon, catalog_digest="f" * 64),
+        replace(dragon, children=dragon.children[:1]),
+        replace(dragon, children=(
+            replace(dragon.children[0], level=19),
+            *dragon.children[1:],
+        )),
+        replace(dragon, source_ids=("forged-source",)),
+        replace(dragon, focus_tags=("spoofed-relevance",)),
+    )
+    for forged in changes:
+        assert not verify_change_history(forged)
+        with pytest.raises(ValueError, match="verification"):
+            nest_snapshot(forged)
+
+
+def test_change_history_rejects_modified_state_receipt_even_with_existing_head():
+    dragon = adult()
+    bad_entry = replace(dragon.changes[-1], state_digest="e" * 64)
+    assert not verify_change_history(
+        replace(dragon, changes=(*dragon.changes[:-1], bad_entry))
+    )
