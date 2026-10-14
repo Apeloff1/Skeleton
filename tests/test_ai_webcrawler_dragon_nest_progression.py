@@ -221,3 +221,22 @@ def test_change_history_rejects_modified_state_receipt_even_with_existing_head()
     assert not verify_change_history(
         replace(dragon, changes=(*dragon.changes[:-1], bad_entry))
     )
+
+
+def test_distinct_source_ids_cannot_claim_identical_content_as_independent_progress():
+    dragon = nest(3)
+    dragon = feed_parent(
+        dragon, "source-0", content_sha256=H1, at=T0,
+        authorized=True, reviewed=True, lawful=True,
+    )
+    assert dragon.consumed_material == (H1,)
+    with pytest.raises(ValueError, match="duplicate content"):
+        feed_parent(
+            dragon, "source-1", content_sha256=H1, at=T1,
+            authorized=True, reviewed=True, lawful=True,
+        )
+    assert len(dragon.consumed) == 1
+    assert dragon.children == ()
+    assert verify_change_history(dragon)
+    mutated = replace(dragon, consumed_material=(H2,))
+    assert not verify_change_history(mutated)
