@@ -17,7 +17,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
-from routes.dragon_academy import _principal
+from routes.dragon_academy import _principal, _native_source_editor
 from skeleton.ai.game_builder.dragon_almanacs import DragonAlmanacs
 from skeleton.ai.game_builder.dragon_delivery import DragonDelivery
 from skeleton.ai.game_builder.reviewed_knowledge import ReviewedKnowledgeStore
@@ -149,12 +149,6 @@ class DeliveryGenerateRequest(DeliveryBriefRequest):
     request_id: str = Field(min_length=16, max_length=80, pattern=r"^[A-Za-z0-9_-]{16,80}$")
 
 
-def _native_session():
-    """Use the same owner-isolated practice repository as Dragon Academy."""
-    from routes.dragon_academy import _lab
-    return _lab()
-
-
 def _canonical_brief(delivery: DragonDelivery, owner: str,
                      body: DeliveryGenerateRequest) -> tuple[object, dict]:
     try:
@@ -184,9 +178,7 @@ def _existing_delivery(native, owner: str, request_id: str):
 @router.post("/generate")
 def delivery_generate(body: DeliveryGenerateRequest, request: Request,
                       response: Response,
-                      owner: str = Depends(
-                          __import__("routes.dragon_academy", fromlist=["_native_source_editor"])._native_source_editor
-                      )) -> dict:
+                      owner: str = Depends(_native_source_editor)) -> dict:
     """Generate an original SOURCE project only after fresh reviewed evidence.
 
     A shared owner scheduler reserves resources before durable generation;
@@ -194,8 +186,9 @@ def delivery_generate(body: DeliveryGenerateRequest, request: Request,
     """
     from dataclasses import asdict
     from routes.dragon_academy import _lab
-    from skeleton.ai.game_builder.resource_governor import ResourceDelta
+    from skeleton.ai.game_builder.resource_governor import ResourceDelta, ResourceLimitError
     from skeleton.ai.webcrawler.dragon_chunk_executor import ChunkResult
+    from skeleton.ai.webcrawler.dragon_execution_pool import DragonPoolCapacityError
     from skeleton.ai.webcrawler.dragon_resource_session import SessionTask
     from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
 
@@ -272,6 +265,8 @@ def delivery_generate(body: DeliveryGenerateRequest, request: Request,
                                     detail="Native source request conflicts with durable evidence or quota") from None
             except (sqlite3.DatabaseError, OSError):
                 raise HTTPException(status_code=503, detail="Native practice storage unavailable") from None
+            except (ResourceLimitError, DragonPoolCapacityError):
+                raise HTTPException(status_code=503, detail="Dragon source generation capacity exhausted") from None
 
             learning = None
             recovery = False
@@ -292,9 +287,7 @@ def delivery_generate(body: DeliveryGenerateRequest, request: Request,
 
 @router.post("/{attempt_id}/learning")
 def recover_delivery_learning(attempt_id: str, response: Response,
-                              owner: str = Depends(
-                                  __import__("routes.dragon_academy", fromlist=["_native_source_editor"])._native_source_editor
-                              )) -> dict:
+                              owner: str = Depends(_native_source_editor)) -> dict:
     """Re-project a committed source artifact, never generate a second one."""
     from routes.dragon_academy import _lab
     from skeleton.ai.webcrawler.dragon_native_practice import DragonNativePracticeLab
