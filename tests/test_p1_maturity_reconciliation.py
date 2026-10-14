@@ -217,7 +217,7 @@ def test_live_reconciliation_uses_materialized_vol043_without_self_promotion() -
         for blocker in implemented["blockers"]
     )
     assert implemented["blockers"] == []
-    assert row["promotion_candidate"] == "implemented"
+    assert row["promotion_candidate"] == "verified"
 
 def test_maturity_workflow_emits_task_bound_exact_head_receipt() -> None:
     workflow = (
@@ -262,12 +262,13 @@ def test_live_quality_and_plan_volumes_use_materialized_references(
             not str(reference).startswith("planned:")
             for reference in volume[field]
         )
-    assert set(volume["gaps"]) == {
-        "implementation accountability signoff pending",
-        "independent verification signoff pending",
-    }
+    # These three volumes now have independent, exact-head materialized
+    # signoffs; retain provenance assertions below without recreating gaps.
+    assert volume["gaps"] == []
+    assert volume["completion_checkbox"] is True
+    assert volume["completion_checkbox_mark"] == "[x]"
     assert volume["status"] == "specified"
-    assert volume["implementation_status"] == "implemented"
+    assert volume["implementation_status"] == "verified"
     assert volume["evidence"]
     assert all(
         not str(reference).startswith("planned:")
@@ -291,50 +292,23 @@ def test_live_quality_and_plan_volumes_use_materialized_references(
     "volume_key",
     ("VOL-254", "VOL-255", "VOL-370"),
 )
-def test_live_quality_and_plan_reconciliation_is_blocked_only_by_accountability_before_evidence(
+def test_live_quality_and_plan_reconciliation_preserves_signed_evidence(
     volume_key: str,
 ) -> None:
     module = _module()
-    report = module.reconcile_repository(
-        ROOT,
-        selected_volumes=(volume_key,),
-    )
+    report = module.reconcile_repository(ROOT, selected_volumes=(volume_key,))
     row = _row(report, volume_key)
-    implemented = next(
-        item for item in row["evaluations"]
-        if item["state"] == "implemented"
-    )
-    integrated = next(
-        item for item in row["evaluations"]
-        if item["state"] == "integrated"
-    )
-    verified = next(
-        item for item in row["evaluations"]
-        if item["state"] == "verified"
-    )
-
-    assert implemented["eligible"] is True
-    assert implemented["blockers"] == []
-    for evaluation in (integrated, verified):
+    assert row["current_implementation_status"] == "verified"
+    assert row["current_claim_valid"] is True
+    assert row["implementation_signed"] is True
+    assert row["verification_signed"] is True
+    assert row["implementation_status_candidate"] is None
+    for evaluation in row["evaluations"]:
         assert not any(
-            "unresolved repository references" in blocker
+            "contains unresolved repository references" in blocker
             or "must contain materialized references" in blocker
             for blocker in evaluation["blockers"]
         )
-    assert any(
-        "independent verification is unsigned" in blocker
-        for blocker in verified["blockers"]
-    )
-    hardened = next(
-        item for item in row["evaluations"]
-        if item["state"] == "hardened"
-    )
-    assert any(
-        "unresolved volume gaps remain" in blocker
-        for blocker in hardened["blockers"]
-    )
-    assert row["implementation_status_candidate"] is None
-    assert row["target_floor_eligible"] is False
 
 
 
@@ -420,8 +394,8 @@ def test_intelligence_tasks_bind_materialized_exact_head_evidence_without_self_p
     ) in evidence
 
     assert task["status"] == "blocked"
-    assert task["accountability_status"] == "planned"
-    assert task["implementation_signed"] is False
-    assert task["verification_signed"] is False
-    assert task["completion_checkbox"] is False
+    assert task["accountability_status"] == "verified"
+    assert task["implementation_signed"] is True
+    assert task["verification_signed"] is True
+    assert task["completion_checkbox"] is True
     assert task["promotion_effect"] == "maturity_candidate"

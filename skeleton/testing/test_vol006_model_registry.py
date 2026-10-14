@@ -63,5 +63,5 @@ def test_tampered_lineage_does_not_verify():
 
 def test_canonical_and_ai_mirror_are_byte_identical():
     from pathlib import Path
-    root=Path(__file__).resolve().parents[1]
+    root=Path(__file__).resolve().parents[2]
     assert (root/"skeleton/modeling/registry.py").read_bytes()==(root/"skeleton/ai/modeling/registry.py").read_bytes()
