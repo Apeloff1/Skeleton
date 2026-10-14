@@ -218,6 +218,7 @@ class ProviderRequest:
     history: tuple[AIMessage, ...] = field(default_factory=tuple)
     max_output_tokens: int | None = None
     model: str | None = None
+    temperature: float | None = None
     data_class: str = "internal"
     purpose: str = "model-inference"
     tenant_id: str | None = None
@@ -1400,6 +1401,14 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
     ):
         raise ProviderProtocolViolationError("max_output_tokens must be a positive integer")
 
+    if request.temperature is not None and (
+        isinstance(request.temperature, bool)
+        or not isinstance(request.temperature, (int, float))
+        or not math.isfinite(request.temperature)
+        or not 0 <= request.temperature <= 2
+    ):
+        raise ProviderProtocolViolationError("temperature must be finite and within [0, 2]")
+
     if request.model is None:
         model = default_model
     elif not isinstance(request.model, str) or not request.model.strip():
@@ -2268,6 +2277,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
             }
             if request.max_output_tokens is not None:
                 kwargs["max_output_tokens"] = request.max_output_tokens
+            if request.temperature is not None:
+                kwargs["temperature"] = request.temperature
             if tools:
                 kwargs["tools"] = [
                     tool.as_openai_tool()
@@ -3083,6 +3094,8 @@ class OpenAISyncProviderAdapter:
         }
         if request.max_output_tokens is not None:
             body["max_output_tokens"] = request.max_output_tokens
+        if request.temperature is not None:
+            body["temperature"] = request.temperature
         if tools:
             body["tools"] = [
                 tool.as_openai_tool()
