@@ -4,9 +4,9 @@ on:
   workflow_run:
     workflows: ['Shift Supervisor Control']
     types: [completed]
-    branches:
-      - "*"
-      - "**"
+    # Supervisor completions from non-main refs fail the trust guard;
+    # reject them at event admission instead of emitting skipped runs.
+    branches: [main]
   workflow_dispatch:
     inputs:
       dry_run:
