@@ -1,40 +1,6 @@
 name: P1 Control Plane Gap Evidence Batch 2 Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/p1_risk_evidence_policy.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - "machine/p1_required_gate_authority.json"
-      - "machine/p1_reproducibility_policy.json"
-      - "machine/ai_scope_freeze_adrs.json"
-      - "skeleton/contracts/risk_evidence.py"
-      - "skeleton/contracts/promotion_gates.py"
-      - "skeleton/contracts/reproducibility.py"
-      - "scripts/reconcile_p1_risk_evidence.py"
-      - "scripts/check_p1_required_gate_authority.py"
-      - "scripts/check_p1_reproducibility.py"
-      - "scripts/check_ai_scope_freeze.py"
-      - "scripts/build_p1_control_plane_gap_evidence.py"
-      - "skeleton/testing/test_risk_evidence.py"
-      - "tests/test_p1_risk_evidence_reconciliation.py"
-      - "skeleton/testing/test_promotion_gates.py"
-      - "tests/test_p1_required_gate_authority.py"
-      - "skeleton/testing/test_reproducibility.py"
-      - "tests/test_p1_reproducibility_bundle.py"
-      - "skeleton/testing/test_architecture_scope_freeze.py"
-      - "tests/test_p1_control_plane_gap_evidence.py"
-      - "tests/test_p1_control_plane_gap_bindings_batch2.py"
-      - ".github/workflows/p1-risk-evidence-binding.yml"
-      - ".github/workflows/p1-reproducibility-bundle.yml"
-      - ".github/workflows/p1-scope-freeze.yml"
-      - ".github/workflows/p1-control-plane-gap-evidence-batch2.yml"
   workflow_dispatch:
 
 permissions:

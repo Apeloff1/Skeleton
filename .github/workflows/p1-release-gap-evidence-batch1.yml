@@ -1,32 +1,6 @@
 name: P1 Release Gap Evidence Batch 1 Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - p1/release-lane-materialize-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/release/lifecycle.py"
-      - "skeleton/release/qualification.py"
-      - "skeleton/release/migration.py"
-      - "skeleton/release/restore.py"
-      - "skeleton/release/disaster_recovery.py"
-      - "skeleton/release/attribution.py"
-      - "skeleton/testing/test_release_qualification.py"
-      - "skeleton/testing/test_installer_lifecycle.py"
-      - "skeleton/testing/test_migration_rollback_compatibility.py"
-      - "skeleton/testing/test_backup_restore_qualification.py"
-      - "skeleton/testing/test_backup_restore_integration.py"
-      - "skeleton/testing/test_disaster_recovery_qualification.py"
-      - "skeleton/testing/test_release_attribution.py"
-      - "tests/test_p1_release_attribution.py"
-      - "machine/ai_master_plan.json"
-      - "machine/p1_risk_evidence_policy.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - "scripts/build_p1_release_gap_evidence.py"
-      - "tests/test_p1_release_gap_evidence.py"
-      - ".github/workflows/p1-release-gap-evidence-batch1.yml"
   workflow_dispatch:
 
 permissions:

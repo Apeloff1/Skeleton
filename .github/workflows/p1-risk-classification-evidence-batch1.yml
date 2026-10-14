@@ -1,40 +1,6 @@
 name: P1 Risk Classification Evidence Batch 1 Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - p1/risk-classification-evidence-batch1-20260930
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/p1_risk_evidence_policy.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - "skeleton/contracts/canonical.py"
-      - "skeleton/contracts/evidence_ingestion.py"
-      - "skeleton/contracts/promotion_evidence.py"
-      - "skeleton/contracts/maturity_reconciliation.py"
-      - "skeleton/contracts/risk_evidence.py"
-      - "scripts/check_ai_master_plan.py"
-      - "scripts/check_ai_build_accountability.py"
-      - "scripts/check_ai_scope_freeze.py"
-      - "scripts/reconcile_p1_maturity.py"
-      - "scripts/reconcile_p1_risk_evidence.py"
-      - "scripts/emit_p1_promotion_evidence.py"
-      - "scripts/build_p1_risk_classification_evidence_batch1.py"
-      - "skeleton/testing/test_ai_master_plan.py"
-      - "skeleton/testing/test_architecture_scope_freeze.py"
-      - "skeleton/testing/test_evidence_ingestion.py"
-      - "skeleton/testing/test_promotion_evidence.py"
-      - "skeleton/testing/test_risk_evidence.py"
-      - "tests/test_p1_maturity_reconciliation.py"
-      - "tests/test_p1_promotion_evidence_emitter.py"
-      - "tests/test_p1_risk_evidence_reconciliation.py"
-      - "tests/test_p1_risk_classification_evidence_batch1.py"
-      - "tests/test_p1_risk_classification_bindings_batch1.py"
-      - ".github/workflows/p1-risk-classification-evidence-batch1.yml"
   workflow_dispatch:
 
 permissions:
