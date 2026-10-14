@@ -2443,5 +2443,34 @@
     "VerificationReceipt selected by AIExecutionResult must verify the same candidate/result lineage",
     "assistant ConversationMessage.execution_result_id points to the canonical AIExecutionResult used for its content",
     "completed StreamEvent references a terminal operation whose AIExecutionResult already exists"
-  ]
+  ],
+  "game_learning_candidate_schemas": {
+    "status": "implementation_candidate",
+    "contracts": [
+      "machine/ai_game_emulator_host.json",
+      "machine/ai_game_parallel_learning.json",
+      "machine/ai_game_demonstrations.json",
+      "machine/ai_game_play.json",
+      "machine/ai_game_content_uploads.json",
+      "machine/ai_game_console_build.json"
+    ],
+    "request_owners": [
+      "backend/routes/game_learning.py",
+      "backend/routes/game_content.py",
+      "backend/routes/game_console_build.py"
+    ],
+    "runtime_owners": [
+      "skeleton/jeeves/game_emulator_catalog.py",
+      "skeleton/jeeves/game_learning_parallel.py",
+      "skeleton/jeeves/game_learning_demonstrations.py"
+    ],
+    "invariants": [
+      "Strict finite bounded JSON and exact supported schema versions; unknown request fields reject",
+      "Native host paths/core installation originate only from operator approval or server-private materialization; public input cannot grant filesystem or library authority",
+      "Play controller token/epoch/revision and input sequence bind recorded transitions",
+      "Source/project/code/config/policy identities bind demonstration replay and frozen actor batches",
+      "Only actual complete episode commit advances learned policy cursor; no synthetic frames, progress or success",
+      "Production promotion and masterplan completion remain their existing separate authorities"
+    ]
+  }
 }

@@ -51,9 +51,26 @@ export default function GameLearningFrame({ frame }: { frame: Frame }) {
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     let active = true; setUri(null); setRuns(null); setError(null); setLoading(false);
-    if (!size || !frame.pixels_base64) return;
+    const png = typeof frame.data_uri === 'string' && frame.data_uri.length <= 2 * 1024 * 1024 && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(frame.data_uri);
+    if (!png && (!size || !frame.pixels_base64)) return;
     setLoading(true);
     void (async () => {
+      if (png) {
+        if (typeof atob !== 'function') throw new Error('This device cannot verify the frame preview.');
+        const encoded = (frame.data_uri as string).split(',', 2)[1]; const raw = atob(encoded);
+        const bytes = Uint8Array.from(raw, character => character.charCodeAt(0));
+        if (bytes.byteLength < 33 || Array.from(bytes.slice(0, 8)).join(',') !== '137,80,78,71,13,10,26,10' || raw.slice(12, 16) !== 'IHDR') throw new Error('The frame is not a bounded PNG preview.');
+        const view = new DataView(bytes.buffer); const width = view.getUint32(16); const height = view.getUint32(20);
+        if (!width || !height || width > 4096 || height > 4096 || width * height > 4194304 || size && (size.width !== width || size.height !== height)) throw new Error('The frame dimensions do not match its preview.');
+        const raster = frame.raster && typeof frame.raster === 'object' ? frame.raster as Record<string, unknown> : {};
+        const expected = frame.png_digest || raster.png_digest;
+        if (typeof expected === 'string') {
+          const hash = await digest(CryptoDigestAlgorithm.SHA256, bytes as unknown as BufferSource);
+          if (Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('') !== expected) throw new Error('The preview failed its returned content identity check.');
+        }
+        if (active) setUri(frame.data_uri as string); return;
+      }
+      if (!size) return;
       const pixels = rawPixels(frame, size.width, size.height);
       if (!pixels) throw new Error('This framebuffer format cannot be previewed on this device.');
       if (typeof frame.pixel_digest === 'string') {
@@ -86,7 +103,7 @@ export default function GameLearningFrame({ frame }: { frame: Frame }) {
   const geometry = size && commands.filter(command => (command.kind === 'rect' || command.kind === 'line') && Array.isArray(command.values)
     && command.values.length >= 5 && command.values.slice(0, 5).every((value: unknown) => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 100000));
   if (typeof frame.data_uri === 'string' && frame.data_uri.length <= 2 * 1024 * 1024 && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(frame.data_uri)) return <View style={{ width: '100%', gap: 8 }}>
-    <Image source={{ uri: frame.data_uri }} style={s.frame} resizeMode="contain" accessibilityLabel="Actual generated game raster returned by the engine" /><Text style={s.dim}>Measured generated-game frame</Text>
+    {loading ? <ActivityIndicator color={C.primaryHover} /> : error ? <Text style={s.error}>{error}</Text> : uri && <Image source={{ uri }} style={s.frame} resizeMode="contain" accessibilityLabel="Actual game raster returned by the engine" />}<Text style={s.dim}>Measured engine frame</Text>
   </View>;
   if (!size || !frame.pixels_base64 && !geometry?.length) return <Text style={s.muted}>This runtime reports render commands and scene state rather than a raster frame.</Text>;
   return <View style={{ width: '100%', gap: 8 }}>

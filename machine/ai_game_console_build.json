@@ -1,0 +1,33 @@
+{
+  "schema_version": "skeleton.ai.game_console_build.v1",
+  "status": "implementation_candidate",
+  "runtime_owner": "skeleton/jeeves/game_console_build.py",
+  "mirror": "skeleton/ai/agents/jeeves/game_console_build.py",
+  "application_owner": "backend/core/game_console_build.py",
+  "routes": "backend/routes/game_console_build.py",
+  "parent": "machine/ai_game_learning.json",
+  "authority": {
+    "jobs": "existing GameLearningWorkspace scoped frozen input, worker lease, cancellation and completion fences",
+    "storage": "existing CORE_DB Mongo; derived game_learning_build_artifacts records and existing game_learning_source_chunks bytes",
+    "downloads": "current source authority plus exact completed producer job and artifact result binding",
+    "commands": "fixed trusted adapter argv or re-emitted canonical Dragon SDK build recipes; no request command/environment/toolchain-path overrides"
+  },
+  "isolation": {
+    "worker": "bounded spawned local worker under existing Jeeves game execution owner",
+    "sandbox": "Linux bubblewrap unshared user/network/PID/IPC/UTS/cgroup namespaces, readonly trusted runtime/SDK trees, private writable project and tmp",
+    "required": true,
+    "missing_or_denied": "sandbox_unavailable, never unsandboxed fallback",
+    "python": "uploaded Python and client Makefile/CMake scripts are never executed; canonical build control files are replaced by trusted emitter recipes where used",
+    "limits": "wall and CPU deadlines, memory, descriptors, per-file output, process count, source/output/log/message count",
+    "cleanup": "cancel/timeout terminates compiler process group and drains worker; no ready receipt before exact verified artifact collection"
+  },
+  "catalog": {
+    "source": "existing skeleton.ai.webcrawler.dragon_native_targets.target_catalog and NativeProject EMITTERS",
+    "coverage": "all actual declared platform profiles; unsupported or absent SDKs remain source_only",
+    "desktop": "exact target OS and CPU ABI required; no Linux executable labeled Windows/macOS/other console",
+    "readiness": "installed trusted binaries/SDK paths and implemented adapter are separate from successful compilation"
+  },
+  "receipts": ["frozen source bytes digest", "canonical recipe digest", "target and ABI", "compiler executable hashes", "actual bounded log sequence", "command exit status", "actual artifact bytes/digests/format", "cancellation or timeout outcome"],
+  "bounds": {"source_files": 256, "source_bytes": 16777216, "source_file_bytes": 2097152, "artifact_files": 8, "artifact_bytes": 33554432, "artifact_file_bytes": 16777216, "log_bytes": 262144, "log_events": 1024, "wall_seconds": [5,120], "memory_bytes": 1073741824, "processes": 64, "descriptors": 128},
+  "claims": {"hardware_execution_verified": false, "cartridge_format_validation_is_gameplay_proof": false, "production_promotion": false, "automated_tests_requested": false}
+}

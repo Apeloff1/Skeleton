@@ -100,3 +100,113 @@ The integration branch starts from current-main commit `c85512043` in an isolate
 ## Build artifacts from this session
 
 The operator enumerated 206 registered profiles from the actual current-main registry. The production web export includes `/game-learning`. The original cartridge build produced 32,768 bytes with SHA-256 `2990f2ad87de761e634a37b67b9213205150e821f10eafc9db86c6f29f5acd39`. This is generated binary/structural evidence, not a gameplay or hardware compatibility result. No simulation, policy training, evaluation or automated tests were executed during this source session.
+
+## Playable emulator and parallel-learning continuation
+
+The continuation began at 03:32:31 UTC with six concurrent implementation lanes.
+It adds real libretro execution through an approved native-core registry, rather
+than treating native source emitters as emulators. The catalogue now contains
+375 profiles, including an explicit emulator entry for all 169 canonical Dragon
+hardware targets. Unmapped cores, unavailable SDKs, required firmware and unsupported
+hardware render callbacks remain visible as unavailable dependencies.
+
+Six pinned upstream cores were compiled and privately installed with their
+licenses, source revisions and exact binary hashes: Gambatte, FCEUmm, Genesis
+Plus GX, Snes9x, mGBA and PCSX-ReARMed. Their approvals cover 15 hardware targets.
+Sega CD firmware was not installed or approved. The PS1 installation explicitly
+selects its core's HLE BIOS mode, which is not complete commercial-game compatibility.
+No commercial ROMs, firmware, platform keys or vendor SDKs were downloaded.
+
+The native worker requires bubblewrap isolation, a private bounded temp filesystem,
+stripped environment, readonly approved content/core/firmware, and CPU, address-space,
+file and process limits. The fixed system Python interpreter is hash-checked in both
+processes; the actual worker version binds the environment identity. Host and worker
+use length-bounded JSON plus independently hashed binary blocks. Native crashes,
+timeouts, missing sandbox capabilities and state-capacity excess retire or refuse
+the operation. Native state plus its JSON snapshot is capped at the application's
+actual 8 MiB persistence boundary. Large readonly content is pinned through verified
+hardlinks; writable or cross-device copying has a separate 64 MiB aggregate limit.
+
+Studio play now runs continuously in an isolated process with keyboard, touch,
+gamepad and bounded console input. A single controller lease, epoch, ordered input
+sequence and revision fence prevent competing writers. Viewers see measured frames;
+the optional browser sound control plays actual captured PCM with sample identity
+and gap reporting. Pause, reset, stop, takeover and interrupted-session recovery
+are explicit. Account changes, source withdrawal and project edits fence stale
+control, streams and publication.
+
+Consented demonstrations retain actual input, observations, rewards and exact
+environment/source lineage. Replay must reproduce the recorded transitions before
+the learner consumes them. Imitation counts and Q updates are separate from authored
+feedback; feedback never invents game rewards. Arbitrary controller inputs can be
+recorded as controller evidence but only exact registered policy actions supply a
+finite-action imitation prior. Authentication proves the recorded account issuer,
+not that the controller was operated by a biological human. No authenticated human
+play data was available or invented in this session.
+
+Parallel training uses one to eight real processes. Each batch pins a frozen policy
+and deterministic episode assignments; the parent validates measured actor receipts
+and applies updates in a central episode-atomic commit. Pending batches and their
+acknowledged prefixes support exact resume. Operational materialization paths do not
+change semantic source identity. Actor credits and interactive slots are separate;
+uncertain worker termination retains capacity rather than advertising a freed slot.
+The instance viewer displays real sampled frames and measured progress.
+
+The source/asset/map/controller editor uses exact revision files and native build
+plans. Build requests execute fixed compiler arguments in isolated workers, validate
+the actual command exits and artifact structure/hash, and expose authenticated
+downloads. Supported RGBDS, cc65, DASM, SDCC/devkitSMS and desktop compiler adapters
+still require their installed dependencies. Licensed or unimplemented targets remain
+source-only. The user cannot submit a shell command, Makefile or arbitrary host path
+to the compiler. Original game generation also fixes duplicate platform-floor corner
+tiles discovered during the actual original-game learning workload.
+
+Cartridge/disc/PC media has a streamed upload path: 1 MiB immutable indexed chunks,
+2 GiB per file, 4 GiB per bundle, 8 GiB per-owner reservations and 32 upload slots.
+Completion streams exact file hashes and validates linked CUE/M3U/GDI/ISO/CHD media;
+only then does it associate an admitted source with the current project. The private
+shared media cache verifies exact files and is bounded to 8 GiB. Partial uploads
+expire, withdrawal blocks current use, and cleanup removes original chunks and
+derived private caches. Historical policies, exports and already pinned execution
+copies are not claimed globally erased. Browser and native clients read bounded
+local file slices and expose received-byte progress and resume.
+
+## Operator setup and measured learning work
+
+The reproducible bootstrap uses fixed upstream revisions and operator-installed
+compilers. It never downloads game content or firmware and never installs through
+an authenticated web request:
+
+```sh
+python scripts/install_game_emulator_cores.py --source-root /absolute/private/core-sources --install-root /absolute/private/cores --fetch-sources
+export SKL_GAME_EMULATOR_REGISTRY=/absolute/private/cores/cores.json
+python -m skeleton.jeeves.game_learning_cli train --target emulator:game_boy --rom /absolute/original.gb --workers 2 --episodes 4 --episode-steps 64 --policy-file .local/native-policy.json
+python -m skeleton.jeeves.game_learning_cli train --target eight_bit_tile_1983 --workers 4 --episodes 8 --episode-steps 64 --policy-file .local/reference-policy.json
+```
+
+The mGBA recipe additionally requires an installed CMake binary; `--cmake-binary`
+selects it explicitly. The headless cartridge JSON path remains limited to 2 MiB;
+larger and multi-file media use the studio's file-backed upload path. Exact parallel
+resume retains worker count and the frozen pending-batch checkpoint. Local policy
+files are private operator artifacts, not application consent or promotion receipts.
+
+Actual requested learning was performed after the learner source froze, without
+running an automated test framework:
+
+| Workload | Completed episodes | Actual Q updates | Actors |
+| --- | ---: | ---: | ---: |
+| 24 original projects across the Forge genres, using their discrete generated-game simulator | 192 | 8,238 | 4 |
+| All 11 existing coded reference engines | 88 | 5,431 | 4 |
+| Original Signal Garden cartridge through the experimental DMG runtime | 8 | 768 | 4 |
+| Same original cartridge through the actual approved Gambatte native core and sandbox | 4 | 256 | 2 |
+| Total | 292 | 14,693 | |
+
+The source/build evidence and exact policy identities are recorded in
+`machine/ai_game_learning_session_evidence_2026-10-14.json`. Policies and measured
+episode traces are retained in private workspace artifacts. The native result
+establishes actual execution and learning on this original cartridge; it does not
+certify the other five cores, arbitrary games, hardware timing, game mastery or
+all-console compatibility. Q updates are learning work, not a held-out improvement
+claim. No evaluations, automated tests, deployment, merge, production model
+promotion or masterplan completion was performed. Python compilation/Ruff,
+scoped TypeScript/ESLint and the production web export passed.

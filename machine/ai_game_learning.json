@@ -20,7 +20,26 @@
     "experimental_rom_runtime": "skeleton/jeeves/game_rom_runtime.py",
     "operator": "skeleton/jeeves/game_learning_cli.py",
     "native_rom_generation": "skeleton/jeeves/game_rom_generation.py",
-    "dragon_gameplay": "skeleton/jeeves/game_dragon_runtime.py"
+    "dragon_gameplay": "skeleton/jeeves/game_dragon_runtime.py",
+    "emulator_registry": "skeleton/jeeves/game_emulator_catalog.py",
+    "emulator_host": "skeleton/jeeves/game_emulator_host.py",
+    "emulator_worker": "skeleton/jeeves/game_emulator_worker.py",
+    "parallel_learning": "skeleton/jeeves/game_learning_parallel.py",
+    "demonstrations": "skeleton/jeeves/game_learning_demonstrations.py",
+    "native_builds": "skeleton/jeeves/game_console_build.py",
+    "play_application": "backend/core/game_play.py",
+    "live_events": "backend/core/game_learning_events.py",
+    "build_application": "backend/core/game_console_build.py",
+    "build_api": "backend/routes/game_console_build.py",
+    "play_product": "frontend/features/Jeeves/GamePlayViewport.tsx",
+    "training_product": "frontend/features/Jeeves/GameTrainingInstances.tsx",
+    "play_client": "frontend/src/product/gamePlayClient.ts",
+    "large_content": "backend/core/game_content_uploads.py",
+    "large_content_api": "backend/routes/game_content.py",
+    "emulator_protocol": "skeleton/jeeves/game_emulator_protocol.py",
+    "large_content_product": "frontend/features/Jeeves/GameContentUpload.tsx",
+    "large_content_client": "frontend/src/product/gameContentClient.ts",
+    "core_provisioning": "scripts/install_game_emulator_cores.py"
   },
   "dependencies": {
     "simulation": "Existing Jeeves legacy/3D/modern runtime families and explicitly registered existing ROM execution implementations only",
@@ -39,7 +58,14 @@
     "training": "Actual bounded local policy updates from measured transitions, deterministic seeds, durable policy/episode cursor, cancellation and truthful failure/recovery status",
     "evaluation": "Executed paired candidate/baseline held-out episodes remain candidate evidence; no automatic production promotion",
     "generation": "Seeded original compatible game projects from grounded metadata and learned policy lineage; source ROM assets/code are not copied into outputs",
-    "export": "Authorized exact-version project bundle with truthful target/runtime/toolchain capability and bounded file content"
+    "export": "Authorized exact-version project bundle with truthful target/runtime/toolchain capability and bounded file content",
+    "installed_emulators": "Exact operator-approved native core/hash/platform/firmware/content identities, actual libretro C ABI in isolated bounded workers; unavailable/unimplemented hardware remains explicit",
+    "human_play": "One authenticated controller lease, sequenced bounded input, actual framebuffer, source/version fencing, pause/reset/stop and explicit recording consent",
+    "live_training": "Actual actor observations and sampled frame sequence with bounded viewing and no synthetic progress; independent worker instances 1..8 under resource limits",
+    "human_learning": "Measured authenticated input/observation/reward trace with exact source/environment and issuer lineage; explicit imitation/offline learning under current consent, not a claim of biological-human identity",
+    "parallel_learning": "Frozen policy per actor batch, process-isolated actual rollouts, deterministic assignments and central episode-atomic updates/resume/cancel; no shared mutable learner races",
+    "native_console_build": "Exact revision source/asset/project edit and operator-approved installed SDK/compiler plan, isolated worker commands, bounded logs and exact output hash; no source-only target declared compiled",
+    "large_media": "Immutable indexed 1 MiB chunks, streamed file SHA-256 and linked media verification, exact-source publication and private file-backed runtime binding"
   },
   "bounds": {
     "upload_bytes": 16777216,
@@ -48,9 +74,14 @@
     "project_tree_bytes": 1000000,
     "episode_steps": 4096,
     "training_episodes": 256,
-    "source_records": 64
+    "source_records": 64,
+    "large_media_chunk_bytes": 1048576,
+    "large_media_file_bytes": 2147483648,
+    "large_media_bundle_bytes": 4294967296,
+    "parallel_actors": 8,
+    "controller_ports": 4
   },
-  "failure": "Invalid source, unavailable emulator, unsupported hardware instruction/mapper, mismatched project revision, foreign source/policy identity, exhausted resources and cancelled/expired jobs fail explicitly; generic historical simulations never establish hardware compatibility",
+  "failure": "Invalid source, unavailable emulator, unsupported hardware instruction/mapper, mismatched project revision, foreign source/policy identity, exhausted resources and cancelled/expired jobs fail explicitly; generic historical simulations never establish hardware compatibility; native worker crashes/timeouts, absent ABI/firmware/toolchain or required sandbox, stale input controller, missing current demonstration consent and partial actor batches fail explicitly",
   "rollback": "Keep source/project/policy revisions and restore the prior approved project or policy; disabling this additive UI/API does not change existing provider routing or erase canonical history",
   "verification": "User-directed one-hour source implementation; automated tests are not run or added. Compilation, lint, typechecks and build checks may run. Studio acceptance and hardware compatibility require future evidence.",
   "production_model_promotion_authorized": false,
@@ -63,8 +94,29 @@
     "machine/ai_game_learning_runtime.json",
     "machine/ai_game_learning_workspace.json",
     "machine/ai_game_policy_learning.json",
-    "machine/ai_game_rom_runtime.json"
+    "machine/ai_game_rom_runtime.json",
+    "machine/ai_game_emulator_catalog.json",
+    "machine/ai_game_emulator_host.json",
+    "machine/ai_game_parallel_learning.json",
+    "machine/ai_game_demonstrations.json",
+    "machine/ai_game_play.json",
+    "machine/ai_game_console_build.json",
+    "machine/ai_game_content_uploads.json"
   ],
   "integration_base": "c85512043",
-  "implementation_scope": "Actual existing coded owners, bounded local learning and studio workflow; no complete all-game/hardware compatibility or studio qualification claim"
+  "implementation_scope": "Actual existing coded owners, bounded local learning and studio workflow; no complete all-game/hardware compatibility or studio qualification claim",
+  "continuation": {
+    "scope": "Playable installed-core emulation, live viewer/control, authenticated human demonstrations, parallel measured actor learning and isolated native console builds",
+    "status": "implementation_candidate",
+    "universal_hardware_compatibility_claim": false,
+    "started_utc": "2026-10-14T03:32:31Z",
+    "automated_tests_authorized": false,
+    "session_evidence": "machine/ai_game_learning_session_evidence_2026-10-14.json",
+    "measured_local_learning": {
+      "episodes": 292,
+      "q_updates": 14693,
+      "native_gambatte_episodes": 4,
+      "production_promotion": false
+    }
+  }
 }

@@ -1,7 +1,7 @@
-import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
+import { CryptoDigestAlgorithm, digest, digestStringAsync } from 'expo-crypto';
 import { API_BASE } from '../../utils/apiBase';
 import api, { type ApiResult } from '../utils/apiClient';
-import { authHeaders } from '../auth/gameforgeAuth';
+import { authHeaders, getAuthToken as getAuthTokenForBuild } from '../auth/gameforgeAuth';
 import { chatApiError, ChatClientError } from './chatErrors';
 
 export type LearningRequest = { signal?: AbortSignal };
@@ -176,11 +176,11 @@ export async function simulateLearningProject(current: LearningProject, simulati
 }
 export async function startLearningTraining(current: LearningProject, config: {
   sessionIds: string[]; algorithm: string; epochs: number; seed: number; episodeSteps?: number; sourceId?: string;
-  freshPolicy?: boolean;
+  freshPolicy?: boolean; workers?: number; demonstrationIds?: string[]; resourceProfile?: string;
 }, input: LearningRequest = {}, key = learningRequestKey('train')): Promise<LearningJob> {
   const result = await data(api.post<{ job: LearningJob }>(path(current.project_id) + '/train', {
     expected_version: current.version, idempotency_key: key, session_ids: config.sessionIds,
-    algorithm: config.algorithm, epochs: config.epochs, seed: config.seed, episode_steps: config.episodeSteps, source_id: config.sourceId, fresh_policy: config.freshPolicy,
+    algorithm: config.algorithm, epochs: config.epochs, seed: config.seed, episode_steps: config.episodeSteps, source_id: config.sourceId, fresh_policy: config.freshPolicy, workers: config.workers, demonstration_ids: config.demonstrationIds, resource_profile: config.resourceProfile,
   }, options(input, key)), 'Local training could not be started.');
   return job(result.job, current.project_id);
 }
@@ -238,3 +238,45 @@ export async function exportLearningProject(current: LearningProject, input: Lea
   if (digest !== result.content_digest) invalid('The exported project content changed.');
   return { filename: result.filename, mimeType: result.media_type, content: result.content, contentDigest: digest, version: result.snapshot_version };
 }
+
+export type ConsoleBuildTarget = { target_id: string; family: string; toolchain: string; output_extension: string; supported_styles: string[]; state: string; missing_dependencies: string[]; reason?: string | null; execution_checked: boolean; options?: { optimization: boolean; debug: boolean } };
+export type ConsoleBuildArtifact = { artifact_id: string; name: string; bytes: number; digest: string; format: string; download_path: string };
+export async function getConsoleBuildCatalogue(input: LearningRequest = {}): Promise<ConsoleBuildTarget[]> {
+  const result = await data(api.get<{ targets: ConsoleBuildTarget[] }>(ROOT + '/build-catalog', options(input)), 'The native build catalogue could not be loaded.');
+  if (!Array.isArray(result.targets) || result.targets.length > 512 || result.targets.some(target => !target || typeof target.target_id !== 'string' || typeof target.state !== 'string' || typeof target.toolchain !== 'string' || !Array.isArray(target.supported_styles) || target.supported_styles.length > 64 || !Array.isArray(target.missing_dependencies))) invalid('The native build catalogue is invalid.');
+  return result.targets;
+}
+export async function startConsoleBuild(current: LearningProject, config: { targetId: string; styleId: string; optimization: 0 | 1 | 2; debug: boolean }, input: LearningRequest = {}, key = learningRequestKey('build')): Promise<LearningJob> {
+  const result = await data(api.post<{ job: LearningJob }>(path(current.project_id) + '/build', {
+    expected_version: current.version, idempotency_key: key, target_id: config.targetId, style_id: config.styleId,
+    optimization: config.optimization, debug: config.debug, timeout_seconds: 60,
+  }, options(input, key)), 'The native build could not be started.');
+  return job(result.job, current.project_id);
+}
+export async function downloadConsoleArtifact(projectId: string, artifact: ConsoleBuildArtifact, input: LearningRequest = {}): Promise<Uint8Array> {
+  const route = ROOT + '/projects/' + encodeURIComponent(projectId) + '/build-artifacts/' + encodeURIComponent(artifact.artifact_id);
+  if (!artifact || !Number.isSafeInteger(artifact.bytes) || artifact.bytes < 1 || artifact.bytes > 16 * 1024 * 1024 || !/^[a-f0-9]{64}$/.test(artifact.digest)
+    || artifact.download_path !== route.replace(/^\/api/, '')) invalid('The build artifact identity is invalid.');
+  const token = getAuthTokenForBuild(); const controller = new AbortController(); const abort = () => controller.abort(); const timer = setTimeout(abort, 30000);
+  input.signal?.addEventListener('abort', abort, { once: true }); if (input.signal?.aborted) abort();
+  try {
+    const response = await fetch(API_BASE + route, { headers: authHeaders(), signal: controller.signal });
+    if (!response.ok) throw new Error('This artifact is unavailable. Check the build status and current source rights.');
+    const length = Number(response.headers.get('content-length'));
+    if (length && length !== artifact.bytes) invalid('The artifact response size differs from its build receipt.');
+    let bytes: Uint8Array;
+    if (response.body?.getReader) {
+      const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let count = 0;
+      try { for (;;) { const result = await reader.read(); if (result.done) break; count += result.value.byteLength; if (count > artifact.bytes) invalid('The artifact response exceeds its build receipt.'); chunks.push(result.value); } }
+      finally { await reader.cancel().catch(() => undefined); }
+      bytes = new Uint8Array(count); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    } else { if (length !== artifact.bytes) invalid('This device requires an exact artifact response size.'); bytes = new Uint8Array(await response.arrayBuffer()); }
+    if (token !== getAuthTokenForBuild() || bytes.byteLength !== artifact.bytes) invalid('The artifact account or byte count changed.');
+    const actual = await digestArtifact(bytes);
+    if (actual !== artifact.digest) invalid('The artifact failed its build content check.');
+    if (token !== getAuthTokenForBuild() || input.signal?.aborted) throw new Error('The artifact download was cancelled because its account changed.');
+    return bytes;
+  } finally { clearTimeout(timer); input.signal?.removeEventListener('abort', abort); }
+}
+
+async function digestArtifact(bytes: Uint8Array): Promise<string> { const hash = await digest(CryptoDigestAlgorithm.SHA256, bytes as unknown as BufferSource); return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join(''); }

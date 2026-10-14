@@ -903,7 +903,7 @@
       "id": "jeeves-game-learning-workspace",
       "owner_plane": "application-api",
       "physical_store": "mongo",
-      "logical_location": "CORE_DB_NAME.game_learning_projects/sources/source_chunks/sessions/jobs/episodes/policies/limits/workers",
+      "logical_location": "CORE_DB_NAME.game_learning_{projects,revisions,sources,source_chunks,sessions,jobs,episodes,policies,limits,workers,plays,recordings,recording_chunks,live_frames,build_artifacts,content_uploads,content_chunks,content_limits}",
       "authority": "authoritative",
       "source_of_truth": true,
       "status": "implementation-candidate",
@@ -923,8 +923,13 @@
         "machine/ai_game_learning_workspace.json",
         "backend/core/game_learning.py",
         "backend/routes/game_learning.py",
-        "machine/ai_game_policy_learning.json"
-      ]
+        "machine/ai_game_policy_learning.json",
+        "machine/ai_game_play.json",
+        "machine/ai_game_demonstrations.json",
+        "machine/ai_game_content_uploads.json",
+        "machine/ai_game_console_build.json"
+      ],
+      "continuation": "Existing-store scoped play/controller leases, consented measured demonstrations, immutable media manifests, build-derived artifact receipts and episode-atomic parallel learner checkpoints. Runtime sockets/processes/preview frames/private content files are derived execution handles, never source or consent authority."
     }
   ],
   "state_flows": [

@@ -17,7 +17,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-MAX_POLICY_BYTES = 8 * 1024 * 1024
+MAX_POLICY_BYTES = 32 * 1024 * 1024
+CHECKPOINT_SCHEMA = "skeleton.game.local_parallel_checkpoint.v1"
 
 
 def _read(path: Path, maximum: int) -> bytes:
@@ -67,7 +68,9 @@ def _write(path: Path, payload: bytes, *, replace: bool) -> None:
     if path.is_symlink() or path.exists() and not stat.S_ISREG(path.stat().st_mode):
         raise ValueError("Output must be a regular file and cannot be a symbolic link")
     if path.exists() and not replace:
-        raise FileExistsError("Output exists; use an explicit resume/fork or replacement option")
+        raise FileExistsError(
+            "Output exists; use an explicit resume/fork or replacement option"
+        )
     descriptor, temporary = tempfile.mkstemp(prefix=".game-learning-", dir=path.parent)
     try:
         with os.fdopen(descriptor, "wb") as stream:
@@ -83,14 +86,16 @@ def _write(path: Path, payload: bytes, *, replace: bool) -> None:
 
 
 def _write_json(path: Path, value: Any, *, replace: bool) -> None:
-    payload = (json.dumps(value, sort_keys=True, indent=2, allow_nan=False) + "\n").encode()
+    payload = (
+        json.dumps(value, sort_keys=True, indent=2, allow_nan=False) + "\n"
+    ).encode()
     if len(payload) > MAX_POLICY_BYTES:
         raise ValueError("Checkpoint output exceeds its byte budget")
     _write(path, payload, replace=replace)
 
 
 def _factory(args):
-    from .game_learning_runtime import create_game_environment
+    from .game_learning_parallel import GameEnvironmentRequest
 
     rom = None
     tree = None
@@ -112,29 +117,82 @@ def _factory(args):
         if not isinstance(raw, dict):
             raise ValueError("Project input must contain a bounded file mapping")
         tree = raw
-        lineage["project_digest"] = hashlib.sha256(json.dumps(tree, sort_keys=True).encode()).hexdigest()
+        lineage["project_digest"] = hashlib.sha256(
+            json.dumps(tree, sort_keys=True).encode()
+        ).hexdigest()
     if rom is not None and tree is not None:
         raise ValueError("Select one explicit ROM or project execution source")
-    factory = lambda: create_game_environment(
-        args.target,
+    dialect = None
+    if tree is not None and "engine/manifest.json" in tree:
+        manifest = json.loads(tree["engine/manifest.json"])
+        if not isinstance(manifest, dict):
+            raise ValueError("Project engine manifest must be an object")
+        dialect = manifest.get("gameplay_dialect")
+    native = args.core is not None or args.target.startswith("emulator:")
+    core_id, registry_digest = None, None
+    if native:
+        from .game_emulator_catalog import GameEmulatorRegistry
+
+        if rom is None or tree is not None:
+            raise ValueError(
+                "Installed-core local play requires --rom; large/multifile media use the streamed studio loader"
+            )
+        registry = GameEmulatorRegistry.from_environment()
+        approved = registry.resolve(args.target)
+        if args.core is not None and approved.core_id != args.core:
+            approved = registry.resolve_core(args.core)
+            if args.target.removeprefix("emulator:") not in approved.target_ids:
+                raise ValueError(
+                    "Requested installed core is not approved for this console"
+                )
+        core_id, registry_digest = approved.core_id, registry.registry_digest
+        lineage.update(core_id=core_id, registry_digest=registry_digest)
+    request = GameEnvironmentRequest(
+        target_id=args.target,
         max_steps=args.episode_steps,
         tree=tree,
         rom_source=rom,
         cycles_per_step=args.cycles_per_step,
+        kind="libretro" if native else "builtin",
+        core_id=core_id,
+        registry_digest=registry_digest,
+        filename=args.rom.name if args.rom else "game.bin",
+        frames_per_step=args.frames_per_step,
+        gameplay_dialect=dialect,
     )
-    return factory, lineage
+    factory = request.build
+    # Return the serializable request alongside its ordinary environment factory.
+    return factory, lineage, request
+
+
+def _checkpoint(value):
+    if value.get("schema_version") != CHECKPOINT_SCHEMA:
+        return value, None
+    if set(value) != {"schema_version", "policy", "parallel_state"} or not isinstance(
+        value["policy"], dict
+    ):
+        raise ValueError("Local parallel checkpoint envelope is invalid")
+    return value["policy"], value["parallel_state"]
 
 
 def _train(args) -> dict[str, Any]:
     from .game_learning import GameLearningConfig, GamePolicyLearner
+    from .game_learning_demonstrations import close_environment
 
-    factory, lineage = _factory(args)
-    spec = factory().spec
+    factory, lineage, environment_request = _factory(args)
+    probe = factory()
+    try:
+        spec = probe.spec
+    finally:
+        close_environment(probe)
     if args.resume and args.fork_parent:
         raise ValueError("Choose exact resume or an explicit parent-policy fork")
-    config = GameLearningConfig(seed=args.seed, max_updates=args.max_updates, max_episodes=256)
+    config = GameLearningConfig(
+        seed=args.seed, max_updates=args.max_updates, max_episodes=256
+    )
+    pending_batch = None
     if args.resume:
-        snapshot = _json_read(args.policy_file)
+        snapshot, pending_batch = _checkpoint(_json_read(args.policy_file))
         learner = GamePolicyLearner.from_snapshot(
             snapshot,
             expected_spec=spec,
@@ -142,10 +200,12 @@ def _train(args) -> dict[str, Any]:
             expected_source_lineage=lineage,
         )
         if learner.policy_id != args.policy_id:
-            raise ValueError("Resume must retain the original configured policy identity")
+            raise ValueError(
+                "Resume must retain the original configured policy identity"
+            )
     elif args.fork_parent:
         learner = GamePolicyLearner.fork(
-            _json_read(args.fork_parent),
+            _checkpoint(_json_read(args.fork_parent))[0],
             newpolicy_id=args.policy_id,
             newsource_lineage=lineage,
             config=config,
@@ -154,29 +214,65 @@ def _train(args) -> dict[str, Any]:
     else:
         if args.policy_file.exists():
             raise FileExistsError("Policy output exists; select resume or a new file")
-        learner = GamePolicyLearner(spec, config, policy_id=args.policy_id, source_lineage=lineage)
+        learner = GamePolicyLearner(
+            spec, config, policy_id=args.policy_id, source_lineage=lineage
+        )
     output_created = args.resume
     stop = False
 
     def cancelled():
         return stop
 
-    def checkpoint(snapshot, trace):
+    parallel = (
+        args.workers > 1
+        or environment_request.kind == "libretro"
+        or pending_batch is not None
+    )
+
+    def checkpoint(snapshot, trace, batch_state=None):
         nonlocal output_created
-        if args.trace_directory:
+        if args.trace_directory and trace is not None:
             name = hashlib.sha256(trace["episode_id"].encode()).hexdigest() + ".json"
             destination = args.trace_directory / name
             if destination.exists():
                 if _json_read(destination) != trace:
-                    raise ValueError("Existing episode trace differs from the admitted episode")
+                    raise ValueError(
+                        "Existing episode trace differs from the admitted episode"
+                    )
             else:
                 _write_json(destination, trace, replace=False)
         # The policy file is the commit point; no fallible audit write follows it.
-        _write_json(args.policy_file, snapshot, replace=output_created)
+        payload = (
+            {
+                "schema_version": CHECKPOINT_SCHEMA,
+                "policy": snapshot,
+                "parallel_state": batch_state,
+            }
+            if parallel
+            else snapshot
+        )
+        _write_json(args.policy_file, payload, replace=output_created)
         output_created = True
 
     try:
-        result = learner.train(factory, episodes=args.episodes, on_checkpoint=checkpoint, cancel=cancelled)
+        if parallel:
+            from .game_learning_parallel import ParallelGamePolicyTrainer
+
+            result = ParallelGamePolicyTrainer(
+                learner, environment_request, actors=args.workers
+            ).train(
+                episodes=args.episodes,
+                resume_state=pending_batch,
+                on_checkpoint=checkpoint,
+                cancel=cancelled,
+            )
+        else:
+            result = learner.train(
+                factory,
+                episodes=args.episodes,
+                on_checkpoint=checkpoint,
+                cancel=cancelled,
+            )
     except KeyboardInterrupt:
         stop = True
         return {
@@ -186,7 +282,10 @@ def _train(args) -> dict[str, Any]:
         }
     return {
         "status": "candidate_trained",
-        "algorithm": "tabular_q_learning_v1",
+        "algorithm": "frozen_batch_local_actor_q_v1"
+        if parallel
+        else "tabular_q_learning_v1",
+        "workers": args.workers if parallel else 1,
         "updates": result.updates,
         "committed_episodes": result.snapshot["committed_episodes"],
         "policy_digest": result.snapshot["snapshot_digest"],
@@ -197,11 +296,23 @@ def _train(args) -> dict[str, Any]:
 
 def _evaluate(args) -> dict[str, Any]:
     from .game_learning import GamePolicyLearner
+    from .game_learning_demonstrations import close_environment
 
-    factory, _ = _factory(args)
-    learner = GamePolicyLearner.from_snapshot(_json_read(args.policy_file), expected_spec=factory().spec)
-    baseline = None if args.baseline is None else _json_read(args.baseline)
-    result = learner.evaluate(factory, heldout_seeds=args.heldout_seed, baseline_snapshot=baseline).as_dict()
+    factory, _, _ = _factory(args)
+    probe = factory()
+    try:
+        spec = probe.spec
+    finally:
+        close_environment(probe)
+    learner = GamePolicyLearner.from_snapshot(
+        _checkpoint(_json_read(args.policy_file))[0], expected_spec=spec
+    )
+    baseline = (
+        None if args.baseline is None else _checkpoint(_json_read(args.baseline))[0]
+    )
+    result = learner.evaluate(
+        factory, heldout_seeds=args.heldout_seed, baseline_snapshot=baseline
+    ).as_dict()
     _write_json(args.evidence_file, result, replace=args.force)
     return {
         "status": "candidate_measured",
@@ -217,7 +328,11 @@ def _native(args) -> dict[str, Any]:
     result = build_original_dmg_game(seed=args.seed, title=args.title)
     rom = base64.b64decode(result["rom_base64"], validate=True)
     _write(args.output, rom, replace=args.force)
-    _write_json(args.output.with_suffix(args.output.suffix + ".json"), result["manifest"], replace=args.force)
+    _write_json(
+        args.output.with_suffix(args.output.suffix + ".json"),
+        result["manifest"],
+        replace=args.force,
+    )
     return {
         "status": "original_rom_built",
         "rom_digest": result["rom_digest"],
@@ -230,8 +345,12 @@ def _native(args) -> dict[str, Any]:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     commands = result.add_subparsers(dest="command", required=True)
-    commands.add_parser("catalog", help="Print actual target/source/execution readiness")
-    native = commands.add_parser("build-dmg", help="Build an original seeded maze cartridge")
+    commands.add_parser(
+        "catalog", help="Print actual target/source/execution readiness"
+    )
+    native = commands.add_parser(
+        "build-dmg", help="Build an original seeded maze cartridge"
+    )
     native.add_argument("--seed", type=int, default=0)
     native.add_argument("--title", default="Signal Garden")
     native.add_argument("--output", type=Path, required=True)
@@ -243,6 +362,10 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--project", type=Path)
         command.add_argument("--episode-steps", type=int, default=256)
         command.add_argument("--cycles-per-step", type=int, default=1824)
+        command.add_argument(
+            "--core", help="Explicit approved installed libretro core identity"
+        )
+        command.add_argument("--frames-per-step", type=int, default=1)
         command.add_argument("--policy-file", type=Path, required=True)
         if name == "train":
             command.add_argument("--episodes", type=int, default=16)
@@ -252,8 +375,11 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--resume", action="store_true")
             command.add_argument("--fork-parent", type=Path)
             command.add_argument("--trace-directory", type=Path)
+            command.add_argument("--workers", type=int, default=1, choices=range(1, 9))
         else:
-            command.add_argument("--heldout-seed", type=int, action="append", required=True)
+            command.add_argument(
+                "--heldout-seed", type=int, action="append", required=True
+            )
             command.add_argument("--baseline", type=Path)
             command.add_argument("--evidence-file", type=Path, required=True)
             command.add_argument("--force", action="store_true")
@@ -276,7 +402,10 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result, sort_keys=True, allow_nan=False))
         return 0
     except (ValueError, TypeError, OSError, KeyError) as exc:
-        print(json.dumps({"status": "rejected", "message": str(exc)[:1000]}), file=sys.stderr)
+        print(
+            json.dumps({"status": "rejected", "message": str(exc)[:1000]}),
+            file=sys.stderr,
+        )
         return 2
 
 

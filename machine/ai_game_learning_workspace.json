@@ -15,7 +15,10 @@
     "policies": "full measured local policy snapshot with source/environment and episode lineage; candidate-only authority",
     "dragon": "Existing Dragon Academy principal and configured SQLite owner only; exact current reviewed ledger record read through DragonGameKnowledgeAdapter. Review writer guard spans Mongo checkpoint/terminal publication; current rights are rechecked before policy reuse/export.",
     "incremental_learning": "Completed parent policy is pinned by exact snapshot digest and current sources/environment; a new candidate preserves learned Q values and inherited evidence, uses a fresh job budget, and measures paired held-out returns against the actual parent.",
-    "audit": "Episode audit projection is prepared before the single authoritative full snapshot-plus-trace job update. Prepared audit/source/job records confer no membership or policy authority."
+    "audit": "Episode audit projection is prepared before the single authoritative full snapshot-plus-trace job update. Prepared audit/source/job records confer no membership or policy authority.",
+    "live_play": "Existing scoped game-learning plays/recordings with rotating controller epochs and tokens, durable source/input/worker fences, snapshot resume and actual TTL frame projections. See ai_game_play.json.",
+    "parallel_learning": "Native one-to-eight process actors use a persisted frozen batch and acknowledged checkpoint prefix; each pending/committed batch-state update shares the authoritative full snapshot/trace job document. Interactive and actor capacity are separately reserved.",
+    "media": "Existing upload authority materializes large content through scoped immutable manifests; source registration pins exact content digest/rights/epoch and defaults to the admitted content. Legacy cartridges above2MiB use private hash-bound descriptors."
   },
   "bounds": {
     "projects_per_owner": 64,
@@ -37,7 +40,9 @@
     "pending_task_handles_per_process": 8,
     "checkpoint_combined_bytes": 8323072,
     "parent_policy_bytes": 2097152,
-    "normalized_source_bundle_bytes": 2097152
+    "normalized_source_bundle_bytes": 2097152,
+    "native_actor_workers": 8,
+    "interactive_workers_reserved": 4
   },
   "rules": [
     "authenticated tenant and owner scope precedes every payload read or mutation",
@@ -50,7 +55,8 @@
     "source-derived knowledge is distinct from game binary compatibility and does not authorize copying uploaded assets into generated games",
     "Stored full source bundles are canonical JSON and their complete digest/provenance are verified before feature or model use.",
     "Simulation actions and frames are actual adapter observations, including generated-grid controllers and the isolated canonical Thumby runtime.",
-    "A worker cancellation waits for its physical thread to quiesce before releasing its process/global capacity; Dragon publication guards drain the actual coroutine before release."
+    "A worker cancellation waits for its physical thread to quiesce before releasing its process/global capacity; Dragon publication guards drain the actual coroutine before release.",
+    "Native metadata probes, one-shot sessions, evaluation, generation policy probes and retained trainer environments close their supervised environments on success and failure."
   ],
   "verification": "User-directed source implementation with no automated test creation or execution. Static formatting/lint checks do not establish simulation, training or hardware compatibility.",
   "production_model_promotion_authorized": false,

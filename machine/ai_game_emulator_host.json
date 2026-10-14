@@ -1,0 +1,48 @@
+{
+  "schema_version": "skeleton.ai.game_emulator_host.v1",
+  "status": "implementation_candidate",
+  "owners": {
+    "host": "skeleton/jeeves/game_emulator_host.py",
+    "worker": "skeleton/jeeves/game_emulator_worker.py",
+    "protocol": "skeleton/jeeves/game_emulator_protocol.py",
+    "registry": "skeleton/jeeves/game_emulator_catalog.py"
+  },
+  "mirrors": "Exact source bytes under skeleton/ai/agents/jeeves",
+  "scope": "Actual libretro C ABI execution of operator-installed hash-approved native cores in isolated bubblewrap subprocesses; no uploaded Python, arbitrary library path, firmware download, hardware-compatibility fabrication or model-provider boundary",
+  "activation": "Canonical registry resolves/revalidates typed approved cores. Host hash-pins private library, all approved system assets, worker/protocol code and content. Readonly canonical content pins use verified hardlinks; writable/cross-device content copies require aggregate 64 MiB and actual free-disk admission. Worker rehashes native library before dlopen and requires exact ABI symbols. No unsafe sandbox fallback. The fixed root-owned /usr/bin/python3 system installation is used instead of a managed virtual environment. Host and worker independently hash its resolved binary; actual CPython version/implementation receipt binds the final environment digest before any episode.",
+  "isolation": "bubblewrap unshares network/PID/IPC/user namespaces, strips environment, exposes readonly runtime libraries/approved core/approved content/BIOS plus private temp/save directories, and dies with its parent. Process address-space/file/CPU limits supplement host wall-clock deadlines. Trusted native libraries remain native code; these boundaries are not a claim that arbitrary hostile libraries can be safely installed.",
+  "interfaces": {
+    "factory": "create_emulator_environment(target_id, core_id, expected_registry_digest, content, rom_source, filename, max_steps, frames_per_step, timeout_seconds, cancelled)",
+    "learning": "EmulatorEnvironment spec/reset/step/snapshot/restore/preview/close exposes 22 finite joypad and 9 keyboard actions, actual measured pixels/audio; visual exploration is not game-success proof",
+    "controller": "input_step accepts bounded four-port joypad/analog/keyboard/mouse/pointer input; arbitrary human controls are explicitly controller-only evidence unless they exactly match one finite policy action",
+    "native": "Actual reset, retro_run, serialize/unserialize, bounded memory reads and controller callbacks; RGB1555/RGB565/XRGB8888 software framebuffer conversion produces actual rgb24 pixels",
+    "content": "Cartridge bytes are bounded; large authorized CD/multifile sources materialize through canonical governed readers into immutable private content roots. Worker receives only readonly local paths and verified manifests, never arbitrary artifact URIs or credentials",
+    "ipc": "Length-prefixed strict bounded JSON metadata plus individually length/hash-bound binary blocks; worker/native stdout is separate from protocol; request IDs and source identities remain exact"
+  },
+  "bounds": {
+    "metadata_bytes": 65536,
+    "ipc_bytes": 100663296,
+    "cartridge_bytes": 33554432,
+    "native_state_bytes": 67108864,
+    "video_pixels": 4194304,
+    "video_dimension": 4096,
+    "audio_frames_per_command": 131072,
+    "controller_ports": 4,
+    "frames_per_step": 60,
+    "episode_steps": 4096,
+    "command_timeout_seconds": 30,
+    "worker_address_space_bytes": 2147483648,
+    "operational_snapshot_json_bytes": 8388608,
+    "preview_dimension": 320,
+    "preview_audio_frames": 16384,
+    "private_tmpfs_bytes": 134217728,
+    "worker_open_files": 128,
+    "worker_processes": 64,
+    "private_content_copy_bytes": 67108864
+  },
+  "integrity": "Registry/core/firmware/options/content/host-worker-protocol/Python identities bind the policy environment. Current registry/source authority is checked around native commands. Snapshots bind exact opaque native state, frame, controller, cursor and identity and require native unserialize success; no caller booleans grant promotion authority.",
+  "failure": "Missing core/symbol/BIOS, failed sandbox activation, unsupported hardware framebuffer/pixel format, corrupt content/state/protocol, callback excess, core crash/shutdown, timeout and cancellation produce explicit errors and retire the worker. Unsupported callbacks return false, never invented success.",
+  "limitations": "Libretro has no universal game-score/health or RNG seed control. Reset invokes actual native reset; a seed labels the episode without claiming control over every core's RNG. Device compatibility, deterministic reset, game mastery and acceptance remain unverified. No tests are written or run in this user-directed session. Operational snapshots refuse state/frame combinations exceeding the existing 8 MiB JSON boundary before native serialization; the ABI 64 MiB transport limit is not end-to-end persistence capacity. Large readonly content uses private hardlink pins and proportional streaming SHA work without per-actor disc copies; writable or cross-device large content explicitly refuses activation. Readonly owner-managed files are never mutated by the backend; arbitrary operator mutation of an already approved inode is outside this data boundary.",
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false
+}

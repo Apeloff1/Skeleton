@@ -36,6 +36,7 @@ class ConsoleTarget:
     runtime_kind: str = "reference_game_simulation"
     requires_rom: bool = False
     native_target_id: str | None = None
+    emulator_target_id: str | None = None
 
     @property
     def family(self) -> EngineFamily:
@@ -46,6 +47,20 @@ class ConsoleTarget:
         return not self.requires_rom and self.native_target_id is None
 
     def as_dict(self) -> dict[str, object]:
+        if self.emulator_target_id is not None:
+            from .game_emulator_catalog import GameEmulatorRegistry
+
+            profile = next(
+                (
+                    row
+                    for row in GameEmulatorRegistry.from_environment().catalog()
+                    if row["target_id"] == self.emulator_target_id
+                ),
+                None,
+            )
+            if profile is None:
+                raise GameEngineLabError("emulator hardware identity is absent from the canonical registry")
+            return _emulator_row(self, profile)
         if self.native_target_id is not None:
             native = next((row for row in _native_inventory() if row["id"] == self.native_target_id), None)
             if native is None:
@@ -285,6 +300,69 @@ def _native_target(row: dict[str, object]) -> ConsoleTarget:
     )
 
 
+def _emulator_target(row: dict[str, object]) -> ConsoleTarget:
+    return ConsoleTarget(
+        "emulator:" + row["id"],
+        row["family"] + " · " + row["id"] + " · Emulator",
+        _native_reference_era(row),
+        runtime_kind="installed_libretro_emulator",
+        requires_rom=True,
+        emulator_target_id=row["id"],
+    )
+
+
+def _emulator_row(target: ConsoleTarget, profile: dict[str, object]) -> dict[str, object]:
+    available = profile["available"] is True
+    return {
+        "schema_version": CATALOG_SCHEMA,
+        "target_id": target.target_id,
+        "label": target.label,
+        "engine_era": target.era.value,
+        "family": target.family.value,
+        "generation_id": target.generation_id,
+        "runtime_kind": "installed_libretro_emulator",
+        "execution_mode": "operator_approved_isolated_libretro",
+        "emulator_target_id": target.emulator_target_id,
+        "requires_rom": True,
+        "reference_supported": False,
+        "rom_execution": available,
+        "full_hardware_emulation": False,
+        "commercial_rom_compatibility_verified": False,
+        "external_emulator": profile,
+        "candidate_core_ids": profile["candidate_core_ids"],
+        "readiness": {
+            "status": profile["readiness"]["code"],
+            "code": profile["readiness"]["code"],
+            "message": profile["readiness"]["message"],
+            "reason": profile["readiness"]["message"],
+            "execution_checked": False,
+        },
+        "capabilities": {
+            "reset": available,
+            "step": available,
+            "snapshot": available,
+            "restore": available,
+            "actual_framebuffer": available,
+            "native_core_execution": available,
+            "tabular_policy_learning": available,
+            "hosted_provider_required": False,
+            "native_console_binary_export": False,
+        },
+        "limitations": [
+            "Installed core/ABI/firmware identity does not certify a game or universal hardware compatibility",
+            "Actual worker content loading, video callbacks and save states may still reject unsupported content",
+            "Copyright permission, platform keys and firmware acquisition remain the operator/source owner's responsibility",
+        ],
+    }
+
+
+def emulator_console_catalog() -> list[dict[str, object]]:
+    from .game_emulator_catalog import GameEmulatorRegistry
+
+    profiles = {row["target_id"]: row for row in GameEmulatorRegistry.from_environment().catalog()}
+    return [_emulator_row(_emulator_target(row), profiles[row["id"]]) for row in _native_inventory()]
+
+
 def resolve_console(target_id: str | EngineEra) -> ConsoleTarget:
     """Resolve only declared targets; an unknown label never selects a fallback."""
     if isinstance(target_id, EngineEra):
@@ -292,6 +370,12 @@ def resolve_console(target_id: str | EngineEra) -> ConsoleTarget:
     if not isinstance(target_id, str) or not 1 <= len(target_id) <= 128:
         raise GameEngineLabError("console target must be a bounded registered identifier")
     key = target_id.strip().lower().replace(" ", "_").replace("-", "_")
+    if key.startswith("emulator:"):
+        native_id = key.removeprefix("emulator:")
+        for row in _native_inventory():
+            if row["id"] == native_id:
+                return _emulator_target(row)
+        raise GameEngineLabError("emulator target is absent from the canonical Dragon registry")
     if key.startswith("dragon_native:"):
         native_id = key.removeprefix("dragon_native:")
         for row in _native_inventory():
@@ -306,7 +390,7 @@ def resolve_console(target_id: str | EngineEra) -> ConsoleTarget:
 
 
 def console_catalog() -> list[dict[str, object]]:
-    return [target.as_dict() for target in _TARGETS] + native_console_catalog()
+    return [target.as_dict() for target in _TARGETS] + native_console_catalog() + emulator_console_catalog()
 
 
 def execution_inventory() -> dict[str, object]:

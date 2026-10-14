@@ -425,6 +425,9 @@ def _design(
         )
         for x in range(4, width - 4, 5):
             walls.extend([[x + offset, height - 4 - (x // 5) % 3] for offset in range(3)])
+    # Side walls share their floor corners. Store each physical tile once so
+    # generated platform levels satisfy the same inventory contract as imports.
+    walls = [list(cell) for cell in dict.fromkeys(tuple(cell) for cell in walls)]
     blocked = {tuple(cell) for cell in walls} | {tuple(spawn), tuple(goal)}
     free = [[x, y] for y in range(1, height - 1) for x in range(1, width - 1) if (x, y) not in blocked]
     if family in {"platformer", "runner"}:

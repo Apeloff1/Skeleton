@@ -312,6 +312,8 @@ KNOWN_ROUTES_WITH_PREFIX: List[RouteEntry] = [
     ("routes.hub",                          "router", "/api"),
     ("routes.ai",                           "router", "/api"),
     ("routes.game_learning",                "router", "/api"),
+    ("routes.game_content",                 "router", "/api"),
+    ("routes.game_console_build",           "router", "/api"),
     ("routes.operation_stream",             "router", "/api"),
     ("routes.ai_pipeline",                  "router", "/api"),
     ("routes.curriculum",                   "router", "/api"),

@@ -16,20 +16,32 @@ import json
 import math
 import random
 import sys
+import threading
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
+from functools import wraps
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
 from .game_learning_runtime import EpisodeStep, GameEnvironmentSpec
 
-POLICY_SCHEMA = "skeleton.jeeves.game_learning_policy.v1"
+POLICY_SCHEMA = "skeleton.jeeves.game_learning_policy.v2"
 TRACE_SCHEMA = "skeleton.game.trace.v1"
 ALGORITHM = "tabular_q_learning_v1"
 MAX_BYTES = 8 * 1024 * 1024
 MAX_LIFETIME_EPISODES = 1024
 MAX_LIFETIME_UPDATES = 1048576
+
+
+def _exclusive(method: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(method)
+    def invoke(self: Any, *args: Any, **kwargs: Any) -> Any:
+        with self.operation():
+            return method(self, *args, **kwargs)
+
+    return invoke
 
 
 class GameLearningError(ValueError):
@@ -192,6 +204,7 @@ class GameLearningConfig:
     max_episodes: int = 256
     reward_clip: float = 100.0
     trace_byte_limit: int = MAX_BYTES
+    imitation_strength: float = 1.0
 
     def __post_init__(self) -> None:
         for key in ("alpha", "gamma", "epsilon", "epsilon_decay", "min_epsilon"):
@@ -210,6 +223,10 @@ class GameLearningConfig:
         if clip <= 0:
             raise GameLearningError("reward clip must be positive")
         object.__setattr__(self, "reward_clip", clip)
+        strength = _number(self.imitation_strength, "imitation strength", 16.0)
+        if strength < 0:
+            raise GameLearningError("imitation strength cannot be negative")
+        object.__setattr__(self, "imitation_strength", strength)
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -267,18 +284,22 @@ class GamePolicyLearner:
         self.source_lineage = _copy_json(dict(source_lineage), limit=65536)
         if self.source_lineage.get("rights_acknowledged") is False:
             raise GameLearningError("source lineage explicitly denies rights")
-        admitted = self.source_lineage.get("admitted_traces", {})
-        if not isinstance(admitted, dict) or len(admitted) > 256:
-            raise GameLearningError("admitted offline trace lineage budget differs")
-        for trace_digest, lineage in admitted.items():
-            _sha(trace_digest, "admitted offline trace")
-            if not isinstance(lineage, dict) or not lineage:
-                raise GameLearningError("admitted offline trace lineage must be explicit")
+        for label in ("admitted_traces", "admitted_feedback"):
+            admitted = self.source_lineage.get(label, {})
+            if not isinstance(admitted, dict) or len(admitted) > 256:
+                raise GameLearningError("admitted authored evidence lineage budget differs")
+            for receipt_digest, lineage in admitted.items():
+                _sha(receipt_digest, "admitted authored evidence")
+                if not isinstance(lineage, dict) or not lineage:
+                    raise GameLearningError("admitted authored evidence lineage must be explicit")
         self._runtime = _runtime()
         self._features = tuple(self.descriptor["observation_bins"])
         self._actions = tuple(self.descriptor["actions"])
         self._q: dict[tuple[int, ...], list[float]] = {}
         self._visits: dict[tuple[int, ...], list[int]] = {}
+        self._imitation: dict[tuple[int, ...], tuple[list[int], list[int]]] = {}
+        self._imitation_total = 0
+        self._imitation_receipts: list[dict[str, Any]] = []
         self._rng = random.Random(config.seed)
         self._episodes: list[dict[str, Any]] = []
         self._updates = 0
@@ -290,6 +311,7 @@ class GamePolicyLearner:
         self._previous_snapshot_digest: str | None = None
         self._snapshot_digest_cache: str | None = None
         self._busy = False
+        self._operation_lock = threading.RLock()
         if parent_snapshot is not None:
             restored = type(self).from_snapshot(
                 parent_snapshot,
@@ -306,6 +328,16 @@ class GamePolicyLearner:
         if self._snapshot_digest_cache is None:
             self._snapshot_digest_cache = self.snapshot()["snapshot_digest"]
         return self._snapshot_digest_cache
+
+    @contextmanager
+    def operation(self):
+        """Reserve this mutable learner for one thread; actors use frozen copies."""
+        if not self._operation_lock.acquire(blocking=False):
+            raise GameLearningError("policy learner is owned by another active operation")
+        try:
+            yield self
+        finally:
+            self._operation_lock.release()
 
     def _observation(self, value: Any) -> dict[str, float]:
         if not isinstance(value, Mapping) or set(value) != set(self._features):
@@ -326,22 +358,42 @@ class GamePolicyLearner:
             self._visits[state] = [0] * len(self._actions)
         return self._q[state]
 
+    @_exclusive
     def predict(self, observation: Mapping[str, float]) -> dict[str, Any]:
         state = self._state(self._observation(observation))
         values = self._q.get(state, [0.0] * len(self._actions))
         visits = self._visits.get(state, [0] * len(self._actions))
-        index = max(range(len(values)), key=values.__getitem__)
+        scores = self._scores(state)
+        index = max(range(len(scores)), key=scores.__getitem__)
+        positive, negative = self._imitation.get(state, ([0] * len(self._actions), [0] * len(self._actions)))
         return {
             "action": self._actions[index],
             "state": list(state),
             "q_values": dict(zip(self._actions, values, strict=True)),
             "visits": dict(zip(self._actions, visits, strict=True)),
             "policy_digest": self.snapshot_digest,
+            "action_scores": dict(zip(self._actions, scores, strict=True)),
+            "imitation_counts": {
+                action: {"positive": positive[i], "negative": negative[i]}
+                for i, action in enumerate(self._actions)
+            },
+            "imitation_strength": self.config.imitation_strength,
         }
+
+    def _scores(self, state: tuple[int, ...]) -> list[float]:
+        values = self._q.get(state, [0.0] * len(self._actions))
+        positive, negative = self._imitation.get(state, ([0] * len(self._actions), [0] * len(self._actions)))
+        total = sum(positive) + sum(negative)
+        if not total:
+            return list(values)
+        return [
+            value + self.config.imitation_strength * (positive[i] - negative[i]) / total
+            for i, value in enumerate(values)
+        ]
 
     def _greedy(self, observation: Mapping[str, float]) -> str:
         state = self._state(observation)
-        values = self._q.get(state, [0.0] * len(self._actions))
+        values = self._scores(state)
         return self._actions[max(range(len(values)), key=values.__getitem__)]
 
     def _action(self, observation: Mapping[str, float]) -> str:
@@ -395,6 +447,9 @@ class GamePolicyLearner:
             "inherited_q_bound": self._inherited_q_bound,
             "parent_snapshot_digest": self._parent_snapshot_digest,
             "parent_policy_id": self._parent_policy_id,
+            "imitation": copy.deepcopy(self._imitation),
+            "imitation_total": self._imitation_total,
+            "imitation_receipts": copy.deepcopy(self._imitation_receipts),
         }
 
     def _adopt(self, state: Mapping[str, Any]) -> None:
@@ -409,8 +464,12 @@ class GamePolicyLearner:
         self._inherited_q_bound = state["inherited_q_bound"]
         self._parent_snapshot_digest = state["parent_snapshot_digest"]
         self._parent_policy_id = state["parent_policy_id"]
+        self._imitation = state["imitation"]
+        self._imitation_total = state["imitation_total"]
+        self._imitation_receipts = state["imitation_receipts"]
         self._snapshot_digest_cache = None
 
+    @_exclusive
     def snapshot(self) -> dict[str, Any]:
         payload = {
             "schema_version": POLICY_SCHEMA,
@@ -434,6 +493,16 @@ class GamePolicyLearner:
             "q_table": [
                 {"state": list(state), "values": self._q[state], "visits": self._visits[state]}
                 for state in sorted(self._q)
+            ],
+            "imitation_observations": self._imitation_total,
+            "imitation_receipts": self._imitation_receipts,
+            "imitation_table": [
+                {
+                    "state": list(state),
+                    "positive": self._imitation[state][0],
+                    "negative": self._imitation[state][1],
+                }
+                for state in sorted(self._imitation)
             ],
         }
         copied = _copy_json(payload)
@@ -466,7 +535,7 @@ class GamePolicyLearner:
             item["policy_id"] == newpolicy_id for item in parent._inherited_episodes
         ):
             raise GameLearningError("fork requires a distinct candidate policy identity")
-        if len(parent._q) > config.max_states:
+        if max(len(parent._q), len(parent._imitation)) > config.max_states:
             raise GameLearningError("parent table exceeds new candidate state budget")
         history = copy.deepcopy(parent._inherited_episodes + parent._episodes)
         inherited_updates = parent._inherited_updates + parent._updates
@@ -475,6 +544,9 @@ class GamePolicyLearner:
         candidate = cls(parent.spec, config, policy_id=newpolicy_id, source_lineage=newsource_lineage)
         candidate._q = copy.deepcopy(parent._q)
         candidate._visits = copy.deepcopy(parent._visits)
+        candidate._imitation = copy.deepcopy(parent._imitation)
+        candidate._imitation_total = parent._imitation_total
+        candidate._imitation_receipts = copy.deepcopy(parent._imitation_receipts)
         candidate._inherited_episodes = history
         candidate._inherited_updates = inherited_updates
         candidate._inherited_q_bound = max(
@@ -518,6 +590,9 @@ class GamePolicyLearner:
             "random_state",
             "q_table",
             "snapshot_digest",
+            "imitation_observations",
+            "imitation_receipts",
+            "imitation_table",
         }
         if set(raw) != fields or raw["schema_version"] != POLICY_SCHEMA or raw["algorithm"] != ALGORITHM:
             raise GameLearningError("unsupported policy snapshot schema")
@@ -614,7 +689,12 @@ class GamePolicyLearner:
             else:
                 total_steps += steps
             _number(episode["return"], "episode return", 1e15)
-            if episode["source"] not in ("local_environment", "offline_import"):
+            if episode["source"] not in (
+                "local_environment",
+                "offline_import",
+                "local_actor_rollout",
+                "human_demonstration",
+            ):
                 raise GameLearningError("invalid episode evidence source")
         if (
             total_steps != updates
@@ -671,6 +751,63 @@ class GamePolicyLearner:
             visits_total += sum(learner._visits[state])
         if visits_total != inherited_updates + updates:
             raise GameLearningError("policy visit counters differ from committed updates")
+        imitation_total = _int(
+            raw["imitation_observations"], "imitation observations", 0, MAX_LIFETIME_UPDATES
+        )
+        imitation_table = raw["imitation_table"]
+        if not isinstance(imitation_table, list) or len(imitation_table) > config.max_states:
+            raise GameLearningError("imitation state budget differs")
+        prior_state = None
+        observed_total = 0
+        for row in imitation_table:
+            if (
+                not isinstance(row, dict)
+                or set(row) != {"state", "positive", "negative"}
+                or not isinstance(row["state"], list)
+                or len(row["state"]) != len(learner._features)
+            ):
+                raise GameLearningError("imitation table schema differs")
+            state = tuple(
+                _int(value, "imitation state bin", 0, len(descriptor["observation_bins"][key]))
+                for key, value in zip(learner._features, row["state"], strict=True)
+            )
+            if prior_state is not None and state <= prior_state:
+                raise GameLearningError("imitation state order differs")
+            prior_state = state
+            vectors = []
+            for label in ("positive", "negative"):
+                if not isinstance(row[label], list) or len(row[label]) != len(learner._actions):
+                    raise GameLearningError("imitation action dimensions differ")
+                vector = [
+                    _int(value, "imitation action count", 0, MAX_LIFETIME_UPDATES) for value in row[label]
+                ]
+                observed_total += sum(vector)
+                vectors.append(vector)
+            if not sum(vectors[0]) + sum(vectors[1]):
+                raise GameLearningError("empty imitation row is invalid")
+            learner._imitation[state] = (vectors[0], vectors[1])
+        receipts = raw["imitation_receipts"]
+        if not isinstance(receipts, list) or len(receipts) > 1024:
+            raise GameLearningError("imitation receipt budget differs")
+        receipt_ids = set()
+        receipt_total = 0
+        for receipt in receipts:
+            if not isinstance(receipt, dict) or set(receipt) != {"digest", "source", "observations"}:
+                raise GameLearningError("imitation receipt schema differs")
+            identity = _sha(receipt["digest"], "imitation receipt")
+            if identity in receipt_ids or receipt["source"] not in (
+                "human_demonstration",
+                "authored_feedback",
+            ):
+                raise GameLearningError("imitation receipt source or identity differs")
+            receipt_ids.add(identity)
+            receipt_total += _int(
+                receipt["observations"], "imitation receipt observations", 1, MAX_LIFETIME_UPDATES
+            )
+        if observed_total != imitation_total or receipt_total != imitation_total:
+            raise GameLearningError("imitation counters differ from recorded authored observations")
+        learner._imitation_total = imitation_total
+        learner._imitation_receipts = receipts
         rng = raw["random_state"]
         if (
             not isinstance(rng, list)
@@ -828,6 +965,34 @@ class GamePolicyLearner:
     ) -> dict[str, Any]:
         self._guard(cancel, authorize)
         environment = factory()
+        try:
+            return self._run_open_episode(
+                environment,
+                seed=seed,
+                episode_id=episode_id,
+                select=select,
+                update=update,
+                cancel=cancel,
+                authorize=authorize,
+                step_budget=step_budget,
+            )
+        finally:
+            close = getattr(environment, "close", None)
+            if callable(close):
+                close()
+
+    def _run_open_episode(
+        self,
+        environment: Any,
+        *,
+        seed: int,
+        episode_id: str,
+        select: Callable[[Mapping[str, float]], str],
+        update: bool,
+        cancel: Callable[[], bool] | None,
+        authorize: Callable[[], None] | None,
+        step_budget: int | None = None,
+    ) -> dict[str, Any]:
         if _descriptor(environment.spec) != self.descriptor:
             raise GameLearningError("factory returned a foreign environment")
         observation = self._observation(environment.reset(seed))
@@ -929,6 +1094,133 @@ class GamePolicyLearner:
             on_checkpoint(snapshot, _copy_json(trace, limit=self.config.trace_byte_limit))
         return summary
 
+    def _record_imitation(self, observation: Mapping[str, float], action: str, weight: int) -> None:
+        _int(weight, "authored preference weight", -16, 16)
+        if not weight or action not in self._actions:
+            raise GameLearningError("authored action preference is invalid")
+        if self._imitation_total + abs(weight) > MAX_LIFETIME_UPDATES:
+            raise GameLearningError("lifetime imitation observation budget exhausted")
+        state = self._state(self._observation(observation))
+        if state not in self._imitation:
+            if len(self._imitation) >= self.config.max_states:
+                raise GameLearningError("imitation state budget exhausted")
+            self._imitation[state] = ([0] * len(self._actions), [0] * len(self._actions))
+        vector = self._imitation[state][0 if weight > 0 else 1]
+        vector[self._actions.index(action)] += abs(weight)
+        self._imitation_total += abs(weight)
+        self._snapshot_digest_cache = None
+
+    @_exclusive
+    def learn_verified_episode(
+        self,
+        episode: Any,
+        *,
+        on_checkpoint: Callable[[dict[str, Any], dict[str, Any]], None] | None = None,
+        cancel: Callable[[], bool] | None = None,
+        authorize: Callable[[], None] | None = None,
+    ) -> GameTrainingResult:
+        """Apply a process-local measured receipt; serialized issuer labels confer no proof."""
+        from .game_learning_demonstrations import _require_verified_episode
+
+        verified = _require_verified_episode(episode)
+        if self._busy:
+            raise GameLearningError("policy learner already executing")
+        self._busy = True
+        prior = self._capture()
+        first_updates = self._updates
+        try:
+            self._guard(cancel, authorize)
+            trace = self.validate_trace(verified.trace)
+            if any(
+                item["episode_id"] == trace["episode_id"] or item["trace_digest"] == trace["trace_digest"]
+                for item in self._inherited_episodes + self._episodes
+            ):
+                raise GameLearningError("verified episode was already committed")
+            if len(self._imitation_receipts) >= 1024 and verified.source == "human_demonstration":
+                raise GameLearningError("imitation receipt budget exhausted")
+            prior_digest = self.snapshot_digest
+            for transition in trace["transitions"]:
+                self._guard(cancel, authorize)
+                transition = self._transition(transition, transition["sequence"])
+                if verified.source == "human_demonstration":
+                    self._record_imitation(transition["observation"], transition["action"], 1)
+                self._update(transition)
+            if verified.source == "human_demonstration":
+                if any(receipt["digest"] == verified.evidence_digest for receipt in self._imitation_receipts):
+                    raise GameLearningError("human demonstration was already learned")
+                self._imitation_receipts.append(
+                    {
+                        "digest": verified.evidence_digest,
+                        "source": verified.source,
+                        "observations": trace["steps"],
+                    }
+                )
+            summary = self._commit_episode(
+                trace,
+                source=verified.source,
+                prior_digest=prior_digest,
+                on_checkpoint=on_checkpoint,
+                cancel=cancel,
+                authorize=authorize,
+            )
+            return GameTrainingResult(self.snapshot(), (summary,), (trace,), self._updates - first_updates)
+        except BaseException:
+            self._adopt(prior)
+            raise
+        finally:
+            self._busy = False
+
+    @_exclusive
+    def learn_authored_feedback(
+        self,
+        feedback: Any,
+        *,
+        on_checkpoint: Callable[[dict[str, Any], None], None] | None = None,
+        cancel: Callable[[], bool] | None = None,
+        authorize: Callable[[], None] | None = None,
+    ) -> dict[str, Any]:
+        """Change authored action preferences without inventing Q rewards or visits."""
+        from .game_learning_demonstrations import _require_verified_feedback
+
+        verified = _require_verified_feedback(feedback)
+        if self._busy:
+            raise GameLearningError("policy learner already executing")
+        if verified.environment_digest != self.descriptor["environment_digest"]:
+            raise GameLearningError("feedback environment identity differs")
+        if (
+            verified.source_lineage != self.source_lineage
+            and self.source_lineage.get("admitted_feedback", {}).get(verified.evidence_digest)
+            != verified.source_lineage
+        ):
+            raise GameLearningError("feedback source lineage is not admitted")
+        if any(receipt["digest"] == verified.evidence_digest for receipt in self._imitation_receipts):
+            raise GameLearningError("authored feedback was already learned")
+        if len(self._imitation_receipts) >= 1024:
+            raise GameLearningError("imitation receipt budget exhausted")
+        self._busy = True
+        prior = self._capture()
+        try:
+            self._guard(cancel, authorize)
+            self._record_imitation(verified.observation, verified.action, verified.weight)
+            self._imitation_receipts.append(
+                {
+                    "digest": verified.evidence_digest,
+                    "source": "authored_feedback",
+                    "observations": abs(verified.weight),
+                }
+            )
+            snapshot = self.snapshot()
+            self._guard(cancel, authorize)
+            if on_checkpoint is not None:
+                on_checkpoint(snapshot, None)
+            return snapshot
+        except BaseException:
+            self._adopt(prior)
+            raise
+        finally:
+            self._busy = False
+
+    @_exclusive
     def train(
         self,
         environment_factory: Callable[[], Any],
@@ -1004,6 +1296,7 @@ class GamePolicyLearner:
         finally:
             self._busy = False
 
+    @_exclusive
     def train_offline(
         self,
         traces: Sequence[Mapping[str, Any]],
@@ -1064,6 +1357,7 @@ class GamePolicyLearner:
         finally:
             self._busy = False
 
+    @_exclusive
     def evaluate(
         self,
         environment_factory: Callable[[], Any],

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+import asyncio
+import json
+from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -113,6 +116,10 @@ class TrainRequest(WriteRequest):
     session_ids: list[str] = Field(default_factory=list, max_length=128)
     parent_policy_id: str | None = Field(default=None, max_length=128)
     fresh_policy: bool = False
+    workers: int = Field(default=1, ge=1, le=8, strict=True)
+    resource_profile: Literal["cpu"] = "cpu"
+    demonstration_ids: list[str] = Field(default_factory=list, max_length=16)
+    frame_stride: int = Field(default=8, ge=1, le=256, strict=True)
 
 
 class GenerateRequest(WriteRequest):
@@ -281,4 +288,291 @@ async def export_project(
         workspace.export_project(
             _scope(user), project_id, expected_version=expected_version, generated_job_id=generated_job_id
         )
+    )
+
+
+class PlayRequest(WriteRequest):
+    source_id: str | None = Field(default=None, max_length=128)
+    seed: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
+    max_steps: int = Field(default=4096, ge=1, le=4096, strict=True)
+    fps: int = Field(default=15, ge=1, le=30, strict=True)
+    controller: Literal["human", "ai"] = "human"
+    policy_id: str | None = Field(default=None, max_length=128)
+
+
+class PlayInput(Request):
+    control_token: str = Field(min_length=20, max_length=256)
+    expected_control_version: int = Field(ge=1, strict=True)
+    input_sequence: int = Field(ge=1, strict=True)
+    action: str = Field(min_length=1, max_length=64)
+    held: bool = Field(default=True, strict=True)
+
+
+class PlayControl(Request):
+    expected_control_version: int = Field(ge=1, strict=True)
+    action: Literal["pause", "resume", "stop", "takeover", "reset"]
+    controller: Literal["human", "ai"] | None = None
+    policy_id: str | None = Field(default=None, max_length=128)
+
+
+class RecordingRequest(Request):
+    expected_control_version: int = Field(ge=1, strict=True)
+    consent: bool = Field(strict=True)
+    label: str | None = Field(default=None, max_length=120)
+    idempotency_key: str = Field(min_length=1, max_length=512)
+
+
+class RecordingFeedback(Request):
+    rating: int = Field(ge=1, le=5, strict=True)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class RecordingStop(Request):
+    consent: bool = Field(strict=True)
+    feedback: RecordingFeedback | None = None
+
+
+class RecordingReplay(WriteRequest):
+    fps: int = Field(default=15, ge=1, le=30, strict=True)
+
+
+def _plays():
+    from core.game_play import GamePlayAuthority
+
+    if not hasattr(workspace, "_play_authority"):
+        workspace._play_authority = GamePlayAuthority(workspace)
+    return workspace._play_authority
+
+
+@router.get("/resources")
+async def game_resources(user: User):
+    from core.game_play import resource_profiles
+
+    _scope(user)
+    return resource_profiles()
+
+
+@router.post("/projects/{project_id}/play")
+async def create_play(project_id: str, body: PlayRequest, user: User):
+    return {
+        "play": await _call(_plays().create(_scope(user), project_id, body.model_dump(exclude_none=True)))
+    }
+
+
+@router.get("/projects/{project_id}/play")
+async def list_play(project_id: str, user: User):
+    scope = _scope(user)
+    project = await _call(workspace._project(project_id, scope))
+    rows = (
+        await _plays()
+        .plays.find({**scope, "project_id": project_id, "play_id": {"$in": project.get("play_ids", [])}})
+        .sort("updated_at", -1)
+        .limit(32)
+        .to_list(length=32)
+    )
+    return {"plays": [_plays().public(row) for row in rows]}
+
+
+@router.get("/play/{play_id}")
+async def get_play(play_id: str, user: User):
+    return {"play": await _call(_plays().get(_scope(user), play_id))}
+
+
+@router.post("/play/{play_id}/input")
+async def play_input(play_id: str, body: PlayInput, user: User):
+    return {"play": await _call(_plays().input(_scope(user), play_id, body.model_dump()))}
+
+
+@router.post("/play/{play_id}/control")
+async def play_control(play_id: str, body: PlayControl, user: User):
+    return {"play": await _call(_plays().control(_scope(user), play_id, body.model_dump(exclude_none=True)))}
+
+
+@router.post("/play/{play_id}/recordings")
+async def start_recording(play_id: str, body: RecordingRequest, user: User):
+    return {
+        "recording": await _call(
+            _plays().start_recording(_scope(user), play_id, body.model_dump(exclude_none=True))
+        )
+    }
+
+
+@router.get("/projects/{project_id}/recordings")
+async def list_recordings(project_id: str, user: User):
+    scope = _scope(user)
+    await _call(workspace._project(project_id, scope))
+    rows = (
+        await _plays()
+        .recordings.find({**scope, "project_id": project_id})
+        .sort("created_at", -1)
+        .limit(128)
+        .to_list(length=128)
+    )
+    return {"recordings": [_plays().recording_public(row) for row in rows]}
+
+
+@router.get("/recordings/{recording_id}")
+async def get_recording(recording_id: str, user: User):
+    row = await _call(_plays().recording(_scope(user), recording_id))
+    return {"recording": _plays().recording_public(row)}
+
+
+@router.post("/recordings/{recording_id}/stop")
+async def stop_recording(recording_id: str, body: RecordingStop, user: User):
+    return {
+        "recording": await _call(
+            _plays().stop_recording(_scope(user), recording_id, body.model_dump(exclude_none=True))
+        )
+    }
+
+
+@router.get("/recordings/{recording_id}/export")
+async def export_recording(recording_id: str, user: User):
+    return await _call(_plays().export_recording(_scope(user), recording_id))
+
+
+@router.post("/recordings/{recording_id}/replay")
+async def replay_recording(recording_id: str, body: RecordingReplay, user: User):
+    return {
+        "play": await _call(_plays().replay(_scope(user), recording_id, body.model_dump(exclude_none=True)))
+    }
+
+
+@router.get("/play/{play_id}/events")
+async def play_events(
+    play_id: str,
+    user: User,
+    after: int = Query(default=0, ge=0),
+    stream_id: str | None = Query(default=None, max_length=128),
+):
+    from fastapi.responses import StreamingResponse
+    from core.game_learning_events import frame_hub, FrameCursorError
+    import asyncio
+    import json
+
+    scope = _scope(user)
+    current = await _call(_plays()._read(scope, play_id))
+    incarnation = stream_id or current["stream_id"]
+    if incarnation != current["stream_id"]:
+        raise HTTPException(
+            409, detail={"code": "stream_replaced", "message": "Reload the actual current play stream."}
+        )
+
+    async def stream():
+        cursor = after
+        for _ in range(900):
+            row = await _plays()._read(scope, play_id)
+            if row["stream_id"] != incarnation:
+                yield 'event: resync\ndata: {"reason":"stream_replaced"}\n\n'
+                return
+            try:
+                events = frame_hub.read("play:" + play_id, incarnation, cursor)
+            except FrameCursorError:
+                projection = await _plays().frames.find_one(
+                    {
+                        "_id": "play:" + play_id,
+                        **scope,
+                        "stream_id": incarnation,
+                        "expires_at": {"$gt": datetime.now(timezone.utc)},
+                    }
+                )
+                events = (
+                    [projection["event"]] if projection and projection["event"]["sequence"] > cursor else []
+                )
+            for event in events:
+                cursor = event["sequence"]
+                yield f'id: {incarnation}:{cursor}\nevent: {event["event"]}\ndata: {json.dumps(event, separators=(",", ":"))}\n\n'
+            if row["status"] in {"stopped", "failed", "interrupted"}:
+                yield "event: terminal\ndata: " + json.dumps(
+                    {"play_id": play_id, "status": row["status"]}
+                ) + "\n\n"
+                return
+            if not events:
+                yield ": keepalive\n\n"
+            await asyncio.sleep(0.1)
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/jobs/{job_id}/instances")
+async def job_instances(job_id: str, user: User):
+    return await _call(workspace.job_instances(_scope(user), job_id))
+
+
+@router.get("/jobs/{job_id}/events")
+async def job_events(
+    job_id: str,
+    user: User,
+    after: int = Query(default=0, ge=0),
+    stream_id: str | None = Query(default=None, max_length=128),
+):
+    from fastapi.responses import StreamingResponse
+    from core.game_learning_events import frame_hub, FrameCursorError
+
+    scope = _scope(user)
+    await _call(workspace.get_job(scope, job_id))
+    raw = await workspace.jobs.find_one({"_id": job_id, **scope})
+    incarnation = stream_id or raw.get("frame_stream_id")
+    if not incarnation:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "actors_not_started",
+                "message": "Wait for actual actor admission before opening the frame stream.",
+            },
+        )
+    if incarnation != raw.get("frame_stream_id"):
+        raise HTTPException(
+            409, detail={"code": "stream_replaced", "message": "Reload the current actor stream."}
+        )
+
+    async def stream():
+        cursor = after
+        for _ in range(3000):
+            state = await workspace.jobs.find_one({"_id": job_id, **scope})
+            if state is None:
+                return
+            await workspace._authority(scope, state["input"])
+            if state.get("frame_stream_id") != incarnation:
+                yield 'event: resync\ndata: {"reason":"stream_replaced"}\n\n'
+                return
+            try:
+                events = frame_hub.read("job:" + job_id, incarnation, cursor)
+            except FrameCursorError:
+                rows = (
+                    await workspace.database["game_learning_live_frames"]
+                    .find(
+                        {
+                            **scope,
+                            "job_id": job_id,
+                            "stream_id": incarnation,
+                            "event.sequence": {"$gt": cursor},
+                            "expires_at": {"$gt": datetime.now(timezone.utc)},
+                        }
+                    )
+                    .sort("event.sequence", 1)
+                    .limit(8)
+                    .to_list(length=8)
+                )
+                events = [row["event"] for row in rows]
+            for event in events:
+                cursor = event["sequence"]
+                yield f'id: {incarnation}:{cursor}\nevent: {event["event"]}\ndata: {json.dumps(event,separators=(",", ":"))}\n\n'
+            if state["status"] in {"completed", "failed", "cancelled", "interrupted"}:
+                yield "event: terminal\ndata: " + json.dumps(
+                    {"job_id": job_id, "status": state["status"]}
+                ) + "\n\n"
+                return
+            if not events:
+                yield ": keepalive\n\n"
+            await asyncio.sleep(0.1)
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )
