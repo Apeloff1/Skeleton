@@ -15,6 +15,17 @@ on:
       - ".github/workflows/git-atlas.yml"
   push:
     branches: [main]
+    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
+    paths:
+      - "scripts/build_git_atlas.py"
+      - "scripts/build_git_atlas_near.py"
+      - "scripts/query_git_atlas.py"
+      - "tests/test_git_atlas.py"
+      - "tests/test_git_atlas_near.py"
+      - ".machine/repository.toml"
+      - "machine/architecture.json"
+      - "machine/ai_file_tree.json"
+      - ".github/workflows/git-atlas.yml"
   schedule:
     - cron: "23 2 * * *"
   workflow_dispatch:

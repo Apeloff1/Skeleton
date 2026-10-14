@@ -3,6 +3,12 @@ name: Repository machine index
 on:
   push:
     branches: [main]
+    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
+    paths:
+      - "skeleton/repo_machine/tracked_inventory.py"
+      - "tests/test_tracked_inventory.py"
+      - ".github/workflows/repo-machine-index.yml"
+      - ".machine/repository.toml"
   pull_request:
     paths:
       - "skeleton/repo_machine/tracked_inventory.py"

@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
     paths-ignore: ['machine/repo_navigation/**']
+    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
+    paths:
+      - "scripts/build_repo_navigation.py"
+      - "tests/test_repo_navigation.py"
+      - ".github/workflows/repo-navigation-index.yml"
   schedule:
     - cron: '29 4 * * *'
   workflow_dispatch:

@@ -10,10 +10,32 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
+    paths:
+      - "machine/*repository_engineering*.json"
+      - "machine/ai_file_tree.json"
+      - "skeleton/repo_machine/**"
+      - "scripts/check_p2_repository_engineering.py"
+      - "scripts/check_ai_file_tree.py"
+      - "tests/test_repo_machine_*.py"
+      - "tests/test_p2_repository_engineering.py"
+      - "skeleton/testing/test_repo_machine_execution_learning.py"
+      - ".github/workflows/p2-repository-engineering.yml"
   push:
     branches:
       - main
       - feat/p2-repository-engineering-control
+    # Scope validation to owning files; scheduled/manual runs stay unfiltered.
+    paths:
+      - "machine/*repository_engineering*.json"
+      - "machine/ai_file_tree.json"
+      - "skeleton/repo_machine/**"
+      - "scripts/check_p2_repository_engineering.py"
+      - "scripts/check_ai_file_tree.py"
+      - "tests/test_repo_machine_*.py"
+      - "tests/test_p2_repository_engineering.py"
+      - "skeleton/testing/test_repo_machine_execution_learning.py"
+      - ".github/workflows/p2-repository-engineering.yml"
   workflow_dispatch:
 
 permissions:
