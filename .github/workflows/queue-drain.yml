@@ -16,10 +16,10 @@ on:
     branches: [main]
     paths: ['.github/workflows/queue-drain.yml']
 
-# v3 escapes the queued v2 recovery generation while keeping one live run plus
-# one coalesced pending run. Future triggers remain non-preemptive.
+# v4 escapes provider-stuck queued v3 recovery, while retaining one
+# non-preemptive worker and one coalesced pending run per repository.
 concurrency:
-  group: queue-drain-v3-${{ github.repository }}
+  group: queue-drain-v4-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -104,6 +104,20 @@ jobs:
                       raw = response.read()
                       return response.status, json.loads(raw) if raw else None
               except urllib.error.HTTPError as exc:
+                  # GitHub installation quota exhaustion can return 403 as
+                  # well as 429; distinguish it from permission failures.
+                  if exc.code in {403, 429}:
+                      try:
+                          detail = json.loads(exc.read().decode('utf-8'))
+                      except (ValueError, UnicodeDecodeError):
+                          detail = {}
+                      message = str(detail.get('message') or '').casefold()
+                      if (
+                          exc.code == 429
+                          or 'rate limit' in message
+                          or 'abuse detection' in message
+                      ):
+                          return 429, None
                   return exc.code, None
               except urllib.error.URLError:
                   return 0, None
@@ -112,7 +126,7 @@ jobs:
               status = 0
               for attempt in range(3):
                   status, _ = request(path, method='POST')
-                  if status not in retryable:
+                  if status not in retryable or status == 429:
                       return status
                   if attempt < 2:
                       time.sleep(2 ** attempt)
@@ -126,13 +140,32 @@ jobs:
                   and payload.get('status') == 'completed'
               )
 
-          def cancel(run_id):
+          def security_lane(run):
+              # Rejected ordinary cancellation is not evidence that forced
+              # termination of security/provenance checks is acceptable.
+              name = str(run.get('name') or '').casefold()
+              workflow_path = str(run.get('path') or '').casefold()
+              sensitive = (
+                  'malware', 'secret', 'security', 'codeql', 'provenance',
+                  'artifact policy', 'dependency', 'repository hygiene',
+                  'workflow input', 'github-advanced-security',
+              )
+              return (
+                  any(term in name for term in sensitive)
+                  or any(term in workflow_path for term in sensitive)
+              )
+
+          def cancel(run_id, security_lane=False):
               status = post_with_retry(
                   f'/repos/{repo}/actions/runs/{run_id}/cancel'
               )
               if status in {200, 202, 404}:
                   return status
+              if status == 429:
+                  return status
               if status in {409, 422} and run_completed(run_id):
+                  return status
+              if security_lane:
                   return status
               if status in {409, 422} or status in retryable:
                   forced = post_with_retry(
@@ -379,11 +412,14 @@ jobs:
           }
           pass_lines = []
           latest_main = ''
+          rate_limit_hit = False
 
           # Four passes catch GitHub-managed fanout that arrives seconds after a
           # push. Each pass resolves main again, so the drainer follows the live
           # repository rather than a stale workflow-event SHA.
           for pass_no in range(1, 5):
+              if rate_limit_hit:
+                  break
               head = main_sha()
               latest_main = head
               head_runs = list_runs(head_sha=head)
@@ -528,7 +564,14 @@ jobs:
               accepted = moved = deferred = failed = 0
               for run in selected:
                   run_id = int(run['id'])
-                  status = cancel(run_id)
+                  status = cancel(run_id, security_lane=security_lane(run))
+                  if status == 429:
+                      # Retain the rest of this inventory for a later sweep;
+                      # additional API calls cannot cure installation limits.
+                      rate_limit_hit = True
+                      deferred += 1
+                      print('GitHub API rate limit reached; ending mutation sweep.')
+                      break
                   if status in {200, 202}:
                       attempted.add(run_id)
                       transient.discard(run_id)
@@ -582,7 +625,7 @@ jobs:
               )
               print(line)
               pass_lines.append(line)
-              if pass_no < 4:
+              if pass_no < 4 and not rate_limit_hit:
                   time.sleep(8)
 
           summary = os.environ.get('GITHUB_STEP_SUMMARY')
@@ -590,6 +633,7 @@ jobs:
               with open(summary, 'a', encoding='utf-8') as handle:
                   handle.write('## Actions queue drain\n')
                   handle.write(f'- Latest live main SHA: `{latest_main}`\n')
+                  handle.write(f'- API rate-limit backpressure: {rate_limit_hit}\n')
                   handle.write('- Sweep passes: 4 over ~24 seconds\n')
                   handle.write(
                       '- Branch control-plane observations preserved: '
