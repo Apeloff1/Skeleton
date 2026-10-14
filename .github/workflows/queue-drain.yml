@@ -70,7 +70,7 @@ jobs:
               'User-Agent': 'skeleton-queue-drainer',
           }
           retryable = frozenset({0, 429, 500, 502, 503, 504})
-          max_cancellation_attempts = 80
+          max_cancellation_attempts = 160
           deadline = time.monotonic() + 450
           cancellation_attempts = 0
           budget_exhausted = False
