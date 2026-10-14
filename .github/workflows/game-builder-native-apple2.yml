@@ -3,7 +3,11 @@ name: Game Builder Native Apple II 6502
 on:
   pull_request:
     paths:
-      - 'skeleton/ai/game_builder/**'
+      - 'skeleton/ai/game_builder/apple2*'
+      - 'skeleton/ai/game_builder/native_binary_structure.py'
+      - 'skeleton/ai/game_builder/native_retro_artifact.py'
+      - 'skeleton/ai/game_builder/editor_platforms.py'
+      - 'skeleton/ai/game_builder/contracts.py'
       - 'scripts/game_builder/native_apple2_ci.py'
       - '.github/workflows/game-builder-native-apple2.yml'
   workflow_dispatch:

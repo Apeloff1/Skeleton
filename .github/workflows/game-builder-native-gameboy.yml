@@ -3,7 +3,12 @@ name: Game Builder Native DMG ROM
 on:
   pull_request:
     paths:
-      - 'skeleton/ai/game_builder/**'
+      - 'skeleton/ai/game_builder/game_boy_native_export.py'
+      - 'skeleton/ai/game_builder/native_binary_structure.py'
+      - 'skeleton/ai/game_builder/native_retro_artifact.py'
+      - 'skeleton/ai/game_builder/editor_platforms.py'
+      - 'skeleton/ai/game_builder/contracts.py'
+      - 'skeleton/ai/game_builder/game_boy_memory_replay.py'
       - 'scripts/game_builder/native_game_boy_ci.py'
       - 'scripts/game_builder/emulate_game_boy_ci.py'
       - '.github/workflows/game-builder-native-gameboy.yml'

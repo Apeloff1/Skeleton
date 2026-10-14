@@ -3,7 +3,11 @@ name: Game Builder Native NES ROM
 on:
   pull_request:
     paths:
-      - 'skeleton/ai/game_builder/**'
+      - 'skeleton/ai/game_builder/nes*'
+      - 'skeleton/ai/game_builder/native_binary_structure.py'
+      - 'skeleton/ai/game_builder/native_retro_artifact.py'
+      - 'skeleton/ai/game_builder/editor_platforms.py'
+      - 'skeleton/ai/game_builder/contracts.py'
       - 'scripts/game_builder/native_nes_ci.py'
       - 'scripts/game_builder/nes_reproducibility_ci.py'
       - 'scripts/game_builder/nes_6502_boot.py'

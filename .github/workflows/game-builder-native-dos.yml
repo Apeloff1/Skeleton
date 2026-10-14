@@ -3,7 +3,11 @@ name: Game Builder Native DOS 8086 COM
 on:
   pull_request:
     paths:
-      - 'skeleton/ai/game_builder/**'
+      - 'skeleton/ai/game_builder/dos*'
+      - 'skeleton/ai/game_builder/native_binary_structure.py'
+      - 'skeleton/ai/game_builder/native_retro_artifact.py'
+      - 'skeleton/ai/game_builder/editor_platforms.py'
+      - 'skeleton/ai/game_builder/contracts.py'
       - 'scripts/game_builder/native_dos_ci.py'
       - 'scripts/game_builder/emulate_dos_ci.py'
       - '.github/workflows/game-builder-native-dos.yml'
