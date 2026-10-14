@@ -778,6 +778,36 @@ class MongoConversationAuthority:
                 query["tenant_id"] = str(tenant_id)
             actions.append((order, kind, query, dict(raw)))
 
+        # Any governed deletion of a conversation message invalidates the
+        # derived ten-step checkpoint too. Fence the entire affected thread
+        # before the first physical delete, not after a partial retry.
+        if self.dragon_projection is not None and actions:
+            affected_threads = {
+                str(query["_id"] if kind == "thread" else query["thread_id"])
+                for _order, kind, query, _raw in actions
+            }
+            for affected_thread_id in sorted(affected_threads):
+                try:
+                    owner_doc = await self.threads.find_one(
+                        {"_id": affected_thread_id, "tenant_id": str(tenant_id)},
+                        {"owner_id": 1},
+                    )
+                except PyMongoError as exc:
+                    raise ConversationStorageUnavailable(
+                        "Dragon deletion owner lookup unavailable"
+                    ) from exc
+                if owner_doc is not None:
+                    affected_owner = str(owner_doc.get("owner_id") or "")
+                    if not affected_owner:
+                        raise ConversationStorageUnavailable(
+                            "Dragon deletion owner identity unavailable"
+                        )
+                    await self._delete_dragon_projection(
+                        tenant_id=str(tenant_id),
+                        owner_id=affected_owner,
+                        thread_id=affected_thread_id,
+                    )
+
         actions.sort(key=lambda item: (item[0], item[3]["record_id"]))
         deleted: list[str] = []
         acknowledgements: list[dict[str, Any]] = []
