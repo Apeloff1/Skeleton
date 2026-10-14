@@ -19,9 +19,9 @@ on:
 # Keep one cleanup sweep alive while main is moving rapidly. New triggers
 # coalesce behind the active worker instead of repeatedly cancelling it.
 concurrency:
-  # v3 separates the ARM cleanup from a provider-stuck queued v2 x64 run.
-  # All v3 wakes coalesce; SHA leases preserve correctness if v2 eventually runs.
-  group: branch-clean-v3-${{ github.repository }}
+  # v4 isolates the corrected fail-closed pruning from provider-stuck v3 runs.
+  # New wakes coalesce; open-PR checks and exact-tip leases remain mandatory.
+  group: branch-clean-v4-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
