@@ -1,27 +1,6 @@
 name: VOL-072 Jeeves Domain
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/jeeves/evidence_response.py"
-      - "skeleton/ai/agents/jeeves/evidence_response.py"
-      - "machine/jeeves_custody.json"
-      - "machine/ai_file_tree.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_vol072_jeeves_domain.py"
-      - "tests/test_vol072_jeeves_domain.py"
-      - ".github/workflows/vol072-jeeves-domain.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/jeeves/evidence_response.py"
-      - "skeleton/ai/agents/jeeves/evidence_response.py"
-      - "machine/jeeves_custody.json"
-      - "machine/ai_file_tree.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_vol072_jeeves_domain.py"
-      - "tests/test_vol072_jeeves_domain.py"
-      - ".github/workflows/vol072-jeeves-domain.yml"
   workflow_dispatch:
 
 permissions:

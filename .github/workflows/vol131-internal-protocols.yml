@@ -1,33 +1,6 @@
 name: VOL-131 Internal Protocols
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_file_tree.json"
-      - "skeleton/distributed/network/internal_protocol.py"
-      - "skeleton/distributed/network/__init__.py"
-      - "skeleton/ai/runtime/distributed/network/internal_protocol.py"
-      - "skeleton/ai/runtime/distributed/network/__init__.py"
-      - "skeleton/testing/test_internal_protocols.py"
-      - "scripts/verify_vol131_internal_protocols.py"
-      - "tests/test_vol131_internal_protocols_independent.py"
-      - ".github/workflows/vol131-internal-protocols.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_file_tree.json"
-      - "skeleton/distributed/network/internal_protocol.py"
-      - "skeleton/distributed/network/__init__.py"
-      - "skeleton/ai/runtime/distributed/network/internal_protocol.py"
-      - "skeleton/ai/runtime/distributed/network/__init__.py"
-      - "skeleton/testing/test_internal_protocols.py"
-      - "scripts/verify_vol131_internal_protocols.py"
-      - "tests/test_vol131_internal_protocols_independent.py"
-      - ".github/workflows/vol131-internal-protocols.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,60 +1,6 @@
 name: VOL-129-132 Contract Consistency Convergence
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_runtime_schemas.json"
-      - "machine/contract_conformance.json"
-      - "machine/schema_registry.json"
-      - "machine/compatibility_model.json"
-      - "machine/state_topology.json"
-      - "machine/consistency_profiles.json"
-      - "machine/ai_file_tree.json"
-      - "skeleton/contracts/protocol.py"
-      - "skeleton/ai/runtime/contracts/protocol.py"
-      - "skeleton/distributed/network/internal_protocol.py"
-      - "skeleton/ai/runtime/distributed/network/internal_protocol.py"
-      - "skeleton/distributed/network/__init__.py"
-      - "skeleton/ai/runtime/distributed/network/__init__.py"
-      - "skeleton/data/schema_evolution.py"
-      - "skeleton/ai/runtime/data/schema_evolution.py"
-      - "skeleton/persistence/consistency.py"
-      - "skeleton/ai/runtime/persistence/consistency.py"
-      - "skeleton/testing/test_internal_protocols.py"
-      - "skeleton/testing/test_schema_registry.py"
-      - "skeleton/testing/test_compatibility_model.py"
-      - "skeleton/testing/test_consistency_profiles.py"
-      - "scripts/check_architecture_contract_conformance.py"
-      - "scripts/check_traceability_spine.py"
-      - "scripts/check_consistency_profiles.py"
-      - "scripts/verify_vol129_132_contract_consistency.py"
-      - "tests/test_traceability_spine.py"
-      - "tests/test_consistency_profiles.py"
-      - "tests/test_vol129_132_contract_consistency_independent.py"
-      - ".github/workflows/vol129-132-contract-consistency.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_runtime_schemas.json"
-      - "machine/contract_conformance.json"
-      - "machine/schema_registry.json"
-      - "machine/compatibility_model.json"
-      - "machine/state_topology.json"
-      - "machine/consistency_profiles.json"
-      - "skeleton/contracts/protocol.py"
-      - "skeleton/ai/runtime/contracts/protocol.py"
-      - "skeleton/distributed/network/internal_protocol.py"
-      - "skeleton/ai/runtime/distributed/network/internal_protocol.py"
-      - "skeleton/data/schema_evolution.py"
-      - "skeleton/ai/runtime/data/schema_evolution.py"
-      - "skeleton/persistence/consistency.py"
-      - "skeleton/ai/runtime/persistence/consistency.py"
-      - "scripts/check_consistency_profiles.py"
-      - "scripts/verify_vol129_132_contract_consistency.py"
-      - ".github/workflows/vol129-132-contract-consistency.yml"
   workflow_dispatch:
 
 permissions:

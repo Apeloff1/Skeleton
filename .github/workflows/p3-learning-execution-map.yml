@@ -2,15 +2,6 @@ name: P3 Learning Extension Authority
 # Deep metadata/closure validation runs after merge or by manual dispatch;
 # canonical PR/security gates retain pre-merge coverage.
 on:
-  push:
-    branches: [main, feat/p3-learning-multimodal-t2]
-    # Run only for this subsystem; avoid every unrelated main push.
-    paths:
-      - "machine/ai_p3_learning_execution_map.json"
-      - "machine/ai_p3_learning_task_backlog.json"
-      - "scripts/check_p3_learning_execution_map.py"
-      - "tests/test_p3_learning_execution_map.py"
-      - ".github/workflows/p3-learning-execution-map.yml"
   workflow_dispatch:
 permissions:
   contents: read

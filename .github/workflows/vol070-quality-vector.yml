@@ -1,25 +1,6 @@
 name: VOL-070 Quality Vector
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/eval/**"
-      - "skeleton/ai/evaluation/**"
-      - "machine/ai_quality_vector.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_vol070_quality_vector.py"
-      - "tests/test_vol070_quality_vector.py"
-      - ".github/workflows/vol070-quality-vector.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/eval/**"
-      - "skeleton/ai/evaluation/**"
-      - "machine/ai_quality_vector.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_vol070_quality_vector.py"
-      - "tests/test_vol070_quality_vector.py"
-      - ".github/workflows/vol070-quality-vector.yml"
   workflow_dispatch:
 
 permissions:

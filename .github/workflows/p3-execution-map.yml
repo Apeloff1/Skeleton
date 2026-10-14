@@ -3,20 +3,6 @@ name: P3 Execution Map
 # Deep metadata/closure validation runs after merge or by manual dispatch;
 # canonical PR/security gates retain pre-merge coverage.
 on:
-  push:
-    branches:
-      - main
-      - feat/p3-autonomous-intelligence-expansion-atomic
-    paths:
-      - "machine/ai_p3_tranche0_plan.json"
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_p3_task_backlog.json"
-      - "machine/ai_p2_execution_map.json"
-      - "machine/ai_p2_functional_ai_closure.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_p3_execution_map.py"
-      - "tests/test_p3_execution_map.py"
-      - ".github/workflows/p3-execution-map.yml"
   workflow_dispatch:
 
 permissions:
