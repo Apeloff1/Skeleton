@@ -106,18 +106,62 @@ def merge_catalogs(catalogs: list[dict]) -> dict:
     merged = {}
     manifests = {}
     for catalog in catalogs:
+        if not isinstance(catalog, dict) or not isinstance(catalog.get("manifest"), dict):
+            raise ValueError("typed retrieved catalog required")
         manifest = catalog["manifest"]
-        cid = manifest["catalog_id"]
+        cid = manifest.get("catalog_id")
+        if (not isinstance(cid, str) or not re.fullmatch(r"catalog-[0-9a-f]{40}", cid)
+                or manifest.get("git_blob_sha") != cid.removeprefix("catalog-")
+                or not isinstance(manifest.get("content_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", manifest["content_sha256"])
+                or manifest.get("linked_content_fetched") is not False):
+            raise ValueError("catalog custody identity is invalid")
+        canonical_source_url(manifest.get("url"))
+        _utc(manifest.get("observed_at"))
         if cid in manifests and manifests[cid] != manifest:
             raise ValueError("conflicting catalog identity")
         manifests[cid] = manifest
-        for item in catalog["sources"]:
-            url = canonical_source_url(item["url"])
-            if item["source_id"] != "source-" + sha256(url.encode()).hexdigest():
+        items = catalog.get("sources")
+        if not isinstance(items, list) or len(items) > 100_000:
+            raise ValueError("bounded catalog sources required")
+        for item in items:
+            if not isinstance(item, dict):
+                raise ValueError("typed catalog source required")
+            url = canonical_source_url(item.get("url"))
+            identity = "source-" + sha256(url.encode()).hexdigest()
+            host = urlsplit(url).hostname
+            kind = ("video_candidate" if host in
+                    {"youtube.com", "www.youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"}
+                    else "web_candidate")
+            if (item.get("source_id") != identity or item.get("url") != url
+                    or item.get("host") != host or item.get("kind") != kind):
                 raise ValueError("source identity mismatch")
+            # Never propagate caller-controlled clearance or model authority.
+            if (item.get("training_authorized") is not False
+                    or item.get("rights") != "not_assessed"
+                    or item.get("availability") != "not_checked"
+                    or item.get("independence") != "not_assessed"):
+                raise ValueError("catalog lead cannot carry approvals")
+            origins = item.get("discoveries")
+            if not isinstance(origins, list) or len(origins) > 10_000:
+                raise ValueError("bounded source lineage required")
             if url not in merged:
-                merged[url] = {**item, "discoveries": []}
-            for origin in item["discoveries"]:
+                merged[url] = {
+                    "source_id": identity, "url": url, "host": host, "kind": kind,
+                    "discoveries": [], "availability": "not_checked",
+                    "rights": "not_assessed", "independence": "not_assessed",
+                    "training_authorized": False,
+                }
+            for origin in origins:
+                if (not isinstance(origin, dict) or set(origin) !=
+                        {"catalog_id", "line", "headers"}
+                        or origin["catalog_id"] != cid
+                        or type(origin["line"]) is not int or origin["line"] < 1
+                        or not isinstance(origin["headers"], list)
+                        or not 1 <= len(origin["headers"]) <= 6
+                        or any(not isinstance(title, str) or not title or len(title) > 160
+                               for title in origin["headers"])):
+                    raise ValueError("catalog discovery lineage is invalid")
                 if origin not in merged[url]["discoveries"]:
                     merged[url]["discoveries"].append(origin)
             if len(merged) > 100_000:
