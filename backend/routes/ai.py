@@ -17,7 +17,8 @@ import time
 from typing import Any, Dict, List, Literal, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.chat_turn_lifecycle import ChatTurnLifecycle
@@ -2429,6 +2430,7 @@ async def get_ai_chat_turn(
 
 @router.get("/chat/turns/{thread_id}/events")
 async def get_ai_chat_turn_events(
+    request: Request,
     thread_id: str,
     idempotency_key: str = Query(..., min_length=1, max_length=1024),
     after_sequence: int = Query(default=0, ge=0),
@@ -2492,7 +2494,7 @@ async def get_ai_chat_turn_events(
     except Exception as exc:
         raise _chat_error(exc) from exc
 
-    return {
+    result = {
         "success": True,
         "operation_id": operation_id,
         "engine_execution_id": execution_id,
@@ -2503,6 +2505,47 @@ async def get_ai_chat_turn_events(
         "page_digest": page.digest,
         "timestamp": _utcnow(),
     }
+    # Keep the exact-digest JSON page contract for API/diagnostic consumers.
+    # Browsers that explicitly accept SSE get immutable, bounded journal frames.
+    if "text/event-stream" not in request.headers.get("accept", "").lower():
+        return result
+
+    final = None
+    if turn.snapshot.terminal:
+        # The canonical conversation/turn endpoint owns final content and status.
+        # Do not project unverified provider fragments as the final assistant text.
+        final = await get_ai_chat_turn(
+            thread_id, idempotency_key=idempotency_key, user=user,
+        )
+
+    async def frames():
+        for event in page.events:
+            record = {
+                **event.as_dict(),
+                "type": event.kind,
+                "execution_id": execution_id,
+                "payload": {},
+            }
+            data = json.dumps(
+                record, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=False, allow_nan=False,
+            )
+            yield f"id: {event.sequence}\\nevent: engine.{event.kind}\\ndata: {data}\\n\\n"
+        if final is not None and final.get("terminal") is True:
+            data = json.dumps(
+                final, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=False, allow_nan=False, default=str,
+            )
+            yield f"event: chat.final\\ndata: {data}\\n\\n"
+        else:
+            # A completed bounded page is a detached observation, not a failed
+            # or re-submitted engine command. The client reopens from its cursor.
+            yield 'event: chat.detach\\ndata: {"reason":"page_complete"}\\n\\n'
+
+    return StreamingResponse(
+        frames(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/chat/turns/{thread_id}/cancel")
