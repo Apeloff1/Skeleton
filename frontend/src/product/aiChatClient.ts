@@ -6,7 +6,7 @@ import {
   getConversationTurn, startConversationTurn,
   type ConversationRequestOptions, type ConversationThread,
   type ConversationTurn, type ConversationTurnMemoryPolicy, type ConversationMessage,
-} from './conversationClient';
+} from './governedConversationClient';
 import { ChatClientError, asChatError, chatAbortError, chatApiError } from './chatErrors';
 
 export { ChatClientError } from './chatErrors';
