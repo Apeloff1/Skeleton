@@ -1,6 +1,6 @@
 # Dragon crawler — owner-wide freshness census and stale-policy isolation
 
-**Authored:** 2026-10-12 UTC  
+**Authored:** 2026-10-12 UTC
 **Depends on:** `dragon-source-policy-renewal-and-freshness-2026-10-12.md`
 
 ## Operational milestone

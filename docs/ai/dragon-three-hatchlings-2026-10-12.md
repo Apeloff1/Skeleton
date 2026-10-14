@@ -1,5 +1,5 @@
 # Dragon companion — three first-class hatchlings and mother research
-**Timestamp:** 2026-10-12 UTC  
+**Timestamp:** 2026-10-12 UTC
 **Change target:** `Apeloff1/Skeleton` / `feat/dragon-wisdom-review-20261010` / PR #3605.
 
 ## Corrected architecture — all THREE hatchlings

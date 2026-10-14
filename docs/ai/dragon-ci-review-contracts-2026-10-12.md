@@ -1,6 +1,6 @@
 # Dragon milestone — exact-head safety regression reconciliation
 
-**Recorded:** 2026-10-12 UTC  
+**Recorded:** 2026-10-12 UTC
 **Scope:** PR #3605, Dragon branch `feat/dragon-wisdom-review-20261010`.
 
 ## Verified regression baseline

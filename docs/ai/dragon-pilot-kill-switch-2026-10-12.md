@@ -1,5 +1,5 @@
 # Dragon pilot kill switch — persistent default-deny, cross-process stop
-**Authored:** 2026-10-12 UTC  
+**Authored:** 2026-10-12 UTC
 **Depends on:** Signed source capture permits and controlled research pilot.
 
 ## Operational milestone
@@ -30,4 +30,4 @@ Reactivation requires **freshly verified owner consent** and a compare-and-swap 
 
 The offline source-operations tests include default-off behavior even with a valid signed grant, refusal to enable without verified owner consent, issuer role refusal, shutdown after a robots response without a page request, resource-slot release and durable retry, cross-instance state detection, stale restart/replay rejection, redundant transition rejection, and broken journal detection. Exact-head Python test execution must still be verified.
 
-**No live sources acquired in this milestone.** The 248-source directory is not a source-rights inventory, and source-capture grants do not authorize media downloads, rights-free reuse or neural training. 
+**No live sources acquired in this milestone.** The 248-source directory is not a source-rights inventory, and source-capture grants do not authorize media downloads, rights-free reuse or neural training.

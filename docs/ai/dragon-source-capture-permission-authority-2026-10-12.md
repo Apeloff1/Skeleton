@@ -1,5 +1,5 @@
 # Dragon source-capture permission authority
-**Implementation:** 2026-10-12 UTC  
+**Implementation:** 2026-10-12 UTC
 **Scope:** Explicit one-source reference capture permissions; not model training.
 
 ## Trust model

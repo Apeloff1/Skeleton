@@ -1,6 +1,6 @@
 # Dragon crawler — robots-delay custody and long-horizon idle recrawling
-**Authored:** 2026-10-12 UTC  
-**Branch:** `feat/dragon-wisdom-review-20261010` (PR #3605)  
+**Authored:** 2026-10-12 UTC
+**Branch:** `feat/dragon-wisdom-review-20261010` (PR #3605)
 **Scope:** 248 curated editorial candidates; only sources with an independent current policy receipt may proceed.
 
 ## Milestone delivered
