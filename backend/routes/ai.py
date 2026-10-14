@@ -2511,7 +2511,10 @@ async def get_ai_chat_turn_events(
         return result
 
     final = None
-    if turn.snapshot.terminal:
+    if page.terminal and turn.snapshot.terminal:
+        # A bounded page must first reach its own terminal journal event:
+        # never skip unobserved immutable evidence just because the overall
+        # turn snapshot has completed since the client last fetched a page.
         # The canonical conversation/turn endpoint owns final content and status.
         # Do not project unverified provider fragments as the final assistant text.
         final = await get_ai_chat_turn(
