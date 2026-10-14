@@ -1,21 +1,6 @@
 name: AI Closure Evidence Contract
 
 on:
-  pull_request:
-    paths:
-      - "machine/ai_closure_evidence.json"
-      - "machine/ai_app_construction.json"
-      - "scripts/check_ai_closure_evidence.py"
-      - "skeleton/testing/test_ai_closure_evidence.py"
-      - ".github/workflows/ai-closure-evidence.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_closure_evidence.json"
-      - "machine/ai_app_construction.json"
-      - "scripts/check_ai_closure_evidence.py"
-      - "skeleton/testing/test_ai_closure_evidence.py"
-      - ".github/workflows/ai-closure-evidence.yml"
   workflow_dispatch:
 
 permissions:

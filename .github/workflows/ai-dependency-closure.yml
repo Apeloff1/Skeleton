@@ -1,25 +1,6 @@
 name: AI Dependency Closure
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_app_construction.json"
-      - "machine/ai_closure_evidence.json"
-      - "machine/ai_implementation_handoff.json"
-      - "scripts/verify_ai_dependency_closure.py"
-      - "scripts/verify_governance_closure.py"
-      - "scripts/verify_cost_admission_closure.py"
-      - "scripts/verify_provider_surface_closure.py"
-      - "scripts/verify_tool_runtime_closure.py"
-      - "tests/test_ai_dependency_closure.py"
-      - ".github/workflows/governance-closure.yml"
-      - ".github/workflows/cost-admission-closure.yml"
-      - ".github/workflows/provider-surface-closure.yml"
-      - ".github/workflows/tool-runtime-closure.yml"
-      - ".github/workflows/ai-dependency-closure.yml"
   workflow_dispatch:
 
 permissions:

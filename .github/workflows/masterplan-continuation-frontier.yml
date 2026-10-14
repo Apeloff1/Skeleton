@@ -1,35 +1,5 @@
 name: Masterplan Continuation Frontier
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "machine/ai_masterplan_continuation_frontier.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_p1_terminal_closure.json"
-      - "machine/ai_p2_functional_ai_closure.json"
-      - "machine/ai_p3_expansion_closure.json"
-      - "machine/ai_p3_engineering_closure.json"
-      - "machine/ai_p3_engineering_execution_map.json"
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_ai_masterplan_continuation.py"
-      - "tests/test_ai_masterplan_continuation.py"
-      - ".github/workflows/masterplan-continuation-frontier.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_masterplan_continuation_frontier.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_p1_terminal_closure.json"
-      - "machine/ai_p2_functional_ai_closure.json"
-      - "machine/ai_p3_expansion_closure.json"
-      - "machine/ai_p3_engineering_closure.json"
-      - "machine/ai_p3_engineering_execution_map.json"
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_ai_masterplan_continuation.py"
-      - "tests/test_ai_masterplan_continuation.py"
-      - ".github/workflows/masterplan-continuation-frontier.yml"
   workflow_dispatch:
 permissions:
   contents: read

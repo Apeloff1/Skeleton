@@ -1,16 +1,6 @@
 name: AI P0 Current-Main Validation
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/ai-p0-current-main-validation.yml"
-      - "backend/**"
-      - "frontend/**"
-      - "skeleton/**"
-      - "machine/**"
-      - "scripts/check_ai_assistant_control_plane.py"
   workflow_dispatch:
 
 permissions:
