@@ -361,14 +361,29 @@ class EngineExecutionCoordinator:
                 "execution_admission_denied",
             )
             return
-        try:
-            provider = self.provider_registry.require_active()
-        except ProviderUnavailableError:
-            await self._finalize_failure(
-                execution_id,
-                "provider_unavailable",
-            )
-            return
+        selection = command.execution_request.context_policy.get("provider_selection")
+        if selection is None:
+            try:
+                provider = self.provider_registry.require_active()
+            except ProviderUnavailableError:
+                await self._finalize_failure(execution_id, "provider_unavailable")
+                return
+        else:
+            if (
+                not isinstance(selection, dict)
+                or set(selection) != {"provider_id", "model_id"}
+                or command.execution_request.context_policy.get("provider_model")
+                != selection.get("model_id")
+            ):
+                await self._finalize_failure(execution_id, "provider_selection_invalid")
+                return
+            try:
+                provider = self.provider_registry.require_selected(
+                    selection["provider_id"], selection["model_id"],
+                )
+            except (ProviderUnavailableError, TypeError, ValueError):
+                await self._finalize_failure(execution_id, "provider_selection_unavailable")
+                return
 
         handoff = command.compiled_context
         allowed_tool_ids = tuple(
