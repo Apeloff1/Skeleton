@@ -514,11 +514,34 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             return self._request(
                 "POST", "/v1/sessions/" + sid + "/turn", request
             )
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            results = list(pool.map(lambda _: call(), range(2)))
-        self.assertEqual([x[0] for x in results], [200, 200])
-        self.assertEqual(sum(x[1]["replayed"] for x in results), 1)
-        self.assertEqual({x[1]["revision"] for x in results}, {1})
+        entered = threading.Event()
+        release = threading.Event()
+        perform_turn = self.app._perform_turn
+
+        def held_turn(*args, **kwargs):
+            entered.set()
+            if not release.wait(timeout=10):
+                raise AssertionError("concurrent turn was not released")
+            return perform_turn(*args, **kwargs)
+
+        with patch.object(self.app, "_perform_turn", side_effect=held_turn) as execute:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                first = pool.submit(call)
+                try:
+                    self.assertTrue(entered.wait(timeout=5))
+                    busy = call()
+                    self.assertEqual(busy[0], 409)
+                    self.assertIn("still running", busy[1]["error"])
+                    self.assertEqual(execute.call_count, 1)
+                finally:
+                    release.set()
+                committed = first.result(timeout=10)
+        replay = call()
+        self.assertEqual([committed[0], replay[0]], [200, 200])
+        self.assertFalse(committed[1]["replayed"])
+        self.assertTrue(replay[1]["replayed"])
+        self.assertEqual(committed[1]["output_digest"], replay[1]["output_digest"])
+        self.assertEqual({committed[1]["revision"], replay[1]["revision"]}, {1})
         _, record, _ = self._request("GET", "/v1/sessions/" + sid)
         self.assertEqual(record["revision"], 1)
 

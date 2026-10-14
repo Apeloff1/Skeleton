@@ -118,7 +118,9 @@
       "timeout_seconds": 720,
       "required_files": [
         "tests/flgb",
-        "tests/test_e2e_inference_receipt.py"
+        "tests/test_e2e_inference_receipt.py",
+        "tests/test_app_offline_chat_cli.py",
+        "tests/test_app_offline_http.py"
       ],
       "command": [
         "python",
@@ -131,7 +133,9 @@
         "-p",
         "pytest_asyncio.plugin",
         "tests/flgb",
-        "tests/test_e2e_inference_receipt.py"
+        "tests/test_e2e_inference_receipt.py",
+        "tests/test_app_offline_chat_cli.py",
+        "tests/test_app_offline_http.py"
       ]
     },
     {
