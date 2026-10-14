@@ -7,7 +7,7 @@ import {
   requestConversationDeletion, updateConversationState, getConversationExport, type ConversationExport,
   type ConversationMessage, type ConversationRequestOptions,
   type ConversationThread, type ConversationTurn, type ConversationTurnMemoryPolicy, type ConversationRecovery,
-} from './conversationClient';
+} from './governedConversationClient';
 import {
   followChatTurn, getChatModels, submitChatTurn, validateChatTurn,
   startRegenerationTurn, getRegenerationTurn, resumeRegenerationTurn, cancelRegenerationTurn, followRegenerationTurn,
