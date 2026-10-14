@@ -36,7 +36,6 @@ from core.engine_client import (
     EngineUnavailableError,
     command_from_context,
 )
-from core.model_catalog import model_catalog
 from routes.gameforge_auth import require_role
 from skeleton.contracts.context import (
     ContextBudget,
@@ -426,6 +425,8 @@ def _chat_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=409, detail=str(exc))
     if isinstance(exc, ConversationStorageUnavailable):
         return HTTPException(status_code=503, detail="Conversation storage is unavailable")
+    if isinstance(exc, ChatAttachmentError):
+        return HTTPException(status_code=exc.status_code, detail=str(exc))
     if isinstance(exc, ChatTurnNotFound):
         return HTTPException(status_code=404, detail="Chat turn not found")
     if isinstance(exc, (ChatTurnConflict, ChatTurnCorruption)):
@@ -515,6 +516,8 @@ def _compile_chat_context(
     operation_id: str,
     execution_id: str,
     request_context: str | None,
+    budget: ContextBudget = CHAT_CONTEXT_BUDGET,
+    attachment_segments: tuple[ContextSegment, ...] = (),
 ) -> ContextEnvelope:
     """Compile the one authoritative immutable context snapshot for a chat turn."""
 
@@ -571,13 +574,14 @@ def _compile_chat_context(
             )
         )
 
+    segments.extend(attachment_segments)
     return ContextCompiler().compile(
         operation_id=operation_id,
         execution_id=execution_id,
         turn_id=user_message.message_id,
         tenant_id=tenant_id,
         purpose=purpose,
-        budget=CHAT_CONTEXT_BUDGET,
+        budget=budget,
         segments=segments,
         tools_enabled=False,
         compiled_at=user_message.created_at,
@@ -1079,6 +1083,53 @@ async def ai_chat(
         )
 
     tenant_id, owner_id = _chat_identity(user)
+    selected_model = None
+    selected_budget = CHAT_CONTEXT_BUDGET
+    # Validate requested execution semantics BEFORE committing any user message.
+    # A missing engine or a non-selectable model is never silently replaced by
+    # whichever provider happens to be configured as the default.
+    explicit_options = any(value is not None for value in (
+        request.provider_id, request.model_id,
+        request.max_output_tokens, request.temperature,
+    ))
+    if (request.provider_id is None) != (request.model_id is None):
+        raise HTTPException(status_code=422, detail="Select both provider and model")
+    if len(set(request.attachment_refs)) != len(request.attachment_refs):
+        raise HTTPException(status_code=422, detail="Duplicate attachment references")
+    if explicit_options or request.attachment_refs:
+        try:
+            configured_engine = EngineClient.from_env()
+        except EngineClientError as exc:
+            raise HTTPException(status_code=503, detail="AI engine configuration is unavailable") from exc
+        if configured_engine is None:
+            raise HTTPException(status_code=503, detail="A configured AI engine is required")
+        if explicit_options:
+            inventory = await model_catalog(
+                configured_engine, actor_id=owner_id, tenant_id=tenant_id,
+            )
+            try:
+                selected_model = resolve_selection(
+                    inventory, provider_id=request.provider_id, model_id=request.model_id,
+                )
+                if request.temperature is not None and not selected_model["supports_temperature"]:
+                    raise ModelSelectionError("model_temperature_unsupported")
+                selected_budget = context_budget_for_selection(
+                    selected_model, output_tokens=request.max_output_tokens,
+                )
+            except ModelSelectionError as exc:
+                raise HTTPException(
+                    status_code=exc.status_code,
+                    detail={"code": exc.code, "message": str(exc)},
+                ) from exc
+        if request.attachment_refs:
+            try:
+                await resolve_attachment_context(
+                    thread_id=request.thread_id, tenant_id=tenant_id,
+                    owner_id=owner_id, attachment_refs=request.attachment_refs,
+                    created_at=datetime.now(timezone.utc),
+                )
+            except ChatAttachmentError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     retrying_incomplete_turn = False
     try:
         existing_transcript = await conversation_authority.active_transcript(
@@ -1114,7 +1165,7 @@ async def ai_chat(
                 + hashlib.sha256(request.context.encode("utf-8")).hexdigest()
             )
         context_refs.append(_chat_request_identity_ref(request))
-        context_attachment_refs = tuple(context_refs)
+        context_attachment_refs = tuple((*context_refs, *request.attachment_refs))
 
         # Preserve the canonical active lineage for every replay of an existing
         # turn, whether the assistant already committed or the turn is still
@@ -1234,6 +1285,13 @@ async def ai_chat(
         transcript,
         before_sequence=user_message.sequence,
     )
+    try:
+        admitted_files = await resolve_attachment_context(
+            thread_id=request.thread_id, tenant_id=tenant_id, owner_id=owner_id,
+            attachment_refs=request.attachment_refs, created_at=user_message.created_at,
+        ) if request.attachment_refs else None
+    except ChatAttachmentError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     context_envelope = _compile_chat_context(
         thread=thread,
         transcript=transcript,
@@ -1242,6 +1300,8 @@ async def ai_chat(
         operation_id=operation_id,
         execution_id=execution_id,
         request_context=request.context,
+        budget=selected_budget,
+        attachment_segments=() if admitted_files is None else admitted_files.segments,
     )
     try:
         chat_turn = await chat_turn_lifecycle.advance(
@@ -1395,10 +1455,21 @@ async def ai_chat(
                     max_model_turns=4,
                     max_tool_calls=1,
                     max_repeat_tool_batches=1,
+                    max_output_tokens=(
+                        None if selected_model is None else selected_budget.reserved_output_tokens
+                    ),
+                    provider_id=(
+                        None if selected_model is None else selected_model["selection_provider_id"]
+                    ),
+                    model_id=(
+                        None if selected_model is None else selected_model["selection_model_id"]
+                    ),
+                    temperature=request.temperature,
                     context_seed_refs=(
                         "conversation:" + thread.thread_id,
                         "conversation-message:" + user_message.message_id,
                         *context_attachment_refs,
+                        *(admitted_files.identity_refs if admitted_files is not None else ()),
                     ),
                     memory_write_intent=memory_write_intent,
                 )
