@@ -52,3 +52,27 @@ def test_same_git_blob_cannot_be_rebound_to_different_catalog_content():
     )
     with pytest.raises(ValueError, match="conflicting catalog identity"):
         merge_catalogs([one, two])
+
+
+def test_untrusted_catalog_cannot_promote_leads_or_forge_custody():
+    from copy import deepcopy
+
+    base = extract_catalog(
+        "https://example.com/reference", catalog_url="https://example.org/index",
+        blob_sha=BLOB, observed_at=STAMP,
+    )
+    changes = (
+        ("training_authorized", True),
+        ("rights", "cleared"),
+        ("availability", "fetched"),
+        ("host", "attacker.example"),
+    )
+    for field, value in changes:
+        forged = deepcopy(base)
+        forged["sources"][0][field] = value
+        with pytest.raises(ValueError):
+            merge_catalogs([forged])
+    bad_lineage = deepcopy(base)
+    bad_lineage["sources"][0]["discoveries"][0]["catalog_id"] = "catalog-" + "e" * 40
+    with pytest.raises(ValueError, match="lineage"):
+        merge_catalogs([bad_lineage])
