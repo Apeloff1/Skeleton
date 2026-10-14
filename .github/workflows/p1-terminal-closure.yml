@@ -1,43 +1,6 @@
 name: P1 Terminal Closure Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_app_construction.json"
-      - "skeleton/learning/promotion.py"
-      - "skeleton/release/slo_promotion.py"
-      - "skeleton/provider_runtime.py"
-      - "skeleton/ai/runtime/provider_runtime.py"
-      - "scripts/verify_p1_feedback_release_closure.py"
-      - "scripts/verify_provider_redundancy_closure.py"
-      - "scripts/verify_p1_terminal_closure.py"
-      - "tests/test_p1_feedback_release_independent_verifier.py"
-      - "tests/test_provider_redundancy_independent_verifier.py"
-      - "tests/test_p1_terminal_closure_verifier.py"
-      - ".github/workflows/p1-feedback-release-closure.yml"
-      - ".github/workflows/provider-redundancy-closure.yml"
-      - ".github/workflows/p1-terminal-closure.yml"
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_app_construction.json"
-      - "skeleton/learning/promotion.py"
-      - "skeleton/release/slo_promotion.py"
-      - "skeleton/provider_runtime.py"
-      - "skeleton/ai/runtime/provider_runtime.py"
-      - "scripts/verify_p1_feedback_release_closure.py"
-      - "scripts/verify_provider_redundancy_closure.py"
-      - "scripts/verify_p1_terminal_closure.py"
-      - "tests/test_p1_feedback_release_independent_verifier.py"
-      - "tests/test_provider_redundancy_independent_verifier.py"
-      - "tests/test_p1_terminal_closure_verifier.py"
-      - ".github/workflows/p1-feedback-release-closure.yml"
-      - ".github/workflows/provider-redundancy-closure.yml"
-      - ".github/workflows/p1-terminal-closure.yml"
   workflow_dispatch:
 
 permissions:

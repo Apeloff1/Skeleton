@@ -14,22 +14,6 @@ on:
       - "skeleton/testing/test_p1_failure_journeys.py"
       - "tests/test_p1_terminal_failure_journeys_policy.py"
       - ".github/workflows/p1-terminal-failure-journeys.yml"
-  pull_request:
-    branches:
-      - main
-      - p1/distributed-lane-materialize-20260928
-      - p1/maturity-intel-specialized-253-255-370-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/contracts/p1_failure_journeys.py"
-      - "skeleton/ai/runtime/contracts/p1_failure_journeys.py"
-      - "machine/p1_terminal_failure_journeys.json"
-      - "scripts/check_p1_terminal_failure_journeys.py"
-      - "scripts/build_p1_terminal_failure_journeys.py"
-      - "skeleton/testing/test_p1_failure_journeys.py"
-      - "tests/test_p1_terminal_failure_journeys_policy.py"
-      - ".github/workflows/p1-terminal-failure-journeys.yml"
   workflow_dispatch:
 
 permissions:

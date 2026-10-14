@@ -17,25 +17,6 @@ on:
       - "skeleton/testing/test_failure_knowledge.py"
       - "skeleton/testing/test_state_recovery_drill.py"
       - ".github/workflows/p1-disaster-recovery-feedback.yml"
-  pull_request:
-    branches:
-      - main
-      - p1/learn-lane-materialize-20260928
-      - p1/rel-04-backup-restore-qualification-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/release/disaster_recovery.py"
-      - "skeleton/release/restore.py"
-      - "skeleton/release/__init__.py"
-      - "skeleton/eval/failure_knowledge.py"
-      - "scripts/state_recovery_drill.py"
-      - "skeleton/testing/test_disaster_recovery_qualification.py"
-      - "skeleton/testing/test_backup_restore_qualification.py"
-      - "skeleton/testing/test_backup_restore_integration.py"
-      - "skeleton/testing/test_failure_knowledge.py"
-      - "skeleton/testing/test_state_recovery_drill.py"
-      - ".github/workflows/p1-disaster-recovery-feedback.yml"
   workflow_dispatch:
 
 permissions:

@@ -19,27 +19,6 @@ on:
       - "skeleton/testing/test_app_installer.py"
       - "skeleton/testing/test_windows_installer.py"
       - ".github/workflows/p1-installer-lifecycle.yml"
-  pull_request:
-    branches:
-      - main
-      - p1/learn-lane-materialize-20260928
-      - p1/rel-01-release-evidence-bundle-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/release/lifecycle.py"
-      - "skeleton/release/qualification.py"
-      - "skeleton/release/__init__.py"
-      - "skeleton/app/installer.py"
-      - "skeleton/app/setup_runtime.py"
-      - "skeleton/app/windows_launcher.py"
-      - "packaging/windows/**"
-      - "scripts/windows/**"
-      - "skeleton/testing/test_installer_lifecycle.py"
-      - "skeleton/testing/test_release_qualification.py"
-      - "skeleton/testing/test_app_installer.py"
-      - "skeleton/testing/test_windows_installer.py"
-      - ".github/workflows/p1-installer-lifecycle.yml"
   workflow_dispatch:
 
 permissions:

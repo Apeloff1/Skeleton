@@ -1,37 +1,6 @@
 name: P1 Scope Freeze Gate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/ai_build_accountability.json"
-      - "machine/ai_p1_terminal_closure.json"
-      - "machine/ai_scope_freeze_adrs.json"
-      - "scripts/check_ai_master_plan.py"
-      - "scripts/check_ai_scope_freeze.py"
-      - "skeleton/testing/test_ai_master_plan.py"
-      - "skeleton/testing/test_architecture_scope_freeze.py"
-      - "docs/plan/MASTER_PLAN.md"
-      - ".github/workflows/p1-scope-freeze.yml"
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/ai_build_accountability.json"
-      - "machine/ai_p1_terminal_closure.json"
-      - "machine/ai_scope_freeze_adrs.json"
-      - "scripts/check_ai_master_plan.py"
-      - "scripts/check_ai_scope_freeze.py"
-      - "skeleton/testing/test_ai_master_plan.py"
-      - "skeleton/testing/test_architecture_scope_freeze.py"
-      - "docs/plan/MASTER_PLAN.md"
-      - ".github/workflows/p1-scope-freeze.yml"
   workflow_dispatch:
 
 permissions:

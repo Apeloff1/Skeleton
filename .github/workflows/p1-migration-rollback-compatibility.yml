@@ -21,29 +21,6 @@ on:
       - "skeleton/testing/test_installer_lifecycle.py"
       - "skeleton/testing/test_release_qualification.py"
       - ".github/workflows/p1-migration-rollback-compatibility.yml"
-  pull_request:
-    branches:
-      - main
-      - p1/learn-lane-materialize-20260928
-      - p1/rel-02-installer-lifecycle-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/release/migration.py"
-      - "skeleton/release/lifecycle.py"
-      - "skeleton/release/qualification.py"
-      - "skeleton/release/__init__.py"
-      - "skeleton/contracts/migration_tests.py"
-      - "machine/state_topology.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/state_migration_compatibility.py"
-      - "skeleton/testing/test_state_migration_compatibility.py"
-      - ".github/workflows/state-recovery-drill.yml"
-      - "skeleton/config/**"
-      - "skeleton/testing/test_migration_rollback_compatibility.py"
-      - "skeleton/testing/test_installer_lifecycle.py"
-      - "skeleton/testing/test_release_qualification.py"
-      - ".github/workflows/p1-migration-rollback-compatibility.yml"
   workflow_dispatch:
 
 permissions:

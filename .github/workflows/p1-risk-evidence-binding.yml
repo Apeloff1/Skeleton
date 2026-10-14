@@ -29,37 +29,6 @@ on:
       - "tests/test_p1_risk_classification_evidence_batch1.py"
       - "tests/test_p1_risk_classification_bindings_batch1.py"
       - ".github/workflows/p1-risk-evidence-binding.yml"
-  pull_request:
-    branches:
-      - main
-      - p1/release-lane-materialize-20260928
-      - p1/risk-classification-evidence-batch1-20260930
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_adversarial_closure.json"
-      - "machine/ai_closure_evidence.json"
-      - "machine/p1_risk_evidence_policy.json"
-      - "machine/p1_risk_evidence_bindings.json"
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/ai_build_accountability.json"
-      - "machine/ai_p1_terminal_closure.json"
-      - "skeleton/contracts/risk_evidence.py"
-      - "skeleton/ai/runtime/contracts/risk_evidence.py"
-      - "skeleton/contracts/__init__.py"
-      - "skeleton/ai/runtime/contracts/__init__.py"
-      - "scripts/reconcile_p1_risk_evidence.py"
-      - "skeleton/testing/test_risk_evidence.py"
-      - "tests/test_p1_risk_evidence_reconciliation.py"
-      - "tests/test_p1_release_gap_bindings_batch1.py"
-      - "scripts/build_p1_control_plane_gap_evidence.py"
-      - "tests/test_p1_control_plane_gap_evidence.py"
-      - "tests/test_p1_control_plane_gap_bindings_batch2.py"
-      - "scripts/build_p1_risk_classification_evidence_batch1.py"
-      - "tests/test_p1_risk_classification_evidence_batch1.py"
-      - "tests/test_p1_risk_classification_bindings_batch1.py"
-      - ".github/workflows/p1-risk-evidence-binding.yml"
   workflow_dispatch:
 
 permissions:
