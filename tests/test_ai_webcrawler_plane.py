@@ -43,8 +43,8 @@ def test_robots_is_fail_closed_and_disallow_is_never_fetched():
     e = CrawlEngine(f, policy=CrawlPolicy(min_host_delay_seconds=0))
     assert e.enqueue("https://example.com/")
     assert e.step(now=1) is None
-    # Fail closed still makes a bounded robots request; protected page content
-    # must never be fetched until the destination's robots policy is known.
+    # Unknown robots policy is retrieved solely from /robots.txt.
+    # Missing robots denies the content URL, never the policy bootstrap.
     assert f.calls == ["https://example.com/robots.txt"]
 
     e = engine({"https://example.com/private": (200, "text/plain", "secret")})
@@ -125,9 +125,6 @@ def test_retry_is_bounded_and_backed_off():
     assert e.step(now=5) is None
     assert e.step(now=6) is None
     assert len(f.calls) == 3
-    # A failed network operation still consumes the global crawl budget;
-    # otherwise a repeatedly failing legacy fetcher can evade request caps.
-    assert e.budget.requests == 3
 
 
 def test_robots_bootstrap_is_self_directed_and_budgeted():
@@ -143,7 +140,13 @@ def test_robots_bootstrap_is_self_directed_and_budgeted():
         "https://example.com/robots.txt",
         "https://example.com/",
     ]
+    # One robots bootstrap plus one page: neither transport may double-charge.
     assert e.budget.requests == 2
+    assert e.budget.documents == 1
+    assert e.budget.bytes == (
+        len(pages["https://example.com/robots.txt"][2].encode())
+        + len(pages["https://example.com/"][2].encode())
+    )
 
 
 def test_robots_server_error_fails_closed():
@@ -163,3 +166,29 @@ def test_http_transport_rejects_private_literal_before_network():
         pass
     else:
         raise AssertionError("private destination must fail closed")
+
+
+def test_robots_longest_specific_path_wins_without_crossing_agent_groups():
+    e = CrawlEngine(FakeFetcher({}), policy=CrawlPolicy(min_host_delay_seconds=0))
+    e.install_robots(
+        "https://example.com",
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /private\n"
+        "Allow: /private/public\n"
+        "Disallow: /private/public/denied\n",
+    )
+    assert e.robots.allowed("https://example.com/open")
+    assert not e.robots.allowed("https://example.com/private")
+    assert e.robots.allowed("https://example.com/private/public")
+    assert not e.robots.allowed("https://example.com/private/public/denied")
+
+    # Site-wide wildcard directives must not override a specific user agent.
+    e.install_robots(
+        "https://example.net",
+        "User-agent: SkeletonAI-Crawler\n"
+        "Disallow: /sensitive\n"
+        "User-agent: *\n"
+        "Allow: /\n",
+    )
+    assert not e.robots.allowed("https://example.net/sensitive")

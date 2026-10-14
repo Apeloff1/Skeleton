@@ -7,6 +7,7 @@ credentials, instantiates provider SDKs, or chooses a provider transport.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import hashlib
 import json
@@ -203,6 +204,13 @@ class EngineChat:
         self._history: list[dict[str, str]] = []
         self._evidence: list[dict[str, str]] = []
         self._queued_prompt: str | None = None
+        # One mutable conversation projection must have one in-flight turn.
+        self._send_lock = asyncio.Lock()
+        # Explicit idempotency keys are bound to one immutable chat request.
+        # This short-lived facade cache cannot replace durable engine receipts.
+        self._completed_explicit_request: EngineTextRequest | None = None
+        self._completed_explicit_response: EngineChatResponse | None = None
+        self._completed_history_snapshot: tuple[tuple[str, str], ...] | None = None
 
     def with_model(self, provider: str, model: str) -> "EngineChat":
         # Routing metadata only; canonical engine policy owns provider choice.
@@ -401,6 +409,16 @@ class EngineChat:
         self,
         message: Any,
     ) -> EngineChatResponse:
+        # A single chat facade owns mutable history and turn idempotency.
+        # Serialize requests through their terminal append to avoid two
+        # concurrent sends building against the same prior context.
+        async with self._send_lock:
+            return await self._send_message_serial(message)
+
+    async def _send_message_serial(
+        self,
+        message: Any,
+    ) -> EngineChatResponse:
         prompt = self._prompt_text(message).strip()
         if not prompt:
             raise ValueError(
@@ -411,6 +429,19 @@ class EngineChat:
             or "Respond helpfully to the user request."
         )
         policy = self.instruction_policy
+        # Replaying the just-committed explicit turn must compare to the
+        # original immutable request, not the history that it appended.
+        # Any later history mutation means this key is no longer reusable.
+        history_snapshot = tuple(
+            (entry["role"], entry["content"]) for entry in self._history
+        )
+        effective_history = tuple(self._history)
+        if (
+            self._turn_idempotency_key is not None
+            and self._completed_explicit_request is not None
+            and history_snapshot == self._completed_history_snapshot
+        ):
+            effective_history = self._completed_explicit_request.history
         request = EngineTextRequest(
             instructions=instructions,
             prompt=prompt,
@@ -421,7 +452,7 @@ class EngineChat:
             instruction_policy_version=(
                 None if policy is None else policy.version
             ),
-            history=tuple(self._history),
+            history=effective_history,
             evidence=tuple(self._evidence),
             tenant_id=self.tenant_id,
             actor_id=self.actor_id,
@@ -431,16 +462,41 @@ class EngineChat:
             data_class=self.data_class,
             purpose=self.purpose,
         )
+        if (
+            self._turn_idempotency_key is not None
+            and self._completed_explicit_request is not None
+        ):
+            if request != self._completed_explicit_request:
+                raise EngineTextError(
+                    "explicit idempotency key reused with changed chat request"
+                )
+            if self._completed_explicit_response is None:
+                raise EngineTextError("explicit turn has no recorded terminal")
+            return self._completed_explicit_response
         response: EngineTextResponse = await self._engine_executor(
             request
         )
+        if not isinstance(response, EngineTextResponse):
+            raise EngineTextError(
+                "engine chat requires a canonical typed terminal response"
+            )
         self._history.append(
             {"role": "user", "content": prompt}
         )
         self._history.append(
             {"role": "assistant", "content": response.text}
         )
-        return EngineChatResponse(
+        # This is a bounded rebuildable view, not the persisted conversation
+        # record. Retain complete user/assistant pairs and evict oldest first.
+        while (
+            len(self._history) > 100
+            or sum(len(item["content"].encode("utf-8")) for item in self._history)
+            > 512 * 1024
+        ):
+            self._history.pop(0)
+            while self._history and self._history[0]["role"] == "assistant":
+                self._history.pop(0)
+        rendered = EngineChatResponse(
             response.text,
             operation_id=response.operation_id,
             execution_id=response.execution_id,
@@ -456,6 +512,13 @@ class EngineChat:
             artifact_refs=tuple(response.artifact_refs),
             usage=response.usage,
         )
+        if self._turn_idempotency_key is not None:
+            self._completed_explicit_request = request
+            self._completed_explicit_response = rendered
+            self._completed_history_snapshot = tuple(
+                (entry["role"], entry["content"]) for entry in self._history
+            )
+        return rendered
 
     async def chat(
         self,

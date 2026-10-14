@@ -57,3 +57,45 @@ def test_live_reaper_preserves_non_pr_security_runs_and_never_force_escalates_th
         "Security/provenance/artifact/dependency PR runs are never "
         "force-cancelled after an ordinary cancellation failure."
     ) in text
+
+
+def test_cleanup_stops_at_rate_limits_instead_of_spamming_delete_calls() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    for resource in ("cache", "artifact", "old-run"):
+        assert f"{resource}-delete-error.txt" in text
+    assert text.count("grep -Eqi '(rate.limit|abuse detection)'") >= 3
+    assert "Rate-limit backpressure activated: $rate_limited" in text
+    assert "Old-run cleanup deferred: GitHub API rate limit reached." in text
+    # Backpressure must persist across subsequent cleanup steps.
+    # The four inventory phases also emit persistent backpressure markers.
+    # Check that every phase continues to fail closed under API limits.
+    assert text.count('touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"') >= 6
+    assert text.count('if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]') >= 3
+
+
+def test_housekeeping_inventory_fails_closed_at_installation_rate_limit() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    for inventory in ("live", "cache", "artifact", "failed-run"):
+        assert f"{inventory}-inventory-api-error.txt" in text
+    assert text.count("Housekeeping inventory deferred due to GitHub API limits.") == 4
+    assert text.count('touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"') >= 6
+    assert "Skipping cache cleanup under GitHub API rate pressure." in text
+    assert "Skipping artifact deletion under GitHub API rate pressure." in text
+    assert "Skipping old-run deletion under GitHub API rate pressure." in text
+
+
+def test_old_run_cleanup_has_single_well_formed_loop_and_summary() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    step = text.split("      - name: Prune stale unsuccessful workflow runs\n", 1)[1]
+
+    # Regression: a split IFS token and duplicated summary previously left
+    # this workflow's destructive cleanup shell invalid.
+    assert "while IFS=$'\\t' read -r id created conclusion name; do" in step
+    assert "while IFS=\n" not in step
+    assert step.count('done < "$inventory"') == 1
+    assert step.count("Old unsuccessful runs deleted:") == 1
+    assert step.count("rate_limited=false") == 1
+    assert step.count('[[ "$id" != "$GITHUB_RUN_ID" ]]') == 1
+    assert step.count('gh run delete "$id" --repo "$REPO"') == 1
+    assert step.count("created_epoch >= cutoff || deleted >= MAX_RUN_DELETES") == 1

@@ -24,10 +24,7 @@ def test_promotion_gate_quarantines_uncorroborated_material():
 
 def test_promotion_gate_accepts_independent_corroboration():
  a=doc("https://a.example/","crawler evidence")
- # Different hosts with byte-for-byte mirrored bodies are NOT two
- # independently corroborating sources; this fixture must be independently
- # authored while remaining relevant to the same research question.
- b=doc("https://b.example/","crawler evidence supported by an independently authored benchmark report and original hardware traces")
+ b=doc("https://b.example/","independent laboratory results provide crawler evidence")
  e=EvidenceSet(ResearchQuery("crawler evidence",required_sources=2));e.add(a);e.add(b)
  assert PromotionGate().decide(a,e,now=100).action=="promote"
 

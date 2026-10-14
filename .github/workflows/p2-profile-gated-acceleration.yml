@@ -90,12 +90,12 @@ jobs:
         with:
           python-version: "3.11.16"
 
-      - name: Install repository runtime
+      - name: Install repository runtime and required test runner
         run: >-
           python -m pip install
           --disable-pip-version-check
           --no-input
-          -e .
+          -e . pytest==9.1.1
 
       - name: Validate acceleration policy
         run: python scripts/check_p2_acceleration.py --json

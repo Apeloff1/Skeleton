@@ -2,7 +2,7 @@
  * Human-reviewed bridge from an existing game's KB to the canonical
  * /api/design-spec/compile endpoint. Pure presentation helpers only.
  */
-import { mapWorldEvidence, validProjectId } from './worldWorkspace';
+import { mapWorldEvidence, validProjectId } from './worldWorkspace.ts';
 
 export type DesignFocus = 'gameplay'|'world'|'narrative'|'visuals';
 export type DesignReview = {
@@ -22,7 +22,7 @@ export type DesignReview = {
   model: string | null;
 };
 
-export const DESIGN_FOCUS: ReadonlyArray<{id: DesignFocus;title:string;instruction:string}> = [
+export const DESIGN_FOCUS: readonly {id: DesignFocus;title:string;instruction:string}[] = [
   {id:'gameplay',title:'Gameplay',instruction:'Review the core gameplay loop, agency, progression and failure states.'},
   {id:'world',title:'World building',instruction:'Review consistency of world geography, simulation rules, ecosystems and traversal.'},
   {id:'narrative',title:'Narrative',instruction:'Review player motivation, quests, pacing, characters and systemic narrative consistency.'},

@@ -16,7 +16,9 @@ import type { DesignFocus, DesignReview } from '../src/product/designReview';
 export default function DesignReviewRoute() {
   const router=useRouter();
   const params=useLocalSearchParams<{game?:string|string[]}>();
-  const gameId=validProjectId(Array.isArray(params.game)?params.game[0]:params.game);
+  const [hydrated,setHydrated]=React.useState(false);
+  React.useEffect(()=>{setHydrated(true);},[]);
+  const gameId=hydrated?validProjectId(Array.isArray(params.game)?params.game[0]:params.game):'';
   const [kb,setKb]=React.useState<unknown>(null);
   const [sourceState,setSourceState]=React.useState<'loading'|'ready'|'error'>('loading');
   const [focus,setFocus]=React.useState<DesignFocus>('gameplay');
@@ -85,7 +87,7 @@ export default function DesignReviewRoute() {
   };
   if(!gameId)return <SafeAreaView style={s.safe}><View style={s.panel}>
     <Text style={s.heading}>Select a real game</Text>
-    <Text style={s.copy}>Design review needs a valid game context. It cannot guess a demo or another user's project.</Text>
+    <Text style={s.copy}>Design review needs a valid game context. It cannot guess a demo or another user project.</Text>
     <TouchableOpacity style={s.primary} accessibilityRole="button" onPress={()=>reopen('/my-builds')}>
       <Text style={s.primaryText}>Choose a build →</Text>
     </TouchableOpacity>

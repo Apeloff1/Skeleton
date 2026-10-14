@@ -728,7 +728,7 @@
       "id": "BL-EDGE-HIST-SYS-020",
       "source_type": "edge_case",
       "source_ref": "HIST-SYS-020",
-      "rationale": "Saltzer\u2013Schroeder principles",
+      "rationale": "Saltzer–Schroeder principles",
       "owner": "repository-machine",
       "owner_ref": "WP-W13,WP-W14,WP-W20",
       "dependency_refs": [],

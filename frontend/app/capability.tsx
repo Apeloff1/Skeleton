@@ -90,8 +90,13 @@ export default function CapabilityRoute() {
         </View>
 
         {capability.actions.map((action) => {
-          const actionReadiness = capabilityReadiness?.find((item) => item.action === action.operation);
-          const readinessLabel = actionReadiness?.state === 'native_ready'
+          const isGoverned = typeof action.operation === 'string';
+          const actionReadiness = isGoverned
+            ? capabilityReadiness?.find((item) => item.action === action.operation)
+            : undefined;
+          const readinessLabel = !isGoverned
+            ? 'DIRECT NAVIGATION'
+            : actionReadiness?.state === 'native_ready'
             ? 'NATIVE READY'
             : actionReadiness
               ? actionReadiness.state.replace(/_/g, ' ').toUpperCase()
@@ -115,7 +120,7 @@ export default function CapabilityRoute() {
             </View>
             <Text style={styles.actionDescription}>{action.description}</Text>
             <View style={styles.operationPill}>
-              <Text style={styles.operationText}>{action.operation}</Text>
+              <Text style={styles.operationText}>{isGoverned ? action.operation : `Navigation: ${action.navigationId}`}</Text>
             </View>
             <View style={styles.buttonRow}>
               {action.href ? (

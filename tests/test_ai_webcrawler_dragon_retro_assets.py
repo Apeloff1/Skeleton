@@ -60,26 +60,37 @@ def test_patchers_fail_closed_on_foreign_rom_templates():
     assert "Tiles:" in gb_assembly()
     assert ".res $2000-" in nes_assembly()
 
-def test_dragon_oam_patch_accepts_compact_assembly_and_rejects_ambiguous_anchors():
-    sprite = (
-        "    xor a\n"
-        "    ld [DRAGON_OAM+2],a\n"
-        "    ld [DRAGON_OAM+3],a"
-    )
-    star = "    ld a, 1\n    ld [DRAGON_OAM+6],a"
-    source = (
-        "Tiles:\n    db $00\nTilesEnd:\n"
-        + sprite + "\n"
-        "PlayerY: ds 1\n"
-        "    ld a, 48\n    ld [PlayerX], a\n"
-        + star + "\n"
-    )
-    rendered = enrich_gb_asm(source)
-    assert "AnimFrame: ds 1" in rendered
-    assert "ld [DRAGON_OAM+2], a" in rendered
-    assert "ld [DRAGON_OAM+6], a" in rendered
-    assert "    ld a, 4\n    ld [DRAGON_OAM+6], a" in rendered
-    with pytest.raises(ValueError, match="sprite update anchor"):
-        enrich_gb_asm(source.replace(sprite, sprite + "\n" + sprite))
-    with pytest.raises(ValueError, match="collectible sprite declaration"):
-        enrich_gb_asm(source.replace(star, star + "\n" + star))
+
+def test_rgbds_reserved_identifiers_are_removed_only_after_asm_sprite_enrichment():
+    # Regression: canonical source uses whitespace variations, and OAM / VRAM
+    # became reserved lexer names in RGBDS 1.0.0.  Both can coexist without
+    # disabling the original animated character and sound instructions.
+    for target,style in (
+        ("game_boy","arcade_score_attack"),
+        ("game_boy_color","arcade_score_attack"),
+        ("game_boy","side_scrolling_platformer"),
+    ):
+        project=render_native_project(
+            title="Dragon RGBDS 1.0",target_id=target,style=style,
+            candidate_id=sha256((target+style).encode()).hexdigest(),
+            mechanics=(Mechanic.MOVEMENT,Mechanic.EXPLORATION),
+            authorized=True,
+        )
+        asm=project.files["src/main.asm"]
+        assert "DEF DRAGON_OAM EQU $FE00" in asm
+        assert "DEF DRAGON_VRAM EQU $8000" in asm
+        assert "DEF OAM EQU" not in asm
+        assert "DEF VRAM EQU" not in asm
+        assert "ld [DRAGON_OAM+6]" in asm
+        assert "ldh [$FF26],a" in asm
+        assert "SECTION \"Entry\", ROM0[$100]" in asm
+        if style=="side_scrolling_platformer":
+            assert "DEF GOAL_X EQU" in asm
+            assert "ld hl,DRAGON_VRAM" in asm
+        else:
+            assert "ld hl, DRAGON_VRAM" in asm
+            assert "ld hl, DRAGON_OAM" in asm
+            assert "ld hl, VRAM" not in asm
+            assert "ld hl, OAM" not in asm
+            assert "AnimFrame: ds 1" in asm
+            assert "ld a, 4" in asm

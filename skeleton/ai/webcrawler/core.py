@@ -322,48 +322,19 @@ class RobotsCache:
     def install(self, origin: str, robots_text: str, *, fetched_at: float = 0.0, etag: str | None = None, last_modified: str | None = None) -> None:
         parser = RobotFileParser()
         parser.set_url(origin.rstrip("/") + "/robots.txt")
-        # RobotFileParser uses first-matching rule, which differs from the
-        # longest-match precedence specified by modern robots policies.
-        # Reorder only directives within each agent group, retaining group
-        # boundaries and their user-agent selection semantics.
-        lines = robots_text.splitlines()
-        sorted_lines: list[str] = []
-        group: list[str] = []
-        def flush() -> None:
-            if not group:
-                return
-            agents = []
-            rules = []
-            seen_rule = False
-            for line in group:
-                key = line.split(":", 1)[0].strip().casefold() if ":" in line else ""
-                if key == "user-agent" and not seen_rule:
-                    agents.append(line)
-                else:
-                    if key not in {"user-agent", ""}:
-                        seen_rule = True
-                    rules.append(line)
-            rules.sort(key=lambda line: (
-                -(len(line.split(":", 1)[1].strip()) if ":" in line and
-                  line.split(":", 1)[0].strip().casefold() in {"allow", "disallow"} else 0),
-                0 if line.split(":", 1)[0].strip().casefold() == "allow" else 1,
-            ))
-            sorted_lines.extend(agents + rules)
-        for line in lines:
-            if not line.strip():
-                flush()
-                group = []
-                sorted_lines.append("")
-                continue
-            key = line.split(":", 1)[0].strip().casefold() if ":" in line else ""
-            if key == "user-agent" and any(
-                x.split(":", 1)[0].strip().casefold() in {"allow", "disallow"} for x in group if ":" in x
-            ):
-                flush()
-                group = []
-            group.append(line)
-        flush()
-        parser.parse(sorted_lines)
+        parser.parse(robots_text.splitlines())
+        # stdlib RobotFileParser matches the *first* applicable rule. RFC 9309
+        # instead selects the longest path match, with Allow winning ties.
+        # Sort only rule lines within each parsed agent group so a broad
+        # Allow: / cannot accidentally override Disallow: /private.
+        groups = [*parser.entries]
+        if parser.default_entry is not None:
+            groups.append(parser.default_entry)
+        for group in groups:
+            group.rulelines.sort(
+                key=lambda rule: (len(rule.path), rule.allowance),
+                reverse=True,
+            )
         self._parsers[origin] = parser
         self._meta[origin] = {"fetched_at": fetched_at, "etag": etag, "last_modified": last_modified}
 
@@ -459,22 +430,6 @@ class CrawlEngine:
             self._queued.discard(selected.url)
         return selected
 
-    @property
-    def pending_count(self) -> int:
-        """Number of queued attempts, including delayed retries."""
-        return len(self._frontier)
-
-    def next_ready_at(self) -> float | None:
-        """Earliest eligible attempt under both retry and host cooldowns.
-
-        This is a scheduling hint, not admission: step still applies policy,
-        robots and the shared request budget. No clock advancement or sleep
-        occurs here, and another host may be ready before the heap's head.
-        """
-        return min((max(item.ready_at, self._host_ready.get(
-            urlsplit(item.url).hostname or "", 0.0
-        )) for item in self._frontier), default=None)
-
     def _retry(self, item: FrontierItem, *, now: float, delay: float | None = None) -> None:
         if item.attempts >= self.policy.max_retries:
             return
@@ -551,9 +506,9 @@ class CrawlEngine:
             return None
         if not self.robots.allowed(item.url):
             return None
-        # fetch_with_policy owns the per-hop host cooldown. Reserving the
-        # first hop here would make fetch_with_policy reject this same request
-        # as premature, even after the scheduled frontier/robots delay.
+        # Redirect-aware fetch_with_policy performs the per-hop host cooldown
+        # check and commits its reservation. Reserving here first makes that
+        # very same first hop appear too early and rejects positive crawl delays.
         try:
             from .redirects import fetch_with_policy
             response = fetch_with_policy(self, item.url, now=now)
@@ -575,9 +530,11 @@ class CrawlEngine:
             item.url,
         ) if successful else None
         novel = bool(doc and not self.store.has_content(doc.content_hash))
-        # Redirect/robots transport charges each actual HTTP hop in
-        # fetch_with_policy. Counting the fallback fetcher again here would
-        # double-charge the same page and exhaust budgets prematurely.
+        # fetch_with_policy already charged each network response, including
+        # redirect hops, against the request/byte budget. Only a novel,
+        # accepted document remains to be charged here. Counting the same
+        # request a second time for fetchers without fetch_once exhausted
+        # small budgets prematurely and understated crawl availability.
         if novel:
             self.budget.documents += 1
         if not doc:

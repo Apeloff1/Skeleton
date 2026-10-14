@@ -122,12 +122,29 @@ def test_rejects_masterplan_gap_binding_loss() -> None:
     path = root / verifier.MASTER
     data = _load(path)
     volume = next(item for item in data["volumes"] if item["key"] == "VOL-052")
-    volume["gaps"].remove("add import graph fitness test")
+    # Reopen a cloned, unsigned volume but omit one required gap.
+    volume["completion_checkbox"] = False
+    volume["completion_checkbox_mark"] = "[ ]"
+    volume["implementation_status"] = "implemented"
+    volume["gaps"] = ["define package layer manifest"]
     _write(path, data)
 
     receipt = verifier.verify_repository(root)
     assert receipt["valid"] is False
     assert any("gap binding drift" in error for error in receipt["errors"])
+
+
+def test_rejects_forged_signed_volume_with_reopened_gap() -> None:
+    root = _fixture()
+    path = root / verifier.MASTER
+    data = _load(path)
+    volume = next(item for item in data["volumes"] if item["key"] == "VOL-052")
+    volume["gaps"] = ["unverified independent requirement"]
+    _write(path, data)
+
+    receipt = verifier.verify_repository(root)
+    assert receipt["valid"] is False
+    assert any("invalid signed completion state" in error for error in receipt["errors"])
 
 
 def test_rejects_validator_contract_weakening() -> None:

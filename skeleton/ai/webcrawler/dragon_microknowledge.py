@@ -69,7 +69,8 @@ class DragonMicroKnowledge:
         if authorized is not True:
             raise PermissionError("microknowledge indexing requires authorization")
         _id(owner); _id(concept_id); _id(evidence_ref)
-        if isinstance(expires_at, bool) or not isfinite(expires_at):
+        if (isinstance(expires_at, bool) or not isinstance(expires_at, (int, float))
+                or not isfinite(expires_at) or expires_at < 0):
             raise ValueError("invalid evidence expiry")
         self._facets(facets)
         row = self.db.execute("SELECT domain,statement FROM dragon_knowledge_concepts WHERE owner=? AND concept_id=?",
@@ -111,9 +112,17 @@ class DragonMicroKnowledge:
         if authorized is not True:
             raise PermissionError("microknowledge retrieval requires authorization")
         _id(owner); self._facets(facets)
-        if not isinstance(query, str) or not 1 <= len(query) <= 512 or isinstance(now, bool) or not isfinite(now):
+        if (not isinstance(query, str) or not 1 <= len(query) <= 512
+                or isinstance(now, bool) or not isinstance(now, (int, float))
+                or not isfinite(now) or now < 0):
             raise ValueError("invalid microknowledge query")
-        if not 0 <= plan.retrieval_candidates <= 256 or not 0 <= plan.context_bytes <= 65536 or not 1 <= plan.chunk_bytes <= 4096:
+        if (not isinstance(plan, ResourcePlan)
+                or type(plan.retrieval_candidates) is not int
+                or type(plan.context_bytes) is not int
+                or type(plan.chunk_bytes) is not int
+                or not 0 <= plan.retrieval_candidates <= 256
+                or not 0 <= plan.context_bytes <= 65536
+                or not 1 <= plan.chunk_bytes <= 4096):
             raise ValueError("invalid retrieval plan")
         terms = _terms(query)[:16]
         if not terms or not plan.retrieval_candidates or not plan.context_bytes:

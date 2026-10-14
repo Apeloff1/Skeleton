@@ -10,9 +10,9 @@ This document is a deterministic projection of machine authority. It has no comp
 
 | Source | Git blob SHA-1 |
 | --- | --- |
-| `machine/ai_master_plan.json` | `1733c3843d7dfe3e1bb609b65e1dee5686285942` |
+| `machine/ai_master_plan.json` | `868ec90626bffe7241217bd90ec2f3fd7a2f1cf9` |
 | `machine/ai_p2_execution_map.json` | `85f22876166ad284af7f1f05dff0532d43a60753` |
-| `machine/ai_p2_task_backlog.json` | `91b610d9dfdecfe655f3e250d0920f561555d0c1` |
+| `machine/ai_p2_task_backlog.json` | `f39dbcb8bf54cc1efd3f4962cb8941f583569bc6` |
 
 ## P2 execution boundary
 

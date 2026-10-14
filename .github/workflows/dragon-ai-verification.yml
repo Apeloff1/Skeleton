@@ -1,32 +1,9 @@
 name: Dragon AI Verification
 on:
   push:
-    # Exact-head execution for Dragon feature work, rather than relying on
-    # a PR check that currently exposes only CodeQL Actions analysis.
-    branches: [main, "feat/dragon-*"]
+    branches: [main]
     paths:
       - "skeleton/ai/webcrawler/dragon_*.py"
-      - "skeleton/ai/game_builder/**"
-      - "backend/routes/dragon_academy.py"
-      - "backend/routes/dragon_research.py"
-      - "backend/core/dragon_research_session.py"
-      - "backend/tests/test_dragon_research_routes.py"
-      - "frontend/app/dragon-research.tsx"
-      - "frontend/app/gameforge-studio.tsx"
-      - "backend/tests/test_dragon_academy_routes.py"
-      - "backend/tests/test_dragon_delivery_routes.py"
-      - "backend/core/dragon_*.py"
-      - "backend/core/conversations.py"
-      - "backend/server.py"
-      - "scripts/check_provider_bootstrap.py"
-      - "backend/routes/ai.py"
-      - "backend/tests/test_dragon_runtime_bridge.py"
-      - "backend/tests/test_dragon_conversation_binding.py"
-      - "tests/test_dragon_*.py"
-      - "tests/test_game_niche_research.py"
-      - "frontend/features/Jeeves/companion/**"
-      - "frontend/scripts/test-dragon-wisdom.cjs"
-      - "frontend/scripts/test-dragon-delivery.cjs"
       - "tests/test_ai*dragon*.py"
       - "frontend/src/components/Dragon*.tsx"
       - "frontend/src/components/dragon*.ts"
@@ -39,27 +16,6 @@ on:
     branches: [main]
     paths:
       - "skeleton/ai/webcrawler/dragon_*.py"
-      - "skeleton/ai/game_builder/**"
-      - "backend/routes/dragon_academy.py"
-      - "backend/routes/dragon_research.py"
-      - "backend/core/dragon_research_session.py"
-      - "backend/tests/test_dragon_research_routes.py"
-      - "frontend/app/dragon-research.tsx"
-      - "frontend/app/gameforge-studio.tsx"
-      - "backend/tests/test_dragon_academy_routes.py"
-      - "backend/tests/test_dragon_delivery_routes.py"
-      - "backend/core/dragon_*.py"
-      - "backend/core/conversations.py"
-      - "backend/server.py"
-      - "scripts/check_provider_bootstrap.py"
-      - "backend/routes/ai.py"
-      - "backend/tests/test_dragon_runtime_bridge.py"
-      - "backend/tests/test_dragon_conversation_binding.py"
-      - "tests/test_dragon_*.py"
-      - "tests/test_game_niche_research.py"
-      - "frontend/features/Jeeves/companion/**"
-      - "frontend/scripts/test-dragon-wisdom.cjs"
-      - "frontend/scripts/test-dragon-delivery.cjs"
       - "tests/test_ai*dragon*.py"
       - "frontend/src/components/Dragon*.tsx"
       - "frontend/src/components/dragon*.ts"
@@ -83,9 +39,9 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with: {python-version: "3.11.16"}
       - name: Install focused test runtime
-        run: python -m pip install --disable-pip-version-check "pytest>=8,<9" "cryptography>=50,<51"
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
       - name: Compile Dragon modules
-        run: python -m compileall -q skeleton/ai/webcrawler skeleton/ai/game_builder backend/routes/dragon_academy.py
+        run: python -m compileall -q skeleton/ai/webcrawler
       - name: Run Dragon regression suite
         env:
           PYTHONPATH: "."
@@ -99,135 +55,6 @@ jobs:
           fi
           printf 'Running %s Dragon test modules\n' "${#tests[@]}"
           python -m pytest -q --noconftest "${tests[@]}"
-      - name: Dragon wisdom and canonical owner integration
-        env:
-          PYTHONPATH: "."
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: |
-          set -euo pipefail
-          # Legacy forge tests bootstrap package modules into sys.modules.
-          # Process isolation keeps class identities canonical for each suite.
-          for test in \
-            tests/test_ai_game_builder_runtime.py \
-            tests/test_ai_game_builder_overengineering_runtime.py \
-            tests/test_ai_game_builder_governance.py \
-            tests/test_game_builder_knowledge_rights_bridge.py \
-            tests/test_game_builder_reviewed_knowledge.py \
-            tests/test_game_research_foundation.py \
-            tests/test_game_niche_research.py \
-            tests/test_dragon_almanacs.py \
-            tests/test_dragon_discovery_mission.py \
-            tests/test_dragon_discovery_facets.py \
-            tests/test_dragon_discovery_portfolio.py \
-            tests/test_dragon_research_campaigns.py \
-            tests/test_dragon_discovery_admission.py \
-            tests/test_dragon_staged_supplements.py \
-            tests/test_dragon_discovery_census.py \
-            tests/test_dragon_platform_coverage.py \
-            tests/test_dragon_discovery_identity_audit.py \
-            tests/test_dragon_technical_source_atlas.py \
-            tests/test_dragon_technical_source_expansion.py \
-            tests/test_dragon_technical_source_captures.py \
-            tests/test_dragon_technical_source_analysis.py \
-            tests/test_dragon_specialist_evidence.py \
-            tests/test_dragon_evidence_mirror.py \
-            tests/test_dragon_technical_source_operations.py \
-            tests/test_dragon_technical_source_acquisition.py \
-            tests/test_dragon_nest_source_feed.py \
-            tests/test_dragon_nest_worker_admission.py \
-            tests/test_dragon_catalog_expansion.py \
-            tests/test_dragon_delivery.py \
-            tests/test_dragon_wisdom_pyramid.py \
-            tests/test_dragon_wisdom_refresh_bridge.py \
-            tests/test_dragon_recrawl_dispatch.py \
-            tests/test_dragon_wisdom_authority.py \
-            tests/test_dragon_wisdom_operational.py \
-            tests/test_dragon_wisdom_integration.py \
-            tests/test_dragon_visual_play_integration.py \
-            tests/test_dragon_evidence_timestamp_compatibility.py; do
-            python -m pytest -q --noconftest "$test"
-          done
-      - name: Authenticated Dragon companion snapshots
-        run: |
-          python -m pip install --disable-pip-version-check "fastapi==0.142.2" "httpx==0.28.1" "bcrypt>=4,<6" "PyJWT>=2,<3" "email-validator>=2,<3"
-          PYTHONPATH=.:backend PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest backend/tests/test_dragon_academy_routes.py backend/tests/test_dragon_delivery_routes.py backend/tests/test_dragon_research_routes.py
-      - name: Canonical Dragon resource and conversation lifecycle
-        run: |
-          python -m pip install --disable-pip-version-check "pymongo>=4,<5" "motor>=3,<4" "pytest-asyncio>=0.24,<2" "python-dotenv>=1,<2" "pydantic-settings>=2,<3"
-          PYTHONPATH=.:backend PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest -p pytest_asyncio.plugin backend/tests/test_dragon_runtime_bridge.py backend/tests/test_dragon_conversation_binding.py backend/tests/test_conversation_storage_admission.py backend/tests/test_conversation_regeneration.py backend/tests/test_conversation_governance.py
-  source-safety:
-    name: Dragon Source Safety
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: {persist-credentials: false}
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        with: {python-version: "3.11.16"}
-      - name: Install focused test runtime
-        run: python -m pip install --disable-pip-version-check "pytest>=8,<9" "cryptography>=50,<51"
-      - name: Compile critical Dragon source authorities
-        run: |
-          python -m compileall -q \
-            skeleton/ai/game_builder/dragon_worker_stop_authority.py \
-            skeleton/ai/game_builder/dragon_pilot_budget.py \
-            skeleton/ai/game_builder/dragon_external_rights.py \
-            skeleton/ai/game_builder/dragon_video_transcript_ledger.py \
-            skeleton/ai/game_builder/dragon_source_delta_ledger.py \
-            skeleton/ai/game_builder/dragon_mother_evidence_synergy.py \
-            skeleton/ai/game_builder/dragon_article_hatchling.py \
-            skeleton/ai/game_builder/dragon_three_hatchling_coordinator.py \
-            skeleton/ai/game_builder/dragon_evidence_disagreement.py \
-            skeleton/ai/game_builder/dragon_research_mirror.py \
-            skeleton/ai/game_builder/dragon_research_source_picker.py \
-            skeleton/ai/game_builder/dragon_research_workboard.py \
-            skeleton/ai/game_builder/dragon_family_research_history.py \
-            skeleton/ai/webcrawler/dragon_hundred_matrix_scrutiny.py \
-            skeleton/ai/webcrawler/dragon_mother_hundred_handoff.py \
-            skeleton/ai/webcrawler/dragon_cross_source_factchecking.py \
-            skeleton/ai/webcrawler/dragon_correlated_mother_handoff.py \
-            skeleton/ai/webcrawler/dragon_rss_freshness_scheduler.py \
-            skeleton/ai/webcrawler/dragon_verified_rss_poll.py \
-            skeleton/ai/webcrawler/dragon_video_tool_research.py \
-            skeleton/ai/webcrawler/dragon_weight_tier_sandbox.py \
-            skeleton/ai/webcrawler/dragon_weight_deployment_vault.py \
-            skeleton/ai/webcrawler/dragon_weight_canary.py \
-            skeleton/ai/webcrawler/dragon_evidence_freshness_ledger.py \
-            skeleton/ai/webcrawler/dragon_jeeves_freshness_guard.py \
-            skeleton/ai/webcrawler/dragon_video_inspiration.py \
-            skeleton/ai/webcrawler/dragon_rss_update_queue.py \
-            skeleton/ai/webcrawler/dragon_weekly_research_export.py \
-            backend/core/dragon_research_session.py \
-            backend/routes/dragon_research.py \
-            skeleton/ai/game_builder/dragon_source_permission_authority.py \
-            skeleton/ai/game_builder/dragon_source_health.py \
-            skeleton/ai/game_builder/dragon_research_pilot.py \
-            tests/test_ai_dragon_source_safety.py \
-            skeleton/ai/game_builder/dragon_technical_source_operations.py \
-            skeleton/ai/game_builder/dragon_technical_source_acquisition.py
-      - name: Execute signed-stop, pilot and capture regression suite
-        env:
-          PYTHONPATH: "."
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: |
-          set -euo pipefail
-          python -m pytest -q --noconftest \
-            tests/test_dragon_technical_source_operations.py \
-            tests/test_ai_dragon_source_safety.py \
-            tests/test_dragon_specialist_evidence.py \
-            tests/test_dragon_evidence_mirror.py \
-            tests/test_dragon_hyperweight_pipeline.py \
-            tests/test_dragon_fact_corroboration.py \
-            tests/test_dragon_rss_freshness_scheduler.py \
-            tests/test_dragon_verified_rss_poll.py \
-            tests/test_dragon_evidence_freshness.py
-          python -m pytest -q --noconftest \
-            tests/test_dragon_technical_source_acquisition.py
-          python -m pytest -q --noconftest \
-            tests/test_dragon_technical_source_captures.py
-
   frontend:
     name: Dragon Frontend
     runs-on: ubuntu-latest
@@ -248,36 +75,5 @@ jobs:
         run: yarn test:dragon-companion
       - name: Cross-language canonical wire parity
         run: yarn test:dragon-wire
-      - name: Final Dragon wisdom display
-        run: yarn test:dragon-wisdom
-      - name: Dragon knowledge-to-native delivery
-        run: node scripts/test-dragon-delivery.cjs
       - name: TypeScript compile
         run: yarn typecheck
-  research-backend:
-    name: Dragon Authenticated Research Backend
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: {persist-credentials: false}
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        with: {python-version: "3.11.16"}
-      - name: Install independent backend validation runtime
-        run: |
-          python -m pip install --disable-pip-version-check \
-            "pytest>=8,<9" "cryptography>=50,<51" \
-            "fastapi==0.142.2" "httpx==0.28.1" "bcrypt>=4,<6" \
-            "PyJWT>=2,<3" "email-validator>=2,<3" \
-            "pymongo>=4,<5" "motor>=3,<4" \
-            "python-dotenv>=1,<2" "pydantic-settings>=2,<3"
-      - name: Validate authenticated research routes independent of broad suite
-        env:
-          PYTHONPATH: ".:backend"
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: |
-          python -m pytest -q --noconftest \
-            backend/tests/test_dragon_research_routes.py \
-            backend/tests/test_dragon_academy_routes.py

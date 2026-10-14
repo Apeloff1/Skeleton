@@ -80,7 +80,11 @@ def _slots(replicas: Sequence[CheckpointReplica]) -> tuple[CheckpointReplica, ..
         domains.add(domain)
         identities.add(id(replica))
         if isinstance(replica, (FileCheckpointReplica, AuthenticatedFileCheckpointReplica)):
-            path = replica.path.resolve(strict=False)
+            # An existing symlink is an unreadable replica, never a quorum
+            # vote. Preserve its slot identity so two independent healthy
+            # replicas can recover while read(O_NOFOLLOW) rejects this slot.
+            path = (replica.path.absolute() if replica.path.is_symlink()
+                    else replica.path.resolve(strict=False))
             if path in file_paths:
                 raise ModelRuntimeError("duplicate checkpoint storage path")
             file_paths.add(path)

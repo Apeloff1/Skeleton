@@ -78,7 +78,10 @@ jobs:
           python-version: "3.11.16"
 
       - name: Install project test runtime
-        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+        # Live route tests import the backend JWT auth boundary.
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]" "PyJWT==2.15.1"
 
       - name: Validate AI chat runtime structure
         run: python scripts/check_ai_chat_runtime.py
@@ -95,7 +98,7 @@ jobs:
 
       - name: Run AI chat and inherited assistant regressions
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q --noconftest --import-mode=importlib -p pytest_asyncio.plugin
           skeleton/testing/test_ai_chat_turn_runtime.py
           skeleton/testing/test_ai_chat_streaming.py
           skeleton/testing/test_ai_chat_turn_ownership.py
@@ -113,7 +116,7 @@ jobs:
 
       - name: Run live chat route cutover regressions
         run: >-
-          python -m pytest -q
+          python -m pytest -q --import-mode=importlib -p pytest_asyncio.plugin
           backend/tests/test_ai_chat_turn_lifecycle.py
           backend/tests/test_ai_chat_turn_route_cutover.py
           backend/tests/test_ai_chat_conversation_authority.py

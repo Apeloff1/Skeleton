@@ -2006,7 +2006,7 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "verified",
       "requirements": [
-        "Use inspect\u2192plan\u2192lease\u2192edit\u2192build\u2192test\u2192review\u2192verify as the canonical repository mutation flow.",
+        "Use inspect→plan→lease→edit→build→test→review→verify as the canonical repository mutation flow.",
         "Isolate workspaces and mutation leases to prevent concurrent destructive edits.",
         "Require patch provenance, focused regression evidence and rollback/revert path."
       ],
@@ -4157,16 +4157,21 @@
         "pyproject.toml"
       ],
       "tests": [
-        "planned:skeleton/testing/test_python_layering.py",
-        "planned:skeleton/testing/test_import_side_effects.py"
+        "tests/test_architecture_package_layers.py",
+        "tests/test_vol052_python_architecture_independent.py",
+        "tests/flgb/test_masterplan_closure.py"
       ],
       "evaluations": [
-        "planned:dependency-cycle scan",
-        "planned:cold-import determinism evaluation"
+        "scripts/check_architecture_package_layers.py",
+        "scripts/verify_vol052_python_architecture.py",
+        ".github/workflows/vol052-python-architecture.yml"
       ],
       "evidence": [
         "skeleton/masterplan/closure.py",
-        "tests/flgb/test_masterplan_closure.py"
+        "tests/flgb/test_masterplan_closure.py",
+        "scripts/check_architecture_package_layers.py",
+        "scripts/verify_vol052_python_architecture.py",
+        ".github/workflows/vol052-python-architecture.yml"
       ],
       "risks": [
         "circular imports",
@@ -4285,10 +4290,12 @@
         "dangling path/reference",
         "schema downgrade"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
+      ],
       "accountability_id": "ACC-VOL-054",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-041-080",
       "enterprise_grade_state": "designed",
@@ -10594,10 +10601,12 @@
         "simulation differs from runtime",
         "biased trace corpus"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-166",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -10646,10 +10655,12 @@
         "stale threat model",
         "unowned mitigation"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-167",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -10761,10 +10772,12 @@
         "implicit trust crossing",
         "fallback privilege widening"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-169",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -10928,10 +10941,12 @@
         "SSRF",
         "policy bypass via redirects"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-172",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -10980,10 +10995,12 @@
         "secret in prompt/log",
         "long-lived credentials"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-173",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11031,10 +11048,12 @@
         "lost key",
         "revoked key remains trusted"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-174",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11083,10 +11102,12 @@
         "tenant bleed",
         "shared cache leak"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-175",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11132,10 +11153,12 @@
         "classification loss",
         "secondary-use violation"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-176",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11186,10 +11209,12 @@
         "tombstone resurrection",
         "orphan derivatives"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-177",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11235,10 +11260,12 @@
         "missing transitive dependency",
         "stale vulnerability data"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-178",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11333,10 +11360,12 @@
         "misleading SLI",
         "unowned objective"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-180",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11383,10 +11412,12 @@
         "bad denominator",
         "budget used to excuse critical failure"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-181",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11433,10 +11464,12 @@
         "metrics backend overload",
         "PII in labels"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-182",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11483,10 +11516,12 @@
         "broken correlation",
         "trace contains secrets"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-183",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11533,10 +11568,12 @@
         "benchmark distortion",
         "profiler overhead misread"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-184",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11583,10 +11620,12 @@
         "retry hides tail latency",
         "stage budget oversubscription"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-185",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11633,10 +11672,12 @@
         "double charge",
         "unsafe cheap fallback"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-186",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",
@@ -11683,10 +11724,12 @@
         "greenwashing metric",
         "quality loss hidden by efficiency"
       ],
-      "gaps": [],
+      "gaps": [
+        "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
+      ],
       "accountability_id": "ACC-VOL-187",
       "completion_checkbox": true,
-      "completion_checkbox_mark": "[x]",
+      "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
       "enterprise_grade_state": "designed",

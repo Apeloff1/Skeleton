@@ -4,65 +4,11 @@ from dataclasses import dataclass
 import hashlib
 import json
 import math
-import re
 import sqlite3
-from urllib.parse import urlsplit
 from typing import Any, Mapping
 
 SCHEMA = "skeleton.ai.dragon_crawl.event.v1"
-_SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\Z")
-
-
-def _validate_source_url(url: object) -> str:
-    """Bound the journal's asserted HTTP origin; this does not grant fetch rights."""
-    if not isinstance(url, str) or len(url) > 4096 or any(ord(c) < 32 for c in url):
-        raise ValueError("invalid event URL")
-    try:
-        parsed = urlsplit(url)
-        if (parsed.scheme not in {"http", "https"} or not parsed.hostname
-                or parsed.username is not None or parsed.password is not None
-                or parsed.fragment):
-            raise ValueError("invalid event URL")
-        _ = parsed.port
-    except (ValueError, TypeError) as exc:
-        raise ValueError("invalid event URL") from exc
-    return url
 ALLOWED = frozenset(("frontier_discovered","dragon_travel","visual_probe","robots_check","fetch_started","fetch_received","policy_rejected","acquisition_accepted","burn_started","burn_chunk","burn_complete","retry_wait","crawl_complete"))
-
-
-def _bounded_json_tree(value: Mapping[str, Any]) -> None:
-    """Admit finite canonical JSON before serialization allocates large strings.
-
-    Caps depth and entries, including for malicious Mapping subclasses and
-    deeply nested arrays whose encoded result might otherwise exhaust memory.
-    """
-    stack = [(value, 0)]
-    visited = 0
-    while stack:
-        current, depth = stack.pop()
-        visited += 1
-        if visited > 4096 or depth > 24:
-            raise ValueError("journal payload node/depth budget exceeded")
-        if isinstance(current, Mapping):
-            if len(current) > 4096:
-                raise ValueError("journal payload field budget exceeded")
-            for key, child in current.items():
-                if not isinstance(key, str) or len(key) > 256:
-                    raise ValueError("journal JSON object keys must be bounded text")
-                stack.append((child, depth + 1))
-        elif isinstance(current, list):
-            if len(current) > 4096:
-                raise ValueError("journal array budget exceeded")
-            stack.extend((child, depth + 1) for child in current)
-        elif current is None or isinstance(current, (str, bool, int)):
-            if isinstance(current, str) and len(current) > 32768:
-                raise ValueError("journal string budget exceeded")
-        elif isinstance(current, float):
-            if not math.isfinite(current):
-                raise ValueError("non-finite journal payload value")
-        else:
-            raise ValueError("non-JSON journal payload value")
-
 
 def _canonical(value: Mapping[str, Any]) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
@@ -100,31 +46,17 @@ class DragonEventJournal:
 
     def append(self, session_id: str, kind: str, url: str, *, at: float,
                payload: Mapping[str, Any] | None = None) -> StoredDragonEvent:
-        if not isinstance(session_id, str) or not _SESSION_ID.fullmatch(session_id) or kind not in ALLOWED:
+        if not session_id or len(session_id) > 128 or kind not in ALLOWED:
             raise ValueError("invalid session or event kind")
-        _validate_source_url(url)
-        if isinstance(at, bool) or not isinstance(at, (int, float)) or not math.isfinite(at) or at < 0:
+        if not url.startswith(("https://", "http://")) or len(url) > 4096:
+            raise ValueError("invalid event URL")
+        if not math.isfinite(at):
             raise ValueError("event time must be finite")
-        # SQLite REAL round trips integers as floats. Hash persisted semantics.
+        # SQLite REAL converts integral timestamps to floats on reread.
         at = float(at)
-        if payload is not None and not isinstance(payload, Mapping):
-            raise ValueError("journal payload must be a JSON object")
-        try:
-            data = dict(payload) if payload is not None else {}
-            _bounded_json_tree(data)
-        except ValueError:
-            # Keep bounded-tree failure categories visible to test and operators.
-            # In particular a self-referential mapping is rejected by the finite
-            # node/depth budget before recursive JSON serialization.
-            raise
-        except (TypeError, UnicodeError, OverflowError, RecursionError) as exc:
-            raise ValueError("journal payload must be canonical finite JSON") from exc
-        try:
-            encoded = _canonical(data)
-            size = len(encoded.encode("utf-8", errors="strict"))
-        except (TypeError, ValueError, UnicodeError, OverflowError, RecursionError) as exc:
-            raise ValueError("journal payload must be canonical finite JSON") from exc
-        if size > 32768:
+        data = dict(payload or {})
+        encoded = _canonical(data)
+        if len(encoded.encode("utf-8")) > 32768:
             raise ValueError("event payload exceeds limit")
         with self.db:
             row = self.db.execute(
@@ -155,89 +87,27 @@ class DragonEventJournal:
         return {"events": events, "nextCursor": str(rows[-1][0]) if rows else None,
                 "hasMore": has_more}
 
-    def verified_page(self, session_id: str, *, after: int = 0,
-                      limit: int = 100) -> dict[str, Any]:
-        """Return a bounded page and its chain receipts only if history verifies.
-
-        The digest chain proves internal continuity, not operator identity or
-        authenticity of the URLs. Hosting APIs must still authenticate sessions.
-        """
-        if (not isinstance(session_id, str) or not _SESSION_ID.fullmatch(session_id)
-                or type(after) is not int or after < 0
-                or type(limit) is not int or not 1 <= limit <= 1000):
-            raise ValueError("invalid verified journal page parameters")
-        if not self.verify(session_id):
-            raise ValueError("journal evidence chain failed verification")
-        result = self.page(session_id, after=after, limit=limit)
-        proof = self.db.execute(
-            "SELECT sequence,previous_digest,digest FROM dragon_companion_events "
-            "WHERE session_id=? AND sequence>? ORDER BY sequence LIMIT ?",
-            (session_id, after, limit)).fetchall()
-        if [row[0] for row in proof] != [event["sequence"] for event in result["events"]]:
-            raise ValueError("journal page changed after chain verification")
-        # Bind every returned record to the verified database digest. A
-        # replacement/mutation between the verification and page read must
-        # never be represented as an already-verified evidence event.
-        for event, (seq, parent, digest) in zip(result["events"], proof):
-            if event.get("event_id") != digest or event.get("schema") != SCHEMA:
-                raise ValueError("journal page evidence changed after verification")
-            record = {
-                "session_id": session_id, "sequence": seq,
-                "kind": event.get("kind"), "url": event.get("url"),
-                "at": event.get("at"), "payload": event.get("payload"),
-                "previous_digest": parent,
-            }
-            try:
-                calculated = hashlib.sha256(_canonical(record).encode("utf-8")).hexdigest()
-                if calculated != digest and isinstance(record["at"], float) and record["at"].is_integer():
-                    record["at"] = int(record["at"])
-                    calculated = hashlib.sha256(_canonical(record).encode("utf-8")).hexdigest()
-                if calculated != digest:
-                    raise ValueError("journal page evidence digest mismatch")
-            except (TypeError, UnicodeError, OverflowError, RecursionError) as exc:
-                raise ValueError("journal page evidence cannot be verified") from exc
-        return {
-            **result,
-            "chain_verified": True,
-            "chain_receipts": [
-                {"sequence": seq, "previous_digest": parent, "digest": digest}
-                for seq, parent, digest in proof
-            ],
-        }
-
     def verify(self, session_id: str) -> bool:
         previous = "0" * 64
-        # Stream rows from SQLite: journal verification must not materialize
-        # the entire history in memory for long-lived companion sessions.
-        cursor = self.db.execute(
+        rows = self.db.execute(
             "SELECT sequence,event_id,kind,url,at,payload,previous_digest,digest "
             "FROM dragon_companion_events WHERE session_id=? ORDER BY sequence",
-            (session_id,))
-        for index, r in enumerate(cursor, 1):
-            try:
-                seq, event_id, kind, url, at, payload, parent, digest = r
-                if (seq != index or parent != previous or event_id != digest
-                        or kind not in ALLOWED or not math.isfinite(at)):
-                    return False
-                _validate_source_url(url)
-                parsed_payload = json.loads(payload)
-                if (not isinstance(parsed_payload, dict)
-                        or _canonical(parsed_payload) != payload):
-                    return False
-                base = {"session_id": session_id, "sequence": seq, "kind": kind,
-                        "url": url, "at": at, "payload": parsed_payload,
-                        "previous_digest": parent}
-                computed = hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest()
-                if computed != digest:
-                    # Historical integer timestamp writers encoded timestamp
-                    # as int before SQLite REAL round-trip. Preserve exact
-                    # evidence without broadening any other chain field.
-                    if not float(at).is_integer():
-                        return False
-                    base["at"] = int(at)
-                    if hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest() != digest:
-                        return False
-                previous = digest
-            except (ValueError, TypeError, UnicodeError, OverflowError, RecursionError):
+            (session_id,)).fetchall()
+        for index, r in enumerate(rows, 1):
+            seq, event_id, kind, url, at, payload, parent, digest = r
+            if seq != index or parent != previous or event_id != digest:
                 return False
+            base = {"session_id": session_id, "sequence": seq, "kind": kind,
+                    "url": url, "at": at, "payload": json.loads(payload),
+                    "previous_digest": parent}
+            candidate=hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest()
+            if candidate!=digest:
+                # Backward-compatible verification of old integer-time
+                # records; the complete original digest still must match.
+                if not isinstance(at,(int,float)) or not float(at).is_integer():
+                    return False
+                base["at"]=int(at)
+                if hashlib.sha256(_canonical(base).encode("utf-8")).hexdigest()!=digest:
+                    return False
+            previous = digest
         return True

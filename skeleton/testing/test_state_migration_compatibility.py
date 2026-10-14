@@ -108,22 +108,21 @@ def test_current_workflows_bind_migration_rehearsal_to_recovery_and_release() ->
     assert all(len(row["digest"]) == 64 for row in receipt.values())
 
 
-def test_current_masterplan_has_consistent_exact_head_qualification() -> None:
-    # The independent verifier accepts either an open qualification gap or
-    # a signed VOL-005 after the qualification evidence was added. Do not
-    # freeze the original pre-signoff state into this regression assertion.
+def test_current_masterplan_preserves_migration_qualification_or_signed_closure() -> None:
+    # This binding can legitimately advance after independent sign-off.
+    # Never allow an incomplete checkbox with cleared qualification evidence.
     binding = _verify_masterplan(ROOT)
 
     assert binding["key"] == "VOL-005"
-    if binding["gaps"]:
-        assert binding["gaps"] == [QUALIFICATION_GAP]
+    assert len(binding["binding_digest"]) == 64
+    if binding["gaps"] == [QUALIFICATION_GAP]:
         assert binding["completion_checkbox"] is False
         assert binding["completion_checkbox_mark"] == "[ ]"
     else:
+        assert binding["gaps"] == []
+        assert binding["implementation_status"] == "verified"
         assert binding["completion_checkbox"] is True
         assert binding["completion_checkbox_mark"] == "[x]"
-        assert binding["implementation_status"] in {"implemented", "hardened", "verified"}
-    assert len(binding["binding_digest"]) == 64
 
 
 def _topology_fixture(tmp_path: Path) -> Path:

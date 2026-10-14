@@ -204,7 +204,12 @@ def _findings(level: LevelExperience) -> tuple[PlayabilityFinding, ...]:
         flags.append(("route_overrun", "strong" if level.route_overrun_ppm > 3_000_000 else "attention"))
     if level.hazard_hits:
         flags.append(("hazard_damage", "strong" if level.hazard_hits > 1 else "attention"))
-    if level.moves >= max(12, level.shortest_safe_route) and not level.completed:
+    if (not level.completed and level.moves >= max(12, level.shortest_safe_route)
+            and level.unique_tiles_visited >= 3
+            and level.collectibles_found < level.collectibles_total):
+        # Repeated no-op wall inputs alone cannot implicate objective design.
+        # Require a substantial traversal and independent spatial progress
+        # before recommending that an operator review incomplete objectives.
         flags.append(("incomplete_objectives", "attention"))
     evidence = canonical_digest(level.to_payload())
     return tuple(

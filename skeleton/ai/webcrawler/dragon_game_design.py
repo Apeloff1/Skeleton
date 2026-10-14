@@ -8,9 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass,asdict
 from hashlib import sha256
 import json,re
-import os,stat
 from pathlib import Path
 from .dragon_native_targets import STYLES,CATALOG
+from .dragon_desktop_abi import DESKTOP_NATIVE
 
 FIELDS=frozenset({
   "schema","title","target","genre","palette","stages","candidates",
@@ -53,9 +53,7 @@ def parse_design(data:object)->GameDesign:
     palette=_text("palette",r"[a-z_]{3,30}",30)
     hero=_text("hero",r"[a-z_]{2,32}",32)
     theme=_text("quest_theme",r"[a-z_]{2,32}",32)
-    notes=_text("project_notes",r"[A-Za-z0-9 .,!?_:;'()/+-]{0,200}",200)
-    if re.search(r"(?:^|;)\s*(?:rm|curl|wget|bash|sh|powershell|cmd|python|node)(?:\s|$)", notes, re.IGNORECASE):
-        raise ValueError("project notes contain command-shaped instructions")
+    notes=_text("project_notes",r"[A-Za-z0-9 .,!?_:;'()+-]{0,200}",200)
     for k,low,high in (("stages",1,8),("candidates",1,24),
                        ("seed",0,2**32-1),("difficulty",1,10)):
         val=data[k]
@@ -67,7 +65,7 @@ def parse_design(data:object)->GameDesign:
         raise ValueError("unsupported genre identifier")
     if palette not in PALETTES or hero not in HEROES or theme not in THEMES:
         raise ValueError("unknown game art or thematic controls")
-    if target not in ("pc_linux","pc_windows","pc_macos","steam_deck"):
+    if target not in DESKTOP_NATIVE:
         if data["stages"]!=1 or data["candidates"]!=1:
             raise ValueError("cartridge generator has one stage/seed per design")
         if palette not in ("dmg_green","handheld","vga_dusk"):
@@ -78,64 +76,20 @@ def parse_design(data:object)->GameDesign:
         data["candidates"],data["seed"],data["difficulty"],hero,theme,notes,
         sha256(canonical.encode()).hexdigest())
 
-
-def verify_design(design: GameDesign) -> GameDesign:
-    """Reject forged dataclass instances before they affect native source output."""
-    if not isinstance(design, GameDesign):
-        raise ValueError("canonical GameDesign required")
-    fields = {key: getattr(design, key) for key in FIELDS}
-    rebuilt = parse_design(fields)
-    if rebuilt != design:
-        raise ValueError("game design digest or controls mutated after admission")
-    return design
-
 def load_design(path:Path)->GameDesign:
-    """Safely read one stable, small UTF-8 design from an operator-owned path.
-
-    Retain the opened file's identity across the read, so changing a source
-    path into a symlink or different file cannot bypass input validation.
-    """
-    path=Path(path).expanduser()
-    try:
-        initial=path.lstat()
-        if not stat.S_ISREG(initial.st_mode) or not 1 <= initial.st_size <= 16384:
-            raise ValueError("game design must be a small regular JSON file")
-        flags=(os.O_RDONLY | getattr(os,"O_BINARY",0)
-               | getattr(os,"O_CLOEXEC",0) | getattr(os,"O_NOFOLLOW",0)
-               | getattr(os,"O_NONBLOCK",0))
-        fd=os.open(path,flags)
-        with os.fdopen(fd,"rb") as stream:
-            opened=os.fstat(stream.fileno())
-            if (not stat.S_ISREG(opened.st_mode)
-                    or (initial.st_dev,initial.st_ino)!=(opened.st_dev,opened.st_ino)):
-                raise ValueError("game design source changed during admission")
-            payload=stream.read(16385)
-            final=os.fstat(stream.fileno())
-        current=path.lstat()
-        if (not stat.S_ISREG(current.st_mode)
-                or (current.st_dev,current.st_ino)!=(opened.st_dev,opened.st_ino)
-                or (final.st_dev,final.st_ino,final.st_size,final.st_mtime_ns)
-                !=(opened.st_dev,opened.st_ino,opened.st_size,opened.st_mtime_ns)
-                or len(payload)!=opened.st_size):
-            raise ValueError("game design source changed during admission")
-    except OSError as exc:
-        raise ValueError("game design must be a readable regular JSON file") from exc
-    if not 1 <= len(payload) <= 16384:
-        raise ValueError("game design exceeds byte limit")
-    try:
-        raw=payload.decode("utf-8",errors="strict")
-    except UnicodeError as exc:
-        raise ValueError("game design must be strict UTF-8") from exc
+    path=Path(path)
+    if path.is_symlink() or not path.is_file() or path.stat().st_size>16384:
+        raise ValueError("game design must be a small regular JSON file")
+    raw=path.read_text(encoding="utf-8")
+    if len(raw.encode())>16384:
+        raise ValueError("game design too large")
     def no_duplicate(pairs):
         result={}
         for k,v in pairs:
             if k in result:raise ValueError("duplicate game design field")
             result[k]=v
         return result
-    def no_nonfinite(value):
-        raise ValueError("non-finite game design values are forbidden")
-    return parse_design(json.loads(raw,object_pairs_hook=no_duplicate,
-                                   parse_constant=no_nonfinite))
+    return parse_design(json.loads(raw,object_pairs_hook=no_duplicate))
 
 def starter_design(*,title="Dragon Deep Quest",target="pc_linux",
                    genre="roguelike",seed=1)->dict:
@@ -149,4 +103,4 @@ def starter_design(*,title="Dragon Deep Quest",target="pc_linux",
     }
 
 def design_manifest(design:GameDesign)->dict:
-    return asdict(verify_design(design))
+    return asdict(design)

@@ -35,7 +35,14 @@ def test_feedback_workflow_keeps_artifact_pin_and_fail_closed_publish() -> None:
     text = _workflow_text()
 
     assert (
-        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+        "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9"
         in text
     )
     assert "if-no-files-found: error" in text
+
+
+def test_feedback_excludes_main_before_actions_run_admission() -> None:
+    text = _workflow_text()
+    trigger, _, rest = text.partition("concurrency:")
+    assert '      - "!main"' in trigger
+    assert "github.event.workflow_run.event == 'pull_request'" in rest

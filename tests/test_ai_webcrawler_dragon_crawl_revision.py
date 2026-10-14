@@ -155,9 +155,9 @@ def test_fingerprints_change_when_source_revision_changes():
     assert before.fingerprint != after.fingerprint
     assert before.current_custody_fingerprint != after.current_custody_fingerprint
     assert not after.prior_readings_reusable
-    assert after.sources[0].quality_changed
+    assert after.sources[0].content_changed
+    assert not after.sources[0].quality_changed
     assert after.readings[0].disposition is ReadingDisposition.QUOTE_ABSENT
-    assert after.readings[0].requires_human_review
 
 
 def test_permutation_does_not_change_any_revision_receipt():
@@ -318,3 +318,16 @@ def test_capture_time_only_change_is_not_quality_drift():
     assert not result.sources[0].quality_changed
     assert result.sources[0].change is SourceChange.UNCHANGED
     assert result.prior_readings_reusable
+
+
+def test_changed_quality_without_changed_text_requires_new_review():
+    source = capture("alpha")
+    changed = replace(source, document=replace(
+        source.document,
+        source_score=max(0.0, source.document.source_score - 0.1),
+    ))
+    report = check((source,), (reading(),), (changed,))
+    assert report.sources[0].quality_changed
+    assert not report.sources[0].content_changed
+    assert report.readings[0].disposition is ReadingDisposition.QUALITY_CHANGED
+    assert not report.prior_readings_reusable

@@ -61,7 +61,9 @@ class EvidenceFact:
     def __post_init__(self) -> None:
         _text(self.key)
         _text(self.evidence_ref, 256)
-        if not isinstance(self.truth, Truth) or isinstance(self.expires_at, bool) or not isfinite(self.expires_at):
+        if (not isinstance(self.truth, Truth) or isinstance(self.expires_at, bool)
+                or not isinstance(self.expires_at, (int, float)) or not isfinite(self.expires_at)
+                or self.expires_at < 0):
             raise ValueError("invalid evidence fact")
 
 
@@ -78,7 +80,9 @@ class MatrixRule:
         if not self.all_of and not self.any_of:
             raise ValueError("rule requires evidence predicates")
         for values in (self.all_of, self.any_of, self.unless, self.required_slots):
-            if len(values) > 32 or len(set(values)) != len(values):
+            if (not isinstance(values, tuple) or len(values) > 32
+                    or any(not isinstance(value, str) for value in values)
+                    or len(set(values)) != len(values)):
                 raise ValueError("invalid matrix rule size")
             for value in values:
                 _text(value)
@@ -104,8 +108,12 @@ class MatrixDecision:
 def evaluate_matrix(rule: MatrixRule, facts: tuple[EvidenceFact, ...],
                     bindings: Mapping[str, str], *, now: float,
                     genre: str, era: str, engine: str) -> MatrixDecision:
-    if isinstance(now, bool) or not isfinite(now) or len(facts) > 256 or len(bindings) > 32:
-        raise ValueError("matrix budget exceeded")
+    if (not isinstance(rule, MatrixRule) or isinstance(now, bool)
+            or not isinstance(now, (int, float)) or not isfinite(now) or now < 0
+            or not isinstance(facts, tuple) or len(facts) > 256
+            or any(not isinstance(fact, EvidenceFact) for fact in facts)
+            or not isinstance(bindings, Mapping) or len(bindings) > 32):
+        raise ValueError("invalid matrix input or budget")
     for value in (genre, era, engine):
         _text(value, 64)
     if len({f.key for f in facts}) != len(facts):

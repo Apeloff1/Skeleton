@@ -33,10 +33,7 @@ def test_ingestion_attaches_promotion_receipt():
  assert r.accepted and s.records[0]["metadata"]["promotion_receipt"]["action"]=="promote"
 
 def test_session_stops_on_independent_evidence_sufficiency():
- a=doc("https://a.example/")
- # Independently corroborating sources must have genuinely distinct content,
- # not identical mirrored bytes on different domains.
- b=doc("https://b.example/", text="research evidence gathered from independent controlled device measurements")
+ a=doc("https://a.example/");b=doc("https://b.example/","research evidence separately supported by independent laboratory results")
  session=ResearchSession(ResearchQuery("research evidence",required_sources=2),Engine([a,b]),SessionLimits(max_steps=10))
  session.run_step(now=100);assert session.stop_reason is None
  session.run_step(now=100);assert session.stop_reason=="evidence_sufficient"

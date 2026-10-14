@@ -116,6 +116,13 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/settings/offline', title: 'Offline Settings', category: 'settings' },
   { path: '/settings/feature-flags', title: 'Feature Flags', category: 'settings' },
 
+  { path: '/design-review', title: 'Design Review', category: 'build' },
+  { path: '/forge-operator/cockpit', title: 'Forge Operator · Cockpit', category: 'build' },
+  { path: '/forge-operator/intake', title: 'Forge Operator · Intake', category: 'build' },
+  { path: '/journeys', title: 'Journeys', category: 'progress' },
+  { path: '/story-index', title: 'Story Index', category: 'ai' },
+  { path: '/world-workbench', title: 'World Workbench', category: 'build' },
+
   // Filesystem-discovered routes kept in the same canonical registry so
   // route coverage fails closed when screens are added or removed.
   { path: '/agent-memory', title: 'Agent Memory', category: 'ai' },
@@ -141,6 +148,14 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/design-spec', title: 'Design Spec', category: 'build' },
   { path: '/discourse', title: 'Discourse', category: 'tools' },
   { path: '/discover', title: 'Discover', category: 'core' },
+  { path: '/dragon-genomic-universe', title: 'Dragon Genomic Universe', category: 'build', heavy: true },
+  { path: '/dragon-living-world', title: 'Dragon Living World', category: 'build', heavy: true },
+  { path: '/dragon-maze-world', title: 'Dragon Maze World', category: 'build', heavy: true },
+  { path: '/dragon-native-production', title: 'Dragon Native Production', category: 'build', heavy: true },
+  { path: '/dragon-originals-forge', title: 'Dragon Originals Forge', category: 'build', heavy: true },
+  { path: '/dragon-route-atlas', title: 'Dragon Route Atlas', category: 'build', heavy: true },
+  { path: '/dragon-route-world', title: 'Dragon Route World', category: 'build', heavy: true },
+  { path: '/dragon-world-codex', title: 'Dragon World Codex', category: 'build', heavy: true },
   { path: '/edit-gamefiles', title: 'Edit Game Files', category: 'code' },
   { path: '/factions', title: 'Factions', category: 'build' },
   { path: '/feature-flags', title: 'Feature Flags', category: 'settings' },

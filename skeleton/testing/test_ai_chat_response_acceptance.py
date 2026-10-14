@@ -303,8 +303,8 @@ def test_acceptance_decision_is_deterministic_and_non_executing() -> None:
 
 def live_acceptance(**overrides):
     values = {
-        "operation_id": "operation-1",
-        "observed_operation_id": "operation-1",
+        "operation_id": "11111111-1111-4111-8111-111111111111",
+        "observed_operation_id": "11111111-1111-4111-8111-111111111111",
         "expected_execution_id": "execution-1",
         "observed_execution_id": "execution-1",
         "context_digest": "d" * 64,
@@ -332,7 +332,7 @@ def test_live_engine_response_is_bound_before_commit() -> None:
 
 
 def test_live_response_acceptance_rejects_operation_identity_drift() -> None:
-    receipt_value = live_acceptance(observed_operation_id="operation-2")
+    receipt_value = live_acceptance(observed_operation_id="22222222-2222-4222-8222-222222222222")
     assert receipt_value.accepted is False
     assert "operation_identity_mismatch" in receipt_value.reasons
 
@@ -421,7 +421,7 @@ def test_live_response_receipt_is_order_invariant_for_receipt_sets() -> None:
 
 def live_claim_binding(
     *,
-    operation_id: str = "operation-1",
+    operation_id: str = "11111111-1111-4111-8111-111111111111",
     context_digest: str = "d" * 64,
     disposition: PublicationDisposition = PublicationDisposition.PUBLISH,
 ) -> LiveClaimEvidenceBinding:
@@ -444,7 +444,7 @@ def test_live_claim_evidence_binds_structured_claims_to_turn_lineage() -> None:
     assert binding.accepted is True
     assert binding.required_claim_count == 1
     assert binding.accepted_claim_count == 1
-    assert binding.operation_id == "operation-1"
+    assert binding.operation_id == "11111111-1111-4111-8111-111111111111"
     assert binding.context_digest == "d" * 64
     assert len(binding.decision_digest) == 64
     assert binding.production_authority is False
@@ -452,11 +452,11 @@ def test_live_claim_evidence_binds_structured_claims_to_turn_lineage() -> None:
 
 def test_live_claim_evidence_rejects_claim_operation_drift() -> None:
     item = claim(
-        operation_id="operation-2",
+        operation_id="22222222-2222-4222-8222-222222222222",
         context_digest="d" * 64,
     )
     binding = bind_live_claim_evidence(
-        operation_id="operation-1",
+        operation_id="11111111-1111-4111-8111-111111111111",
         context_digest="d" * 64,
         claims=(item,),
         receipts=(receipt(item),),
@@ -469,11 +469,11 @@ def test_live_claim_evidence_rejects_claim_operation_drift() -> None:
 
 def test_live_claim_evidence_rejects_claim_context_drift() -> None:
     item = claim(
-        operation_id="operation-1",
+        operation_id="11111111-1111-4111-8111-111111111111",
         context_digest="e" * 64,
     )
     binding = bind_live_claim_evidence(
-        operation_id="operation-1",
+        operation_id="11111111-1111-4111-8111-111111111111",
         context_digest="d" * 64,
         claims=(item,),
         receipts=(receipt(item),),
@@ -486,11 +486,11 @@ def test_live_claim_evidence_rejects_claim_context_drift() -> None:
 
 def test_live_claim_evidence_rejects_missing_required_receipt() -> None:
     item = claim(
-        operation_id="operation-1",
+        operation_id="11111111-1111-4111-8111-111111111111",
         context_digest="d" * 64,
     )
     binding = bind_live_claim_evidence(
-        operation_id="operation-1",
+        operation_id="11111111-1111-4111-8111-111111111111",
         context_digest="d" * 64,
         claims=(item,),
         receipts=(),
@@ -533,8 +533,12 @@ def test_live_gate_rejects_present_but_rejected_claim_evidence() -> None:
 
 
 def test_live_claim_binding_is_content_minimized() -> None:
-    binding = live_claim_binding()
-    encoded = str(binding.as_dict())
+    operation_id = "44444444-4444-4444-8444-444444444444"
+    binding = live_claim_binding(operation_id=operation_id)
+    payload = binding.as_dict()
+    assert payload["operation_id"] == operation_id
+    assert binding.accepted is True
+    encoded = str(payload)
     assert "System A decreases latency by 10 percent." not in encoded
     assert CLAIM_ID not in encoded
     assert binding.authority_scope == "live-claim-evidence-binding-only"

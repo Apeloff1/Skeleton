@@ -32,6 +32,13 @@ WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 # publishers must be reviewed repository-by-repository so approving one scanner
 # or build helper cannot silently authorize every action from that publisher.
 TRUSTED_ACTION_OWNERS = frozenset({"actions", "github"})
+
+# Exact-release exception for the signed Chickensoft v2.4.1 Godot installer.
+# Only this fully qualified immutable action ref is accepted. Do not widen
+# APPROVED_THIRD_PARTY_ACTIONS to cover arbitrary revisions or sibling actions.
+APPROVED_EXACT_PINNED_ACTIONS = frozenset({
+    "chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789",
+})
 APPROVED_THIRD_PARTY_ACTIONS = frozenset(
     {
         "anchore/sbom-action",
@@ -44,6 +51,9 @@ APPROVED_THIRD_PARTY_ACTIONS = frozenset(
         "docker/setup-qemu-action",
         "gacts/gitleaks",
         "gitleaks/gitleaks-action",
+        # Reviewed MSYS2 UCRT64 compiler installer for native Windows homebrew;
+        # workflow pins one exact 40-hex action commit, not a mutable v2 tag.
+        "msys2/setup-msys2",
     }
 )
 
@@ -73,6 +83,11 @@ def _reference_violation(path_name: str, number: int, reference: str) -> str | N
             f"{path_name}:{number}: remote action/reusable workflow has an invalid "
             f"repository reference: {reference}"
         )
+
+    # A reviewed exception must match the entire action ref, not merely the
+    # owner/repo. Tags, different SHAs and nested reusable workflows fail closed.
+    if reference in APPROVED_EXACT_PINNED_ACTIONS:
+        return None
 
     owner = repository.split("/", 1)[0]
     if owner in TRUSTED_ACTION_OWNERS or repository in APPROVED_THIRD_PARTY_ACTIONS:

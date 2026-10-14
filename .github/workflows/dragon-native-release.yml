@@ -29,21 +29,24 @@ jobs:
       matrix:
         host: [ubuntu-24.04, windows-2025, macos-15]
     steps:
-      - name: Enable long paths before Windows checkout
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: git config --global core.longpaths true
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # The monorepo contains unrelated legacy Windows paths longer than
+      # MAX_PATH. Fetch only the Dragon webcrawler source tree, which contains
+      # the pure-Python generator's bounded sibling imports. Do not import
+      # the skeleton.ai package initializer into this standalone build.
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+          sparse-checkout: |
+            /skeleton/ai/webcrawler/
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Confirm available native host C compiler and CMake
         run: cmake --version
       - name: Build native executable and replay all original puzzle stages
         run: >
-          python -m skeleton.ai.webcrawler.dragon_native_release
+          python skeleton/ai/webcrawler/dragon_native_release.py
           --out _generated/dragon-puzzle
           --title "Original Dragon Puzzle Quest"
       - name: Verify release ZIP SHA and native executable evidence
@@ -60,7 +63,7 @@ jobs:
           assert release["selftest_stage_lines"]==4
           assert release["binary_sha256"] and release["source_fingerprint"]
           print("DRAGON_NATIVE_HOST_ARTIFACT_PASS",release["target"],release["binary_format"])
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@v7
         with:
           name: dragon-native-puzzle-${{ matrix.host }}
           path: |

@@ -61,83 +61,6 @@ def test_principal_is_tenant_scoped_and_not_request_controllable():
         route._principal({"email":"alice@example.test","tenant_id":123,"role":"viewer"})
 
 
-
-def test_nest_read_api_requires_secret_and_never_mints_progress(tmp_path, monkeypatch):
-    from fastapi import Response
-    from skeleton.ai.webcrawler.dragon_nest_store import DragonNestStore
-    owner=identity()
-    db_path=tmp_path/"nest.sqlite"
-    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(db_path))
-    monkeypatch.delenv("SKL_DRAGON_NEST_SIGNING_KEY_HEX",raising=False)
-    with pytest.raises(HTTPException) as missing:
-        route.academy_nest(Response(),owner=owner)
-    assert missing.value.status_code==503
-    key=b"signed-unique-nest-testing-key-32bytes"
-    monkeypatch.setenv("SKL_DRAGON_NEST_SIGNING_KEY_HEX",key.hex())
-    empty=route.academy_nest(Response(),owner=owner)
-    assert empty=={"ok":True,"nest":None}
-    with sqlite3.connect(db_path) as db:
-        store=DragonNestStore(db,signing_key=key)
-        store.initialize(owner,("source-1",),focus_tags=("game-code",),
-                         at="2026-10-12T12:00:00Z",authorized=True)
-    headers=Response()
-    first=route.academy_nest(headers,owner=owner)
-    assert headers.headers["cache-control"]=="private, no-store"
-    assert first["nest"]["stage"]=="egg"
-    assert first["nest"]["sources_consumed"]==0
-    assert route.academy_nest(Response(),owner=identity("bob@example.test"))["nest"] is None
-    with sqlite3.connect(db_path) as db:
-        assert db.execute("SELECT COUNT(*) FROM dragon_nest_history").fetchone()[0]==1
-        db.execute("UPDATE dragon_nest_state SET head=? WHERE owner=?",
-                   ("f"*64,owner))
-        db.commit()
-    with pytest.raises(HTTPException) as corruption:
-        route.academy_nest(Response(),owner=owner)
-    assert corruption.value.status_code==409
-    assert not any(r.path.endswith("/nest/create") or r.path.endswith("/nest/grow")
-                   for r in route.router.routes)
-
-
-
-
-def test_mother_glean_read_is_tenant_private_and_requires_signed_custody(tmp_path,monkeypatch):
-    from fastapi import Response
-    from skeleton.ai.webcrawler.dragon_mother_glean_ledger import MotherGleanLedger
-    owner=identity()
-    db_path=tmp_path/"mother.sqlite"
-    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(db_path))
-    monkeypatch.delenv("SKL_DRAGON_MOTHER_SIGNING_KEY_HEX",raising=False)
-    with pytest.raises(HTTPException) as missing:
-        route.academy_mother_glean(Response(),owner=owner)
-    assert missing.value.status_code==503
-    key=b"mother-route-key-is-separated-32bytes-long"
-    monkeypatch.setenv("SKL_DRAGON_MOTHER_SIGNING_KEY_HEX",key.hex())
-    response=Response()
-    assert route.academy_mother_glean(response,owner=owner)=={"ok":True,"glean":None}
-    assert response.headers["cache-control"]=="private, no-store"
-    assert route.academy_mother_glean(Response(),owner=identity(
-        "bob@example.test"))=={"ok":True,"glean":None}
-    with sqlite3.connect(db_path) as db:
-        MotherGleanLedger(db,signing_key=key)
-        db.execute(
-            "INSERT INTO dragon_mother_glean "
-            "(owner,seq,acquisition_key,payload,previous_head,head,mac) "
-            "VALUES(?,?,?,?,?,?,?)",
-            (owner,1,"a"*64,"{}","0"*64,"b"*64,"c"*64),
-        )
-        db.commit()
-    with pytest.raises(HTTPException) as tampered:
-        route.academy_mother_glean(Response(),owner=owner)
-    assert tampered.value.status_code==409
-    assert route.academy_mother_glean(Response(),owner=identity(
-        "bob@example.test"))=={"ok":True,"glean":None}
-    assert not any(
-        r.path.endswith("/mother-glean/promote")
-        or r.path.endswith("/mother-glean/acquire")
-        for r in route.router.routes
-    )
-
-
 def test_storage_is_fail_closed(monkeypatch):
     monkeypatch.delenv("SKL_DRAGON_PRACTICE_DB_PATH",raising=False)
     with pytest.raises(HTTPException) as exc:
@@ -347,382 +270,523 @@ def test_adaptive_practice_subscriptions_preserve_opt_in_and_finite_ticks(
     assert route.academy_status(owner=owner)["native_attempts"]
 
 
-def test_authenticated_companion_reads_only_signed_current_owner_review(tmp_path, monkeypatch):
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-    from skeleton.ai.game_builder.dragon_review_store import DragonReviewStore
-    from skeleton.ai.game_builder.dragon_wisdom import SquareReview, SQUARES
-    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH", str(tmp_path/"reviews.sqlite"))
-    monkeypatch.setenv("SKL_DRAGON_REVIEW_SIGNING_KEY_HEX", (b"s"*32).hex())
-    monkeypatch.setattr(route.time, "time", lambda: 21)
-    squares=tuple({"id": key,"label":label,"score":70,"industry_score":None,
-        "industry_delta":None,"status":"improve","comparison_state":"unknown",
-        "axes":list(axes)} for key,label,axes in SQUARES)
-    review=SquareReview("a"*64,"b"*64,"c"*64,"d"*64,"e"*64,None,100,100,
-        squares,(),(),(),"f"*64,True,20,40)
-    with sqlite3.connect(tmp_path/"reviews.sqlite") as db:
-        DragonReviewStore(db,signing_key=b"s"*32).publish(identity(),review,
-            now=20,expires_at=40,trusted_worker=True)
-    app=FastAPI();app.include_router(route.router)
-    app.dependency_overrides[route.get_current_user]=lambda: {
-        "email":"alice@example.test","tenant_id":"tenant-a","role":"viewer"}
-    with TestClient(app) as client:
-        response=client.get("/api/dragon-academy/status")
-        assert response.status_code==200
-        assert response.json()["wisdom_review"]["review"]==review.to_payload()
-        assert client.get("/api/dragon-academy/wisdom").json()["snapshot"]==response.json()["wisdom_review"]
-        assert client.post("/api/dragon-academy/wisdom",json={"review":{}}).status_code==405
-        assert client.post("/api/dragon-academy/status",json={"wisdom_review":{}}).status_code==405
-        app.dependency_overrides[route.get_current_user]=lambda: {
-            "email":"bob@example.test","tenant_id":"tenant-a","role":"viewer"}
-        assert client.get("/api/dragon-academy/status").json()["wisdom_review"] is None
-        app.dependency_overrides[route.get_current_user]=lambda: {
-            "email":"alice@example.test","tenant_id":"tenant-a","role":"viewer"}
-        monkeypatch.setattr(route.time,"time",lambda:40)
-        assert client.get("/api/dragon-academy/status").json()["wisdom_review"] is None
-        monkeypatch.setattr(route.time,"time",lambda:21)
-        monkeypatch.setenv("SKL_DRAGON_REVIEW_SIGNING_KEY_HEX", (b"x"*32).hex())
-        assert client.get("/api/dragon-academy/status").status_code==409
-        app.dependency_overrides[route.get_current_user]=lambda: None
-        assert client.get("/api/dragon-academy/status").status_code==401
+
+def test_creator_source_bundle_auth_requires_editor_and_no_dev_bypass():
+    for user in (
+        None,
+        {"email": "a@example.test", "role": "editor", "dev_mode": True},
+        {"email": "a@example.test", "role": "viewer"},
+    ):
+        with pytest.raises(HTTPException) as denied:
+            route._native_source_editor(user)
+        assert denied.value.status_code in (401, 403)
+    good = {"email": "maker@example.test", "tenant_id": "studio-x", "role": "editor"}
+    assert route._native_source_editor(good) == route._principal(good)
 
 
-
-
-def test_authenticated_hoag_and_recrawl_read_only_routes(tmp_path, monkeypatch):
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-    from skeleton.ai.game_builder.reviewed_knowledge import (
-        ReviewedDocument, ReviewedKnowledgeStore, ReviewedNote,
-    )
-    from skeleton.ai.game_builder.dragon_wisdom_pyramid import DragonWisdomPyramid
-
-    db_path = tmp_path / "knowledge.sqlite"
-    monkeypatch.delenv("SKL_DRAGON_KNOWLEDGE_DB_PATH", raising=False)
-    app = FastAPI()
-    app.include_router(route.router)
-    app.dependency_overrides[route.get_current_user] = lambda: {
-        "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
-    }
-    with TestClient(app) as client:
-        assert client.get("/api/dragon-academy/knowledge/hoag").status_code == 503
-        assert client.get("/api/dragon-academy/knowledge/recrawls").status_code == 503
+def test_creator_bundle_emits_real_native_source_without_build_or_database():
+    from io import BytesIO
+    from zipfile import ZipFile
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
 
     owner = identity()
-    now = 1_791_638_400
-    with ReviewedKnowledgeStore(db_path) as library:
-        wiki = DragonWisdomPyramid(library)
-        revisions = {}
-        for label in ("a", "b"):
-            source_id = "source-" + label
-            text = "Jump timing should be predictable."
-            document = ReviewedDocument(
-                owner=owner, source_id=source_id,
-                source_url="https://example.org/" + source_id,
-                title="Original game design study", text=text,
-                observed_at="2026-10-10T12:00:00Z",
-                license_id="design-reference-license",
-                allowed_scopes=("design_reference",),
-                reviewer_id="research-reviewer-" + label,
-                approved=True,
-                notes=(ReviewedNote(
-                    note_id="note-" + label, mechanic="platforming",
-                    statement=text, start=0, end=len(text),
-                    stance="supports", confidence_ppm=880_000,
-                    dependence_group="publisher-" + label,
-                    tags=("jump",),
-                ),),
-            )
-            revisions[label] = library.import_document(
-                document, expected_parent_digest=None, authorized=True,
-            )
-        brief = library.build_brief(
-            owner, "jump", authorized=True, min_independent_groups=2,
-        )
-        decision = wiki.wiki_review(
-            owner, brief, mechanic="platforming", disposition="accepted",
-            independent_reviewer_id="independent-wiki-reviewer",
-            review_evidence_digest="a" * 64, now=now, expires_at=now + 3600,
-            authorized=True, trusted_worker=True,
-        )
-        wiki.promote(
-            owner, decision["digest"], now=now + 1,
-            authorized=True, trusted_worker=True, human_approved=True,
-        )
-    monkeypatch.setenv("SKL_DRAGON_KNOWLEDGE_DB_PATH", str(db_path))
-    monkeypatch.setattr(route.time, "time", lambda: now + 5)
-    with TestClient(app) as client:
-        result = client.get("/api/dragon-academy/knowledge/hoag")
-        assert result.status_code == 200
-        assert result.headers["cache-control"] == "private, no-store"
-        assert result.json()["items"][0]["mechanic"] == "platforming"
-        assert result.json()["items"][0]["training_authorized"] is False
-        assert "Jump timing" not in result.text
-        assert client.post("/api/dragon-academy/knowledge/hoag", json={}).status_code == 405
-        assert client.post("/api/dragon-academy/knowledge/recrawls", json={}).status_code == 405
-        app.dependency_overrides[route.get_current_user] = lambda: {
-            "email": "bob@example.test", "tenant_id": "tenant-a", "role": "viewer",
-        }
-        assert client.get("/api/dragon-academy/knowledge/hoag").json()["items"] == []
-        app.dependency_overrides[route.get_current_user] = lambda: None
-        assert client.get("/api/dragon-academy/knowledge/hoag").status_code == 401
-        app.dependency_overrides[route.get_current_user] = lambda: {
-            "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
-        }
-        with ReviewedKnowledgeStore(db_path) as library:
-            DragonWisdomPyramid(library).recrawl(
-                owner, "source-a", reason="changed_source",
-                expected_revision=revisions["a"].revision_digest,
-                now=now + 6, authorized=True, trusted_worker=True,
-            )
-        monkeypatch.setattr(route.time, "time", lambda: now + 7)
-        result = client.get("/api/dragon-academy/knowledge/recrawls")
-        assert result.status_code == 200
-        assert result.json()["orders"][0]["source_id"] == "source-a"
-        assert result.json()["orders"][0]["execution_authorized"] is False
-        assert client.get("/api/dragon-academy/knowledge/hoag").json()["items"] == []
+    catalog = route.native_production_capabilities(owner=owner)
+    assert catalog["ok"]
+    assert any(x["id"] == "game_boy" and x["native_source_emitter"]
+               for x in catalog["targets"])
+    assert all("certificate" not in str(x.get("claims", "")).lower()
+               for x in catalog["targets"])
 
-def test_guarded_pulse_requires_configured_shared_runtime():
-    from starlette.requests import Request
-    from fastapi import FastAPI
-    app=FastAPI()
-    request=Request({'type':'http','app':app})
-    with pytest.raises(HTTPException) as exc:
-        route.pulse_practice(request,owner=identity())
-    assert exc.value.status_code==503
-
-
-def test_guarded_pulse_runs_native_subscription_and_defers_under_heat(tmp_path,monkeypatch):
-    from starlette.requests import Request
-    from fastapi import FastAPI
-    from dataclasses import replace
-    from skeleton.ai.webcrawler.dragon_chunk_executor import DragonChunkExecutor
-    from skeleton.ai.webcrawler.dragon_resource_session import DragonResourceSession, HardwareSample
-    from skeleton.ai.game_builder.resource_governor import ResourceGovernor, ResourceEnvelope
-    from skeleton.kernel.global_resource_scheduler import GlobalResourceScheduler, GlobalResourcePolicy, ResourceVector, PlanePolicy
-    app=FastAPI();owner=identity()
-    scheduler=GlobalResourceScheduler(GlobalResourcePolicy(ResourceVector(cpu_millis=4000,memory_mb=256,io_tokens=10),
-        (PlanePolicy('interactive',2,ResourceVector(),1.),PlanePolicy('background',1,ResourceVector(),1.))))
-    hardware=HardwareSample(256*1024**2,4,.1,.9,True,False,10)
-    executor=DragonChunkExecutor(DragonResourceSession(global_resources=scheduler,tenant=owner),
-        ResourceGovernor(ResourceEnvelope(100,10,1000000,3,1,1,10)),lambda:hardware,clock=lambda:10)
-    app.state.dragon_practice_executor_factory=lambda authenticated_owner: executor
-    request=Request({'type':'http','app':app})
-    path=tmp_path/'pulse.sqlite';monkeypatch.setenv('SKL_DRAGON_PRACTICE_DB_PATH',str(path))
-    with route._lab() as (lab,cycles):
-        lab.offer(approved(owner),authorized=True,now=10)
-        cycles.enable(owner,authorized=True,human_approved=True,now=10,expires_at=3010,
-            demos_per_tick=2,max_ticks=2,generation_mode='native')
-    executor.hardware=lambda:replace(hardware,thermal_limited=True)
-    deferred=route.pulse_practice(request,owner=owner)
-    assert deferred['resource_execution']['reason']=='thermal_or_pressure'
-    assert deferred['subscription']['remaining_ticks']==2 and not deferred['created']
-    executor.hardware=lambda:hardware
-    result=route.pulse_practice(request,owner=owner)
-    assert len(result['created'])==2 and result['resource_execution']['done']
-    assert result['subscription']['remaining_ticks']==1
-    assert scheduler.usage('background').empty
-    with pytest.raises(HTTPException) as exc:
-        route.pulse_practice(request,owner=identity('other@example.test'))
-    assert exc.value.status_code==503
-
-
-
-
-def test_signed_custody_and_memory_route_fail_closed_on_rollback(tmp_path, monkeypatch):
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-    from skeleton.ai.game_builder.reviewed_knowledge import (
-        ReviewedDocument, ReviewedKnowledgeStore, ReviewedNote,
+    body = route.NativeProductionSourceRequest(
+        title="Original Lunar Drifter",
+        style="arcade_score_attack", targets=["game_boy", "nes"],
+        original_work_attested=True, approved=True,
     )
-    from skeleton.ai.game_builder.dragon_wisdom_authority import DragonWisdomAuthority
-    from skeleton.ai.game_builder.dragon_wisdom_memory import DragonWisdomMemory
-    from skeleton.ai.game_builder.dragon_wisdom_pyramid import DragonWisdomPyramid
-    from skeleton.ai.game_builder.dragon_wisdom_custody import DragonCustodyAnchor
+    response = route.native_production_source_bundle(body, owner=owner)
+    assert response.media_type == "application/zip"
+    assert response.headers["cache-control"] == "private, no-store"
+    assert response.headers["x-dragon-claim"] == "source-only-not-a-compiled-game"
+    assert hashlib.sha256(response.body).hexdigest() == response.headers["x-content-sha256"]
+    audit = verify_source_bundle(response.body)
+    assert audit["status"] == "verified_source_bundle"
+    assert audit["target_count"] == 2
+    with ZipFile(BytesIO(response.body)) as payload:
+        assert "production-index.json" in payload.namelist()
+        assert sum(x.startswith("releases/dragon-") for x in payload.namelist()) == 2
 
+
+def test_creator_bundle_fail_closed_on_rights_and_unimplemented_platform():
     owner = identity()
-    now = 1791644400
-    db_path = tmp_path / "source-evidence.sqlite"
-    anchor_dir = tmp_path / "external-anchors"
-    anchor_dir.mkdir()
-    monkeypatch.setenv("SKL_DRAGON_KNOWLEDGE_DB_PATH", str(db_path))
-    monkeypatch.setenv("SKL_DRAGON_WISDOM_CUSTODY_REQUIRED", "1")
-    monkeypatch.setenv("SKL_DRAGON_WISDOM_ANCHOR_DIR", str(anchor_dir))
-    monkeypatch.setenv("SKL_DRAGON_WISDOM_ANCHOR_KEY_HEX", "cd"*32)
-    monkeypatch.setattr(route.time, "time", lambda: now+3)
+    no_rights = route.NativeProductionSourceRequest(
+        title="Original Lantern", style="arcade_score_attack",
+        targets=["game_boy"], original_work_attested=False, approved=True,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_source_bundle(no_rights, owner=owner)
+    assert denied.value.status_code == 403
 
-    with ReviewedKnowledgeStore(db_path) as library:
-        pyramid = DragonWisdomPyramid(library)
-        for suffix in ("a", "b"):
-            text = "Original input delay measurements and game design."
-            library.import_document(ReviewedDocument(
-                owner=owner, source_id="source-"+suffix,
-                source_url="https://example.org/"+suffix,
-                title="Original mechanics study", text=text,
-                observed_at="2026-10-10T12:00:00Z",
-                license_id="approved-design-reference",
-                allowed_scopes=("design_reference",),
-                reviewer_id="source-reviewer-"+suffix, approved=True,
-                notes=(ReviewedNote(
-                    note_id="note-"+suffix, mechanic="platforming",
-                    statement="Input timing has measurable constraints.",
-                    start=0, end=len("Original input delay"),
-                    stance="supports", confidence_ppm=900000,
-                    dependence_group="publisher-"+suffix,
-                    tags=("delay", "input"),
-                ),),
-            ), expected_parent_digest=None, authorized=True)
-        brief = library.build_brief(
-            owner, "input", authorized=True, min_independent_groups=2,
-        )
-        auth = DragonWisdomAuthority(
-            pyramid, wiki_signing_key=b"r"*32,
-            approval_signing_key=b"a"*32, issuer="studio-identity",
-        )
-        wiki_grant = auth.issue_grant(
-            owner, "wiki-reviewer", "neutral-lab", "wiki_reviewer",
-            brief.to_payload()["brief_digest"], now=now, expires_at=now+60,
-            identity_verified=True, authorized=True,
-        )
-        review = auth.review(
-            owner, brief, mechanic="platforming", disposition="accepted",
-            review_evidence_digest="e"*64, grant=wiki_grant,
-            now=now, expires_at=now+3600,
-            authorized=True, trusted_worker=True,
-        )
-        approve_grant = auth.issue_grant(
-            owner, "human-approver", "governance", "memory_approver",
-            review["digest"], now=now, expires_at=now+60,
-            identity_verified=True, authorized=True,
-        )
-        auth.approve(
-            owner, review["digest"], grant=approve_grant,
-            now=now+1, authorized=True, trusted_worker=True,
-        )
-        DragonWisdomMemory(pyramid).reconcile(
-            owner, now=now+2, authorized=True, trusted_worker=True,
-        )
+    unsupported = route.NativeProductionSourceRequest(
+        title="Original Lantern", style="arcade_score_attack",
+        targets=["ps5"], original_work_attested=True, approved=True,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_source_bundle(unsupported, owner=owner)
+    assert denied.value.status_code == 422
 
-    app = FastAPI()
-    app.include_router(route.router)
-    app.dependency_overrides[route.get_current_user] = lambda: {
-        "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
+    no_publication = route.NativeProductionSourceRequest(
+        title="Original Lantern", style="arcade_score_attack",
+        targets=["game_boy"], original_work_attested=True, approved=False,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_source_bundle(no_publication, owner=owner)
+    assert denied.value.status_code == 403
+
+
+
+@pytest.mark.parametrize("changes", [
+    {"approved": 1},
+    {"approved": "true"},
+    {"original_work_attested": 1},
+    {"original_work_attested": "yes"},
+    {"seed": True},
+    {"seed": "1"},
+    {"compile_roms": True},
+    {"allow_licensed_sdk": True},
+    {"targets": ["game_boy"] * 4},
+])
+def test_native_creator_request_rejects_coerced_authority_and_extra_fields(changes):
+    from pydantic import ValidationError
+    payload = {
+        "title": "Original River Quest",
+        "style": "arcade_score_attack",
+        "targets": ["game_boy"],
+        "original_work_attested": True,
+        "approved": True,
     }
-    with TestClient(app) as client:
-        # Even correctly signed approvals cannot be served without a separate
-        # externally anchored journal head when strict custody is configured.
-        assert client.get("/api/dragon-academy/knowledge/hoag").status_code == 409
-        assert client.get("/api/dragon-academy/knowledge/memory").status_code == 409
-        with ReviewedKnowledgeStore(db_path) as library:
-            pyramid = DragonWisdomPyramid(library)
-            DragonCustodyAnchor(anchor_dir, signing_key=bytes.fromhex("cd"*32)).checkpoint(
-                pyramid, owner, now=now+2, authorized=True,
-                trusted_worker=True, allow_initial_bootstrap=True,
-            )
-        response = client.get("/api/dragon-academy/knowledge/memory")
-        assert response.status_code == 200
-        assert response.headers["cache-control"] == "private, no-store"
-        assert len(response.json()["items"]) == 1
-        assert response.json()["items"][0]["training_authorized"] is False
-        assert client.get("/api/dragon-academy/knowledge/memory?mechanic=other").json()["items"] == []
-        assert client.post("/api/dragon-academy/knowledge/memory", json={}).status_code == 405
-        app.dependency_overrides[route.get_current_user] = lambda: {
-            "email": "bob@example.test", "tenant_id": "tenant-a", "role": "viewer",
-        }
-        assert client.get("/api/dragon-academy/knowledge/memory").status_code == 409
-        app.dependency_overrides[route.get_current_user] = lambda: {
-            "email": "alice@example.test", "tenant_id": "tenant-a", "role": "viewer",
-        }
-        with ReviewedKnowledgeStore(db_path) as library:
-            pyramid = DragonWisdomPyramid(library)
-            pyramid.revoke(owner, review["digest"], reason="rights_change",
-                           now=now+3, authorized=True, trusted_worker=True)
-        assert client.get("/api/dragon-academy/knowledge/memory").status_code == 409
-        with ReviewedKnowledgeStore(db_path) as library:
-            pyramid = DragonWisdomPyramid(library)
-            DragonCustodyAnchor(anchor_dir, signing_key=bytes.fromhex("cd"*32)).checkpoint(
-                pyramid, owner, now=now+4, authorized=True,
-                trusted_worker=True,
-            )
-        assert client.get("/api/dragon-academy/knowledge/memory").json()["items"] == []
+    payload.update(changes)
+    with pytest.raises(ValidationError):
+        route.NativeProductionSourceRequest(**payload)
 
 
-def test_mother_glean_api_returns_real_signed_reviewed_lens_summary(tmp_path,monkeypatch):
-    from fastapi import Response
-    from skeleton.ai.game_builder.reviewed_knowledge import (
-        ReviewedDocument,ReviewedKnowledgeStore,ReviewedNote,
+
+def test_native_creator_portable_design_is_downloaded_as_original_native_source():
+    from zipfile import ZipFile
+    from io import BytesIO
+    import json
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
+
+    approved = route.NativeProductionSourceRequest(
+        title="Original Galaxy Puzzle", style="arcade_score_attack",
+        targets=["game_boy", "pc_linux"],
+        original_work_attested=True, approved=True, seed=337,
+        portable_design=route.NativeProductionDesignBody(
+            palette="modern_neon", hero="astronaut", quest_theme="space",
+            difficulty=8, stages=6, candidates=13,
+        ),
     )
-    from skeleton.ai.webcrawler.dragon_nest_progression import (
-        AcquiredKnowledge,feed_parent,learn_when_idle,new_nest,
-    )
-    from skeleton.ai.webcrawler.dragon_mother_glean_matrix import HatchlingReceipt
-    from skeleton.ai.webcrawler.dragon_mother_glean_ledger import MotherGleanLedger
+    response = route.native_production_source_bundle(approved, owner=identity())
+    assert verify_source_bundle(response.body)["target_count"] == 2
+    with ZipFile(BytesIO(response.body)) as archive:
+        manifest = json.loads(archive.read("production-index.json"))
+        assert manifest["target_count"] == 2
+        assert all(item["port_profile_digest"] for item in manifest["entries"])
+        for zip_name in archive.namelist():
+            if not zip_name.startswith("releases/"):
+                continue
+            with ZipFile(BytesIO(archive.read(zip_name))) as nested:
+                receipt = json.loads(nested.read("release-receipt.json"))
+                assert receipt["port_plan"]["production_seed"] == 337
+                assert receipt["port_plan"]["portable_profile"]["hero"] == "astronaut"
+                assert receipt["evidence"] == "source_generated"
 
-    owner=identity()
-    at0="2026-10-12T12:00:00Z"
-    at1="2026-10-12T12:10:00Z"
-    at2="2026-10-12T12:20:00Z"
-    db_path=tmp_path/"mother_projection.sqlite"
-    monkeypatch.setenv("SKL_DRAGON_PRACTICE_DB_PATH",str(db_path))
-    key=b"mother-integration-route-secret-32-bytes-long"
-    monkeypatch.setenv("SKL_DRAGON_MOTHER_SIGNING_KEY_HEX",key.hex())
-    with ReviewedKnowledgeStore(tmp_path/"reviewed.sqlite") as library:
-        for sid,group in (("source-a","reviewer-group-a"),
-                          ("source-b","reviewer-group-b")):
-            library.import_document(
-                ReviewedDocument(
-                    owner,sid,f"https://{sid}.example.org/research",
-                    "Movement studies","Movement reference for game systems.",
-                    at0,"lawful-review",("design_reference",),
-                    "qualified-editor",True,
-                    (ReviewedNote(
-                        "note-"+sid,"movement",
-                        "Movement because feedback enables player choice with latency tradeoff.",
-                        0,8,"supports",950000,group,("gameplay","movement"),
-                    ),),
-                ),
-                expected_parent_digest=None,authorized=True,
-            )
-        hits={hit.source_id:hit for hit in library.search(
-            owner,"movement",authorized=True,diversify=False,
-        )}
-        nest=new_nest(owner,("source-a","source-b"),
-                      focus_tags=("movement",),at=at0)
-        for sid in ("source-a","source-b"):
-            nest=feed_parent(
-                nest,sid,content_sha256=hits[sid].source_text_digest,
-                at=at0,authorized=True,reviewed=True,lawful=True,
-            )
-        nest=learn_when_idle(
-            nest,"article",
-            AcquiredKnowledge(
-                "source-a",hits["source-a"].source_text_digest,at1,
-                ("movement",),True,True,.95,None,"article",
-            ),
-            at=at1,idle_since=at0,consented=True,
-            background_allowed=True,owner_authorized=True,
-        )
-        with sqlite3.connect(db_path) as db:
-            MotherGleanLedger(db,signing_key=key).run(
-                library,nest,(HatchlingReceipt(
-                    "article","source-a",hits["source-a"].source_text_digest,
-                    "note-source-a",at1,
-                ),),at=at2,idle_since=at1,owner_authorized=True,
-                consented=True,background_allowed=True,
-            )
-    response=Response()
-    body=route.academy_mother_glean(response,owner=owner)
-    assert body["ok"] is True and body["glean"] is not None
-    glean=body["glean"]
-    assert glean["schema"]=="skeleton.dragon.mother_glean_summary.v1"
-    assert glean["source_count"]==1
-    assert glean["search_count"]==36
-    assert glean["hypothesis_count"]>=1
-    assert "causal" in glean["lenses"]
-    assert glean["questions"]
-    assert glean["model_promotion_authorized"] is False
-    assert len(glean["evidence_digest"])==64
-    assert response.headers["cache-control"]=="private, no-store"
-    assert route.academy_mother_glean(
-        Response(),owner=identity("bob@example.test"),
-    )=={"ok":True,"glean":None}
+
+@pytest.mark.parametrize("fields", [
+    {"portable_design": {"difficulty": 11}},
+    {"portable_design": {"difficulty": True}},
+    {"portable_design": {"stages": "4"}},
+    {"portable_design": {"candidates": 25}},
+    {"portable_design": {"hero": "hatchling", "private_script": "import os"}},
+])
+def test_portable_creator_api_does_not_coerce_or_execute_design(fields):
+    from pydantic import ValidationError
+    data = {
+        "title": "Original Homebrew", "style": "arcade_score_attack",
+        "targets": ["game_boy"], "approved": True, "original_work_attested": True,
+    }
+    data.update(fields)
+    with pytest.raises(ValidationError):
+        route.NativeProductionSourceRequest(**data)
+
+
+
+def test_authenticated_creator_preview_is_read_only_and_exposes_hardware_degradations(
+    monkeypatch,
+):
+    from skeleton.ai.webcrawler import dragon_native_production as production
+    def fail_if_emitted(**kwargs):
+        raise AssertionError("source emitter must never execute during preview")
+    monkeypatch.setattr(production, "render_native_project", fail_if_emitted)
+    body = route.NativeProductionSourceRequest(
+        title="Original Trail Quest", style="arcade_score_attack",
+        targets=["game_boy", "pc_linux"], approved=False,
+        original_work_attested=True,
+        portable_design=route.NativeProductionDesignBody(
+            palette="modern_neon", hero="explorer",
+            stages=6, candidates=12, difficulty=7,
+        ),
+    )
+    result = route.native_production_preview(body, owner=identity())
+    assert result["ok"]
+    assert result["status"] == "source_ready"
+    assert result["can_export_sources"]
+    assert result["evidence"] == "none"
+    assert result["candidate_count"] == 2
+    rows = {item["target"]: item for item in result["targets"]}
+    assert rows["game_boy"]["target_stages"] == 1
+    assert rows["game_boy"]["target_palette"] == "handheld"
+    assert rows["pc_linux"]["target_stages"] == 6
+    assert not rows["pc_linux"]["adaptations"]
+
+
+def test_native_creator_preview_cannot_bypass_original_rights_declaration():
+    body = route.NativeProductionSourceRequest(
+        title="Original Trail Quest", style="arcade_score_attack",
+        targets=["game_boy"], approved=False, original_work_attested=False,
+    )
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_preview(body, owner=identity())
+    assert denied.value.status_code == 403
+
+
+def test_native_creator_preview_discloses_blocked_licensed_sdk():
+    body = route.NativeProductionSourceRequest(
+        title="Original Trail Quest", style="arcade_score_attack",
+        targets=["game_boy", "ps5"], approved=False,
+        original_work_attested=True,
+    )
+    report = route.native_production_preview(body, owner=identity())
+    assert not report["can_export_sources"]
+    assert {t["target"]: t["state"] for t in report["targets"]} == {
+        "game_boy": "source_ready",
+        "ps5": "blocked",
+    }
+    assert "no generated code" in report["claim_boundary"]
+
+
+
+@pytest.mark.parametrize("hero,theme,palette", [
+    ("hatchling", "crystals", "dmg_green"),
+    ("robot", "clockwork", "modern_neon"),
+    ("astronaut", "space", "vga_dusk"),
+    ("pilot", "volcano", "handheld"),
+    ("explorer", "forest", "cga"),
+    ("knight", "ice", "crt_arcade"),
+])
+def test_original_native_2bpp_pixel_preview_matches_real_emitter(hero, theme, palette):
+    from skeleton.ai.webcrawler.dragon_native_artforge import original_tiles
+    req = route.NativeProductionPixelArtPreview(
+        hero=hero, quest_theme=theme, palette=palette,
+        seed=41, target="game_boy",
+    )
+    result = route.native_production_art_preview(req, owner=identity())
+    assert result["ok"] and result["hero"] == hero
+    assert result["target"] == "game_boy"
+    assert len(result["frames"]) == 4
+    expected = original_tiles(
+        hero=hero, theme=theme, seed=41,
+        palette=result["applied_palette"],
+    )
+    assert result["frames"]["hero"] == expected["dragon"]
+    assert result["frames"]["collectible"] == expected["star"]
+    assert len(result["gb_tiles_sha256"]) == 64
+    assert all(set("".join(frame)) <= set("0123")
+               for frame in result["frames"].values())
+    assert "not certified" in result["claim_boundary"]
+
+
+@pytest.mark.parametrize("changes", [
+    {"target": "ps5"},
+    {"target": "../../local"},
+    {"hero": "third_party_famous_character"},
+    {"quest_theme": "game_franchise"},
+    {"palette": "unknown_video_palette"},
+])
+def test_original_pixel_preview_denies_nonexistent_or_unlicensed_assets(changes):
+    req = route.NativeProductionPixelArtPreview(**changes)
+    with pytest.raises(HTTPException) as denied:
+        route.native_production_art_preview(req, owner=identity())
+    assert denied.value.status_code == 422
+
+
+@pytest.mark.parametrize("fields", [
+    {"seed": True},
+    {"seed": "42"},
+    {"seed": -1},
+    {"hero": "robot", "custom_rom_path": "third_party.gb"},
+])
+def test_original_pixel_preview_is_strictly_typed_and_has_no_unsafe_inputs(fields):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        route.NativeProductionPixelArtPreview(**fields)
+
+
+
+def test_original_puzzle_creator_can_explicitly_request_solver_proven_new_stages():
+    from zipfile import ZipFile
+    from io import BytesIO
+    import json
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
+    spec = route.NativeProductionSourceRequest(
+        title="Original Clockwork Crate Labyrinth",
+        style="fixed_screen_puzzle", targets=["pc_linux"],
+        seed=1977, original_work_attested=True, approved=True,
+        portable_design=route.NativeProductionDesignBody(
+            palette="vga_dusk", hero="explorer",
+            quest_theme="clockwork", stages=2,
+            candidates=4, difficulty=7, procedural_levels=True,
+        ),
+    )
+    preview = route.native_production_preview(spec, owner=identity())
+    assert preview["can_export_sources"]
+    released = route.native_production_source_bundle(spec, owner=identity())
+    assert verify_source_bundle(released.body)["target_count"] == 1
+    with ZipFile(BytesIO(released.body)) as archive:
+        inner = next(name for name in archive.namelist() if name.startswith("releases/"))
+        with ZipFile(BytesIO(archive.read(inner))) as project:
+            proof = json.loads(project.read("source/dragon-puzzle-proof.json"))
+            assert proof["stages"] == 2 and proof["procedural"] is True
+
+
+@pytest.mark.parametrize("bad", [
+    {"procedural_levels": "true"},
+    {"procedural_levels": 1},
+    {"procedural_levels": []},
+])
+def test_original_creator_procedural_option_rejects_coerced_input(bad):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        route.NativeProductionDesignBody(**bad)
+
+
+
+def test_original_game_board_editor_validates_user_drawn_source_before_compilation():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import validate_authored_levels
+    boards=[list(BASE_LEVELS[0]),list(BASE_LEVELS[2])]
+    payload=route.NativePuzzleGridValidationRequest(levels=boards)
+    result=route.native_production_validate_puzzle(payload,owner=identity())
+    assert result["ok"] and result["total_stages"]==2
+    assert len(result["digest"])==64
+    assert all(row["shortest_moves"]>0 for row in result["stages"])
+    assert all(set(row["shortest_solution"])<=set("wasd") and
+               len(row["shortest_solution"])==row["shortest_moves"]
+               for row in result["stages"])
+    assert all(row["shortest_moves"]<=400 for row in result["stages"])
+    assert result["digest"]==validate_authored_levels(
+        tuple(tuple(x) for x in boards)).digest
+
+
+def test_starter_level_api_produces_real_solvable_non_duplicate_boards():
+    from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import parse_authored_document
+    response=route.native_production_puzzle_starter(stages=6,owner=identity())
+    assert response["ok"]
+    original={k:v for k,v in response.items() if k!="ok"}
+    parsed=parse_authored_document(original)
+    assert len(parsed.levels)==6
+    assert len(set(row.layout_sha256 for row in parsed.levels))==6
+
+
+def test_user_authored_source_export_uses_exact_requested_original_grid():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_production import verify_source_bundle
+    from zipfile import ZipFile
+    from io import BytesIO
+    import json
+    body=route.NativeProductionSourceRequest(
+        title="Original User Level Campaign",
+        style="fixed_screen_puzzle",
+        targets=["pc_linux"], seed=19,
+        approved=True,original_work_attested=True,
+        portable_design=route.NativeProductionDesignBody(stages=2),
+        authored_puzzles=[list(BASE_LEVELS[0]),list(BASE_LEVELS[3])],
+    )
+    result=route.native_production_source_bundle(body,owner=identity())
+    assert verify_source_bundle(result.body)["target_count"]==1
+    with ZipFile(BytesIO(result.body)) as outer:
+        zipname=next(x for x in outer.namelist() if x.startswith("releases/"))
+        with ZipFile(BytesIO(outer.read(zipname))) as native:
+            proof=json.loads(native.read("source/dragon-puzzle-proof.json"))
+            assert proof["authored_level_rows"]==[
+                list(BASE_LEVELS[0]),list(BASE_LEVELS[3])]
+            assert proof["authoring_mode"]=="authored"
+
+
+@pytest.mark.parametrize("bad",[
+    {"levels":[["#"]*10]},
+    {"levels":[["."*12]*11]},
+    {"levels":[["x"*12]*10]},
+    {"levels":[["@"*12]*10]},
+    {"levels":[["."*12]*10]*9},
+])
+def test_native_original_level_editor_rejects_malformed_or_unbounded_canvas(bad):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        route.NativePuzzleGridValidationRequest(**bad)
+
+
+
+@pytest.mark.parametrize("endpoint",[
+    "/api/dragon-academy/native/production/puzzle/validate",
+    "/api/dragon-academy/native/production/puzzle/starter",
+])
+def test_original_puzzle_cpu_budgets_are_editor_only(endpoint):
+    """Authenticated viewers cannot trigger expensive exact BFS source design."""
+    selected=next(x for x in route.router.routes if x.path==endpoint)
+    assert any(item.call is route._native_source_editor
+               for item in selected.dependant.dependencies)
+    visitor={"email":"guest@example.test","tenant_id":"tenant-a","role":"viewer"}
+    with pytest.raises(HTTPException) as denied:
+        route._native_source_editor(visitor)
+    assert denied.value.status_code==403
+    editor={"email":"maker@example.test","tenant_id":"tenant-a","role":"editor"}
+    assert len(route._native_source_editor(editor))==64
+
+
+
+def test_editor_shortest_solution_sequence_completes_original_game_in_independent_physics():
+    """Creator walkthrough comes from exact BFS and is a real playable route."""
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_puzzle_trace import simulate_grid
+    from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import preview_authored_levels
+    boards=(BASE_LEVELS[0],BASE_LEVELS[3])
+    approved=preview_authored_levels(boards)
+    assert approved["total_stages"]==len(boards)
+    for index,record in enumerate(approved["stages"]):
+        moves=record["shortest_solution"]
+        assert moves and len(moves)==record["shortest_moves"]
+        simulated=simulate_grid(boards[index],moves,level=index+1)
+        assert simulated.solved
+        assert simulated.moves==record["shortest_moves"]
+        assert simulated.pushes>=1
+
+
+
+def test_live_editor_hint_solves_actual_modified_game_state_not_only_first_move():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_puzzle_trace import simulate_grid
+    world=BASE_LEVELS[0]
+    played=simulate_grid(world,"d")
+    question=route.NativePuzzleCurrentHintRequest(
+        rows=list(world),player=played.player,crates=list(played.crates))
+    result=route.native_production_current_puzzle_hint(question,owner=identity())
+    assert result["ok"]
+    assert result["schema"]=="skeleton.ai.dragon.original_puzzle_current_hint.v1"
+    assert result["remaining_moves"]==len(result["shortest_route"])
+    assert result["next_move"]==result["shortest_route"][0]
+    assert set(result["shortest_route"])<=set("wasd")
+    completed=simulate_grid(world,"d"+result["shortest_route"])
+    assert completed.solved
+    assert result["solved"] is False
+    terminal=route.NativePuzzleCurrentHintRequest(
+        rows=list(world),player=completed.player,crates=list(completed.crates))
+    done=route.native_production_current_puzzle_hint(terminal,owner=identity())
+    assert done["solved"] is True
+    assert done["remaining_moves"]==0
+    assert done["next_move"] is None
+
+
+@pytest.mark.parametrize("bad", [
+    {"player":-1,"crates":[52]},
+    {"player":120,"crates":[52]},
+    {"player":True,"crates":[52]},
+    {"player":43,"crates":[]},
+    {"player":43,"crates":[52,53,54,55]},
+    {"player":43,"crates":["52"]},
+])
+def test_live_editor_hint_rejects_malformed_current_player_and_crate_inputs(bad):
+    from pydantic import ValidationError
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    with pytest.raises(ValidationError):
+        route.NativePuzzleCurrentHintRequest(rows=list(BASE_LEVELS[0]),**bad)
+
+
+def test_live_hint_denies_overlapping_or_unreachable_original_grid_state():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from fastapi import HTTPException
+    board=list(BASE_LEVELS[0])
+    for player,crates in [(0,[65]),(52,[52]),(52,[0])]:
+        request=route.NativePuzzleCurrentHintRequest(
+            rows=board,player=player,crates=crates)
+        with pytest.raises(HTTPException) as denied:
+            route.native_production_current_puzzle_hint(request,owner=identity())
+        assert denied.value.status_code==422
+
+
+def test_original_live_hint_cpu_entry_is_creator_role_protected():
+    current=next(x for x in route.router.routes if x.path==
+                 "/api/dragon-academy/native/production/puzzle/current-hint")
+    assert any(dep.call is route._native_source_editor
+               for dep in current.dependant.dependencies)
+
+
+
+def test_original_campaign_api_builds_real_multistage_forks_and_solver_diversity():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    from skeleton.ai.webcrawler.dragon_native_campaign_paths import verify_graph_report
+    from skeleton.ai.webcrawler.dragon_native_multipath import verify_route_report
+    from skeleton.ai.webcrawler.dragon_native_challenge_director import SCHEMA
+    args=route.NativeOriginalCampaignAnalysisRequest(
+        levels=[list(x) for x in BASE_LEVELS],
+        mode="branching",challenge_profile="spicy",route_budget=1500,
+    )
+    result=route.native_production_analyze_campaign(args,owner=identity())
+    assert result["ok"]
+    assert result["schema"]=="skeleton.ai.dragon.native_campaign_design_preview.v1"
+    assert len(result["stages"])==4
+    graph=verify_graph_report(result["chapter_paths"])
+    assert graph.ending_count==2 and graph.choice_nodes>=1
+    assert len(graph.complete_routes)>=2
+    assert result["challenge"]["schema"]==SCHEMA
+    assert result["challenge"]["profile"]=="spicy"
+    assert result["challenge"]["has_player_observations"] is False
+    for index,stage in enumerate(result["stages"]):
+        assert stage["stage"]==index+1
+        proof=verify_route_report(BASE_LEVELS[index],stage["routes"])
+        assert proof["routes"]>=1
+    assert "no human" in result["claim"]
+
+
+@pytest.mark.parametrize("bad",[
+    {"mode":"nonlinear_forever"},
+    {"challenge_profile":"sadistic"},
+    {"route_budget":False},
+    {"route_budget":1000000},
+])
+def test_original_campaign_preview_rejects_unbounded_game_or_coercible_choices(bad):
+    from pydantic import ValidationError
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    with pytest.raises(ValidationError):
+        route.NativeOriginalCampaignAnalysisRequest(
+            levels=[list(BASE_LEVELS[0])],**bad)
+
+
+def test_original_campaigned_multisolver_and_challenge_editor_routes_are_role_guarded():
+    for path in (
+        "/api/dragon-academy/native/production/puzzle/multiple-routes",
+        "/api/dragon-academy/native/production/puzzle/campaign/analyze",
+    ):
+        selected=next(x for x in route.router.routes if x.path==path)
+        assert any(item.call is route._native_source_editor
+                   for item in selected.dependant.dependencies)
+
+
+def test_original_campaign_does_not_invent_branch_choices_for_two_stages():
+    from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+    args=route.NativeOriginalCampaignAnalysisRequest(
+        levels=[list(BASE_LEVELS[0]),list(BASE_LEVELS[1])],
+        mode="branching",route_budget=1000,
+    )
+    report=route.native_production_analyze_campaign(args,owner=identity())
+    assert report["chapter_paths"]["ending_count"]==1
+    assert report["chapter_paths"]["choice_nodes"]==0
+    assert len(report["chapter_paths"]["complete_routes"])==1

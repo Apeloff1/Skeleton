@@ -7,16 +7,8 @@ import { extractConversationInterests, proposeResearchMission } from './conversa
 import { Ionicons } from '@expo/vector-icons';
 import DragonCompanion from './DragonCompanion';
 import DragonFamilyNest from './DragonFamilyNest';
-import type { DragonFamilyProjection } from './dragonFamilyProjection';
+import type {DragonFamilyProjection} from './dragonFamilyProjection';
 import DragonQuestBoard from './DragonQuestBoard';
-import DragonDeliveryWorkbench from './DragonDeliveryWorkbench';
-import DragonWisdomSquares from './DragonWisdomSquares';
-import DragonKnowledgePyramid from './DragonKnowledgePyramid';
-import DragonNestProgression, { type DragonNestSnapshot } from './DragonNestProgression';
-import DragonMotherGleanPanel, { type MotherGleanSummary } from './DragonMotherGleanPanel';
-import { dragonWaitingBubble } from './dragonMagicEightBall';
-import type { DragonWisdomReview } from './dragonWisdomReview';
-import type { DragonKnowledgeView } from './dragonKnowledgePyramid';
 import type{NativeAttempt,NativeTarget,NativeCurriculum}from './dragonNativeTargets';
 import {type DragonPracticeProgress,type DragonPracticeAttempt,type DragonPracticeSubscription,validateDragonProgress} from './dragonProgression';
 import { companionForConversation, companionFromCrawler, type DragonEventKind } from './dragonCompanion';
@@ -30,18 +22,13 @@ export interface CompanionTelemetry {
 }
 
 export interface CompanionAcademyInput {
-  family?: DragonFamilyProjection | null;
-  wisdomReview?: DragonWisdomReview | null;
-  knowledgeView?: DragonKnowledgeView | null;
-  nest?: DragonNestSnapshot | null;
-  motherGlean?: MotherGleanSummary | null;
+  family?: DragonFamilyProjection|null;
   progress?:DragonPracticeProgress|null;
   attempts?:readonly DragonPracticeAttempt[];
   nativeAttempts?:readonly NativeAttempt[];
   nativeTargets?:readonly NativeTarget[];
   nativeStyles?:readonly string[];
   nativeCurriculum?:NativeCurriculum|null;
-  onDeliveryGenerated?:()=>void;
   onGenerateCurriculum?:()=>void;
   onGenerateNative?:(target:string,style:string)=>void;
   onDownloadNative?:(attemptId:string)=>void;
@@ -54,12 +41,11 @@ export interface CompanionAcademyInput {
   practiceBusy?:boolean;
 }
 
-export default function DragonCompanionPanel({ draft, lastUserText, telemetry, academy, waitingRequestId }: {
+export default function DragonCompanionPanel({ draft, lastUserText, telemetry, academy }: {
   draft: string;
   lastUserText?: string;
   telemetry?: CompanionTelemetry;
   academy?: CompanionAcademyInput;
-  waitingRequestId?: string | null;
 }) {
   const [showResearch, setShowResearch] = useState(false);
   const [showAcademy,setShowAcademy]=useState(false);
@@ -84,10 +70,6 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
     ? companionFromCrawler(telemetry.kind, telemetry.payload)
     : companionForConversation(interest);
   return <View style={s.panel}>
-    {waitingRequestId && <View accessibilityLiveRegion="polite" style={s.metric}>
-      <Text style={s.value}>{dragonWaitingBubble(waitingRequestId)}</Text>
-      <Text style={s.note}>Magic 8 Ball · waiting message, not an answer</Text>
-    </View>}
     <DragonCompanion state={state} motion={motion} reducedMotion={systemReducedMotion}
       level={verifiedProgress?.level} unlocked={verifiedProgress?.unlocked} />
     <DragonFamilyNest family={academy?.family} />
@@ -101,7 +83,6 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
     <Pressable accessibilityRole="button" accessibilityLabel="Inspect suggested research interests" onPress={() => setShowResearch(v => !v)} style={s.metric}><Ionicons name="bulb-outline" size={16} color="#fb923c" /><Text style={s.value}>{showResearch ? 'Hide research interests' : 'Inspect research interests'}</Text></Pressable>
     {showResearch && <View style={s.metric}><Text style={s.value}>{proposal ? proposal.query : 'No research interest yet'}</Text><Text style={s.note}>Suggestion only · no web crawl starts without a separate explicit command.</Text></View>}
     <Pressable accessibilityRole="button" accessibilityLabel="Toggle Dragon Academy" onPress={()=>setShowAcademy(x=>!x)} style={s.academyButton}><Ionicons name="trophy-outline" color="#fbbf24" size={16}/><Text style={s.academyText}>{showAcademy?"Hide":"Show"} Dragon Academy · capability levels & game practice</Text></Pressable>
-    {showAcademy&&<DragonDeliveryWorkbench targets={academy?.nativeTargets} onGenerated={academy?.onDeliveryGenerated}/>}
     {showAcademy&&<DragonQuestBoard progress={academy?.progress} attempts={academy?.attempts}
       nativeAttempts={academy?.nativeAttempts} nativeTargets={academy?.nativeTargets}
       nativeStyles={academy?.nativeStyles}
@@ -114,10 +95,6 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
       onOpenDemo={academy?.onOpenDemo} onStopPractice={academy?.onStopPractice}
       onRevokePractice={academy?.onRevokePractice}
       busy={academy?.practiceBusy} />}
-    {academy?.wisdomReview && <DragonWisdomSquares review={academy.wisdomReview} />}
-    {academy?.knowledgeView && <DragonKnowledgePyramid view={academy.knowledgeView} />}
-    {academy?.nest && <DragonNestProgression snapshot={academy.nest} />}
-    {academy?.motherGlean && <DragonMotherGleanPanel summary={academy.motherGlean} />}
     <Text style={s.note}>Petting and animation are just for fun. System reduced-motion settings take priority. These reactions never start research or change memory.</Text>
     <Text style={s.note}>Conversation creates interest signals. Only policy-compliant, provenance-preserved acquisitions may become distilled memory.</Text>
   </View>;

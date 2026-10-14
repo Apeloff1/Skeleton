@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import hashlib
 import math
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable
 
 from .game_engine_lab import GameEngineLabError
 
@@ -33,9 +33,7 @@ MAX_RASTER_PIXELS = MAX_RASTER_WIDTH * MAX_RASTER_HEIGHT
 def _finite(value: float, label: str) -> float:
     result = float(value)
     if not math.isfinite(result):
-        raise GameEngineLabError(
-            f"{label} must be finite"
-        )
+        raise GameEngineLabError(f"{label} must be finite")
     return result
 
 
@@ -72,9 +70,9 @@ class RenderVertex:
 
     def lerp(
         self,
-        other: "RenderVertex",
+        other: RenderVertex,
         alpha: float,
-    ) -> "RenderVertex":
+    ) -> RenderVertex:
         alpha = _clamp(
             _finite(
                 alpha,
@@ -84,24 +82,9 @@ class RenderVertex:
             1.0,
         )
         return RenderVertex(
-            self.x
-            + (
-                other.x
-                - self.x
-            )
-            * alpha,
-            self.y
-            + (
-                other.y
-                - self.y
-            )
-            * alpha,
-            self.z
-            + (
-                other.z
-                - self.z
-            )
-            * alpha,
+            self.x + (other.x - self.x) * alpha,
+            self.y + (other.y - self.y) * alpha,
+            self.z + (other.z - self.z) * alpha,
         )
 
 
@@ -118,24 +101,12 @@ class RenderTriangle:
     shader_phase: float = 0.0
 
     def __post_init__(self) -> None:
-        if (
-            not self.object_id
-            or len(self.object_id) > 64
-        ):
-            raise GameEngineLabError(
-                "render object id must be bounded"
-            )
-        if (
-            type(self.material) is not int
-            or not 0 <= self.material <= 65535
-        ):
-            raise GameEngineLabError(
-                "render material outside unsigned-16 range"
-            )
+        if not self.object_id or len(self.object_id) > 64:
+            raise GameEngineLabError("render object id must be bounded")
+        if type(self.material) is not int or not 0 <= self.material <= 65535:
+            raise GameEngineLabError("render material outside unsigned-16 range")
         if len(self.vertices) != 3:
-            raise GameEngineLabError(
-                "render triangle requires exactly three vertices"
-            )
+            raise GameEngineLabError("render triangle requires exactly three vertices")
         _finite(
             self.shader_phase,
             "render shader phase",
@@ -164,9 +135,7 @@ class RasterConfig:
             or not 8 <= self.width <= MAX_RASTER_WIDTH
             or not 8 <= self.height <= MAX_RASTER_HEIGHT
         ):
-            raise GameEngineLabError(
-                "raster dimensions outside bounded validation range"
-            )
+            raise GameEngineLabError("raster dimensions outside bounded validation range")
         near = _finite(
             self.near,
             "near plane",
@@ -175,29 +144,20 @@ class RasterConfig:
             self.far,
             "far plane",
         )
-        if (
-            near <= 0
-            or far <= near
-        ):
-            raise GameEngineLabError(
-                "raster near/far planes invalid"
-            )
+        if near <= 0 or far <= near:
+            raise GameEngineLabError("raster near/far planes invalid")
         fov = _finite(
             self.fov_y_deg,
             "vertical field of view",
         )
         if not 10 <= fov <= 150:
-            raise GameEngineLabError(
-                "raster field of view outside [10, 150]"
-            )
+            raise GameEngineLabError("raster field of view outside [10, 150]")
         fog = _finite(
             self.fog_start,
             "fog start",
         )
         if not 0 <= fog <= 1:
-            raise GameEngineLabError(
-                "fog start must be within [0, 1]"
-            )
+            raise GameEngineLabError("fog start must be within [0, 1]")
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +189,27 @@ class RasterFrame:
 
 
 @dataclass(frozen=True, slots=True)
+class RasterImage:
+    """Exact bounded RGB pixels emitted by the existing reference rasterizer."""
+
+    frame: RasterFrame
+    pixels: bytes
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.frame, RasterFrame) or not isinstance(self.pixels, bytes):
+            raise GameEngineLabError("raster image requires a typed frame and immutable pixels")
+        if (
+            type(self.frame.width) is not int
+            or type(self.frame.height) is not int
+            or not 8 <= self.frame.width <= MAX_RASTER_WIDTH
+            or not 8 <= self.frame.height <= MAX_RASTER_HEIGHT
+            or len(self.pixels) != self.frame.width * self.frame.height * 3
+            or hashlib.sha256(self.pixels).hexdigest() != self.frame.color_digest
+        ):
+            raise GameEngineLabError("raster pixels do not match the bounded measured color buffer")
+
+
+@dataclass(frozen=True, slots=True)
 class _ScreenVertex:
     x: float
     y: float
@@ -252,11 +233,7 @@ class _PreparedTriangle:
 
 
 def _normalize(vertex: RenderVertex) -> RenderVertex:
-    length = math.sqrt(
-        vertex.x * vertex.x
-        + vertex.y * vertex.y
-        + vertex.z * vertex.z
-    )
+    length = math.sqrt(vertex.x * vertex.x + vertex.y * vertex.y + vertex.z * vertex.z)
     if length <= 1e-12:
         return RenderVertex(
             0.0,
@@ -286,12 +263,9 @@ def _cross(
     right: RenderVertex,
 ) -> RenderVertex:
     return RenderVertex(
-        left.y * right.z
-        - left.z * right.y,
-        left.z * right.x
-        - left.x * right.z,
-        left.x * right.y
-        - left.y * right.x,
+        left.y * right.z - left.z * right.y,
+        left.z * right.x - left.x * right.z,
+        left.x * right.y - left.y * right.x,
     )
 
 
@@ -299,11 +273,7 @@ def _dot(
     left: RenderVertex,
     right: RenderVertex,
 ) -> float:
-    return (
-        left.x * right.x
-        + left.y * right.y
-        + left.z * right.z
-    )
+    return left.x * right.x + left.y * right.y + left.z * right.z
 
 
 def _polygon_clip_z(
@@ -318,42 +288,16 @@ def _polygon_clip_z(
     def inside(
         vertex: RenderVertex,
     ) -> bool:
-        return (
-            vertex.z >= plane
-            if keep_greater
-            else vertex.z <= plane
-        )
+        return vertex.z >= plane if keep_greater else vertex.z <= plane
 
-    output: list[
-        RenderVertex
-    ] = []
+    output: list[RenderVertex] = []
     previous = vertices[-1]
-    previous_inside = inside(
-        previous
-    )
+    previous_inside = inside(previous)
     for current in vertices:
-        current_inside = inside(
-            current
-        )
-        if (
-            current_inside
-            != previous_inside
-        ):
-            denominator = (
-                current.z
-                - previous.z
-            )
-            alpha = (
-                0.0
-                if abs(
-                    denominator
-                ) <= 1e-12
-                else (
-                    plane
-                    - previous.z
-                )
-                / denominator
-            )
+        current_inside = inside(current)
+        if current_inside != previous_inside:
+            denominator = current.z - previous.z
+            alpha = 0.0 if abs(denominator) <= 1e-12 else (plane - previous.z) / denominator
             output.append(
                 previous.lerp(
                     current,
@@ -361,13 +305,9 @@ def _polygon_clip_z(
                 )
             )
         if current_inside:
-            output.append(
-                current
-            )
+            output.append(current)
         previous = current
-        previous_inside = (
-            current_inside
-        )
+        previous_inside = current_inside
     return tuple(output)
 
 
@@ -403,9 +343,7 @@ def clip_triangle(
                 (
                     first,
                     polygon[index],
-                    polygon[
-                        index + 1
-                    ],
+                    polygon[index + 1],
                 ),
                 triangle.shader,
                 triangle.shader_phase,
@@ -419,55 +357,15 @@ def _project(
     config: RasterConfig,
 ) -> _ScreenVertex:
     if vertex.z <= 0:
-        raise GameEngineLabError(
-            "cannot project non-positive camera depth"
-        )
-    aspect = (
-        config.width
-        / config.height
-    )
-    focal_y = (
-        1.0
-        / math.tan(
-            math.radians(
-                config.fov_y_deg
-            )
-            * 0.5
-        )
-    )
-    focal_x = (
-        focal_y
-        / aspect
-    )
-    ndc_x = (
-        vertex.x
-        * focal_x
-        / vertex.z
-    )
-    ndc_y = (
-        vertex.y
-        * focal_y
-        / vertex.z
-    )
+        raise GameEngineLabError("cannot project non-positive camera depth")
+    aspect = config.width / config.height
+    focal_y = 1.0 / math.tan(math.radians(config.fov_y_deg) * 0.5)
+    focal_x = focal_y / aspect
+    ndc_x = vertex.x * focal_x / vertex.z
+    ndc_y = vertex.y * focal_y / vertex.z
     return _ScreenVertex(
-        (
-            ndc_x
-            * 0.5
-            + 0.5
-        )
-        * (
-            config.width
-            - 1
-        ),
-        (
-            0.5
-            - ndc_y
-            * 0.5
-        )
-        * (
-            config.height
-            - 1
-        ),
+        (ndc_x * 0.5 + 0.5) * (config.width - 1),
+        (0.5 - ndc_y * 0.5) * (config.height - 1),
         vertex.z,
         1.0 / vertex.z,
     )
@@ -481,38 +379,21 @@ def _edge(
     px: float,
     py: float,
 ) -> float:
-    return (
-        (
-            px - ax
-        )
-        * (
-            by - ay
-        )
-        - (
-            py - ay
-        )
-        * (
-            bx - ax
-        )
-    )
+    return (px - ax) * (by - ay) - (py - ay) * (bx - ax)
 
 
 def _face_intensity(
     triangle: RenderTriangle,
     light: RenderVertex,
 ) -> float:
-    a, b, c = (
-        triangle.vertices
-    )
+    a, b, c = triangle.vertices
     normal = _normalize(
         _cross(
             _sub(b, a),
             _sub(c, a),
         )
     )
-    light = _normalize(
-        light
-    )
+    light = _normalize(light)
     diffuse = abs(
         _dot(
             normal,
@@ -524,9 +405,7 @@ def _face_intensity(
         )
     )
     return _clamp(
-        0.2
-        + 0.8
-        * diffuse,
+        0.2 + 0.8 * diffuse,
         0.0,
         1.0,
     )
@@ -541,8 +420,7 @@ def _prepare(
             vertex,
             config,
         )
-        for vertex
-        in triangle.vertices
+        for vertex in triangle.vertices
     )
     area = _edge(
         screen[0].x,
@@ -556,8 +434,7 @@ def _prepare(
         return None
     intensity = (
         1.0
-        if config.pipeline
-        is RasterPipeline.PAINTER
+        if config.pipeline is RasterPipeline.PAINTER
         else _face_intensity(
             triangle,
             config.light_direction,
@@ -570,12 +447,7 @@ def _prepare(
         triangle.shader_phase,
         screen,  # type: ignore[arg-type]
         intensity,
-        sum(
-            vertex.z
-            for vertex
-            in triangle.vertices
-        )
-        / 3.0,
+        sum(vertex.z for vertex in triangle.vertices) / 3.0,
     )
 
 
@@ -584,24 +456,9 @@ def _material_base(
 ) -> tuple[int, int, int]:
     # Stable high-contrast pseudo-palette derived only from material identity.
     return (
-        48
-        + (
-            material * 97
-            + 31
-        )
-        % 192,
-        48
-        + (
-            material * 57
-            + 83
-        )
-        % 192,
-        48
-        + (
-            material * 131
-            + 17
-        )
-        % 192,
+        48 + (material * 97 + 31) % 192,
+        48 + (material * 57 + 83) % 192,
+        48 + (material * 131 + 17) % 192,
     )
 
 
@@ -610,101 +467,28 @@ def _shade(
     depth: float,
     config: RasterConfig,
 ) -> tuple[int, int, int]:
-    red, green, blue = (
-        _material_base(
-            triangle.material
-        )
-    )
-    intensity = (
-        triangle.intensity
-    )
+    red, green, blue = _material_base(triangle.material)
+    intensity = triangle.intensity
     red *= intensity
     green *= intensity
     blue *= intensity
 
-    if (
-        config.pipeline
-        is RasterPipeline.PROGRAMMABLE
-    ):
+    if config.pipeline is RasterPipeline.PROGRAMMABLE:
         # The historical programmable reference implements a bounded subset
         # matching ShaderProgram's tint/fog-style operations.
-        if (
-            triangle.shader
-            == "skinned"
-        ):
-            phase_wave = math.sin(
-                triangle.shader_phase
-                * 4.0
-            )
-            phase_pulse = (
-                0.85
-                + 0.15
-                * (
-                    phase_wave
-                    + 1.0
-                )
-                * 0.5
-            )
-            red = (
-                red
-                * 1.06
-                * phase_pulse
-                + 18.0
-                * (
-                    phase_wave
-                    + 1.0
-                )
-                * 0.5
-            )
-            green *= (
-                0.92
-                + 0.08
-                * (
-                    1.0
-                    - phase_wave
-                )
-                * 0.5
-            )
-            blue = (
-                blue
-                * (
-                    0.90
-                    + 0.10
-                    * (
-                        1.0
-                        - phase_wave
-                    )
-                    * 0.5
-                )
-                + 12.0
-                * (
-                    1.0
-                    - phase_wave
-                )
-                * 0.5
-            )
+        if triangle.shader == "skinned":
+            phase_wave = math.sin(triangle.shader_phase * 4.0)
+            phase_pulse = 0.85 + 0.15 * (phase_wave + 1.0) * 0.5
+            red = red * 1.06 * phase_pulse + 18.0 * (phase_wave + 1.0) * 0.5
+            green *= 0.92 + 0.08 * (1.0 - phase_wave) * 0.5
+            blue = blue * (0.90 + 0.10 * (1.0 - phase_wave) * 0.5) + 12.0 * (1.0 - phase_wave) * 0.5
         normalized_depth = _clamp(
-            (
-                depth
-                - config.near
-            )
-            / (
-                config.far
-                - config.near
-            ),
+            (depth - config.near) / (config.far - config.near),
             0.0,
             1.0,
         )
         fog = _clamp(
-            (
-                normalized_depth
-                - config.fog_start
-            )
-            / max(
-                1e-9,
-                1.0
-                - config.fog_start
-            ),
+            (normalized_depth - config.fog_start) / max(1e-9, 1.0 - config.fog_start),
             0.0,
             1.0,
         )
@@ -713,60 +497,30 @@ def _shade(
             112.0,
             128.0,
         )
-        red = (
-            red
-            * (
-                1.0
-                - fog
-            )
-            + fog_color[0]
-            * fog
-        )
-        green = (
-            green
-            * (
-                1.0
-                - fog
-            )
-            + fog_color[1]
-            * fog
-        )
-        blue = (
-            blue
-            * (
-                1.0
-                - fog
-            )
-            + fog_color[2]
-            * fog
-        )
+        red = red * (1.0 - fog) + fog_color[0] * fog
+        green = green * (1.0 - fog) + fog_color[1] * fog
+        blue = blue * (1.0 - fog) + fog_color[2] * fog
 
     return (
-        int(
-            round(
-                _clamp(
-                    red,
-                    0.0,
-                    255.0,
-                )
+        round(
+            _clamp(
+                red,
+                0.0,
+                255.0,
             )
         ),
-        int(
-            round(
-                _clamp(
-                    green,
-                    0.0,
-                    255.0,
-                )
+        round(
+            _clamp(
+                green,
+                0.0,
+                255.0,
             )
         ),
-        int(
-            round(
-                _clamp(
-                    blue,
-                    0.0,
-                    255.0,
-                )
+        round(
+            _clamp(
+                blue,
+                0.0,
+                255.0,
             )
         ),
     )
@@ -778,40 +532,28 @@ class ReferenceRasterizer:
     def __init__(
         self,
         config: RasterConfig,
+        *,
+        capture_pixels: bool = False,
     ) -> None:
+        if type(capture_pixels) is not bool:
+            raise GameEngineLabError("raster capture flag must be boolean")
         self.config = config
-        pixel_count = (
-            config.width
-            * config.height
-        )
-        if (
-            pixel_count
-            > MAX_RASTER_PIXELS
-        ):
-            raise GameEngineLabError(
-                "raster pixel budget exceeded"
-            )
+        self._capture_pixels = capture_pixels
+        self._color_pixels: bytes | None = None
+        pixel_count = config.width * config.height
+        if pixel_count > MAX_RASTER_PIXELS:
+            raise GameEngineLabError("raster pixel budget exceeded")
 
     def render(
         self,
-        triangles: Iterable[
-            RenderTriangle
-        ],
+        triangles: Iterable[RenderTriangle],
     ) -> RasterFrame:
-        values = tuple(
-            triangles
-        )
-        if (
-            len(values)
-            > MAX_RASTER_TRIANGLES
-        ):
-            raise GameEngineLabError(
-                "raster triangle budget exceeded"
-            )
+        self._color_pixels = None
+        values = tuple(triangles)
+        if len(values) > MAX_RASTER_TRIANGLES:
+            raise GameEngineLabError("raster triangle budget exceeded")
 
-        clipped: list[
-            RenderTriangle
-        ] = []
+        clipped: list[RenderTriangle] = []
         clipped_count = 0
         for triangle in values:
             pieces = clip_triangle(
@@ -819,20 +561,11 @@ class ReferenceRasterizer:
                 self.config.near,
                 self.config.far,
             )
-            if (
-                len(pieces) != 1
-                or (
-                    pieces
-                    and pieces[0]
-                    != triangle
-                )
-            ):
+            if len(pieces) != 1 or (pieces and pieces[0] != triangle):
                 clipped_count += 1
             clipped.extend(pieces)
 
-        prepared: list[
-            _PreparedTriangle
-        ] = []
+        prepared: list[_PreparedTriangle] = []
         culled = 0
         for triangle in clipped:
             item = _prepare(
@@ -842,14 +575,9 @@ class ReferenceRasterizer:
             if item is None:
                 culled += 1
                 continue
-            prepared.append(
-                item
-            )
+            prepared.append(item)
 
-        if (
-            self.config.pipeline
-            is RasterPipeline.PAINTER
-        ):
+        if self.config.pipeline is RasterPipeline.PAINTER:
             # Back-to-front ordering models painter semantics. Stable tie
             # breakers make coplanar content deterministic.
             prepared.sort(
@@ -863,39 +591,18 @@ class ReferenceRasterizer:
 
         width = self.config.width
         height = self.config.height
-        count = (
-            width * height
-        )
-        colors = bytearray(
-            count * 3
-        )
-        materials = [
-            -1
-            for _ in range(
-                count
-            )
-        ]
-        depths = [
-            math.inf
-            for _ in range(
-                count
-            )
-        ]
-        touched = [
-            0
-            for _ in range(
-                count
-            )
-        ]
+        count = width * height
+        colors = bytearray(count * 3)
+        materials = [-1 for _ in range(count)]
+        depths = [math.inf for _ in range(count)]
+        touched = [0 for _ in range(count)]
         shaded = 0
         depth_rejected = 0
         overdraw = 0
         rasterized = 0
 
         for triangle in prepared:
-            v0, v1, v2 = (
-                triangle.screen
-            )
+            v0, v1, v2 = triangle.screen
             area = _edge(
                 v0.x,
                 v0.y,
@@ -908,56 +615,45 @@ class ReferenceRasterizer:
                 continue
             min_x = max(
                 0,
-                int(
-                    math.floor(
-                        min(
-                            v0.x,
-                            v1.x,
-                            v2.x,
-                        )
+                math.floor(
+                    min(
+                        v0.x,
+                        v1.x,
+                        v2.x,
                     )
                 ),
             )
             max_x = min(
                 width - 1,
-                int(
-                    math.ceil(
-                        max(
-                            v0.x,
-                            v1.x,
-                            v2.x,
-                        )
+                math.ceil(
+                    max(
+                        v0.x,
+                        v1.x,
+                        v2.x,
                     )
                 ),
             )
             min_y = max(
                 0,
-                int(
-                    math.floor(
-                        min(
-                            v0.y,
-                            v1.y,
-                            v2.y,
-                        )
+                math.floor(
+                    min(
+                        v0.y,
+                        v1.y,
+                        v2.y,
                     )
                 ),
             )
             max_y = min(
                 height - 1,
-                int(
-                    math.ceil(
-                        max(
-                            v0.y,
-                            v1.y,
-                            v2.y,
-                        )
+                math.ceil(
+                    max(
+                        v0.y,
+                        v1.y,
+                        v2.y,
                     )
                 ),
             )
-            if (
-                max_x < min_x
-                or max_y < min_y
-            ):
+            if max_x < min_x or max_y < min_y:
                 continue
 
             drew_any = False
@@ -965,16 +661,12 @@ class ReferenceRasterizer:
                 min_y,
                 max_y + 1,
             ):
-                py = (
-                    y + 0.5
-                )
+                py = y + 0.5
                 for x in range(
                     min_x,
                     max_x + 1,
                 ):
-                    px = (
-                        x + 0.5
-                    )
+                    px = x + 0.5
                     w0 = _edge(
                         v1.x,
                         v1.y,
@@ -1000,57 +692,26 @@ class ReferenceRasterizer:
                         py,
                     )
                     if area > 0:
-                        inside = (
-                            w0 >= 0
-                            and w1 >= 0
-                            and w2 >= 0
-                        )
+                        inside = w0 >= 0 and w1 >= 0 and w2 >= 0
                     else:
-                        inside = (
-                            w0 <= 0
-                            and w1 <= 0
-                            and w2 <= 0
-                        )
+                        inside = w0 <= 0 and w1 <= 0 and w2 <= 0
                     if not inside:
                         continue
                     w0 /= area
                     w1 /= area
                     w2 /= area
 
-                    reciprocal_depth = (
-                        w0
-                        * v0.reciprocal_z
-                        + w1
-                        * v1.reciprocal_z
-                        + w2
-                        * v2.reciprocal_z
-                    )
-                    if (
-                        reciprocal_depth
-                        <= 1e-12
-                    ):
+                    reciprocal_depth = w0 * v0.reciprocal_z + w1 * v1.reciprocal_z + w2 * v2.reciprocal_z
+                    if reciprocal_depth <= 1e-12:
                         continue
-                    depth = (
-                        1.0
-                        / reciprocal_depth
-                    )
-                    index = (
-                        y * width
-                        + x
-                    )
+                    depth = 1.0 / reciprocal_depth
+                    index = y * width + x
                     if touched[index]:
                         overdraw += 1
                     touched[index] += 1
 
-                    depth_test = (
-                        self.config.pipeline
-                        is not RasterPipeline.PAINTER
-                    )
-                    if (
-                        depth_test
-                        and depth
-                        >= depths[index]
-                    ):
+                    depth_test = self.config.pipeline is not RasterPipeline.PAINTER
+                    if depth_test and depth >= depths[index]:
                         depth_rejected += 1
                         continue
 
@@ -1059,51 +720,25 @@ class ReferenceRasterizer:
                         depth,
                         self.config,
                     )
-                    offset = (
-                        index * 3
-                    )
-                    colors[offset] = (
-                        color[0]
-                    )
-                    colors[
-                        offset + 1
-                    ] = color[1]
-                    colors[
-                        offset + 2
-                    ] = color[2]
-                    materials[index] = (
-                        triangle.material
-                    )
-                    depths[index] = (
-                        depth
-                    )
+                    offset = index * 3
+                    colors[offset] = color[0]
+                    colors[offset + 1] = color[1]
+                    colors[offset + 2] = color[2]
+                    materials[index] = triangle.material
+                    depths[index] = depth
                     shaded += 1
                     drew_any = True
             if drew_any:
                 rasterized += 1
 
-        covered_indices = [
-            index
-            for index, material
-            in enumerate(materials)
-            if material >= 0
-        ]
-        finite_depths = [
-            depths[index]
-            for index
-            in covered_indices
-            if math.isfinite(
-                depths[index]
-            )
-        ]
+        covered_indices = [index for index, material in enumerate(materials) if material >= 0]
+        finite_depths = [depths[index] for index in covered_indices if math.isfinite(depths[index])]
         histogram: dict[
             int,
             int,
         ] = {}
         for index in covered_indices:
-            material = (
-                materials[index]
-            )
+            material = materials[index]
             histogram[material] = (
                 histogram.get(
                     material,
@@ -1115,76 +750,40 @@ class ReferenceRasterizer:
         depth_bytes = bytearray()
         for depth in depths:
             if math.isfinite(depth):
-                quantized = int(
-                    round(
-                        _clamp(
-                            (
-                                depth
-                                - self.config.near
-                            )
-                            / (
-                                self.config.far
-                                - self.config.near
-                            ),
-                            0.0,
-                            1.0,
-                        )
-                        * 16_777_215
+                quantized = round(
+                    _clamp(
+                        (depth - self.config.near) / (self.config.far - self.config.near),
+                        0.0,
+                        1.0,
                     )
+                    * 16_777_215
                 )
             else:
-                quantized = (
-                    16_777_215
-                )
+                quantized = 16_777_215
             depth_bytes.extend(
                 (
-                    (
-                        quantized
-                        >> 16
-                    )
-                    & 0xFF,
-                    (
-                        quantized
-                        >> 8
-                    )
-                    & 0xFF,
-                    quantized
-                    & 0xFF,
+                    (quantized >> 16) & 0xFF,
+                    (quantized >> 8) & 0xFF,
+                    quantized & 0xFF,
                 )
             )
 
-        color_digest = (
-            hashlib.sha256(
-                bytes(colors)
-            ).hexdigest()
-        )
-        depth_digest = (
-            hashlib.sha256(
-                bytes(depth_bytes)
-            ).hexdigest()
-        )
+        color_digest = hashlib.sha256(bytes(colors)).hexdigest()
+        if self._capture_pixels:
+            self._color_pixels = bytes(colors)
+        depth_digest = hashlib.sha256(bytes(depth_bytes)).hexdigest()
         stats = RasterStats(
-            submitted_triangles=
-                len(values),
-            clipped_triangles=
-                clipped_count,
+            submitted_triangles=len(values),
+            clipped_triangles=clipped_count,
             culled_triangles=culled,
-            rasterized_triangles=
-                rasterized,
-            covered_pixels=
-                len(
-                    covered_indices
-                ),
+            rasterized_triangles=rasterized,
+            covered_pixels=len(covered_indices),
             shaded_fragments=shaded,
-            depth_rejected_fragments=
-                depth_rejected,
-            overdraw_fragments=
-                overdraw,
+            depth_rejected_fragments=depth_rejected,
+            overdraw_fragments=overdraw,
             min_depth=(
                 round(
-                    min(
-                        finite_depths
-                    ),
+                    min(finite_depths),
                     8,
                 )
                 if finite_depths
@@ -1192,20 +791,14 @@ class ReferenceRasterizer:
             ),
             max_depth=(
                 round(
-                    max(
-                        finite_depths
-                    ),
+                    max(finite_depths),
                     8,
                 )
                 if finite_depths
                 else None
             ),
         )
-        histogram_tuple = tuple(
-            sorted(
-                histogram.items()
-            )
-        )
+        histogram_tuple = tuple(sorted(histogram.items()))
         identity = (
             f"{self.config.pipeline.value}|"
             f"{width}x{height}|"
@@ -1217,11 +810,7 @@ class ReferenceRasterizer:
         return RasterFrame(
             width,
             height,
-            hashlib.sha256(
-                identity.encode(
-                    "utf-8"
-                )
-            ).hexdigest(),
+            hashlib.sha256(identity.encode("utf-8")).hexdigest(),
             color_digest,
             depth_digest,
             stats,
@@ -1230,9 +819,7 @@ class ReferenceRasterizer:
 
 
 def render_reference_scene(
-    triangles: Iterable[
-        RenderTriangle
-    ],
+    triangles: Iterable[RenderTriangle],
     *,
     width: int,
     height: int,
@@ -1250,6 +837,32 @@ def render_reference_scene(
             fov_y_deg=fov_y_deg,
             pipeline=pipeline,
         )
-    ).render(
-        triangles
+    ).render(triangles)
+
+
+def render_reference_image(
+    triangles: Sequence[RenderTriangle],
+    *,
+    width: int,
+    height: int,
+    near: float,
+    far: float,
+    fov_y_deg: float,
+    pipeline: RasterPipeline,
+) -> RasterImage:
+    """Run the identical raster pipeline, retaining its actual RGB buffer."""
+    if (
+        not isinstance(triangles, Sequence)
+        or isinstance(triangles, (str, bytes, bytearray))
+        or len(triangles) > MAX_RASTER_TRIANGLES
+        or any(not isinstance(triangle, RenderTriangle) for triangle in triangles)
+    ):
+        raise GameEngineLabError("raster image requires a bounded typed triangle sequence")
+    renderer = ReferenceRasterizer(
+        RasterConfig(width, height, near, far, fov_y_deg, pipeline),
+        capture_pixels=True,
     )
+    frame = renderer.render(triangles)
+    if renderer._color_pixels is None:
+        raise GameEngineLabError("reference rasterizer did not emit a color buffer")
+    return RasterImage(frame, renderer._color_pixels)

@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
-import asyncio
 from typing import Any, Awaitable, Callable, Mapping
 from uuid import uuid4
 
@@ -33,7 +32,6 @@ from skeleton.contracts.conversation import (
     ConversationThread,
     ConversationThreadState,
 )
-from skeleton.contracts.context import ContextSegment, ContextKind, ContextTrust
 from skeleton.persistence.conversation_repository import (
     ConversationConflict,
     ConversationNotFound,
@@ -47,6 +45,19 @@ class ConversationStorageUnavailable(ConversationRepositoryError):
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _bson_datetime(value: object) -> datetime:
+    """BSON datetimes are UTC, including the driver's default naïve decode.
+
+    Normalize only the persistence boundary. API/domain timestamps still
+    require an explicit timezone and the shared legacy client stays unchanged.
+    """
+    if not isinstance(value, datetime):
+        raise ConversationStorageUnavailable("invalid persisted conversation timestamp")
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def _thread_doc(thread: ConversationThread) -> dict[str, Any]:
@@ -92,8 +103,8 @@ def _thread_from_doc(doc: dict[str, Any]) -> ConversationThread:
         thread_id=str(doc["thread_id"]),
         tenant_id=str(doc["tenant_id"]),
         owner_id=str(doc["owner_id"]),
-        created_at=doc["created_at"],
-        updated_at=doc["updated_at"],
+        created_at=_bson_datetime(doc["created_at"]),
+        updated_at=_bson_datetime(doc["updated_at"]),
         version=int(doc["version"]),
         message_sequence=int(doc["message_sequence"]),
         active_branch_id=str(doc["active_branch_id"]),
@@ -111,7 +122,7 @@ def _message_from_doc(doc: dict[str, Any]) -> ConversationMessage:
         branch_id=str(doc["branch_id"]),
         sequence=int(doc["sequence"]),
         author_type=ConversationAuthorType(str(doc["author_type"])),
-        created_at=doc["created_at"],
+        created_at=_bson_datetime(doc["created_at"]),
         idempotency_key=str(doc["idempotency_key"]),
         content=doc.get("content"),
         content_ref=doc.get("content_ref"),
@@ -151,10 +162,7 @@ class MongoConversationAuthority:
         governance_inventory_reader: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_engine_target_executor: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_retention_planner: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
-        dragon_projection=None,
     ) -> None:
-        self.dragon_projection = dragon_projection
-        self.dragon_projection_outcomes = {"written": 0, "skipped": 0, "degraded": 0}
         self.database = database
         self.threads = database["conversation_threads"]
         self.messages = database["conversation_messages"]
@@ -167,89 +175,6 @@ class MongoConversationAuthority:
             governance_engine_target_executor
         )
         self.governance_retention_planner = governance_retention_planner
-
-    async def _project_dragon_checkpoint(self, thread, message):
-        projection = getattr(self, "dragon_projection", None)
-        if projection is None or message.sequence % 10 or message.sequence > thread.message_sequence:
-            return
-        async def apply():
-            fields = {name: 1 for name in (
-                "message_id", "thread_id", "branch_id", "sequence", "author_type", "created_at",
-                "idempotency_key", "data_class", "schema_version", "causal_user_message_id",
-                "operation_id", "ai_result_id", "tool_receipt_refs")}
-            docs = await (self.messages.find({"thread_id": thread.thread_id,
-                "branch_id": thread.active_branch_id,
-                "sequence": {"$gt": message.sequence - 10, "$lte": message.sequence}}, fields)
-                .sort("sequence", ASCENDING).limit(10).to_list(length=10))
-            if len(docs) != 10:
-                return None  # A branch fork is not ten contiguous active-branch steps.
-            refs = tuple(_message_from_doc({**doc, "content": None,
-                "content_ref": "conversation-message://" + thread.thread_id + "/" + str(doc["message_id"])})
-                for doc in docs)
-            return await projection.after_commit(thread, refs)
-        outcomes = getattr(self, "dragon_projection_outcomes", None)
-        try:
-            result = await asyncio.wait_for(apply(), timeout=0.25)
-            if outcomes is not None:
-                outcomes["written" if result is not None else "skipped"] += 1
-            return "written" if result is not None else "skipped"
-        except Exception:
-            # Canonical commit already succeeded. Derived loss never rolls it back.
-            # Retry of the immutable message can reconstruct this exact window.
-            if outcomes is not None:
-                outcomes["degraded"] += 1
-            return "degraded"
-
-    async def repair_dragon_checkpoint(self, thread_id, *, tenant_id, owner_id, end_sequence):
-        """Bounded repair of one authorized, currently retained ten-step window."""
-        from types import SimpleNamespace
-        thread = await self.get_thread(thread_id, tenant_id=tenant_id, owner_id=owner_id)
-        if isinstance(end_sequence, bool) or not isinstance(end_sequence, int) or end_sequence < 10 or end_sequence % 10 or end_sequence > thread.message_sequence:
-            raise ValueError("invalid committed checkpoint boundary")
-        if thread.state is not ConversationThreadState.ACTIVE:
-            return "not_active"
-        if getattr(self, "dragon_projection", None) is None:
-            return "disabled"
-        return await self._project_dragon_checkpoint(thread, SimpleNamespace(sequence=end_sequence))
-
-    async def dragon_context_segments(self, thread, query):
-        projection = getattr(self, "dragon_projection", None)
-        if projection is None:
-            return ()
-        async def read():
-            current = await self.get_thread(thread.thread_id, tenant_id=thread.tenant_id, owner_id=thread.owner_id)
-            if current.active_branch_id != thread.active_branch_id or current.version != thread.version:
-                return ()
-            result = await projection.context_segments(current, query)
-            if not isinstance(result, tuple) or len(result) > 3:
-                return ()
-            if any(not isinstance(segment, ContextSegment) or segment.kind is not ContextKind.CONVERSATION_SUMMARY
-                   or segment.trust_level is not ContextTrust.DERIVED_UNTRUSTED
-                   or segment.tenant_id != current.tenant_id or segment.data_class != current.data_class
-                   or segment.purpose != "model-inference" or segment.mandatory
-                   or segment.content is None or len(segment.content.encode()) > 4097 for segment in result):
-                return ()
-            return result
-        try:
-            return await asyncio.wait_for(read(), timeout=0.25)
-        except Exception:
-            return ()
-
-    async def _delete_dragon_projection(self, kind, query, tenant_id):
-        projection = getattr(self, "dragon_projection", None)
-        if projection is None:
-            return
-        thread_id = query["thread_id"] if kind == "message" else query["_id"]
-        doc = await self.threads.find_one({"_id": thread_id, "tenant_id": tenant_id})
-        if doc is None:
-            return  # An already removed parent has no authorized context route.
-        owner = str(doc.get("owner_id") or "")
-        if not owner:
-            raise ConversationStorageUnavailable("conversation projection deletion identity unavailable")
-        try:
-            await asyncio.wait_for(projection.delete_thread(tenant_id, owner, thread_id), timeout=0.25)
-        except Exception as exc:
-            raise ConversationStorageUnavailable("conversation projection deletion unavailable") from exc
 
     @staticmethod
     def _governed_conversation_location(
@@ -597,7 +522,6 @@ class MongoConversationAuthority:
                 "record_ids": [],
                 "linked_execution": None,
                 "conversation": None,
-                "dragon_projection": await self._expire_dragon_projection(str(tenant_id)),
                 "complete": True,
             }
 
@@ -680,19 +604,8 @@ class MongoConversationAuthority:
                 if conversation_result is None
                 else dict(conversation_result)
             ),
-            "dragon_projection": await self._expire_dragon_projection(str(tenant_id)),
             "complete": True,
         }
-
-    async def _expire_dragon_projection(self, tenant_id):
-        projection = getattr(self, "dragon_projection", None)
-        if projection is None:
-            return None
-        try:
-            return await asyncio.wait_for(projection.expire_tenant(tenant_id, limit=128), timeout=.25)
-        except Exception as exc:
-            # A parent sweep cannot acknowledge derived erasure it did not do.
-            raise ConversationStorageUnavailable("conversation projection retention unavailable") from exc
 
     async def execute_governed_deletion(
         self,
@@ -758,7 +671,6 @@ class MongoConversationAuthority:
         acknowledgements: list[dict[str, Any]] = []
         for _order, kind, query, raw in actions:
             collection = self.messages if kind == "message" else self.threads
-            await self._delete_dragon_projection(kind, query, str(tenant_id))
             try:
                 await collection.delete_one(query)
             except Exception as exc:
@@ -1277,7 +1189,6 @@ class MongoConversationAuthority:
                     "idempotency_key was reused with different content"
                 )
             if existing.sequence <= thread.message_sequence:
-                await self._project_dragon_checkpoint(thread, existing)
                 return thread, existing
 
         if not thread.writable:
@@ -1396,7 +1307,6 @@ class MongoConversationAuthority:
                         owner_id=owner_id,
                     )
                     if existing.sequence <= recovered.message_sequence:
-                        await self._project_dragon_checkpoint(recovered, existing)
                         return recovered, existing
             raise ConversationConflict(
                 "conversation message identity or ordering conflict"
@@ -1413,7 +1323,6 @@ class MongoConversationAuthority:
         )
         if committed.message_sequence < message.sequence:
             raise ConversationConflict("conversation append did not reach commit point")
-        await self._project_dragon_checkpoint(committed, message)
         return committed, message
 
     async def append_user_message(

@@ -29,8 +29,9 @@ def _level_with_completion(original: str, campaign_id: str,
         "type":"skeleton.game.campaign.completed.v1",
         "campaign":campaign_id,"chapter":chapter_id,
     })
-    # The original Canvas compiler writes this branch without a trailing
-    # semicolon before the closing brace; enforce one unique goal branch.
+    # The canonical Canvas generator ends the goal statement without an
+    # extra semicolon before the closing brace. Bind to that exact event,
+    # without lowering the uniqueness check or firing on an unearned goal.
     mark="state.won=true;state.score+=250"
     if original.count(mark)!=1:
         raise ValueError("playable runtime does not expose unique goal event")

@@ -104,12 +104,34 @@ def _verify_volume(
         errors.append(f"{VOLUME} title drift")
     if volume.get("scope") != "canonical-plan":
         errors.append(f"{VOLUME} scope drift")
-    if volume.get("completion_checkbox") is True:
-        errors.append(f"{VOLUME} cannot self-sign from implementation evidence")
+    signed = volume.get("completion_checkbox")
     gaps = set(volume.get("gaps") or [])
-    missing = sorted(REQUIRED_GAPS - gaps)
-    if missing:
-        errors.append(f"{VOLUME} gap binding drift: {missing}")
+    if signed is True:
+        # Audit the existing independent sign-off; never issue one here.
+        if (
+            volume.get("implementation_status") != "verified"
+            or volume.get("completion_checkbox_mark") != "[x]"
+            or gaps
+        ):
+            errors.append(f"{VOLUME} invalid signed completion state")
+        if not {
+            "tests/test_architecture_package_layers.py",
+            "tests/test_vol052_python_architecture_independent.py",
+        }.issubset(set(volume.get("tests") or [])):
+            errors.append(f"{VOLUME} missing executable test evidence")
+        if not {
+            "scripts/check_architecture_package_layers.py",
+            "scripts/verify_vol052_python_architecture.py",
+        }.issubset(set(volume.get("evaluations") or [])):
+            errors.append(f"{VOLUME} missing executable evaluation evidence")
+    elif signed is False:
+        if volume.get("completion_checkbox_mark") != "[ ]":
+            errors.append(f"{VOLUME} unsigned checkbox mark drift")
+        missing = sorted(REQUIRED_GAPS - gaps)
+        if missing:
+            errors.append(f"{VOLUME} gap binding drift: {missing}")
+    else:
+        errors.append(f"{VOLUME} malformed signed state")
     requirements = tuple(str(item) for item in volume.get("requirements") or [])
     for phrase in (
         "Separate contracts/domain/runtime/adapters/testing concerns",
@@ -132,6 +154,8 @@ def _verify_layers(
     manifest: Mapping[str, Any],
     root: Path,
     errors: list[str],
+    *,
+    expected_gaps: set[str],
 ) -> dict[str, Any]:
     if manifest.get("schema_version") != "skeleton.architecture.python_package_layers.v1":
         errors.append("package-layer schema drift")
@@ -155,7 +179,8 @@ def _verify_layers(
     else:
         if binding.get("title") != TITLE:
             errors.append(f"{VOLUME} package-layer title binding drift")
-        if set(binding.get("required_gap_texts") or []) != REQUIRED_GAPS:
+        declared = binding.get("required_gap_texts")
+        if not isinstance(declared, list) or set(declared) != expected_gaps:
             errors.append(f"{VOLUME} package-layer gap binding drift")
 
     policy = manifest.get("policy")
@@ -335,7 +360,9 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     registry = _load(root / REGISTRY)
 
     volume_binding = _verify_volume(master, errors)
-    layer_binding = _verify_layers(manifest, root, errors)
+    layer_binding = _verify_layers(
+        manifest, root, errors, expected_gaps=set(volume_binding["gaps"])
+    )
     registry_binding = _verify_rule_registry(registry, errors)
     source_digests = _verify_source_contract(root, errors)
 

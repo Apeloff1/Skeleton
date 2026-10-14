@@ -4,7 +4,7 @@
  * A step being opened is NOT evidence that an operation ran or a build finished.
  * No model execution, asset or project data is stored by this module.
  */
-import { projectHref } from './worldWorkspace';
+import { projectHref } from './worldWorkspace.ts';
 
 export type JourneyStep = {
   id: string;
@@ -88,7 +88,7 @@ export const PRODUCT_JOURNEYS: readonly ProductJourney[] = [
       { id: 'mission', title: 'Inspect the mission', description: 'Review current work and its execution status.', href: '/mission-control' },
       { id: 'tools', title: 'Open the builder hub', description: 'Choose the tool relevant to your task.', href: '/build-hub' },
       { id: 'studio', title: 'Continue in Studio', description: 'Work on an existing or new game.', href: '/studio', acceptsBuild: true },
-      { id: 'review', title: 'Review the design', description: 'Compile a game-scoped design review with explicit control.', href: '/design-review', requiresBuild: true },
+      { id: 'design-review', title: 'Review the design', description: 'Compile a game-scoped design review with explicit control.', href: '/design-review', requiresBuild: true },
     ],
   },
   {
@@ -99,7 +99,7 @@ export const PRODUCT_JOURNEYS: readonly ProductJourney[] = [
       { id: 'workbench', title: 'Open World Workbench', description: 'Inspect world evidence and forge missing artifacts.', href: '/world-workbench', requiresBuild: true },
       { id: 'world', title: 'Create a world', description: 'Define regions, ecology and world rules from the game.', href: '/worldforge', acceptsBuild: true },
       { id: 'scene', title: 'Compose a scene', description: 'Build a scene for this game.', href: '/compose-scene', requiresBuild: true },
-      { id: 'assets', title: 'Build assets', description: "Generate art grounded in this game's knowledge.", href: '/asset-genesis', requiresBuild: true },
+      { id: 'assets', title: 'Build assets', description: 'Generate art grounded in this game knowledge.', href: '/asset-genesis', requiresBuild: true },
       { id: 'mechanics', title: 'Engineer mechanics', description: 'Mount and inspect game systems.', href: '/systems-forge', requiresBuild: true },
       { id: 'review', title: 'Review your design', description: 'Compile an evidence-guided design brief.', href: '/design-review', requiresBuild: true },
       { id: 'studio', title: 'Integrate the project', description: 'Continue with the integrated game build.', href: '/studio', acceptsBuild: true },

@@ -354,30 +354,14 @@ class ReviewedKnowledgeStore:
     to the embedding process. Never expose this object as an unauthenticated API.
     """
 
-    def __init__(self, path: str | Path, *, policy: KnowledgePolicy | None = None,
-                 read_only: bool = False) -> None:
+    def __init__(self, path: str | Path, *, policy: KnowledgePolicy | None = None) -> None:
         self.policy = policy or KnowledgePolicy()
         if not isinstance(self.policy, KnowledgePolicy):
             raise KnowledgeError("KnowledgePolicy required")
-        if type(read_only) is not bool:
-            raise ValueError("explicit read-only connection mode required")
-        if read_only:
-            verified_path = Path(path).expanduser()
-            if (not verified_path.is_absolute() or not verified_path.is_file()
-                or verified_path.is_symlink()):
-                raise ValueError("existing canonical read-only knowledge store required")
-            # URI-escaped absolute SQLite path; never fall back to creating a
-            # fresh empty DB if an external volume has disappeared.
-            self.db = sqlite3.connect(
-                verified_path.as_uri() + "?mode=ro",
-                timeout=10, isolation_level=None, uri=True)
-            self.db.execute("PRAGMA query_only = ON")
-        else:
-            self.db = sqlite3.connect(str(path), timeout=10, isolation_level=None)
+        self.db = sqlite3.connect(str(path), timeout=10, isolation_level=None)
         self.db.execute("PRAGMA busy_timeout = 10000")
         self.db.execute("PRAGMA foreign_keys = ON")
-        if not read_only:
-            self.db.execute("PRAGMA journal_mode = WAL")
+        self.db.execute("PRAGMA journal_mode = WAL")
         self.db.execute(
             """CREATE TABLE IF NOT EXISTS game_builder_knowledge (
                 owner TEXT NOT NULL,
@@ -444,7 +428,7 @@ class ReviewedKnowledgeStore:
             note = ReviewedNote.from_mapping(entry["note"])
             quote = _text(entry["exact_quote"], "exact_quote", self.policy.max_evidence_chars)
             if len(quote) != note.end - note.start:
-                raise KnowledgeError("stored source span mismatch")
+                raise KnowledgeError("stored source span integrity mismatch")
             if note.note_id in seen:
                 raise KnowledgeError("duplicate stored note id")
             seen.add(note.note_id)
@@ -596,115 +580,6 @@ class ReviewedKnowledgeStore:
             _strict_json(raw)["source_text_digest"],
             len(_strict_json(raw)["notes"]),
         ) for revision, digest, parent, raw in rows)
-
-    def plan_recrawl(
-        self, owner: str, *, as_of: str, authorized: bool,
-        max_age_seconds: int = 604800, min_independent_groups: int = 2,
-        min_confidence_ppm: int = 800000, limit: int = 20,
-        scope: str = "design_reference",
-    ) -> dict[str, Any]:
-        """Project review gaps from one verified snapshot; never authorize I/O.
-
-        A request binds the expected parent for the existing import operation.
-        Repeated observations do not count as independent sources. Conflict
-        detection examines all current in-scope notes before applying LIMIT.
-        The caller supplies the trusted evaluation clock and authenticates the
-        operator; neither a digest nor this projection proves reviewer identity.
-        """
-        if authorized is not True:
-            raise PermissionError("knowledge refresh planning requires authorization")
-        owner = _id(owner, "owner")
-        as_of = _utc(as_of)
-        _integer(max_age_seconds, "max_age_seconds", 1, 31536000)
-        _integer(min_independent_groups, "min_independent_groups", 1, 100)
-        _integer(min_confidence_ppm, "min_confidence_ppm", 0, 1000000)
-        _integer(limit, "limit", 1, self.policy.max_query_results)
-        if scope not in _ALLOWED_SCOPES:
-            raise KnowledgeError("unsupported knowledge use scope")
-        now = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
-        sources = self._rows(owner)
-        root = canonical_digest([
-            [s["source_id"], s["revision"], s["revision_digest"]] for s in sources
-        ])
-        active = [s for s in sources
-                  if s["status"] == "active" and scope in s["allowed_scopes"]]
-        groups: dict[str, set[str]] = {}
-        stances: dict[str, set[str]] = {}
-        for source in active:
-            age = (now - datetime.fromisoformat(
-                source["observed_at"].replace("Z", "+00:00")
-            )).total_seconds()
-            for entry in source["notes"]:
-                note = entry["note"]
-                mechanic = note["mechanic"]
-                stances.setdefault(mechanic, set()).add(note["stance"])
-                # Future, old, uncertain and weak evidence cannot corroborate.
-                if (0 <= age < max_age_seconds and note["stance"] == "supports"
-                        and note["confidence_ppm"] >= min_confidence_ppm):
-                    groups.setdefault(mechanic, set()).add(note["dependence_group"])
-        requests = []
-        counts: Counter[str] = Counter()
-        for source in active:
-            age = int((now - datetime.fromisoformat(
-                source["observed_at"].replace("Z", "+00:00")
-            )).total_seconds())
-            notes = [e["note"] for e in source["notes"]]
-            mechanics = sorted({n["mechanic"] for n in notes})
-            reasons: set[str] = set()
-            if age < 0:
-                reasons.add("future_observation")
-            elif age >= max_age_seconds:
-                reasons.add("stale_observation")
-            conflicts = sorted(m for m in mechanics
-                               if {"supports", "challenges"} <= stances[m])
-            if conflicts:
-                reasons.add("contradictory_evidence")
-            if any(n["stance"] == "uncertain" for n in notes):
-                reasons.add("uncertain_evidence")
-            if any(n["confidence_ppm"] < min_confidence_ppm for n in notes):
-                reasons.add("low_confidence")
-            deficits = {m: max(0, min_independent_groups - len(groups.get(m, set())))
-                        for m in mechanics}
-            if any(deficits.values()):
-                reasons.add("insufficient_independent_support")
-            if not reasons:
-                continue
-            counts.update(reasons)
-            priority = (0 if "future_observation" in reasons else
-                        1 if conflicts else 2 if "stale_observation" in reasons else 3)
-            body = {
-                "owner": owner, "source_id": source["source_id"],
-                "source_url": source["source_url"],
-                "expected_parent_digest": source["revision_digest"],
-                "source_text_digest": source["source_text_digest"],
-                "revision": source["revision"], "observed_at": source["observed_at"],
-                "age_seconds": age, "priority": priority,
-                "reasons": sorted(reasons), "conflicting_mechanics": conflicts,
-                "independent_support_deficits": deficits,
-                "required_checks": ["source_permission", "fresh_observation",
-                                    "exact_span_review", "rights_scope_review",
-                                    "independent_reviewer"],
-            }
-            requests.append(body)
-        requests.sort(key=lambda r: (r["priority"], -r["age_seconds"], r["source_id"]))
-        policy = {"max_age_seconds": max_age_seconds,
-                  "min_independent_groups": min_independent_groups,
-                  "min_confidence_ppm": min_confidence_ppm}
-        selected = []
-        for request in requests[:limit]:
-            identity = {"knowledge_root": root, "as_of": as_of,
-                        "scope": scope, "policy": policy, "request": request}
-            selected.append({**request, "request_digest": canonical_digest(identity)})
-        body = {
-            "schema": "skeleton.game_builder.recrawl_plan.v1",
-            "owner": owner, "as_of": as_of, "scope": scope,
-            "knowledge_root": root, "policy": policy,
-            "active_sources": len(active), "total_requests": len(requests),
-            "deferred_requests": max(0, len(requests) - limit),
-            "reason_counts": dict(sorted(counts.items())), "requests": selected,
-            "execution_authorized": False, "memory_promotion_authorized": False,
-        }
-        return {**body, "plan_digest": canonical_digest(body)}
 
     def search(
         self, owner: str, query: str, *,

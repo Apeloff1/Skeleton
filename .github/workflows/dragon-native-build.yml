@@ -4,6 +4,51 @@ on:
   pull_request:
     paths:
       - 'skeleton/ai/webcrawler/dragon_native_*.py'
+      - 'skeleton/ai/webcrawler/dragon_living_world*.py'
+      - 'skeleton/ai/webcrawler/dragon_original_mechanic_forge.py'
+      - 'skeleton/ai/webcrawler/dragon_original_campaign_forge.py'
+      - 'skeleton/ai/webcrawler/dragon_original_prototype_factory.py'
+      - 'skeleton/ai/webcrawler/dragon_original_candidate_spool.py'
+      - 'tests/test_ai_dragon_original_mechanic_forge.py'
+      - 'tests/test_ai_dragon_original_campaign_forge.py'
+      - 'tests/test_ai_dragon_original_mechanic_fusions.py'
+      - 'tests/test_ai_dragon_original_prototype_factory.py'
+      - 'tests/test_ai_dragon_original_candidate_spool.py'
+      - 'backend/tests/test_dragon_original_prototype_routes.py'
+      - 'backend/tests/test_dragon_original_mechanics_routes.py'
+      - 'frontend/app/dragon-originals-forge.tsx'
+      - 'skeleton/ai/webcrawler/dragon_world_genome.py'
+      - 'skeleton/ai/webcrawler/dragon_world_codex.py'
+      - 'skeleton/ai/webcrawler/dragon_world_codex_runtime.py'
+      - 'skeleton/ai/webcrawler/dragon_codex_access_matrix.py'
+      - 'skeleton/ai/webcrawler/dragon_codex_tiles.py'
+      - 'skeleton/ai/webcrawler/dragon_world_story_grammar.py'
+      - 'skeleton/ai/webcrawler/dragon_codex_*.py'
+      - 'tests/test_ai_dragon_world_codex.py'
+      - 'tests/test_ai_dragon_codex_access_matrix.py'
+      - 'tests/test_ai_dragon_codex_tiles.py'
+      - 'backend/tests/test_dragon_codex_tiles_routes.py'
+      - 'tests/test_ai_dragon_world_story_grammar.py'
+      - 'tests/test_ai_dragon_codex_desktop.py'
+      - 'backend/tests/test_dragon_world_codex_routes.py'
+      - 'frontend/app/dragon-world-codex.tsx'
+      - 'skeleton/ai/webcrawler/dragon_genomic_world.py'
+      - 'skeleton/ai/webcrawler/dragon_genomic_paths.py'
+      - 'tests/test_ai_dragon_world_genome.py'
+      - 'backend/tests/test_dragon_genomic_world_routes.py'
+      - 'frontend/app/dragon-genomic-universe.tsx'
+      - 'skeleton/ai/webcrawler/dragon_living_maze_solvers.py'
+      - 'skeleton/ai/webcrawler/dragon_route_*.py'
+      - 'tests/test_ai_dragon_living_world*.py'
+      - 'tests/test_ai_dragon_living_maze_solvers.py'
+      - 'tests/test_ai_dragon_route_*.py'
+      - 'backend/tests/test_dragon_living_world*.py'
+      - 'backend/tests/test_dragon_living_maze_routes.py'
+      - 'backend/tests/test_dragon_route_*.py'
+      - 'frontend/app/dragon-living-world.tsx'
+      - 'frontend/app/dragon-maze-world.tsx'
+      - 'frontend/app/dragon-route-atlas.tsx'
+      - 'frontend/src/product/productCatalog.ts'
       - 'skeleton/ai/webcrawler/dragon_game_blueprints.py'
       - 'skeleton/ai/webcrawler/dragon_game_design.py'
       - 'skeleton/ai/webcrawler/dragon_playtest_planner.py'
@@ -11,6 +56,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_native_raycaster.py'
       - 'skeleton/ai/webcrawler/dragon_native_3d_era.py'
       - 'skeleton/ai/webcrawler/dragon_native_puzzle.py'
+      - 'skeleton/ai/webcrawler/dragon_native_artforge.py'
       - 'skeleton/ai/webcrawler/dragon_hw_graphics.py'
       - 'skeleton/ai/webcrawler/dragon_hardware_budget.py'
       - 'skeleton/ai/webcrawler/dragon_game_fitness.py'
@@ -46,6 +92,7 @@ on:
       - 'skeleton/ai/webcrawler/dragon_practice_lab.py'
       - 'skeleton/ai/webcrawler/dragon_practice_cycles.py'
       - 'tests/test_ai_webcrawler_dragon_native_*.py'
+      - 'tests/test_ai_dragon_native_*.py'
       - '.github/workflows/dragon-native-build.yml'
   workflow_dispatch:
 
@@ -61,12 +108,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Check native game sources and creator script syntax before toolchain installation
+        run: |
+          set -euo pipefail
+          python -m compileall -q skeleton/ai/webcrawler/dragon_native_*.py
+          python -m compileall -q backend/routes/dragon_academy.py
+          node --check frontend/scripts/test-dragon-native-puzzle-preview.mjs
       - name: Install native ROM toolchain prerequisites
         run: |
           sudo apt-get update
@@ -82,6 +135,31 @@ jobs:
       - name: Execute real native ROM compilation tests
         run: |
           python -m pytest -q \
+            tests/test_ai_dragon_native_production.py \
+            tests/test_ai_dragon_native_desktop.py \
+            tests/test_ai_dragon_native_artforge.py \
+            tests/test_ai_dragon_native_evolution.py \
+            tests/test_ai_dragon_native_puzzle_hints.py \
+            tests/test_ai_dragon_native_puzzle_trace.py \
+            tests/test_ai_dragon_native_puzzle_variants.py \
+            tests/test_ai_dragon_native_puzzle_authoring.py \
+            tests/test_ai_dragon_native_puzzle_challenge.py \
+            tests/test_ai_dragon_native_puzzle_save.py \
+            tests/test_ai_dragon_native_multipath.py \
+            tests/test_ai_dragon_native_campaign_paths.py \
+            tests/test_ai_dragon_native_challenge_director.py \
+            tests/test_ai_dragon_native_level_curation.py \
+            tests/test_ai_dragon_route_world.py \
+            tests/test_ai_dragon_route_native_game.py \
+            tests/test_ai_dragon_route_native_integration.py \
+            tests/test_ai_dragon_route_world_assurance.py \
+            tests/test_ai_dragon_route_world_batch.py \
+            tests/test_ai_dragon_route_maze.py \
+            tests/test_ai_dragon_route_maze_native.py \
+            tests/test_ai_dragon_route_maze_integration.py \
+            tests/test_ai_dragon_route_atlas.py \
+            tests/test_ai_dragon_route_world_assurance.py \
+            tests/test_ai_dragon_native_puzzle_graphics.py \
             tests/test_ai_webcrawler_dragon_native_projects.py \
             tests/test_ai_webcrawler_dragon_native_compile.py \
             tests/test_ai_webcrawler_dragon_native_cycles.py \
@@ -102,6 +180,130 @@ jobs:
             tests/test_ai_webcrawler_dragon_native_c64.py \
             tests/test_ai_webcrawler_dragon_native_gbc.py \
             tests/test_ai_webcrawler_dragon_native_platformer.py
+      - name: Compile authored hero art and movement animations in actual GB CGB NES ROMs
+        run: |
+          set -euo pipefail
+          cat > /tmp/dragon-authored-game.json <<'JSON'
+          {
+            "schema":"skeleton.ai.dragon.portable_game_design.v1",
+            "palette":"dmg_green",
+            "hero":"robot",
+            "quest_theme":"space",
+            "difficulty":7,
+            "stages":5,
+            "candidates":8,
+            "project_notes":"Original art-directed homebrew with input-driven sprite motion"
+          }
+          JSON
+          python -m skeleton.ai.webcrawler.dragon_native_production build \
+            --title "Original Sprite and World Campaign" \
+            --style arcade_score_attack \
+            --targets game_boy,game_boy_color,nes \
+            --portable-design /tmp/dragon-authored-game.json \
+            --attest-original-rights --compile-roms --require-compiled \
+            --out /tmp/dragon-original-art-roms \
+            > /tmp/dragon-original-art-build.json
+          python -m skeleton.ai.webcrawler.dragon_native_production build \
+            --title "Original Scrolling Pixel Quest" \
+            --style side_scrolling_platformer \
+            --targets game_boy --portable-design /tmp/dragon-authored-game.json \
+            --attest-original-rights --compile-roms --require-compiled \
+            --out /tmp/dragon-original-art-platformer \
+            > /tmp/dragon-original-art-platformer.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          from io import BytesIO
+          from skeleton.ai.webcrawler.dragon_native_production import (
+              verify_published_production, verify_source_release,
+          )
+          runs = (
+              ("/tmp/dragon-original-art-build.json", "/tmp/dragon-original-art-roms", 3),
+              ("/tmp/dragon-original-art-platformer.json", "/tmp/dragon-original-art-platformer", 1),
+          )
+          for receipt_path, root_path, count in runs:
+              result = json.loads(Path(receipt_path).read_text())
+              assert result["status"] == "published"
+              audit = verify_published_production(Path(root_path), result["index"])
+              assert audit["archives_verified"] == count
+              for item in result["artifacts"]:
+                  assert item["binary_sha256"] and item["original_art_sha256"]
+                  archive = (Path(root_path) / item["archive_name"]).read_bytes()
+                  proof = verify_source_release(archive)
+                  assert proof["port_plan"]["portable_profile"]["hero"] == "robot"
+                  assert proof["original_art_sha256"] == item["original_art_sha256"]
+                  with ZipFile(BytesIO(archive)) as native:
+                      assert "source/dragon-native-art.json" in native.namelist()
+              print("ORIGINAL_GAME_ROM_AND_ART_APPLIED", audit["request_id"])
+          PY
+      - name: Prove multi-game evolution produces distinct verified native cartridges
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_native_production import ProductionRequest, PortableGameDesign
+          from skeleton.ai.webcrawler.dragon_native_evolution import (
+              EvolutionSeriesRequest, build_evolution_series, verify_evolution_series,
+          )
+          specification = EvolutionSeriesRequest(
+              base=ProductionRequest(
+                  title="Original Evolving Crystal Expedition",
+                  style="arcade_score_attack", targets=("game_boy", "nes"),
+                  seed=1977, original_work_attested=True,
+                  portable_design=PortableGameDesign(
+                      hero="robot", quest_theme="crystals", palette="dmg_green",
+                      stages=4, candidates=6, difficulty=3,
+                  ),
+              ),
+              editions=3,
+          )
+          root = Path("/tmp/dragon-evolution-series")
+          release = build_evolution_series(specification, root, authorized=True)
+          assert release["status"] == "published"
+          audit = verify_evolution_series(root, release["index"])
+          assert audit["source_projects_verified"] == 6
+          assert audit["editions_verified"] == 3
+          print("DRAGON_NATIVE_GAME_EVOLUTION_VERIFIED",audit["index_sha256"])
+          PY
+      - name: Compile and verify player-authored original puzzle campaigns
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_native_puzzle_authoring import (
+              authored_document, starter_authored_levels,
+          )
+          from skeleton.ai.webcrawler.dragon_native_puzzle import BASE_LEVELS
+          from skeleton.ai.webcrawler.dragon_native_production import (
+              ProductionRequest, PortableGameDesign,
+          )
+          from skeleton.ai.webcrawler.dragon_native_desktop import (
+              build_native_puzzle_executable, verify_native_puzzle_executable,
+          )
+          from zipfile import ZipFile
+          from io import BytesIO
+          import json
+
+          layouts = (BASE_LEVELS[0], BASE_LEVELS[3])
+          spec = ProductionRequest(
+              title="Original Authored Level Creator",
+              style="fixed_screen_puzzle", targets=("pc_linux",),
+              seed=1923, original_work_attested=True,
+              authored_puzzles=layouts,
+              portable_design=PortableGameDesign(stages=2, difficulty=6),
+          )
+          package, report = build_native_puzzle_executable(spec, authorized=True)
+          assert report["independent_replays_verified"] == 8
+          audit = verify_native_puzzle_executable(package)
+          assert audit["source_level_proofs"] == 2
+          with ZipFile(BytesIO(package)) as released:
+              with ZipFile(BytesIO(released.read("source/native-source-release.zip"))) as sources:
+                  game = json.loads(sources.read("source/dragon-puzzle-proof.json"))
+                  assert game["authoring_mode"] == "authored"
+                  assert game["authored_level_rows"] == [list(x) for x in layouts]
+          print("NATIVE_USER_AUTHORED_GAME_REPLAYED", audit["executable_sha256"])
+          PY
       - name: Build original Game Boy ROM
         run: |
           python -m skeleton.ai.webcrawler.dragon_native_cli \
@@ -123,21 +325,117 @@ jobs:
           python -m skeleton.ai.webcrawler.dragon_native_cli \
             --target nes --out /tmp/dragon-nes --compile
           test -s /tmp/dragon-nes/build/dragon.nes
-      - name: Build original Commodore 64 executable
+      - name: Verify complete Dragon production pipeline with real GB and NES binaries
+        run: |
+          set -euo pipefail
+          python -m skeleton.ai.webcrawler.dragon_native_production build \
+            --title "Original Dragon Campaign" \
+            --style arcade_score_attack \
+            --targets game_boy,nes \
+            --attest-original-rights --compile-roms --require-compiled \
+            --out /tmp/dragon-production \
+            > /tmp/dragon-production-build.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_native_production import (
+              verify_published_production, verify_source_release,
+          )
+          from zipfile import ZipFile
+          from io import BytesIO
+          result = json.loads(Path("/tmp/dragon-production-build.json").read_text())
+          assert result["status"] == "published"
+          assert {a["target"] for a in result["artifacts"]} == {"game_boy", "nes"}
+          assert all(a["binary_sha256"] and
+                     a["compiler_state"] == "compiled_native"
+                     for a in result["artifacts"])
+          report = verify_published_production(
+              Path("/tmp/dragon-production"), result["index"])
+          assert report["archives_verified"] == 2
+          for artifact in result["artifacts"]:
+              path = Path("/tmp/dragon-production") / artifact["archive_name"]
+              with ZipFile(BytesIO(path.read_bytes())) as archive:
+                  receipt = verify_source_release(path.read_bytes())
+                  assert receipt["evidence"] == "rom_structural_verified"
+                  assert receipt["binary_member"] in archive.namelist()
+          print("DRAGON_PRODUCTION_REAL_ROM_VERIFIED", report["request_id"])
+          PY
+      - name: Build real standalone Linux C99 original puzzle game and selftest
+        run: |
+          set -euo pipefail
+          python -m skeleton.ai.webcrawler.dragon_native_desktop build \
+            --title "Original Dragon Puzzle Campaign" --seed 1977 \
+            --stages 6 --difficulty 8 --attest-original-rights \
+            --authorize-local-build --out /tmp/dragon-native-puzzle \
+            > /tmp/dragon-native-puzzle-build.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          from io import BytesIO
+          from skeleton.ai.webcrawler.dragon_native_desktop import verify_native_puzzle_executable
+          result = json.loads(Path("/tmp/dragon-native-puzzle-build.json").read_text())
+          assert result["status"] == "native_linux_executable_built_and_selftested"
+          package = (Path("/tmp/dragon-native-puzzle") / result["filename"]).read_bytes()
+          receipt = verify_native_puzzle_executable(package)
+          assert receipt["source_level_proofs"] == 6
+          assert receipt["runtime_stages_claimed_by_builder"] == 6
+          assert result["evidence"]["native_hint_selftest"] == "current_position_bfs_all_stages_passed"
+          assert result["evidence"]["native_branch_selftest"] == "all_actual_branch_transitions_and_endings_replayed"
+          assert result["evidence"]["branch_endings_verified"] == 2
+          assert result["evidence"]["branch_transitions_verified"] >= 6
+          assert result["evidence"]["branch_endings_verified"] == 2
+          assert result["evidence"]["independent_replays_verified"] == 24
+          assert result["evidence"]["native_challenge_selftest"] == "optimal_route_three_stars_all_stages"
+          with ZipFile(BytesIO(package)) as archive:
+              executable = archive.read("binary/dragon_game")
+          assert executable[:4] == b"\x7fELF"
+          print("DRAGON_NATIVE_LINUX_PUZZLE_EXECUTED", receipt["executable_sha256"])
+          PY
+      - name: Compile and replay original Steam Deck-target Linux game
+        run: |
+          set -euo pipefail
+          python -m skeleton.ai.webcrawler.dragon_native_desktop build \
+            --title "Original Dragon Deck Expedition" --target steam_deck \
+            --seed 2026 --stages 3 --difficulty 8 \
+            --attest-original-rights --authorize-local-build \
+            --out /tmp/original-dragon-deck > /tmp/dragon-deck-result.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_native_desktop import verify_native_puzzle_executable
+          result=json.loads(Path("/tmp/dragon-deck-result.json").read_text())
+          assert result["status"]=="native_linux_executable_built_and_selftested"
+          assert result["evidence"]["native_target"]=="steam_deck"
+          assert result["evidence"]["independent_replays_verified"]==12
+          audit=verify_native_puzzle_executable(
+              (Path("/tmp/original-dragon-deck")/result["filename"]).read_bytes())
+          assert audit["source_level_proofs"]==3
+          print("ORIGINAL_STEAM_DECK_LINUX_HOST_GAME_PASS",audit["executable_sha256"])
+          PY
+      - name: Publish original Linux executable and runtime replay evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-native-linux-puzzle
+          path: /tmp/dragon-native-puzzle/dragon-native-puzzle-*.zip
+          if-no-files-found: error
+          retention-days: 7
+      - name: Compile actual NES horizontal scrolling platformer cartridge
         run: |
           python -m skeleton.ai.webcrawler.dragon_native_cli \
-            --target commodore_64 --out /tmp/dragon-c64 --compile
-          test -s /tmp/dragon-c64/build/dragon.prg
+            --target nes --style side_scrolling_platformer \
+            --out /tmp/dragon-nes-platform --compile
+          test -s /tmp/dragon-nes-platform/build/dragon.nes
       - name: Publish original homebrew ROM artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@v7
         with:
           name: dragon-native-homebrew-roms
           path: |
             /tmp/dragon-gameboy/build/dragon.gb
             /tmp/dragon-nes/build/dragon.nes
-            /tmp/dragon-c64/build/dragon.prg
             /tmp/dragon-gameboy-color/build/dragon.gbc
             /tmp/dragon-gameboy-platform/build/dragon.gb
+            /tmp/dragon-nes-platform/build/dragon.nes
           if-no-files-found: error
           retention-days: 7
 
@@ -145,10 +443,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install native SDL2 C toolchain
@@ -170,4 +468,664 @@ jobs:
             tests/test_ai_webcrawler_dragon_campaign_quests.py \
             tests/test_ai_webcrawler_dragon_native_sega_snes.py \
             tests/test_ai_webcrawler_dragon_chip_music.py \
-            tests/test_ai_webcrawler_dragon_native_variants.py
+            tests/test_ai_webcrawler_dragon_native_variants.py \
+            tests/test_ai_dragon_native_puzzle_graphics.py \
+            tests/test_ai_dragon_native_capture_operator.py \
+            tests/test_ai_dragon_native_media_storyboard.py
+
+
+      - name: Record and audit genuine original game pixels from native SDL
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          set -euo pipefail
+          python -m skeleton.ai.webcrawler.dragon_native_capture_operator capture \
+            --title "Original Dragon Game Preview" \
+            --seed 1977 --stages 3 --difficulty 7 \
+            --attest-original-rights --authorize-local-capture \
+            --out /tmp/original-game-media > /tmp/dragon-media-report.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          from io import BytesIO
+          from skeleton.ai.webcrawler.dragon_native_capture_operator import verify_original_capture
+          result=json.loads(Path("/tmp/dragon-media-report.json").read_text())
+          assert result["status"]=="original_native_gameplay_frames_captured"
+          assert result["frames"]==9
+          package=(Path("/tmp/original-game-media")/result["filename"]).read_bytes()
+          verification=verify_original_capture(package)
+          assert verification["frames_verified"]==9
+          with ZipFile(BytesIO(package)) as archive:
+              assert archive.read("frames/level-01-frame-00.bmp")[:2]==b"BM"
+              assert archive.read("frames/level-03-frame-02.bmp")[:2]==b"BM"
+          print("ORIGINAL_NATIVE_GAMEPLAY_PIXELS_VERIFIED",verification["binary_sha256"])
+          PY
+      - name: Render actual original game preview storyboard PNG
+        run: |
+          set -euo pipefail
+          set -- /tmp/original-game-media/dragon-original-game-frames-*.zip
+          test "$#" -eq 1
+          python -m skeleton.ai.webcrawler.dragon_native_media_storyboard \
+            --capture "$1" --out /tmp/dragon-original-storyboard \
+            --authorize-storyboard > /tmp/dragon-storyboard-report.json
+          python - <<'PY'
+          import json,struct
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_native_media_storyboard import verify_original_storyboard
+          result=json.loads(Path("/tmp/dragon-storyboard-report.json").read_text())
+          assert result["frames"]==9 and result["stages"]==3
+          root=Path("/tmp/dragon-original-storyboard")
+          png=(root/result["image"]).read_bytes()
+          assert png[:8]==b"\x89PNG\r\n\x1a\n"
+          assert struct.unpack_from(">II",png,16)==(480,360)
+          proof=verify_original_storyboard((root/result["archive"]).read_bytes())
+          assert proof["frames"]==9
+          print("ORIGINAL_GAME_PREVIEW_PNG_VERIFIED",proof["image_sha256"])
+          PY
+      - name: Publish original preview storyboard PNG
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-gameplay-png-preview
+          path: |
+            /tmp/dragon-original-storyboard/dragon-original-storyboard-*.png
+            /tmp/dragon-original-storyboard/dragon-original-storyboard-*.zip
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish original gameplay frame evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-gameplay-sdl-frames
+          path: /tmp/original-game-media/dragon-original-game-frames-*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  codex-128-axis-original-worlds-and-native-desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require bounded original Codex/genre/platform source syntax
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            skeleton/ai/webcrawler/dragon_world_codex.py \
+            skeleton/ai/webcrawler/dragon_world_codex_runtime.py \
+            skeleton/ai/webcrawler/dragon_world_story_grammar.py \
+            skeleton/ai/webcrawler/dragon_codex_platforms.py \
+            skeleton/ai/webcrawler/dragon_codex_access_matrix.py \
+            skeleton/ai/webcrawler/dragon_codex_tiles.py \
+            skeleton/ai/webcrawler/dragon_codex_desktop.py
+      - name: Install real deterministic game runtime tests
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Prove 1024-bit exact world identities, all delayed gates, stories and native builds
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            tests/test_ai_dragon_world_codex.py \
+            tests/test_ai_dragon_codex_access_matrix.py \
+            tests/test_ai_dragon_codex_tiles.py \
+            tests/test_ai_dragon_world_story_grammar.py \
+            tests/test_ai_dragon_codex_desktop.py
+      - name: Compile a genuinely interactive Linux C99 original game and replay all temporal gates
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dragon-codex-original
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_world_codex import edit
+          from skeleton.ai.webcrawler.dragon_codex_desktop import emit_codex_c99
+          root=Path("/tmp/dragon-codex-original")
+          world=edit("0",{"elevation_tectonics":255,
+                          "plate_migration":255,
+                          "choice_permanence":128})
+          source=emit_codex_c99(world)
+          (root/"dragon_codex_game.c").write_text(
+              source.source,encoding="utf-8")
+          PY
+          cc -std=c99 -O2 -Wall -Wextra -Werror \
+            /tmp/dragon-codex-original/dragon_codex_game.c \
+            -o /tmp/dragon-codex-original/dragon_codex_game
+          /tmp/dragon-codex-original/dragon_codex_game --selftest \
+            | tee /tmp/dragon-codex-original/selftest.txt
+          grep -q "DRAGON_CODEX_SELFTEST_PASS 16" \
+            /tmp/dragon-codex-original/selftest.txt
+          printf "status\nstudy 0\nstudy 1\nwait\nmap\nquit\n" |
+            /tmp/dragon-codex-original/dragon_codex_game \
+            > /tmp/dragon-codex-original/interactive-session.txt
+          grep -q "No mandatory ending" \
+            /tmp/dragon-codex-original/interactive-session.txt
+      - name: Publish original source and actual compiled selftest evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-codex-native-c99-source-and-playback
+          path: |
+            /tmp/dragon-codex-original/dragon_codex_game.c
+            /tmp/dragon-codex-original/selftest.txt
+            /tmp/dragon-codex-original/interactive-session.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  genomic-worlds-and-real-route-space:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check exact-address genomic game and route compiler syntax
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            skeleton/ai/webcrawler/dragon_world_genome.py \
+            skeleton/ai/webcrawler/dragon_genomic_world.py \
+            skeleton/ai/webcrawler/dragon_genomic_paths.py
+      - name: Install deterministic local pytest tooling
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Execute all 24 physical world-axis and huge integer route checks
+        run: |
+          set -euo pipefail
+          python -m pytest -q tests/test_ai_dragon_world_genome.py
+      - name: Independently replay extreme indexed games and authored paths
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dragon-genomic-world-proof
+          python - <<'PY'
+          from pathlib import Path
+          from dataclasses import asdict
+          import json
+          from skeleton.ai.webcrawler.dragon_world_genome import (
+              GENOMIC_WORLD_COUNT,AXIS_NAMES,unrank_genome_address,
+              edit_genome,lattice_summary,
+          )
+          from skeleton.ai.webcrawler.dragon_genomic_world import (
+              AXIS_ACTIONS,initial_genomic_state,play,cell,report,
+          )
+          from skeleton.ai.webcrawler.dragon_genomic_paths import (
+              GLOBAL_CHOICE_PATH_COUNT,PROGRAM_COUNT,materialize_path,
+              verify_path,sample_paths,
+          )
+          root=Path("/tmp/dragon-genomic-world-proof")
+          for name,index in (
+              ("first_world","0"),
+              ("largest_world",str(GENOMIC_WORLD_COUNT-1)),
+          ):
+              address=unrank_genome_address(index)
+              current=initial_genomic_state(address)
+              assert len(AXIS_ACTIONS)==len(AXIS_NAMES)==24
+              beginning=current
+              for action in AXIS_ACTIONS[:12]:
+                  current=play(address,current,action)
+              assert current.history_digest!=beginning.history_digest
+              assert current.base.turn==12
+              exact_path_index=str(int(index)*PROGRAM_COUNT)
+              proof=materialize_path(exact_path_index)
+              assert verify_path(proof)["verified"]
+              data={
+                  "schema":"skeleton.ai.dragon.genomic_release_gate.v1",
+                  "world":name,
+                  "exact_world_decimal_index":index,
+                  "genome":address.genome_digest,
+                  "physical":report(address,current,radius=1),
+                  "real_path":asdict(proof),
+                  "path_verification":verify_path(proof),
+                  "world_count_exact_decimal":str(GENOMIC_WORLD_COUNT),
+                  "path_count_exact_decimal":str(GLOBAL_CHOICE_PATH_COUNT),
+                  "disclaimer":"sampled original state machines, not billions of compiled games",
+              }
+              (root/(name+".json")).write_text(
+                  json.dumps(data,sort_keys=True,indent=2)+"\n",
+                  encoding="utf-8",
+              )
+          PY
+      - name: Publish actual source replay receipts rather than fake world counts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-genomic-world-and-route-evidence
+          path: /tmp/dragon-genomic-world-proof/*.json
+          if-no-files-found: error
+          retention-days: 7
+
+  original-gameplay-millions-and-quintillions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile real executable game mechanic and campaign sources
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            skeleton/ai/webcrawler/dragon_original_mechanic_forge.py \
+            skeleton/ai/webcrawler/dragon_original_campaign_forge.py \
+            skeleton/ai/webcrawler/dragon_original_prototype_factory.py \
+            skeleton/ai/webcrawler/dragon_original_candidate_spool.py
+      - name: Install deterministic original mechanics game test harness
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Verify every one of 32 mechanic axes at all real enabled levels
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            tests/test_ai_dragon_original_mechanic_forge.py \
+            tests/test_ai_dragon_original_campaign_forge.py \
+            tests/test_ai_dragon_original_mechanic_fusions.py \
+            tests/test_ai_dragon_original_prototype_factory.py \
+            tests/test_ai_dragon_original_candidate_spool.py
+      - name: Generate signed gameplay evidence for 16.7m nuclei and quintillion rulebook capacity
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dragon-original-mechanic-evidence
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          from dataclasses import asdict
+          from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+              PROGRAM_COUNT,MILLION_DISTINCT_ENABLE_PROFILES,
+              make_program,binary_nucleus,capabilities,distinguish,
+              prove_mechanic,initial,choices,perform,
+          )
+          from skeleton.ai.webcrawler.dragon_original_campaign_forge import (
+              sample_experiences,compose_journey,verify_journey,
+          )
+          assert PROGRAM_COUNT==2**64
+          assert MILLION_DISTINCT_ENABLE_PROFILES==2**24
+          directory=Path('/tmp/dragon-original-mechanic-evidence')
+          cases={
+              'zero_program':make_program('0'),
+              'single_rule':make_program('1'),
+              'millionth_nucleus':binary_nucleus(1_000_000),
+              'largest_nucleus':binary_nucleus(2**24-1),
+              'highest_quintillion_program':make_program(str(2**64-1)),
+          }
+          sampled=[]
+          for name,program in cases.items():
+              portfolio=sample_experiences(
+                  program,seed=1977,limit=16,steps=24)
+              assert portfolio['sampled']==16
+              assert portfolio['programs_materialized_as_finished_games']==0
+              filename=directory/(name+'.json')
+              filename.write_text(
+                  json.dumps({
+                      'kind':'actual_original_replayed_mechanic_program',
+                      'program':asdict(program),
+                      'replay_portfolio':portfolio,
+                  },sort_keys=True,indent=2)+'\n',encoding='utf-8')
+              sampled.append(name)
+          for axis in range(32):
+              from skeleton.ai.webcrawler.dragon_original_mechanic_forge import (
+                  program_from_levels,
+              )
+              old=[0]*32
+              old[axis]=1
+              first=program_from_levels(tuple(old))
+              old[axis]=3
+              advanced=program_from_levels(tuple(old))
+              assert distinguish(first,advanced)['distinguishable']
+          assert len(sampled)==5
+          print('ORIGINAL_MECHANIC_PROOFS_READY',len(sampled),
+                'NATIVE_READY_FALSE',capabilities()['finished_unique_cleared_games'])
+          PY
+      - name: Actually persist and independently verify four playable original game candidates
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json,sqlite3
+          from skeleton.ai.webcrawler.dragon_original_candidate_spool import (
+              materialize_batch,audit_batch,
+          )
+          path=Path('/tmp/dragon-original-mechanic-evidence/original-candidates.sqlite')
+          with sqlite3.connect(path) as db:
+              produced=materialize_batch(db,start=500,count=4,
+                                          routes=2,steps=12,branch_seed=1977)
+              assert produced['new_original_source_candidates']==4
+              assert (produced['new_original_playable_prototypes']+
+                      produced['new_underbuilt_drafts']==4)
+              assert produced['genuinely_finished_licensed_games']==0
+              recheck=materialize_batch(db,start=500,count=4,
+                                         routes=2,steps=12,branch_seed=1977)
+              assert recheck['new_original_playable_prototypes']==0
+              assert recheck['independently_verified_existing_prototypes']==4
+              audit=audit_batch(db,start=500,count=4,branch_seed=1977)
+              assert audit['all_actual_original_gameplay_replayed']
+          path.with_suffix('.json').write_text(
+              json.dumps({'source_materialization':produced,
+                          'idempotent_recheck':recheck,
+                          'independent_audit':audit},
+                         sort_keys=True,indent=2)+'\n',
+              encoding='utf-8')
+          PY
+      - name: Publish replayed original gameplay receipts, not fictitious finished binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-gameplay-program-proofs
+          path: /tmp/dragon-original-mechanic-evidence/*.json
+          retention-days: 7
+          if-no-files-found: error
+
+  living-world-lifecycle-and-endings:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Ensure living world state machines have no Python syntax errors
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            skeleton/ai/webcrawler/dragon_living_world.py \
+            skeleton/ai/webcrawler/dragon_living_world_routes.py \
+            skeleton/ai/webcrawler/dragon_living_world_checkpoint.py \
+            skeleton/ai/webcrawler/dragon_living_world_store.py \
+            skeleton/ai/webcrawler/dragon_living_maze_solvers.py \
+            skeleton/ai/webcrawler/dragon_living_world_lattice.py
+      - name: Install only deterministic living-world test harness
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Prove original non-win sandboxes, mutable maze, ending choices and signed world continuation
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            tests/test_ai_dragon_living_world.py \
+            tests/test_ai_dragon_living_world_routes.py \
+            tests/test_ai_dragon_living_world_checkpoint.py \
+            tests/test_ai_dragon_living_world_store.py \
+            tests/test_ai_dragon_living_maze_solvers.py \
+            tests/test_ai_dragon_living_world_lattice.py
+      - name: Replay real postgame, no-win and shifting labyrinth alternative source proofs
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dragon-living-world-evidence
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          from skeleton.ai.webcrawler.dragon_living_world import (
+              create_world,initial_state,replay,describe,catalog,
+          )
+          from skeleton.ai.webcrawler.dragon_living_world_routes import portfolio
+          folder=Path("/tmp/dragon-living-world-evidence")
+          worlds=(
+              ("endless",create_world(world_id=1977,variant=4,
+                                    style="creative_sandbox")),
+              ("postgame",create_world(world_id=2026,variant=2,
+                                     style="open_world_story")),
+              ("mutable_maze",create_world(world_id=101,variant=7,
+                                         style="mutable_labyrinth")),
+              ("multi_realm",create_world(world_id=81,variant=9,
+                                        style="multiple_world_platform")),
+          )
+          for title,world in worlds:
+              paths=portfolio(world,limit=10)
+              assert len(paths["samples"])==10
+              fresh=describe(world,initial_state(world))
+              assert fresh["playable"]
+              assert paths["world_fingerprint"]==world.world_fingerprint
+              report={"schema":"skeleton.ai.dragon.living_ci_evidence.v1",
+                      "world":title,"style":world.style,
+                      "has_required_goal":world.includes_goal,
+                      "source_fingerprint":world.world_fingerprint,
+                      "start":fresh,"alternatives":paths}
+              if title=="postgame":
+                  finished=replay(world,("help_settlers",
+                     "help_settlers","ending_civic_union","forage"))
+                  assert finished.endings_seen==("civic_union",)
+                  assert describe(world,finished)["postgame_active"]
+                  report["verified_play_after_ending"]=describe(world,finished)
+              if title=="mutable_maze":
+                  before=describe(world,initial_state(world))
+                  after=describe(world,replay(world,("north","wait")))
+                  assert before["environment"]["maze_phase"]!=after["environment"]["maze_phase"]
+                  report["shifting_maze_after_move"]=after
+              (folder/(title+".json")).write_text(
+                  json.dumps(report,sort_keys=True,indent=2)+"\n",encoding="utf-8")
+          assert catalog()["addressable_world_variant_slots"]==16_000_000
+          PY
+      - name: Publish deterministic gameplay/state-machine evidence without claiming built games
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-living-world-gameplay-evidence
+          path: /tmp/dragon-living-world-evidence/*.json
+          if-no-files-found: error
+          retention-days: 7
+
+  native-world-route-simulation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check original game world source parser and route schemas
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            skeleton/ai/webcrawler/dragon_route_taxonomy.py \
+            skeleton/ai/webcrawler/dragon_route_world.py \
+            skeleton/ai/webcrawler/dragon_route_world_factory.py \
+            skeleton/ai/webcrawler/dragon_route_world_variants.py \
+            skeleton/ai/webcrawler/dragon_route_native_game.py \
+            skeleton/ai/webcrawler/dragon_route_maze.py \
+            skeleton/ai/webcrawler/dragon_route_atlas.py
+      - name: Install strictly local Python testing dependencies
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Compile and replay true weather/secret/free-roam C99 games
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            tests/test_ai_dragon_route_world.py \
+            tests/test_ai_dragon_route_native_game.py \
+            tests/test_ai_dragon_route_native_integration.py \
+            tests/test_ai_dragon_route_maze.py \
+            tests/test_ai_dragon_route_maze_native.py \
+            tests/test_ai_dragon_route_maze_integration.py \
+            tests/test_ai_dragon_route_atlas.py
+      - name: Require every-room, all-climate and secret C99 maze gameplay
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_route_maze import MazeRequest,build_maze,verify_maze
+          from skeleton.ai.webcrawler.dragon_route_native_game import emit_route_game
+          creation=build_maze(MazeRequest(width=6,height=6,seed=1977,
+              challenge="spicy",scenic_density=90,secret_count=3))
+          assert verify_maze(creation)["rooms"]==36
+          source=emit_route_game(creation.world,creation.traveller,
+                                 authorized=True,maze_creation=creation)
+          root=Path("/tmp/dragon-certified-maze")
+          for name,text in source.items():
+              file=root/name
+              file.parent.mkdir(parents=True,exist_ok=True)
+              file.write_text(text,encoding="utf-8")
+          PY
+          make -C /tmp/dragon-certified-maze
+          /tmp/dragon-certified-maze/dragon_route_game --selftest \
+            | tee /tmp/dragon-certified-maze-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=maze_spine' /tmp/dragon-certified-maze-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=room_35' /tmp/dragon-certified-maze-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=secret_' /tmp/dragon-certified-maze-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=doubleback_' /tmp/dragon-certified-maze-proof.txt
+      - name: Build a playable original rainy game source distribution
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from skeleton.ai.webcrawler.dragon_route_world_factory import make_frontier
+          from skeleton.ai.webcrawler.dragon_route_native_game import emit_route_game
+          world,traveller=make_frontier(seed=1977,weather="rain",hour=8)
+          files=emit_route_game(world,traveller,authorized=True)
+          root=Path("/tmp/dragon-original-route-world")
+          for name,source in files.items():
+              location=root/name
+              location.parent.mkdir(parents=True,exist_ok=True)
+              location.write_text(source)
+          PY
+          make -C /tmp/dragon-original-route-world
+          /tmp/dragon-original-route-world/dragon_route_game --selftest \
+            | tee /tmp/original-route-world-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=outer_space' /tmp/original-route-world-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=secret' /tmp/original-route-world-proof.txt
+          grep 'DRAGON_ORIGINAL_ROUTE_PASS name=rain' /tmp/original-route-world-proof.txt
+          grep 'DRAGON_ORIGINAL_WORLD_PASS' /tmp/original-route-world-proof.txt
+      - name: Publish original-game source, actual native ELF and replay proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-free-roam-multimodal-game
+          path: |
+            /tmp/dragon-original-route-world/src/main.c
+            /tmp/dragon-original-route-world/include/dragon_route_world.h
+            /tmp/dragon-original-route-world/dragon-original-route-proof.json
+            /tmp/dragon-original-route-world/Makefile
+            /tmp/dragon-original-route-world/CMakeLists.txt
+            /tmp/dragon-original-route-world/dragon_route_game
+            /tmp/original-route-world-proof.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  native-game-creator-editor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Exercise actual native original puzzle editor physics and export constraints
+        run: |
+          set -euo pipefail
+          cd frontend
+          npm run test:dragon-native-editor
+      - name: Verify original puzzle editor route and API implementation
+        run: |
+          set -euo pipefail
+          test -s frontend/src/components/DragonOriginalPuzzleEditor.tsx
+          test -s frontend/src/product/dragonPuzzlePreview.ts
+          test -s frontend/src/product/dragonPuzzleHistory.ts
+          test -s frontend/app/dragon-native-production.tsx
+          test -s backend/routes/dragon_academy.py
+
+  build-actual-original-windows-executable:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install real native x64 MinGW-w64 compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64
+          python -m pip install --disable-pip-version-check pytest
+          x86_64-w64-mingw32-gcc --version
+      - name: Compile actual Windows .exe and verify PE game source
+        run: |
+          set -euo pipefail
+          python -m pytest -q tests/test_ai_dragon_native_windows.py
+          python -m skeleton.ai.webcrawler.dragon_native_windows build \
+            --title "Original Dragon Windows Adventure" \
+            --seed 1977 --stages 4 --difficulty 7 \
+            --attest-original-rights --authorize-cross-compile \
+            --out /tmp/original-dragon-windows \
+            > /tmp/original-dragon-windows-result.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from io import BytesIO
+          from zipfile import ZipFile
+          from skeleton.ai.webcrawler.dragon_native_windows import verify_windows_executable,pe64_format
+          receipt=json.loads(Path("/tmp/original-dragon-windows-result.json").read_text())
+          assert receipt["status"]=="native_windows_executable_cross_compiled"
+          assert receipt["windows_runtime_tested"] is False
+          file=Path("/tmp/original-dragon-windows")/receipt["filename"]
+          payload=file.read_bytes()
+          verification=verify_windows_executable(payload)
+          assert verification["levels_proven"]==4
+          assert verification["windows_runtime_tested"] is False
+          with ZipFile(BytesIO(payload)) as archive:
+              exe=archive.read("binary/dragon_game.exe")
+              assert pe64_format(exe).startswith("PE32+ x86_64")
+          print("ORIGINAL_NATIVE_WIN64_PE_BUILT",verification["exe_sha256"])
+          PY
+      - name: Publish original Win64 game source and executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-win64-game
+          path: /tmp/original-dragon-windows/dragon-original-win64-*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+
+  build-actual-original-macos-game:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare native Apple C compiler and pytest
+        run: |
+          xcrun --find clang
+          cc --version
+          python -m pip install --disable-pip-version-check pytest
+      - name: Build and execute original macOS game with exact physics replay
+        run: |
+          set -euo pipefail
+          python -m pytest -q tests/test_ai_dragon_native_macos.py
+          python -m skeleton.ai.webcrawler.dragon_native_macos build \
+            --title "Original Dragon Mac Campaign" \
+            --seed 1977 --stages 4 --difficulty 6 \
+            --attest-original-rights --authorize-local-build \
+            --out /tmp/original-dragon-macos > /tmp/original-dragon-macos-result.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from io import BytesIO
+          from zipfile import ZipFile
+          from skeleton.ai.webcrawler.dragon_native_macos import (
+              verify_native_macos_game, macho64_format,
+          )
+          receipt=json.loads(Path("/tmp/original-dragon-macos-result.json").read_text())
+          assert receipt["status"]=="macos_host_game_built_and_tested"
+          assert receipt["evidence"]["actual_macos_host_executed"] is True
+          assert receipt["evidence"]["independent_replays"]==12
+          archive=(Path("/tmp/original-dragon-macos")/receipt["filename"]).read_bytes()
+          audit=verify_native_macos_game(archive)
+          assert audit["stages_replayed"]==4
+          with ZipFile(BytesIO(archive)) as package:
+              binary=package.read("binary/dragon_game")
+              assert "Mach-O" in macho64_format(binary)
+          print("ORIGINAL_NATIVE_MACOS_GAME_EXECUTED",audit["executable_sha256"])
+          PY
+      - name: Publish original macOS Mach-O game and runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-original-macos-game
+          path: /tmp/original-dragon-macos/dragon-original-macos-*.zip
+          if-no-files-found: error
+          retention-days: 7

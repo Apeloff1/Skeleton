@@ -1,0 +1,82 @@
+name: Repository navigation and duplication index
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "27 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-navigation-index-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Test repository index contracts
+        run: python -m unittest discover -s tests -p 'test_repository_navigation_index.py' -v
+
+      - name: Build complete git-tree navigation index
+        run: |
+          python scripts/build_repository_navigation_index.py \
+            --root . --output .machine/repository-navigation \
+            --near-limit 2500 --near-threshold 0.82
+
+      - name: Validate provenance, completeness, and shard integrity
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          folder = Path('.machine/repository-navigation')
+          summary = json.loads((folder / 'summary.json').read_text())
+          sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if sha != os.environ['EXPECTED_SHA'] or summary['commit'] != sha:
+              raise RuntimeError('repository index is not bound to triggering HEAD')
+          if not summary['complete_git_tree']:
+              raise RuntimeError('inventory truncated')
+          expected = len(subprocess.check_output(['git', 'ls-tree', '-r', '-z', 'HEAD']).split(b'\0')) - 1
+          if summary['file_count'] != expected:
+              raise RuntimeError(f'Git tree coverage mismatch: {summary["file_count"]}/{expected}')
+          file_lines = sum(1 for _ in (folder / 'files.jsonl').open(encoding='utf-8'))
+          if file_lines != expected:
+              raise RuntimeError('file index coverage mismatch')
+          for name, digest in summary['artifact_digests'].items():
+              if hashlib.sha256((folder / name).read_bytes()).hexdigest() != digest:
+                  raise RuntimeError(f'index artifact corrupted: {name}')
+          print(f'Indexed all {expected} tracked paths at {sha}')
+          PY
+
+      - name: Publish immutable navigation index artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: repository-navigation-${{ github.sha }}
+          path: .machine/repository-navigation/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
+          compression-level: 9

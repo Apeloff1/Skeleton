@@ -11,6 +11,7 @@ import {
 import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
+import { validProjectId } from '../src/product/worldWorkspace';
 
 const TYPE_COLOR: Record<string, string> = {
   Faction: '#f472b6', Region: '#34d399', Character: '#fbbf24', Quest: '#60a5fa',
@@ -20,8 +21,8 @@ const W = 358, H = 358, CX = W / 2, CY = H / 2;
 
 export default function CanonGraph() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ game?: string }>();
-  const gameId = params?.game ? String(params.game) : '';
+  const params = useLocalSearchParams<{ game?: string | string[] }>();
+  const gameId = validProjectId(Array.isArray(params.game) ? params.game[0] : params.game);
   const [graph, setGraph] = React.useState<any>(null);
   const [audit, setAudit] = React.useState<any>(null);
   const [sel, setSel] = React.useState<string | null>(null);
@@ -32,16 +33,27 @@ export default function CanonGraph() {
   const [heal, setHeal] = React.useState<any | null>(null);
   const [healing, setHealing] = React.useState(false);
   const [applied, setApplied] = React.useState<Record<number, string>>({});
+  const [loadError, setLoadError] = React.useState('');
 
   React.useEffect(() => {
+    let current = true;
+    setGraph(null); setAudit(null); setLoadError('');
+    if (!gameId) return;
     (async () => {
+      try {
       const [g, a] = await Promise.all([
         api.get<any>(`/api/graph/${gameId}`, { timeoutMs: 12000 }),
         api.get<any>(`/api/graph/${gameId}/audit`, { timeoutMs: 12000 }),
       ]);
+      if (!current) return;
       if (g.ok && g.data && !g.data.error) setGraph(g.data);
+      else setLoadError('The graph could not be loaded for this game. Check the project and connection.');
       if (a.ok && a.data && !a.data.error) setAudit(a.data);
+      } catch {
+        if (current) setLoadError('The graph could not be loaded. Check the connection and reopen the project.');
+      }
     })();
+    return () => { current = false; };
   }, [gameId]);
 
   // deterministic radial-cluster layout: cluster nodes by type, spread each cluster on a ring
@@ -101,6 +113,17 @@ export default function CanonGraph() {
     }
   }, [heal, gameId]);
 
+  if (!gameId || loadError) {
+    return <SafeAreaView style={s.root}>
+      <View style={s.header}><Text style={s.title}>Canon Graph</Text></View>
+      <View style={{ padding: 24, gap: 16 }}>
+        <Text style={{ color: '#cbd5e1' }}>{loadError || 'Choose an existing game to inspect its canon graph.'}</Text>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/my-builds')}>
+          <Text style={{ color: '#93c5fd' }}>Choose a game</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>;
+  }
   if (!graph) {
     return (
       <SafeAreaView style={s.root}>

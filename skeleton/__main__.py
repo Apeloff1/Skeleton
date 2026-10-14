@@ -5,14 +5,60 @@ Usage:
 
 Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
+    ready       Organism readiness, optional --fix/--walk and bounded -n
+    product     Live operator product and policy card
+    health      Live organism health card (nonzero when degraded)
+    next        Next recommended organism action
+    wiki         Bounded read-only Hoag/wiki atom-query handles
+    seed         Existing organism/kernel owner
+    caps         Existing organism/kernel owner
+    lattice      Existing organism/kernel owner
+    pulse        Existing organism/kernel owner
+    orch         Existing organism/kernel owner
+    season       Existing organism/kernel owner
+    scoreboard   Existing organism/kernel owner
+    hot          Existing organism/kernel owner
+    coverage     Existing organism/kernel owner
+    decade       Existing organism/kernel owner
+    bank         Existing organism/kernel owner
+    switch       Existing organism/kernel owner
+    witness      Existing organism/kernel owner
+    gov          Existing organism/kernel owner
+    cage         Existing organism/kernel owner
+    rot          Existing organism/kernel owner
+    fieldcov     Existing organism/kernel owner
+    enact        Existing organism/kernel owner
+    day          Existing organism/kernel owner
+    week         Existing organism/kernel owner
+    calendar     Existing organism/kernel owner
+    conductor    Existing organism/kernel owner
+    ctx          Existing organism/kernel owner
+    live         Existing organism/kernel owner
+    observe      Existing organism/kernel owner
+    stacks       Existing organism/kernel owner
+    mix          Existing organism/kernel owner
+    satellites   Existing organism/kernel owner
+    path         Existing organism/kernel owner
+    bound        Existing organism/kernel owner
+    fieldwalk    Existing organism/kernel owner
+    dump         Existing organism/kernel owner
+    orgwalk      Existing organism/kernel owner
+    sleep        Existing organism/kernel owner
+    forget       Existing organism/kernel owner
+    helix        Existing organism/kernel owner
+    recall       Existing organism/kernel owner
     run         Start the skeleton runtime / GameForge vision run
+                run <vision> [--answers JSON|FILE|@FILE] [--answers-file FILE]
+                    [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
+                    [--playtest off|auto|require] [--repair-mode apply|suggest]
+                    [--blend ERA1 ERA2 --t 0..1] [--generation ID] [--json]
     forge       Blueprint compilation and materialization
     test        Run test suites
     dev         Developer CLI (scaffold, wizard, health, visualize)
     eras        List GameForge era dialects
     generations List hardware generations
     plan        Jeeves BuildPlan for a vision / era
-    cockpit     Apply one cockpit command
+    cockpit     Durable creator steering (BIND, SNAPSHOT --out, RESTORE)
     walk        Prove spawn→extract on the emitted door graph
                 (--mode thermal, --seed S, --all-eras, --steps, --json)
     doctor      Check forge prerequisites (eras, walk smoke, output dir, Godot)
@@ -65,7 +111,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 def _cmd_contracts(_rest: List[str]) -> int:
@@ -369,8 +415,50 @@ def _cmd_plan(rest: List[str]) -> int:
 
 
 def _cmd_cockpit(rest: List[str]) -> int:
-    from skeleton.context.cockpit import Cockpit
-    out = Cockpit().apply(" ".join(rest).strip())
+    """Operate the persisted, versioned local creator steering state."""
+    from pathlib import Path
+    from skeleton.context.cockpit import Cockpit, CockpitError
+    from skeleton.context.operator_state import (
+        capture_steering, read_steering, restore_cockpit, write_steering,
+    )
+    try:
+        if rest and rest[0].upper() == "RESTORE":
+            if len(rest) != 2:
+                raise ValueError("usage: cockpit RESTORE <snapshot.json>")
+            incoming = read_steering(Path(rest[1]))
+            if incoming is None:
+                raise ValueError("cockpit snapshot does not exist")
+            # Recovery must still work after a corrupt local state.
+            write_steering(incoming)
+            out = {"ok": True, "verb": "RESTORE",
+                   "result": restore_cockpit(incoming).snapshot()}
+        else:
+            saved = read_steering()
+            cockpit = restore_cockpit(saved) if saved else Cockpit()
+            if rest and rest[0].upper() == "SNAPSHOT" and len(rest) == 3 and rest[1] == "--out":
+                location = write_steering(
+                    capture_steering(cockpit, era_bound=bool(saved and saved["era_bound"])),
+                    Path(rest[2]),
+                )
+                out = {"ok": True, "verb": "SNAPSHOT",
+                       "path": str(location), "result": cockpit.snapshot()}
+            elif rest and rest[0].upper() == "SNAPSHOT" and len(rest) != 1:
+                raise ValueError("usage: cockpit SNAPSHOT [--out snapshot.json]")
+            else:
+                out = cockpit.apply(" ".join(rest).strip())
+                verb = out["verb"]
+                if verb in {"BIND", "SET", "LERP", "BLEND", "DETECT"}:
+                    bound = bool(saved and saved["era_bound"])
+                    if verb in {"DETECT", "LERP"} or (
+                        verb == "BIND" and len(rest) > 1 and rest[1].upper() == "ERA"
+                    ):
+                        bound = True
+                    elif verb == "BLEND":
+                        bound = False
+                    write_steering(capture_steering(cockpit, era_bound=bound))
+    except (OSError, ValueError, CockpitError) as exc:
+        print(f"cockpit: {exc}", file=sys.stderr)
+        return 2
     print(json.dumps(out, indent=2, default=str))
     return 0
 
@@ -406,6 +494,43 @@ def _cmd_doctor(rest: List[str]) -> int:
     return run_doctor(rest)
 
 
+def _load_run_answers(source: str, *, file_path: bool = False) -> Dict[str, str]:
+    """Read bounded questionnaire answers (inline JSON, @file or --answers-file).
+
+    Reject misspelled beat names and choices instead of silently discarding
+    operator intent. Brief facets are intentionally free-form strings.
+    """
+    from pathlib import Path
+    from skeleton.context.questionnaire import validate_answers
+
+    # Backward-compatible with the existing creator CLI's --answers PATH.
+    legacy_file = False
+    if not file_path and not source.startswith("@") and not source.lstrip().startswith(("{", "[")):
+        try:
+            legacy_file = Path(source).expanduser().is_file()
+        except (OSError, ValueError):
+            legacy_file = False
+    if file_path or source.startswith("@") or legacy_file:
+        path = Path(source[1:] if source.startswith("@") and not file_path else source).expanduser()
+        try:
+            if path.stat().st_size > 65_536:
+                raise ValueError("answers file exceeds 64 KiB")
+            raw = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ValueError(f"cannot read answers file: {exc}") from exc
+    else:
+        raw = source
+    if len(raw.encode("utf-8")) > 65_536:
+        raise ValueError("answers JSON exceeds 64 KiB")
+    try:
+        answers = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid answers JSON: {exc.msg}") from exc
+    if not isinstance(answers, dict):
+        raise ValueError("answers must be a JSON object mapping strings to strings")
+    return validate_answers(answers)
+
+
 def _parse_run_args(rest: List[str]):
     vision_parts: List[str] = []
     era = None
@@ -415,49 +540,138 @@ def _parse_run_args(rest: List[str]):
     blend = None
     t = 0.5
     generation = None
+    answers: Dict[str, str] = {}
+    playtest = None
+    repair_mode = "apply"
+    archetype = None
     i = 0
     while i < len(rest):
         a = rest[i]
-        if a == "--era" and i + 1 < len(rest):
-            era = rest[i + 1]; i += 2
-        elif a == "--out" and i + 1 < len(rest):
-            out = rest[i + 1]; i += 2
-        elif a == "--overwrite":
-            overwrite = True; i += 1
-        elif a == "--json":
-            as_json = True; i += 1
-        elif a == "--blend" and i + 2 < len(rest):
-            blend = (rest[i + 1], rest[i + 2]); i += 3
-        elif a == "--t" and i + 1 < len(rest):
-            t = float(rest[i + 1]); i += 2
-        elif a == "--generation" and i + 1 < len(rest):
-            generation = rest[i + 1]; i += 2
+        if a in ("--era", "--out", "--generation", "--answers", "--answers-file",
+                 "--playtest", "--repair-mode", "--archetype", "--t"):
+            if i + 1 >= len(rest):
+                raise ValueError(f"{a} requires a value")
+            value = rest[i + 1]
+            if a == "--era":
+                era = value
+            elif a == "--out":
+                out = value
+            elif a == "--generation":
+                generation = value
+            elif a == "--answers":
+                answers = _load_run_answers(value)
+            elif a == "--answers-file":
+                answers = _load_run_answers(value, file_path=True)
+            elif a == "--playtest":
+                if value not in ("off", "auto", "require"):
+                    raise ValueError("--playtest must be off, auto or require")
+                playtest = value
+            elif a == "--repair-mode":
+                if value not in ("apply", "suggest"):
+                    raise ValueError("--repair-mode must be apply or suggest")
+                repair_mode = value
+            elif a == "--archetype":
+                archetype = value
+            else:
+                try:
+                    t = float(value)
+                except ValueError as exc:
+                    raise ValueError("--t must be a finite number in [0, 1]") from exc
+                import math
+                if not math.isfinite(t) or not 0 <= t <= 1:
+                    raise ValueError("--t must be a finite number in [0, 1]")
+            i += 2
+        elif a in ("--overwrite", "--json"):
+            if a == "--overwrite":
+                overwrite = True
+            else:
+                as_json = True
+            i += 1
+        elif a == "--blend":
+            if i + 2 >= len(rest) or rest[i + 1].startswith("--") or rest[i + 2].startswith("--"):
+                raise ValueError("--blend requires two era names")
+            blend = (rest[i + 1], rest[i + 2])
+            i += 3
+        elif a.startswith("-"):
+            raise ValueError(f"unknown run option: {a}")
         else:
-            vision_parts.append(a); i += 1
+            vision_parts.append(a)
+            i += 1
+    if blend is None and "--t" in rest:
+        raise ValueError("--t requires --blend")
     blend_arg = tuple(blend) + (t,) if blend else None
-    return " ".join(vision_parts).strip(), era, out, overwrite, as_json, blend_arg, generation
+    return (" ".join(vision_parts).strip(), era, out, overwrite, as_json,
+            blend_arg, generation, answers, playtest, repair_mode, archetype)
 
 
 def _cmd_gameforge_run(rest: List[str]) -> int:
     from skeleton.context.pipeline import GameForgeRun
-    vision, era, out, overwrite, as_json, blend, generation = _parse_run_args(rest)
-    if not vision and era is None and out is None and blend is None:
+    from skeleton.context.operator_state import read_steering, restore_cockpit
+    if any(arg in ("--help", "-h") for arg in rest):
+        print("Usage: python -m skeleton run <vision> [--answers JSON|@FILE] "
+              "[--answers-file FILE] [--era ID] [--archetype NAME] [--out DIR] "
+              "[--overwrite] [--playtest off|auto|require] "
+              "[--repair-mode apply|suggest] [--blend ERA1 ERA2 --t 0..1] "
+              "[--generation ID] [--json]")
+        return 0
+    try:
+        (vision, era, out, overwrite, as_json, blend, generation, answers,
+         playtest, repair_mode, archetype) = _parse_run_args(rest)
+        saved = read_steering()
+    except (ValueError, OSError) as exc:
+        print(f"run: {exc}", file=sys.stderr)
+        return 2
+    if not rest:
         from skeleton.genesis import Genesis
         genesis = Genesis(seed=42).boot()
         print("Skeleton runtime booted.")
         print(f"Handles: {list(genesis.handles.keys())}")
         return 0
-    payload = GameForgeRun.live().execute(
-        vision, era=era, answers={}, project_root=out, overwrite=overwrite, target="godot",
-        blend=blend, generation=generation,
+    cockpit = restore_cockpit(saved) if saved else None
+    explicit = era is not None or blend is not None
+    if not explicit and saved:
+        if saved["era_bound"]:
+            era = saved["tensor"]["era"]
+        elif saved["blend"]:
+            blend = tuple(saved["blend"])
+    # Questionnaire axes are authoritative unless an operator explicitly
+    # pinned an era; persisted default axes must not erase voted intake.
+    operator_tensor = (
+        cockpit.tensor if cockpit is not None and not explicit
+        and blend is None and (not answers or bool(saved and saved["era_bound"]))
+        else None
     )
+    try:
+        payload = GameForgeRun.live(cockpit=cockpit).execute(
+            vision, era=era, archetype=archetype, answers=answers,
+            project_root=out, overwrite=overwrite, target="godot",
+            blend=blend, generation=generation, playtest=playtest,
+            repair_mode=repair_mode, operator_tensor=operator_tensor,
+        )
+    except ValueError as exc:
+        print(f"run: {exc}", file=sys.stderr)
+        return 2
     if as_json:
-        slim = {k: payload[k] for k in ("succeeded", "era", "mass", "complete", "sim", "project", "forge") if k in payload}
+        keys = ("succeeded", "era", "mass", "complete", "sim", "project",
+                "forge", "intake", "playtest", "run", "source_manifest")
+        slim = {k: payload[k] for k in keys if k in payload}
+        slim["failed_stages"] = [s for s in (payload.get("run") or {}).get("stages", [])
+                                 if s.get("status") == "FAILED"]
         print(json.dumps(slim, indent=2, default=str))
     else:
-        print(f"era={payload.get('era')} mass={payload.get('mass')} sim={(payload.get('sim') or {}).get('passed')} files={(payload.get('forge') or {}).get('file_count')}")
+        check = payload.get("playtest")
+        check_result = (check.get("status", check.get("passed")) if isinstance(check, dict)
+                        else ("off" if playtest in (None, "off") else "not-reached"))
+        print(f"era={payload.get('era')} mass={payload.get('mass')} "
+              f"sim={(payload.get('sim') or {}).get('passed')} "
+              f"files={(payload.get('forge') or {}).get('file_count')} "
+              f"playtest={check_result}")
         if payload.get("project"):
             print("wrote", payload["project"]["root"])
+        for stage in (payload.get("run") or {}).get("stages", []):
+            if stage.get("status") == "FAILED":
+                print(f"FAILED stage={stage.get('name')}: "
+                      f"{stage.get('error') or stage.get('gate_failure')}", file=sys.stderr)
     return 0 if payload.get("succeeded") else 1
 
 
@@ -511,6 +725,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
         return run_app_cli(rest)
+    if cmd in ("ready", "product", "health", "next"):
+        from skeleton.organism.operator_cli import run_operator_cli
+        return run_operator_cli(cmd, rest)
+    if cmd in ("wiki", "seed", "caps", "lattice", "pulse", "orch", "season", "scoreboard", "hot", "coverage", "decade", "bank", "switch", "witness", "gov", "cage", "rot", "fieldcov", "enact", "day", "week", "calendar", "conductor", "ctx", "live", "observe", "stacks", "mix", "satellites", "path", "bound", "fieldwalk", "dump", "orgwalk", "sleep", "forget", "helix", "recall"):
+        from skeleton.organism.operator_cli import run_operator_cli
+        return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
     if cmd == "forge":
         from skeleton.forge.universal import Forge
@@ -521,10 +741,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
     if cmd == "test": return _cmd_test(rest)
     if cmd == "dev":
-        from skeleton.developer.cli import dev_exit_code, run_dev_cli
-        result = run_dev_cli(rest)
-        if isinstance(result, dict): print(json.dumps(result, indent=2, default=str))
-        return dev_exit_code(result)
+        from skeleton.developer.cli import main as developer_main
+        return developer_main(rest)
     if cmd == "eras": return _cmd_eras(rest)
     if cmd == "generations": return _cmd_generations(rest)
     if cmd == "plan": return _cmd_plan(rest)

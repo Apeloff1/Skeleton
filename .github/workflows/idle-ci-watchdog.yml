@@ -43,7 +43,7 @@ jobs:
           if [[ -z "$issue" ]]; then
             issue=$(gh api --method POST "repos/${REPO}/issues" \
               -f title="$ISSUE_TITLE" \
-              -f body='Automated CI watchdog ledger. The bot only retries cancelled/timed-out non-security workflows once per run ID and never bypasses a failed security gate.' \
+              -f body='Automated CI watchdog ledger. The bot only retries timed-out non-security workflows once per run ID; intentional cancellations are never rerun and never bypasses a failed security gate.' \
               --jq '.number')
           fi
           if [[ ! "$issue" =~ ^[0-9]+$ ]]; then
@@ -69,7 +69,10 @@ jobs:
             created_epoch=$(date -u -d "$created" +%s)
             (( created_epoch >= cutoff )) || continue
             [[ "$status" == 'completed' ]] || continue
-            [[ "$conclusion" == 'cancelled' || "$conclusion" == 'timed_out' ]] || continue
+            # GitHub's cancellation is often intentional supersedence (newer
+            # PR head, branch cleanup, or queue shedding). Never resurrect
+            # that discarded generation. A timed-out run may be retried once.
+            [[ "$conclusion" == 'timed_out' ]] || continue
 
             case "$name" in
               *Malware*|*Secret*|*Security*|*CodeQL*|*Provenance*|*Artifact\ Policy*|*Dependency\ Review*)
@@ -100,7 +103,10 @@ jobs:
                 echo "::warning::Watchdog reran run ${id} but could not record the ledger comment."
               fi
             else
-              gh issue comment "$issue" --repo "$REPO" --body "CI watchdog could not rerun candidate:${id}; leaving it eligible for a later watchdog pass." >/dev/null || true
+              # Failed retry attempts are visible in Actions logs, not sent
+              # repeatedly as issue-comment notifications. Only successful
+              # retries get a durable run:${id} ledger entry.
+              echo "::warning::CI watchdog could not rerun transient timed_out candidate:${id}; retry remains eligible."
             fi
           done < <(jq -c '.[]' "$RUNNER_TEMP/runs.json")
 
@@ -108,7 +114,7 @@ jobs:
             echo '## Idle CI watchdog'
             echo "- Recent runs inspected: ${inspected}"
             echo "- Transient retries started: ${retries}"
-            echo '- Security, provenance, artifact and dependency-security workflows are never auto-retried.'
+            echo '- Cancelled runs, security, provenance, artifact and dependency-security workflows are never auto-retried.'
             echo '- GitHub run_attempt is authoritative for once-per-run retry enforcement.'
             echo '- Failed runs are not hidden or bypassed; persistent failures remain visible for repair.'
           } >> "$GITHUB_STEP_SUMMARY"

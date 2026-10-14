@@ -8,7 +8,9 @@ on:
       - "*"
       - "**"
   schedule:
-    - cron: '*/10 * * * *'
+    # The PR Lifecycle Signal still wakes immediate cleanup; the staggered
+    # half-hour sweep only recovers missed lifecycle observations.
+    - cron: '13,43 * * * *'
   push:
     branches: [main]
     paths:

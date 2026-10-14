@@ -39,10 +39,7 @@ class ResearchQuery:
         for name in ("diversity_weight","contradiction_weight","min_relevance","min_source_score"):
             value=getattr(self,name)
             if not isinstance(value,(int,float)) or isinstance(value,bool) or not math.isfinite(value) or not 0<=value<=1: raise ValueError(f"{name} must be finite and between 0 and 1")
-        # Keep the total discretionary adjustment within the normalized score
-        # budget so callers cannot suppress the actual evidence term entirely.
-        if self.diversity_weight + self.contradiction_weight > 1:
-            raise ValueError("combined diversity and contradiction weight budget exceeded")
+        if self.diversity_weight+self.contradiction_weight>1: raise ValueError("research weights exceed score budget")
 
 @dataclass(frozen=True)
 class EvidenceObservation:
@@ -62,7 +59,7 @@ class EvidenceObservation:
     def from_document(cls, doc: CrawlDocument, query: str) -> "EvidenceObservation":
         excerpt = doc.text[:2000]
         oid = hashlib.sha256(
-            f"{doc.canonical_url}\0{doc.content_hash}\0{query.lower()}".encode()
+            f"{doc.content_hash}\0{query.lower()}".encode()
         ).hexdigest()
         return cls(
             observation_id=oid,

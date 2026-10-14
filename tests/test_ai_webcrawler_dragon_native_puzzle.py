@@ -55,7 +55,7 @@ def test_real_pc_puzzle_game_exposes_true_native_and_compiled_solution():
     assert "src/main.c" in p.files
     assert "include/dragon_puzzle.h" in p.files
     assert "Makefile" in p.files and "CMakeLists.txt" in p.files
-    assert "SDL" not in p.files["src/main.c"]
+    assert "#include <SDL" not in p.files["src/main.c"]
     assert "UNDO_MAX" in p.files["src/main.c"]
     assert "static int perform(char key)" in p.files["src/main.c"]
     assert "static void rollback(void)" in p.files["src/main.c"]
@@ -117,4 +117,6 @@ def test_native_c99_compilation_and_actual_solution_replay(tmp_path):
     keyboard=subprocess.run([str(binary)],input="h\nq\n",
         capture_output=True,text=True,timeout=10)
     assert keyboard.returncode==0
-    assert "Canonical first input:" in keyboard.stdout
+    # H now searches the actual player/crate state. The pre-upgrade
+    # "Canonical first input" message would mislead after moving crates.
+    assert "Next shortest move from current position:" in keyboard.stdout

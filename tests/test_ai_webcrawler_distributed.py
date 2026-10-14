@@ -1,8 +1,9 @@
 import tempfile
+import sqlite3
 from skeleton.ai.webcrawler.leases import SqliteLeaseStore
 from skeleton.ai.webcrawler.traps import TrapGuard
 from skeleton.ai.webcrawler.storage import SqliteCrawlStore
-from skeleton.ai.webcrawler.migrations import SCHEMA_VERSION
+from skeleton.ai.webcrawler.migrations import migrate, SCHEMA_VERSION
 
 def test_lease_excludes_second_worker_until_expiry():
     with tempfile.TemporaryDirectory() as d:
@@ -35,3 +36,19 @@ def test_store_records_latest_schema_version():
         assert s.db.execute("SELECT version FROM schema_version").fetchone()[0] == SCHEMA_VERSION
         assert s.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_documents_fetched_at'").fetchone()
         s.close()
+
+
+def test_empty_database_migration_bootstraps_base_tables_and_is_idempotent():
+    db = sqlite3.connect(":memory:")
+    try:
+        assert migrate(db) == SCHEMA_VERSION
+        tables = {
+            row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        assert {"documents", "urls", "checkpoints"}.issubset(tables)
+        assert db.execute("SELECT version FROM schema_version").fetchone()[0] == SCHEMA_VERSION
+        assert migrate(db) == SCHEMA_VERSION
+    finally:
+        db.close()

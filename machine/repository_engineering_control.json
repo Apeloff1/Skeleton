@@ -255,11 +255,278 @@
   ],
   "backlog": {
     "summary": {
-      "item_count": 980,
-      "open_count": 980,
+      "item_count": 999,
+      "open_count": 999,
       "closed_count": 0
     },
     "items": [
+      {
+        "backlog_id": "BL-GAP-VOL-054-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-054:gap:001",
+        "volume_ref": "VOL-054",
+        "statement": "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending",
+        "accountability_id": "ACC-VOL-054",
+        "requirement_refs": [
+          "REQ:VOL-054:001",
+          "REQ:VOL-054:002",
+          "REQ:VOL-054:003"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-166-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-166:gap:001",
+        "volume_ref": "VOL-166",
+        "statement": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending",
+        "accountability_id": "ACC-VOL-166",
+        "requirement_refs": [
+          "REQ:VOL-166:001",
+          "REQ:VOL-166:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-167-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-167:gap:001",
+        "volume_ref": "VOL-167",
+        "statement": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending",
+        "accountability_id": "ACC-VOL-167",
+        "requirement_refs": [
+          "REQ:VOL-167:001",
+          "REQ:VOL-167:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-169-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-169:gap:001",
+        "volume_ref": "VOL-169",
+        "statement": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending",
+        "accountability_id": "ACC-VOL-169",
+        "requirement_refs": [
+          "REQ:VOL-169:001",
+          "REQ:VOL-169:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-172-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-172:gap:001",
+        "volume_ref": "VOL-172",
+        "statement": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending",
+        "accountability_id": "ACC-VOL-172",
+        "requirement_refs": [
+          "REQ:VOL-172:001",
+          "REQ:VOL-172:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-173-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-173:gap:001",
+        "volume_ref": "VOL-173",
+        "statement": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending",
+        "accountability_id": "ACC-VOL-173",
+        "requirement_refs": [
+          "REQ:VOL-173:001",
+          "REQ:VOL-173:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-174-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-174:gap:001",
+        "volume_ref": "VOL-174",
+        "statement": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending",
+        "accountability_id": "ACC-VOL-174",
+        "requirement_refs": [
+          "REQ:VOL-174:001",
+          "REQ:VOL-174:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-175-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-175:gap:001",
+        "volume_ref": "VOL-175",
+        "statement": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending",
+        "accountability_id": "ACC-VOL-175",
+        "requirement_refs": [
+          "REQ:VOL-175:001",
+          "REQ:VOL-175:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-176-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-176:gap:001",
+        "volume_ref": "VOL-176",
+        "statement": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending",
+        "accountability_id": "ACC-VOL-176",
+        "requirement_refs": [
+          "REQ:VOL-176:001",
+          "REQ:VOL-176:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-177-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-177:gap:001",
+        "volume_ref": "VOL-177",
+        "statement": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending",
+        "accountability_id": "ACC-VOL-177",
+        "requirement_refs": [
+          "REQ:VOL-177:001",
+          "REQ:VOL-177:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-178-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-178:gap:001",
+        "volume_ref": "VOL-178",
+        "statement": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending",
+        "accountability_id": "ACC-VOL-178",
+        "requirement_refs": [
+          "REQ:VOL-178:001",
+          "REQ:VOL-178:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-180-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-180:gap:001",
+        "volume_ref": "VOL-180",
+        "statement": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending",
+        "accountability_id": "ACC-VOL-180",
+        "requirement_refs": [
+          "REQ:VOL-180:001",
+          "REQ:VOL-180:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-181-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-181:gap:001",
+        "volume_ref": "VOL-181",
+        "statement": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending",
+        "accountability_id": "ACC-VOL-181",
+        "requirement_refs": [
+          "REQ:VOL-181:001",
+          "REQ:VOL-181:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-182-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-182:gap:001",
+        "volume_ref": "VOL-182",
+        "statement": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending",
+        "accountability_id": "ACC-VOL-182",
+        "requirement_refs": [
+          "REQ:VOL-182:001",
+          "REQ:VOL-182:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-183-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-183:gap:001",
+        "volume_ref": "VOL-183",
+        "statement": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending",
+        "accountability_id": "ACC-VOL-183",
+        "requirement_refs": [
+          "REQ:VOL-183:001",
+          "REQ:VOL-183:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-184-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-184:gap:001",
+        "volume_ref": "VOL-184",
+        "statement": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending",
+        "accountability_id": "ACC-VOL-184",
+        "requirement_refs": [
+          "REQ:VOL-184:001",
+          "REQ:VOL-184:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-185-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-185:gap:001",
+        "volume_ref": "VOL-185",
+        "statement": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending",
+        "accountability_id": "ACC-VOL-185",
+        "requirement_refs": [
+          "REQ:VOL-185:001",
+          "REQ:VOL-185:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-186-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-186:gap:001",
+        "volume_ref": "VOL-186",
+        "statement": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending",
+        "accountability_id": "ACC-VOL-186",
+        "requirement_refs": [
+          "REQ:VOL-186:001",
+          "REQ:VOL-186:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
+      {
+        "backlog_id": "BL-GAP-VOL-187-001",
+        "source_kind": "gap",
+        "source_ref": "VOL-187:gap:001",
+        "volume_ref": "VOL-187",
+        "statement": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending",
+        "accountability_id": "ACC-VOL-187",
+        "requirement_refs": [
+          "REQ:VOL-187:001",
+          "REQ:VOL-187:002"
+        ],
+        "state": "open",
+        "closure_evidence_refs": []
+      },
       {
         "backlog_id": "BL-RISK-VOL-000-001",
         "source_kind": "risk",
@@ -23143,7 +23410,7 @@
       ],
       "interest_metric": {
         "name": "requirements_without_evidence",
-        "value": 432,
+        "value": 373,
         "unit": "requirements"
       },
       "status": "open"

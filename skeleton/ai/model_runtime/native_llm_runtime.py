@@ -1,12 +1,10 @@
 """Executable native LLM serving boundary over Skeleton's causal transformer."""
 from __future__ import annotations
-import math
-
 from dataclasses import dataclass
 import math
 import hmac
 import random
-from typing import Any, Iterator, Mapping, Sequence
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from skeleton.cortex.attn import sample_logits
 from skeleton.cortex.transformer import KVCache, TinyTransformer
@@ -111,14 +109,18 @@ class GenerationStream:
     def __init__(self, iterator: Iterator[RuntimeEvent]) -> None:
         self._iterator = iterator
         self.result: GenerationResult | None = None
+        self._closed = False
 
     def __iter__(self) -> "GenerationStream":
         return self
 
     def __next__(self) -> RuntimeEvent:
+        if self._closed:
+            raise StopIteration
         try:
             return next(self._iterator)
         except StopIteration as exc:
+            self._closed = True
             if exc.value is not None and not isinstance(exc.value, GenerationResult):
                 raise RuntimeContractError("stream returned invalid terminal result")
             self.result = exc.value
@@ -129,6 +131,7 @@ class GenerationStream:
         close = getattr(self._iterator, "close", None)
         if close is not None:
             close()
+        self._closed = True
 
     def __enter__(self) -> "GenerationStream":
         return self
@@ -176,6 +179,10 @@ class NativeLLMRuntime:
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("configured context exceeds KV memory budget")
         self.device = self._bind_device(self.device_policy)
+        self.model._strict_device_request = (
+            not self.device_policy.allow_fallback
+            and self.device_policy.requested in {"torch", "torch-cpu", "cuda", "gpu", "mps"}
+        )
 
     def _architecture(self) -> RuntimeArchitecture:
         return RuntimeArchitecture(
@@ -187,6 +194,11 @@ class NativeLLMRuntime:
             feed_forward=self.model.d_ff,
             norm=self.model.norm,
             ffn_kind=self.model.ffn_kind,
+            positional=(
+                "rope-only"
+                if getattr(self.model, "position_mode", "learned_rope") == "rope"
+                else "learned-position-embedding+rope-attention"
+            ),
         )
 
     @property
@@ -215,28 +227,67 @@ class NativeLLMRuntime:
 
     def _bind_device(self, policy: DevicePolicy) -> DeviceReceipt:
         requested = policy.requested
+        wants_kv_policy = (
+            policy.kv_dtype != "fp32" or policy.kv_limit_bytes is not None
+            or policy.prefill_query_chunk is not None
+        )
+        if policy.kv_limit_bytes is not None and (
+            policy.kv_limit_bytes > self.limits.max_kv_bytes
+        ):
+            raise RuntimeContractError(
+                "device KV allocation ceiling exceeds native runtime policy"
+            )
+        if requested == "cpu" and wants_kv_policy:
+            raise RuntimeContractError(
+                "KV compression/budget or chunked prefill requires a Torch execution device"
+            )
         current = str(getattr(self.model, "device", "cpu") or "cpu")
-        if requested == "cpu" and current == "cpu":
+        was_resident = bool(getattr(self.model, "resident", False))
+        if requested == "cpu" and current == "cpu" and not was_resident:
             actual = "cpu"
-            resident = bool(getattr(self.model, "resident", False))
+            resident = False
         else:
             try:
-                self.model.to(requested)
+                if wants_kv_policy:
+                    self.model.to(
+                        requested,
+                        kv_dtype=policy.kv_dtype,
+                        max_kv_bytes=policy.kv_limit_bytes,
+                        prefill_query_chunk=policy.prefill_query_chunk,
+                    )
+                else:
+                    # Preserve compatibility with legacy device binders and
+                    # one-argument test doubles when optional compact-KV
+                    # functionality has not been requested.
+                    self.model.to(requested)
             except Exception as exc:
                 raise RuntimeContractError("device binding failed") from exc
             actual = str(getattr(self.model, "device", "cpu") or "cpu")
             resident = bool(getattr(self.model, "resident", False))
         if requested in {"cuda", "gpu"}:
-            degraded = actual != "cuda"
+            degraded = actual != "cuda" or not resident
+        elif requested == "mps":
+            degraded = actual != "mps" or not resident
         elif requested in {"torch", "torch-cpu"}:
             degraded = not resident
         else:
             degraded = False
+        # Explicitly configured compact caches must be implemented by the
+        # selected execution backend, regardless of general fallback policy.
+        if wants_kv_policy and not resident:
+            raise RuntimeContractError(
+                "requested KV precision/budget not admitted on this device"
+            )
         if degraded and not policy.allow_fallback:
             raise RuntimeContractError(
                 "requested device unavailable and fallback is disabled"
             )
-        return DeviceReceipt(requested, actual, resident, degraded)
+        return DeviceReceipt(
+            requested, actual, resident, degraded,
+            policy.kv_dtype if resident else "fp32",
+            policy.kv_limit_bytes if resident else None,
+            policy.prefill_query_chunk if resident else None,
+        )
 
     def bind_device(self, policy: DevicePolicy) -> DeviceReceipt:
         if not isinstance(policy, DevicePolicy):
@@ -244,6 +295,10 @@ class NativeLLMRuntime:
         receipt = self._bind_device(policy)
         self.device_policy = policy
         self.device = receipt
+        self.model._strict_device_request = (
+            not policy.allow_fallback
+            and policy.requested in {"torch", "torch-cpu", "cuda", "gpu", "mps"}
+        )
         return receipt
 
     def _current_model_digest(self) -> str:
@@ -257,18 +312,59 @@ class NativeLLMRuntime:
                 "model mutated after admission; call refresh_model_identity"
             )
 
+    def _assert_execution_device(self) -> None:
+        """Do not issue a single-device receipt for a mixed-device execution."""
+        actual = str(getattr(self.model, "device", "cpu") or "cpu")
+        resident = bool(getattr(self.model, "resident", False))
+        if actual == self.device.actual and resident == self.device.resident:
+            return
+        if (actual == "cpu" and not resident and self.device_policy.allow_fallback
+                and self.device_policy.kv_dtype == "fp32"
+                and self.device_policy.kv_limit_bytes is None
+                and self.device_policy.prefill_query_chunk is None):
+            # The transformer has synchronized canonical weights before
+            # dropping its accelerator. A subsequent whole request can use
+            # this explicit degraded receipt; the in-flight request cannot.
+            self.device = DeviceReceipt(self.device_policy.requested, "cpu", False, True)
+        raise RuntimeContractError(
+            "execution device changed; retry the whole request after explicit device admission"
+        )
+
     def refresh_model_identity(self) -> str:
         snapshot = portable_model_snapshot(self.model)
         validate_model_snapshot(snapshot)
         size = logical_bytes(snapshot)
         if size > self.limits.max_model_bytes:
             raise RuntimeContractError("mutated model exceeds runtime memory budget")
-        tokenizer = NativeTokenizer(self.model)
+        try:
+            tokenizer = NativeTokenizer(self.model)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer re-admission failed") from exc
         architecture = self._architecture()
         if self.limits.max_context > self.model.ctx:
             raise RuntimeContractError("mutated model context below runtime limit")
         if self.estimate_kv_bytes(self.limits.max_context) > self.limits.max_kv_bytes:
             raise RuntimeContractError("mutated model exceeds KV memory budget")
+        # Re-pin accelerator tensors and drop old KV state before a changed
+        # model identity can be admitted; never serve mismatched weights.
+        digest = snapshot_digest(snapshot)
+        accelerator = getattr(self.model, "_accel", None)
+        if accelerator is not None:
+            try:
+                accelerator.pin()
+                refreshed = portable_model_snapshot(self.model)
+                if not hmac.compare_digest(snapshot_digest(refreshed), digest):
+                    raise RuntimeContractError(
+                        "model changed while rebinding accelerator"
+                    )
+            except Exception as exc:
+                # A failed refresh cannot publish a hybrid CPU/GPU model.
+                self.model._accel = None
+                self.model.resident = False
+                self.model.device = "cpu"
+                raise RuntimeContractError(
+                    "accelerator rebind failed during model identity refresh"
+                ) from exc
         self._model_snapshot = snapshot
         self._model_digest = digest
         self._model_bytes = size
@@ -312,6 +408,7 @@ class NativeLLMRuntime:
         sequence: TokenSequence,
         *,
         use_cache: bool = True,
+        interrupt: Callable[[], None] | None = None,
     ) -> InferenceResult:
         """Run embeddings → position/RoPE → transformer blocks → LM head.
 
@@ -321,8 +418,16 @@ class NativeLLMRuntime:
         """
         if not isinstance(sequence, TokenSequence):
             raise RuntimeContractError("TokenSequence required")
+        if interrupt is not None:
+            interrupt()
         if not isinstance(use_cache, bool):
             raise RuntimeContractError("use_cache must be boolean")
+        self.assert_model_unchanged()
+        self._assert_execution_device()
+        try:
+            self.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("tokenizer drift during inference") from exc
         if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
             raise RuntimeContractError("token sequence tokenizer identity mismatch")
         if not sequence.token_ids:
@@ -335,16 +440,31 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("native tokenizer drift during inference") from exc
+            raise RuntimeContractError("tokenizer drift during inference") from exc
         if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
             raise RuntimeContractError("inference exceeds KV memory budget")
         window = sequence.token_ids[-self.limits.max_context:]
+        binding = (self.model_digest, self.tokenizer.digest, self.architecture.digest,
+                   self.device.digest, self.limits, self.device_policy)
         cache = KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None
-        logits = tuple(float(value) for value in self.model._logits_window(window, cache))
+        raw_logits = (self.model._logits_window(window, cache) if interrupt is None
+                      else self.model._logits_window(window, cache, interrupt=interrupt))
+        if interrupt is not None:
+            interrupt()
+        logits = tuple(float(value) for value in raw_logits)
+        self._assert_execution_device()
         if len(logits) != self.tokenizer.vocab_size:
             raise RuntimeContractError("inference graph emitted invalid logits shape")
         if any(value != value or value in (float("inf"), float("-inf")) for value in logits):
             raise RuntimeContractError("inference graph emitted non-finite logits")
+        self.assert_model_unchanged()
+        try:
+            self.tokenizer.assert_unchanged()
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("tokenizer drift during inference") from exc
+        if binding != (self.model_digest, self.tokenizer.digest, self.architecture.digest,
+                       self.device.digest, self.limits, self.device_policy):
+            raise RuntimeContractError("runtime binding changed during inference")
         return InferenceResult(
             prompt_sequence=sequence,
             logits=logits,
@@ -353,78 +473,71 @@ class NativeLLMRuntime:
             architecture_digest=self.architecture.digest,
         )
 
-    def infer_text(self, text: str, *, use_cache: bool = True) -> InferenceResult:
+    def infer_text(self, text: str, *, use_cache: bool = True,
+                   interrupt: Callable[[], None] | None = None) -> InferenceResult:
         """Tokenize text and execute one next-token inference graph pass."""
-        return self.infer_sequence(self.encode(text), use_cache=use_cache)
+        if interrupt is not None:
+            interrupt()
+        return self.infer_sequence(self.encode(text), use_cache=use_cache, interrupt=interrupt)
 
-    def infer_sequence(
-        self,
-        sequence: TokenSequence,
-        *,
-        use_cache: bool = True,
-    ) -> InferenceResult:
-        """Run embeddings → position/RoPE → transformer blocks → LM head.
-
-        This exposes the executable inference graph independently of decoding so
-        loaders, portability checks, and samplers can validate identical model
-        state against a canonical pre-tokenized input.
-        """
-        if not isinstance(sequence, TokenSequence):
-            raise RuntimeContractError("TokenSequence required")
-        if not isinstance(use_cache, bool):
-            raise RuntimeContractError("use_cache must be boolean")
-        self.assert_model_unchanged()
+    def _finalize_feed(self, feed: StreamingTextFeed) -> TokenSequence:
+        """Admit a bounded text feed without leaking tokenizer-specific errors."""
+        if not isinstance(feed, StreamingTextFeed):
+            raise RuntimeContractError("StreamingTextFeed required")
         try:
-            self.tokenizer.assert_unchanged()
+            return feed.finalize(self.tokenizer)
         except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated after admission") from exc
-        if not hmac.compare_digest(sequence.tokenizer_digest, self.tokenizer.digest):
-            raise RuntimeContractError("token sequence tokenizer identity mismatch")
-        if not sequence.token_ids:
-            raise RuntimeContractError("token sequence must not be empty")
-        if len(sequence.token_ids) > self.limits.max_context:
-            raise RuntimeContractError("prompt exceeds context budget")
-        if any(token_id >= self.tokenizer.vocab_size for token_id in sequence.token_ids):
-            raise RuntimeContractError("token sequence contains id outside vocabulary")
-        self.assert_model_unchanged()
-        try:
-            self.tokenizer.assert_unchanged()
-        except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated after admission") from exc
-        if use_cache and self.estimate_kv_bytes(len(sequence.token_ids)) > self.limits.max_kv_bytes:
-            raise RuntimeContractError("inference exceeds KV memory budget")
-        window = sequence.token_ids[-self.limits.max_context:]
-        cache = KVCache(self.model.n_layers, self.limits.max_context) if use_cache else None
-        logits = tuple(float(value) for value in self.model._logits_window(window, cache))
-        if len(logits) != self.tokenizer.vocab_size:
-            raise RuntimeContractError("inference graph emitted invalid logits shape")
-        if any(value != value or value in (float("inf"), float("-inf")) for value in logits):
-            raise RuntimeContractError("inference graph emitted non-finite logits")
-        return InferenceResult(
-            prompt_sequence=sequence,
-            logits=logits,
-            cache_tokens=len(cache.tokens) if cache is not None else 0,
-            model_digest=self.model_digest,
-            architecture_digest=self.architecture.digest,
-        )
-
-    def infer_text(self, text: str, *, use_cache: bool = True) -> InferenceResult:
-        """Tokenize text and execute one next-token inference graph pass."""
-        return self.infer_sequence(self.encode(text), use_cache=use_cache)
+            raise RuntimeContractError("feed tokenization failed admission") from exc
 
     def infer_feed(
         self,
         feed: StreamingTextFeed,
         *,
         use_cache: bool = True,
+        interrupt: Callable[[], None] | None = None,
     ) -> InferenceResult:
         """Execute next-token inference directly from a bounded text feed."""
-        if not isinstance(feed, StreamingTextFeed):
-            raise RuntimeContractError("StreamingTextFeed required")
-        return self.infer_sequence(feed.finalize(self.tokenizer), use_cache=use_cache)
+        if interrupt is not None:
+            interrupt()
+        return self.infer_sequence(self._finalize_feed(feed), use_cache=use_cache,
+                                   interrupt=interrupt)
 
     def _config_digest(self, config: GenerationConfig) -> str:
         return digest_json(config.to_dict())
+
+    @staticmethod
+    def _sampling_logits(
+        logits: Sequence[float], history: Sequence[int], generated_count: int,
+        config: GenerationConfig,
+    ) -> list[float]:
+        """Apply request-bound policies without mutating model graph logits.
+
+        Repetition uses both prompt and continuation, limited to the configured
+        recent window. Multiplicative penalties move negative and positive
+        logits in the same probability-reducing direction.
+        """
+        adjusted = list(logits)
+        if (config.repetition_penalty != 1.0 or config.presence_penalty
+                or config.frequency_penalty):
+            counts: dict[int, int] = {}
+            for token_id in history[-config.penalty_window:]:
+                counts[token_id] = counts.get(token_id, 0) + 1
+            for token_id, count in counts.items():
+                value = adjusted[token_id]
+                value = (value / config.repetition_penalty if value >= 0.0
+                         else value * config.repetition_penalty)
+                value -= config.presence_penalty + config.frequency_penalty * count
+                if not math.isfinite(value):
+                    raise RuntimeContractError("sampling penalty overflow")
+                adjusted[token_id] = value
+        blocked = set(config.suppress_token_ids)
+        if generated_count < config.min_new_tokens:
+            blocked.update(config.stop_token_ids)
+        for token_id in blocked:
+            adjusted[token_id] = float("-inf")
+        if not any(math.isfinite(value) for value in adjusted):
+            raise RuntimeContractError("sampling policy leaves no eligible token")
+        return adjusted
 
     def _request_digest(
         self,
@@ -452,6 +565,7 @@ class NativeLLMRuntime:
             raise RuntimeContractError("GenerationConfig required")
         config.validate(limits=self.limits, vocab_size=self.tokenizer.vocab_size)
         self.assert_model_unchanged()
+        self._assert_execution_device()
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
@@ -487,36 +601,69 @@ class NativeLLMRuntime:
         self,
         prompt: str,
         config: GenerationConfig | None = None,
+        *, interrupt: Callable[[], None] | None = None,
     ) -> GenerationStream:
         cfg = config or GenerationConfig(
             max_new_tokens=min(32, self.limits.max_new_tokens)
         )
-        return GenerationStream(self._stream_impl(prompt, cfg))
+        return GenerationStream(self._stream_impl(prompt, cfg, interrupt=interrupt))
 
     def _stream_impl(
         self,
         prompt: str,
         config: GenerationConfig,
+        *, interrupt: Callable[[], None] | None = None,
     ) -> Iterator[RuntimeEvent]:
+        if interrupt is not None:
+            interrupt()
         if not isinstance(config, GenerationConfig):
             raise RuntimeContractError("GenerationConfig required")
-        return (yield from self._stream_sequence_impl(self.encode(prompt), config))
+        try:
+            sequence = self.encode(prompt)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("prompt tokenization failed admission") from exc
+        except RuntimeContractError as exc:
+            if isinstance(exc.__cause__, TokenizerContractError):
+                raise RuntimeContractError("prompt tokenization failed admission") from exc.__cause__
+            raise
+        return (yield from self._stream_sequence_impl(sequence, config, interrupt=interrupt))
 
     def stream_sequence(
         self,
         sequence: TokenSequence,
         config: GenerationConfig | None = None,
+        *, interrupt: Callable[[], None] | None = None,
     ) -> GenerationStream:
         """Stream pre-tokenized inference through the canonical decoder."""
         cfg = config or GenerationConfig(max_new_tokens=min(32, self.limits.max_new_tokens))
-        return GenerationStream(self._stream_sequence_impl(sequence, cfg))
+        return GenerationStream(self._stream_sequence_impl(sequence, cfg, interrupt=interrupt))
 
     def _stream_sequence_impl(
         self,
         prompt_sequence: TokenSequence,
         config: GenerationConfig,
+        *, interrupt: Callable[[], None] | None = None,
     ) -> Iterator[RuntimeEvent]:
+        if interrupt is not None:
+            interrupt()
         self._admit_sequence(prompt_sequence, config)
+        admitted_binding = (
+            self.model_digest, self.tokenizer.digest, self.architecture.digest,
+            self.device.digest, self.device_policy, self.limits,
+        )
+
+        def assert_binding() -> None:
+            # Distinguish tokenizer identity drift before aggregate binding
+            # checks. Keep the full (more costly) tokenizer integrity proof at
+            # the existing post-inference checkpoint, not twice per token.
+            if self.tokenizer.digest != admitted_binding[1]:
+                raise RuntimeContractError("tokenizer mutated during generation")
+            if admitted_binding != (
+                self.model_digest, self.tokenizer.digest, self.architecture.digest,
+                self.device.digest, self.device_policy, self.limits,
+            ):
+                raise RuntimeContractError("runtime binding changed during generation")
+
         config_digest = self._config_digest(config)
         request_digest = self._request_digest(prompt_sequence, config)
         events: list[RuntimeEvent] = []
@@ -548,22 +695,31 @@ class NativeLLMRuntime:
         finish_reason = "length"
         cache_resets = 0
         kv_peak = 0
+        stopped_text: str | None = None
 
         for _ in range(config.max_new_tokens):
+            assert_binding()
+            if interrupt is not None:
+                interrupt()
             window = output[-self.limits.max_context :]
-            before = len(cache.tokens) if cache is not None else 0
-            primed = cache.primed_for(window) if cache is not None else False
-            logits = tuple(float(value) for value in self.model._logits_window(window, cache))
+            if interrupt is None:
+                raw_logits = self.model._logits_window(window, cache)
+            else:
+                raw_logits = self.model._logits_window(window, cache, interrupt=interrupt)
+                interrupt()
+            logits = tuple(float(value) for value in raw_logits)
+            self._assert_execution_device()
+            assert_binding()
             if len(logits) != self.tokenizer.vocab_size:
                 raise RuntimeContractError("generation graph emitted invalid logits shape")
             if any(not math.isfinite(value) for value in logits):
                 raise RuntimeContractError("generation graph emitted non-finite logits")
-            if cache is not None and before and not primed:
-                cache_resets += 1
+            if cache is not None:
+                cache_resets = cache.reset_count
 
             next_id = int(
                 sample_logits(
-                    logits,
+                    self._sampling_logits(logits, output, len(generated), config),
                     rng,
                     temperature=config.temperature,
                     top_k=config.top_k,
@@ -575,9 +731,18 @@ class NativeLLMRuntime:
             output.append(next_id)
             generated.append(next_id)
             token_text = self.tokenizer.token_text(next_id)
+            stop_token_hit = next_id in stop_ids
+            stop_string_hit = False
+            if config.stop_strings and len(generated) >= config.min_new_tokens:
+                decoded = self.tokenizer.decode_ids(generated)
+                matches = [decoded.find(marker) for marker in config.stop_strings]
+                matches = [position for position in matches if position >= 0]
+                if matches:
+                    stopped_text = decoded[:min(matches)]
+                    stop_string_hit = True
             cache_tokens = len(cache.tokens) if cache is not None else 0
             if cache is not None:
-                kv_peak = max(kv_peak, self.estimate_kv_bytes(cache_tokens))
+                kv_peak = max(kv_peak, self.estimate_kv_bytes(cache_tokens), cache.reserved_bytes)
                 if kv_peak > self.limits.max_kv_bytes:
                     raise RuntimeContractError("generation exceeded KV memory budget")
             self.assert_model_unchanged()
@@ -590,7 +755,12 @@ class NativeLLMRuntime:
                 sequence,
                 "token",
                 token_id=next_id,
-                text_delta=token_text,
+                # String-stop mode buffers visible text until completion.
+                # BPE boundaries can revise a suffix; publishing raw pieces
+                # would expose partial stop markers that cannot be recalled.
+                text_delta=("" if config.stop_strings or (
+                    stop_token_hit and not config.include_stop_tokens
+                ) else token_text),
                 cache_tokens=cache_tokens,
                 detail_digest=digest_json(
                     {
@@ -604,13 +774,13 @@ class NativeLLMRuntime:
             yield event
             sequence += 1
 
-            if next_id in stop_ids:
-                finish_reason = "stop_token"
+            if stop_token_hit or stop_string_hit:
+                finish_reason = "stop_string" if stop_string_hit else "stop_token"
                 event = RuntimeEvent(
                     sequence,
                     "stopped",
                     token_id=next_id,
-                    text_delta=token_text,
+                    text_delta="",
                     cache_tokens=cache_tokens,
                     detail_digest=event.detail_digest,
                 )
@@ -622,11 +792,18 @@ class NativeLLMRuntime:
         if config.max_new_tokens == 0:
             finish_reason = "completed"
 
+        assert_binding()
+
         generated_ids = tuple(generated)
         generated_tokens = tuple(
             self.tokenizer.token_text(token_id) for token_id in generated_ids
         )
-        text = self.tokenizer.decode_ids(generated_ids)
+        visible_ids = generated_ids
+        if (finish_reason == "stop_token" and not config.include_stop_tokens
+                and visible_ids):
+            visible_ids = visible_ids[:-1]
+        text = (stopped_text if stopped_text is not None
+                else self.tokenizer.decode_ids(visible_ids))
         output_digest = digest_json(
             {
                 "generated_ids": list(generated_ids),
@@ -652,16 +829,25 @@ class NativeLLMRuntime:
             device_digest=self.device.digest,
             seed=config.seed,
         )
+        # Construct and validate the durable checkpoint before announcing
+        # completion. An invalidated model or tokenizer must never emit a
+        # terminal success event whose final replay receipt is unavailable.
+        if interrupt is not None:
+            interrupt()
+        checkpoint = self.checkpoint()
+        assert_binding()
+        if interrupt is not None:
+            interrupt()
         event = RuntimeEvent(
             sequence,
             "completed",
+            text_delta=text if config.stop_strings else "",
             cache_tokens=len(cache.tokens) if cache is not None else 0,
             detail_digest=receipt.digest,
         )
         events.append(event)
         yield event
 
-        checkpoint = self.checkpoint()
         return GenerationResult(
             prompt_sequence=prompt_sequence,
             generated_ids=generated_ids,
@@ -678,11 +864,12 @@ class NativeLLMRuntime:
         self,
         sequence: TokenSequence,
         config: GenerationConfig | None = None,
+        *, interrupt: Callable[[], None] | None = None,
     ) -> GenerationResult:
         """Generate from token IDs without lossy decoding and retokenization."""
-        stream = self.stream_sequence(sequence, config)
-        for _event in stream:
-            pass
+        with self.stream_sequence(sequence, config, interrupt=interrupt) as stream:
+            for _event in stream:
+                pass
         if stream.result is None:
             raise RuntimeContractError("generation terminated without result")
         return stream.result
@@ -691,34 +878,37 @@ class NativeLLMRuntime:
         self,
         feed: StreamingTextFeed,
         config: GenerationConfig | None = None,
+        *, interrupt: Callable[[], None] | None = None,
     ) -> GenerationStream:
         """Execute a bounded text feed as a stream of real transformer tokens.
 
         The feed is finalized once; token IDs are forwarded without a lossy
         text round-trip, and generation uses the canonical decoder.
         """
-        if not isinstance(feed, StreamingTextFeed):
-            raise RuntimeContractError("StreamingTextFeed required")
-        return self.stream_sequence(feed.finalize(self.tokenizer), config)
+        if interrupt is not None:
+            interrupt()
+        return self.stream_sequence(self._finalize_feed(feed), config, interrupt=interrupt)
 
     def generate_feed(
         self,
         feed: StreamingTextFeed,
         config: GenerationConfig | None = None,
+        *, interrupt: Callable[[], None] | None = None,
     ) -> GenerationResult:
         """Finalize a StreamingTextFeed and execute it end-to-end."""
-        if not isinstance(feed, StreamingTextFeed):
-            raise RuntimeContractError("StreamingTextFeed required")
-        return self.generate_sequence(feed.finalize(self.tokenizer), config)
+        if interrupt is not None:
+            interrupt()
+        return self.generate_sequence(self._finalize_feed(feed), config, interrupt=interrupt)
 
     def generate(
         self,
         prompt: str,
         config: GenerationConfig | None = None,
+        *, interrupt: Callable[[], None] | None = None,
     ) -> GenerationResult:
-        stream = self.stream(prompt, config)
-        for _event in stream:
-            pass
+        with self.stream(prompt, config, interrupt=interrupt) as stream:
+            for _event in stream:
+                pass
         if stream.result is None:
             raise RuntimeContractError("generation terminated without result")
         return stream.result
@@ -726,6 +916,7 @@ class NativeLLMRuntime:
     def generate_batch(
         self,
         requests: Sequence[BatchGenerationRequest],
+        *, interrupt: Callable[[], None] | None = None,
     ) -> tuple[BatchGenerationResult, ...]:
         if not requests:
             return ()
@@ -738,18 +929,25 @@ class NativeLLMRuntime:
             raise RuntimeContractError("duplicate batch request id")
 
         aggregate = 0
+        admitted: list[tuple[BatchGenerationRequest, TokenSequence]] = []
         for request in requests:
+            if interrupt is not None:
+                interrupt()
             sequence, _ = self._admit(request.prompt, request.config)
             aggregate += len(sequence.token_ids) + request.config.max_new_tokens
             if aggregate > self.limits.max_batch_tokens:
                 raise RuntimeContractError("batch token budget exceeded")
+            admitted.append((request, sequence))
 
+        # Each admitted sequence is immutable and bound to the tokenizer
+        # digest. Re-encoding a prompt here would create a second admission
+        # boundary and allow a different token trajectory after preflight.
         return tuple(
             BatchGenerationResult(
                 request.request_id,
-                self.generate(request.prompt, request.config),
+                self.generate_sequence(sequence, request.config, interrupt=interrupt),
             )
-            for request in requests
+            for request, sequence in admitted
         )
 
     def replay(
@@ -787,7 +985,7 @@ class NativeLLMRuntime:
         try:
             self.tokenizer.assert_unchanged()
         except TokenizerContractError as exc:
-            raise RuntimeContractError("tokenizer mutated before checkpoint") from exc
+            raise RuntimeContractError("tokenizer changed before checkpoint") from exc
         return make_checkpoint(
             model=self.model,
             model_digest=self.model_digest,

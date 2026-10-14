@@ -10,13 +10,30 @@ from __future__ import annotations
 from argparse import ArgumentParser
 from dataclasses import asdict,dataclass
 from hashlib import sha256
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from time import monotonic
 from zipfile import ZIP_DEFLATED,ZipFile,ZipInfo
 import json,os,platform,shutil,subprocess,sys
 
-from .dragon_native_cli import emit_demo
-from .dragon_native_projects import digest
+# Can run as a standalone Python file from an intentionally sparse checkout.
+# Importing skeleton.ai's package initializer would pull in unrelated AI
+# subsystems, defeating an offline/native-host isolated compilation pipeline.
+if __package__:
+    from .dragon_native_puzzle import emit_native_puzzle
+else:
+    # Direct script execution must not load skeleton.ai's heavyweight package
+    # initializers. Use a private local namespace so the generator's relative
+    # sibling imports resolve, including its bounded campaign/curation helpers.
+    from importlib import import_module
+    from types import ModuleType
+
+    _isolated_name = "_dragon_native_standalone"
+    _isolated = ModuleType(_isolated_name)
+    _isolated.__path__ = [str(Path(__file__).resolve().parent)]
+    sys.modules[_isolated_name] = _isolated
+    emit_native_puzzle = import_module(
+        f"{_isolated_name}.dragon_native_puzzle"
+    ).emit_native_puzzle
 
 RELEASE_NAME="dragon_game.exe" if sys.platform=="win32" else "dragon_game"
 TARGETS={"linux":"pc_linux","windows":"pc_windows","darwin":"pc_macos"}
@@ -91,8 +108,35 @@ def build_native_release(root:Path,*,title:str="Original Dragon Puzzle Quest")->
         raise ValueError("native release output must be an empty regular directory")
     host=platform.system().lower()
     target=host_target(host)
-    written=emit_demo(target,root,title=title,style="fixed_screen_puzzle")
-    source_fingerprint=digest(written)
+    if not isinstance(title,str) or not 1<=len(title)<=100 or any(
+        ord(ch)<32 or ord(ch)==127 for ch in title
+    ):
+        raise ValueError("invalid native release title")
+    # Only this pure-stdlib puzzle generator is required. Source emitted
+    # here is exactly the source compiled, hashed and embedded in the proof.
+    seed=int.from_bytes(sha256(title.encode("utf-8")).digest()[:4],"big")
+    written=emit_native_puzzle(seed=seed,stages=4,difficulty=4)
+    root.mkdir(parents=True,exist_ok=True)
+    for name,body in written.items():
+        # Validate the emitter-owned *member*, never the joined output path:
+        # root is normally absolute, but each source name must be relative.
+        if (not isinstance(name, str) or not name or "\\" in name or ":" in name
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in name)
+                or not isinstance(body, str)):
+            raise ValueError("unsafe native release source entry")
+        member = PurePosixPath(name)
+        if (member.is_absolute() or any(part in (".", "..") for part in name.split("/"))
+                or "" in name.split("/") or member.as_posix() != name):
+            raise ValueError("unsafe native release source entry")
+        candidate = root.joinpath(*member.parts)
+        candidate.parent.mkdir(parents=True,exist_ok=True)
+        if candidate.is_symlink() or not candidate.parent.resolve().is_relative_to(root.resolve()):
+            raise ValueError("unsafe native release source entry")
+        candidate.write_text(body,encoding="utf-8")
+    source_fingerprint=sha256(json.dumps(
+        written,sort_keys=True,separators=(",",":"),ensure_ascii=True,
+        allow_nan=False
+    ).encode("utf-8")).hexdigest()
     build_dir=root/"build"
     started=monotonic()
     cfg=_run(["cmake","-S",str(root.resolve()),"-B",str(build_dir.resolve()),

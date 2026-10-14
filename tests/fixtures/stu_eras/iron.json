@@ -1,0 +1,21 @@
+{
+  "schema": "stu-eras/1",
+  "id": "iron",
+  "title": "Iron Age",
+  "order": 2,
+  "start": "camp",
+  "citation": "docs/lineage/era.md",
+  "tags": ["ancient", "war"],
+  "rooms": [
+    {"id": "camp", "name": "War Camp", "kind": "hub", "exits": [
+      {"direction": "north", "target": "pass"}
+    ]},
+    {"id": "pass", "name": "Mountain Pass", "kind": "corridor", "depth": 1, "exits": [
+      {"direction": "south", "target": "camp"},
+      {"direction": "north", "target": "keep"}
+    ]},
+    {"id": "keep", "name": "Hill Keep", "kind": "arena", "depth": 2, "exits": [
+      {"direction": "south", "target": "pass"}
+    ]}
+  ]
+}

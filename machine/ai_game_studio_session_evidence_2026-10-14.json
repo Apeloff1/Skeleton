@@ -1,0 +1,710 @@
+{
+  "schema_version": "skeleton.ai.game_studio_session_evidence.v1",
+  "status": "measured_implementation_candidate",
+  "session_started_utc": "2026-10-14T04:39:16Z",
+  "requested_work_window_until_utc": "2026-10-14T06:39:16Z",
+  "latest_user_priority": "Build the studio app and executable remembered improvement triangle, not more example games",
+  "automated_tests_run": false,
+  "production_promotion": false,
+  "masterplan_closure": false,
+  "core_inventory": {
+    "compiled_core_count": 34,
+    "additional_compiled_core_count": 28,
+    "operator_approved_core_count": 29,
+    "canonical_hardware_targets": 169,
+    "targets_with_operator_approved_mapping": 46,
+    "approved_target_ids": [
+      "atari_2600",
+      "zx_spectrum",
+      "nes",
+      "master_system",
+      "game_boy",
+      "game_boy_color",
+      "game_gear",
+      "lynx",
+      "turbografx_16",
+      "genesis",
+      "snes",
+      "dos_8086",
+      "dos_vga",
+      "ps1",
+      "nintendo_64",
+      "game_boy_advance",
+      "nintendo_ds",
+      "psp",
+      "atari_5200",
+      "atari_7800",
+      "vectrex",
+      "sega_sg1000",
+      "sega_mark_iii",
+      "game_boy_pocket",
+      "game_boy_light",
+      "game_boy_micro",
+      "game_boy_player",
+      "virtual_boy",
+      "wonderswan",
+      "wonderswan_color",
+      "neo_geo_pocket",
+      "neo_geo_pocket_color",
+      "pokemon_mini",
+      "zx81",
+      "amstrad_cpc",
+      "atari_400_800",
+      "atari_130xe",
+      "atari_jaguar",
+      "3do",
+      "sega_32x",
+      "neo_geo_cd",
+      "psp_go",
+      "psp_street",
+      "dos_cga",
+      "dos_ega",
+      "dos_vesa"
+    ],
+    "registry_digest": "b37877352e04fe52d19fc0b20f3481276fd9f03d800ff273227c70f9e53a4e40",
+    "original_registry_digest": "f8e482dac5ac8590ad29d272c053c48f12a03b92db529454c3c03857d8e2a706"
+  },
+  "editor_bound_native_builds": [
+    {
+      "target_id": "nes",
+      "state": "binary_ready",
+      "artifacts": [
+        {
+          "name": "build/game.nes",
+          "bytes": 40976,
+          "digest": "11a927faff4b58c3a23eb84947d1c712edb22743397e589a7944b35c832cb7f9",
+          "format": "ines",
+          "format_validation": "structural_cartridge_metadata_only:2a86c0a1c46d07a3a66e6907979b9d5b925c59169ec99af61ecea06fff4e4e75",
+          "hardware_execution_verified": false
+        }
+      ],
+      "source_digest": "dc71269e6f7490b9d170d3d0a3459a31857a6fb5e77df2b841c221bd19b59215",
+      "runtime_digest": "79ed9f19f2a926503dbd9f200234d3dedb0a48dc16e73a6214a19bd19294a6c6"
+    },
+    {
+      "target_id": "game_boy",
+      "state": "binary_ready",
+      "artifacts": [
+        {
+          "name": "build/game.gb",
+          "bytes": 32768,
+          "digest": "08eb75a3bb3858b3eb7a2946be96a05eccd3bb14fb49f6250c5f158ce7d7d76a",
+          "format": "game_boy_cartridge",
+          "format_validation": "structural_cartridge_metadata_only:21e060952a7bf32e45e308acfd648d293be22c64292d0f87f2763e5255e7614c",
+          "hardware_execution_verified": false
+        }
+      ],
+      "source_digest": "6189a2fce31fe05814569c0a292b1111f1c3ff71992f384354032b3a51bfe22b",
+      "runtime_digest": "79ed9f19f2a926503dbd9f200234d3dedb0a48dc16e73a6214a19bd19294a6c6"
+    }
+  ],
+  "editor_bound_actual_emulation": [
+    {
+      "target_id": "nes",
+      "core_id": "fceumm",
+      "rom_sha256": "11a927faff4b58c3a23eb84947d1c712edb22743397e589a7944b35c832cb7f9",
+      "steps": 150,
+      "elapsed_seconds": 3.684,
+      "environment_digest": "64d9c5bbbda37d54b22ab9c573fcc552f903bfe3f896572a2a6611fec5a8f636",
+      "frame_receipt": {
+        "width": 256,
+        "height": 224,
+        "pixel_digest": "3b8fdd87228b9a3d8b224a22de7a500ee4259ac463cf01f8c7f5542863dbc029",
+        "source_pixel_digest": "3b8fdd87228b9a3d8b224a22de7a500ee4259ac463cf01f8c7f5542863dbc029",
+        "native_runs": 151,
+        "video_callbacks": 151
+      }
+    },
+    {
+      "target_id": "game_boy",
+      "core_id": "gambatte",
+      "rom_sha256": "08eb75a3bb3858b3eb7a2946be96a05eccd3bb14fb49f6250c5f158ce7d7d76a",
+      "steps": 150,
+      "elapsed_seconds": 4.915,
+      "environment_digest": "c96445bb17250d3453254ecde9ec9807d33054127276366c36957cda483b5360",
+      "frame_receipt": {
+        "width": 160,
+        "height": 144,
+        "pixel_digest": "ed81a3b228900829d24e45495f27bc54ce2d8f67dbe58f80087af868877971f6",
+        "source_pixel_digest": "ed81a3b228900829d24e45495f27bc54ce2d8f67dbe58f80087af868877971f6",
+        "native_runs": 151,
+        "video_callbacks": 151
+      }
+    }
+  ],
+  "additional_original_nes_learning": {
+    "algorithm": "frozen_batch_local_actor_q_v1",
+    "committed_episodes": 8,
+    "policy_digest": "58107187bc9232e55da5c8ca67ada3f7aabaf7fd001e52226479aa2722149d28",
+    "policy_file": "/workspace/scratch/jeeves-original-nes-workload/policy.json",
+    "production_promotion": false,
+    "status": "candidate_trained",
+    "updates": 1024,
+    "workers": 2
+  },
+  "final_campaign_execution": {
+    "configured_round_budget_per_campaign": 100000,
+    "executed_rounds": 17,
+    "actual_transitions": 9600,
+    "retained_lessons": 68,
+    "actual_q_updates": 1920,
+    "checkpoint_restored_runtime_kinds": [
+      "console_editor",
+      "successor",
+      "native_rom"
+    ],
+    "workloads": [
+      {
+        "kind": "console_editor",
+        "configured_budget": 100000,
+        "actual_rounds": 4,
+        "actual_steps": 2560,
+        "elapsed_seconds": 9.658,
+        "checkpoint_cursor": 4,
+        "snapshot_digest": "a42065af039041a42e64e8bed6daad3c54798423872d9ca5837c58f324a04dc1",
+        "actual_lesson_count": 16,
+        "reports": [
+          {
+            "round_index": 1,
+            "round_digest": "51ac2f98d3dbfbb9773c39c2aa3178d727c44782b58c27209a1193b826159722",
+            "actual_steps": 640,
+            "champion_promoted": true
+          },
+          {
+            "round_index": 2,
+            "round_digest": "795404c7838fa170fb103594e20f140c563fb2d8927ebcffd3fa715e97dd38d8",
+            "actual_steps": 640,
+            "champion_promoted": false
+          },
+          {
+            "round_index": 3,
+            "round_digest": "ecffa0e95c54ee7dccc303cb7414aca0deeda290f57a0fda1e8db26ef4c172f2",
+            "actual_steps": 640,
+            "champion_promoted": false
+          },
+          {
+            "round_index": 4,
+            "round_digest": "9b9c253ef92c62a9ea4491512ff649e62d592aaee85a4a18b4c36b495b705eda",
+            "actual_steps": 640,
+            "champion_promoted": false
+          }
+        ]
+      },
+      {
+        "kind": "successor",
+        "configured_budget": 100000,
+        "actual_rounds": 8,
+        "actual_steps": 5120,
+        "elapsed_seconds": 18.246,
+        "checkpoint_cursor": 8,
+        "snapshot_digest": "795d527937b46cabc7452bad5fa6d33d476e7c31b9eeb0d15ed275abb40ef276",
+        "actual_lesson_count": 32,
+        "reports": [
+          {
+            "round_index": 1,
+            "round_digest": "737f928629bd71550bbd3ffeaf48b67c3d7a06ff730f233f4f1dcde7ffe92dd8",
+            "actual_steps": 640,
+            "champion_promoted": false
+          },
+          {
+            "round_index": 2,
+            "round_digest": "cdc5712c24e099723e077b56faa181dfcd0451596879e2aa91c920131d657287",
+            "actual_steps": 640,
+            "champion_promoted": false
+          },
+          {
+            "round_index": 3,
+            "round_digest": "aa1c1fc0fd6b457c6fb6a945d1b8dc35ab10cbd789c715994bf5300b63191d21",
+            "actual_steps": 640,
+            "champion_promoted": false
+          },
+          {
+            "round_index": 4,
+            "round_digest": "c5c70bb67e1551ea4a0a3317f05522d08c0692d8a33c3e727580c52740d16d43",
+            "actual_steps": 640,
+            "champion_promoted": false
+          },
+          {
+            "round_index": 5,
+            "round_digest": "940e47bdb17d7c0be786d3033592c65b37996b3b5f6e63165a140ea12509b969",
+            "actual_steps": 640,
+            "champion_promoted": false
+          },
+          {
+            "round_index": 6,
+            "round_digest": "67bbb86c3a15c7d546f604df257443042a2e8297f92b6919638396ceb50ae13c",
+            "actual_steps": 640,
+            "champion_promoted": false
+          },
+          {
+            "round_index": 7,
+            "round_digest": "8682eb0cb713cd5e6c6457fa14c9675a55087e437d564b41c3895997199018a6",
+            "actual_steps": 640,
+            "champion_promoted": false
+          },
+          {
+            "round_index": 8,
+            "round_digest": "913bcf723ea4f9eca2effa8b210dcbd8e9aa19a92bd4c6f045a1489116c81096",
+            "actual_steps": 640,
+            "champion_promoted": false
+          }
+        ]
+      },
+      {
+        "kind": "native_rom",
+        "configured_budget": 100000,
+        "actual_rounds": 4,
+        "actual_steps": 1280,
+        "elapsed_seconds": 24.565,
+        "checkpoint_cursor": 4,
+        "snapshot_digest": "304e77b02c06e6fe3d06c83b01a64005f5a743f6b12c38b80939312edbdad2a7",
+        "actual_lesson_count": 16,
+        "reports": [
+          {
+            "round_index": 1,
+            "round_digest": "600de7d85bb248eb2524c535c5bbaa44054a8bb3ee8e0a268f844956bda28d36",
+            "actual_steps": 320,
+            "champion_promoted": false
+          },
+          {
+            "round_index": 2,
+            "round_digest": "28fc6eda882fd0bd05ed41b7a17efb7d6f351161da1e8d5506c427aef25a1b26",
+            "actual_steps": 320,
+            "champion_promoted": true
+          },
+          {
+            "round_index": 3,
+            "round_digest": "6f08765d6c556d7e26cc15801331e46199f7d62b5bb3df253a4ac87b49755c5c",
+            "actual_steps": 320,
+            "champion_promoted": true
+          },
+          {
+            "round_index": 4,
+            "round_digest": "2d2312b3001c9def6abd275952919dbc3d5acaaa57eb035706907f0c4d5a7d0f",
+            "actual_steps": 320,
+            "champion_promoted": false
+          }
+        ]
+      }
+    ],
+    "cross_build_proposal": {
+      "actual_rounds": 1,
+      "actual_steps": 640,
+      "round_digest": "d2e81cb84480ceef1e2b239abaa0501791cbc7de6a0a16362dc516aba6a9a780",
+      "original_proposal_digest": "4c4cacb711ea73e0171ce1e26348ee5e09301ba23f7bf2e7617b3e207874e02c",
+      "new_source_request_digest": "89580d854e978e314bd1605962d22e5210715215fb0756310b28fbc311c036f4",
+      "measurement_or_policy_transferred": false
+    },
+    "fidelity_trial": {
+      "round": 6,
+      "trial": "pixel_to_enhanced",
+      "actual_pixel_review": true,
+      "accepted": false,
+      "champion_retained": true
+    },
+    "scope": "Actual local runtime/learner/triangle execution. Authenticated Mongo/API deployment and automatic durable scheduling not exercised."
+  },
+  "desktop_export_compiler": {
+    "targets": [
+      {
+        "target_id": "windows-amd64",
+        "state": "binary_ready",
+        "artifacts": [
+          {
+            "name": "riverlight-the-threefold-valley-windows-amd64.exe",
+            "bytes": 7225344,
+            "digest": "178004caa0d50e91755204b7c606863c413e624b9a718068a303c0db58af77fa",
+            "format": "pe32_plus",
+            "format_validation": "actual_compiler_exit_and_os_architecture",
+            "hardware_execution_verified": false
+          },
+          {
+            "name": "riverlight-the-threefold-valley-windows-amd64.zip",
+            "bytes": 3068882,
+            "digest": "5447a176a3a06da3161ad4227aebb8ced205c4e022b50ffb7ca00f158def1ea2",
+            "format": "zip",
+            "format_validation": "compiled_os_architecture_and_exact_embedded_source",
+            "hardware_execution_verified": false
+          }
+        ],
+        "elapsed_seconds": 32.464
+      },
+      {
+        "target_id": "linux-amd64",
+        "state": "binary_ready",
+        "artifacts": [
+          {
+            "name": "riverlight-the-threefold-valley-linux-amd64",
+            "bytes": 7016608,
+            "digest": "c44c67d315037a55a635c4205458c080cdd29a5e93f517036026bca9c58700e2",
+            "format": "elf64",
+            "format_validation": "actual_compiler_exit_and_os_architecture",
+            "hardware_execution_verified": false
+          },
+          {
+            "name": "riverlight-the-threefold-valley-linux-amd64.zip",
+            "bytes": 2993927,
+            "digest": "373ebf6e639f45c255589b5914991b62e6045336053fff080b5ebeedf7fa8df3",
+            "format": "zip",
+            "format_validation": "compiled_os_architecture_and_exact_embedded_source",
+            "hardware_execution_verified": false
+          }
+        ],
+        "elapsed_seconds": 32.969
+      },
+      {
+        "target_id": "linux-arm64",
+        "state": "binary_ready",
+        "artifacts": [
+          {
+            "name": "riverlight-the-threefold-valley-linux-arm64",
+            "bytes": 6488224,
+            "digest": "ea3ec037c085cef5e78e1164f45eedd35641f8257f95d683d7118008f32dbbcc",
+            "format": "elf64",
+            "format_validation": "actual_compiler_exit_and_os_architecture",
+            "hardware_execution_verified": false
+          },
+          {
+            "name": "riverlight-the-threefold-valley-linux-arm64.zip",
+            "bytes": 2694089,
+            "digest": "cf05415ee0b3d756680398b7c5cee30fb957ad9528b488f96515ddafb18f1c8e",
+            "format": "zip",
+            "format_validation": "compiled_os_architecture_and_exact_embedded_source",
+            "hardware_execution_verified": false
+          }
+        ],
+        "elapsed_seconds": 33.607
+      },
+      {
+        "target_id": "darwin-amd64",
+        "state": "binary_ready",
+        "artifacts": [
+          {
+            "name": "riverlight-the-threefold-valley-darwin-amd64",
+            "bytes": 7150368,
+            "digest": "68e0ac7e5b92222a36ff103e4518e58687e321c96ced8320a140231a134ad05c",
+            "format": "mach_o_64",
+            "format_validation": "actual_compiler_exit_and_os_architecture",
+            "hardware_execution_verified": false
+          },
+          {
+            "name": "riverlight-the-threefold-valley-darwin-amd64.zip",
+            "bytes": 3032861,
+            "digest": "8be428babe8b8404ca9ff5678446e8c7c485174769234e53d0912833dfdcffe9",
+            "format": "zip",
+            "format_validation": "compiled_os_architecture_and_exact_embedded_source",
+            "hardware_execution_verified": false
+          }
+        ],
+        "elapsed_seconds": 32.566
+      },
+      {
+        "target_id": "darwin-arm64",
+        "state": "binary_ready",
+        "artifacts": [
+          {
+            "name": "riverlight-the-threefold-valley-darwin-arm64",
+            "bytes": 6623826,
+            "digest": "2944c7972918c7415ca72d640892e3df32d3d2e6d257311c55ad3be4cf4b73a3",
+            "format": "mach_o_64",
+            "format_validation": "actual_compiler_exit_and_os_architecture",
+            "hardware_execution_verified": false
+          },
+          {
+            "name": "riverlight-the-threefold-valley-darwin-arm64.zip",
+            "bytes": 2784192,
+            "digest": "dc7d76048714a06c9c874c847daaf59abd3fbd960d7e5c2e16c98c4bcdb50c71",
+            "format": "zip",
+            "format_validation": "compiled_os_architecture_and_exact_embedded_source",
+            "hardware_execution_verified": false
+          }
+        ],
+        "elapsed_seconds": 17.799
+      }
+    ],
+    "foreign_os_execution_verified": false,
+    "linux_browser_play_and_persistent_save_readback": true,
+    "renderer": "native_launcher_with_browser_game"
+  },
+  "production_web_export": {
+    "files": 292,
+    "bytes": 33303280,
+    "html_routes": 186,
+    "archive_bytes": 9278408,
+    "archive_sha256": "6cfdd07987d18cbd86fe92ebe519ec87af0b40099fbb7f9b47b6ad44ef6e8c18",
+    "source_path": "frontend/features/Jeeves/GameLearningWorkspace.tsx"
+  },
+  "validation": {
+    "changed_python_ast_compilation_and_provider_ownership": {
+      "status": "pass",
+      "files": 70
+    },
+    "whole_provider_bootstrap": "passed before final additions; changed-source supplementary ownership check passed afterward",
+    "ai_file_tree": "passed179 governed mappings",
+    "architecture": "passed",
+    "construction": "passed",
+    "capability_interfaces": "passed",
+    "enterprise_superiority_contract": "passed_source_only",
+    "enterprise_implementation_notes": "passed_source_only",
+    "frontend_typescript_eslint": "passed14 owned files",
+    "production_expo_export": "passed",
+    "automated_tests": "not run per user instruction"
+  },
+  "source_sha256": {
+    "backend/core/game_console_build.py": "74b246d52fa9f792d791fb5dd35c0e2b8a57d411fbebc9c21d1021156002e157",
+    "backend/core/game_console_studio.py": "4faf9c6b070f6247737dc69252e9800a6337c1b65122eabcc4c8ae8bace37bfa",
+    "backend/core/game_learning.py": "2fe1df6cd46e62e4e59c273b8af79b253b58c5a102867091845d37bf1efd8c2d",
+    "backend/core/game_play.py": "c4d04adbf5a269db6649e64587876b2bfabf35c82a0dff6a74a2b4981e0a9f58",
+    "backend/core/game_studio_learning.py": "cb6b23bbf711e8829a07ec8da1535e080c80c9ba84975afb1a630584386e6d2f",
+    "backend/core/game_studio_tools.py": "2cfa790742991317236e6dbd2589d2818303662015ee27b81ae2aaf7154febdb",
+    "backend/core/game_successor.py": "3e285f3b440338d51b625ae4712560af2a8b573f7f4d8c8ff8c7b71b15d5743a",
+    "backend/core/routes_registry.py": "21f7621374dce3e372b4ba6876987cd6051c1fa72e91dbc766dd419cafd17ea8",
+    "backend/routes/game_console_studio.py": "2cb14ba89e81b385f8e280cee6d8bbac1f4a1a21d75bf7b59f54e64b73a6fb90",
+    "backend/routes/game_studio_learning.py": "3a0478eba9be9997b301a0861de7a59fda809ba3303cb602373e870ba620843a",
+    "backend/routes/game_studio_tools.py": "46335e1532c3ef1ad0872eb775b341e0213b81120bde5318ec29825cff5d367a",
+    "backend/routes/game_successor.py": "82273e8efd8aca3fe6a7c1adc41b50604387522eeacb5ac550238caf1731cc57",
+    "scripts/install_game_desktop_toolchains.py": "a2873a007b5e05a8a24d8568e1bba70b83108c291a169661c783911fe2b9e0c5",
+    "scripts/install_game_emulator_cores.py": "18998bf5085e18093cc3b40dd4f0bbcea18cf9885014be7ba6d10ee8e5b1b0ac",
+    "skeleton/ai/agents/jeeves/agent/tools.py": "60cd05ca99c923481b7ff85655a922312cdf4d6fa123c7dbde84c3e749b4c505",
+    "skeleton/ai/agents/jeeves/ai/creator_runbook_runtime.py": "c1322e4983b52a2046bee39e23498717095c7997804c8a49352a6f7869bcdbd9",
+    "skeleton/ai/agents/jeeves/app_capability_bridge.py": "24784a428d830095232d575ec7177f02dcb10422e14274459d3aa524bbf94580",
+    "skeleton/ai/agents/jeeves/core.py": "f8dfa6c5ee5d02d8703aeb64dabacc41c29b0fd79d74fcde5266dd9f22c28d28",
+    "skeleton/ai/agents/jeeves/game_console_assets.py": "eca3b1206286b34990ac80bc79eba56dc6b9bbcfa404afb79014f03c0683ad4f",
+    "skeleton/ai/agents/jeeves/game_console_build.py": "704556125be5a19e2b1b57219871f7dc717bf25778863f7f4f65a53d5eb4f71a",
+    "skeleton/ai/agents/jeeves/game_console_editor.py": "d5bbbaa4361a7cf291c07ba44d55915a1c0a13c177af091fe26c0a1434fdd187",
+    "skeleton/ai/agents/jeeves/game_console_simulation.py": "38160eb32ee88e543df087f67147faedf08c87a96f9a213af59197f8a928665f",
+    "skeleton/ai/agents/jeeves/game_desktop_export.py": "709e8583c77b7c8387f1b1f35e5c59bc1207601dade64a80d2799c8286e29355",
+    "skeleton/ai/agents/jeeves/game_emulator_catalog.py": "a7df09a67c49d0420b6a33d2762798644d37d0947f5359191f54973d49f09f02",
+    "skeleton/ai/agents/jeeves/game_emulator_host.py": "1406d46ab0cf31a8d10e1471471503c9b6f7a2eaa3e91b667261664a768a13b4",
+    "skeleton/ai/agents/jeeves/game_emulator_worker.py": "795e0bd394fcaab2e570585c6c9eb6765ffe8a94a17711411e8b67759a0fdf6f",
+    "skeleton/ai/agents/jeeves/game_learning_generation.py": "176614095cee3fc0318f7e05a7a5bbc6f03cfeb1df5cce1ec93ffe09f10f7cf5",
+    "skeleton/ai/agents/jeeves/game_learning_ingestion.py": "72f11103ad987fc7d021ae2d76eab84dd4eaed2e23decba21b9a236b07d2b8ff",
+    "skeleton/ai/agents/jeeves/game_learning_parallel.py": "696aaa951440b8f24a64369304c9dda176b5256c28c24ee7df7709ed8a0a63a6",
+    "skeleton/ai/agents/jeeves/game_studio_learning.py": "094d56aad8cb5ab7bdea72c19239a384abd730c097f5fd50ee1c17015cb56708",
+    "skeleton/ai/agents/jeeves/game_studio_tools.py": "c7fa4ce68782c703574e3f97305b357c12a8d4f9b4743d1684e3c3090a35e972",
+    "skeleton/ai/agents/jeeves/game_style_analysis.py": "c5f384806b4217c13be694c3f9d86d4d8b2c2b630766ed422d9a4af3d3574748",
+    "skeleton/ai/agents/jeeves/game_successor.py": "6459bf1028fcf57fa7f71439b9cd39cff9359a367fa620df8e5bbfa419365290",
+    "skeleton/ai/agents/jeeves/game_successor_assets.py": "7fc9fb87c6900ea55ed66858d86d18f28be1184146e3570aded6f4198489383e",
+    "skeleton/ai/agents/jeeves/game_successor_browser.py": "9aa97f506f3ae242fcb4cb0815d7dcd22297a6bd2e5753b3b689d72a9363ab6f",
+    "skeleton/ai/agents/jeeves/game_successor_native.py": "997b882ccb5aa8aa0795a0eb85e1cc787ba4303d5bff4520c8dda6d18eae4e17",
+    "skeleton/ai/agents/jeeves/game_successor_runtime.py": "29539b5ae368ff07fb932b86e99d3939d4ffa4f2b9ea9b3179274329adf18e5e",
+    "skeleton/ai/agents/jeeves/game_successor_world.py": "360fda5d3d8ad748a00013234be19369fe26de2d5ee79bdf1c476f07be1afd89",
+    "skeleton/ai/agents/jeeves/repository_file_atlas.py": "9f8119518a18d28efa4ee73670af93c29ffb1c75f7b0f9ece35a1f81b1134dfe",
+    "skeleton/ai/agents/jeeves/shadow_weight_bridge.py": "287fda6d5f84faf45defcd8e06029ca11dbb0c4f675f2e685a4e53058f86afb2",
+    "skeleton/ai/agents/jeeves/source_edit_gateway.py": "e3036bb8ddc550a52f624e4a6aa1779cae1ce7bef7cb51a81ebfe5fbd1f10929",
+    "skeleton/ai/agents/jeeves/source_read_gateway.py": "bc34675746c5200b9d444ce05593f2dfe889304fcdf0bedb68ccc105d22630f6",
+    "skeleton/jeeves/agent/tools.py": "60cd05ca99c923481b7ff85655a922312cdf4d6fa123c7dbde84c3e749b4c505",
+    "skeleton/jeeves/ai/creator_runbook_runtime.py": "c1322e4983b52a2046bee39e23498717095c7997804c8a49352a6f7869bcdbd9",
+    "skeleton/jeeves/app_capability_bridge.py": "24784a428d830095232d575ec7177f02dcb10422e14274459d3aa524bbf94580",
+    "skeleton/jeeves/core.py": "f8dfa6c5ee5d02d8703aeb64dabacc41c29b0fd79d74fcde5266dd9f22c28d28",
+    "skeleton/jeeves/game_console_assets.py": "eca3b1206286b34990ac80bc79eba56dc6b9bbcfa404afb79014f03c0683ad4f",
+    "skeleton/jeeves/game_console_build.py": "704556125be5a19e2b1b57219871f7dc717bf25778863f7f4f65a53d5eb4f71a",
+    "skeleton/jeeves/game_console_editor.py": "d5bbbaa4361a7cf291c07ba44d55915a1c0a13c177af091fe26c0a1434fdd187",
+    "skeleton/jeeves/game_console_simulation.py": "38160eb32ee88e543df087f67147faedf08c87a96f9a213af59197f8a928665f",
+    "skeleton/jeeves/game_desktop_export.py": "709e8583c77b7c8387f1b1f35e5c59bc1207601dade64a80d2799c8286e29355",
+    "skeleton/jeeves/game_emulator_catalog.py": "a7df09a67c49d0420b6a33d2762798644d37d0947f5359191f54973d49f09f02",
+    "skeleton/jeeves/game_emulator_host.py": "1406d46ab0cf31a8d10e1471471503c9b6f7a2eaa3e91b667261664a768a13b4",
+    "skeleton/jeeves/game_emulator_worker.py": "795e0bd394fcaab2e570585c6c9eb6765ffe8a94a17711411e8b67759a0fdf6f",
+    "skeleton/jeeves/game_learning_generation.py": "176614095cee3fc0318f7e05a7a5bbc6f03cfeb1df5cce1ec93ffe09f10f7cf5",
+    "skeleton/jeeves/game_learning_ingestion.py": "72f11103ad987fc7d021ae2d76eab84dd4eaed2e23decba21b9a236b07d2b8ff",
+    "skeleton/jeeves/game_learning_parallel.py": "696aaa951440b8f24a64369304c9dda176b5256c28c24ee7df7709ed8a0a63a6",
+    "skeleton/jeeves/game_studio_learning.py": "094d56aad8cb5ab7bdea72c19239a384abd730c097f5fd50ee1c17015cb56708",
+    "skeleton/jeeves/game_studio_tools.py": "c7fa4ce68782c703574e3f97305b357c12a8d4f9b4743d1684e3c3090a35e972",
+    "skeleton/jeeves/game_style_analysis.py": "c5f384806b4217c13be694c3f9d86d4d8b2c2b630766ed422d9a4af3d3574748",
+    "skeleton/jeeves/game_successor.py": "6459bf1028fcf57fa7f71439b9cd39cff9359a367fa620df8e5bbfa419365290",
+    "skeleton/jeeves/game_successor_assets.py": "7fc9fb87c6900ea55ed66858d86d18f28be1184146e3570aded6f4198489383e",
+    "skeleton/jeeves/game_successor_browser.py": "9aa97f506f3ae242fcb4cb0815d7dcd22297a6bd2e5753b3b689d72a9363ab6f",
+    "skeleton/jeeves/game_successor_native.py": "997b882ccb5aa8aa0795a0eb85e1cc787ba4303d5bff4520c8dda6d18eae4e17",
+    "skeleton/jeeves/game_successor_runtime.py": "29539b5ae368ff07fb932b86e99d3939d4ffa4f2b9ea9b3179274329adf18e5e",
+    "skeleton/jeeves/game_successor_world.py": "360fda5d3d8ad748a00013234be19369fe26de2d5ee79bdf1c476f07be1afd89",
+    "skeleton/jeeves/repository_file_atlas.py": "9f8119518a18d28efa4ee73670af93c29ffb1c75f7b0f9ece35a1f81b1134dfe",
+    "skeleton/jeeves/shadow_weight_bridge.py": "287fda6d5f84faf45defcd8e06029ca11dbb0c4f675f2e685a4e53058f86afb2",
+    "skeleton/jeeves/source_edit_gateway.py": "e3036bb8ddc550a52f624e4a6aa1779cae1ce7bef7cb51a81ebfe5fbd1f10929",
+    "skeleton/jeeves/source_read_gateway.py": "bc34675746c5200b9d444ce05593f2dfe889304fcdf0bedb68ccc105d22630f6"
+  },
+  "limitations": [
+    "Configured100000 rounds is not an executed stress workload",
+    "Dragon and adversarial reviews are executable numeric specialists, not fabricated LLM inference",
+    "Opaque native ROMs are playable through approved installed cores but full semantic game understanding and native rewriting are not inferred",
+    "169 editor profiles do not imply169 working native console builds",
+    "The native NES/GB bindings cover a bounded viewport/movement/collision/sprite/goal prototype; richer scene mechanics remain design/portable runtime capabilities",
+    "Bounded2D fidelity presets and iteration counts do not prove superiority over commercial originals",
+    "Existing auth/Mongo/storage/Dragon custody and approved tooling remain required"
+  ],
+  "canonical_jeeves_source_git_tree": "bd3d135bd3d3b01e034623bbe15c7b8baf1ed673",
+  "publication": "Source candidate for existing draft PR3816; no merge or production deployment",
+  "additional_eight_actor_learning": {
+    "algorithm": "frozen_batch_local_actor_q_v1",
+    "committed_episodes": 64,
+    "policy_digest": "6fb4cc996dffa96f9f94ced37d846574b0bea5b7544351743b9737985ec58e29",
+    "policy_file": "/workspace/scratch/jeeves-studio-eight-actor-policy.json",
+    "production_promotion": false,
+    "status": "candidate_trained",
+    "updates": 8192,
+    "workers": 8,
+    "policy_artifact_sha256": "39a25fbfe79b735cf7d5277b7099fe432bd567d10426a0565714554b48e6a5bd",
+    "peak_sampled_live_actor_processes": 6,
+    "process_sample_scope": "A late bounded sample observed6live actor processes; this is not asserted as the true peak.64 completed episodes from the8-worker job are recorded by the actual learner."
+  },
+  "advanced_continuation": {
+    "started_utc": "2026-10-14T06:54:57Z",
+    "source_freeze_utc": "2026-10-14T07:46:00Z",
+    "report": "docs/plan/JEEVES_STUDIO_ADVANCED_2026-10-14.md",
+    "automated_tests_run": false,
+    "production_promotion": false,
+    "masterplan_closure": false,
+    "scope": "Studio application, executable editors/artifacts/inspection/remembered improvement; no additional example games",
+    "capabilities": [
+      "Compiled artifact admission and actual approved-core user/AI play/training",
+      "Runtime-consumed bounded scene hierarchy/animation/event/variable graph",
+      "Actual32x32DMGscrolling kernel",
+      "Actual frame sequence Dragon numeric inspection",
+      "Paired multiseed objective/constraint campaign v2 and persisted UCB/counterexample curriculum",
+      "Durable recovery/quiescence/attempt journals and source-only championhandoff",
+      "Canonical EngineChat scoped goal planner plus strict real application execution"
+    ],
+    "actual_campaign_workloads": {
+      "multiobjective": {
+        "configured_rounds": 100000,
+        "actual_rounds": 6,
+        "actual_steps": 8064,
+        "actual_q_updates": 1152,
+        "heldout_seeds_per_partition": 3,
+        "checkpoint_cursor": 6,
+        "bandit_state": {
+          "adventure.melee_damage": {
+            "accepted": 0,
+            "reward_sum": -1.0,
+            "trials": 1
+          },
+          "farming.growth_days": {
+            "accepted": 0,
+            "reward_sum": -0.003854487683113941,
+            "trials": 1
+          },
+          "farming.season_days": {
+            "accepted": 0,
+            "reward_sum": -1.0,
+            "trials": 1
+          },
+          "farming.water_decay": {
+            "accepted": 0,
+            "reward_sum": -1.0,
+            "trials": 1
+          },
+          "fishing.cast_range": {
+            "accepted": 0,
+            "reward_sum": -1.0,
+            "trials": 1
+          },
+          "policy.continue": {
+            "accepted": 0,
+            "reward_sum": 0.0,
+            "trials": 1
+          }
+        },
+        "counterexamples_retained": 12,
+        "lesson_count": 24,
+        "snapshot_digest": "4e0ada0c1f798a3e2edbdea735481bb23636ace89281ea59ddb250bd984d217a",
+        "source_code_digest": "2e854ab3bdf7f395defd44e6ac502622eccb3181b7aa9a71fea0e3a9b9c0e160",
+        "elapsed_seconds": 68.9097726780019,
+        "automated_tests_run": false
+      },
+      "curriculum": {
+        "actual_rounds": 3,
+        "actual_steps": 2688,
+        "actual_parent_updates": 128,
+        "actual_candidate_updates": 384,
+        "actual_counterexample_training_episodes": 2,
+        "restored_cursor": 3,
+        "snapshot_digest": "b15e759c930e546e8f34fc21c9ec803b7c2c585381c446a28a16ff50ad2217bf",
+        "bandit_state": {
+          "policy.continue": {
+            "accepted": 0,
+            "reward_sum": -3.0,
+            "trials": 3
+          }
+        },
+        "render_readiness": "Reference command previews remain unavailable as PNG, so visual promotion fails closed",
+        "automated_tests_run": false,
+        "source_code_digest": "2e854ab3bdf7f395defd44e6ac502622eccb3181b7aa9a71fea0e3a9b9c0e160"
+      }
+    },
+    "campaign_totals": {
+      "rounds": 9,
+      "steps": 10752,
+      "candidate_q_updates": 1536,
+      "parent_q_updates": 512,
+      "accepted_candidates": 0,
+      "champions_retained": true
+    },
+    "native_scrolling": {
+      "target": "game_boy",
+      "rom_bytes": 32768,
+      "rom_sha256": "30dca61a66f1d9737984c184756bf9a94e1b983c5dcfbcd57c0e45e171d9c56d",
+      "actual_emulator_frames": 271,
+      "evidence_root": "/workspace/scratch/console-editor-scrolling-authoring"
+    },
+    "temporal_review": {
+      "actual_steps": 16,
+      "actual_frames": 9,
+      "report_bytes": 50551,
+      "path": "/workspace/scratch/studio-actual-review-final/review.json",
+      "review_digest": "799c6694095d30319c0cdd1cf52e1a6b33e93762358401e3039e3901cf5d0ef5",
+      "file_sha256": "9c5f4742f48ef32d638a54c2493e06768e790d8807ef6358e6f130917ddb92dc",
+      "reviewer_implementation_digest": "d998465fec8c1574e1d318f1d37c0d5a955006446816398cacac920d843b553d",
+      "matches_final_source": true
+    },
+    "application_schema_build": {
+      "operation_schemas": 27,
+      "openapi_paths": 15,
+      "request_schemas": 11,
+      "openapi": "/workspace/scratch/jeeves-studio-more-application-openapi.json",
+      "catalog": "/workspace/scratch/jeeves-studio-more-operation-catalog.json"
+    },
+    "frontend_production": {
+      "files": 292,
+      "bytes": 33373834,
+      "html_routes": 186,
+      "javascript_files": 67,
+      "root": "/workspace/scratch/jeeves-studio-app-web-advanced-final",
+      "bundle_sha256": "6d7e548a90af847d797d9731bdbc8d77b851fe3609859985f920d9e1755e6a12",
+      "zip": "/workspace/scratch/jeeves-studio-app-web-advanced-final.zip",
+      "zip_bytes": 9207333,
+      "zip_sha256": "1694ecba3e59f8f43d6dddf768171f2ec7705300ba8f4dca45bd708e96e0b636"
+    },
+    "source_sha256": {
+      "skeleton/jeeves/game_console_graph.py": "659513bc9ebdfcb4d2501c70169e0a2159b9144bbc6f1f47fd99d41016e23f3c",
+      "skeleton/jeeves/game_console_editor.py": "017f0ed4ac9ea2ee85ae2d7ce3a87ede0ea1cfcec29d55fb0c439f259ed53648",
+      "skeleton/jeeves/game_console_simulation.py": "0219ba014a89e73d4814b0cbd43ef12085ea12f1d44fc14149af7438efa834f8",
+      "skeleton/jeeves/game_studio_review.py": "fb6e3f86a2f111082db007edd6cf182cd29d0babbcf6bd996b6f6f6c6ecaa421",
+      "skeleton/jeeves/game_studio_learning.py": "2e854ab3bdf7f395defd44e6ac502622eccb3181b7aa9a71fea0e3a9b9c0e160",
+      "skeleton/jeeves/game_studio_tools.py": "a898847f9ee68c565f09598c9f1395bbbd56c69c3ea4363b92f55aa55691b3bf",
+      "backend/core/game_studio_agent.py": "5e240588f8a69144278ad4be41e62d0f594bbb5711e52fb61338b7c4f6a1d9bf",
+      "backend/core/game_studio_tools.py": "6c09ffbc03d3574e77271dbdfeb5645711615463b791f0de01bff798f038f5df",
+      "backend/core/game_console_build.py": "01c87c8d7b79c02a1961081778a7465e386e947c31cd4023035a97fd137d4dd5",
+      "backend/core/game_studio_learning.py": "026edbfcadd6c9674c7eddecf86cc4d4f44f8d3a043a1ddb180df931f51d847a",
+      "backend/core/game_learning.py": "80dfe6c2963fcc90e1263728d2e97ee85dc6a5651748647cce63462e0a8695cd"
+    },
+    "unverified": [
+      "Hosted model execution",
+      "Authenticated Mongo/API end-to-end",
+      "100000-round stress workload",
+      "Every-console/title compatibility",
+      "Subjective quality/original superiority"
+    ],
+    "final_source_checks": {
+      "whole_provider_bootstrap": "pass",
+      "supplemental_changed_python": "/workspace/scratch/jeeves-studio-more-source-validation.json",
+      "canonical_mirror_mismatches": [],
+      "architecture_construction_capability_interfaces": "pass",
+      "enterprise_source_validators": "pass",
+      "python_ruff_black_compilation": "pass",
+      "typescript_eslint": "pass",
+      "production_export": "pass",
+      "automated_tests_run": false,
+      "changed_python_files": 27,
+      "changed_python_status": "pass"
+    }
+  }
+}

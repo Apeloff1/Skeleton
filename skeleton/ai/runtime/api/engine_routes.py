@@ -314,6 +314,40 @@ def _raise_engine_error(exc: Exception) -> None:
     raise exc
 
 
+@router.get("/providers")
+def provider_status(
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+    coordinator=Depends(_engine_coordinator),
+) -> dict[str, Any]:
+    """Expose engine-owned provider identity to the authenticated application."""
+    principal = _verified_service_principal(request, service_token)
+    try:
+        grant = service.authorities.grant_for(principal)
+    except EngineAuthorityError as exc:
+        raise HTTPException(status_code=403, detail="engine provider authority denied") from exc
+    if "engine:read" not in grant.scopes:
+        raise HTTPException(status_code=403, detail="engine provider read scope denied")
+    if coordinator is None:
+        raise HTTPException(status_code=503, detail="engine provider runtime unavailable")
+    registry = coordinator.provider_registry
+    providers = []
+    for raw in registry.statuses():
+        row = {key: raw[key] for key in (
+            "id", "model", "available", "execution_mode", "network_policy",
+        ) if key in raw}
+        artifact = raw.get("artifact")
+        if isinstance(artifact, dict):
+            row["artifact"] = {key: artifact[key] for key in (
+                "schema", "model_id", "model_digest", "artifact_sha256",
+                "artifact_bytes", "reference",
+            ) if key in artifact}
+        providers.append(row)
+    return {"active": registry.active_id, "available": registry.available,
+            "providers": providers}
+
+
 @router.post("/executions", status_code=status.HTTP_202_ACCEPTED)
 async def submit_execution(
     body: EngineSubmitBody,

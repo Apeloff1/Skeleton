@@ -25,6 +25,8 @@ export default function Dashboard() {
   const [todayEvents, setTodayEvents] = useState<any[]>([]);
   const [continueReading, setContinueReading] = useState<any[]>([]);
   const [recentBuilds, setRecentBuilds] = useState<any[]>([]);
+  const [greeting, setGreeting] = useState(greetings[0]);
+  useEffect(() => { setGreeting(greetings[Math.floor(Math.random() * greetings.length)]); }, []);
   /** Per-fetch loading + error so dashboard cards can self-skeleton / self-retry. */
   const [readingState, setReadingState] = useState<'idle' | 'loading' | 'error' | 'ok'>('loading');
   const [buildsState, setBuildsState] = useState<'idle' | 'loading' | 'error' | 'ok'>('loading');
@@ -61,7 +63,6 @@ export default function Dashboard() {
   }, []);
   useEffect(() => { loadBuilds(); }, [loadBuilds]);
 
-  const greeting = greetings[Math.floor(Math.random() * greetings.length)];
   const xp = user.stats.total_xp;
   const level = Math.floor(Math.sqrt(xp / 100)) + 1;
   const xpToNext = (level * level) * 100;

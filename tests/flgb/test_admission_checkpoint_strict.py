@@ -205,6 +205,8 @@ class TestStrictSchedulerRestore(unittest.TestCase):
 
 
 class TestRetainedKVIdentitySafety(unittest.TestCase):
+    sign = staticmethod(TestStrictSchedulerRestore.sign)
+
     @staticmethod
     def build():
         limits = AdmissionLimits(

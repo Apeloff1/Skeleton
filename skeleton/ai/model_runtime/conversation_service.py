@@ -30,7 +30,11 @@ class SessionRecord:
     pinned: bool
 
     def to_dict(self) -> dict[str, Any]:
-        return dict(vars(self))
+        # The frozen slots-backed session record has no __dict__.
+        return {"session_id": self.session_id, "created_at": self.created_at,
+                "updated_at": self.updated_at, "revision": self.revision,
+                "turns": self.turns, "context_tokens": self.context_tokens,
+                "pinned": self.pinned}
 
 
 @dataclass(frozen=True)
@@ -112,6 +116,11 @@ class NativeConversationService:
     def count(self) -> int:
         with self._lock:
             return len(self._sessions)
+
+    def can_admit(self) -> bool:
+        """Use the same capacity boundary for creation and durable reattachment."""
+        with self._lock:
+            return len(self._sessions) < self.max_sessions
 
     def list_sessions(self) -> tuple[SessionRecord, ...]:
         with self._lock:

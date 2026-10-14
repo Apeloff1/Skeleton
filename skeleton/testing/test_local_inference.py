@@ -458,3 +458,226 @@ def test_reference_model_artifact_rejects_unknown_transition_row_fields() -> Non
 
     with pytest.raises(ValueError,match="contains unsupported key"):
         ReferenceNGramModel.from_dict(payload)
+
+
+async def _wait_for_signal(signal: threading.Event) -> None:
+    async def wait():
+        while not signal.is_set():
+            await asyncio.sleep(0)
+    await asyncio.wait_for(wait(), timeout=2)
+
+
+def _lifecycle_engine(runner) -> LocalInferenceEngine:
+    return LocalInferenceEngine(
+        CallableLocalModel(model_id="lifecycle", model_digest="a" * 64, runner=runner),
+        cache_size=0,
+    )
+
+
+def _lifecycle_result() -> LocalInferenceResult:
+    return LocalInferenceResult(
+        text="finished", model_id="lifecycle", model_digest="a" * 64,
+        input_tokens=1, output_tokens=1,
+    )
+
+
+@pytest.mark.asyncio
+async def test_batch_failure_waits_for_other_native_workers() -> None:
+    started, release, stopped = (threading.Event() for _ in range(3))
+
+    def run(request, cancel):
+        if request.prompt == "fail":
+            assert started.wait(2)
+            raise ValueError("request failed")
+        started.set()
+        try:
+            assert release.wait(2)
+            return _lifecycle_result()
+        finally:
+            stopped.set()
+
+    engine = _lifecycle_engine(run)
+    batch = asyncio.create_task(engine.generate_many((
+        LocalInferenceRequest(prompt="slow"), LocalInferenceRequest(prompt="fail"),
+    )))
+    try:
+        await _wait_for_signal(started)
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(asyncio.shield(batch), timeout=0.05)
+    finally:
+        release.set()
+        with pytest.raises(ValueError, match="request failed"):
+            await batch
+    assert stopped.is_set()
+
+
+@pytest.mark.asyncio
+async def test_scheduler_failure_isolated_to_its_request() -> None:
+    def run(request, cancel):
+        if request.prompt == "fail":
+            raise ValueError("request failed")
+        return _lifecycle_result()
+
+    scheduler = LocalInferenceScheduler(_lifecycle_engine(run), batch_window_ms=20)
+    try:
+        failed, succeeded = await asyncio.gather(
+            scheduler.submit(LocalInferenceRequest(prompt="fail")),
+            scheduler.submit(LocalInferenceRequest(prompt="ok")),
+            return_exceptions=True,
+        )
+    finally:
+        await scheduler.close()
+    assert isinstance(failed, ValueError)
+    assert isinstance(succeeded, LocalInferenceResult)
+    assert succeeded.text == "finished"
+
+
+@pytest.mark.asyncio
+async def test_scheduler_cancellation_stops_active_native_worker() -> None:
+    started, stopped = threading.Event(), threading.Event()
+
+    def run(request, cancel):
+        started.set()
+        try:
+            assert cancel.wait(2), "scheduler did not propagate cancellation"
+            return _lifecycle_result()
+        finally:
+            stopped.set()
+
+    scheduler = LocalInferenceScheduler(_lifecycle_engine(run), batch_window_ms=0)
+    submitted = asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt="cancel")))
+    try:
+        await _wait_for_signal(started)
+        submitted.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await submitted
+        assert stopped.is_set(), "cancellation returned before native worker stopped"
+    finally:
+        await scheduler.close()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_close_callers_wait_for_native_worker() -> None:
+    started, release, stopped = (threading.Event() for _ in range(3))
+
+    def run(request, cancel):
+        started.set()
+        try:
+            assert release.wait(2)
+            return _lifecycle_result()
+        finally:
+            stopped.set()
+
+    scheduler = LocalInferenceScheduler(_lifecycle_engine(run), batch_window_ms=0)
+    submitted = asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt="slow")))
+    await _wait_for_signal(started)
+    first = asyncio.create_task(scheduler.close())
+    await asyncio.sleep(0)
+    second = asyncio.create_task(scheduler.close())
+    try:
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(asyncio.shield(second), timeout=0.05)
+    finally:
+        release.set()
+        await asyncio.gather(first, second, submitted)
+    assert stopped.is_set()
+
+
+@pytest.mark.asyncio
+async def test_saturated_scheduler_drains_admitted_requests_before_close() -> None:
+    started, release = threading.Event(), threading.Event()
+
+    def run(request, cancel):
+        started.set()
+        assert release.wait(3)
+        return _lifecycle_result()
+
+    scheduler = LocalInferenceScheduler(
+        _lifecycle_engine(run), max_batch_size=1, batch_window_ms=0,
+    )
+    first = asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt="first")))
+    await _wait_for_signal(started)
+    pending = [asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt=str(i))))
+               for i in range(34)]
+    async def wait_for_pressure():
+        while not scheduler._queue.full() or not scheduler._admission_lock.locked():
+            await asyncio.sleep(0)
+    await asyncio.wait_for(wait_for_pressure(), timeout=1)
+    closing = asyncio.create_task(scheduler.close())
+    await asyncio.sleep(0)
+    release.set()
+    await asyncio.wait_for(closing, timeout=2)
+    results = await asyncio.wait_for(
+        asyncio.gather(first, *pending, return_exceptions=True), timeout=2,
+    )
+    assert sum(isinstance(result, LocalInferenceResult) for result in results) == 34
+    assert isinstance(results[-1], RuntimeError)
+    assert str(results[-1]) == "local inference scheduler is closed"
+    assert scheduler._queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_close_keeps_shared_shutdown_owned() -> None:
+    started, release, stopped = (threading.Event() for _ in range(3))
+
+    def run(request, cancel):
+        started.set()
+        try:
+            assert release.wait(3)
+            return _lifecycle_result()
+        finally:
+            stopped.set()
+
+    scheduler = LocalInferenceScheduler(_lifecycle_engine(run), batch_window_ms=0)
+    submitted = asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt="slow")))
+    await _wait_for_signal(started)
+    closing = asyncio.create_task(scheduler.close())
+    await asyncio.sleep(0)
+    closing.cancel()
+    await asyncio.sleep(0)
+    closing.cancel()
+    await asyncio.sleep(0)
+    assert not closing.done()
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(closing, timeout=2)
+    await scheduler.close()
+    assert stopped.is_set()
+    assert (await submitted).text == "finished"
+    with pytest.raises(RuntimeError, match="closed"):
+        await scheduler.submit(LocalInferenceRequest(prompt="too late"))
+
+
+@pytest.mark.asyncio
+async def test_cancelled_batch_drains_every_native_worker() -> None:
+    started = [threading.Event(), threading.Event()]
+    stopped = [threading.Event(), threading.Event()]
+
+    def run(request, cancel):
+        index = int(request.prompt)
+        started[index].set()
+        try:
+            assert cancel.wait(2)
+            return _lifecycle_result()
+        finally:
+            stopped[index].set()
+
+    # The helper defaults to one native slot. This regression requires both
+    # workers to start before cancellation; explicitly provision two slots
+    # rather than waiting forever for an impossible second admission.
+    engine = LocalInferenceEngine(
+        CallableLocalModel(
+            model_id="lifecycle", model_digest="a" * 64, runner=run,
+        ),
+        cache_size=0,
+        max_concurrency=2,
+    )
+    batch = asyncio.create_task(engine.generate_many(tuple(
+        LocalInferenceRequest(prompt=str(i)) for i in range(2)
+    )))
+    for signal in started:
+        await _wait_for_signal(signal)
+    batch.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await batch
+    assert all(signal.is_set() for signal in stopped)

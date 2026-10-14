@@ -52,7 +52,8 @@ def digest_video_inspiration(
         or type(source_url) is not str or not source_url.startswith("https://")
         or len(source_url)>2048 or type(transcript) is not tuple
         or type(descriptions) is not tuple or not isinstance(source_frames,FrameBatch)
-        or not 1<=max_notes<=128 or len(descriptions)>max_notes
+        or type(max_notes) is not int or not 1<=max_notes<=128
+        or not 1<=len(descriptions)<=max_notes or len(transcript)>10_000
         or not isinstance(decoded_visual,VisualFeatureBatch)
         or not HEX.fullmatch(decoded_visual.observation_fingerprint)
         or not HEX.fullmatch(decoded_visual.source_batch_fingerprint)):
@@ -60,6 +61,11 @@ def digest_video_inspiration(
     if (decoded_visual.source_batch_fingerprint!=source_frames.batch_fingerprint
         or not 1<=len(source_frames.frames)<=512):
         raise ValueError("visual features not bound to original source frames")
+    # Require a normalized secure source URL, not the HTTPS scheme alone.
+    from urllib.parse import urlsplit
+    parsed=urlsplit(source_url)
+    if not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
+        raise ValueError("canonical video source URL required")
     frame_digests={f.frame_id:f.frame_digest for f in source_frames.frames}
     if (len(frame_digests)!=len(source_frames.frames)
         or any(not HEX.fullmatch(digest) for digest in frame_digests.values())):

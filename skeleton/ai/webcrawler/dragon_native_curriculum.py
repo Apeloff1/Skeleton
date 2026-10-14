@@ -55,17 +55,21 @@ MILESTONES=(
   CurriculumMilestone("gb_input","game_boy","arcade_score_attack",(),
                        "D-pad game logic and SM83 sprites",100,"handheld_8bit"),
   CurriculumMilestone("gb_platforms","game_boy","side_scrolling_platformer",
-                       ("game_boy",),"scrolling camera and jump physics",95,"handheld_8bit"),
+                       ("game_boy",),"scrolling camera and jump physics",104,"handheld_8bit"),
   CurriculumMilestone("nes_chase","nes","arcade_score_attack",
                        ("game_boy",),"6502 CPU and NES CHR graphics",94,"cartridge_8bit"),
   CurriculumMilestone("gbc_palette","game_boy_color","arcade_score_attack",
                        ("game_boy",),"CGB palette RAM and color-only ROM",93,"handheld_8bit"),
+  CurriculumMilestone("lynx_handheld","lynx","arcade_score_attack",
+                       ("game_boy","nes"),"65C02 Lynx Suzy sprite engine and native cart header",86,"handheld_8bit"),
   CurriculumMilestone("c64_legacy","commodore_64","arcade_score_attack",
                        ("nes",),"VIC-II, CIA and SID platform input",85,"classic_computer"),
   CurriculumMilestone("sms_palette","master_system","arcade_score_attack",
                        ("nes",),"Z80 VRAM sprites and Sega VDP",83,"cartridge_8bit"),
   CurriculumMilestone("gg_handheld","game_gear","arcade_score_attack",
                        ("game_boy_color",),"handheld VDP and 12-bit CRAM",82,"handheld_8bit"),
+  CurriculumMilestone("lynx_native","lynx","arcade_score_attack",
+                       ("game_boy","nes"),"65C02 Lynx cartridge, input and display basics",80,"handheld_8bit"),
   CurriculumMilestone("gba_native","game_boy_advance","arcade_score_attack",
                        ("game_boy_color",),"ARM framebuffer and native 4bpp art",79,"handheld_32bit"),
   CurriculumMilestone("genesis_vdp","genesis","arcade_score_attack",
@@ -121,6 +125,11 @@ class DragonNativeCurriculum:
         successes=Counter(x.target for x in proofs)
         recommendations=[];blocked=[]
         for step in MILESTONES:
+            # Once the source-bound Game Boy ROM receipt is present, move
+            # the companion into new mechanic acquisition instead of
+            # recommending another entry-level arcade reskin.
+            if step.milestone_id=="gb_input" and "game_boy" in built:
+                continue
             unmet=tuple(x for x in step.requires if x not in built)
             if unmet:
                 blocked.append({
@@ -134,7 +143,10 @@ class DragonNativeCurriculum:
                 continue
             # Prefer a genuinely new capability over farming 8 near-duplicates.
             score=step.weight-16*count
-            if step.target in built:score-=8
+            # A new genre/mechanic on proven hardware is a new capability,
+            # not an eight-point repeat penalty. Only penalize a previously
+            # attempted target+genre; existing count penalty still applies.
+            if step.target in built and count > 0:score-=8
             recommendations.append(CurriculumRecommendation(
                 step.target,step.genre,step.milestone_id,
                 ("New hardware/genre acquisition" if count==0 else

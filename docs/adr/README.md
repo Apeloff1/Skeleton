@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-<!-- machine-git-blob: machine/adr_index.json@b713a5e03d4a4f525066b608bd6d4c88622cc166 -->
+<!-- machine-git-blob: machine/adr_index.json@3e0c82eb09187f40b4a31193714803f89c7ab920 -->
 
 Machine index: `machine/adr_index.json`
 

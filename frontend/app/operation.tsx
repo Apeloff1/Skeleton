@@ -32,7 +32,9 @@ export default function OperationRoute() {
   const [result, setResult] = useState<string | null>(null);
   const [queueCount, setQueueCount] = useState<number | null>(null);
 
-  if (!capability || !action) {
+  // Deep links are untrusted: navigation-only entries must never be sent to
+  // the governed operation admission endpoint.
+  if (!capability || !action || typeof action.operation !== 'string') {
     return <SafeAreaView style={styles.safe}><View style={styles.center}><Text style={styles.title}>Unknown operation</Text></View></SafeAreaView>;
   }
 

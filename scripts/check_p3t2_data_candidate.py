@@ -128,11 +128,19 @@ def validate(root=ROOT, head=None):
             raise DataCandidateError(f"{key} missing")
         module = MODULES[key]
         test = TESTS[key]
-        if (
-            volume.get("completion_checkbox") is not False
-            or volume.get("implementation_status") == "verified"
-        ):
-            raise DataCandidateError(f"{key} completion drift")
+        # The P3-T2 candidate never signs its owner or promotes itself.
+        # Independently verified masterplan volumes can legitimately predate
+        # this candidate's exact-head qualification.
+        signed = volume.get("completion_checkbox")
+        verified = volume.get("implementation_status") == "verified"
+        if signed is True:
+            if not verified or volume.get("completion_checkbox_mark") != "[x]" or volume.get("gaps"):
+                raise DataCandidateError(f"{key} inconsistent independent signoff")
+        elif signed is False:
+            if verified or volume.get("completion_checkbox_mark") != "[ ]":
+                raise DataCandidateError(f"{key} unsigned volume claims verification")
+        else:
+            raise DataCandidateError(f"{key} invalid completion checkbox")
         if (
             module not in volume.get("implementation_paths", [])
             or test not in volume.get("tests", [])

@@ -80,9 +80,9 @@ def test_stale_taste_rejected():
     forge = DragonGameForge()
     profile = taste()
     spec = forge.propose(profile, constraints(), authorized=True)
-    with pytest.raises(ValueError, match="stale"):
+    with pytest.raises(ValueError, match="taste profile review receipt invalid"):
         forge.evaluate(
-            spec, replace(profile, fingerprint="f" * 64), authorized=True,
+            spec, replace(profile, fingerprint="different"), authorized=True,
         )
 
 

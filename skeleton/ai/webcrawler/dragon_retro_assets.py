@@ -101,11 +101,11 @@ def enrich_gb_asm(source:str) -> str:
     source,n=re.subn(r"(?s)Tiles:\n.*?\nTilesEnd:",lambda _:gb_assembly(),source)
     if n!=1:
         raise ValueError("GB tile section missing")
-    # Source generators use both 'ld [DRAGON_OAM+2],a' and 'ld [DRAGON_OAM+2], a'.
+    # Source generators use both 'ld [OAM+2],a' and 'ld [OAM+2], a'.
     # Parse the SM83 instruction boundary, not incidental whitespace.
     pattern=(r"(?m)^    xor a\s*\n"
-             r"    ld \[DRAGON_OAM\+2\],\s*a\s*\n"
-             r"    ld \[DRAGON_OAM\+3\],\s*a$")
+             r"    ld \[OAM\+2\],\s*a\s*\n"
+             r"    ld \[OAM\+3\],\s*a$")
     after="""    ld hl, AnimFrame
     inc [hl]
     ld a, [hl]
@@ -116,12 +116,9 @@ def enrich_gb_asm(source:str) -> str:
 .idle:
     xor a
 .paint:
-    ld [DRAGON_OAM+2], a
+    ld [OAM+2], a
     xor a
-    ld [DRAGON_OAM+3], a"""
-    # A single replacement alone would silently accept a second forged anchor.
-    if len(re.findall(pattern,source))!=1:
-        raise ValueError("GB sprite update anchor unavailable")
+    ld [OAM+3], a"""
     source,count=re.subn(pattern,lambda _:after,source,count=1)
     if count!=1:
         raise ValueError("GB sprite update anchor unavailable")
@@ -132,12 +129,9 @@ def enrich_gb_asm(source:str) -> str:
         raise ValueError("GB boot sequence missing")
     source=source.replace("    ld a, 48\n    ld [PlayerX], a",
                           "    xor a\n    ld [AnimFrame], a\n    ld a, 48\n    ld [PlayerX], a",1)
-    star_pattern=r"(?m)^    ld a,\s*1\n    ld \[DRAGON_OAM\+6\],\s*a$"
-    if len(re.findall(star_pattern,source))!=1:
-        raise ValueError("GB collectible sprite declaration missing")
     source,count=re.subn(
-        star_pattern,
-        "    ld a, 4\n    ld [DRAGON_OAM+6], a",source,count=1)
+        r"(?m)^    ld a,\s*1\n    ld \[OAM\+6\],\s*a$",
+        "    ld a, 4\n    ld [OAM+6], a",source,count=1)
     if count!=1:
         raise ValueError("GB collectible sprite declaration missing")
     return source

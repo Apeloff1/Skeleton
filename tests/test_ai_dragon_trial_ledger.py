@@ -57,8 +57,11 @@ def test_incomplete_outcomes_do_not_verify_protocol():
 def test_independent_design_evidence_enables_causal_eligibility():
  seed="1"*64
  l=DragonTrialLedger(sqlite3.connect(":memory:"))
+ # A genuinely randomized 20-trial split may have fewer than ten samples
+ # in one arm. Provide enough independently allocated trials to meet the
+ # analyzer's predeclared per-arm evidence floor without relaxing it.
  a=tuple(TrialAssignment(f"t{i}",expected_randomized_intervention(f"t{i}",seed),
-  "ctx",f"s{i%2}") for i in range(40))
+  "ctx",f"s{i%2}") for i in range(64))
  assert {x.intervention for x in a}=={False,True}
  p=l.preregister("u",hypothesis_id="h",mechanic="jump",assignments=a,
   outcome_definition="binary displacement threshold",registered_at=10,authorized=True)

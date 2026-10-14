@@ -69,6 +69,16 @@ class NativeRuntimeLocalModel:
     def tokenizer_digest(self) -> str:
         return self.runtime.tokenizer.digest
 
+    @property
+    def execution_profile_digest(self) -> str:
+        return hashlib.sha256(self._stable_json({
+            "schema": "skeleton.native.execution-profile.v1",
+            "runtime": self._runtime_digest,
+            "device": self.runtime.device.to_dict(),
+            "device_policy": self.runtime.device_policy.to_dict(),
+            "limits": self.runtime.limits.to_dict(),
+        }).encode("utf-8")).hexdigest()
+
     def assert_identity(self) -> None:
         """Reject mutable weight/tokenizer/runtime drift before cache or inference."""
         self.runtime.assert_model_unchanged()
@@ -142,7 +152,7 @@ class NativeRuntimeLocalModel:
             )
         except NativeRuntimeBackendError:
             raise
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, RecursionError) as exc:
             raise NativeRuntimeBackendError(
                 "native local protocol output is not valid JSON"
             ) from exc
@@ -284,6 +294,8 @@ class NativeRuntimeLocalModel:
                         raise NativeRuntimeBackendError(
                             "native local tool call has invalid fields"
                         )
+                    if not isinstance(raw_call["call_id"], str) or not isinstance(raw_call["tool_id"], str):
+                        raise NativeRuntimeBackendError("native tool identifiers must be strings")
                     call_id = str(raw_call.get("call_id", "")).strip()
                     tool_id = str(raw_call.get("tool_id", "")).strip()
                     arguments = raw_call.get("arguments", {})
@@ -398,6 +410,7 @@ class NativeRuntimeLocalModel:
 
         self.assert_identity()
         started = time.perf_counter()
+        eos_id = self.runtime.tokenizer.special_token_id("eos")
         config = GenerationConfig(
             max_new_tokens=request.max_output_tokens,
             seed=request.seed,
@@ -405,16 +418,20 @@ class NativeRuntimeLocalModel:
             top_k=0,
             top_p=1.0,
             use_cache=True,
+            stop_token_ids=() if eos_id is None else (eos_id,),
+            stop_strings=request.stop,
+            include_stop_tokens=False,
         )
+
+        def interrupt() -> None:
+            if cancel.is_set():
+                raise LocalInferenceCancelled("native local inference cancelled")
 
         try:
             rendered_input = self._render_prompt(request)
-            stream = self.runtime.stream(rendered_input, config)
-            for _event in stream:
-                if cancel.is_set():
-                    raise LocalInferenceCancelled(
-                        "native local inference cancelled"
-                    )
+            with self.runtime.stream(rendered_input, config, interrupt=interrupt) as stream:
+                for _event in stream:
+                    interrupt()
             result = stream.result
             if result is None:
                 raise NativeRuntimeBackendError(
@@ -429,11 +446,15 @@ class NativeRuntimeLocalModel:
 
         self.assert_identity()
         raw_text, stop_hit = self._truncate_stop(result.text, request.stop)
-        if not raw_text:
+        stop_hit = stop_hit or result.finish_reason in {"stop_token", "stop_string"}
+        if not raw_text and not stop_hit:
             # Preserve generated model material instead of inventing an answer.
             raw_text = " ".join(result.generated_tokens).strip()
         if not raw_text:
-            raise NativeRuntimeBackendError("native runtime generated no output")
+            raise NativeRuntimeBackendError(
+                "native runtime stopped before visible output" if stop_hit
+                else "native runtime generated no output"
+            )
 
         text, tool_calls, structured, parsed_finish = self._parse_output(
             raw_text,
@@ -441,7 +462,7 @@ class NativeRuntimeLocalModel:
         )
         if tool_calls:
             finish_reason = "tool_calls"
-        elif stop_hit or result.finish_reason in {"completed", "stop_token"}:
+        elif stop_hit or result.finish_reason in {"completed", "stop_token", "stop_string"}:
             finish_reason = "completed"
         elif parsed_finish == "completed":
             finish_reason = "length"

@@ -17,10 +17,19 @@ from typing import Callable
 from .flgb_model_runtime import LocalModelReceipt, LocalModelRequest, ModelIdentity, digest_json
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
 from .runtime_contracts import GenerationConfig, RuntimeContractError, RuntimeEvent
+from .tokenization import TokenizerContractError
 
 
 class NativeServiceError(RuntimeContractError):
     """Fail-closed native serving boundary violation."""
+
+
+class _ExecutionInterrupted(Exception):
+    """Internal control flow; never a model failure or a completed generation."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 class CancellationToken:
@@ -220,9 +229,9 @@ class NativeModelService:
     ) -> NativeServiceResult:
         """Execute one bounded local inference operation.
 
-        Cancellation/deadline checks run before execution and between emitted
-        runtime events. A transformer kernel invocation remains one bounded
-        atomic step; this service does not attempt unsafe thread interruption.
+        Cancellation/deadline checks run before execution, between events,
+        between transformer layers, and between configured Torch prefill
+        chunks. Individual kernels remain atomic; threads are not terminated.
         """
         if not isinstance(request, LocalModelRequest):
             raise NativeServiceError("LocalModelRequest required")
@@ -250,8 +259,16 @@ class NativeModelService:
                 events=events,
             )
 
+        stream = None
+
+        def interrupt() -> None:
+            if token.cancelled:
+                raise _ExecutionInterrupted("cancelled")
+            if self._now_ns() >= deadline_ns:
+                raise _ExecutionInterrupted("deadline")
+
         try:
-            stream = self.runtime.stream(prompt, config)
+            stream = self.runtime.stream(prompt, config, interrupt=interrupt)
             for event in stream:
                 events.append(event)
                 if token.cancelled:
@@ -261,7 +278,11 @@ class NativeModelService:
                         terminal_reason="cancelled",
                         events=events,
                     )
-                if self._now_ns() >= deadline_ns:
+                # Admission and prompt are one non-output envelope. Preserve
+                # both immutable evidence events once admitted; a deadline
+                # between them still prevents model execution because the
+                # runtime checks interrupt() before the next decoding step.
+                if event.kind != "admitted" and self._now_ns() >= deadline_ns:
                     return self._terminal(
                         request,
                         prompt=prompt,
@@ -271,6 +292,11 @@ class NativeModelService:
             generation = stream.result
             if generation is None:
                 raise NativeServiceError("native runtime completed without generation result")
+            interrupt()
+        except _ExecutionInterrupted as exc:
+            return self._terminal(
+                request, prompt=prompt, terminal_reason=exc.reason, events=events,
+            )
         except (RuntimeContractError, TokenizerContractError):
             return self._terminal(
                 request,
@@ -278,6 +304,13 @@ class NativeModelService:
                 terminal_reason="model_error",
                 events=events,
             )
+        finally:
+            # Every terminal path must close a partially consumed generator,
+            # releasing attention caches and preventing stale model frames.
+            if stream is not None:
+                close = getattr(stream, "close", None)
+                if close is not None:
+                    close()
 
         receipt = LocalModelReceipt(
             operation_id=request.operation_id,

@@ -11,40 +11,37 @@ const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yarn-audit-policy-'));
 
 function assertBraceExpansionResolutionLock() {
   const frontendRoot = path.resolve(__dirname, '..');
-  const packageJson = JSON.parse(
-    fs.readFileSync(path.join(frontendRoot, 'package.json'), 'utf8'),
-  );
   const lock = fs.readFileSync(path.join(frontendRoot, 'yarn.lock'), 'utf8');
-  const expectedVersion = '1.1.21';
-  const expectedIntegrity =
-    'sha512-9zeA+KLZNNzglF2TPKRQEDyx6Yby7daAkuy8MiPzpXPsYDWi/DRM8jmwUDxokQjYqBpv5DgPiwD4h4ZZSy1Ujw==';
-
-  assert.strictEqual(
-    packageJson.resolutions['**/minimatch/brace-expansion'],
-    expectedVersion,
-    'brace-expansion resolution must stay on the reviewed patched release',
-  );
-
-  const selector =
-    'brace-expansion@1.1.21, brace-expansion@^1.1.7, brace-expansion@^2.0.2, brace-expansion@^5.0.5:';
-  const start = lock.indexOf(selector);
-  assert.notStrictEqual(start, -1, 'brace-expansion lock selector missing');
-  const nextEntry = lock.indexOf('\n\n', start);
-  const block = lock.slice(start, nextEntry === -1 ? undefined : nextEntry);
-
-  assert.match(block, /version "1\.1\.21"/);
-  assert.match(
-    block,
-    /resolved "https:\/\/registry\.yarnpkg\.com\/brace-expansion\/-\/brace-expansion-1\.1\.21\.tgz"/,
-  );
-  assert.ok(
-    block.includes(`integrity ${expectedIntegrity}`),
-    'brace-expansion lock integrity must match the reviewed 1.1.21 artifact',
-  );
-  assert.ok(
-    !block.includes('brace-expansion-1.1.20.tgz') && !block.includes('version "1.1.20"'),
-    'brace-expansion lock must not silently retain the vulnerable 1.1.20 payload',
-  );
+  // CVE-2026-102277 has separate fixed releases for each supported major.
+  // Never collapse the 2.x/5.x consumers onto the incompatible 1.x API.
+  const reviewed = [
+    {
+      selector: 'brace-expansion@^1.1.7',
+      version: '1.1.21',
+      integrity: 'sha512-9zeA+KLZNNzglF2TPKRQEDyx6Yby7daAkuy8MiPzpXPsYDWi/DRM8jmwUDxokQjYqBpv5DgPiwD4h4ZZSy1Ujw==',
+    },
+    {
+      selector: 'brace-expansion@^2.0.2',
+      version: '2.1.7',
+      integrity: 'sha512-uZbew1NqdmPDTMJ8ah1y+b+9QEJrfkXFk3RcTQw3X0jW/xRUvFKsg1CfQdSYGdTbXZWExtU3J3ccxtnfw1Fi0g==',
+    },
+    {
+      selector: 'brace-expansion@^5.0.5',
+      version: '5.0.12',
+      integrity: 'sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==',
+    },
+  ];
+  const blocks = lock.split(/\n\n+/).filter((entry) => /^brace-expansion@/.test(entry));
+  assert.strictEqual(blocks.length, reviewed.length, 'unexpected brace-expansion lock entry');
+  for (const { selector, version, integrity } of reviewed) {
+    const entry = blocks.find((block) => block.startsWith(selector + ':\n'));
+    assert.ok(entry, `required brace-expansion lock selector missing: ${selector}`);
+    assert.ok(entry.includes(`  version "${version}"\n`), `unreviewed brace-expansion version for ${selector}`);
+    assert.ok(entry.includes(`resolved "https://registry.yarnpkg.com/brace-expansion/-/brace-expansion-${version}.tgz`),
+      `unreviewed brace-expansion artifact for ${selector}`);
+    assert.ok(entry.includes(`integrity ${integrity}`),
+      `brace-expansion integrity mismatch for ${selector}`);
+  }
 }
 
 const advisory = ({ module, severity, ghsa, title = 'fixture advisory' }) => ({

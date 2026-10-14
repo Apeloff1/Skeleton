@@ -12,6 +12,7 @@ class DragonLiveHardware:
     def sample(self) -> HardwareSample:
         profile = self.probe.profile()
         state = self.probe.read_state()
+        # Only live measured memory, never a platform default, permits work.
         verified = state.memory_sample_verified is True
         pressure = max(state.cpu_load, state.memory_pressure, state.swap_pressure)
         if not isfinite(pressure) or not 0 <= pressure <= 1:

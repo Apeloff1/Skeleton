@@ -1,0 +1,2468 @@
+{
+  "schema": "skeleton.draft_conflict_reconciliation.v1",
+  "pull_request": 3605,
+  "original_head": "e5f9e0cd4783957a53da02b29de64f15e64f5288",
+  "merge_base": "79fe3870e331563f5da85471976f53aaf10c240d",
+  "main_head": "7b844e724ff37db997ae7388c0c63509a8adbb73",
+  "rule": "main wins overlapping changes; unchanged-main edits and absent-main additions retained; new/workflow edits withheld pending security review",
+  "counts": {
+    "clean_add": 356,
+    "safe_edit": 29,
+    "already_integrated": 24,
+    "conflict_main": 77,
+    "withheld_workflow": 4
+  },
+  "resolutions": [
+    {
+      "path": ".github/workflows/ai-100-large-milestones.yml",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": ".github/workflows/dragon-ai-verification.yml",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": ".github/workflows/dragon-mother-glean-validation.yml",
+      "status": "added",
+      "resolution": "withheld_workflow"
+    },
+    {
+      "path": ".github/workflows/dragon-native-build.yml",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": ".github/workflows/dragon-native-release.yml",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": ".github/workflows/dragon-shadow-weight-validation.yml",
+      "status": "added",
+      "resolution": "withheld_workflow"
+    },
+    {
+      "path": ".github/workflows/dragon-weekly-research-backlog.yml",
+      "status": "added",
+      "resolution": "withheld_workflow"
+    },
+    {
+      "path": ".github/workflows/enterprise-ai-superiority.yml",
+      "status": "modified",
+      "resolution": "withheld_workflow"
+    },
+    {
+      "path": "backend/core/conversations.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/core/dragon_conversation_binding.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "backend/core/dragon_research_session.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "backend/core/dragon_runtime_bridge.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "backend/core/routes_registry.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/routes/ai.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "backend/routes/dragon_academy.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/routes/dragon_research.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "backend/server.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "backend/tests/test_ai_chat_conversation_authority.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "backend/tests/test_dragon_academy_routes.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "backend/tests/test_dragon_conversation_binding.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "backend/tests/test_dragon_delivery_routes.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "backend/tests/test_dragon_research_routes.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "backend/tests/test_dragon_runtime_bridge.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/crawler-resumable-acquisition-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-100-matrices-hyperweights-video-rss-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-10-batch-0001.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0002.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0003.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0004.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0005.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0006.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0007.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0008.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0009.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0010.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0011.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0012.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0013.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0014.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0015.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0016.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0017.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0018.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0019.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-11-batch-0020.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-12-batch-0021.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-12-batch-0022.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-12-batch-0023.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-2026-10-12-batch-0024.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-acquisition-retention-continuation-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-advanced-technical-sources-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-app-delivery-vision-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-atomic-rss-custody-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-ci-review-contracts-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-ci-unblockers-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-controlled-source-pilot-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-durable-source-operations-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-durable-weight-vault-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-ed25519-independent-rights-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-empirical-evidence-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-freshness-jeeves-guard-and-canary-repair-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-hatchling-video-delta-crossmedia-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-independent-facts-rss-video-tool-upgrades-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-industry-almanacs-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-knowledge-production-closure-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-mother-glean-matrix-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-native-build-completion-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-pilot-kill-switch-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-pilot-utc-budget-ci-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-pinned-source-expansion-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-readonly-inspection-and-egg-stage-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-reconciled-source-expansion-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-research-cockpit-and-adversarial-mirror-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-research-source-selector-and-session-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-research-supervised-dispatch-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-resource-cognition-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-resource-granted-idle-specialists-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-robots-delay-custody-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-runtime-conversation-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-signed-jeeves-canary-watch-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-signed-worker-stop-and-health-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-source-admission-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-source-capture-permission-authority-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-source-policy-renewal-and-freshness-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-source-refresh-census-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-staged-provenance-and-task-triage-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-strict-cross-source-two-tier-promotion-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-task-three-hatchling-planning-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-technical-atlas-cohort-20261012.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-three-hatchling-workboard-history-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-three-hatchlings-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-three-specialist-source-bridge-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-verified-acquisition-2026-10-12.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-wisdom-endurance-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/dragon-wisdom-pyramid-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261010-batch-0001.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0002.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0003.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0004.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0005.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0006.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0007.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0008.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0009.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0010.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0011.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0012.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0013.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0014.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0015.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0016.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0017.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0018.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0019.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261011-batch-0020.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0021.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0022.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0023.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-20261012-batch-0024.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261010-batch-0001.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0002.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0003.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0004.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0005.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0006.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0007.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0008.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0009.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0010.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0011.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0012.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0013.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0014.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0015.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0016.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0017.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0018.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0019.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261011-batch-0020.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261012-batch-0021.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261012-batch-0022.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261012-batch-0023.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-acquisition-topics-20261012-batch-0024.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-catalog-metadata-20261012-round3.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-new-catalog-metadata-20261012-round4.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-new-catalog-metadata-20261012-v1.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-original-grid-20261010.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261011-batch-0020.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0021.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0022.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0023.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0024.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0030.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0031.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0032.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0033.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0034.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0035.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0036.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0037.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0038.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0039.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0040.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0041.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0042.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0043.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0044.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0045.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0046.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0047.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0048.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0049.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/evidence/dragon-source-expansion-20261012-batch-0050.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/game-knowledge-floors-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "docs/ai/game-niche-expansion-2026-10-10.md",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/app/dragon-research.tsx",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/app/gameforge-studio.tsx",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "frontend/features/Jeeves/ChatWorkspace.tsx",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonCompanionPanel.tsx",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonDeliveryWorkbench.tsx",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonKnowledgePyramid.tsx",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonMotherGleanPanel.tsx",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonNestProgression.tsx",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/DragonWisdomSquares.tsx",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonDelivery.ts",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonKnowledgePyramid.ts",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonMagicEightBall.ts",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/dragonWisdomReview.ts",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/useDragonAcademy.ts",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/features/Jeeves/companion/useDragonDelivery.ts",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/package.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/scripts/test-dragon-delivery.cjs",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/scripts/test-dragon-wisdom.cjs",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "frontend/src/product/journeyCatalog.ts",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "frontend/yarn.lock",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/ai_capabilities.json",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "machine/ai_game_builder_dual_rival_forge.json",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "machine/ai_masterplan_parse_index.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/ai_runtime_schemas.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/dragon_almanac_acquisition_progress.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/dragon_game_repository_audit_20261010.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/dragon_industry_almanac_execution_20261010.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/dragon_pinned_crawl_catalogs_20261012.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/dragon_raw_lead_identity_cohort_a_20261012.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/dragon_raw_lead_identity_cohort_b_20261012.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-000-040.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-041-080.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-081-120.json",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-121-160.json",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-161-200.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-201-240.json",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-241-280.json",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-281-320.json",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-321-360.json",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-361-400.json",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "machine/enterprise_volume_notes/DP-401-420.json",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "machine/global_resource_scheduler_contract.json",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "machine/state_machine_catalogue.json",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "machine/state_topology.json",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "scripts/audit_dragon_game_repository.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "scripts/benchmark_dragon_microknowledge.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "scripts/check_provider_bootstrap.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "scripts/dragon_weekly_export.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "scripts/reconcile_enterprise_ai_implementation_notes.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/manifest.json",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-000.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-001.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-002.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-003.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-004.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-005.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-006.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-007.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-008.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-009.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-010.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-011.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-012.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-013.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-014.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-015.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-016.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-017.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-018.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-019.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-020.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-021.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-022.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-023.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-024.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-025.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-026.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-027.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-028.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-029.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-030.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-031.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-032.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-033.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/catalogs/dragon_sources_20261010/sources-034.jsonl",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/control_plane.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_almanac_cli.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_almanac_experiment.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_almanac_sequence.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_almanac_weights.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_almanacs.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_article_hatchling.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_catalog_expansion.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_delivery.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_discovery_admission.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_discovery_census.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_discovery_facets.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_discovery_identity_audit.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_discovery_mission.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_discovery_portfolio.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_discovery_reconciled.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_evidence_disagreement.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_external_rights.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_family_research_history.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_industry_domains.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_legal_updates.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_mother_evidence_synergy.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_pilot_budget.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_platform_coverage.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_porting.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_recrawl_dispatch.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_recrawl_executor.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_research_campaigns.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_research_mirror.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_research_pilot.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_research_source_picker.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_research_supervisor.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_research_workboard.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_review_store.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_source_catalog.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_source_delta_ledger.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_source_health.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_source_permission_authority.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_source_policy_renewal.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_source_refresh_planner.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_staged_research_triage.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_staged_supplements.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_task_research_planner.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_technical_source_acquisition.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_technical_source_analysis.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_technical_source_atlas.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_technical_source_captures.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_technical_source_cli.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_technical_source_cohort_20261012.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_technical_source_operations.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_technical_source_seeds.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_three_hatchling_coordinator.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_video_transcript_ledger.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_wisdom.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_wisdom_authority.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_wisdom_custody.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_wisdom_memory.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_wisdom_pyramid.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/game_builder/dragon_worker_stop_authority.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/game_ip_watch.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/game_niche_catalog.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/game_niche_research.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/game_research_foundation.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/knowledge_cli.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/game_builder/release.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/game_builder/reviewed_knowledge.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/game_builder/rights.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/game_builder/story_digest.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/game_builder/successor_blueprints.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/__init__.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/archivex.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/core.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_build_evidence.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_capability_gap_matrix.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_chunk_executor.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_companion_runtime.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_conditional_automation.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_conversation_micro_logs.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_correlated_mother_handoff.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_crawl_revision.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_cross_source_factchecking.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_evidence_freshness_ledger.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_execution_pool.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_game_design.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_game_mechanics.py",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_gb_platformer.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_hundred_matrix_scrutiny.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_idle_service.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_interest_signals.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_jeeves_freshness_guard.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_journal.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_live_hardware.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_microknowledge.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_mother_glean_ledger.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_mother_glean_matrix.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_mother_hundred_handoff.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_mother_shadow_handoff.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_cli.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_compile.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_practice.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_projects.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_puzzle.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_native_targets.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_nest_progression.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_nest_research_scheduler.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_nest_review_bridge.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_nest_source_feed.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_nest_store.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_nest_worker_admission.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_practice_cycles.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_provenance_promotion.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_reasoning_matrix.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_reference_game_adapter.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_research_audit.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_resource_session.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_retro_assets.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_rss_freshness_scheduler.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_rss_update_queue.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_runtime_events.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_shadow_weight_automation.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_shadow_weight_coordinator.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_signal_ledger.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_verified_rss_poll.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_video_inspiration.py",
+      "status": "added",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_video_tool_research.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_visual_play.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_weekly_research_export.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_weight_canary.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_weight_deployment_vault.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/dragon_weight_tier_sandbox.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_builder_knowledge_runtime.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_knowledge_acquisition.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_knowledge_index.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_campaign_hub.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/game_scale_feedback.py",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/migrations.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/redirects.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/research.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/research_state.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/storage.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/ai/webcrawler/video_memory_bridge.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "skeleton/automation/overseer/hardware.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "skeleton/testing/test_state_migration_compatibility.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_dragon_browser_visual_import.py",
+      "status": "modified",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "tests/test_ai_dragon_chunk_executor.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_dragon_custodied_temporal.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_dragon_empirical_calibration.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_dragon_execution_pool.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_dragon_frame_custody.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_dragon_guarded_practice.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_dragon_provider_validation_resources.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "tests/test_ai_dragon_resource_cognition.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_dragon_source_safety.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_dragon_trial_ledger.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_game_builder_frontier_runtime.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_game_builder_overengineering_runtime.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_archivex.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_direct_migrations.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_distributed.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_analysis_depth.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_build_evidence.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_crawl_revision.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_game_blueprints.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_game_forge.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_game_mechanics.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_interest_signals.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_journal.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_mother_glean_matrix.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_mother_shadow_handoff.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_native_3d_design.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_native_compile.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_native_curriculum.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_native_platformer.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_native_projects.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_nest_progression.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_nest_research_scheduler.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_nest_review_bridge.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_nest_store.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_provenance_promotion.py",
+      "status": "modified",
+      "resolution": "safe_edit"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_retro_assets.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_revision_journal.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_shadow_weight_automation.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_dragon_visualization.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_ingestion_session.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_plane.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_research_quality.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_scheduler.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_ai_webcrawler_storage_governance.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_cs_300_ladder.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_dragon_almanacs.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_catalog_expansion.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_delivery.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_discovery_admission.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_discovery_census.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_discovery_facets.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_discovery_identity_audit.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_discovery_mission.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_discovery_portfolio.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_evidence_freshness.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_evidence_mirror.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_evidence_timestamp_compatibility.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_fact_corroboration.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_hyperweight_pipeline.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_nest_source_feed.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_nest_worker_admission.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_platform_coverage.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_recrawl_dispatch.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_research_campaigns.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_rss_freshness_scheduler.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_specialist_evidence.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_staged_supplements.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_technical_source_acquisition.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_technical_source_analysis.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_technical_source_atlas.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_technical_source_captures.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_technical_source_expansion.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_technical_source_operations.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_verified_rss_poll.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_visual_play_integration.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_wisdom_authority.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "tests/test_dragon_wisdom_integration.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_wisdom_operational.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_dragon_wisdom_pyramid.py",
+      "status": "added",
+      "resolution": "already_integrated"
+    },
+    {
+      "path": "tests/test_dragon_wisdom_refresh_bridge.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_enterprise_dossier_reconciliation.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_game_acquisition_batches.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_game_builder_reviewed_knowledge.py",
+      "status": "modified",
+      "resolution": "conflict_main"
+    },
+    {
+      "path": "tests/test_game_knowledge_atomic_ingestion.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_game_niche_research.py",
+      "status": "added",
+      "resolution": "clean_add"
+    },
+    {
+      "path": "tests/test_game_research_foundation.py",
+      "status": "added",
+      "resolution": "clean_add"
+    }
+  ],
+  "warning": "Git merge resolves file-level conflicts but does not qualify runtime, generated data, third-party rights, CI or end-to-end behavior."
+}

@@ -13,12 +13,12 @@ on:
       - '.github/workflows/ai-100-large-milestones.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ai-100-large-milestones-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
-
-permissions:
-  contents: read
 
 jobs:
   validate:

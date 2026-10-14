@@ -1,0 +1,199 @@
+name: Advanced Godot Native Platformer Replay
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/ai/game_builder/advanced_platformer_godot.py"
+      - "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
+      - "skeleton/ai/game_builder/advanced_level_scenes.py"
+      - "skeleton/ai/game_builder/advanced_genre_engines.py"
+      - "skeleton/ai/game_builder/system_editor_cli.py"
+      - "skeleton/ai/game_builder/game_workspace_server.py"
+      - "skeleton/ai/game_builder/game_workspace_ui.py"
+      - "tests/test_game_builder_advanced_platformer_godot.py"
+      - ".github/workflows/game-builder-advanced-platformer-native.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: advanced-native-platformer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  independently-execute-platformer:
+    name: Python/Godot platformer parity on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    timeout-minutes: 23
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Checkout exact PR head with safe source scope
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            skeleton/__init__.py
+            skeleton/ai/__init__.py
+            skeleton/ai/capability_map.py
+            skeleton/ai/game_builder/
+            tests/__init__.py
+            tests/test_game_builder_advanced_platformer_godot.py
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Godot 4.4.1 native runtime and export templates
+        uses: chickensoft-games/setup-godot@f166999204a4f2722c6fe042fbaa3b3ea0d9c789
+        with:
+          version: "4.4.1"
+          use-dotnet: false
+          include-templates: true
+          cache: true
+      - name: Validate exact source and Python proof contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          godot --version
+          python -m py_compile skeleton/ai/game_builder/advanced_godot_export.py
+          python -m unittest tests.test_game_builder_advanced_platformer_godot -v
+      - name: Build six genuine authored native platformer gameplay variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from skeleton.ai.game_builder.advanced_level_scenes import make_advanced_scene
+          from skeleton.ai.game_builder.advanced_gameplay_runtime import run_advanced_session
+          from skeleton.ai.game_builder.advanced_platformer_godot import render_platformer_godot_package
+          from skeleton.ai.game_builder.advanced_godot_export import write_advanced_godot_package
+          root=Path(os.environ["RUNNER_TEMP"])/"advanced-native-platformers"
+          root.mkdir()
+          winning={"spawn_x":0,"exit_x":15,"hazards":[],
+                   "collectibles":[2,7],"checkpoints":[5,10]}
+          hazard={"spawn_x":0,"exit_x":15,"hazards":[3],
+                  "collectibles":[7],"checkpoints":[8]}
+          scenarios=(
+              ("winning",{"level_width":16},["right"]*5,winning,0),
+              ("hazard",{"level_width":16},["right","right"],hazard,1),
+              ("double_jump",{"double_jump":True},
+               ["jump_right","jump_right","wait","left"],None,11),
+              ("cooldown",{},["dash_right","wait","wait","wait","dash_right"],None,7),
+              ("airborne",{"gravity":4,"jump_impulse":16,"run_speed":2},
+               ["jump_right","right","wait","wait"],None,4),
+              ("original",{},["right","right","jump_right","wait"],None,9),
+          )
+          for name,settings,actions,layout,seed in scenarios:
+              scene=make_advanced_scene("platformer",settings,seed=seed,layout=layout)
+              game=run_advanced_session("platformer",settings,actions,
+                                        seed=seed,scene=scene)
+              if name=="winning":
+                  assert game["state"]["finished"] and game["terminal"]
+              pkg=render_platformer_godot_package(game,settings,authorized=True)
+              write_advanced_godot_package(pkg,root/name,authorized=True)
+              print("NATIVE_PLATFORMER_SOURCE",name,"actions",len(actions),
+                    "state",game["state"]["x"],game["state"]["y"],
+                    "python_digest",game["digest"])
+          PY
+      - name: Independently execute all six platformer games in real Godot 4
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/advanced-native-platformers"
+          for mode in winning hazard double_jump cooldown airborne original; do
+            project="$root/$mode/godot"
+            echo "Native platformer scenario $mode"
+            godot --headless --path "$project" --import
+            godot --headless --path "$project" -- --verify-platformer | tee "$root/$mode/native-replay.log"
+            grep -q "NATIVE_ADVANCED_PLATFORMER_OK" "$root/$mode/native-replay.log"
+          done
+      - name: Export Linux desktop platformer executable and execute the actual binary
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$RUNNER_TEMP/advanced-native-platformers/winning/godot"
+          executable="$RUNNER_TEMP/advanced-native-platformers/original-advanced-platformer.x86_64"
+          godot --headless --path "$project" --export-release Linux "$executable"
+          test -s "$executable"
+          chmod +x "$executable"
+          "$executable" --headless -- --verify-platformer | tee "$RUNNER_TEMP/advanced-native-platformers/linux-export-replay.log"
+          grep -q "NATIVE_ADVANCED_PLATFORMER_OK" "$RUNNER_TEMP/advanced-native-platformers/linux-export-replay.log"
+      - name: Export actual Windows game and verify native console executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'advanced-native-platformers'
+          $project = Join-Path $root 'winning/godot'
+          $binary = Join-Path $root 'original-advanced-platformer.exe'
+          # The setup-godot Windows GUI editor can detach without a reliable
+          # synchronous exit code. Use the same pinned official console engine
+          # already required by the repository's Windows native integration.
+          $archive = Join-Path $env:USERPROFILE 'downloads/Godot_v4.4.1-stable_win64.exe.zip'
+          $engineDir = Join-Path $root 'pinned-godot-console'
+          if (-not (Test-Path $archive)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $archive) | Out-Null
+            Invoke-WebRequest -Uri 'https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip' -OutFile $archive -MaximumRedirection 5
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $engineDir -Force
+          $nativeEditor = Get-ChildItem $engineDir -Recurse -Filter '*_console.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $nativeEditor) {
+            throw "Version-pinned official Godot Windows console editor unavailable"
+          }
+          & $nativeEditor.FullName --version
+          if ($LASTEXITCODE -ne 0) { throw "Godot Windows console startup failed" }
+          & $nativeEditor.FullName --headless --path $project --import
+          if ($LASTEXITCODE -ne 0) { throw "Advanced platformer Windows resource import failed" }
+          & $nativeEditor.FullName --headless --path $project --export-release 'Windows Desktop' $binary
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $binary)) {
+            throw "Advanced Godot Windows console game executable export failed"
+          }
+          if ((Get-Item $binary).Length -le 1024) {
+            throw "Advanced Godot Windows game executable is empty"
+          }
+          $console = Join-Path $root 'original-advanced-platformer.console.exe'
+          if (-not (Test-Path $console)) {
+            throw "Exported original platformer lacks an observable Windows console binary"
+          }
+          $python = @'
+          import subprocess,sys
+          result=subprocess.run(
+              [sys.argv[1],"--headless","--","--verify-platformer"],
+              capture_output=True,text=True,timeout=90)
+          print(result.stdout)
+          print(result.stderr)
+          sys.exit(0 if result.returncode==0 and
+              "NATIVE_ADVANCED_PLATFORMER_OK" in result.stdout+result.stderr else 1)
+          '@
+          $proofScript = Join-Path $root 'verify_windows_native.py'
+          [IO.File]::WriteAllText($proofScript, $python)
+          & python $proofScript $console
+          if ($LASTEXITCODE -ne 0) {
+            throw "Exported Windows homebrew platformer gameplay diverged from reviewed Python"
+          }
+          Write-Host "Native Windows executable SHA256:"
+          Get-FileHash -Algorithm SHA256 $binary | Format-List
+          Get-FileHash -Algorithm SHA256 $console | Format-List
+      - name: Upload native gameplay proof logs and source release manifests
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-advanced-platformer-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/advanced-native-platformers/*/native-replay.log
+            ${{ runner.temp }}/advanced-native-platformers/*/release.json
+            ${{ runner.temp }}/advanced-native-platformers/linux-export-replay.log
+            ${{ runner.temp }}/advanced-native-platformers/original-advanced-platformer.exe
+            ${{ runner.temp }}/advanced-native-platformers/original-advanced-platformer.console.exe
+            ${{ runner.temp }}/advanced-native-platformers/original-advanced-platformer.x86_64
+          if-no-files-found: warn
+          retention-days: 7

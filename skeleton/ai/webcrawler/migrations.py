@@ -36,22 +36,9 @@ MIGRATIONS={
  ),
 }
 def migrate(db):
- # Distinguish a new database from one claiming a prior migration. Creating
- # missing tables on an already-versioned DB could conceal destructive loss.
  db.execute("CREATE TABLE IF NOT EXISTS schema_version(version INTEGER NOT NULL)")
  row=db.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
- existing={r[0] for r in db.execute(
-  "SELECT name FROM sqlite_master WHERE type='table'"
- )}
- base={"documents","urls","checkpoints"}
- if row is not None and not base.issubset(existing):
-  raise ValueError("versioned crawler database is missing canonical base tables")
- # Standalone migrate(connection) must initialize the base schema before
- # installing later indexes, just like SqliteCrawlStore does.
- if row is None:
-  with db:
-   for sql in MIGRATIONS[1]:db.execute(sql)
- version=int(row[0]) if row else 1
+ version=int(row[0]) if row else 0
  if version>SCHEMA_VERSION:raise ValueError("crawler database schema is newer than runtime")
  for target in range(version+1,SCHEMA_VERSION+1):
   with db:

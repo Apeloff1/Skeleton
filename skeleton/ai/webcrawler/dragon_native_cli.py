@@ -22,10 +22,9 @@ def emit_demo(target:str, output_dir:Path, *, title:str="Dragon Tiny Adventure",
         target,title,style=design.target,design.title,design.genre
     if style not in STYLES:
         raise ValueError("unknown original game style")
-    output_dir=output_dir.expanduser()
+    output_dir=output_dir.expanduser().resolve()
     if output_dir.is_symlink():
         raise ValueError("refusing to write to symlinked project root")
-    output_dir=output_dir.resolve()
     identity=sha256((title+"\0"+target+"\0"+style+
                      ("\0"+design.digest if design is not None else "")).encode()).hexdigest()
     project=render_native_project(
@@ -36,33 +35,16 @@ def emit_demo(target:str, output_dir:Path, *, title:str="Dragon Tiny Adventure",
     # Prevent accidental replacement of existing user project files.
     if output_dir.exists() and any(output_dir.iterdir()) and not overwrite:
         raise FileExistsError("destination is not empty; choose another folder")
-    from .dragon_native_compile import _safe_member
-    from tempfile import TemporaryDirectory
-    import os
-    # Preflight the entire plan before overwriting any existing user file.
-    for name in project.files:
-        dest = _safe_member(output_dir, name)
-        if dest.exists() and not dest.is_file():
-            raise ValueError("native output collides with an existing directory")
-        parent = dest.parent
-        while parent != output_dir:
-            if parent.exists() and not parent.is_dir():
-                raise ValueError("native output parent must be a directory")
-            parent = parent.parent
     output_dir.mkdir(parents=True,exist_ok=True)
     created={}
-    with TemporaryDirectory(prefix=".dragon-source-", dir=output_dir) as temporary:
-        staging = Path(temporary)
-        for name, content in sorted(project.files.items()):
-            staged = staging / name
-            staged.parent.mkdir(parents=True, exist_ok=True)
-            staged.write_text(content, encoding="utf-8")
-        for name, content in sorted(project.files.items()):
-            dest = _safe_member(output_dir, name)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            # Replacement does not mutate another file through a hard link.
-            os.replace(staging / name, dest)
-            created[name]=sha256(content.encode()).hexdigest()
+    for name,content in sorted(project.files.items()):
+        dest=output_dir/name
+        dest.parent.mkdir(parents=True,exist_ok=True)
+        # Never follow symlinks, even in user-selected existing directories.
+        if dest.is_symlink() or dest.parent.is_symlink():
+            raise ValueError("refusing symlinked output paths")
+        dest.write_text(content,encoding="utf-8")
+        created[name]=sha256(content.encode()).hexdigest()
     return created
 
 def main() -> None:
@@ -72,9 +54,45 @@ def main() -> None:
     parser.add_argument("--title",default="Dragon Tiny Adventure")
     parser.add_argument("--out",type=Path,required=True)
     parser.add_argument("--overwrite",action="store_true")
-    parser.add_argument("--compile",action="store_true",help="Compile GB/CGB/NES/C64 with a local toolchain")
+    parser.add_argument("--compile",action="store_true",help="Compile GB/NES/CGB with a local toolchain")
+    parser.add_argument("--portfolio-targets",
+                        help="Comma-separated hardware IDs for multi-target production")
+    parser.add_argument("--attest-original-rights",action="store_true",
+                        help="Attest original work or lawful authorization; not legal clearance")
+    parser.add_argument("--rights-basis",default="original_homebrew")
+    parser.add_argument("--rights-reference",default="")
+    parser.add_argument("--authorize-publication",action="store_true",
+                        help="Explicitly authorize publishing immutable source releases")
+    parser.add_argument("--compile-roms",action="store_true",
+                        help="Portfolio only: attempt vetted local GB/CGB/NES compilation")
+    parser.add_argument("--require-compiled",action="store_true",
+                        help="Fail rather than publish source-only when ROM toolchain is absent")
+    parser.add_argument("--seed",type=int,default=1,
+                        help="Deterministic production candidate seed")
     parser.add_argument("--spec",type=Path,help="Strict game-design JSON; overrides title/target/style")
     args=parser.parse_args()
+    if args.portfolio_targets:
+        if args.spec or args.overwrite or args.compile:
+            parser.error("portfolio release uses its own bounded authorization and compiler path")
+        from .dragon_native_production import ProductionRequest,publish_production
+        import json
+        request=ProductionRequest(
+            title=args.title,style=args.style,
+            targets=tuple(t.strip() for t in args.portfolio_targets.split(",")),
+            original_work_attested=args.attest_original_rights,
+            rights_basis=args.rights_basis,rights_reference=args.rights_reference,
+            seed=args.seed,compile_roms=args.compile_roms,
+            require_compiled=args.require_compiled,
+        )
+        result=publish_production(request,args.out,authorized=args.authorize_publication)
+        print(json.dumps(result,sort_keys=True,indent=2))
+        if result["status"]=="blocked":
+            raise SystemExit(2)
+        return
+    if (args.attest_original_rights or args.rights_basis!="original_homebrew" or
+            args.rights_reference or args.authorize_publication or args.compile_roms or
+            args.require_compiled or args.seed!=1):
+        parser.error("portfolio-only flags require --portfolio-targets")
     design=load_design(args.spec) if args.spec else None
     title=design.title if design is not None else args.title
     target=design.target if design is not None else args.target

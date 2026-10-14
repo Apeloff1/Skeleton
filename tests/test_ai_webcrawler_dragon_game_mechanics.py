@@ -359,7 +359,7 @@ def test_stored_observation_bool_confidence_and_timestamp_are_rejected():
         body = [[1000, "combat", "Timing-based interaction", 0.9, "unknown", False]]
         body[0][index] = value
         store.db.execute("UPDATE dragon_game_sessions SET observations_json=? WHERE owner=?",
-                         (json.dumps(body, separators=(",", ":"), ensure_ascii=True), "alice"))
+                         (json.dumps(body,separators=(",",":"),ensure_ascii=True), "alice"))
         with pytest.raises(ValueError, match="cell validation failed"):
             store.sessions("alice", authorized=True)
 
@@ -372,7 +372,7 @@ def test_persisted_event_order_is_validated():
     raw = store.db.execute("SELECT observations_json FROM dragon_game_sessions").fetchone()[0]
     entries = list(reversed(json.loads(raw)))
     store.db.execute("UPDATE dragon_game_sessions SET observations_json=?",
-                     (json.dumps(entries, separators=(",", ":"), ensure_ascii=True),))
+                     (json.dumps(entries,separators=(",",":"),ensure_ascii=True),))
     with pytest.raises(ValueError, match="time order"):
         store.sessions("alice", authorized=True)
 
@@ -404,7 +404,7 @@ def test_persisted_notes_cannot_bypass_byte_budget():
     store.record(session(store), authorized=True)
     original = json.loads(store.db.execute("SELECT observations_json FROM dragon_game_sessions").fetchone()[0])
     original[0][2] = "X" * 6000
-    store.db.execute("UPDATE dragon_game_sessions SET observations_json=?", (json.dumps(original, separators=(",", ":"), ensure_ascii=True),))
+    store.db.execute("UPDATE dragon_game_sessions SET observations_json=?", (json.dumps(original,separators=(",",":"),ensure_ascii=True),))
     with pytest.raises(ValueError, match="cell validation"):
         store.sessions("alice", authorized=True)
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import shutil
+import subprocess
 
 import pytest
 
@@ -37,7 +38,8 @@ def _store(path:Path,payload:dict)->None:
     path.write_text(json.dumps(payload,indent=2)+"\n",encoding="utf-8")
 
 def test_current_storage_candidate_is_valid():
-    result=validate(ROOT,head="a"*40)
+    head=subprocess.check_output(["git","-C",str(ROOT),"rev-parse","HEAD"],text=True).strip()
+    result=validate(ROOT,head=head)
     assert result["volume_refs"]==["VOL-133","VOL-135","VOL-136"]
     assert result["executable_test_count"]==3
     assert result["completion_checkbox"] is False
@@ -78,6 +80,36 @@ def test_rejects_mirror_drift(tmp_path:Path):
     with pytest.raises(StorageCandidateError,match="storage mirror parity drift"):
         validate(root)
 
+def test_unsigned_volume_cannot_claim_independent_verification(tmp_path:Path):
+    root=_fixture(tmp_path)
+    path=root/"machine/ai_master_plan.json"
+    payload=_load(path)
+    volume=next(v for v in payload["volumes"] if v["key"]=="VOL-133")
+    assert volume["implementation_status"]=="verified"
+    volume["completion_checkbox"]=False
+    volume["completion_checkbox_mark"]="[ ]"
+    _store(path,payload)
+    with pytest.raises(StorageCandidateError,match="unsigned volume claims verification"):
+        validate(root)
+
+
+def test_signed_volume_must_not_keep_unresolved_gaps(tmp_path:Path):
+    root=_fixture(tmp_path)
+    path=root/"machine/ai_master_plan.json"
+    payload=_load(path)
+    volume=next(v for v in payload["volumes"] if v["key"]=="VOL-135")
+    volume["gaps"].append("unresolved independent check")
+    _store(path,payload)
+    with pytest.raises(StorageCandidateError,match="inconsistent independent signoff"):
+        validate(root)
+
+
 def test_rejects_invalid_reported_head():
     with pytest.raises(StorageCandidateError,match="reported exact head"):
         validate(ROOT,head="not-a-sha")
+
+def test_rejects_mismatched_reported_exact_head():
+    current=subprocess.check_output(["git","-C",str(ROOT),"rev-parse","HEAD"],text=True).strip()
+    fake="a"*40 if current!="a"*40 else "b"*40
+    with pytest.raises(StorageCandidateError,match="reported exact head mismatch"):
+        validate(ROOT,head=fake)

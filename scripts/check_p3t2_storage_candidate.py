@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 from typing import Any, Sequence
 
@@ -88,10 +89,18 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
         volume=by_key.get(key)
         if not isinstance(volume,dict):
             raise StorageCandidateError(f"masterplan volume missing: {key}")
-        if volume.get("completion_checkbox") is not False:
-            raise StorageCandidateError(f"{key} completion checkbox may not self-promote")
-        if volume.get("implementation_status")=="verified":
-            raise StorageCandidateError(f"{key} may not claim verified implementation from this candidate")
+        # Candidate authority stays unsigned. An independently signed
+        # masterplan volume is valid only when its recorded closure agrees.
+        signed=volume.get("completion_checkbox")
+        verified=volume.get("implementation_status")=="verified"
+        if signed is True:
+            if not verified or volume.get("completion_checkbox_mark")!="[x]" or volume.get("gaps"):
+                raise StorageCandidateError(f"{key} inconsistent independent signoff")
+        elif signed is False:
+            if verified or volume.get("completion_checkbox_mark")!="[ ]":
+                raise StorageCandidateError(f"{key} unsigned volume claims verification")
+        else:
+            raise StorageCandidateError(f"{key} invalid completion checkbox")
         paths=volume.get("implementation_paths")
         if not isinstance(paths,list) or "skeleton/storage/cas" not in paths:
             raise StorageCandidateError(f"{key} missing governed storage implementation path")
@@ -134,6 +143,14 @@ def validate(root:Path=ROOT, *, head:str|None=None)->dict[str,Any]:
     if head is not None:
         if re.fullmatch(r"[0-9a-f]{40}",head) is None:
             raise StorageCandidateError("reported exact head is not a 40-character lowercase Git SHA")
+        git_head=subprocess.run(
+            ["git","-C",str(root),"rev-parse","HEAD"],
+            capture_output=True,text=True,check=False,
+        )
+        if git_head.returncode != 0:
+            raise StorageCandidateError("repository exact head unavailable")
+        if head != git_head.stdout.strip():
+            raise StorageCandidateError("reported exact head mismatch")
 
     return {
         "status":"valid",

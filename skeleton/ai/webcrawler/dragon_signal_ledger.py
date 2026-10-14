@@ -93,7 +93,7 @@ class DragonSignalLedger:
         owner = self._owner(owner)
         if limit is None:
             limit = min(500, self.policy.max_per_owner)
-        if type(limit) is not int or not 1 <= limit <= self.policy.max_per_owner:
+        if isinstance(limit,bool) or not isinstance(limit,int) or not 1 <= limit <= self.policy.max_per_owner:
             raise ValueError("invalid query limit")
         rows = self.connection.execute("""
             SELECT signal_id, kind, tags_json, observed_at, strength, source_id

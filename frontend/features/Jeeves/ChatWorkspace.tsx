@@ -147,7 +147,14 @@ function Library({ controller, close }: { controller: WorkspaceController; close
 export default function ChatWorkspace() {
   const router = useRouter();
   const dragonAcademy = useDragonAcademy();
-  const { width } = useWindowDimensions();
+  const { width: viewportWidth } = useWindowDimensions();
+  const [hydrated, setHydrated] = useState(Platform.OS !== 'web');
+  useEffect(() => { setHydrated(true); }, []);
+  // Expo exports this route at width zero. Keep the first browser render
+  // identical, then apply responsive layout once hydration has completed.
+  const width = hydrated ? viewportWidth : 0;
+  const [composerHeight, setComposerHeight] = useState(168);
+  const [companionOpen, setCompanionOpen] = useState(false);
   const [controller] = useState(() => new WorkspaceController(
     AsyncStorage,
     async (body, signal) => {
@@ -289,9 +296,10 @@ export default function ChatWorkspace() {
         <Text style={[s.small, s.flex]}>{snapshot.notice || 'Changes could not be saved to this device.'}</Text>
         {snapshot.saveState === 'error' ? <Button icon="refresh-outline" label="Save again" onPress={controller.retrySave} /> : <TouchableOpacity accessibilityLabel="Dismiss notice" onPress={controller.dismissNotice}><Ionicons name="close" size={20} color={C.text} /></TouchableOpacity>}
       </View>}
-      <View style={[s.companionDock, width < 760 && s.companionDockCompact]}>
-        <DragonCompanionPanel draft={conversation.draft} lastUserText={[...conversation.messages].reverse().find(message => message.role === 'user')?.text} academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} waitingRequestId={snapshot.busyId} />
-      </View>
+      {width < 760 && <View style={s.companionToggle}><Button icon="sparkles-outline" label={companionOpen ? 'Hide companion' : 'Show companion'} onPress={() => setCompanionOpen(open => !open)} /></View>}
+      {(width >= 760 || companionOpen) && <ScrollView style={[s.companionDock, { bottom: composerHeight + 12 }, width < 760 && s.companionDockCompact]} keyboardShouldPersistTaps="handled">
+        <DragonCompanionPanel draft={conversation.draft} lastUserText={[...conversation.messages].reverse().find(message => message.role === 'user')?.text} academy={dragonAcademy.view} telemetry={dragonAcademy.telemetry} />
+      </ScrollView>}
       <DragonDemoPlayer demo={dragonAcademy.demo} onClose={dragonAcademy.closeDemo} />
       {!!dragonAcademy.error && <Text accessibilityRole="alert" style={s.small}>{dragonAcademy.error}</Text>}
       <ScrollView ref={scroll} style={s.flex} contentContainerStyle={[s.transcript, width < 760 && s.transcriptCompact]} keyboardShouldPersistTaps="handled" testID="jeeves-transcript">
@@ -307,7 +315,7 @@ export default function ChatWorkspace() {
         {conversation.messages.map(message => <MessageCard key={message.id} message={message} controller={controller} busy={busy} />)}
         {busy && <View style={s.composing}><ActivityIndicator color={C.purple} /><Text style={s.small}>Jeeves is composing…</Text><Button icon="stop-outline" label="Stop" onPress={controller.cancel} /></View>}
       </ScrollView>
-      <View style={s.composer}>
+      <View style={s.composer} onLayout={event => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}>
         {attachment && <View style={s.row}><Ionicons name="attach" color={C.green} size={18} /><Text numberOfLines={1} style={[s.small, s.flex]}>{attachment.name}</Text><Button icon="close" label="Remove" onPress={() => setAttachment(undefined)} /></View>}
         <TextInput value={conversation.draft} onChangeText={draft => controller.edit({ draft })} style={s.composerInput} multiline maxLength={MAX_TEXT}
           placeholder="Ask Jeeves about your next step…" placeholderTextColor={C.muted} accessibilityLabel="Message Jeeves" testID="chat-input" />
@@ -331,7 +339,7 @@ export default function ChatWorkspace() {
       <Button icon="checkmark-outline" label="Save details" onPress={() => { controller.edit({ title, context }); setSettings(false); }} />
       <View style={s.divider} /><Text style={s.label}>Keep a copy</Text><Text style={s.small}>Export a Markdown transcript. Attachment and generated file contents are excluded.</Text>
       <Button icon="download-outline" label="Export transcript" onPress={() => { void exportTranscript(conversation).catch(() => controller.notify('Could not export the transcript. Try copying individual messages.')); }} />
-      <Text style={s.small}>Chats are stored on this device, without account synchronization. Server history depends on backend availability.</Text>
+      <Text style={s.small}>Conversation history is kept on the server. The chat list, drafts and a rebuildable cache stay on this device; attachments last only for this visit.</Text>
     </ScrollView></SafeAreaView></Modal>
   </SafeAreaView>;
 }
@@ -347,7 +355,8 @@ const s = StyleSheet.create({
   chatToolbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 12, gap: 8, borderBottomWidth: 1, borderColor: C.edge },
   chatTitle: { color: C.text, fontSize: 15, fontWeight: '700', lineHeight: 21 },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#26223c', padding: 12 },
-  companionDock: { position: 'absolute', right: 16, top: 112, width: 310, zIndex: 8 }, companionDockCompact: { position: 'relative', right: undefined, top: undefined, width: '100%', maxWidth: 420, alignSelf: 'center', paddingHorizontal: 14, paddingTop: 10 },
+  companionToggle: { paddingHorizontal: 14, paddingVertical: 6, alignItems: 'flex-start' },
+  companionDock: { position: 'absolute', right: 16, top: 112, width: 310, zIndex: 8 }, companionDockCompact: { position: 'relative', right: undefined, top: undefined, bottom: undefined, width: '100%', maxWidth: 420, maxHeight: 240, flexShrink: 1, alignSelf: 'center', paddingHorizontal: 14, paddingTop: 10 },
   transcript: { padding: 18, paddingBottom: 30, paddingRight: 340, width: '100%', maxWidth: 1280, alignSelf: 'center', flexGrow: 1 }, transcriptCompact: { paddingRight: 18, maxWidth: 960 },
   welcome: { alignItems: 'center', justifyContent: 'center', paddingVertical: 30, gap: 16 },
   crest: { padding: 20, backgroundColor: '#241c38', borderRadius: 24, borderWidth: 1, borderColor: '#463362' },

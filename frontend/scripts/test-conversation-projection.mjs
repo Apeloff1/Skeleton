@@ -148,3 +148,70 @@ test('conversation turn transport targets assembled AI route and keeps reconnect
   assert.match(source, /engine_execution_id/);
   assert.match(source, /AbortSignal/);
 });
+
+test('unsafe canonical sequence and oversized projection fail closed with stable error codes', () => {
+  assert.throws(
+    () => validateConversationProjection(
+      { thread_id: 'thread-a', message_sequence: Number.MAX_SAFE_INTEGER + 1 }, [],
+    ),
+    (error) => error.code === 'invalid_projection',
+  );
+  assert.throws(
+    () => validateConversationProjection(thread, [
+      { thread_id: 'thread-a', sequence: Number.MAX_SAFE_INTEGER + 1 },
+    ]),
+    (error) => error.code === 'invalid_sequence',
+  );
+  assert.throws(
+    () => validateConversationProjection(
+      { thread_id: 'thread-a', message_sequence: 10001 },
+      Array.from({ length: 10001 }, (_, i) => ({
+        thread_id: 'thread-a', sequence: i + 1,
+      })),
+    ),
+    (error) => error.code === 'invalid_projection',
+  );
+});
+
+test('conversation projections reject duplicate or malformed message identity', () => {
+  assert.throws(
+    () => validateConversationProjection(thread, [
+      { thread_id: 'thread-a', sequence: 1, message_id: 'message-1' },
+      { thread_id: 'thread-a', sequence: 2, message_id: 'message-1' },
+    ]),
+    (error) => error.code === 'invalid_message',
+  );
+  assert.throws(
+    () => validateConversationProjection(thread, [
+      { thread_id: 'thread-a', sequence: 1, message_id: '' },
+    ]),
+    (error) => error.code === 'invalid_message',
+  );
+  assert.throws(
+    () => validateConversationProjection(thread, [null]),
+    (error) => error.code === 'invalid_message',
+  );
+});
+
+test('reconnect result preserves stable nonduplicated message IDs in sequence order', () => {
+  const data = [
+    { thread_id: 'thread-a', sequence: 3, message_id: 'm3' },
+    { thread_id: 'thread-a', sequence: 1, message_id: 'm1' },
+  ];
+  const result = validateConversationProjection(thread, data);
+  assert.deepEqual(result.messages.map(({ message_id }) => message_id), ['m1', 'm3']);
+  assert.equal(result.lastSequence, 3);
+  assert.equal(data[0].sequence, 3);
+});
+
+test('/ai-chat route lazily opens the canonical workspace instead of divergent draft UI', async () => {
+  const [route, workspace] = await Promise.all([
+    readFile(new URL('../app/ai-chat.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../features/Jeeves/ChatWorkspace.tsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(route, /makeLazyModalRoute/);
+  assert.match(route, /import\('\.\.\/features\/Jeeves\/ChatWorkspace'\)/);
+  assert.match(route, /'AIChatRoute'/);
+  assert.match(workspace, /export default function ChatWorkspace\(\)/);
+  assert.doesNotMatch(route, /initialThreadId=/);
+});

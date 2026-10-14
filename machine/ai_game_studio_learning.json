@@ -1,0 +1,198 @@
+{
+  "schema_version": "skeleton.ai.game_studio_learning.v1",
+  "status": "implementation_candidate",
+  "parent": "machine/ai_game_learning.json",
+  "owners": {
+    "runtime": "skeleton/jeeves/game_studio_learning.py",
+    "agent_tools": "skeleton/jeeves/game_studio_tools.py",
+    "application": "backend/core/game_studio_learning.py",
+    "application_tools": "backend/core/game_studio_tools.py",
+    "api": "backend/routes/game_studio_learning.py",
+    "product": "frontend/features/Jeeves/GameStudioLearningPanel.tsx",
+    "client": "frontend/src/product/gameStudioLearningClient.ts",
+    "agent_registration": "skeleton/jeeves/core.py",
+    "tool_api": "backend/routes/game_studio_tools.py"
+  },
+  "authority": "Existing current tenant/owner/project/source/teacher rights, workspace Mongo authority, existing bounded job workers and canonical agent tool grants; no new provider/service/runtime root",
+  "interfaces": [
+    "Campaign requests at most100000 rounds executed as bounded cancellable durable slices, with no synthetic completed counts",
+    "Jeeves actual game play and measured policy learning, Dragon source/frame/layout review, separate adversarial held-out and perturbed evaluation",
+    "Exact round/role/candidate/source/code/policy/report identities with atomic committed-round cursor, idempotent lesson records and interrupted recovery",
+    "Lesson retrieval and next-candidate proposals use scoped empirical outcomes including rejected experiments; failed candidates never automatically replace champions",
+    "Progressive fidelity settings affect emitted rendering/source assets where supported and preserve gameplay/timing constraints; unsupported fidelity remains explicit",
+    "Agent studio commands delegate only current scoped editor/build/play/review/learning owners, never arbitrary shell/network or fabricated consent"
+  ],
+  "bounds": {
+    "campaign_rounds": 100000,
+    "slice_rounds": 8,
+    "parallel_actors": 8,
+    "completed_round_records_paged": true,
+    "per_slice_steps": 131072,
+    "lesson_evidence_bytes": 262144
+  },
+  "state": "Existing CORE_DB game_learning campaigns/rounds/lessons plus scoped jobs/revisions/policies; runtime objects/preview pixels/saves are derived handles",
+  "failure": "Stale source or policy identity, revoked consent, expired lease, malformed evidence, exhausted budget, missing core/toolchain, blocked review and unquiesced cancellation do not advance learned cursor or publish candidate",
+  "limitations": "Large configured run budgets are not executed evidence. Automatic quality improvement, flawless execution, commercial-game superiority, full semantic ROM digestion and all-target binary compatibility are not asserted. Deterministic specialist reviews are not represented as model inference.",
+  "automated_tests_requested": false,
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "runtime_api": {
+    "config": "CampaignConfig(...,evaluation_seeds=3,curriculum=\"mixed\",objective_weights=None,max_mean_step_ms=None,max_death_regression=0,max_worst_seed_regression=0)",
+    "campaign": "StudioLearningCampaign(request,config,context,lineage,policy_snapshot=None,snapshot=None,lessons=(),proposal_priors=())",
+    "execution": "run_slice(rounds,on_checkpoint(snapshot,round_report),authorize,cancel)",
+    "snapshot": "Strict skeleton.game.studio_campaign.v2; persistent bandit_state, bounded counterexamples, champion+policy and exact existing binding. No implicit v1 migration.",
+    "round": "Existing digest-bound roles plus objective_vector, constraints, measured performance, per-seed evaluations, bandit_observation and counterexample_summaries.",
+    "proposal_prior": "make_proposal_prior(lesson,origin_context=...,destination_context=...); validate_proposal_prior(prior,destination_context=...)",
+    "catalog": "campaign_catalog(); StudioLearningCampaign.proposal_catalog() exposes only typed fields consumed by current request."
+  },
+  "round_semantics": [
+    "Actual bounded tabular Q updates; exact-environment champion continuation forks measured parent state, while changed descriptors receive fresh tables. Frozen-policy evaluation transfers check exact action/bin/reward semantics.",
+    "New multi-seed held-out/adversarial partitions are deterministic and disjoint from current/inherited training; retained prior evaluation counterexamples can explicitly become future training seeds and are labelled accordingly.",
+    "Dragon analyzes actual preview pixels and temporal frame evidence through the existing reviewer; analytic layout/economy and typed source capacity are distinct from played metrics, and no subjective art critique/model execution is fabricated.",
+    "A candidate only replaces champion after all hard checks and measured ordinary/perturbed comparisons meet declared gates; checkpoint failure rolls back the whole round",
+    "Supported authored successor mechanics and console-editor speed mutate through their existing typed source owners; opaque native content is played but not automatically rewritten",
+    "All-round evidence remains paged in existing application Mongo; runtime snapshots carry bounded recent lesson memory plus full history digest/cursors"
+  ],
+  "context_scope": [
+    "target_id",
+    "genre",
+    "engine",
+    "source_digest",
+    "code_digest"
+  ],
+  "runtime_bounds": {
+    "episodes_per_round": 4,
+    "episode_steps": 4096,
+    "recent_lessons": 64,
+    "imported_lessons": 128,
+    "snapshot_bytes": 8388608,
+    "round_report_bytes": 262144,
+    "proposal_priors": 128,
+    "proposal_priors_bytes": 262144,
+    "evaluation_seeds": 8,
+    "counterexamples": 16,
+    "counterexample_bytes": 524288,
+    "bandit_arms": 128
+  },
+  "dragon_visual_review": {
+    "decoder": "existing bounded console_assets.decode_png",
+    "sample_limit": 65536,
+    "metrics": [
+      "occupied_quantized_palette_bins",
+      "dominant_color_fraction",
+      "luminance_range",
+      "edge_density",
+      "opaque_fraction",
+      "flat_raster",
+      "readable_signal"
+    ],
+    "authority": "Measured raster statistics only; no subjective aesthetics, commercial quality or model-critic claim",
+    "hard_floor": "Actual supported preview, finite valid PNG, >=2 quantized colors, luminance range>=4, opaque>=2%, dominant<=99.9%, edge density>=0.01%"
+  },
+  "runtime_recovery_scope": "Current same-store issued checkpoint/report authority plus strict snapshot/config/source/code digests; hashes do not authenticate a privileged fully rewritten unsigned history. Native/reference champion content is immutable; authored candidates use existing typed source owners.",
+  "episode_budget": "Exact planned steps = rounds*(episodes_per_round+4*evaluation_seeds)*episode_steps; actual counters charge numerical Q updates and every actual comparison trajectory.",
+  "progressive_fidelity_trials": {
+    "schedule": "Persistent UCB1 proposal selection among admitted typed arms; rejected upcoming profiles are not blindly retried.",
+    "profiles": [
+      "pixel",
+      "enhanced",
+      "cinematic"
+    ],
+    "execution": "Actually re-emits the supported renderer/source profile and measures its resulting pixels; remembered same-context rejection avoids blind repeat",
+    "acceptance": "Actual multi-seed weighted objective gain plus source, economy, visual-signal, ordinary/perturbed/per-seed/death/optional-latency constraints; no aesthetic or display-FPS score.",
+    "unsupported": "Console-editor/native opaque targets never silently acquire successor fidelity or copied assets"
+  },
+  "proposal_transfer": {
+    "transfer_kind": "proposal_only_not_measurement",
+    "envelope_fields": [
+      "transfer_kind",
+      "lesson",
+      "origin_context",
+      "origin_context_digest",
+      "destination_context_digest",
+      "evidence_digest",
+      "prior_digest"
+    ],
+    "eligibility": [
+      "target_id",
+      "genre",
+      "engine",
+      "code_digest"
+    ],
+    "authority": "Backend retrieves only owned current-rights authorized original lessons and source/teacher records; original context and evidence remain unchanged. Digests are not signatures or rights grants.",
+    "use": "Own-context decision takes precedence; otherwise a scoped prior may propose accepted directions, reverse rejected directions, or avoid a rejected fidelity profile. Priors never import Q, champion, completed counts or empirical measurements into a different source context.",
+    "recovery": "Exact bounded prior set is pinned in immutable campaign binding and retained in snapshot; a new set requires a new campaign."
+  },
+  "advanced_campaign": {
+    "status": "implementation_candidate",
+    "algorithm": "deterministic-UCB1 typed-proposal bandit; actual bounded tabular Q updates and paired multi-seed ordinary/perturbed evaluation",
+    "objective_keys": [
+      "return",
+      "completion",
+      "survival",
+      "coverage",
+      "diversity"
+    ],
+    "measurement": "Return from actual reward components; completed/dead from actual observations/flags; observed tabular state coverage and action/event diversity are descriptive numeric measures, not subjective gameplay or aesthetics.",
+    "constraints": "Actual preview/source/resource gates, nonnegative aggregate ordinary and perturbed return deltas, configured worst-seed/death regression caps and optional measured mean-step wall-time limit.",
+    "curriculum": [
+      "fresh",
+      "mixed",
+      "counterexample"
+    ],
+    "counterexamples": "Bounded actual failed/regressing episode receipts and selected full transition traces; replay seed may move explicitly from prior held-out evidence into future training. Each new evaluation partition stays disjoint from current and inherited training seeds.",
+    "current_policy": "Exact-environment policy.continue arm forks actual admitted champion weights/visits with parent digest and lifetime limits; changed environments initialize a fresh table and never silently relabel inherited Q semantics.",
+    "proposals": "Supported typed successor mechanics, selected economy/entity/layout edits and fidelity profiles; console editor typed configuration/entity changes; opaque native content only policy learning, no automatic rewrite.",
+    "recovery": "All bandit/curriculum/counterexample state commits and rolls back atomically with each round under existing application checkpoint authority.",
+    "promotion": "Weighted objective gain plus declared hard constraints across actual paired seeds; no guaranteed improvement or native-all-genres claim.",
+    "snapshot_schema": "skeleton.game.studio_campaign.v2",
+    "objective_normalization": "Return gain divided by max(1,abs baseline mean return); completion/survival/coverage/action-entropy gains use measured fractions.",
+    "proposal_attribution": "Source mutations and candidate policy may change together; measured candidate gains are not isolated causal estimates of a mechanic.",
+    "performance": "Actual offline environment-step wall milliseconds and separately measured preview wall milliseconds; source/frame analysis work is bounded but excluded from numerical step counters. No display-FPS or isolated hardware claim.",
+    "evidence_retention": "Counterexample receipt SHA binds original round/seed/source/environment/policy/return/trace SHA; optional full trace payload can be dropped to preserve the524288-byte bound without relabelling evidence. Subsequent curriculum reexecutes the actual environment; no imported scalar reward is trusted.",
+    "policy_lifetime": "Exact-parent continuation obeys existing1024-episode/1048576-update lifetime caps; configured100000 rounds do not override them or authorize silent policy reset.",
+    "restore": "Strict v2 field/config/code identity, integer cursor/trial counts, exact four issued lessons per round, counterexample provenance and actual cumulative work bounds; no v1 or old-code implicit migration.",
+    "source_constraints": "Original successor route checks and authored crop seed/value ordering; editor declared blocked/failing source checks and applicable static navigation reject promotion. Opaque native economy/layout remain explicitly unavailable."
+  },
+  "application_extension": {
+    "owner": "backend/core/game_studio_learning.py",
+    "api": "backend/routes/game_studio_learning.py",
+    "authority": "Existing scoped CORE_DB workspace/jobs/campaigns/rounds/lessons; no separate daemon, database, provider or model promotion authority",
+    "recovery": "Existing scheduler invokes a bounded current-authority sweep. Per-campaign Mongo recovery token/lease serializes startup, periodic scan and completion callback; all actual workers/actor credits stay with existing workspace._schedule. Live or physically draining local workers are never requeued; completed/failed/cancelled/interrupted attempt evidence is archived before reusable job slot reset. Configured budgets never count as executed rounds. Interrupted attempts with no durable progress receive bounded exponential backoff and pause after five distinct failed epochs; explicit owner resume resets the retry allowance. Live/source/code/teacher fences are rechecked before each continuation; configured rounds never imply completed work.",
+    "interfaces": [
+      "ensure_campaign_indexes",
+      "recover_studio_campaigns(limit=32)",
+      "attempts(campaign_id,after_epoch,limit)",
+      "authorize_campaign(expected_campaign_version,idempotency_key,auto_continue,authorization_seconds)",
+      "champion(campaign_id)",
+      "adopt_champion(expected_campaign_version,expected_version,idempotency_key,champion_round_digest)",
+      "export_champion",
+      "catalog()",
+      "lessons(project_id,q,limit,cursor)"
+    ],
+    "storage": "Reuse campaign rows plus immutable issued request, attempt and round identities in existing rounds collection; commands have bounded applied markers. Search terms/context keys derive only from existing issued lessons. No new authoritative collection.",
+    "bounds": {
+      "sweep_campaigns": 32,
+      "recovery_lease_seconds": 30,
+      "attempt_page": 32,
+      "lesson_page": 32,
+      "lesson_index_terms": 64,
+      "lesson_query_terms": 16,
+      "query_milliseconds": 2000,
+      "authorization_seconds": 86400,
+      "source_handoff_utf8_bytes": 1048576,
+      "no_progress_auto_retries": 5,
+      "maximum_retry_backoff_seconds": 300,
+      "legacy_lesson_index_batch": 64
+    },
+    "handoff": "Only the current snapshot champion that matches an exact committed accepted round may hand off editable typed source files. Reauthorize original source/teacher rights, bind campaign/round/request/policy/source/code identities and use the existing workspace expected-version save. ROM/native opaque content and Q policy promotion are excluded; raw exports remain exact source JSON from this same authorized handoff. A CAS reservation pauses the exact champion before the existing editor save; exact pending saves may reopen only their owned revision operation. Full original source files are preserved and canonical successor outputs regenerated; every original and parent source/teacher obligation transfers, bounded64 each.",
+    "evaluation": "Measured multiobjective config/curriculum remains the canonical pure owner API, preserving exact v2 snapshot/prior bindings. No caller-reported quality scalar determines champion admission. Historical policy reads verify issued policy/parent lineage and current source/consent rights while permitting an intentional later editor revision; current policy execution retains exact editor-tree fences.",
+    "bounded_current_source_selection": "Optional source_id is explicit compiled/native artifact selection through existing workspace._input; unselected build artifacts do not become learning inputs. Source context binds exact tree, admitted source refs, selected source, compiler/core identity.",
+    "static_validation": [
+      "Black",
+      "Ruff",
+      "Python syntax compilation"
+    ],
+    "automated_tests_run": false
+  }
+}

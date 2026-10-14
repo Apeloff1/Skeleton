@@ -74,8 +74,15 @@ export default function GateStage({ stage: stageProp }: { stage?: string }) {
     } catch { setReport({ error: 'Gate run failed' }); } finally { setRunning(false); }
   }, [buildId, target, constructId, kind, stage, ai]);
 
-  if (loading || !meta) {
-    return <SafeAreaView style={styles.safe} edges={['top']}><View style={styles.center}><ActivityIndicator color={C.accent} /></View></SafeAreaView>;
+  if (loading) {
+    return <SafeAreaView style={styles.safe} edges={['top']}><View style={styles.center}><ActivityIndicator color={C.accent} /><Text style={{ color: C.muted }}>Loading quality gate…</Text></View></SafeAreaView>;
+  }
+  if (!meta) {
+    return <SafeAreaView style={styles.safe} edges={['top']}><View style={styles.center}>
+      <Text style={styles.title}>Gate unavailable</Text>
+      <Text style={{ color: C.muted }}>Choose a supported gate, or check the connection and try again.</Text>
+      <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/stages')}><Text style={{ color: C.accent }}>Open stages</Text></TouchableOpacity>
+    </View></SafeAreaView>;
   }
 
   return (

@@ -63,7 +63,7 @@ class DragonResearchAudit:
             raise ValueError("unsupported audit action")
         if not isinstance(subject_id, str) or not subject_id or len(subject_id) > 128:
             raise ValueError("invalid audit subject")
-        if isinstance(now, bool) or not isinstance(now, (int, float)) or not isfinite(now) or now < 0:
+        if not isfinite(now) or now < 0:
             raise ValueError("invalid audit time")
         now = float(now)
         with self.db:
@@ -98,11 +98,14 @@ class DragonResearchAudit:
             sequence, action, subject_id, timestamp, stored_previous, digest = row
             if sequence != expected or stored_previous != previous:
                 return False
-            if digest != self._digest(owner, sequence, action, subject_id,
-                                      timestamp, stored_previous):
-                if not float(timestamp).is_integer() or digest != self._digest(
-                        owner, sequence, action, subject_id, int(timestamp), stored_previous):
-                    return False
+            verified = self._digest(owner, sequence, action, subject_id,
+                                     timestamp, stored_previous)==digest
+            if not verified and isinstance(timestamp,(float,int)) and float(timestamp).is_integer():
+                # Historical integer-time receipts persisted as SQLite REAL.
+                verified = self._digest(owner, sequence, action, subject_id,
+                                        int(timestamp), stored_previous)==digest
+            if not verified:
+                return False
             previous = digest
         return True
 

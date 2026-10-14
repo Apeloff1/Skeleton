@@ -32,3 +32,15 @@ def test_every_frontend_capability_routes_through_canonical_surface():
     # ids are more deeply indented and therefore excluded by the anchored regex.
     assert capability_ids == {capability.id for capability in PRODUCT_KERNEL.all()}
     assert "href: '/hub'" not in source
+
+
+def test_direct_navigation_is_not_admitted_as_a_governed_operation() -> None:
+    source = CATALOG.read_text(encoding="utf-8")
+    navigation_ids = re.findall(r"navigationId:\s*'([^']+)'", source)
+    governed_ids = re.findall(r"operation:\s*'([^']+)'", source)
+    charter = {action for domain in CANONICAL_PRODUCT_POLICY for action in domain.actions}
+
+    assert len(navigation_ids) == 15
+    assert len(navigation_ids) == len(set(navigation_ids))
+    assert set(navigation_ids).isdisjoint(charter)
+    assert set(governed_ids) == charter

@@ -10,7 +10,7 @@ import {
   ScrollView, Platform, Vibration, Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import { useModalStore } from '../../store/modalStore';
 import { ReadingVisualizer } from '../ReadingLibrary/ReadingVisualizer';
 import { ThemeColors } from '../../constants/themes';
@@ -49,8 +49,7 @@ export const BibleModal: React.FC<BibleModalProps> = memo(({
 }) => {
   const [selectedChapter, setSelectedChapter] = useState<BibleChapter | null>(null);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
-  const [musicEnabled, setMusicEnabled] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [musicEnabled, setMusicEnabled] = useState(false);
   const topicData = useModalStore(s => s.getModalData('bible'));
   const categoryFilter = topicData?.topic || '';
   const [dbBibles, setDbBibles] = useState<any[]>([]);
@@ -131,7 +130,8 @@ export const BibleModal: React.FC<BibleModalProps> = memo(({
 
   // Pick a random track URI for the player
   const [trackUri] = useState(() => AMBIENT_TRACKS[Math.floor(Math.random() * AMBIENT_TRACKS.length)]);
-  const player = useAudioPlayer({ uri: trackUri });
+  const player = useAudioPlayer(musicEnabled ? { uri: trackUri } : null);
+  const { playing: isPlaying } = useAudioPlayerStatus(player);
 
   const stats = getBibleStats(progress.completedChapters);
 
@@ -147,7 +147,6 @@ export const BibleModal: React.FC<BibleModalProps> = memo(({
           player.loop = true;
           player.volume = 0.3;
           player.play();
-          setIsPlaying(true);
         } catch (error) {
           console.log('Music playback error:', error);
         }
@@ -155,7 +154,6 @@ export const BibleModal: React.FC<BibleModalProps> = memo(({
     } else {
       try {
         player.pause();
-        setIsPlaying(false);
       } catch (error) {
         console.log('Stop music error:', error);
       }

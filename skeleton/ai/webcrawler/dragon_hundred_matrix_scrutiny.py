@@ -73,8 +73,8 @@ def scrutinize_one_hundred(
     if (type(now) is not int or now<0 or
         type(require_groups) is not int or not 2<=require_groups<=8 or
         type(public_key) is not bytes or len(public_key)!=32 or
-        type(trusted_reviewer) is not str or not trusted_reviewer or
-        type(key_id) is not str or not key_id or
+        type(trusted_reviewer) is not str or not 1<=len(trusted_reviewer)<=128 or
+        type(key_id) is not str or not 1<=len(key_id)<=128 or
         type(findings) is not tuple or len(findings)>100):
         raise ValueError("trusted bounded independent scrutiny inputs required")
     verifier=Ed25519PublicKey.from_public_bytes(public_key)
@@ -96,7 +96,7 @@ def scrutinize_one_hundred(
         for item in groups:
             _hex(item)
         if (type(finding.issued_at) is not int or type(finding.expires_at) is not int
-            or finding.issued_at>now or not finding.issued_at<finding.expires_at
+            or finding.issued_at<0 or finding.issued_at>now or not finding.issued_at<finding.expires_at
             or finding.expires_at-finding.issued_at>90*86400):
             raise ValueError("bounded attestation interval required")
         try:

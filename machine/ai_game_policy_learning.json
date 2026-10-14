@@ -1,0 +1,61 @@
+{
+  "schema_version": "skeleton.ai.game_policy_learning.v1",
+  "status": "implementation_candidate",
+  "canonical_owner": "skeleton/jeeves/game_learning.py",
+  "mirror": "skeleton/ai/agents/jeeves/game_learning.py",
+  "aggregate_contract": "machine/ai_game_learning.json",
+  "state_authority": "Existing CORE_DB application job/project revisions; learner creates no database or storage service",
+  "algorithm": {
+    "id": "tabular_q_learning_v1",
+    "state": "Sorted declared numeric observation keys discretized by fixed strictly increasing threshold tuples with bisect_right",
+    "update": "Q(s,a) += alpha * (clipped sum of declared reward components + gamma * max Q(next_state) unless terminated - Q(s,a))",
+    "truncation": "A truncated episode ends collection but preserves the nonterminal bootstrap target",
+    "exploration": "Seeded epsilon-greedy; committed episode count controls bounded epsilon decay; ties use declared action order",
+    "inference": "Greedy action plus exact Q values and visit counts; no calibrated probability or general intelligence claim"
+  },
+  "bounds": {
+    "actions": 32,
+    "observation_features": 32,
+    "thresholds_per_feature": 64,
+    "reward_components": 16,
+    "episode_steps": 4096,
+    "episodes": 256,
+    "updates": 65536,
+    "states": 16384,
+    "lifetime_episodes": 1024,
+    "lifetime_updates": 1048576,
+    "snapshot_bytes": 8388608,
+    "trace_bytes": 8388608,
+    "evaluation_episodes": 64,
+    "evaluation_steps": 65536,
+    "source_lineage_bytes": 65536
+  },
+  "durability": {
+    "checkpoint_boundary": "Complete episode only; uncommitted episode Q updates, random state and cursors are rolled back on cancellation or checkpoint callback failure",
+    "snapshot": "Canonical SHA256-bound complete Q table, exact visits, optimizer config, environment descriptor, runtime identity, seed ledger, source lineage, episode cursor and trace digest history",
+    "callback": "Existing authority atomically persists candidate snapshot and episode trace after worker/version/rights checks; learner treats successful callback return as commitment",
+    "recovery": "Restore strict full snapshot; do not reapply committed episodes; restart may replay only the uncommitted episode",
+    "fork": "Explicit new candidate requires a parent with committed current-job learning updates, copies exact parent Q/visits, pins full parent snapshot digest and policy identity, retains inherited episode/seed ledger, resets only current-job counters and RNG/config. Per-job and lifetime usage bounds remain separate; no parent or production policy mutation",
+    "fences": "Application authority supplies cancellation, authorization and atomic checkpoint callbacks; no child writes or authority created by learner"
+  },
+  "offline_trace": {
+    "schema_version": "skeleton.game.trace.v1",
+    "required": ["schema_version", "environment", "episode_id", "seed", "source_lineage", "transitions", "return", "steps", "trace_digest"],
+    "transition_required": ["sequence", "observation", "action", "next_observation", "reward", "reward_components", "terminated", "truncated"],
+    "validation": "Exact environment descriptor and source lineage, or exact original lineage in policy source_lineage.admitted_traces keyed by the complete trace digest; finite typed observations/rewards, action membership, sequential continuous observation chain, terminal/truncated last transition, exact component sum, return and canonical UTF8 JSON digest",
+    "admitted_traces": "Bounded 256-entry immutable trace-digest-to-original-lineage map populated only by existing authenticated backend from current rights-scoped source bundles; it grants no independent rights authority",
+    "evidence": "Imported transitions are supplied evidence; Q updates are real execution but imported rewards are not relabeled as simulator-measured returns"
+  },
+  "evaluation": {
+    "execution": "Fresh actual environments, paired disjoint held-out seeds, greedy candidate versus seeded uniform-random or explicitly supplied parent policy",
+    "measures": "Raw component return, episode steps, termination/truncation rates, paired return difference and trace identities",
+    "mutation": "No Q updates and no training RNG/cursor changes",
+    "promotion": "Candidate evidence only; improvement is never assumed and no production promotion is performed"
+  },
+  "failure": "Malformed or substituted snapshots/traces, foreign environment/config/lineage, exhausted states/steps/episodes/bytes, nonfinite arithmetic, cancellation and rejected authority callbacks fail explicitly before committing the next episode",
+  "limitations": "Bounded tabular local control policy, not neural all-game learning or universal hardware emulation. Rights/provenance remain application-owned. Snapshot digests detect byte corruption but do not authenticate a malicious issuer. Runtime interruption within an episode replays that episode.",
+  "automated_tests_authorized": false,
+  "verification": "User directs no tests. Static compilation/lint only during this implementation session; future executed acceptance evidence required.",
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false
+}
