@@ -24,7 +24,7 @@ def test_promotion_gate_quarantines_uncorroborated_material():
 
 def test_promotion_gate_accepts_independent_corroboration():
  a=doc("https://a.example/","crawler evidence")
- b=doc("https://b.example/","crawler evidence")
+ b=doc("https://b.example/","independent laboratory results provide crawler evidence")
  e=EvidenceSet(ResearchQuery("crawler evidence",required_sources=2));e.add(a);e.add(b)
  assert PromotionGate().decide(a,e,now=100).action=="promote"
 
