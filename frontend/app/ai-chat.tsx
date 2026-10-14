@@ -1,11 +1,12 @@
-/** Compatibility entrypoint for the governed AI chat workstream.
- * Route renders the current canonical workspace, not the divergent draft UI.
- * Keep it lazily loaded so Expo Router cold-start remains bounded.
+/** Entry point for the governed AI chat workstream.
+ * The server-authorized conversation, model inventory and replay controller live
+ * in GovernedChatWorkspace. Keep legacy Jeeves chat on /jeeves-chat.
+ * Lazily load the governed workspace so Expo Router startup remains bounded.
  */
 import { makeLazyModalRoute } from '../components/SafeModalRoute';
 
 export default makeLazyModalRoute(
-  () => import('../features/Jeeves/ChatWorkspace'),
+  () => import('../features/Jeeves/GovernedChatWorkspace'),
   'AIChatRoute',
   'default',
 );
