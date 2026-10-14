@@ -68,12 +68,19 @@ jobs:
             while true; do
               : > "$tmp"
               if gh api --paginate "/repos/${REPO}/actions/runs?status=${status_name}&per_page=100" \
-                --jq '.workflow_runs[] | [.id, .name, .event, .head_sha, .head_branch, .created_at] | @tsv' > "$tmp"; then
+                --jq '.workflow_runs[] | [.id, .name, .event, .head_sha, .head_branch, .created_at] | @tsv' > "$tmp" 2>"$RUNNER_TEMP/live-inventory-api-error.txt"; then
                 cat "$tmp" >> "$inventory"
                 rm -f "$tmp"
                 return 0
               else
                 status=$?
+                # API exhaustion is not transient within this sweep. Keep
+                # incomplete inventory unusable, and skip all later stages.
+                if grep -Eqi '(rate.limit|abuse detection)' "$RUNNER_TEMP/live-inventory-api-error.txt"; then
+                  touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
+                  echo '::warning::Housekeeping inventory deferred due to GitHub API limits.'
+                  exit 0
+                fi
               fi
               if (( attempt >= 4 )); then
                 rm -f "$tmp"
@@ -471,6 +478,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]; then
+            echo '::warning::Skipping cache cleanup under GitHub API rate pressure.'
+            exit 0
+          fi
           cutoff=$(date -u -d "${CACHE_RETENTION_DAYS} days ago" +%s)
           inventory="$RUNNER_TEMP/caches.tsv"
           deleted=0
@@ -482,11 +493,18 @@ jobs:
             local attempt=1 delay=2 status tmp="${inventory}.candidate"
             while true; do
               : > "$tmp"
-              if gh api --paginate "/repos/${REPO}/actions/caches?per_page=100" --jq '.actions_caches[] | [.id, .last_accessed_at, .created_at, .size_in_bytes] | @tsv' > "$tmp"; then
+              if gh api --paginate "/repos/${REPO}/actions/caches?per_page=100" --jq '.actions_caches[] | [.id, .last_accessed_at, .created_at, .size_in_bytes] | @tsv' > "$tmp" 2>"$RUNNER_TEMP/cache-inventory-api-error.txt"; then
                 mv "$tmp" "$inventory"
                 return 0
               else
                 status=$?
+                # API exhaustion is not transient within this sweep. Keep
+                # incomplete inventory unusable, and skip all later stages.
+                if grep -Eqi '(rate.limit|abuse detection)' "$RUNNER_TEMP/cache-inventory-api-error.txt"; then
+                  touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
+                  echo '::warning::Housekeeping inventory deferred due to GitHub API limits.'
+                  exit 0
+                fi
               fi
               if (( attempt >= 4 )); then
                 rm -f "$tmp"
@@ -553,11 +571,18 @@ jobs:
             local attempt=1 delay=2 status tmp="${inventory}.candidate"
             while true; do
               : > "$tmp"
-              if gh api --paginate "/repos/${REPO}/actions/artifacts?per_page=100" --jq '.artifacts[] | [.id, .created_at, .expired] | @tsv' > "$tmp"; then
+              if gh api --paginate "/repos/${REPO}/actions/artifacts?per_page=100" --jq '.artifacts[] | [.id, .created_at, .expired] | @tsv' > "$tmp" 2>"$RUNNER_TEMP/artifact-inventory-api-error.txt"; then
                 mv "$tmp" "$inventory"
                 return 0
               else
                 status=$?
+                # API exhaustion is not transient within this sweep. Keep
+                # incomplete inventory unusable, and skip all later stages.
+                if grep -Eqi '(rate.limit|abuse detection)' "$RUNNER_TEMP/artifact-inventory-api-error.txt"; then
+                  touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
+                  echo '::warning::Housekeeping inventory deferred due to GitHub API limits.'
+                  exit 0
+                fi
               fi
               if (( attempt >= 4 )); then
                 rm -f "$tmp"
@@ -623,12 +648,19 @@ jobs:
                 --status "$status_name" \
                 --created "<${cutoff_iso}" \
                 --json databaseId,createdAt,conclusion,name \
-                --jq '.[] | [.databaseId, .createdAt, .conclusion, .name] | @tsv' > "$tmp"; then
+                --jq '.[] | [.databaseId, .createdAt, .conclusion, .name] | @tsv' > "$tmp" 2>"$RUNNER_TEMP/failed-run-inventory-api-error.txt"; then
                 cat "$tmp" >> "$inventory"
                 rm -f "$tmp"
                 return 0
               else
                 status=$?
+                # API exhaustion is not transient within this sweep. Keep
+                # incomplete inventory unusable, and skip all later stages.
+                if grep -Eqi '(rate.limit|abuse detection)' "$RUNNER_TEMP/failed-run-inventory-api-error.txt"; then
+                  touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
+                  echo '::warning::Housekeeping inventory deferred due to GitHub API limits.'
+                  exit 0
+                fi
               fi
               if (( attempt >= 4 )); then
                 rm -f "$tmp"

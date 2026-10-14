@@ -246,3 +246,11 @@ def test_queue_drain_never_force_cancels_security_evidence() -> None:
         workflow.index("def main_sha():")
     ]
     assert cancel.index("if security_lane:") < cancel.index("/force-cancel")
+
+
+def test_housekeeping_wake_cooldown_recovers_persistent_old_queue() -> None:
+    workflow = _workflow_text()
+    assert "HOUSEKEEPING_WAKE_STALE_MINUTES: '1440'" in workflow
+    assert "HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '90'" in workflow
+    assert "HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '360'" not in workflow
+    assert "for status_name in requested waiting pending queued in_progress; do" in workflow
