@@ -108,7 +108,7 @@ def test_signer_forgeries_owner_substitutions_and_stale_revisions_are_denied():
         with pytest.raises(PermissionError, match="stale knowledge"):
             ledger.record(signed(private), now=150, expected_revision=0, authorized=True)
         with pytest.raises(PermissionError, match="signature"):
-            ledger.record(replace(signed(private), status="revoked"), now=150,
+            ledger.record(replace(signed(private), source_set_digest="e" * 64), now=150,
                           expected_revision=1, authorized=True)
     finally:
         db.close()
