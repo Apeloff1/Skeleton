@@ -228,7 +228,17 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
 }): Promise<ConversationTurn> {
   let cursor = input.lastEventId ?? 0;
   if (!Number.isSafeInteger(cursor) || cursor < 0) throw new ChatClientError('Stream cursor is invalid.');
+  // An in-memory event sequence without its verified digest is not a usable
+  // persisted cursor. Replay from zero rather than invent a hash or bypass
+  // the server's exact-cursor contract.
+  let cursorDigest: string | null = null;
   let provisional = input.provisionalText ?? '';
+  if (cursor > 0) {
+    cursor = 0;
+    provisional = '';
+    input.onCursor?.(0);
+    input.onText?.('');
+  }
   const seen = new Map<number, string>();
   const eventIds = new Map<string, number>();
   const started = Date.now();
@@ -271,7 +281,9 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
     try {
       const headers = authHeaders({ Accept: 'text/event-stream', ...input.headers });
       if (cursor) headers['Last-Event-ID'] = String(cursor);
-      const path = transport.eventsPath! + '?idempotency_key=' + encodeURIComponent(key) + '&after_sequence=' + cursor;
+      const path = transport.eventsPath! + '?idempotency_key=' + encodeURIComponent(key)
+        + '&after_sequence=' + cursor
+        + (cursorDigest === null ? '' : '&last_event_digest=' + encodeURIComponent(cursorDigest));
       const response = await fetch(API_BASE + path, { headers, signal: controller.signal, credentials: 'same-origin' });
       if (!response.ok) {
         let detail: unknown = null;
@@ -330,6 +342,14 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
           || (typeof record.type === 'string' && frame.event !== 'engine.' + record.type)) {
           throw new ChatClientError('Engine event identifier or type is invalid.', { code: 'invalid_event' });
         }
+        const digest = record.event_digest;
+        if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) {
+          throw new ChatClientError('Engine event digest is invalid.', { code: 'invalid_event_digest' });
+        }
+        const previousDigest = record.previous_event_digest;
+        if (previousDigest !== cursorDigest) {
+          throw new ChatClientError('Engine event digest chain changed.', { code: 'conflicting_event_digest' });
+        }
         const previousSequence = eventIds.get(eventId);
         if (previousSequence !== undefined && previousSequence !== sequence) throw new ChatClientError('Engine event identity was reused.', { code: 'conflicting_event' });
         const fingerprint = await digestStringAsync(CryptoDigestAlgorithm.SHA256, canonical({ event: frame.event, data: record }));
@@ -359,6 +379,7 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
         seen.set(sequence, fingerprint);
         while (seen.size > 256) seen.delete(seen.keys().next().value!);
         cursor = sequence;
+        cursorDigest = digest;
         input.onCursor?.(cursor);
         retries = 0;
       };
