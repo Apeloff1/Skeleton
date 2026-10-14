@@ -109,6 +109,11 @@ def merge_catalogs(catalogs: list[dict]) -> dict:
         if not isinstance(catalog, dict) or not isinstance(catalog.get("manifest"), dict):
             raise ValueError("typed retrieved catalog required")
         manifest = catalog["manifest"]
+        if set(manifest) != {
+            "catalog_id", "url", "git_blob_sha", "content_sha256",
+            "observed_at", "linked_content_fetched",
+        }:
+            raise ValueError("catalog manifest fields are invalid")
         cid = manifest.get("catalog_id")
         if (not isinstance(cid, str) or not re.fullmatch(r"catalog-[0-9a-f]{40}", cid)
                 or manifest.get("git_blob_sha") != cid.removeprefix("catalog-")
@@ -116,7 +121,8 @@ def merge_catalogs(catalogs: list[dict]) -> dict:
                 or not re.fullmatch(r"[0-9a-f]{64}", manifest["content_sha256"])
                 or manifest.get("linked_content_fetched") is not False):
             raise ValueError("catalog custody identity is invalid")
-        canonical_source_url(manifest.get("url"))
+        if canonical_source_url(manifest.get("url")) != manifest["url"]:
+            raise ValueError("catalog source URL is not canonical")
         _utc(manifest.get("observed_at"))
         if cid in manifests and manifests[cid] != manifest:
             raise ValueError("conflicting catalog identity")
