@@ -1,19 +1,6 @@
 name: P3 Training Data Plane
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/runtime/training/**"
-      - "skeleton/testing/test_p3_training_data.py"
-      - ".github/workflows/p3-training-data.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-t2-training-plane-atomic
-    paths:
-      - "skeleton/ai/runtime/training/**"
-      - "skeleton/testing/test_p3_training_data.py"
-      - ".github/workflows/p3-training-data.yml"
   workflow_dispatch:
 
 permissions:

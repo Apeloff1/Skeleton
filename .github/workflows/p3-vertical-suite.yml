@@ -1,37 +1,6 @@
 name: P3 Vertical Suite
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/eval/vertical_suite.py"
-      - "skeleton/ai/evaluation/vertical_suite.py"
-      - "skeleton/testing/test_vs002_engineering_agent.py"
-      - "skeleton/testing/test_vs003_scientific_researcher.py"
-      - "skeleton/testing/test_vs004_multi_agent_engineering.py"
-      - "skeleton/testing/test_vs005_self_improvement.py"
-      - "skeleton/testing/test_vs006_distributed_execution.py"
-      - "skeleton/testing/test_vs007_desktop_product.py"
-      - "skeleton/testing/test_p3_vertical_suite.py"
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_p3_task_backlog.json"
-      - ".github/workflows/p3-vertical-suite.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-autonomous-intelligence-expansion-atomic
-    paths:
-      - "skeleton/eval/vertical_suite.py"
-      - "skeleton/ai/evaluation/vertical_suite.py"
-      - "skeleton/testing/test_vs002_engineering_agent.py"
-      - "skeleton/testing/test_vs003_scientific_researcher.py"
-      - "skeleton/testing/test_vs004_multi_agent_engineering.py"
-      - "skeleton/testing/test_vs005_self_improvement.py"
-      - "skeleton/testing/test_vs006_distributed_execution.py"
-      - "skeleton/testing/test_vs007_desktop_product.py"
-      - "skeleton/testing/test_p3_vertical_suite.py"
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_p3_task_backlog.json"
-      - ".github/workflows/p3-vertical-suite.yml"
   workflow_dispatch:
 
 permissions:

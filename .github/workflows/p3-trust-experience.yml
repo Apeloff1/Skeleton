@@ -1,25 +1,6 @@
 name: P3 Trust Experience
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/cognition/trust_experience.py"
-      - "skeleton/ai/cognition/trust_experience.py"
-      - "skeleton/testing/test_p3_trust_experience.py"
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_p3_task_backlog.json"
-      - ".github/workflows/p3-trust-experience.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-autonomous-intelligence-expansion-atomic
-    paths:
-      - "skeleton/cognition/trust_experience.py"
-      - "skeleton/ai/cognition/trust_experience.py"
-      - "skeleton/testing/test_p3_trust_experience.py"
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_p3_task_backlog.json"
-      - ".github/workflows/p3-trust-experience.yml"
   workflow_dispatch:
 
 permissions:

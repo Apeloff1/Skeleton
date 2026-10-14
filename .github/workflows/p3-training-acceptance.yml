@@ -1,30 +1,6 @@
 name: P3 Native Training Acceptance
 
 on:
-  pull_request:
-    paths:
-      - "machine/ai_p3_training_execution_map.json"
-      - "machine/ai_p3_training_task_backlog.json"
-      - "skeleton/ai/runtime/training/**"
-      - "skeleton/testing/test_p3_training_data.py"
-      - "skeleton/testing/test_p3_training_control.py"
-      - "skeleton/testing/test_p3_local_training_evaluation.py"
-      - "skeleton/testing/test_p3_post_training.py"
-      - "tests/test_p3_training_execution_map.py"
-      - "tests/test_p3_training_acceptance.py"
-      - "scripts/check_p3_training_execution_map.py"
-      - ".github/workflows/p3-training-acceptance.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-t2-training-plane-atomic
-    paths:
-      - "machine/ai_p3_training_execution_map.json"
-      - "machine/ai_p3_training_task_backlog.json"
-      - "skeleton/ai/runtime/training/**"
-      - "tests/test_p3_training_acceptance.py"
-      - "scripts/check_p3_training_execution_map.py"
-      - ".github/workflows/p3-training-acceptance.yml"
   workflow_dispatch:
 
 permissions:

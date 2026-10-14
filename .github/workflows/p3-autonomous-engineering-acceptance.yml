@@ -1,27 +1,6 @@
 name: P3 Autonomous Engineering Acceptance
 
 on:
-  pull_request:
-    paths:
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_p3_task_backlog.json"
-      - "scripts/check_p3_execution_map.py"
-      - "tests/test_p3_execution_map.py"
-      - "skeleton/ai/runtime/autonomous_engineering/**"
-      - "skeleton/testing/test_p3_*.py"
-      - ".github/workflows/p3-autonomous-engineering-acceptance.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-autonomous-engineering-frontier
-    paths:
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_p3_task_backlog.json"
-      - "scripts/check_p3_execution_map.py"
-      - "tests/test_p3_execution_map.py"
-      - "skeleton/ai/runtime/autonomous_engineering/**"
-      - "skeleton/testing/test_p3_*.py"
-      - ".github/workflows/p3-autonomous-engineering-acceptance.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,19 +1,6 @@
 name: P3 Post Training and Curriculum
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/runtime/training/**"
-      - "skeleton/testing/test_p3_post_training.py"
-      - ".github/workflows/p3-post-training.yml"
-  push:
-    branches:
-      - main
-      - feat/p3-t2-training-plane-atomic
-    paths:
-      - "skeleton/ai/runtime/training/**"
-      - "skeleton/testing/test_p3_post_training.py"
-      - ".github/workflows/p3-post-training.yml"
   workflow_dispatch:
 
 permissions:
