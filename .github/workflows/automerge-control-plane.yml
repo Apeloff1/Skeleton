@@ -13,17 +13,9 @@ on:
       # Validate only successful source conclusions before allocating runners.
       - "!main"
   schedule:
-    # Merge Readiness completion remains the immediate event-driven wake;
-    # the scheduled fallback catches missed events without five-minute churn.
+    # PR validation completions remain the immediate wake; the hourly
+    # fallback covers missed events and workflow-only updates without fanout.
     - cron: "8 * * * *"
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/automerge-control-plane.yml"
-      - "skeleton/pr_automation/automerge_*.py"
-      - "scripts/check_automerge_contract.py"
-      - "skeleton/testing/test_automerge_*.py"
 
 concurrency:
   group: automerge-control-plane-${{ github.repository }}

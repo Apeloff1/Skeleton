@@ -2,7 +2,7 @@ name: Idle Backlog Bot
 
 on:
   schedule:
-    - cron: '17,47 * * * *'
+    - cron: '47 5 * * *'
   workflow_dispatch:
 
 concurrency:

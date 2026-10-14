@@ -3,7 +3,7 @@ name: CI Failure Bot
 on:
   workflow_dispatch:
   schedule:
-    - cron: '27 */2 * * *'
+    - cron: '27 */4 * * *'
 
 concurrency:
   group: ci-failure-bot-${{ github.repository }}

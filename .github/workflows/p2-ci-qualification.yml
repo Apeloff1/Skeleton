@@ -6,7 +6,8 @@ on:
     # separate producer completions (including skipped and cancelled ones).
     workflows: ["Merge Readiness"]
     types: [completed]
-    branches: ["**"]
+    # Canonical CI qualification is tied to post-merge main, not PR heads.
+    branches: [main]
 
 permissions:
   actions: read
@@ -27,6 +28,8 @@ jobs:
     # re-triggers this workflow without producing evidence.
     if: >-
       github.event.workflow_run.head_repository.full_name == github.repository
+      && github.event.workflow_run.head_branch == github.event.repository.default_branch
+      && github.event.workflow_run.event == 'push'
       && github.event.workflow_run.conclusion != 'cancelled'
       && github.event.workflow_run.conclusion != 'skipped'
     runs-on: ubuntu-24.04
