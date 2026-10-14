@@ -1,17 +1,6 @@
 name: Backpressure Propagation
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "machine/backpressure_contract.json"
-      - "scripts/verify_backpressure_contract.py"
-      - "skeleton/kernel/backpressure.py"
-      - "skeleton/ai/runtime/kernel/backpressure.py"
-      - "skeleton/testing/test_backpressure_propagation.py"
-      - "machine/ai_hostile_gap_disposition.json"
-      - ".github/workflows/backpressure-propagation.yml"
   push:
     branches:
       - main

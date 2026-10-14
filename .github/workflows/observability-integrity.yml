@@ -1,17 +1,6 @@
 name: Observability Integrity
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "machine/observability_integrity_contract.json"
-      - "scripts/verify_observability_integrity_contract.py"
-      - "skeleton/observability/integrity.py"
-      - "skeleton/ai/runtime/observability/integrity.py"
-      - "skeleton/observability/resilient_telemetry.py"
-      - "skeleton/testing/test_observability_integrity.py"
-      - "machine/ai_hostile_gap_disposition.json"
-      - ".github/workflows/observability-integrity.yml"
   push:
     branches: [main]
     paths:

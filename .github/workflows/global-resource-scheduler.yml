@@ -1,20 +1,6 @@
 name: Global Resource Scheduler
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "machine/global_resource_scheduler_contract.json"
-      - "scripts/verify_global_resource_scheduler_contract.py"
-      - "skeleton/kernel/global_resource_scheduler.py"
-      - "skeleton/ai/runtime/kernel/global_resource_scheduler.py"
-      - "skeleton/automation/agents/scheduler.py"
-      - "skeleton/ai/agents/core/scheduler.py"
-      - "skeleton/testing/test_global_resource_scheduler.py"
-      - "skeleton/testing/test_global_resource_swarm_integration.py"
-      - "machine/ai_hostile_gap_disposition.json"
-      - ".github/workflows/global-resource-scheduler.yml"
   push:
     branches:
       - main

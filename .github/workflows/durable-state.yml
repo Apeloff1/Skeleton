@@ -15,21 +15,7 @@ on:
       - "skeleton/testing/test_checkpoint_migrations.py"
       - "skeleton/testing/test_jeeves_durable_*.py"
       - ".github/workflows/durable-state.yml"
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths:
-      - "skeleton/state/**"
-      - "skeleton/jeeves/agent/durable_audit.py"
-      - "skeleton/jeeves/agent/durable_transition_model.py"
-      - "skeleton/jeeves/agent/durable_runtime.py"
-      - "skeleton/jeeves/agent/frontier_runtime.py"
-      - "skeleton/jeeves/agent/runtime_guard.py"
-      - "skeleton/jeeves/agent/audit_assurance.py"
-      - "skeleton/testing/test_durable_run_store.py"
-      - "skeleton/testing/test_checkpoint_migrations.py"
-      - "skeleton/testing/test_jeeves_durable_*.py"
-      - ".github/workflows/durable-state.yml"
-
+  workflow_dispatch:
 permissions:
   contents: read
 

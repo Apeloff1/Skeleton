@@ -1,15 +1,6 @@
 name: Durable Distributed Ordering
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "skeleton/kernel/distributed_ordering.py"
-      - "skeleton/ai/runtime/kernel/distributed_ordering.py"
-      - "skeleton/testing/test_distributed_ordering_authority.py"
-      - "machine/ai_hostile_gap_disposition.json"
-      - ".github/workflows/durable-distributed-ordering.yml"
   push:
     branches:
       - main

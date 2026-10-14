@@ -12,18 +12,7 @@ on:
       - "skeleton/testing/test_durable_run_store.py"
       - "skeleton/testing/test_swarm_durable.py"
       - ".github/workflows/swarm-durable-recovery.yml"
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths:
-      - "skeleton/agents/swarm_durable.py"
-      - "skeleton/agents/swarm_recovery.py"
-      - "skeleton/agents/swarm_checkpoint.py"
-      - "skeleton/agents/swarm_runtime.py"
-      - "skeleton/state/**"
-      - "skeleton/testing/test_durable_run_store.py"
-      - "skeleton/testing/test_swarm_durable.py"
-      - ".github/workflows/swarm-durable-recovery.yml"
-
+  workflow_dispatch:
 permissions:
   contents: read
 

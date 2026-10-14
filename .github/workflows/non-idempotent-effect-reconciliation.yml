@@ -1,20 +1,6 @@
 name: Non-idempotent Effect Reconciliation
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "skeleton/skills/tool_effect_reconciliation.py"
-      - "skeleton/ai/runtime/skills/tool_effect_reconciliation.py"
-      - "skeleton/skills/tool_saga.py"
-      - "skeleton/ai/runtime/skills/tool_saga.py"
-      - "skeleton/testing/test_tool_effect_reconciliation.py"
-      - "skeleton/testing/test_tool_receipt_store.py"
-      - "skeleton/testing/test_tool_saga.py"
-      - "machine/ai_hostile_gap_disposition.json"
-      - "machine/tool_effect_reconciliation_contract.json"
-      - ".github/workflows/non-idempotent-effect-reconciliation.yml"
   push:
     branches:
       - main
