@@ -822,3 +822,24 @@ test('reattachment recovers a committed answer without a second generation', asy
   assert.equal(store.active.messages[1].text, 'Already committed');
   assert.equal(store.active.draft, '');
 });
+
+test('Jeeves Markdown renderer is inert, bounded to display primitives, and JSX syntax-valid', () => {
+  const path = require('node:path');
+  const fileName = path.join(__dirname, '..', 'features', 'Jeeves', 'MessageContent.tsx');
+  const source = fs.readFileSync(fileName, 'utf8');
+  const result = ts.transpileModule(source, {
+    fileName,
+    reportDiagnostics: true,
+    compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+  });
+  const errors = (result.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error);
+  assert.deepEqual(errors.map(d => String(d.messageText)), []);
+  assert.match(source, /function markdown\(text: string\)/);
+  assert.match(source, /streaming = false/);
+  assert.match(source, /function CodeBlock\(/);
+  assert.match(source, /kind: 'list'/);
+  assert.match(source, /kind: 'table'/);
+  assert.match(source, /kind: 'heading'/);
+  assert.ok(source.includes('mailto:') && source.includes('https?:'), 'links limited to authored http/mailto schemes');
+  assert.doesNotMatch(source, /dangerouslySetInnerHTML|WebView|\beval\s*\(/);
+});
