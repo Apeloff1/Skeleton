@@ -339,7 +339,7 @@ export default function ChatWorkspace() {
       <Button icon="checkmark-outline" label="Save details" onPress={() => { controller.edit({ title, context }); setSettings(false); }} />
       <View style={s.divider} /><Text style={s.label}>Keep a copy</Text><Text style={s.small}>Export a Markdown transcript. Attachment and generated file contents are excluded.</Text>
       <Button icon="download-outline" label="Export transcript" onPress={() => { void exportTranscript(conversation).catch(() => controller.notify('Could not export the transcript. Try copying individual messages.')); }} />
-      <Text style={s.small}>Server history belongs to your signed-in account. Drafts and a rebuildable cache stay on this device; attachments last only for this visit.</Text>
+      <Text style={s.small}>Conversation history is kept on the server. The chat list, drafts and a rebuildable cache stay on this device; attachments last only for this visit.</Text>
     </ScrollView></SafeAreaView></Modal>
   </SafeAreaView>;
 }

@@ -465,7 +465,10 @@ class Campaign:
             server = server.replace("http://skeleton:8001", f"http://127.0.0.1:{self.args.engine_port}")
             server = server.replace("http://backend:8001", f"http://127.0.0.1:{self.args.backend_port}")
             config = prefix / "nginx.conf"
-            config.write_text("daemon off;\nmaster_process off;\nworker_processes 1;\npid " + str(prefix / "nginx.pid")
+            # UID-mapped containers may not map Nginx's default nobody user.
+            # Keep this loopback fixture's temporary files with their owner.
+            owner = "user root root;\n" if os.geteuid() == 0 else ""
+            config.write_text(owner + "daemon off;\nmaster_process off;\nworker_processes 1;\npid " + str(prefix / "nginx.pid")
                 + ";\nerror_log stderr notice;\nevents { worker_connections 128; }\nhttp {\n"
                 + "access_log off;\nclient_body_temp_path " + str(prefix / "body") + ";\n"
                 + "proxy_temp_path " + str(prefix / "proxy") + ";\n"
@@ -514,7 +517,8 @@ class Campaign:
             routes = sorted("/" + path.relative_to(self.web_export).with_suffix("").as_posix()
                             for path in self.web_export.rglob("*.html")
                             if not any(part.startswith(("_", "+")) for part in path.relative_to(self.web_export).parts))
-            routes = ["/" if route == "/index" else "/gate/fine_tuning" if route == "/gate/[stage]" else route
+            routes = [route.removesuffix("index") if route.endswith("/index")
+                      else "/gate/fine_tuning" if route == "/gate/[stage]" else route
                       for route in routes]
         if self.args.audit_route:
             routes = self.args.audit_route

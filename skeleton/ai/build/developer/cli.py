@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from contextlib import redirect_stdout
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -310,10 +311,58 @@ def dev_exit_code(result: Any) -> int:
     return 0
 
 
+class _JSONOutputTracker:
+    """Forward immediately and recognize JSON containers with constant memory."""
+
+    def __init__(self, stream):
+        self.stream = stream
+        self.emitted = False
+        self.depth = 0
+        self.quoted = False
+        self.escaped = False
+        self.line_start = True
+
+    def __getattr__(self, name):
+        return getattr(self.stream, name)
+
+    def write(self, text):
+        written = self.stream.write(text)
+        if self.emitted:
+            return written
+        for character in text:
+            if self.depth == 0:
+                if self.line_start and character == "{":
+                    self.depth = 1
+                elif character == "\n":
+                    self.line_start = True
+                elif not character.isspace():
+                    self.line_start = False
+            elif self.quoted:
+                if self.escaped:
+                    self.escaped = False
+                elif character == "\\":
+                    self.escaped = True
+                elif character == '"':
+                    self.quoted = False
+            elif character == '"':
+                self.quoted = True
+            elif character in "{[":
+                self.depth += 1
+            elif character in "}]":
+                self.depth -= 1
+                if self.depth == 0:
+                    self.emitted = True
+                    break
+        return written
+
+
 def main(argv: Optional[List[str]] = None) -> int:
-    """Console-script adapter; never pass a result mapping to sys.exit."""
-    result = run_dev_cli(argv)
-    if isinstance(result, dict) and result.get("status") != "help_shown":
+    """Console adapter: preserve producer output and render unprinted results."""
+    output = _JSONOutputTracker(sys.stdout)
+    with redirect_stdout(output):
+        result = run_dev_cli(argv)
+    if (isinstance(result, dict) and result.get("status") != "help_shown"
+            and not output.emitted):
         print(json.dumps(result, indent=2, default=str))
     return dev_exit_code(result)
 

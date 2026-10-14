@@ -165,3 +165,14 @@ installed device behavior or live providers. The expanded `app-cli-forge` shard
 reports a missing Godot binary as an unverified playtest rather than silently
 certifying that journey. Set `SKELETON_GODOT_BIN` to a real supported executable
 when qualifying the headless game playtest.
+
+The CI forge shard installs Godot 4.4.1 from the official download service and
+checks its pinned archive SHA-256 before executing that playtest.
+
+For production-style ingress qualification, build the web export without
+explicit backend or engine URL overrides and add `--nginx /absolute/path/to/nginx`.
+The runner uses the repository's ingress configuration with loopback fixture
+upstreams. `--audit-all-routes` opens every exported public route, including a
+concrete dynamic gate URL; `--audit-route /path` reproduces selected routes.
+The route audit checks initial rendering and HTTP 5xx responses. It does not
+certify every feature or complete every workflow behind each page.
