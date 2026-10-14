@@ -19,14 +19,14 @@ def test_queue_drain_does_not_self_thrash_on_main_pushes() -> None:
     assert "types: [completed]" in workflow
     assert "branches: [main]" in workflow
     assert "\n  push:\n    branches: [main]\n    paths: ['.github/workflows/queue-drain.yml']" in workflow
-    assert "group: queue-drain-v3-${{ github.repository }}" in workflow
+    assert "group: queue-drain-v4-${{ github.repository }}" in workflow
     assert "cancel-in-progress: false" in workflow
 
 
 def test_queue_drain_keeps_recovery_safety_boundary() -> None:
     workflow = _workflow_text()
 
-    assert "runs-on: ubuntu-latest" in workflow
+    assert "runs-on: ubuntu-24.04-arm" in workflow
     assert "actions: write" in workflow
     assert "contents: read" in workflow
     assert "permissions: {}" in workflow
@@ -106,7 +106,7 @@ def test_queue_drain_force_cancels_provider_stuck_obsolete_runs() -> None:
 
     assert "def post_with_retry(path):" in workflow
     assert "def run_completed(run_id):" in workflow
-    assert "def cancel(run_id):" in workflow
+    assert "def cancel(run_id, security_lane=False):" in workflow
     assert "/actions/runs/{run_id}/force-cancel" in workflow
     assert "status in {409, 422} and run_completed(run_id)" in workflow
     assert "status in {409, 422} or status in retryable" in workflow
@@ -174,7 +174,7 @@ def test_housekeeping_wake_is_independent_arm_job() -> None:
     wake = workflow[wake_start:]
 
     assert "Wake exact stale-PR housekeeping when needed" not in drain
-    assert "runs-on: ubuntu-latest" in drain
+    assert "runs-on: ubuntu-24.04-arm" in drain
     assert "Wake exact stale-PR housekeeping when needed" in wake
     assert "runs-on: ubuntu-24.04-arm" in wake
     assert "timeout-minutes: 3" in wake
@@ -220,3 +220,47 @@ def test_housekeeping_api_limits_defer_without_dispatch_or_silent_admission() ->
     assert wake.index("api_json \"actions/workflows/") < wake.index(
         'gh workflow run "$HOUSEKEEPING_WORKFLOW"'
     )
+
+
+def test_queue_drain_backpressure_stops_exhausted_mutation_sweeps() -> None:
+    workflow = _workflow_text()
+
+    assert "exc.code in {403, 429}" in workflow
+    assert "'rate limit' in message" in workflow
+    assert "if status not in retryable or status == 429:" in workflow
+    assert "if status == 429:" in workflow
+    assert "rate_limit_hit = True" in workflow
+    assert "if rate_limit_hit:" in workflow
+    assert "if pass_no < 4 and not rate_limit_hit:" in workflow
+
+
+def test_queue_drain_never_force_cancels_security_evidence() -> None:
+    workflow = _workflow_text()
+
+    assert "def security_lane(run):" in workflow
+    assert "'github-advanced-security'" in workflow
+    assert "if security_lane:" in workflow
+    assert "status = cancel(run_id, security_lane=security_lane(run))" in workflow
+    cancel = workflow[
+        workflow.index("def cancel(run_id, security_lane=False):"):
+        workflow.index("def main_sha():")
+    ]
+    assert cancel.index("if security_lane:") < cancel.index("/force-cancel")
+
+
+def test_housekeeping_wake_cooldown_recovers_persistent_old_queue() -> None:
+    workflow = _workflow_text()
+    assert "HOUSEKEEPING_WAKE_STALE_MINUTES: '1440'" in workflow
+    assert "HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '90'" in workflow
+    assert "HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '360'" not in workflow
+    assert "for status_name in requested waiting pending queued in_progress; do" in workflow
+
+
+def test_drain_recovery_arm_lane_keeps_control_plane_safeguards() -> None:
+    workflow = _workflow_text()
+    drain = workflow[workflow.index("  drain:\n"):workflow.index("  wake-housekeeping:\n")]
+    assert "runs-on: ubuntu-24.04-arm" in drain
+    assert "cancel-in-progress: false" in workflow
+    assert "if stale_pr_run(run, open_pr_heads):" in drain
+    assert "if security_lane:" in drain
+    assert "if status == 429:" in drain

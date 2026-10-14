@@ -1,4 +1,4 @@
-name: Archive closed PR branches safely
+name: Archive closed PR and duplicate-tip branches safely
 
 on:
   workflow_dispatch:
@@ -9,16 +9,17 @@ on:
     paths: ['.github/workflows/branch-archive.yml']
 
 concurrency:
-  group: branch-archive-v2-${{ github.repository }}
+  # Independent ARM maintenance lane; earlier queued x64 archive runs stay isolated.
+  group: branch-archive-v3-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   archive:
-    name: Tag and remove inactive closed-PR refs
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    name: Preserve and prune inactive refs
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
     permissions:
       contents: write
       pull-requests: read
@@ -62,58 +63,74 @@ jobs:
           cd repo
 
           cutoff=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ')
+          stacked_cutoff=$(date -u -d '4 hours ago' '+%Y-%m-%dT%H:%M:%SZ')
 
           declare -A open_heads=()
           declare -A open_bases=()
           declare -A archive_pr=()
+          declare -A stacked_merged_pr=()
+          declare -A stacked_merged_at=()
 
           load_open_refs() {
-            local branch heads_file bases_file
-            heads_file="$RUNNER_TEMP/branch-archive-open-heads.txt"
-            bases_file="$RUNNER_TEMP/branch-archive-open-bases.txt"
+            local refs_file candidate attempt head base
+            refs_file="$RUNNER_TEMP/branch-archive-open-refs.tsv"
+            candidate="$RUNNER_TEMP/branch-archive-open-refs.candidate.tsv"
+
+            # Fetch head/base pairs together to avoid mismatched snapshots and
+            # halve GitHub API calls. Retry transient empty/truncated pages;
+            # never accept partial results after a pagination error.
+            for attempt in 1 2 3 4; do
+              if gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+                --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | [.head.ref, .base.ref] | @tsv' \
+                > "$candidate"; then
+                mv -f "$candidate" "$refs_file"
+                break
+              fi
+              rm -f "$candidate"
+              if (( attempt == 4 )); then
+                echo '::error::Open PR inventory unavailable after four attempts; refusing branch archive mutations.'
+                return 1
+              fi
+              echo "::warning::Retrying incomplete GitHub open-PR inventory (attempt $attempt/4)."
+              sleep "$(( attempt * 2 ))"
+            done
+
             open_heads=()
             open_bases=()
-
-            # A process substitution can conceal API failures from set -e.
-            # Resolve each snapshot completely before any cleanup decision.
-            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref' \
-              > "$heads_file"; then
-              echo '::error::Open PR heads unavailable; refusing branch archive mutations.'
-              return 1
-            fi
-            if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .base.ref' \
-              > "$bases_file"; then
-              echo '::error::Open PR bases unavailable; refusing branch archive mutations.'
-              return 1
-            fi
-
-            while IFS= read -r branch; do
-              [[ -n "$branch" ]] || continue
-              open_heads["$branch"]=1
-            done < "$heads_file"
-            while IFS= read -r branch; do
-              [[ -n "$branch" && "$branch" != main ]] || continue
-              open_bases["$branch"]=1
-            done < "$bases_file"
+            while IFS=$'\t' read -r head base; do
+              [[ -n "$head" && -n "$base" ]] || continue
+              open_heads["$head"]=1
+              if [[ "$base" != main ]]; then
+                open_bases["$base"]=1
+              fi
+            done < "$refs_file"
           }
 
           load_archive_candidates() {
-            local branch tip pr candidates_file
+            local kind branch tip pr merged_at key candidates_file
             candidates_file="$RUNNER_TEMP/branch-archive-closed-candidates.tsv"
             archive_pr=()
+            stacked_merged_pr=()
+            stacked_merged_at=()
 
+            # Single fail-closed history snapshot for unmerged and stacked PRs.
             if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
-              --jq ".[] | select(.merged_at == null and .closed_at != null and .closed_at <= \"$cutoff\" and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha, (.number|tostring)] | @tsv" \
+              --jq ".[] | select(.head.repo.full_name == .base.repo.full_name) | select((.merged_at == null and .closed_at != null and .closed_at <= \"$cutoff\") or (.merged_at != null and .merged_at <= \"$stacked_cutoff\" and .base.ref != \"main\")) | [(if .merged_at == null then \"closed\" else \"stacked\" end), .head.ref, .head.sha, (.number|tostring), (.merged_at // \"none\")] | @tsv" \
               > "$candidates_file"; then
               echo '::error::Closed PR history unavailable; refusing branch archive mutations.'
               return 1
             fi
-
-            while read -r branch tip pr; do
+            while IFS=$'\t' read -r kind branch tip pr merged_at; do
               [[ -n "$branch" && -n "$tip" && -n "$pr" ]] || continue
-              archive_pr["${branch}:${tip}"]="$pr"
+              key="${branch}:${tip}"
+              case "$kind" in
+                closed) archive_pr["$key"]="$pr" ;;
+                stacked)
+                  stacked_merged_pr["$key"]="$pr"
+                  stacked_merged_at["$key"]="$merged_at"
+                  ;;
+                *) echo '::error::Unrecognized archived PR candidate type.'; return 1 ;;
+              esac
             done < "$candidates_file"
           }
 
@@ -205,3 +222,267 @@ jobs:
             echo '- Archive tags use archive/closed-pr/pr-<number>-<sha12>.'
             echo '- No branch is deleted until its exact commit is confirmed reachable through the archive tag.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # Exact-tip duplicate aliases carry no distinct commits. Preserve
+          # a stable survivor *and* a remote recovery tag before retiring old
+          # secondary names. Never infer that their work is on main.
+          git fetch --quiet --prune --no-tags --filter=blob:none origin '+refs/heads/*:refs/remotes/origin/*'
+          if ! load_open_refs; then
+            echo '::warning::Duplicate archive skipped: open PR refs unavailable.'
+            exit 0
+          fi
+
+          events_file="$RUNNER_TEMP/branch-archive-ref-events.tsv"
+          if ! gh api --paginate "/repos/$GITHUB_REPOSITORY/events?per_page=100" \
+            --jq '.[] | select((.type == "CreateEvent" or .type == "DeleteEvent") and .payload.ref_type == "branch") | [.type, .payload.ref, .created_at] | @tsv' \
+            > "$events_file"; then
+            echo '::warning::Duplicate archive skipped: branch event inventory unavailable.'
+            exit 0
+          fi
+
+          declare -A recent_create=()
+          declare -A recent_delete=()
+          declare -A survivor=()
+          declare -A survivor_priority=()
+
+          while IFS=$'\t' read -r kind ref when; do
+            [[ -n "$kind" && -n "$ref" && -n "$when" ]] || continue
+            epoch=$(date -u -d "$when" +%s 2>/dev/null || true)
+            [[ "$epoch" =~ ^[0-9]+$ ]] || continue
+            if [[ "$kind" == CreateEvent ]]; then
+              if (( epoch > ${recent_create[$ref]:-0} )); then
+                recent_create["$ref"]="$epoch"
+              fi
+            else
+              if (( epoch > ${recent_delete[$ref]:-0} )); then
+                recent_delete["$ref"]="$epoch"
+              fi
+            fi
+          done < "$events_file"
+
+          # The lexicographically first branch survives ties. Named protected
+          # refs and active PR heads/bases always outrank disposable aliases.
+          while read -r tip branch; do
+            [[ -n "$tip" && -n "$branch" ]] || continue
+            priority=2
+            case "$branch" in
+              main|master|develop|development|staging|production|prod|gh-pages|release/*|keep/*|backup/*|archive/*)
+                priority=0
+                ;;
+            esac
+            if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
+              priority=0
+            fi
+            if [[ -z "${survivor[$tip]+x}" ]] || (( priority < survivor_priority[$tip] )); then
+              survivor["$tip"]="$branch"
+              survivor_priority["$tip"]="$priority"
+            fi
+          done < <(
+            git for-each-ref --format='%(objectname) %(refname:strip=3)' refs/remotes/origin | sort -k2,2
+          )
+
+          duplicate_archived=0
+          duplicate_preserved=0
+          duplicate_races=0
+          duplicate_cap=20
+          now_epoch=$(date -u +%s)
+          while read -r tip branch; do
+            [[ -n "$tip" && -n "$branch" ]] || continue
+            [[ "$branch" != "${survivor[$tip]}" ]] || continue
+
+            case "$branch" in
+              main|master|develop|development|staging|production|prod|gh-pages|release/*|keep/*|backup/*|archive/*)
+                duplicate_preserved=$((duplicate_preserved + 1))
+                continue
+                ;;
+            esac
+            if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
+              duplicate_preserved=$((duplicate_preserved + 1))
+              continue
+            fi
+            created="${recent_create[$branch]:-}"
+            deleted="${recent_delete[$branch]:-}"
+            if [[ -n "$created" ]]; then
+              if (( now_epoch - created < 86400 || now_epoch < created )); then
+                duplicate_preserved=$((duplicate_preserved + 1))
+                continue
+              fi
+              if [[ -n "$deleted" ]] && (( deleted >= created )); then
+                duplicate_preserved=$((duplicate_preserved + 1))
+                continue
+              fi
+            fi
+            committed=$(git show -s --format=%ct "$tip" 2>/dev/null || true)
+            if [[ ! "$committed" =~ ^[0-9]+$ ]] || (( now_epoch - committed < 604800 )); then
+              duplicate_preserved=$((duplicate_preserved + 1))
+              continue
+            fi
+
+            # Rate-limit the number of write attempts per pass, not just
+            # successful deletes, to avoid amplifying repository congestion.
+            if (( duplicate_archived + duplicate_races >= duplicate_cap )); then
+              echo '::notice::Duplicate-tip archive write budget exhausted.'
+              break
+            fi
+
+            # Revalidate after inventory: no new open PR may lose its branch.
+            if ! load_open_refs; then
+              echo '::warning::PR revalidation unavailable; stopping duplicate cleanup.'
+              break
+            fi
+            if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
+              duplicate_preserved=$((duplicate_preserved + 1))
+              continue
+            fi
+            keeper="${survivor[$tip]}"
+            keeper_live=$(git ls-remote --heads origin "refs/heads/$keeper" | awk 'NR==1 {print $1}')
+            branch_live=$(git ls-remote --heads origin "refs/heads/$branch" | awk 'NR==1 {print $1}')
+            if [[ "$keeper_live" != "$tip" || "$branch_live" != "$tip" ]]; then
+              duplicate_races=$((duplicate_races + 1))
+              continue
+            fi
+
+            branch_fingerprint=$(printf '%s' "$branch" | sha256sum | cut -c1-16)
+            tag="archive/duplicate-ref/${tip:0:12}-$branch_fingerprint"
+            remote_tag=$(git ls-remote --refs --tags origin "refs/tags/$tag" | awk 'NR==1 {print $1}')
+            if [[ -z "$remote_tag" ]]; then
+              if ! git push --quiet origin "$tip:refs/tags/$tag"; then
+                duplicate_races=$((duplicate_races + 1))
+                continue
+              fi
+              remote_tag=$(git ls-remote --refs --tags origin "refs/tags/$tag" | awk 'NR==1 {print $1}')
+            fi
+            if [[ "$remote_tag" != "$tip" ]]; then
+              duplicate_races=$((duplicate_races + 1))
+              continue
+            fi
+
+            if ! load_open_refs; then
+              echo '::warning::Post-tag PR revalidation unavailable; keeping branch.'
+              break
+            fi
+            if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
+              duplicate_preserved=$((duplicate_preserved + 1))
+              continue
+            fi
+            keeper_live=$(git ls-remote --heads origin "refs/heads/$keeper" | awk 'NR==1 {print $1}')
+            if [[ "$keeper_live" != "$tip" ]]; then
+              duplicate_races=$((duplicate_races + 1))
+              continue
+            fi
+            if git push --quiet "--force-with-lease=refs/heads/$branch:$tip" origin ":refs/heads/$branch"; then
+              duplicate_archived=$((duplicate_archived + 1))
+            else
+              duplicate_races=$((duplicate_races + 1))
+            fi
+          done < <(
+            git for-each-ref --format='%(objectname) %(refname:strip=3)' refs/remotes/origin | sort -k2,2
+          )
+
+          {
+            echo
+            echo '## Exact-tip duplicate archive'
+            echo "- Redundant aliases tagged then deleted: $duplicate_archived"
+            echo "- Recent, protected, or PR-related aliases preserved: $duplicate_preserved"
+            echo "- Moved refs, tag failures, and blocked deletes: $duplicate_races"
+            echo "- Write budget: $duplicate_cap"
+            echo '- No duplicate is deleted without a surviving same-SHA branch and an exact-SHA recovery tag.'
+            echo '- Minimum commit age: seven days; observed recent creations or delayed recreations are preserved.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::Duplicate-tip archive: deleted=$duplicate_archived, preserved=$duplicate_preserved, races=$duplicate_races"
+
+          # Stacked PR merges are not proof of main ancestry. Save every
+          # deleted head SHA under an immutable tag before pruning its ref.
+          git fetch --quiet --prune --no-tags --filter=blob:none origin '+refs/heads/*:refs/remotes/origin/*'
+          stacked_archived=0
+          stacked_preserved=0
+          stacked_races=0
+          stacked_attempts=0
+          stacked_budget=20
+
+          while read -r tip branch; do
+            [[ -n "$tip" && -n "$branch" ]] || continue
+            key="${branch}:${tip}"
+            pr="${stacked_merged_pr[$key]:-}"
+            [[ -n "$pr" ]] || continue
+            case "$branch" in
+              main|master|develop|development|staging|production|prod|gh-pages|release/*|keep/*|backup/*|archive/*)
+                stacked_preserved=$((stacked_preserved + 1))
+                continue
+                ;;
+            esac
+            if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
+              stacked_preserved=$((stacked_preserved + 1))
+              continue
+            fi
+
+            merged_at="${stacked_merged_at[$key]:-}"
+            merged_epoch=$(date -u -d "$merged_at" +%s 2>/dev/null || true)
+            created_epoch="${recent_create[$branch]:-0}"
+            deleted_epoch="${recent_delete[$branch]:-0}"
+            if [[ ! "$merged_epoch" =~ ^[0-9]+$ ]] || (( now_epoch - merged_epoch < 14400 || created_epoch > merged_epoch )); then
+              stacked_preserved=$((stacked_preserved + 1))
+              continue
+            fi
+            if (( created_epoch > 0 && deleted_epoch >= created_epoch )); then
+              stacked_preserved=$((stacked_preserved + 1))
+              continue
+            fi
+            if (( stacked_attempts >= stacked_budget )); then
+              echo '::notice::Stacked-merge archive write budget exhausted.'
+              break
+            fi
+            stacked_attempts=$((stacked_attempts + 1))
+            if ! load_open_refs; then
+              echo '::warning::Stacked-merge PR revalidation unavailable; stopping.'
+              break
+            fi
+            if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
+              stacked_preserved=$((stacked_preserved + 1))
+              continue
+            fi
+            live_tip=$(git ls-remote --heads origin "refs/heads/$branch" | awk 'NR==1 {print $1}')
+            if [[ "$live_tip" != "$tip" ]]; then
+              stacked_races=$((stacked_races + 1))
+              continue
+            fi
+            tag="archive/stacked-merged-pr/pr-${pr}-${tip:0:12}"
+            remote_tag=$(git ls-remote --refs --tags origin "refs/tags/$tag" | awk 'NR==1 {print $1}')
+            if [[ -z "$remote_tag" ]]; then
+              if ! git push --quiet origin "${tip}:refs/tags/${tag}"; then
+                stacked_races=$((stacked_races + 1))
+                continue
+              fi
+              remote_tag=$(git ls-remote --refs --tags origin "refs/tags/$tag" | awk 'NR==1 {print $1}')
+            fi
+            if [[ "$remote_tag" != "$tip" ]]; then
+              stacked_races=$((stacked_races + 1))
+              continue
+            fi
+            if ! load_open_refs; then
+              echo '::warning::Post-tag PR revalidation unavailable; keeping stacked branch.'
+              break
+            fi
+            if [[ -n "${open_heads[$branch]+x}" || -n "${open_bases[$branch]+x}" ]]; then
+              stacked_preserved=$((stacked_preserved + 1))
+              continue
+            fi
+            if git push --quiet "--force-with-lease=refs/heads/${branch}:${tip}" origin ":refs/heads/${branch}"; then
+              stacked_archived=$((stacked_archived + 1))
+            else
+              stacked_races=$((stacked_races + 1))
+            fi
+          done < <(
+            git for-each-ref --format='%(objectname) %(refname:strip=3)' refs/remotes/origin | sort -k2,2
+          )
+
+          {
+            echo
+            echo '## Merged stacked-PR head archive'
+            echo "- Exact heads archived and deleted: $stacked_archived"
+            echo "- Protected/recent/recreated heads preserved: $stacked_preserved"
+            echo "- Moved or blocked heads preserved: $stacked_races"
+            echo "- Attempts: $stacked_attempts of $stacked_budget maximum"
+            echo '- Four-hour post-merge grace; no assumption of main ancestry.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::Stacked PR archive: deleted=$stacked_archived, preserved=$stacked_preserved, races=$stacked_races"
