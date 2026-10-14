@@ -1,11 +1,9 @@
 name: P1 Volume Accountability Candidate Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - p1/maturity-volume-materialization-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+    # Candidate projection is advisory; validate on main, not every feature PR.
     paths:
       - "machine/ai_master_plan.json"
       - "machine/ai_build_accountability.json"

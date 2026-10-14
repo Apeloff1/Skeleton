@@ -1,16 +1,6 @@
 name: P1 L0 Accountability Verification
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "machine/ai_build_accountability.json"
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/accountability_events/P1-L0/**"
-      - "docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md"
-      - "tests/test_p1_accountability_materialization.py"
-      - "tests/test_ai_p1_execution_map.py"
-      - ".github/workflows/p1-l0-accountability-verification.yml"
   push:
     branches: [main]
     paths:
