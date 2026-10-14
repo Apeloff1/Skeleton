@@ -1088,6 +1088,33 @@ async def ai_chat(
         )
 
     tenant_id, owner_id = _chat_identity(user)
+    try:
+        # Replay of an already committed assistant answer requires only durable
+        # conversation state, never a currently configured inference provider.
+        # Check the exact prior request digest to prevent a reused key from
+        # returning a different prompt's assistant answer.
+        existing_transcript = await conversation_authority.active_transcript(
+            request.thread_id, tenant_id=tenant_id, owner_id=owner_id,
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
+    existing_turn_user, existing_turn_assistant = _chat_turn_messages(
+        existing_transcript, request.idempotency_key,
+    )
+    if existing_turn_assistant is not None:
+        if (
+            existing_turn_user is None
+            or _chat_request_identity_ref(request)
+            not in existing_turn_user.attachment_refs
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Saved chat request identity does not match this replay",
+            )
+        return await get_ai_chat_turn(
+            request.thread_id, idempotency_key=request.idempotency_key, user=user,
+        )
+
     selected_model = None
     selected_budget = CHAT_CONTEXT_BUDGET
     # Validate requested execution semantics BEFORE committing any user message.
@@ -1141,15 +1168,6 @@ async def ai_chat(
                 raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     retrying_incomplete_turn = False
     try:
-        existing_transcript = await conversation_authority.active_transcript(
-            request.thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-        )
-        existing_turn_user, existing_turn_assistant = _chat_turn_messages(
-            existing_transcript,
-            request.idempotency_key,
-        )
         if (
             existing_transcript
             and existing_transcript[-1].author_type
