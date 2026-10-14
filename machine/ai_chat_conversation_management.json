@@ -1,0 +1,52 @@
+{
+  "schema_version": "skeleton.ai.chat_conversation_management.v1",
+  "status": "implemented_unverified",
+  "canonical_owner": "skeleton/persistence/conversation_repository.py",
+  "production_authority": "backend/core/conversations.py:MongoConversationAuthority",
+  "public_routes": "backend/routes/conversations.py",
+  "authority_scope": "existing server-owned conversation thread and immutable message ledger",
+  "masterplan_completion_authorized": false,
+  "apis": {
+    "list_search": "GET /api/v1/conversations?q=<literal title>&include_archived=<bool>&limit=<1..200>&cursor=<opaque position>",
+    "rename": "PATCH /api/v1/conversations/{thread_id} with title and expected_thread_version",
+    "archive_reopen": "existing PATCH /api/v1/conversations/{thread_id}/state with expected_thread_version",
+    "delete": "existing governed DELETE /api/v1/conversations/{thread_id}?expected_thread_version=<version>",
+    "snapshot": "GET /api/v1/conversations/{thread_id}/snapshot?limit=<1..500>&before_message_id=<optional active-lineage cursor>&expected_thread_version=<optional version>",
+    "recover": "GET /api/v1/conversations/{thread_id}/recovery returns the current canonical snapshot and committed pending user turn identity; execution status remains owned by existing chat turn endpoints",
+    "regeneration": "Existing POST /messages/{assistant_id}/regenerate supports exact provider/model/output settings and deferred acceptance; sibling GET /regenerate/turn, POST /regenerate/resume and POST /regenerate/cancel expose actual engine status, exact stored-command recovery and cancellation",
+    "export": "GET /api/v1/conversations/{thread_id}/export?format=json|markdown&expected_thread_version=<optional current version> returns server-rendered canonical active transcript under exact thread owner/tenant and current governed export rights"
+  },
+  "rules": [
+    "every read and mutation filters authenticated tenant and owner before returning conversation content",
+    "search is bounded case-insensitive literal title matching, never caller supplied regular expression",
+    "opaque list cursor only selects an ordering position and confers no authorization",
+    "rename and archive/reopen use the current thread version; deleting/deleted threads cannot be renamed or reopened",
+    "pending chat turns are reconstructed from committed user messages and canonical assistant or system-derived terminal markers, never browser transcript state",
+    "snapshot paging follows immutable active parent lineage, rejects missing/cyclic/foreign/ahead-of-commit messages and reports an explicit continuation cursor",
+    "snapshot checks its thread version after reading and returns conflict if it cannot provide a coherent current projection",
+    "retry preserves the existing user message idempotency key and exact causal identity; no new conversation store or provider path is introduced",
+    "edited messages retain original source attachment references but discard obsolete prior execution identity references; the current committed edited USER tip may bind an exact hashed request once in operational metadata on its existing message row",
+    "operational request binding preserves immutable message content and lineage, rejects differing retry semantics, and is checked against the current authorized active tip/thread version before dispatch",
+    "the exact bounded compiled chat engine command is persisted write-once on the existing committed USER row before engine submission, preserving ephemeral context, model settings and memory policy across pre-admission restart without trusting browser reconstruction",
+    "regeneration freezes the exact server-compiled command and selection once on the existing original assistant row before engine admission; retries reuse that record and terminal output creates an immutable sibling branch only while the original thread sequence/branch fence remains current",
+    "regeneration dispatch uses bounded operational ready/submitting/admitted/withdrawn CAS metadata on the same row; ready requests can be durably withdrawn before dispatch, while already-claimed submissions retain cancellation intent until actual engine terminal truth is known",
+    "export includes only authorized canonical active-lineage messages and their provenance/branch references, requires active exportable unexpired governance records for that exact thread and every included message, and excludes raw attachment payloads and other tenants or owners",
+    "metadata writes retain existing storage admission and deletion retains existing governance propagation"
+  ],
+  "bounds": {
+    "title_characters": 200,
+    "search_characters": 200,
+    "list_page": 200,
+    "snapshot_page": 500,
+    "active_lineage_messages": 10000,
+    "active_lineage_payload_bytes": 8388608,
+    "export_bytes": 16777216,
+    "snapshot_read_attempts": 3,
+    "regeneration_requests_per_assistant": 16,
+    "regeneration_request_bytes": 2097152,
+    "regeneration_metadata_bytes_per_assistant": 8388608,
+    "chat_command_bytes": 2097152
+  },
+  "verification": "Implementation and static review only in this work window; user explicitly instructed no test creation or execution. No fresh runtime validation or closure evidence is claimed.",
+  "rollback": "Withdraw additive search/metadata/snapshot routes while retaining all existing canonical threads, immutable messages, versions and governed deletion state."
+}
