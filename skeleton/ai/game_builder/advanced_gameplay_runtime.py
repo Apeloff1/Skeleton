@@ -65,12 +65,19 @@ from .advanced_genre_engines import (
     GenreActionError, apply_genre_scene,
 )
 
+from .advanced_world_rpg_runtime import (
+    MAZE_ACTIONS, RPG_ACTIONS, WorldGameError,
+    maze_bound_start, maze_step, rpg_start, rpg_step,
+)
+
 SCHEMA = "skeleton.game_builder.advanced_session.v1"
-ENGINES = ("platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "physics")
+ENGINES = ("maze", "rpg", "platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "physics")
 MAX_TURNS = 128
 MAX_SEED = 2**31 - 1
 
 ACTION_HELP = {
+    "maze": MAZE_ACTIONS,
+    "rpg": RPG_ACTIONS,
     "platformer": ("left", "right", "jump", "jump_left", "jump_right",
                    "wait", "dash_left", "dash_right"),
     "tactics": ("north", "south", "west", "east", "attack:0",
@@ -694,6 +701,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
     config = make_editor_document(editor, settings)
     rules = config["settings"]
     starts = {
+        "maze": maze_bound_start,
+        "rpg": rpg_start,
         "platformer":_platform_start,
         "tactics":_tactics_start,
         "tower_defense":_defense_start,
@@ -718,10 +727,14 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
     }
     try:
         state=starts[editor](rules,seed)
-    except (GenreActionError,FarmingActionError,FactoryActionError,
+    except (WorldGameError,GenreActionError,FarmingActionError,FactoryActionError,
             ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError) as exc:
         raise AdvancedRuntimeError(str(exc)) from exc
     if scene is not None:
+        # Maze/RPG runtime scenes are not yet in the strict authored-scene
+        # schema; reject rather than silently discard unverified layouts.
+        if editor in ("maze", "rpg"):
+            raise AdvancedRuntimeError("authored scene not supported for this runtime")
         from .advanced_level_scenes import validate_advanced_scene
         authored=validate_advanced_scene(scene,rules)
         if authored["editor"]!=editor or authored["seed"]!=seed:
@@ -792,6 +805,8 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         if state["finished"] or state["failed"]:
             raise AdvancedRuntimeError("gameplay cannot advance after terminal outcome")
         steps = {
+            "maze": maze_step,
+            "rpg": rpg_step,
             "platformer":_platform_step,"tactics":_tactics_step,
             "tower_defense":_defense_step,"racing":_racing_step,
             "survival":_survival_step,
@@ -814,7 +829,7 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         }
         try:
             events=steps[editor](state,rules,action)
-        except (GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError) as exc:
+        except (WorldGameError,GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,
