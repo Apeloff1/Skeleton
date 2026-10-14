@@ -71,7 +71,7 @@ def test_linux_meminfo_with_measured_available_memory_is_verified(monkeypatch):
         "SwapTotal: 1024 kB\nSwapFree: 1024 kB\n"
     )
     monkeypatch.setattr(Path, "read_text", lambda self: meminfo if str(self) == "/proc/meminfo" else "")
-    used, available, pressure, swap, verified = probe._memory_state()
+    used, available, pressure, swap, verified = probe._memory_state_observed()
     assert verified is True
     assert available == 8192
     assert used == 8192
@@ -84,7 +84,19 @@ def test_linux_missing_memavailable_falls_back_without_claiming_measurement(monk
     probe._sys = "linux"
     meminfo = "MemTotal: 16777216 kB\nMemFree: 1048576 kB\n"
     monkeypatch.setattr(Path, "read_text", lambda self: meminfo if str(self) == "/proc/meminfo" else "")
-    used, available, pressure, swap, verified = probe._memory_state()
+    used, available, pressure, swap, verified = probe._memory_state_observed()
     assert verified is False
     assert available == 1024
     assert pressure > 0
+
+
+def test_legacy_four_field_probe_tuple_keeps_existing_callers_compatible(monkeypatch):
+    probe = HardwareProbe()
+    probe._sys = "linux"
+    meminfo = "MemTotal: 16777216 kB\nMemAvailable: 8388608 kB\n"
+    monkeypatch.setattr(Path, "read_text", lambda self: meminfo if str(self) == "/proc/meminfo" else "")
+    legacy = probe._memory_state()
+    observed = probe._memory_state_observed()
+    assert len(legacy) == 4
+    assert legacy == observed[:4]
+    assert observed[4] is True
