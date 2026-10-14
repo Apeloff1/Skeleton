@@ -19,17 +19,17 @@ TEST_ROOTS = ("tests", "skeleton/testing", "backend/tests")
 
 # Keywords refer to test module filenames, not production files or imported code.
 FEATURE_MARKERS: dict[str, tuple[str, ...]] = {
-    "ai": ("ai", "inference", "model_routing"),
-    "jeeves": ("jeeves", "cortex"),
-    "game-builder": ("game_builder", "game_forge", "story_canon"),
-    "dragon": ("dragon", "crawler"),
-    "physics": ("physics", "simulation"),
-    "security": ("security", "sandbox", "auth", "isolation"),
-    "shell": ("shell", "process_safety"),
-    "memory": ("memory", "retrieval", "rag"),
-    "agents": ("agent", "swarm", "supervisor"),
-    "provider": ("provider", "model_routing"),
-    "app": ("app_assembly", "application", "installation"),
+    "ai": ("ai", "inference", "model_routing", "transformer", "tokenizer", "embedding"),
+    "jeeves": ("jeeves", "cortex", "llm"),
+    "game-builder": ("game_builder", "game_forge", "story_canon", "forge", "world_builder", "dialogue"),
+    "dragon": ("dragon", "crawler", "webcrawler"),
+    "physics": ("physics", "simulation", "collision", "rigid_body", "broadphase"),
+    "security": ("security", "sandbox", "auth", "authentication", "authorization", "isolation", "sast", "secret", "malware"),
+    "shell": ("shell", "process_safety", "command", "terminal"),
+    "memory": ("memory", "retrieval", "rag", "embedding", "vector", "chunker", "reranker"),
+    "agents": ("agent", "agents", "swarm", "supervisor", "worker", "scheduler", "autonomous"),
+    "provider": ("provider", "providers", "model_routing"),
+    "app": ("app_assembly", "application", "installation", "app", "installer", "deployment"),
     "backend": (),  # All backend/tests test modules.
     "all": (),  # All three test roots, except opt-in integration categories.
 }
@@ -41,6 +41,15 @@ FEATURE_DIRS: dict[str, tuple[str, ...]] = {
     "security": ("tests/supply_chain",),
 }
 INTEGRATION_MARKERS = ("e2e", "integration", "live")
+
+
+def _is_integration_case(relative: Path) -> bool:
+    """Reject explicitly integration-designated files *and* directories."""
+    return any(
+        _has_marker(component.lower(), marker)
+        for component in relative.with_suffix("").parts
+        for marker in INTEGRATION_MARKERS
+    )
 
 
 def _has_marker(stem: str, marker: str) -> bool:
@@ -62,16 +71,18 @@ def discover_tests(
     matches: set[str] = set()
     for test_root in TEST_ROOTS:
         directory = root / test_root
-        if not directory.is_dir():
+        if not directory.is_dir() or directory.is_symlink():
             continue
+        canonical_root = directory.resolve()
         for path in directory.rglob("test_*.py"):
-            if not path.is_file():
+            # A symlinked intermediate directory must never escape the test root.
+            if (not path.is_file() or path.is_symlink()
+                    or not path.resolve().is_relative_to(canonical_root)):
                 continue
             stem = path.stem.lower()
-            relative = path.relative_to(root).as_posix()
-            if not include_integration and any(
-                _has_marker(stem, marker) for marker in INTEGRATION_MARKERS
-            ):
+            relative_path = path.relative_to(root)
+            relative = relative_path.as_posix()
+            if not include_integration and _is_integration_case(relative_path):
                 continue
             if (
                 "all" in selected
@@ -110,21 +121,37 @@ def main(argv: list[str] | None = None) -> int:
         "--feature", action="append", required=True, choices=sorted(FEATURE_MARKERS),
         help="Select a feature; repeat to combine features.",
     )
-    parser.add_argument("--list", action="store_true", help="List selected files without executing.")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--list", action="store_true", help="List files without importing tests.")
+    modes.add_argument(
+        "--collect-only", action="store_true",
+        help="Ask pytest to collect tests without executing them.",
+    )
     parser.add_argument(
         "--include-integration", action="store_true",
         help="Opt in to files named e2e/integration/live (excluded by default).",
     )
     parser.add_argument("--maxfail", type=int, default=1, help="Stop after N failures (0=all).")
+    parser.add_argument(
+        "--timeout-seconds", type=int, default=0,
+        help="Limit subprocess wall time in seconds (0=no timeout).",
+    )
     parser.add_argument("--junitxml", help="Write pytest JUnit XML to this path.")
     args = parser.parse_args(argv)
     if args.maxfail < 0:
         parser.error("--maxfail must be >= 0")
+    if args.timeout_seconds < 0:
+        parser.error("--timeout-seconds must be >= 0")
 
     paths = discover_tests(ROOT, args.feature, include_integration=args.include_integration)
     if not paths:
         print("ERROR: no matching test files; refusing a false-green run", file=sys.stderr)
         return 2
+    # A valid feature with zero tests must not borrow another selector's green result.
+    for feature in sorted(set(args.feature) - {"all"}):
+        if not discover_tests(ROOT, (feature,), include_integration=args.include_integration):
+            print(f"ERROR: no matching test files for {feature}; refusing a false-green run", file=sys.stderr)
+            return 2
     if args.list:
         print("\n".join(paths))
         print(f"SELECTED {len(paths)} test files", file=sys.stderr)
@@ -137,8 +164,20 @@ def main(argv: list[str] | None = None) -> int:
         filter(None, [str(ROOT), str(ROOT / "backend"), env.get("PYTHONPATH", "")])
     )
     command = build_command(paths, maxfail=args.maxfail, junitxml=args.junitxml)
+    if args.collect_only:
+        command.append("--collect-only")
     print(f"SELECTED {len(paths)} test files", flush=True)
-    return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
+    kwargs = {"cwd": ROOT, "env": env, "check": False}
+    if args.timeout_seconds:
+        kwargs["timeout"] = args.timeout_seconds
+    try:
+        return subprocess.run(command, **kwargs).returncode
+    except subprocess.TimeoutExpired:
+        print("ERROR: pytest exceeded the wall-time limit", file=sys.stderr)
+        return 124
+    except OSError as exc:
+        print(f"ERROR: pytest could not start: {exc}", file=sys.stderr)
+        return 126
 
 
 if __name__ == "__main__":
