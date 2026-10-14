@@ -264,21 +264,16 @@ jobs:
               # An absent event is not a reason to retain proven historical
               # ancestors forever. Keep all unknown fresh or divergent tips.
               merged_key="${branch}:${tip}"
+              now_epoch=$(date -u +%s)
               if [[ -z "${branch_creation_epochs[$branch]+x}" ]]; then
-                if [[ -n "${merged_pr_head_tips[$merged_key]+x}" ]]; then
-                  merged_without_create_count=$((merged_without_create_count + 1))
-                else
-                  historical_committed_at=$(git show -s --format=%ct "$tip" 2>/dev/null || true)
-                  if [[ "$historical_committed_at" =~ ^[0-9]+$ ]] \
-                     && (( now_epoch - historical_committed_at >= 604800 )) \
-                     && git merge-base --is-ancestor "$tip" "$main_ref"; then
-                    historical_ancestor_count=$((historical_ancestor_count + 1))
-                  else
-                    unknown_creation_count=$((unknown_creation_count + 1))
-                    printf '%s %s creation-age-unknown-not-proven-ancestor\n' "$branch" "$tip" >> ../preserved-branches.txt
-                    continue
-                  fi
+                # Commit age is not creation age. Preserve a branch lacking
+                # creation events unless a matching merged PR proves its tip.
+                if [[ -z "${merged_pr_head_tips[$merged_key]+x}" ]]; then
+                  unknown_creation_count=$((unknown_creation_count + 1))
+                  printf '%s %s creation-age-unknown\n' "$branch" "$tip" >> ../preserved-branches.txt
+                  continue
                 fi
+                merged_without_create_count=$((merged_without_create_count + 1))
               else
                 creation_epoch="${branch_creation_epochs[$branch]}"
                 deletion_epoch="${branch_deletion_epochs[$branch]:-}"

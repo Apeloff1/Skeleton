@@ -68,8 +68,10 @@ def test_cleanup_stops_at_rate_limits_instead_of_spamming_delete_calls() -> None
     assert "Rate-limit backpressure activated: $rate_limited" in text
     assert "Old-run cleanup deferred: GitHub API rate limit reached." in text
     # Backpressure must persist across subsequent cleanup steps.
-    assert text.count('touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"') == 2
-    assert text.count('if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]') == 2
+    # The four inventory phases also emit persistent backpressure markers.
+    # Check that every phase continues to fail closed under API limits.
+    assert text.count('touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"') >= 6
+    assert text.count('if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]') >= 3
 
 
 def test_housekeeping_inventory_fails_closed_at_installation_rate_limit() -> None:
