@@ -60,6 +60,8 @@ MILESTONES=(
                        ("game_boy",),"6502 CPU and NES CHR graphics",94,"cartridge_8bit"),
   CurriculumMilestone("gbc_palette","game_boy_color","arcade_score_attack",
                        ("game_boy",),"CGB palette RAM and color-only ROM",93,"handheld_8bit"),
+  CurriculumMilestone("lynx_handheld","lynx","arcade_score_attack",
+                       ("game_boy","nes"),"65C02 Lynx Suzy sprite engine and native cart header",86,"handheld_8bit"),
   CurriculumMilestone("c64_legacy","commodore_64","arcade_score_attack",
                        ("nes",),"VIC-II, CIA and SID platform input",85,"classic_computer"),
   CurriculumMilestone("sms_palette","master_system","arcade_score_attack",

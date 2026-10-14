@@ -172,7 +172,9 @@ def test_native_cpu_observations_never_relabel_gameplay_as_hardware_or_rights():
 
 
 
-@pytest.mark.parametrize("digest",["X"*64,"0x"+"0"*64,"a"*63,True,None,123,[]])
+# None intentionally retains the optional no-stage-digest contract. Explicit
+# malformed caller-provided digests must still fail before executing native CPU.
+@pytest.mark.parametrize("digest",["X"*64,"0x"+"0"*64,"a"*63,True,123,[]])
 def test_native_6502_boot_refuses_untrusted_expected_original_tilemap_digest(
     tmp_path,digest,
 ):
