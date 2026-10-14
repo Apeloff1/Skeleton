@@ -615,7 +615,7 @@ export default function DragonOriginalPuzzleEditor({
       <Text style={styles.help}>
         Paint the actual native 12×10 world. Each level requires exactly
         one hero, one to three crates, matching goals and a reachable solution.
-        Dragon's exact solver checks your design before game source export.
+        Dragon&apos;s exact solver checks your design before game source export.
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.toolbar}>

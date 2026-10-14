@@ -508,7 +508,7 @@ function NativeSourceEditor() {
           <Text style={stylesUi.label}>Actual original cartridge sprite source</Text>
           <Text style={stylesUi.hint}>
             Eight-by-eight 2bpp actor, collectible and enemy tiles generated
-            by Dragon's native art compiler. Tones below illustrate pixel
+            by Dragon&apos;s native art compiler. Tones below illustrate pixel
             indices, not certified device color output.
           </Text>
           {artLoading && <ActivityIndicator color="#84a8a3" />}
