@@ -1,13 +1,26 @@
-"""Pure, no-network assertions for Dragon catalog extraction and URL custody."""
+"""Pure no-network assertions for authenticated Git-blob catalog extraction."""
 from __future__ import annotations
+
+from copy import deepcopy
+from hashlib import sha1
 
 import pytest
 from skeleton.ai.game_builder.dragon_source_catalog import (
     canonical_source_url, extract_catalog, merge_catalogs,
 )
 
-BLOB = "1" * 40
 STAMP = "2026-10-12T12:00:00Z"
+
+
+def git_blob(content: str) -> str:
+    raw = content.encode("utf-8")
+    return sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+
+
+def read_catalog(content: str, *, url: str = "https://example.org/index"):
+    return extract_catalog(
+        content, catalog_url=url, blob_sha=git_blob(content), observed_at=STAMP,
+    )
 
 
 def test_canonical_link_identity_removes_only_tracking_parameters():
@@ -15,10 +28,8 @@ def test_canonical_link_identity_removes_only_tracking_parameters():
         "https://Example.com/articles?utm_source=a&topic=game&gclid=z"
     ) == "https://example.com/articles?topic=game"
     for invalid in (
-        "http://localhost/",
-        "http://127.0.0.1/",
-        "https://private.local/file",
-        "https://user:pw@example.com/",
+        "http://localhost/", "http://127.0.0.1/",
+        "https://private.local/file", "https://user:pw@example.com/",
         "https://example.com:8443/",
     ):
         with pytest.raises(ValueError):
@@ -27,7 +38,8 @@ def test_canonical_link_identity_removes_only_tracking_parameters():
 
 def test_catalog_only_discovers_leads_without_fetching_or_approving():
     source = "# Sources\nhttps://example.com/game-guide\nhttps://example.com/game-guide?utm_campaign=a\n"
-    one = extract_catalog(source, catalog_url="https://example.org/index", blob_sha=BLOB, observed_at=STAMP)
+    one = read_catalog(source)
+    assert one["manifest"]["git_blob_sha"] == git_blob(source)
     assert one["manifest"]["linked_content_fetched"] is False
     assert len(one["sources"]) == 1
     item = one["sources"][0]
@@ -41,31 +53,24 @@ def test_catalog_only_discovers_leads_without_fetching_or_approving():
     assert result["individually_fetched_sources"] == 0
 
 
-def test_same_git_blob_cannot_be_rebound_to_different_catalog_content():
-    one = extract_catalog(
-        "https://example.com/one", catalog_url="https://example.org/index",
-        blob_sha=BLOB, observed_at=STAMP,
-    )
-    two = extract_catalog(
-        "https://example.com/two", catalog_url="https://example.org/index",
-        blob_sha=BLOB, observed_at=STAMP,
-    )
-    with pytest.raises(ValueError, match="conflicting catalog identity"):
-        merge_catalogs([one, two])
+def test_git_object_identity_is_bound_to_utf8_bytes_not_declared_string():
+    source = "https://example.com/one"
+    with pytest.raises(ValueError, match="do not match"):
+        extract_catalog(source, catalog_url="https://example.org/index",
+                        blob_sha="1" * 40, observed_at=STAMP)
+    assert read_catalog(source)["manifest"]["git_blob_sha"] == git_blob(source)
+    # Same Git blob identity cannot be assigned to a different body.
+    with pytest.raises(ValueError, match="do not match"):
+        extract_catalog("https://example.com/two",
+                        catalog_url="https://example.org/index",
+                        blob_sha=git_blob(source), observed_at=STAMP)
 
 
 def test_untrusted_catalog_cannot_promote_leads_or_forge_custody():
-    from copy import deepcopy
-
-    base = extract_catalog(
-        "https://example.com/reference", catalog_url="https://example.org/index",
-        blob_sha=BLOB, observed_at=STAMP,
-    )
+    base = read_catalog("https://example.com/reference")
     changes = (
-        ("training_authorized", True),
-        ("rights", "cleared"),
-        ("availability", "fetched"),
-        ("host", "attacker.example"),
+        ("training_authorized", True), ("rights", "cleared"),
+        ("availability", "fetched"), ("host", "attacker.example"),
     )
     for field, value in changes:
         forged = deepcopy(base)
@@ -79,12 +84,7 @@ def test_untrusted_catalog_cannot_promote_leads_or_forge_custody():
 
 
 def test_manifest_custody_rejects_unknown_fields_and_noncanonical_links():
-    from copy import deepcopy
-
-    base = extract_catalog(
-        "https://example.com/reference", catalog_url="https://example.org/index",
-        blob_sha=BLOB, observed_at=STAMP,
-    )
+    base = read_catalog("https://example.com/reference")
     extra_authority = deepcopy(base)
     extra_authority["manifest"]["source_authorized"] = True
     with pytest.raises(ValueError, match="manifest fields"):
@@ -93,3 +93,11 @@ def test_manifest_custody_rejects_unknown_fields_and_noncanonical_links():
     alias["manifest"]["url"] = "https://EXAMPLE.org/index?utm_campaign=forged"
     with pytest.raises(ValueError, match="not canonical"):
         merge_catalogs([alias])
+
+
+def test_incompatible_observation_cannot_rebind_one_git_blob():
+    base = read_catalog("https://example.com/reference")
+    forged = deepcopy(base)
+    forged["manifest"]["observed_at"] = "2026-10-13T00:00:00Z"
+    with pytest.raises(ValueError, match="conflicting catalog identity"):
+        merge_catalogs([base, forged])
