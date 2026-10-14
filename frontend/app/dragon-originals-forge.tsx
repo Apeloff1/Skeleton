@@ -391,7 +391,7 @@ function Creator(){
         <Text style={s.hint}>
           These are potentially distinct game mechanics, not finished unique
           commercial games. Rule programs can additionally be combined with
-          Dragon's 128-axis environment Codex for much larger variation.
+          Dragon&apos;s 128-axis environment Codex for much larger variation.
         </Text>
         <Text style={s.heading}>Load one of 16.7 million original rule nuclei</Text>
         <TextInput value={nucleus} style={s.input}
