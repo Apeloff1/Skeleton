@@ -6,7 +6,7 @@ on:
     # One canonical validation completion is enough to wake recovery. The
     # five-minute schedule catches missed wakes without multiplying queued
     # drainer runs for every CI/CD, Backend Quality, and Frontier completion.
-    workflows: ["Merge Readiness"]
+    workflows: ["Merge Readiness", "Prune redundant branches safely"]
     types: [completed]
     branches: [main]
   schedule:
