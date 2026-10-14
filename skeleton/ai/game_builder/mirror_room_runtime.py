@@ -192,21 +192,28 @@ def review_playable_project(
             name = "tampered-proof-chain"
             row = proof.action_receipts[0]
             altered = replace(row, before_digest="f" * 64)
-            forged = replace(proof, action_receipts=(altered, *proof.action_receipts[1:]))
+            # The typed replay constructor itself may refuse a forged boundary.
+            # Construct it *inside* the rejection probe so this counts as
+            # correctly blocked tampering, rather than crashing the mirror.
             observed = _expect_rejected(
-                lambda: verify_replay(world, forged, authorized=True))
+                lambda: verify_replay(world,
+                    replace(proof, action_receipts=(altered, *proof.action_receipts[1:])),
+                    authorized=True))
         elif family == 6:
             name = "tampered-proof-final-state"
-            forged = replace(proof, final_state=replace(proof.final_state, score=proof.final_state.score + index + 1))
             observed = _expect_rejected(
-                lambda: verify_replay(world, forged, authorized=True))
+                lambda: verify_replay(world,
+                    replace(proof, final_state=replace(
+                        proof.final_state, score=proof.final_state.score + index + 1)),
+                    authorized=True))
         elif family == 7:
             name = "tampered-proof-action"
             row = proof.action_receipts[0]
-            forged = replace(proof, action_receipts=(
-                replace(row, action="unsupported"), *proof.action_receipts[1:]))
             observed = _expect_rejected(
-                lambda: verify_replay(world, forged, authorized=True))
+                lambda: verify_replay(world,
+                    replace(proof, action_receipts=(
+                        replace(row, action="unsupported"), *proof.action_receipts[1:])),
+                    authorized=True))
         elif family == 8:
             name = "terminal-replay-overflow"
             observed = _expect_rejected(
