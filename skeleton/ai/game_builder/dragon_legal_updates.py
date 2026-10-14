@@ -34,10 +34,26 @@ class LegalSourceObservation:
         for value in (self.source_id, self.jurisdiction):
             if not isinstance(value, str) or not value.strip() or len(value) > 192:
                 raise ValueError("bounded legal source identity and jurisdiction required")
-        if not isinstance(self.url, str) or len(self.url) > 2048:
-            raise ValueError("bounded primary-source URL required")
-        parsed = urlsplit(self.url)
-        if parsed.scheme != "https" or parsed.hostname not in PRIMARY_HOSTS or parsed.username or parsed.password or parsed.port not in {None, 443} or parsed.fragment:
+        if (
+            not isinstance(self.url, str)
+            or not 1 <= len(self.url) <= 2048
+            or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in self.url)
+        ):
+            raise ValueError("bounded canonical primary-source URL required")
+        try:
+            parsed = urlsplit(self.url)
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError("legal source URL has an invalid authority or port") from exc
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname not in PRIMARY_HOSTS
+            or parsed.username is not None
+            or parsed.password is not None
+            or port not in {None, 443}
+            or parsed.fragment
+            or not parsed.path.startswith("/")
+        ):
             raise ValueError("legal observation requires an approved primary-source HTTPS URL")
         if not isinstance(self.areas, frozenset) or not self.areas or not self.areas <= REVIEW_AREAS:
             raise ValueError("explicit applicable legal-review areas required")
