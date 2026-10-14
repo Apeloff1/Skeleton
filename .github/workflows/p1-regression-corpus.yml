@@ -16,22 +16,6 @@ on:
       - "scripts/check_p1_regression_corpus.py"
       - "tests/test_p1_regression_corpus.py"
       - ".github/workflows/p1-regression-corpus.yml"
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/eval/regression_corpus.py"
-      - "skeleton/ai/evaluation/regression_corpus.py"
-      - "skeleton/contracts/risk_evidence.py"
-      - "skeleton/eval/__init__.py"
-      - "skeleton/ai/evaluation/__init__.py"
-      - "skeleton/testing/test_regression_corpus.py"
-      - "machine/p1_regression_corpus.json"
-      - "scripts/check_p1_regression_corpus.py"
-      - "tests/test_p1_regression_corpus.py"
-      - ".github/workflows/p1-regression-corpus.yml"
   workflow_dispatch:
 
 permissions:

@@ -18,25 +18,6 @@ on:
       - "skeleton/eval/champion_registry.py"
       - "skeleton/testing/test_release_qualification.py"
       - ".github/workflows/p1-release-evidence-bundle.yml"
-  pull_request:
-    branches:
-      - main
-      - p1/learn-lane-materialize-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "skeleton/release/evidence.py"
-      - "skeleton/release/qualification.py"
-      - "skeleton/release/__init__.py"
-      - "skeleton/contracts/reproducibility.py"
-      - "skeleton/app/assembly.py"
-      - "skeleton/app/installer.py"
-      - "packaging/windows/**"
-      - "backend/core/tenant_storage_boundary.py"
-      - "skeleton/agents/safe_autonomy.py"
-      - "skeleton/eval/champion_registry.py"
-      - "skeleton/testing/test_release_qualification.py"
-      - ".github/workflows/p1-release-evidence-bundle.yml"
   workflow_dispatch:
 
 permissions:

@@ -13,20 +13,6 @@ on:
       - "skeleton/testing/test_release_attribution.py"
       - "tests/test_p1_release_attribution.py"
       - ".github/workflows/p1-release-attribution.yml"
-  pull_request:
-    branches:
-      - main
-      - p1/learn-lane-materialize-20260928
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/p1_release_attribution.json"
-      - "scripts/check_p1_release_attribution.py"
-      - "skeleton/release/attribution.py"
-      - "skeleton/release/__init__.py"
-      - "skeleton/testing/test_release_attribution.py"
-      - "tests/test_p1_release_attribution.py"
-      - ".github/workflows/p1-release-attribution.yml"
   workflow_dispatch:
 
 permissions:
