@@ -9,8 +9,9 @@ on:
       - "*"
       - "**"
   schedule:
-    # Stagger branch pruning to twice hourly; workflow-run wakeups remain active.
-    - cron: '3,33 * * * *'
+    # Bound full graph fetches to hourly; housekeeping completion and manual
+    # recovery still wake this controller independently of the timer.
+    - cron: '3 * * * *'
   push:
     branches: [main]
     # Immediate kick only when this maintenance workflow itself changes.

@@ -10,9 +10,9 @@ on:
       - 'backend/tests/test_pr_churn_control.py'
       - 'scripts/quality-gates.sh'
   schedule:
-    # PR churn retirement is noncritical; keep manual and main-change dispatch.
-    # The 15-minute fallback avoids competing with five-minute branch flow.
-    - cron: '11 * * * *'
+    # Noncritical PR churn retirement retains manual and path-scoped pushes.
+    # Sweep every two hours rather than compete with active branch flow.
+    - cron: '11 */2 * * *'
 
 permissions: {}
 

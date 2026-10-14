@@ -3,9 +3,9 @@ name: Archive closed PR and duplicate-tip branches safely
 on:
   workflow_dispatch:
   schedule:
-    # Branch-clean keeps the frequent five-minute guard; archival of closed
-    # and duplicate-tip branches can use a staggered half-hour safety sweep.
-    - cron: '19,49 * * * *'
+    # Hourly archival is sufficient while branch-clean and lifecycle cleanup
+    # preserve separate recovery paths. Avoid duplicate full graph fetches.
+    - cron: '19 * * * *'
   push:
     branches: [main]
     paths: ['.github/workflows/branch-archive.yml']
