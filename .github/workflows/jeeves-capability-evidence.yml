@@ -2,7 +2,7 @@ name: Jeeves Capability Evidence
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
     paths:
       - "skeleton/jeeves/evidence_core.py"
       - "skeleton/jeeves/llm_core.py"
