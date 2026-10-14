@@ -3,7 +3,10 @@ name: Night Shift Bots
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 */2 * * *'
+    # The bot only labels open work and appends a nightly ledger comment.
+    # A daily sweep avoids twelve identical inventory/report runs per day;
+    # workflow_dispatch remains available for immediate operator requests.
+    - cron: '17 2 * * *'
 
 concurrency:
   group: night-shift-${{ github.repository }}
