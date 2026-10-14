@@ -6089,7 +6089,7 @@
       "source": "skeleton/multimodal",
       "destination": "skeleton/ai/runtime/multimodal",
       "kind": "tree",
-      "source_git_object_sha": "749fcccb8e312baf5b50b7bb006984e806bb3e04",
+      "source_git_object_sha": "63a2962e366b9f4ea565ca6200b0edc099994db9",
       "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
       "work_package_refs": [
         "WP-W28",
