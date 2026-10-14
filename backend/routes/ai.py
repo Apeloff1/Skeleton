@@ -21,6 +21,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.chat_attachments import ChatAttachmentError, resolve_attachment_context
+from core.model_catalog import (
+    ModelSelectionError, model_catalog, resolve_selection, context_budget_for_selection,
+)
 from core.chat_turn_lifecycle import ChatTurnLifecycle
 from core.chat_turns import chat_turn_authority
 from core.conversations import ConversationStorageUnavailable, conversation_authority
@@ -264,6 +268,8 @@ class AIChatMemoryPolicy(BaseModel):
 
 
 class AIChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message: str = Field(..., min_length=1, max_length=100_000, description="User message")
     thread_id: str = Field(..., min_length=1, max_length=64, description="Canonical conversation thread")
     idempotency_key: str = Field(..., min_length=1, max_length=1024, description="Stable client message identity")
@@ -281,6 +287,11 @@ class AIChatRequest(BaseModel):
             "result into canonical long-term memory."
         ),
     )
+    attachment_refs: tuple[str, ...] = Field(default=(), max_length=4)
+    provider_id: str | None = Field(default=None, min_length=1, max_length=128)
+    model_id: str | None = Field(default=None, min_length=1, max_length=256)
+    max_output_tokens: int | None = Field(default=None, ge=1, le=1000000)
+    temperature: float | None = Field(default=None, ge=0, le=2)
     response_mode: Literal["wait", "deferred"] = Field(
         default="wait",
         description=(
@@ -376,6 +387,11 @@ def _chat_request_digest(request: AIChatRequest) -> str:
         "idempotency_key": request.idempotency_key,
         "context_sha256": context_digest,
         "memory_policy": memory_policy,
+        "attachment_refs": list(request.attachment_refs),
+        "provider_id": request.provider_id,
+        "model_id": request.model_id,
+        "max_output_tokens": request.max_output_tokens,
+        "temperature": request.temperature,
     }
     encoded = json.dumps(
         payload,
