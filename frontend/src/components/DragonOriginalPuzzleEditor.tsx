@@ -43,10 +43,10 @@ type Validation = {
   ok: boolean;
   digest: string;
   total_stages: number;
-  stages: Array<{
+  stages: {
     stage: number; layout_sha256: string;
     shortest_moves: number; shortest_solution: string; solver_states: number; crates: number;
-  }>;
+  }[];
 };
 
 type Props = {
@@ -100,14 +100,14 @@ export default function DragonOriginalPuzzleEditor({
   const [campaignBusy, setCampaignBusy] = React.useState(false);
   const [campaignAnalysis, setCampaignAnalysis] = React.useState<{
     endings: number; forks: number; routes: number;
-    stages: Array<{stage: number; tension: number; warningCount: number}>;
+    stages: {stage: number; tension: number; warningCount: number}[];
     warnings: string[];
   } | null>(null);
   const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
-  const [routeChoices, setRouteChoices] = React.useState<Array<{
+  const [routeChoices, setRouteChoices] = React.useState<{
     path: string; moves: number; pushes: number;
     visited_cells: number; risky_pushes: number; variation: string; solver: string;
-  }> | null>(null);
+  }[] | null>(null);
   const [hintBusy, setHintBusy] = React.useState(false);
 
   React.useEffect(() => {
@@ -481,7 +481,7 @@ export default function DragonOriginalPuzzleEditor({
         };
         challenge?: {
           profile:string;overall_fairness_warnings:string[];
-          stages:Array<{stage:number;measured_complexity:number;warnings:string[]}>;
+          stages:{stage:number;measured_complexity:number;warnings:string[]}[];
           has_player_observations:boolean;
         };
       };

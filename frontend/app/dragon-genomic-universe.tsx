@@ -63,7 +63,7 @@ type Capacity={
   genomic_world_space:{
     controlled_simulation_axes:number;
     levels_per_axis:number;
-    axes:Array<{id:string;description:string;levels:number}>;
+    axes:{id:string;description:string;levels:number}[];
     genomes_per_original_base_design:string;
     reversibly_addressable_world_configurations:string;
     completed_or_legally_cleared_games:number;

@@ -31,11 +31,11 @@ type NativePlan = {
   status: 'source_ready' | 'blocked';
   can_export_sources: boolean;
   evidence: string;
-  targets: Array<{
+  targets: ({
     target: string; state: string; reason: string;
     target_palette: string | null; target_stages: number | null;
     target_candidates: number | null; adaptations: string[];
-  }>;
+  })[];
 };
 
 type CapabilityPayload = {

@@ -21,7 +21,7 @@ type World={source_address:string;world_style:string;lifecycle:string;
   no_mandatory_win:boolean;history_digest:string;
   player_resources:Record<string,number>;journeys:string[];
   gates:Gate[];
-  available_actions:Array<{name:string;available:boolean;kind:string}>;
+  available_actions:{name:string;available:boolean;kind:string}[];
   domain_progress:Record<string,{reputation:number;axes:Record<string,number>}>;
   axes_level_map:Record<string,number>|null;
   terrain:{codex_terrain:Record<string,{energy:number;instability:number;
@@ -104,7 +104,7 @@ function Editor(){
     package:{target:string;content_sha256:string;
       projection:{active_axes:number;deferred_axes:string[];
         hardware_binary_compiled:boolean};
-      chunks:Array<{chunk:number;identity:string;rooms:unknown[]}>};
+      chunks:{chunk:number;identity:string;rooms:unknown[]}[]};
     independent_verification:{verified:boolean;room_count:number};
   }|null>(null);
   const [busy,setBusy]=React.useState(false);
