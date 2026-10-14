@@ -1,13 +1,6 @@
 name: Original World Native Builds
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/game/generation/original_world_product_*.py"
-      - "scripts/original_world_native_launcher.py"
-      - ".github/workflows/original-world-native-builds.yml"
   workflow_dispatch:
 
 permissions:

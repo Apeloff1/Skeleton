@@ -1,15 +1,6 @@
 name: Dragon Native Executable Release
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/webcrawler/dragon_native_puzzle.py'
-      - 'skeleton/ai/webcrawler/dragon_native_release.py'
-      - 'skeleton/ai/webcrawler/dragon_native_projects.py'
-      - 'skeleton/ai/webcrawler/dragon_native_targets.py'
-      - 'tests/test_ai_webcrawler_dragon_native_release.py'
-      - 'tests/test_ai_webcrawler_dragon_native_puzzle.py'
-      - '.github/workflows/dragon-native-release.yml'
   workflow_dispatch:
 
 permissions:

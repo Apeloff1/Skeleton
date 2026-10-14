@@ -1,43 +1,6 @@
 name: Original World Atlas
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/game/generation/original_*.py"
-      - "skeleton/game/generation/world_*.py"
-      - "tests/test_original_world*.py"
-      - "tests/test_original_foundation*.py"
-      - "docs/ORIGINAL_WORLD_MECHANIC_ATLAS.md"
-      - "docs/ORIGINAL_WORLD_FOUNDATIONS_10K.md"
-      - "docs/ORIGINAL_WORLD_MILLION_FORGE.md"
-      - "docs/ORIGINAL_WORLD_TENFOLD_SPATIAL_FORGE.md"
-      - "docs/ORIGINAL_WORLD_LIVING_122M.md"
-      - "docs/ORIGINAL_WORLD_PRODUCT_DELIVERY.md"
-      - "docs/ORIGINAL_WORLD_NPC_CIVIC_EDUCATION_GENERATIONS.md"
-      - "docs/ORIGINAL_WORLD_NPC_PLATFORM_GENRE_FIDELITY.md"
-      - "docs/ORIGINAL_WORLD_NPC_ERA_FIDELITY.md"
-      - "docs/ORIGINAL_WORLD_NPC_COGNITION_V2.md"
-      - ".github/workflows/original-world-atlas.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/game/generation/original_*.py"
-      - "skeleton/game/generation/world_*.py"
-      - "tests/test_original_world*.py"
-      - "tests/test_original_foundation*.py"
-      - "docs/ORIGINAL_WORLD_MECHANIC_ATLAS.md"
-      - "docs/ORIGINAL_WORLD_FOUNDATIONS_10K.md"
-      - "docs/ORIGINAL_WORLD_MILLION_FORGE.md"
-      - "docs/ORIGINAL_WORLD_TENFOLD_SPATIAL_FORGE.md"
-      - "docs/ORIGINAL_WORLD_LIVING_122M.md"
-      - "docs/ORIGINAL_WORLD_PRODUCT_DELIVERY.md"
-      - "docs/ORIGINAL_WORLD_NPC_CIVIC_EDUCATION_GENERATIONS.md"
-      - "docs/ORIGINAL_WORLD_NPC_PLATFORM_GENRE_FIDELITY.md"
-      - "docs/ORIGINAL_WORLD_NPC_ERA_FIDELITY.md"
-      - "docs/ORIGINAL_WORLD_NPC_COGNITION_V2.md"
-      - ".github/workflows/original-world-atlas.yml"
   workflow_dispatch:
 
 permissions:
