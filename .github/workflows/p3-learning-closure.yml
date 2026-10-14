@@ -1,13 +1,7 @@
 name: P3 Learning T2 Closure
+# Deep metadata/closure validation runs after merge or by manual dispatch;
+# canonical PR/security gates retain pre-merge coverage.
 on:
-  pull_request:
-    paths:
-      - "machine/ai_p3_learning_closure.json"
-      - "machine/ai_p3_learning_execution_map.json"
-      - "machine/ai_p3_learning_task_backlog.json"
-      - "scripts/check_p3_learning_closure.py"
-      - "tests/test_p3_learning_closure.py"
-      - ".github/workflows/p3-learning-closure.yml"
   push:
     branches: [main, feat/p3-learning-multimodal-t2]
   workflow_dispatch:

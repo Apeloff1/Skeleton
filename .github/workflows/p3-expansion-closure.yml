@@ -1,14 +1,8 @@
 name: P3 Expansion Closure
 
+# Deep metadata/closure validation runs after merge or by manual dispatch;
+# canonical PR/security gates retain pre-merge coverage.
 on:
-  pull_request:
-    paths:
-      - "machine/ai_p3_expansion_closure.json"
-      - "machine/ai_p3_execution_map.json"
-      - "machine/ai_p3_task_backlog.json"
-      - "scripts/check_p3_expansion_closure.py"
-      - "tests/test_p3_expansion_closure.py"
-      - ".github/workflows/p3-expansion-closure.yml"
   push:
     branches:
       - main

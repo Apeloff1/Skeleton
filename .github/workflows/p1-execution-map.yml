@@ -1,25 +1,11 @@
 name: P1 Execution Map Gate
 
+# Deep metadata/closure validation runs after merge or by manual dispatch;
+# canonical PR/security gates retain pre-merge coverage.
 on:
   push:
     branches:
       - main
-    paths:
-      - "machine/ai_p1_execution_map.json"
-      - "machine/ai_p1_task_backlog.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_master_build_sequence.json"
-      - "scripts/check_ai_p1_execution_map.py"
-      - "tests/test_ai_p1_execution_map.py"
-      - "docs/plan/P1_EXECUTION_MAP.md"
-      - "docs/plan/MASTER_INDEX.md"
-      - "docs/plan/MASTER_PLAN.md"
-      - ".github/workflows/p1-execution-map.yml"
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "machine/ai_p1_execution_map.json"
       - "machine/ai_p1_task_backlog.json"

@@ -1,14 +1,8 @@
 name: P3 Training Closure
 
+# Deep metadata/closure validation runs after merge or by manual dispatch;
+# canonical PR/security gates retain pre-merge coverage.
 on:
-  pull_request:
-    paths:
-      - "machine/ai_p3_training_closure.json"
-      - "machine/ai_p3_training_execution_map.json"
-      - "machine/ai_p3_training_task_backlog.json"
-      - "scripts/check_p3_training_closure.py"
-      - "tests/test_p3_training_closure.py"
-      - ".github/workflows/p3-training-closure.yml"
   push:
     branches:
       - main
