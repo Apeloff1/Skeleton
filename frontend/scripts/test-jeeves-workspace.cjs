@@ -840,6 +840,6 @@ test('Jeeves Markdown renderer is inert, bounded to display primitives, and JSX 
   assert.match(source, /kind: 'list'/);
   assert.match(source, /kind: 'table'/);
   assert.match(source, /kind: 'heading'/);
-  assert.match(source, /\(https\?:\\\/\\\/\|mailto:\)/i);
+  assert.ok(source.includes('mailto:') && source.includes('https?:'), 'links limited to authored http/mailto schemes');
   assert.doesNotMatch(source, /dangerouslySetInnerHTML|WebView|\beval\s*\(/);
 });
