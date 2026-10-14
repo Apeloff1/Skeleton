@@ -511,6 +511,7 @@ jobs:
                 deleted=$((deleted + 1))
                 reclaimed=$((reclaimed + size))
               elif grep -Eqi '(rate.limit|abuse detection)' "$delete_error"; then
+                touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
                 echo '::warning::Cache cleanup deferred: GitHub API rate limit reached.'
                 break
               else
@@ -536,6 +537,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # A prior cleanup step exhausted the installation API budget.
+          # Preserve all later resources instead of retrying doomed mutations.
+          if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]; then
+            echo '::warning::Skipping artifact deletion under GitHub API rate pressure.'
+            exit 0
+          fi
           cutoff=$(date -u -d "${ARTIFACT_RETENTION_DAYS} days ago" +%s)
           inventory="$RUNNER_TEMP/artifacts.tsv"
           deleted=0
@@ -572,6 +579,7 @@ jobs:
               if gh api --method DELETE "/repos/${REPO}/actions/artifacts/${id}" >/dev/null 2>"$delete_error"; then
                 deleted=$((deleted + 1))
               elif grep -Eqi '(rate.limit|abuse detection)' "$delete_error"; then
+                touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"
                 echo '::warning::Artifact cleanup deferred: GitHub API rate limit reached.'
                 break
               else
@@ -593,6 +601,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]; then
+            echo '::warning::Skipping old-run deletion under GitHub API rate pressure.'
+            exit 0
+          fi
           cutoff=$(date -u -d "${FAILED_RUN_RETENTION_DAYS} days ago" +%s)
           cutoff_iso=$(date -u -d "${FAILED_RUN_RETENTION_DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)
           inventory="$RUNNER_TEMP/runs.tsv"
