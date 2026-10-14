@@ -570,48 +570,74 @@ def _observe_runs(repository: str) -> list[dict[str, Any]]:
     GitHub run id so admission never mistakes hidden live work for spare
     capacity.
     """
-    fields = (
-        "databaseId,name,event,status,conclusion,"
-        "headBranch,headSha,createdAt,updatedAt"
+    # GitHub CLI's 'gh run list' history query can fail under Actions queue
+    # congestion, independently of the authenticated REST Actions listing.
+    # The REST API is also used for status-scoped reads: give all of its rows
+    # one canonical shape so status, createdAt and updatedAt retain meaning.
+    projection = (
+        ".workflow_runs | map({"
+        "databaseId: .id, name: .name, event: .event, "
+        "status: .status, conclusion: .conclusion, "
+        "headBranch: .head_branch, headSha: .head_sha, "
+        "createdAt: .created_at, updatedAt: .updated_at"
+        "})"
     )
     history = _gh_json(
         [
-            "run",
-            "list",
-            "--repo",
-            repository,
-            "--limit",
-            str(MAX_ITEMS),
-            "--json",
-            fields,
+            "api",
+            f"/repos/{repository}/actions/runs?per_page={MAX_ITEMS}",
+            "--jq",
+            projection,
         ]
     )
     merged: dict[str, dict[str, Any]] = {}
-    anonymous: list[dict[str, Any]] = []
 
     def add(run: dict[str, Any]) -> None:
-        run_id = _run_id(run)
-        if run_id:
-            merged[run_id] = run
-        else:
-            anonymous.append(run)
+        run_id = run.get("databaseId")
+        created = run.get("createdAt")
+        updated = run.get("updatedAt")
+        status = run.get("status")
+        if (
+            type(run_id) is not int
+            or run_id <= 0
+            or not isinstance(status, str)
+            or not status
+            or _timestamp(created) is None
+            or _timestamp(updated) is None
+        ):
+            raise TrafficManagerError(
+                "repository traffic observation contains an invalid Actions run"
+            )
+        merged[str(run_id)] = run
 
     for run in history:
         add(run)
+    # A single page is not a complete queue inventory: real congestion can
+    # exceed 100 queued runs. Scan bounded pages so old queued work remains
+    # visible to stale-age and relief decisions. Refuse admission if the
+    # active inventory exceeds the bounded observation budget.
     for status in sorted(ACTIVE_STATUSES):
-        for run in _gh_json(
-            [
-                "api",
-                (
-                    f"/repos/{repository}/actions/runs"
-                    f"?status={status}&per_page={MAX_ITEMS}"
-                ),
-                "--jq",
-                ".workflow_runs",
-            ]
-        ):
-            add(run)
-    return [*merged.values(), *anonymous]
+        for page in range(1, 11):
+            page_runs = _gh_json(
+                [
+                    "api",
+                    (
+                        f"/repos/{repository}/actions/runs"
+                        f"?status={status}&per_page={MAX_ITEMS}&page={page}"
+                    ),
+                    "--jq",
+                    projection,
+                ]
+            )
+            for run in page_runs:
+                add(run)
+            if len(page_runs) < MAX_ITEMS:
+                break
+        else:
+            raise TrafficManagerError(
+                "repository traffic observation exceeded bounded active page limit"
+            )
+    return list(merged.values())
 
 
 def observe(

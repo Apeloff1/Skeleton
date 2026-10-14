@@ -650,6 +650,11 @@ class NativeLLMRuntime:
         )
 
         def assert_binding() -> None:
+            # Distinguish tokenizer identity drift before aggregate binding
+            # checks. Keep the full (more costly) tokenizer integrity proof at
+            # the existing post-inference checkpoint, not twice per token.
+            if self.tokenizer.digest != admitted_binding[1]:
+                raise RuntimeContractError("tokenizer mutated during generation")
             if admitted_binding != (
                 self.model_digest, self.tokenizer.digest, self.architecture.digest,
                 self.device.digest, self.device_policy, self.limits,
