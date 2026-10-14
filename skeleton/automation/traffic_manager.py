@@ -612,19 +612,31 @@ def _observe_runs(repository: str) -> list[dict[str, Any]]:
 
     for run in history:
         add(run)
+    # A single page is not a complete queue inventory: real congestion can
+    # exceed 100 queued runs. Scan bounded pages so old queued work remains
+    # visible to stale-age and relief decisions. Refuse admission if the
+    # active inventory exceeds the bounded observation budget.
     for status in sorted(ACTIVE_STATUSES):
-        for run in _gh_json(
-            [
-                "api",
-                (
-                    f"/repos/{repository}/actions/runs"
-                    f"?status={status}&per_page={MAX_ITEMS}"
-                ),
-                "--jq",
-                projection,
-            ]
-        ):
-            add(run)
+        for page in range(1, 11):
+            page_runs = _gh_json(
+                [
+                    "api",
+                    (
+                        f"/repos/{repository}/actions/runs"
+                        f"?status={status}&per_page={MAX_ITEMS}&page={page}"
+                    ),
+                    "--jq",
+                    projection,
+                ]
+            )
+            for run in page_runs:
+                add(run)
+            if len(page_runs) < MAX_ITEMS:
+                break
+        else:
+            raise TrafficManagerError(
+                "repository traffic observation exceeded bounded active page limit"
+            )
     return list(merged.values())
 
 
