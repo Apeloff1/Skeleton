@@ -1,5 +1,6 @@
 """Storage diagnostics remain available without importing deferred seeds."""
 from concurrent.futures import ThreadPoolExecutor
+import importlib
 import sys
 
 from fastapi import FastAPI
@@ -54,6 +55,7 @@ def test_first_concurrent_proxy_access_imports_target_once(tmp_path, monkeypatch
         f"with open({str(marker)!r}, 'a') as stream:\n    stream.write('loaded\\n')\nVALUE = 73\n"
     )
     monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setitem(lazy_registry._LOADERS, name, lambda: importlib.import_module(name))
     sys.modules.pop(name, None)
     proxy = lazy_registry.lazy_import(name)
     assert name not in sys.modules and not marker.exists()
@@ -66,3 +68,23 @@ def test_first_concurrent_proxy_access_imports_target_once(tmp_path, monkeypatch
         assert marker.read_text() == "loaded\n"
     finally:
         sys.modules.pop(name, None)
+
+
+@pytest.mark.parametrize("name", ["os", "asyncio", "../../os", "core.unregistered_module", "seeds.unknown"])
+def test_proxy_rejects_unregistered_import_paths(name):
+    before = set(sys.modules)
+    with pytest.raises(ValueError, match="not registered"):
+        lazy_registry.lazy_import(name)
+    assert set(sys.modules) == before
+
+
+def test_literal_loader_inventory_matches_declared_repository_modules():
+    expected = {"core." + name for name in lazy_registry.module_names()}
+    expected.update("seeds." + name for name in lazy_registry._pkg_module_names("seeds"))
+    assert set(lazy_registry._LOADERS) == expected
+
+
+def test_registry_has_no_runtime_selected_python_imports():
+    from pathlib import Path
+    from scripts.check_dynamic_import_safety import violations
+    assert violations(Path(lazy_registry.__file__)) == []
