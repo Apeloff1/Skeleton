@@ -171,7 +171,7 @@ test('ActionSheet exposes modal semantics, accessible buttons and reduced motion
 test('Toast exposes live status without swallowing child controls', () => {
   const content = source('components/Toast.tsx');
   assert.match(content, /accessibleStatusProps/);
-  assert.match(content, /accessibleButtonProps\('Dismiss notification'\)/);
+  assert.match(content, /accessibleButtonProps\(t\('notification.dismiss'\)\)/);
   assert.match(content, /minWidth: 44/);
   assert.match(content, /minHeight: 44/);
   assert.match(content, /useReduceMotion/);
@@ -184,7 +184,8 @@ test('Toast exposes live status without swallowing child controls', () => {
 test('StabilityBanner exposes textual assertive connectivity semantics', () => {
   const content = source('src/components/StabilityBanner.tsx');
   assert.match(content, /accessibleStatusProps/);
-  assert.match(content, /Connectivity status:/);
+  assert.match(content, /const messageText = t\(message.key\)/);
+  assert.match(content, /status.connectivity.offline/);
   assert.match(content, /variant === 'offline' \|\| variant === 'down'/);
   assert.match(content, /useReduceMotion/);
 });
@@ -193,25 +194,25 @@ test('BootLauncher exposes progress, failure, recovery and single reduce-motion 
   const content = source('components/BootLauncher.tsx');
   assert.match(content, /useReduceMotion/);
   assert.match(content, /accessibleStatusProps/);
-  assert.match(content, /Startup progress:/);
-  assert.match(content, /Boot failed\./);
-  assert.match(content, /accessibleButtonProps\('Retry boot'\)/);
-  assert.match(content, /accessibleButtonProps\('Open Safe Mode'\)/);
+  assert.match(content, /t\('status.startup_progress', \{ percent: boundedPct \}\)/);
+  assert.match(content, /t\('recovery.boot_failed'\)/);
+  assert.match(content, /accessibleButtonProps\(t\('recovery.retry'\)\)/);
+  assert.match(content, /accessibleButtonProps\(t\('recovery.safe_mode'\)\)/);
   assert.doesNotMatch(content, /AccessibilityInfo\.isReduceMotionEnabled/);
 });
 
 test('LaunchCascade exposes named fallback controls and startup status', () => {
   const content = source('components/LaunchCascade.tsx');
-  assert.match(content, /accessibleButtonProps\('Open Skeleton'\)/);
-  assert.match(content, /accessibleButtonProps\('Open Safe Mode'\)/);
-  assert.match(content, /accessibleStatusProps\('Starting Skeleton'\)/);
+  assert.match(content, /accessibleButtonProps\(t\('launcher.open'\)\)/);
+  assert.match(content, /accessibleButtonProps\(t\('recovery.safe_mode'\)\)/);
+  assert.match(content, /accessibleStatusProps\(t\('status.starting'\)\)/);
   assert.match(content, /minHeight: 44/);
 });
 
 
 test('Entry route announces startup safety status before launcher mounts', () => {
   const content = source('app/index.tsx');
-  assert.match(content, /accessibleStatusProps\('Checking startup safety'\)/);
+  assert.match(content, /accessibleStatusProps\(t\('status.startup_check'\)\)/);
   assert.match(content, /accessibilityElementsHidden/);
 });
 

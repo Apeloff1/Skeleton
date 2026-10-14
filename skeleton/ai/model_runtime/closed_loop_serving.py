@@ -33,9 +33,11 @@ class ClosedLoopServingController:
             raise ValueError("RuntimePolicy required")
         if not isinstance(estimator, DeterministicRuntimeEstimator):
             raise ValueError("DeterministicRuntimeEstimator required")
+        if planner is not None and not isinstance(planner, SLOResourcePlanner):
+            raise ValueError("SLOResourcePlanner required")
         self.policy = policy
         self.estimator = estimator
-        self.planner = planner or SLOResourcePlanner()
+        self.planner = planner if planner is not None else SLOResourcePlanner()
 
     def observe(self, telemetry: RequestTelemetry, *, kv_bytes_per_token: int) -> FeedbackReceipt:
         return self.estimator.observe(telemetry, kv_bytes_per_token=kv_bytes_per_token)

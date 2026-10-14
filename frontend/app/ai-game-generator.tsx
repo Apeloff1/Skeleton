@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { withScreenGuard } from '../components/withScreenGuard';
 import { queueGameBuilderArtifact } from '../features/GameFactory/gameBuilderHandoff';
 import theme from '../theme/tokens';
+import { LazyMount } from '../src/utils/lazyMount';
 
 const LazyAIGameGeneratorModal = React.lazy(() =>
   import('../features/AIGameGenerator/AIGameGeneratorModal').then((module) => ({
@@ -30,7 +31,7 @@ function AIGameGeneratorRoute() {
   }, [router]);
 
   return (
-    <React.Suspense
+    <LazyMount
       fallback={
         <View style={{ flex: 1, backgroundColor: '#05070d', alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#A78BFA" />
@@ -43,7 +44,7 @@ function AIGameGeneratorRoute() {
         colors={theme.colors as any}
         onGenerated={handleGenerated}
       />
-    </React.Suspense>
+    </LazyMount>
   );
 }
 

@@ -15,7 +15,7 @@
  *   {show && <LazyMount><Heavy .../></LazyMount>}
  */
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, Platform, StyleSheet } from 'react-native';
 
 type AnyComponent = React.ComponentType<any>;
 type ComponentKeys<TModule> = {
@@ -44,19 +44,19 @@ export function lazyNamed<TModule, K extends ComponentKeys<TModule>>(
 export const LazyMount: React.FC<{ children: React.ReactNode; fallback?: React.ReactNode }> = ({
   children,
   fallback,
-}) => (
-  <React.Suspense
-    fallback={
-      fallback ?? (
+}) => {
+  // Expo's static renderer cannot finish a suspended lazy import. Render the
+  // same loading state on the server and during the first browser render,
+  // then mount the lazy child after hydration. Native routes mount directly.
+  const [mounted, setMounted] = React.useState(Platform.OS !== 'web');
+  React.useEffect(() => { setMounted(true); }, []);
+  const loading = fallback ?? (
         <View style={styles.fallback}>
           <ActivityIndicator color="#A78BFA" />
         </View>
-      )
-    }
-  >
-    {children}
-  </React.Suspense>
-);
+  );
+  return mounted ? <React.Suspense fallback={loading}>{children}</React.Suspense> : <>{loading}</>;
+};
 
 const styles = StyleSheet.create({
   fallback: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 180 },

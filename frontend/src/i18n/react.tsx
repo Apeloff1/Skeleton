@@ -36,7 +36,8 @@ interface LocaleContextValue {
 const LocaleContext = React.createContext<LocaleContextValue | null>(null);
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = React.useState<string>(() => detectSystemLocale());
+  const [locale, setLocaleState] = React.useState<string>('en');
+  React.useEffect(() => { setLocaleState(detectSystemLocale()); }, []);
 
   const setLocale = React.useCallback((next: string) => {
     setLocaleState(normalizeLocale(next));

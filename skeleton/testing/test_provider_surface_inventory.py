@@ -236,3 +236,32 @@ def test_import_analysis_is_shared_without_mutable_results(tmp_path, monkeypatch
     assert len(walks) == 2
     source.unlink()
     assert module._imported_modules(source) == []
+
+
+def test_credential_analysis_reuses_findings_and_invalidates_same_size_edits(tmp_path, monkeypatch):
+    module = _checker()
+    source = tmp_path / "provider.py"
+    initial = "import os\ncredential = os.getenv('OPENAI_API_KEY')\n"
+    changed = initial.replace("OPENAI_API_KEY", "GEMINI_API_KEY")
+    assert len(initial) == len(changed)
+    source.write_text(initial, encoding="utf-8")
+    reads = []
+    original = module._credential_environment_reads
+
+    def counted(path):
+        reads.append(path)
+        return original(path)
+
+    monkeypatch.setattr(module, "_credential_environment_reads", counted)
+    first = module._credential_markers(source)
+    assert first == ["OPENAI_API_KEY"]
+    first.clear()
+    assert module._credential_markers(source) == ["OPENAI_API_KEY"]
+    assert len(reads) == 1
+    previous = source.stat()
+    source.write_text(changed, encoding="utf-8")
+    module.os.utime(source, ns=(previous.st_atime_ns, previous.st_mtime_ns + 1_000_000))
+    assert module._credential_markers(source) == ["GEMINI_API_KEY"]
+    assert len(reads) == 2
+    source.unlink()
+    assert module._credential_markers(source) == []

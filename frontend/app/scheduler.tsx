@@ -1,3 +1,4 @@
+import { LazyMount } from '../src/utils/lazyMount';
 /**
  * Calendar • Clock • Scheduler
  * A self-contained productivity surface persisted in AsyncStorage.
@@ -61,7 +62,7 @@ const COLORS = [theme.colors.primary, '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'
 function pad2(n: number) { return n.toString().padStart(2, '0'); }
 function ymd(d: Date) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 
-export default function SchedulerScreen() {
+function SchedulerScreen() {
   const router = useRouter();
   const [now, setNow] = useState(new Date());
   const [events, setEvents] = useState<Event[]>([]);
@@ -504,3 +505,8 @@ const s = StyleSheet.create({
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 14, marginTop: 20, gap: 8 },
   saveBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
 });
+
+// The live clock and device calendar are initialized after web hydration.
+export default function SchedulerRoute() {
+  return <LazyMount><SchedulerScreen /></LazyMount>;
+}

@@ -1,3 +1,4 @@
+import { LazyMount } from '../src/utils/lazyMount';
 /** Project Story Index — actual indexed scene evidence and recall for Jeeves.
  * Every scene is server-owned, branch-scoped and cited. This is not a static
  * demo, and neither missing history nor audit truncation is marked "pass".
@@ -32,7 +33,7 @@ type StoryRecall = {
   instruction_policy: string;
 };
 
-export default function StoryIndexScreen() {
+function StoryIndexScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ game?: string | string[] }>();
   const routeId = Array.isArray(params.game) ? params.game[0] : params.game;
@@ -357,4 +358,9 @@ export default function StoryIndexScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+// Project history and account handoffs are resolved after web hydration.
+export default function StoryIndexRoute() {
+  return <LazyMount><StoryIndexScreen /></LazyMount>;
 }

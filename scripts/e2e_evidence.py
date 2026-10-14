@@ -59,13 +59,14 @@ class Recorder:
         self.events = (output / "events.jsonl").open("w", encoding="utf-8")
         self.issues: list[dict] = []
         self.suites: list[dict] = []
+        self.test_counts: dict[str, dict] = {}
         self.started = timestamp()
         self.run_id = digest(self.started + ":" + os.environ.get("GITHUB_RUN_ID", "local"))
 
-    def emit(self, kind: str, **metadata):
+    def emit(self, event_name: str, **metadata):
         # Never accept arbitrary credential-bearing objects in event metadata.
         safe = {key: self.redact(str(value))[:MAX_LINE] for key, value in metadata.items()}
-        event = {"timestamp": timestamp(), "run_id": self.run_id, "event": kind, **safe}
+        event = {"timestamp": timestamp(), "run_id": self.run_id, "event": event_name, **safe}
         self.events.write(json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n")
         self.events.flush()
 
@@ -228,14 +229,33 @@ def parse_junit(path: Path, suite: str, rec: Recorder) -> int:
                   evidence=f"logs/{suite}.log")
         return 0
     problems = 0
+    counts = {"collected": 0, "passed": 0, "failures": 0, "errors": 0, "skipped": 0}
     for case in xml.iter("testcase"):
+        counts["collected"] += 1
         name = f"{case.get('classname', '')}::{case.get('name', '')}"
+        passed = True
         for tag in ("failure", "error"):
             for finding in case.findall(tag):
+                passed = False
+                counts["failures" if tag == "failure" else "errors"] += 1
                 problems += 1
                 message = finding.get("message") or finding.text or tag
                 rec.issue(suite=suite, phase="execute", kind=tag, testcase=name,
                           message=message[:1200], evidence=f"junit/{suite}.xml")
+        for finding in case.findall("skipped"):
+            passed = False
+            counts["skipped"] += 1
+            problems += 1
+            rec.issue(suite=suite, phase="execute", kind="unverified-test", testcase=name,
+                      message=finding.get("message") or "Skipped or expected-failure test was not verified",
+                      severity="medium", evidence=f"junit/{suite}.xml")
+        counts["passed"] += int(passed)
+    if not counts["collected"]:
+        problems += 1
+        rec.issue(suite=suite, phase="execute", kind="empty-junit",
+                  message="The XML receipt contains no test cases", evidence=f"junit/{suite}.xml")
+    rec.test_counts[suite] = counts
+    rec.emit("suite.test-counts", suite=suite, **counts)
     # JUnit can include arbitrary failure text. The artifact must never retain
     # the raw XML that pytest emitted.
     for node in xml.iter():
@@ -257,18 +277,31 @@ def launch(rec: Recorder, suite: dict) -> None:
     logfile = rec.output / "logs" / f"{name}.log"
     logfile.parent.mkdir(exist_ok=True)
     cmd = list(suite["command"])
+    private_xml = None
     if cmd[0] == "python":
         cmd[0] = sys.executable
         if "-m" in cmd and "pytest" in cmd:
             private_xml = rec.output / f".{name}.raw.xml"
             cmd += [f"--junitxml={private_xml}", "--durations=20"]
-    else:
-        private_xml = None
     # No shell, no user-controlled command and no provider credentials.
     allowed_env = ("PATH", "HOME", "LANG", "LC_ALL", "CI", "PYTHONPATH",
                    "PYTEST_DISABLE_PLUGIN_AUTOLOAD", "VIRTUAL_ENV",
                    "GITHUB_ACTIONS", "TMPDIR", "NODE_OPTIONS")
     env = {key: os.environ[key] for key in allowed_env if key in os.environ}
+    if name == "app-cli-forge":
+        for key in ("SKELETON_GODOT_BIN", "GODOT_BINARY"):
+            selected = os.environ.get(key)
+            if selected:
+                binary = Path(selected).resolve()
+                if not binary.is_file() or not os.access(binary, os.X_OK):
+                    rec.issue(suite=name, phase="preflight", kind="invalid-local-tool",
+                              message="Selected Godot executable is unavailable", evidence="events.jsonl")
+                    rec.suites.append({"id": name, "status": "failed", "duration_seconds": 0.0,
+                                       "exit_code": 1, "timed_out": False})
+                    return
+                env[key] = str(binary)
+                rec.emit("tool.bound", suite=name, variable=key,
+                         binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest())
     env["PYTHONUNBUFFERED"] = "1"
     started = time.monotonic()
     rec.emit("suite.started", suite=name, tier=suite["tier"],
@@ -352,6 +385,7 @@ def launch(rec: Recorder, suite: dict) -> None:
             "id": name, "status": status, "duration_seconds": elapsed,
             "exit_code": code, "log": f"logs/{name}.log", "timed_out": timed_out,
             "logged_lines": lines, "truncated_lines": discarded,
+            "tests": rec.test_counts.get(name),
         })
         rec.emit("suite.finished", suite=name, status=status,
                  elapsed_seconds=elapsed, exit_code=code, logged_lines=lines,
@@ -380,11 +414,17 @@ def main() -> int:
                       evidence="machine/e2e_suites.json", severity="critical")
             rec.emit("preflight.failed", reason=type(exc).__name__)
             return 2
-        selected = [s for s in suites if not args.suite or s["id"] in args.suite]
+        selected = [s for s in suites if (s["id"] in args.suite if args.suite
+                    else args.mode == "preflight" or s["tier"] == "offline")]
         unknown = set(args.suite) - {s["id"] for s in suites}
         if unknown:
             rec.issue(suite="manifest", phase="preflight", kind="unknown-suite",
                       message="Requested suite ID not registered", severity="critical")
+            return 2
+        if args.mode == "offline-e2e" and any(s["tier"] != "offline" for s in selected):
+            rec.issue(suite="manifest", phase="preflight", kind="unsafe-suite",
+                      message="Live-service suites are not permitted in offline-e2e mode",
+                      severity="critical")
             return 2
         check_inventory(rec, selected)
         if rec.issues:
@@ -392,11 +432,6 @@ def main() -> int:
         if args.mode == "offline-e2e":
             rec.suites.clear()
             for suite in selected:
-                if suite["tier"] != "offline":
-                    rec.issue(suite=suite["id"], phase="preflight", kind="unsafe-suite",
-                              message="Live-service suites are not permitted in offline-e2e mode",
-                              severity="critical")
-                    continue
                 launch(rec, suite)
         return 1 if rec.issues else 0
     except Exception as exc:

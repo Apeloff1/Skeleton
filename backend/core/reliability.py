@@ -252,36 +252,52 @@ def dlq_snapshot() -> list[dict]:
 # ════════════════════════════════════════════════════════════════════════════
 #  6. GRACEFUL SIGTERM DRAIN
 # ════════════════════════════════════════════════════════════════════════════
-_drain_started = False
-
 def install_graceful_drain(app, *, grace_seconds: float = 30.0):
     """Wire SIGTERM/SIGINT so inflight requests finish before uvicorn exits.
 
     Strategy: when a signal arrives, set `app.state._shedding = True` so
     LoadSheddingMiddleware starts returning 503 for new requests, sleep
-    grace_seconds, then re-raise the signal to let uvicorn's own handler
-    finish the job.
+    grace_seconds, then hand the signal to the existing server handler.
+    Preserve uvicorn's handler instead of replacing it with an asyncio
+    callback that catches its own re-raised signal forever.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
+    started = False
+    timer = None
 
-    def _handle(sig):
-        global _drain_started
-        if _drain_started:
+    def forward(sig, frame, previous):
+        nonlocal timer
+        if timer is not None:
+            timer.cancel()
+            timer = None
+        if callable(previous):
+            previous(sig, frame)
+        elif previous == signal.SIG_DFL:
+            signal.signal(sig, previous)
+            signal.raise_signal(sig)
+
+    def _handle(sig, frame, previous):
+        nonlocal started, timer
+        if started:
+            # A second shutdown signal must still reach the server.
+            forward(sig, frame, previous)
             return
-        _drain_started = True
+        started = True
         logger.info(f"[drain] signal {sig.name} received — beginning {grace_seconds}s graceful drain")
         try:
             app.state._shedding = True
         except Exception:
             pass
-        # Re-raise the default handler after grace_seconds.
-        loop.call_later(grace_seconds, lambda: signal.raise_signal(sig))
+        timer = loop.call_later(grace_seconds, forward, sig, frame, previous)
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:
-            loop.add_signal_handler(sig, lambda s=sig: _handle(s))
-        except (NotImplementedError, RuntimeError):
-            # Windows / certain test loops can't add signal handlers.
+            previous = signal.getsignal(sig)
+            if previous == signal.SIG_IGN:
+                continue
+            signal.signal(sig, lambda signum, frame, p=previous: _handle(signal.Signals(signum), frame, p))
+        except (NotImplementedError, RuntimeError, ValueError):
+            # Non-main threads and certain hosts cannot install handlers.
             pass
 
 
