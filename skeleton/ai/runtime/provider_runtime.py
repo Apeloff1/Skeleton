@@ -218,6 +218,7 @@ class ProviderRequest:
     history: tuple[AIMessage, ...] = field(default_factory=tuple)
     max_output_tokens: int | None = None
     model: str | None = None
+    temperature: float | None = None
     data_class: str = "internal"
     purpose: str = "model-inference"
     tenant_id: str | None = None
@@ -1400,6 +1401,14 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
     ):
         raise ProviderProtocolViolationError("max_output_tokens must be a positive integer")
 
+    if request.temperature is not None and (
+        isinstance(request.temperature, bool)
+        or not isinstance(request.temperature, (int, float))
+        or not math.isfinite(request.temperature)
+        or not 0 <= request.temperature <= 2
+    ):
+        raise ProviderProtocolViolationError("temperature must be finite and within [0, 2]")
+
     if request.model is None:
         model = default_model
     elif not isinstance(request.model, str) or not request.model.strip():
@@ -2268,6 +2277,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
             }
             if request.max_output_tokens is not None:
                 kwargs["max_output_tokens"] = request.max_output_tokens
+            if request.temperature is not None:
+                kwargs["temperature"] = request.temperature
             if tools:
                 kwargs["tools"] = [
                     tool.as_openai_tool()
@@ -3083,6 +3094,8 @@ class OpenAISyncProviderAdapter:
         }
         if request.max_output_tokens is not None:
             body["max_output_tokens"] = request.max_output_tokens
+        if request.temperature is not None:
+            body["temperature"] = request.temperature
         if tools:
             body["tools"] = [
                 tool.as_openai_tool()
@@ -3458,6 +3471,29 @@ class ProviderRegistry:
             self._adapters[provider_id].available
             for provider_id in candidate_ids
         )
+
+    def require_selected(self, provider_id: str, model_id: str) -> ProviderAdapter:
+        """Select exactly one configured, architecture-acknowledged model.
+
+        An explicit user selection cannot silently fall back to a different
+        provider or model, even when the automatic route has fallbacks.
+        """
+        if (
+            not isinstance(provider_id, str)
+            or not provider_id
+            or provider_id != provider_id.strip()
+            or not isinstance(model_id, str)
+            or not model_id
+            or model_id != model_id.strip()
+        ):
+            raise ProviderUnavailableError("explicit provider selection is malformed")
+        adapter = self._adapters.get(provider_id)
+        if adapter is None or getattr(adapter, "model", None) != model_id:
+            raise ProviderUnavailableError("selected provider/model is not configured")
+        self._architecture_receipt(provider_id)
+        if not adapter.available:
+            raise ProviderUnavailableError("selected provider/model is unavailable")
+        return adapter
 
     def require_active(self) -> ProviderAdapter:
         adapter = self.active

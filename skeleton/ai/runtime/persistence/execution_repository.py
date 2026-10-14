@@ -8,20 +8,20 @@ the same compare-and-set and transactional semantics.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import sqlite3
 import threading
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
 from skeleton.contracts.ai_execution import (
+    AgentTurn,
     AIExecution,
     AIExecutionRequest,
     AIExecutionResult,
-    AgentTurn,
     ExecutionCheckpoint,
     ExecutionFinalizationIntent,
     ExecutionState,
@@ -43,14 +43,10 @@ class ExecutionRepositoryCorruption(ExecutionRepositoryError):
 
 
 def _utc(value: datetime | None = None) -> datetime:
-    instant = datetime.now(timezone.utc) if value is None else value
-    if (
-        not isinstance(instant, datetime)
-        or instant.tzinfo is None
-        or instant.utcoffset() is None
-    ):
+    instant = datetime.now(UTC) if value is None else value
+    if not isinstance(instant, datetime) or instant.tzinfo is None or instant.utcoffset() is None:
         raise ExecutionRepositoryError("timestamps must be timezone-aware")
-    return instant.astimezone(timezone.utc)
+    return instant.astimezone(UTC)
 
 
 def _parse_time(raw: object, field: str) -> datetime:
@@ -62,7 +58,7 @@ def _parse_time(raw: object, field: str) -> datetime:
         raise ExecutionRepositoryCorruption(f"{field} is invalid") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ExecutionRepositoryCorruption(f"{field} must be timezone-aware")
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _json_dump(value: Any) -> str:
@@ -148,9 +144,21 @@ class SQLiteExecutionRepository:
         self._connection.row_factory = sqlite3.Row
         self._lock = threading.RLock()
         with self._lock:
-            self._connection.executescript(
-                """
+            self._connection.executescript("""
                 PRAGMA foreign_keys = ON;
+
+                CREATE TABLE IF NOT EXISTS ai_execution_stream_event (
+                    namespace TEXT NOT NULL,
+                    execution_id TEXT NOT NULL,
+                    sequence INTEGER NOT NULL,
+                    event_key TEXT NOT NULL,
+                    event_digest TEXT NOT NULL,
+                    event_json TEXT NOT NULL,
+                    size_bytes INTEGER NOT NULL,
+                    PRIMARY KEY(namespace, execution_id, sequence),
+                    UNIQUE(namespace, execution_id, event_key),
+                    FOREIGN KEY(namespace, execution_id) REFERENCES ai_execution_state(namespace, execution_id) ON DELETE CASCADE
+                );
 
                 CREATE TABLE IF NOT EXISTS ai_execution_state (
                     namespace TEXT NOT NULL,
@@ -263,43 +271,30 @@ class SQLiteExecutionRepository:
 
                 CREATE INDEX IF NOT EXISTS idx_ai_execution_outbox_pending
                 ON ai_execution_outbox(namespace, published_at, created_at);
-                """
-            )
+                """)
             state_columns = {
-                str(row["name"])
-                for row in self._connection.execute(
-                    "PRAGMA table_info(ai_execution_state)"
-                )
+                str(row["name"]) for row in self._connection.execute("PRAGMA table_info(ai_execution_state)")
             }
             if "state_digest" not in state_columns:
-                self._connection.execute(
-                    "ALTER TABLE ai_execution_state "
-                    "ADD COLUMN state_digest TEXT"
-                )
-            for row in self._connection.execute(
-                """
+                self._connection.execute("ALTER TABLE ai_execution_state " "ADD COLUMN state_digest TEXT")
+            for row in self._connection.execute("""
                 SELECT * FROM ai_execution_state
                 WHERE state_digest IS NULL OR state_digest = ''
-                """
-            ).fetchall():
+                """).fetchall():
                 request_payload = _json_object(
                     row["request_json"],
                     "request_json",
                 )
                 request = self._request_from_dict(request_payload)
                 if request.identity_digest != row["identity_digest"]:
-                    raise ExecutionRepositoryCorruption(
-                        "persisted execution identity digest mismatch"
-                    )
+                    raise ExecutionRepositoryCorruption("persisted execution identity digest mismatch")
                 execution = AIExecution(
                     request=request,
                     state=ExecutionState(row["state"]),
                     version=int(row["version"]),
                     latest_turn_index=int(row["latest_turn_index"]),
                     checkpoint_version=int(row["checkpoint_version"]),
-                    cancellation_requested=bool(
-                        row["cancellation_requested"]
-                    ),
+                    cancellation_requested=bool(row["cancellation_requested"]),
                     updated_at=_parse_time(
                         row["updated_at"],
                         "updated_at",
@@ -319,23 +314,15 @@ class SQLiteExecutionRepository:
                 )
 
             turn_columns = {
-                str(row["name"])
-                for row in self._connection.execute(
-                    "PRAGMA table_info(ai_execution_turn)"
-                )
+                str(row["name"]) for row in self._connection.execute("PRAGMA table_info(ai_execution_turn)")
             }
             if "turn_digest" not in turn_columns:
-                self._connection.execute(
-                    "ALTER TABLE ai_execution_turn "
-                    "ADD COLUMN turn_digest TEXT"
-                )
-            for row in self._connection.execute(
-                """
+                self._connection.execute("ALTER TABLE ai_execution_turn " "ADD COLUMN turn_digest TEXT")
+            for row in self._connection.execute("""
                 SELECT namespace, execution_id, turn_id, turn_json
                 FROM ai_execution_turn
                 WHERE turn_digest IS NULL OR turn_digest = ''
-                """
-            ).fetchall():
+                """).fetchall():
                 payload = _json_object(row["turn_json"], "turn_json")
                 digest = execution_payload_digest(payload)
                 self._connection.execute(
@@ -354,23 +341,18 @@ class SQLiteExecutionRepository:
 
             checkpoint_columns = {
                 str(row["name"])
-                for row in self._connection.execute(
-                    "PRAGMA table_info(ai_execution_checkpoint)"
-                )
+                for row in self._connection.execute("PRAGMA table_info(ai_execution_checkpoint)")
             }
             if "checkpoint_digest" not in checkpoint_columns:
                 self._connection.execute(
-                    "ALTER TABLE ai_execution_checkpoint "
-                    "ADD COLUMN checkpoint_digest TEXT"
+                    "ALTER TABLE ai_execution_checkpoint " "ADD COLUMN checkpoint_digest TEXT"
                 )
-            for row in self._connection.execute(
-                """
+            for row in self._connection.execute("""
                 SELECT namespace, execution_id, checkpoint_version,
                        checkpoint_json
                 FROM ai_execution_checkpoint
                 WHERE checkpoint_digest IS NULL OR checkpoint_digest = ''
-                """
-            ).fetchall():
+                """).fetchall():
                 payload = _json_object(
                     row["checkpoint_json"],
                     "checkpoint_json",
@@ -392,23 +374,15 @@ class SQLiteExecutionRepository:
                 )
 
             result_columns = {
-                str(row["name"])
-                for row in self._connection.execute(
-                    "PRAGMA table_info(ai_execution_result)"
-                )
+                str(row["name"]) for row in self._connection.execute("PRAGMA table_info(ai_execution_result)")
             }
             if "result_digest" not in result_columns:
-                self._connection.execute(
-                    "ALTER TABLE ai_execution_result "
-                    "ADD COLUMN result_digest TEXT"
-                )
-            for row in self._connection.execute(
-                """
+                self._connection.execute("ALTER TABLE ai_execution_result " "ADD COLUMN result_digest TEXT")
+            for row in self._connection.execute("""
                 SELECT namespace, execution_id, result_json
                 FROM ai_execution_result
                 WHERE result_digest IS NULL OR result_digest = ''
-                """
-            ).fetchall():
+                """).fetchall():
                 payload = _json_object(row["result_json"], "result_json")
                 result = self._result_from_payload(payload)
                 digest = execution_payload_digest(result.as_dict())
@@ -426,23 +400,15 @@ class SQLiteExecutionRepository:
                 )
 
             outbox_columns = {
-                str(row["name"])
-                for row in self._connection.execute(
-                    "PRAGMA table_info(ai_execution_outbox)"
-                )
+                str(row["name"]) for row in self._connection.execute("PRAGMA table_info(ai_execution_outbox)")
             }
             if "payload_digest" not in outbox_columns:
-                self._connection.execute(
-                    "ALTER TABLE ai_execution_outbox "
-                    "ADD COLUMN payload_digest TEXT"
-                )
-            for row in self._connection.execute(
-                """
+                self._connection.execute("ALTER TABLE ai_execution_outbox " "ADD COLUMN payload_digest TEXT")
+            for row in self._connection.execute("""
                 SELECT namespace, outbox_id, payload_json
                 FROM ai_execution_outbox
                 WHERE payload_digest IS NULL OR payload_digest = ''
-                """
-            ).fetchall():
+                """).fetchall():
                 payload = _json_object(row["payload_json"], "payload_json")
                 digest = execution_payload_digest(payload)
                 self._connection.execute(
@@ -483,8 +449,7 @@ class SQLiteExecutionRepository:
                 "version": execution.version,
                 "latest_turn_index": execution.latest_turn_index,
                 "checkpoint_version": execution.checkpoint_version,
-                "cancellation_requested":
-                    execution.cancellation_requested,
+                "cancellation_requested": execution.cancellation_requested,
                 "updated_at": execution.updated_at.isoformat(),
             }
         )
@@ -494,16 +459,9 @@ class SQLiteExecutionRepository:
             request_payload = _json_object(row["request_json"], "request_json")
             request = self._request_from_dict(request_payload)
             if request.identity_digest != row["identity_digest"]:
-                raise ExecutionRepositoryCorruption(
-                    "persisted execution identity digest mismatch"
-                )
-            if (
-                request.execution_id != row["execution_id"]
-                or request.operation_id != row["operation_id"]
-            ):
-                raise ExecutionRepositoryCorruption(
-                    "persisted execution request identity mismatch"
-                )
+                raise ExecutionRepositoryCorruption("persisted execution identity digest mismatch")
+            if request.execution_id != row["execution_id"] or request.operation_id != row["operation_id"]:
+                raise ExecutionRepositoryCorruption("persisted execution request identity mismatch")
             execution = AIExecution(
                 request=request,
                 state=ExecutionState(row["state"]),
@@ -515,16 +473,12 @@ class SQLiteExecutionRepository:
             )
             digest = self._execution_state_digest(execution)
             if digest != row["state_digest"]:
-                raise ExecutionRepositoryCorruption(
-                    "persisted execution state digest mismatch"
-                )
+                raise ExecutionRepositoryCorruption("persisted execution state digest mismatch")
             return execution
         except ExecutionRepositoryCorruption:
             raise
         except Exception as exc:
-            raise ExecutionRepositoryCorruption(
-                "persisted execution violates contract"
-            ) from exc
+            raise ExecutionRepositoryCorruption("persisted execution violates contract") from exc
 
     @staticmethod
     def _turn_from_row(row: sqlite3.Row) -> AgentTurn:
@@ -549,16 +503,12 @@ class SQLiteExecutionRepository:
             )
             digest = execution_payload_digest(turn.as_dict())
             if digest != row["turn_digest"]:
-                raise ExecutionRepositoryCorruption(
-                    "persisted turn digest mismatch"
-                )
+                raise ExecutionRepositoryCorruption("persisted turn digest mismatch")
             return turn
         except ExecutionRepositoryCorruption:
             raise
         except Exception as exc:
-            raise ExecutionRepositoryCorruption(
-                "persisted turn violates contract"
-            ) from exc
+            raise ExecutionRepositoryCorruption("persisted turn violates contract") from exc
 
     @staticmethod
     def _checkpoint_from_row(row: sqlite3.Row) -> ExecutionCheckpoint:
@@ -577,16 +527,12 @@ class SQLiteExecutionRepository:
             )
             digest = execution_payload_digest(checkpoint.as_dict())
             if digest != row["checkpoint_digest"]:
-                raise ExecutionRepositoryCorruption(
-                    "persisted checkpoint digest mismatch"
-                )
+                raise ExecutionRepositoryCorruption("persisted checkpoint digest mismatch")
             return checkpoint
         except ExecutionRepositoryCorruption:
             raise
         except Exception as exc:
-            raise ExecutionRepositoryCorruption(
-                "persisted checkpoint violates contract"
-            ) from exc
+            raise ExecutionRepositoryCorruption("persisted checkpoint violates contract") from exc
 
     @staticmethod
     def _result_from_payload(payload: dict[str, Any]) -> AIExecutionResult:
@@ -615,16 +561,12 @@ class SQLiteExecutionRepository:
             result = cls._result_from_payload(payload)
             digest = execution_payload_digest(result.as_dict())
             if digest != row["result_digest"]:
-                raise ExecutionRepositoryCorruption(
-                    "persisted result digest mismatch"
-                )
+                raise ExecutionRepositoryCorruption("persisted result digest mismatch")
             return result
         except ExecutionRepositoryCorruption:
             raise
         except Exception as exc:
-            raise ExecutionRepositoryCorruption(
-                "persisted result violates contract"
-            ) from exc
+            raise ExecutionRepositoryCorruption("persisted result violates contract") from exc
 
     @staticmethod
     def _verification_receipt_from_row(
@@ -651,33 +593,21 @@ class SQLiteExecutionRepository:
                     payload["verified_at"],
                     "verified_at",
                 ),
-                supporting_evidence_ids=tuple(
-                    payload.get("supporting_evidence_ids") or ()
-                ),
-                contradicting_evidence_ids=tuple(
-                    payload.get("contradicting_evidence_ids") or ()
-                ),
-                rejected_evidence_ids=tuple(
-                    payload.get("rejected_evidence_ids") or ()
-                ),
-                postcondition_observation_ids=tuple(
-                    payload.get("postcondition_observation_ids") or ()
-                ),
+                supporting_evidence_ids=tuple(payload.get("supporting_evidence_ids") or ()),
+                contradicting_evidence_ids=tuple(payload.get("contradicting_evidence_ids") or ()),
+                rejected_evidence_ids=tuple(payload.get("rejected_evidence_ids") or ()),
+                postcondition_observation_ids=tuple(payload.get("postcondition_observation_ids") or ()),
                 independent=bool(payload.get("independent", False)),
                 issues=tuple(payload.get("issues") or ()),
                 schema_version=int(payload.get("schema_version", 1)),
             )
             if receipt.digest != row["receipt_digest"]:
-                raise ExecutionRepositoryCorruption(
-                    "persisted verification receipt digest mismatch"
-                )
+                raise ExecutionRepositoryCorruption("persisted verification receipt digest mismatch")
             return receipt
         except ExecutionRepositoryCorruption:
             raise
         except Exception as exc:
-            raise ExecutionRepositoryCorruption(
-                "persisted verification receipt violates contract"
-            ) from exc
+            raise ExecutionRepositoryCorruption("persisted verification receipt violates contract") from exc
 
     @classmethod
     def _intent_from_row(cls, row: sqlite3.Row) -> ExecutionFinalizationIntent:
@@ -685,31 +615,21 @@ class SQLiteExecutionRepository:
             payload = _json_object(row["intent_json"], "intent_json")
             result_payload = payload.get("result")
             if not isinstance(result_payload, dict):
-                raise ExecutionRepositoryCorruption(
-                    "finalization intent result must be an object"
-                )
+                raise ExecutionRepositoryCorruption("finalization intent result must be an object")
             intent = ExecutionFinalizationIntent(
                 result=cls._result_from_payload(result_payload),
-                expected_execution_version=int(
-                    payload["expected_execution_version"]
-                ),
+                expected_execution_version=int(payload["expected_execution_version"]),
                 staged_at=_parse_time(payload["staged_at"], "staged_at"),
             )
             if intent.intent_digest != row["intent_digest"]:
-                raise ExecutionRepositoryCorruption(
-                    "persisted finalization intent digest mismatch"
-                )
+                raise ExecutionRepositoryCorruption("persisted finalization intent digest mismatch")
             if payload.get("intent_digest") != intent.intent_digest:
-                raise ExecutionRepositoryCorruption(
-                    "finalization intent payload digest mismatch"
-                )
+                raise ExecutionRepositoryCorruption("finalization intent payload digest mismatch")
             return intent
         except ExecutionRepositoryCorruption:
             raise
         except Exception as exc:
-            raise ExecutionRepositoryCorruption(
-                "persisted finalization intent violates contract"
-            ) from exc
+            raise ExecutionRepositoryCorruption("persisted finalization intent violates contract") from exc
 
     @staticmethod
     def _outbox_from_row(row: sqlite3.Row) -> ExecutionOutboxEvent:
@@ -717,9 +637,7 @@ class SQLiteExecutionRepository:
             payload = _json_object(row["payload_json"], "payload_json")
             digest = execution_payload_digest(payload)
             if digest != row["payload_digest"]:
-                raise ExecutionRepositoryCorruption(
-                    "persisted outbox payload digest mismatch"
-                )
+                raise ExecutionRepositoryCorruption("persisted outbox payload digest mismatch")
             return ExecutionOutboxEvent(
                 outbox_id=row["outbox_id"],
                 execution_id=row["execution_id"],
@@ -728,17 +646,167 @@ class SQLiteExecutionRepository:
                 payload=payload,
                 created_at=_parse_time(row["created_at"], "created_at"),
                 published_at=(
-                    None
-                    if row["published_at"] is None
-                    else _parse_time(row["published_at"], "published_at")
+                    None if row["published_at"] is None else _parse_time(row["published_at"], "published_at")
                 ),
             )
         except ExecutionRepositoryCorruption:
             raise
         except Exception as exc:
-            raise ExecutionRepositoryCorruption(
-                "persisted outbox event violates contract"
-            ) from exc
+            raise ExecutionRepositoryCorruption("persisted outbox event violates contract") from exc
+
+    def append_stream_event(
+        self,
+        execution_id: str,
+        event_key: str,
+        event_type: str,
+        payload: dict[str, Any],
+        *,
+        expected_version: int | None = None,
+        provisional: bool = False,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Append a bounded immutable replay event under the execution authority."""
+        if not isinstance(event_key, str) or not 1 <= len(event_key) <= 512:
+            raise ExecutionRepositoryError("stream event identity is invalid")
+        if type(provisional) is not bool or (
+            expected_version is not None and (type(expected_version) is not int or expected_version < 1)
+        ):
+            raise ExecutionRepositoryError("stream publication fence/qualification is invalid")
+        if (
+            not isinstance(event_type, str)
+            or not 1 <= len(event_type) <= 128
+            or not isinstance(payload, dict)
+        ):
+            raise ExecutionRepositoryError("stream event type/payload is invalid")
+        value = {
+            "execution_id": execution_id,
+            "type": event_type,
+            "payload": payload,
+            "provisional": provisional,
+        }
+        encoded_payload = _json_dump(value)
+        if len(encoded_payload.encode("utf-8")) > 262144:
+            raise ExecutionRepositoryError("stream event exceeds byte limit")
+        content_digest = execution_payload_digest(value)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                current = self.get(execution_id)
+                if expected_version is not None and current.version != expected_version:
+                    raise ExecutionRepositoryConflict("execution version changed before stream publication")
+                existing = self._connection.execute(
+                    "SELECT event_digest,CASE WHEN length(CAST(event_json AS BLOB))<=262144 THEN event_json ELSE NULL END AS event_json FROM ai_execution_stream_event "
+                    "WHERE namespace=? AND execution_id=? AND event_key=?",
+                    (self.namespace, execution_id, event_key),
+                ).fetchone()
+                if existing is not None:
+                    if existing["event_json"] is None:
+                        raise ExecutionRepositoryCorruption("existing stream event exceeds byte bounds")
+                    event = _json_object(existing["event_json"], "stream_event")
+                    original = {key: event[key] for key in value}
+                    if execution_payload_digest(original) != content_digest or original != value:
+                        raise ExecutionRepositoryConflict(
+                            "stream event identity was reused for different content"
+                        )
+                    if execution_payload_digest(event) != existing["event_digest"]:
+                        raise ExecutionRepositoryCorruption("stream event digest mismatch")
+                    self._connection.commit()
+                    return event
+                if provisional and (current.cancellation_requested or current.terminal):
+                    raise ExecutionRepositoryConflict(
+                        "provisional output cannot publish after cancellation or finalization"
+                    )
+                aggregate = self._connection.execute(
+                    "SELECT COALESCE(MAX(sequence),0),COUNT(*),COALESCE(SUM(size_bytes),0) "
+                    "FROM ai_execution_stream_event WHERE namespace=? AND execution_id=?",
+                    (self.namespace, execution_id),
+                ).fetchone()
+                sequence = int(aggregate[0]) + 1
+                event = {
+                    **value,
+                    "event_id": f"execution-stream:{execution_id}:{sequence}",
+                    "sequence": sequence,
+                    "created_at": _utc(now).isoformat(),
+                }
+                encoded = _json_dump(event)
+                size = len(encoded.encode("utf-8"))
+                if size > 262144 or int(aggregate[1]) >= 65536 or int(aggregate[2]) + size > 33554432:
+                    raise ExecutionRepositoryError("execution stream retention bounds exceeded")
+                self._connection.execute(
+                    "INSERT INTO ai_execution_stream_event VALUES (?,?,?,?,?,?,?)",
+                    (
+                        self.namespace,
+                        execution_id,
+                        sequence,
+                        event_key,
+                        execution_payload_digest(event),
+                        encoded,
+                        size,
+                    ),
+                )
+                self._connection.commit()
+                return event
+            except BaseException:
+                self._connection.rollback()
+                raise
+
+    def stream_events(
+        self, execution_id: str, *, after_sequence: int = 0, limit: int = 256
+    ) -> dict[str, Any]:
+        """Read exact immutable event pages; the cursor acknowledges the last event."""
+        if (
+            type(after_sequence) is not int
+            or not 0 <= after_sequence <= 2**63 - 1
+            or type(limit) is not int
+            or not 1 <= limit <= 1024
+        ):
+            raise ExecutionRepositoryError("stream cursor/page bounds are invalid")
+        with self._lock:
+            self.get(execution_id)
+            rows = self._connection.execute(
+                "SELECT sequence,event_digest,CASE WHEN length(CAST(event_json AS BLOB))<=262144 THEN event_json ELSE NULL END AS event_json,size_bytes FROM ai_execution_stream_event "
+                "WHERE namespace=? AND execution_id=? AND sequence>? ORDER BY sequence LIMIT ?",
+                (self.namespace, execution_id, after_sequence, limit),
+            ).fetchall()
+            last = self._connection.execute(
+                "SELECT COALESCE(MAX(sequence),0) FROM ai_execution_stream_event WHERE namespace=? AND execution_id=?",
+                (self.namespace, execution_id),
+            ).fetchone()[0]
+        if after_sequence > last:
+            raise ExecutionRepositoryConflict("stream cursor is beyond durable history")
+        events = []
+        expected = after_sequence + 1
+        for row in rows:
+            if (
+                row["event_json"] is None
+                or row["size_bytes"] > 262144
+                or len(row["event_json"].encode("utf-8")) != row["size_bytes"]
+            ):
+                raise ExecutionRepositoryCorruption("stream event exceeds declared size")
+            event = _json_object(row["event_json"], "stream_event")
+            if (
+                event.get("sequence") != expected
+                or row["sequence"] != expected
+                or execution_payload_digest(event) != row["event_digest"]
+                or event.get("execution_id") != execution_id
+                or type(event.get("sequence")) is not int
+                or event.get("event_id") != f"execution-stream:{execution_id}:{expected}"
+                or type(event.get("provisional")) is not bool
+                or not isinstance(event.get("payload"), dict)
+                or not isinstance(event.get("type"), str)
+            ):
+                raise ExecutionRepositoryCorruption("stream history identity/gap mismatch")
+            events.append(event)
+            expected += 1
+        return {
+            "execution_id": execution_id,
+            "events": events,
+            "stream_schema_version": 1,
+            "last_sequence": expected - 1,
+            "next_sequence": expected,
+            "has_more": expected - 1 < last,
+            "latest_sequence": last,
+        }
 
     def create(
         self,
@@ -796,9 +864,7 @@ class SQLiteExecutionRepository:
                 return initial
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
-                raise ExecutionRepositoryConflict(
-                    "execution durable identity conflict"
-                ) from exc
+                raise ExecutionRepositoryConflict("execution durable identity conflict") from exc
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
@@ -830,9 +896,7 @@ class SQLiteExecutionRepository:
             try:
                 current = self.get(execution_id)
                 if current.version != expected_version:
-                    raise ExecutionRepositoryConflict(
-                        "execution version changed before transition"
-                    )
+                    raise ExecutionRepositoryConflict("execution version changed before transition")
                 updated = current.transition(target, now=instant)
                 cursor = self._connection.execute(
                     """
@@ -852,9 +916,7 @@ class SQLiteExecutionRepository:
                     ),
                 )
                 if cursor.rowcount != 1:
-                    raise ExecutionRepositoryConflict(
-                        "execution version changed during transition"
-                    )
+                    raise ExecutionRepositoryConflict("execution version changed during transition")
                 self._connection.execute("COMMIT")
                 return updated
             except Exception:
@@ -874,9 +936,7 @@ class SQLiteExecutionRepository:
             try:
                 current = self.get(execution_id)
                 if current.version != expected_version:
-                    raise ExecutionRepositoryConflict(
-                        "execution version changed before cancellation request"
-                    )
+                    raise ExecutionRepositoryConflict("execution version changed before cancellation request")
                 if current.terminal:
                     self._connection.execute("COMMIT")
                     return current
@@ -906,9 +966,7 @@ class SQLiteExecutionRepository:
                     ),
                 )
                 if cursor.rowcount != 1:
-                    raise ExecutionRepositoryConflict(
-                        "execution version changed during cancellation request"
-                    )
+                    raise ExecutionRepositoryConflict("execution version changed during cancellation request")
                 self._connection.execute("COMMIT")
                 return updated
             except Exception:
@@ -930,18 +988,12 @@ class SQLiteExecutionRepository:
             try:
                 current = self.get(turn.execution_id)
                 if current.operation_id != turn.operation_id:
-                    raise ExecutionRepositoryConflict(
-                        "turn operation does not match execution"
-                    )
+                    raise ExecutionRepositoryConflict("turn operation does not match execution")
                 if current.version != expected_execution_version:
-                    raise ExecutionRepositoryConflict(
-                        "execution version changed before turn append"
-                    )
+                    raise ExecutionRepositoryConflict("execution version changed before turn append")
                 expected_turn_index = current.latest_turn_index + 1
                 if turn.turn_index != expected_turn_index:
-                    raise ExecutionRepositoryConflict(
-                        "turn_index must strictly increase"
-                    )
+                    raise ExecutionRepositoryConflict("turn_index must strictly increase")
                 if turn.turn_index > 0:
                     parent = self._connection.execute(
                         """
@@ -955,9 +1007,7 @@ class SQLiteExecutionRepository:
                         ),
                     ).fetchone()
                     if parent is None or parent["turn_id"] != turn.parent_turn_id:
-                        raise ExecutionRepositoryConflict(
-                            "turn parent does not match immutable lineage"
-                        )
+                        raise ExecutionRepositoryConflict("turn parent does not match immutable lineage")
                 self._connection.execute(
                     """
                     INSERT INTO ai_execution_turn(
@@ -1003,16 +1053,12 @@ class SQLiteExecutionRepository:
                     ),
                 )
                 if cursor.rowcount != 1:
-                    raise ExecutionRepositoryConflict(
-                        "execution changed during turn append"
-                    )
+                    raise ExecutionRepositoryConflict("execution changed during turn append")
                 self._connection.execute("COMMIT")
                 return updated
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
-                raise ExecutionRepositoryConflict(
-                    "turn identity or index already exists"
-                ) from exc
+                raise ExecutionRepositoryConflict("turn identity or index already exists") from exc
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
@@ -1044,13 +1090,9 @@ class SQLiteExecutionRepository:
             try:
                 current = self.get(execution_id)
                 if current.version != expected_execution_version:
-                    raise ExecutionRepositoryConflict(
-                        "execution version changed before checkpoint"
-                    )
+                    raise ExecutionRepositoryConflict("execution version changed before checkpoint")
                 if current.checkpoint_version != expected_checkpoint_version:
-                    raise ExecutionRepositoryConflict(
-                        "checkpoint version changed before compare-and-set"
-                    )
+                    raise ExecutionRepositoryConflict("checkpoint version changed before compare-and-set")
                 next_checkpoint_version = current.checkpoint_version + 1
                 next_execution_version = current.version + 1
                 checkpoint = ExecutionCheckpoint(
@@ -1108,16 +1150,12 @@ class SQLiteExecutionRepository:
                     ),
                 )
                 if cursor.rowcount != 1:
-                    raise ExecutionRepositoryConflict(
-                        "execution changed during checkpoint compare-and-set"
-                    )
+                    raise ExecutionRepositoryConflict("execution changed during checkpoint compare-and-set")
                 self._connection.execute("COMMIT")
                 return checkpoint
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
-                raise ExecutionRepositoryConflict(
-                    "checkpoint identity conflict"
-                ) from exc
+                raise ExecutionRepositoryConflict("checkpoint identity conflict") from exc
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
@@ -1168,9 +1206,7 @@ class SQLiteExecutionRepository:
                 if row is not None:
                     existing = self._verification_receipt_from_row(row)
                     if existing.as_dict() != receipt.as_dict():
-                        raise ExecutionRepositoryConflict(
-                            "verification receipt identity already differs"
-                        )
+                        raise ExecutionRepositoryConflict("verification receipt identity already differs")
                     self._connection.execute("COMMIT")
                     return existing
 
@@ -1183,9 +1219,7 @@ class SQLiteExecutionRepository:
                         (self.namespace, receipt.execution_id),
                     ).fetchone()
                     if execution_row is None:
-                        raise ExecutionRepositoryConflict(
-                            "verification receipt execution is unknown"
-                        )
+                        raise ExecutionRepositoryConflict("verification receipt execution is unknown")
 
                 self._connection.execute(
                     """
@@ -1211,9 +1245,7 @@ class SQLiteExecutionRepository:
                 return receipt
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
-                raise ExecutionRepositoryConflict(
-                    "verification receipt identity conflict"
-                ) from exc
+                raise ExecutionRepositoryConflict("verification receipt identity conflict") from exc
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
@@ -1230,11 +1262,7 @@ class SQLiteExecutionRepository:
                 """,
                 (self.namespace, str(receipt_id)),
             ).fetchone()
-            return (
-                None
-                if row is None
-                else self._verification_receipt_from_row(row)
-            )
+            return None if row is None else self._verification_receipt_from_row(row)
 
     def verification_receipts_for_execution(
         self,
@@ -1249,10 +1277,7 @@ class SQLiteExecutionRepository:
                 """,
                 (self.namespace, str(execution_id)),
             ).fetchall()
-            return tuple(
-                self._verification_receipt_from_row(row)
-                for row in rows
-            )
+            return tuple(self._verification_receipt_from_row(row) for row in rows)
 
     def verification_receipts_for_claim(
         self,
@@ -1267,10 +1292,7 @@ class SQLiteExecutionRepository:
                 """,
                 (self.namespace, str(claim_id)),
             ).fetchall()
-            return tuple(
-                self._verification_receipt_from_row(row)
-                for row in rows
-            )
+            return tuple(self._verification_receipt_from_row(row) for row in rows)
 
     def finalization_intent(
         self,
@@ -1312,15 +1334,11 @@ class SQLiteExecutionRepository:
                 existing_result = self.result(result.execution_id)
                 if existing_result is not None:
                     if existing_result.as_dict() != result.as_dict():
-                        raise ExecutionRepositoryConflict(
-                            "terminal execution result already differs"
-                        )
+                        raise ExecutionRepositoryConflict("terminal execution result already differs")
                     self._connection.execute("COMMIT")
                     return intent
                 if current.version != expected_execution_version:
-                    raise ExecutionRepositoryConflict(
-                        "execution version changed before finalization staging"
-                    )
+                    raise ExecutionRepositoryConflict("execution version changed before finalization staging")
                 row = self._connection.execute(
                     """
                     SELECT * FROM ai_execution_finalization_intent
@@ -1331,9 +1349,7 @@ class SQLiteExecutionRepository:
                 if row is not None:
                     existing = self._intent_from_row(row)
                     if existing.intent_digest != intent.intent_digest:
-                        raise ExecutionRepositoryConflict(
-                            "staged finalization intent already differs"
-                        )
+                        raise ExecutionRepositoryConflict("staged finalization intent already differs")
                     self._connection.execute("COMMIT")
                     return existing
                 self._connection.execute(
@@ -1356,9 +1372,7 @@ class SQLiteExecutionRepository:
                 return intent
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
-                raise ExecutionRepositoryConflict(
-                    "finalization intent identity conflict"
-                ) from exc
+                raise ExecutionRepositoryConflict("finalization intent identity conflict") from exc
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
@@ -1374,9 +1388,7 @@ class SQLiteExecutionRepository:
             existing = self.result(execution_id)
             if existing is not None:
                 return self.get(execution_id)
-            raise ExecutionRepositoryError(
-                "execution has no staged finalization intent"
-            )
+            raise ExecutionRepositoryError("execution has no staged finalization intent")
         return self.finalize(
             intent.result,
             expected_execution_version=intent.expected_execution_version,
@@ -1405,15 +1417,11 @@ class SQLiteExecutionRepository:
             try:
                 current = self.get(result.execution_id)
                 if current.operation_id != result.operation_id:
-                    raise ExecutionRepositoryConflict(
-                        "result operation does not match execution"
-                    )
+                    raise ExecutionRepositoryConflict("result operation does not match execution")
                 existing = self.result(result.execution_id)
                 if existing is not None:
                     if existing.as_dict() != result.as_dict():
-                        raise ExecutionRepositoryConflict(
-                            "terminal execution result already differs"
-                        )
+                        raise ExecutionRepositoryConflict("terminal execution result already differs")
                     self._connection.execute(
                         """
                         DELETE FROM ai_execution_finalization_intent
@@ -1424,9 +1432,7 @@ class SQLiteExecutionRepository:
                     self._connection.execute("COMMIT")
                     return current
                 if current.version != expected_execution_version:
-                    raise ExecutionRepositoryConflict(
-                        "execution version changed before finalization"
-                    )
+                    raise ExecutionRepositoryConflict("execution version changed before finalization")
 
                 if terminal_state in {
                     ExecutionState.FAILED,
@@ -1531,9 +1537,7 @@ class SQLiteExecutionRepository:
                     ),
                 )
                 if cursor.rowcount != 1:
-                    raise ExecutionRepositoryConflict(
-                        "execution changed during atomic finalization"
-                    )
+                    raise ExecutionRepositoryConflict("execution changed during atomic finalization")
                 self._connection.execute(
                     """
                     DELETE FROM ai_execution_finalization_intent
@@ -1545,9 +1549,7 @@ class SQLiteExecutionRepository:
                 return updated
             except sqlite3.IntegrityError as exc:
                 self._connection.execute("ROLLBACK")
-                raise ExecutionRepositoryConflict(
-                    "execution finalization conflict"
-                ) from exc
+                raise ExecutionRepositoryConflict("execution finalization conflict") from exc
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise

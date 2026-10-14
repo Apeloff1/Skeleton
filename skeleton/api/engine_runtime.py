@@ -361,14 +361,45 @@ class EngineExecutionCoordinator:
                 "execution_admission_denied",
             )
             return
-        try:
-            provider = self.provider_registry.require_active()
-        except ProviderUnavailableError:
-            await self._finalize_failure(
-                execution_id,
-                "provider_unavailable",
-            )
-            return
+        selection = command.execution_request.context_policy.get("provider_selection")
+        if selection is None:
+            try:
+                provider = self.provider_registry.require_active()
+            except ProviderUnavailableError:
+                await self._finalize_failure(execution_id, "provider_unavailable")
+                return
+        else:
+            if (
+                not isinstance(selection, dict)
+                or set(selection) != {"provider_id", "model_id"}
+                or command.execution_request.context_policy.get("provider_model")
+                != selection.get("model_id")
+            ):
+                await self._finalize_failure(execution_id, "provider_selection_invalid")
+                return
+            try:
+                provider = self.provider_registry.require_selected(
+                    selection["provider_id"], selection["model_id"],
+                )
+            except (ProviderUnavailableError, TypeError, ValueError):
+                await self._finalize_failure(execution_id, "provider_selection_unavailable")
+                return
+
+        requested_temperature = command.execution_request.context_policy.get("provider_temperature")
+        if requested_temperature is not None:
+            # Only the hosted Responses adapters currently implement sampling
+            # overrides. Never report a local-model request as honored when
+            # the local inference adapter has not bound the option.
+            if provider.provider_id not in {"openai", "openai-compatible-secondary"}:
+                await self._finalize_failure(execution_id, "provider_temperature_unsupported")
+                return
+            if (
+                isinstance(requested_temperature, bool)
+                or not isinstance(requested_temperature, (int, float))
+                or not 0 <= requested_temperature <= 2
+            ):
+                await self._finalize_failure(execution_id, "provider_temperature_invalid")
+                return
 
         handoff = command.compiled_context
         allowed_tool_ids = tuple(
