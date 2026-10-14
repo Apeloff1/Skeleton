@@ -63,7 +63,7 @@ def test_digest_binds_asset_identity_and_real_bytes() -> None:
         replace(a, evidence_digest=b.evidence_digest)
     with pytest.raises(MediaValidationError, match="does not match"):
         replace(a, source_digest="a" * 64)
-    with pytest.raises(MediaValidationError, match="provenance"):
+    with pytest.raises(MediaValidationError, match="digest mismatch"):
         replace(a, asset=b.asset)
 
 
