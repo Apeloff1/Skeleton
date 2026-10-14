@@ -45,3 +45,29 @@ Timeouts return exit code 124; pytest start failures return 126. Exit statuses a
 Feature selection uses whole underscore-delimited filename tokens, not substring matches. For example, Dragon also selects `webcrawler` modules, game-building includes `forge` and `dialogue`, and application includes `app` and `deployment`. A file may legitimately match several capabilities, but is executed only once per invocation. For multiple requested features, each selector must find at least one file; otherwise the command fails with exit code 2 instead of reporting a misleading successful partial suite.
 
 Symlinks for individual test files and test-root directories are not followed; test paths resolving outside their root are excluded. These guards only validate discovery and do not constitute runtime sandboxing. The feature mapping remains a heuristic rather than an assertion that every test in a capability has been discovered.
+
+
+## Deterministic test sharding and selection manifests
+
+For large runs, select one-based disjoint partitions. Each test module is assigned
+using SHA-256 of its repository-relative POSIX path modulo the total shard count,
+so the same repository snapshot and selectors produce the same assignment on
+different machines. Sharding is by **test module**, not by individual test case,
+and it does not imply equal runtimes or balanced test counts.
+
+```bash
+python scripts/run_feature_unit_tests.py --feature ai --shard 1/4
+python scripts/run_feature_unit_tests.py --feature ai --shard 2/4
+python scripts/run_feature_unit_tests.py --feature ai --shard 3/4
+python scripts/run_feature_unit_tests.py --feature ai --shard 4/4
+python scripts/run_feature_unit_tests.py --feature ai --shard 1/4 --list-json
+```
+
+The `--list-json` output is a stable machine-readable inventory: selection
+schema version, requested features, each feature's unsharded test-file count,
+integration opt-in, optional shard index and total, the selected relative
+paths, and a SHA-256 digest of their compact JSON list. It does not execute
+or import tests. To prove execution, use pytest with JUnit output and capture
+the commit SHA separately. An empty shard returns error code 2 rather than
+reporting a false pass, and every requested feature must be present in the
+pre-shard selection.
