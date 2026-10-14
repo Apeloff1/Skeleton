@@ -15,6 +15,19 @@ on:
       - ".github/workflows/p3-learning-multimodal-acceptance.yml"
   push:
     branches: [main, feat/p3-learning-multimodal-t2]
+    # Avoid unnecessary main/PR CI for unrelated files.
+    paths:
+      - "machine/ai_p3_learning_execution_map.json"
+      - "machine/ai_p3_learning_task_backlog.json"
+      - "skeleton/ai/runtime/learning_foundation/**"
+      - "skeleton/testing/test_p3_data_foundation.py"
+      - "skeleton/testing/test_p3_training_control.py"
+      - "skeleton/testing/test_p3_learning_programs.py"
+      - "skeleton/testing/test_p3_multimodal_foundation.py"
+      - "skeleton/testing/test_p3_learning_foundation_acceptance.py"
+      - "skeleton/testing/test_p3_model_lifecycle.py"
+      - "scripts/check_p3_learning_execution_map.py"
+      - ".github/workflows/p3-learning-multimodal-acceptance.yml"
   workflow_dispatch:
 permissions:
   contents: read
