@@ -1184,6 +1184,7 @@ class CognitiveExecutionRuntime:
                 if context_policy.get("provider_model") is None
                 else str(context_policy["provider_model"])
             ),
+            temperature=context_policy.get("provider_temperature"),
             estimated_cost_usd=float(
                 context_policy.get("estimated_cost_usd", 0.0)
             ),
