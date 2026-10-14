@@ -78,9 +78,9 @@ headers = {
 }
 retryable = frozenset({0, 429, 500, 502, 503, 504})
 
-# Keep this set aligned with .github/workflows/queue-drain.yml. These runs are
-# the recovery/control plane or canonical post-merge evidence and are never
-# cancellation targets merely because main advances.
+# Preserve all canonical controller/event-evidence exclusions. Owner-mode
+# queue recovery is intentionally stricter: keep even historical Merge
+# Readiness and P1 gate receipts unless an operator resolves them separately.
 control_plane_paths = frozenset(
     {
         ".github/workflows/actions-housekeeping-cli.yml",
@@ -97,6 +97,18 @@ control_plane_paths = frozenset(
         ".github/workflows/p1-risk-evidence-binding.yml",
         ".github/workflows/p1-reproducibility-bundle.yml",
         ".github/workflows/p1-scope-freeze.yml",
+        ".github/workflows/automerge-control-plane.yml",
+        ".github/workflows/repair-intake.yml",
+        ".github/workflows/automation-traffic-manager.yml",
+        ".github/workflows/bot-manager.yml",
+        ".github/workflows/repo-bots.yml",
+        ".github/workflows/idle-security-bot.yml",
+        ".github/workflows/security-watch-bot.yml",
+        ".github/workflows/ci-failure-bot.yml",
+        ".github/workflows/shift-supervisor-control.yml",
+        ".github/workflows/shift-supervisor-watchdog.yml",
+        ".github/workflows/supervisor.yml",
+        ".github/workflows/pr-churn-control.yml",
     }
 )
 

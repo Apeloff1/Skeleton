@@ -13,13 +13,13 @@ def test_queue_drain_does_not_self_thrash_on_main_pushes() -> None:
 
     assert "workflow_dispatch:" in workflow
     assert "schedule:" in workflow
-    assert 'cron: "2-57/5 * * * *"' in workflow
+    assert 'cron: "2-52/10 * * * *"' in workflow
     assert "workflow_run:" in workflow
-    assert 'workflows: ["Merge Readiness", "CI/CD", "Backend Quality", "Frontier Contracts"]' in workflow
+    assert 'workflows: ["Merge Readiness", "Prune redundant branches safely"]' in workflow
     assert "types: [completed]" in workflow
     assert "branches: [main]" in workflow
     assert "\n  push:\n    branches: [main]\n    paths: ['.github/workflows/queue-drain.yml']" in workflow
-    assert "group: queue-drain-v4-${{ github.repository }}" in workflow
+    assert "group: queue-drain-v6-${{ github.repository }}" in workflow
     assert "cancel-in-progress: false" in workflow
 
 
@@ -41,7 +41,7 @@ def test_queue_drain_keeps_recovery_safety_boundary() -> None:
 def test_queue_drain_wake_is_low_frequency_canonical_validation() -> None:
     workflow = _workflow_text()
 
-    assert 'workflows: ["Merge Readiness", "CI/CD", "Backend Quality", "Frontier Contracts"]' in workflow
+    assert 'workflows: ["Merge Readiness", "Prune redundant branches safely"]' in workflow
     assert 'workflows: ["Drain obsolete PR Actions"]' not in workflow
     assert "branches: [main]" in workflow
 
@@ -53,7 +53,9 @@ def test_queue_drain_recovery_does_not_require_upstream_success() -> None:
     assert "github.event.workflow_run.conclusion == 'success'" not in workflow
     assert "github.event.workflow_run.head_repository.full_name == github.repository" in workflow
     assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in workflow
-    assert "Any trusted terminal main Merge Readiness completion may wake recovery." in workflow
+    assert "Main failures still trigger immediate recovery." in workflow
+    assert "github.event.workflow_run.conclusion != 'cancelled'" in workflow
+    assert "github.event.workflow_run.conclusion != 'skipped'" in workflow
 
 
 def test_queue_drain_reclaims_obsolete_same_repository_pr_runs() -> None:
@@ -142,45 +144,20 @@ def test_queue_drain_reclaims_stale_dynamic_codeql_pr_runs() -> None:
     assert "dynamic/github-code-scanning/codeql" in helper
 
 
-def test_queue_drain_wakes_housekeeping_only_for_old_eligible_pr_backlog() -> None:
+def test_queue_drain_has_one_recovery_worker_and_independent_housekeeping() -> None:
     workflow = _workflow_text()
+    housekeeping = (
+        Path(__file__).resolve().parents[2]
+        / ".github/workflows/actions-housekeeping-cli.yml"
+    ).read_text(encoding="utf-8")
 
-    assert "Wake exact stale-PR housekeeping when needed" in workflow
-    assert "HOUSEKEEPING_WORKFLOW: actions-housekeeping-cli.yml" in workflow
-    assert "HOUSEKEEPING_WAKE_STALE_MINUTES: '1440'" in workflow
-    assert 'api_json "actions/runs?status=queued&per_page=100&page=${page}" "$page_json"' in workflow
-    assert '[[ "$event" == \'pull_request\' ]] || continue' in workflow
-    assert "*Malware*|*Secret*|*Security*|*CodeQL*|*Provenance*" in workflow
-    assert "for page in $(seq 1 10)" in workflow
-    assert "exceeded its bounded 1,000-run queued inventory scan" in workflow
-
-
-def test_queue_drain_does_not_duplicate_live_housekeeping() -> None:
-    workflow = _workflow_text()
-
-    assert "for status_name in requested waiting pending queued in_progress; do" in workflow
-    assert 'api_json "actions/workflows/${HOUSEKEEPING_WORKFLOW}/runs?status=${status_name}&per_page=1"' in workflow
-    assert "existing Housekeeping run is ${housekeeping_status}" in workflow
-    assert 'gh workflow run "$HOUSEKEEPING_WORKFLOW" --repo "$REPO" --ref main' in workflow
-    assert "Housekeeping independently re-proves PR/run identity before any cancellation." in workflow
-
-
-def test_housekeeping_wake_is_independent_arm_job() -> None:
-    workflow = _workflow_text()
-
-    drain_start = workflow.index("  drain:\n")
-    wake_start = workflow.index("  wake-housekeeping:\n")
-    drain = workflow[drain_start:wake_start]
-    wake = workflow[wake_start:]
-
-    assert "Wake exact stale-PR housekeeping when needed" not in drain
-    assert "runs-on: ubuntu-24.04-arm" in drain
-    assert "Wake exact stale-PR housekeeping when needed" in wake
-    assert "runs-on: ubuntu-24.04-arm" in wake
-    assert "timeout-minutes: 3" in wake
-    assert "actions: write" in wake
-    assert "github.event.workflow_run.head_repository.full_name == github.repository" in wake
-    assert "github.event.workflow_run.head_branch == github.event.repository.default_branch" in wake
+    assert "  drain:\\n" in workflow
+    assert "  wake-housekeeping:\\n" not in workflow
+    assert "runs-on: ubuntu-24.04-arm" in workflow
+    assert "gh workflow run actions-housekeeping-cli.yml" not in workflow
+    assert "schedule:" in housekeeping
+    assert "cron: '23 */6 * * *'" in housekeeping
+    assert "def recover_pr_numbers()" not in workflow
 
 
 def test_queue_drain_reclaims_only_closed_pr_ghas_ai_runs() -> None:
@@ -209,17 +186,11 @@ def test_queue_drain_reclaims_only_closed_pr_ghas_ai_runs() -> None:
     assert "and head_ref == branch" in helper
 
 
-def test_housekeeping_api_limits_defer_without_dispatch_or_silent_admission() -> None:
+def test_no_extra_housekeeping_dispatch_on_drain_events() -> None:
     workflow = _workflow_text()
-    wake = workflow[workflow.index("  wake-housekeeping:\n"):]
-    assert "api_json() {" in wake
-    assert 'grep -Eqi \'(rate.limit|abuse detection)\'' in wake
-    assert "GitHub installation API capacity exhausted; deferred without mutation" in wake
-    assert "Housekeeping API observation failed; fail closed." in wake
-    assert wake.index("api_json() {") < wake.index("for page in $(seq 1 10)")
-    assert wake.index("api_json \"actions/workflows/") < wake.index(
-        'gh workflow run "$HOUSEKEEPING_WORKFLOW"'
-    )
+    assert "  wake-housekeeping:" not in workflow
+    assert "HOUSEKEEPING_WAKE_STALE_MINUTES" not in workflow
+    assert "gh workflow run" not in workflow
 
 
 def test_queue_drain_backpressure_stops_exhausted_mutation_sweeps() -> None:
@@ -231,7 +202,7 @@ def test_queue_drain_backpressure_stops_exhausted_mutation_sweeps() -> None:
     assert "if status == 429:" in workflow
     assert "rate_limit_hit = True" in workflow
     assert "if rate_limit_hit:" in workflow
-    assert "if pass_no < 4 and not rate_limit_hit:" in workflow
+    assert "if pass_no < 4 and not rate_limit_hit and not budget_exhausted:" in workflow
 
 
 def test_queue_drain_never_force_cancels_security_evidence() -> None:
@@ -248,17 +219,21 @@ def test_queue_drain_never_force_cancels_security_evidence() -> None:
     assert cancel.index("if security_lane:") < cancel.index("/force-cancel")
 
 
-def test_housekeeping_wake_cooldown_recovers_persistent_old_queue() -> None:
+def test_periodic_controller_coalescing_keeps_newest_live_wake() -> None:
     workflow = _workflow_text()
-    assert "HOUSEKEEPING_WAKE_STALE_MINUTES: '1440'" in workflow
-    assert "HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '90'" in workflow
-    assert "HOUSEKEEPING_RECENT_SUCCESS_COOLDOWN_MINUTES: '360'" not in workflow
-    assert "for status_name in requested waiting pending queued in_progress; do" in workflow
+    assert "def periodic_controller_key(run):" in workflow
+    assert "latest_controllers = {}" in workflow
+    assert "int(latest['id']) > run_id" in workflow
+    assert "coalesced_control_plane_queued" in workflow
+    assert "event == 'workflow_run'" in workflow
+    assert "event == 'schedule'" in workflow
+    assert "'.github/workflows/repair-intake.yml'" in workflow
+    assert "'pending', 'waiting'" in workflow
 
 
 def test_drain_recovery_arm_lane_keeps_control_plane_safeguards() -> None:
     workflow = _workflow_text()
-    drain = workflow[workflow.index("  drain:\n"):workflow.index("  wake-housekeeping:\n")]
+    drain = workflow[workflow.index("  drain:\n"):]
     assert "runs-on: ubuntu-24.04-arm" in drain
     assert "cancel-in-progress: false" in workflow
     assert "if stale_pr_run(run, open_pr_heads):" in drain

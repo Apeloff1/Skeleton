@@ -61,10 +61,10 @@ def test_security_digest_remains_closed_after_refresh() -> None:
     assert "-f state=closed" in text
 
 
-def test_security_digest_runs_hourly_and_caps_each_remediation_batch_at_50() -> None:
+def test_security_digest_runs_every_six_hours_and_caps_each_remediation_batch_at_50() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "- cron: '11 * * * *'" in text
+    assert "- cron: '11 */6 * * *'" in text
     assert "BATCH_SIZE: '50'" in text
     assert '| .[:$limit]' in text
     assert "Prioritized remediation batch" in text

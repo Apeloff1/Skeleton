@@ -64,8 +64,9 @@ def test_control_plane_triggers_are_bounded() -> None:
 
     assert 'push:' not in supervisor_trigger
     assert 'workflow_dispatch:' in supervisor_trigger
-    assert supervisor_trigger.count('cron:') == 2
+    assert supervisor_trigger.count('cron:') == 1
+    assert "cron: '2 * * * *'" in supervisor_trigger
 
     assert 'workflow_run:' not in watchdog_trigger
-    assert "cron: '12,42 * * * *'" in watchdog_trigger
+    assert "cron: '12 1,5,9,13,17,21 * * *'" in watchdog_trigger
     assert 'workflow_dispatch:' in watchdog_trigger

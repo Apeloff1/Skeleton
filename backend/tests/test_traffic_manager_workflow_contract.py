@@ -27,7 +27,7 @@ def test_traffic_manager_is_only_routine_schedule_for_supervisor_chain() -> None
     supervisor = _source(SUPERVISOR)
     secretary = _source(SECRETARY)
 
-    assert 'cron: "*/10 * * * *"' in traffic
+    assert 'cron: "17 * * * *"' in traffic
     assert "  schedule:" in traffic.split("permissions:", 1)[0]
     assert "  schedule:" not in supervisor.split("concurrency:", 1)[0]
     assert "  schedule:" not in secretary.split("concurrency:", 1)[0]
@@ -94,46 +94,32 @@ def test_traffic_manager_dispatches_relief_only_on_pressure() -> None:
     assert "needs.admission.outputs.relieve == 'true'" in relief
     assert "actions: write" in relief
     assert "contents: read" in relief
-    assert "pull-requests: write" in relief
+    assert "pull-requests: read" in relief
+    assert "pull-requests: write" not in relief
     assert "gh workflow run queue-drain.yml" in relief
     assert "actions/workflows/queue-drain.yml/runs" in relief
     assert "requested waiting pending queued in_progress" in relief
     assert '--ref "$TRAFFIC_DEFAULT_BRANCH"' in relief
 
 
-def test_relief_quenches_only_bounded_same_repo_main_prs() -> None:
+def test_relief_does_not_convert_merge_ready_prs_to_drafts() -> None:
     source = _source(TRAFFIC)
     relief = _job_block(source, "relief", "dispatch")
-    assert "Quench non-exempt ready PR fanout" in relief
-    assert "TRAFFIC_MAX_DRAFTS: '20'" in relief
-    assert '.base.ref == "main"' in relief
-    assert ".head.repo.full_name == $repo" in relief
-    assert 'gh pr ready "$pr_number" --undo' in relief
-    assert '--argjson max_drafts "$TRAFFIC_MAX_DRAFTS"' in relief
-    assert "][: $max_drafts][]" in relief
-    assert "TRAFFIC_MAX_DRAFTS <= 100" in relief
+    assert "Preserve ready PR mergeability" in relief
+    assert "Queue relief did not modify PR draft/ready state." in relief
+    assert "gh pr ready" not in relief
+    assert "TRAFFIC_MAX_DRAFTS" not in relief
+    assert "pull-requests: write" not in relief
 
 
-def test_relief_preserves_in_progress_current_head_validation() -> None:
+def test_relief_preserves_current_validation_without_pr_mutation() -> None:
     source = _source(TRAFFIC)
     relief = _job_block(source, "relief", "dispatch")
-
-    assert "actions/runs?status=in_progress&per_page=100" in relief
-    assert "gh api --paginate --slurp" in relief
-    assert 'select(type == "string" and test("^[0-9a-fA-F]{40}$"))' in relief
-    assert '--slurpfile active_heads "$active_heads"' in relief
-    assert '.head.sha as $head_sha' in relief
-    assert 'index($head_sha)) == null' in relief
-    assert "In-progress current-head validations are preserved" in relief
-
-
-def test_relief_preserves_explicit_priority_labels() -> None:
-    source = _source(TRAFFIC)
-    relief = _job_block(source, "relief", "dispatch")
-    assert '"traffic:keep-ready"' in relief
-    assert '"ci:priority"' in relief
-    assert '"queue:exempt"' in relief
-    assert "A concurrent actor may have drafted it first" in relief
+    assert "needs.admission.outputs.relieve == 'true'" in relief
+    assert "actions/workflows/queue-drain.yml/runs" in relief
+    assert "requested waiting pending queued in_progress" in relief
+    assert "gh workflow run queue-drain.yml" in relief
+    assert "/actions/runs/" not in relief
 
 
 def test_traffic_manager_exposes_relief_observability() -> None:

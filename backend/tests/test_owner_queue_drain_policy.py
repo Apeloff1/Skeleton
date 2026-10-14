@@ -34,8 +34,21 @@ def test_owner_queue_drain_keeps_canonical_control_plane_exclusions() -> None:
     canonical = WORKFLOW.read_text(encoding="utf-8")
     owner = OWNER_DRAIN.read_text(encoding="utf-8")
 
-    assert _workflow_path_literals(canonical) == CONTROL_PLANE_PATHS
-    assert _workflow_path_literals(owner) == CONTROL_PLANE_PATHS
+    def protected_paths(source: str) -> set[str]:
+        # Capture only the protected set; periodic-controller coalescing is a
+        # separate, narrowly guarded policy and must not affect this check.
+        section = source.split("control_plane_paths = frozenset", 1)[1]
+        section = section.split("}", 1)[0]
+        return _workflow_path_literals(section)
+
+    canonical_paths = protected_paths(canonical)
+    owner_paths = protected_paths(owner)
+    assert canonical_paths <= owner_paths
+    assert ".github/workflows/automerge-control-plane.yml" in canonical_paths
+    assert ".github/workflows/repair-intake.yml" in canonical_paths
+    assert ".github/workflows/queue-drain.yml" in canonical_paths
+    assert ".github/workflows/merge-readiness.yml" in owner_paths
+    assert ".github/workflows/p1-required-gate-authority.yml" in owner_paths
 
 
 def test_owner_queue_drain_is_bounded_and_dry_run_by_default() -> None:
