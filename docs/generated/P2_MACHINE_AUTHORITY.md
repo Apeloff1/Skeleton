@@ -48,7 +48,7 @@ This document is a deterministic projection of machine authority. It has no comp
 | `VOL-051` | Repository Architecture | `verified` |
 | `VOL-052` | Internal Python Architecture | `verified` |
 | `VOL-053` | Import Architecture | `verified` |
-| `VOL-054` | Machine Architecture Manifests | `verified` |
+| `VOL-054` | Machine Architecture Manifests | `implemented` |
 | `VOL-055` | Architecture Linter | `verified` |
 | `VOL-058` | ADR Program | `verified` |
 | `VOL-116` | Architecture Fitness Functions | `verified` |
@@ -95,10 +95,10 @@ This document is a deterministic projection of machine authority. It has no comp
 | `VOL-104` | Acceptance: Functional AI | `verified` |
 | `VOL-132` | Consistency Model | `verified` |
 | `VOL-134` | Outbox / Inbox Patterns | `verified` |
-| `VOL-167` | Threat Model | `verified` |
-| `VOL-169` | Security Boundaries | `verified` |
-| `VOL-172` | Egress Control | `verified` |
-| `VOL-175` | Tenant Isolation | `verified` |
+| `VOL-167` | Threat Model | `implemented` |
+| `VOL-169` | Security Boundaries | `implemented` |
+| `VOL-172` | Egress Control | `implemented` |
+| `VOL-175` | Tenant Isolation | `implemented` |
 
 ## Authority boundary
 
