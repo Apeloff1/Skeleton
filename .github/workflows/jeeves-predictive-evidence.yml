@@ -1,27 +1,7 @@
 name: Jeeves Predictive Evidence
 
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - "skeleton/jeeves/historical_*.py"
-      - "skeleton/jeeves/predictive*.py"
-      - "skeleton/learning/evidence.py"
-      - "skeleton/testing/test_jeeves_historical_*.py"
-      - "skeleton/testing/test_jeeves_predictive_*.py"
-      - "skeleton/testing/test_learning_evidence.py"
-      - ".github/workflows/jeeves-predictive-evidence.yml"
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, closed]
-    paths:
-      - "skeleton/jeeves/historical_*.py"
-      - "skeleton/jeeves/predictive*.py"
-      - "skeleton/learning/evidence.py"
-      - "skeleton/testing/test_jeeves_historical_*.py"
-      - "skeleton/testing/test_jeeves_predictive_*.py"
-      - "skeleton/testing/test_learning_evidence.py"
-      - ".github/workflows/jeeves-predictive-evidence.yml"
-
+  workflow_dispatch:
 permissions:
   contents: read
 

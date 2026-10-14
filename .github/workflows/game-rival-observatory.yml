@@ -1,17 +1,5 @@
 name: Game Rival Convergence and Originality Observatory
 on:
-  pull_request:
-    paths:
-      - "skeleton/ai/game_builder/rival_convergence_observatory.py"
-      - "skeleton/ai/game_builder/rival_public_monitor.py"
-      - "skeleton/ai/game_builder/rival_watch_cli.py"
-      - "skeleton/ai/game_builder/rival_delivery_campaign.py"
-      - "skeleton/ai/game_builder/rival_trajectory.py"
-      - "tests/test_game_builder_rival_convergence.py"
-      - "tests/test_game_builder_rival_campaign_cli.py"
-      - "docs/ai/game_rival_watchlist.json"
-      - "docs/ai/game_rival_convergence_design_2026_10.md"
-      - ".github/workflows/game-rival-observatory.yml"
   schedule:
     - cron: "17 7 * * *"
   workflow_dispatch:

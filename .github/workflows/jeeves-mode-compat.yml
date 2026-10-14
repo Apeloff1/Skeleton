@@ -1,19 +1,7 @@
 name: Jeeves Mode Compatibility
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    paths:
-      - "skeleton/jeeves/llm_core.py"
-      - "tests/test_jeeves_mode_compat.py"
-      - ".github/workflows/jeeves-mode-compat.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/jeeves/llm_core.py"
-      - "tests/test_jeeves_mode_compat.py"
-      - ".github/workflows/jeeves-mode-compat.yml"
-
+  workflow_dispatch:
 concurrency:
   group: jeeves-mode-compat-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

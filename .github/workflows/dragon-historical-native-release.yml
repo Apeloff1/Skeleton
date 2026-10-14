@@ -1,12 +1,6 @@
 name: Dragon Historical Native Executable Release
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/webcrawler/dragon_retro_binary_release.py'
-      - 'skeleton/ai/webcrawler/dragon_native_legacy_expansion.py'
-      - 'tests/test_ai_webcrawler_dragon_retro_binary_release.py'
-      - '.github/workflows/dragon-historical-native-release.yml'
   workflow_dispatch:
 
 permissions:

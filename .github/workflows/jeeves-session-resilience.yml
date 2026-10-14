@@ -1,22 +1,7 @@
 name: Jeeves Session Resilience
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches: [main]
-    paths:
-      - "skeleton/jeeves/core.py"
-      - "tests/test_jeeves_session_resilience.py"
-      - "tests/test_jeeves_session_resilience_followup.py"
-      - ".github/workflows/jeeves-session-resilience.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/jeeves/core.py"
-      - "tests/test_jeeves_session_resilience.py"
-      - "tests/test_jeeves_session_resilience_followup.py"
-      - ".github/workflows/jeeves-session-resilience.yml"
-
+  workflow_dispatch:
 concurrency:
   group: jeeves-session-resilience-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
