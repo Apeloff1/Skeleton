@@ -177,7 +177,7 @@ class HardwareProbe:
 
     def read_state(self) -> HardwareState:
         cpu_load, per_core, io_wait = self._cpu_load()
-        mem_used, mem_avail, mem_pressure, swap_pressure, memory_verified = self._memory_state()
+        mem_used, mem_avail, mem_pressure, swap_pressure, memory_verified = self._memory_state_observed()
         temps = self._temps()
         batt_level, batt_charging = self._battery_state()
 
@@ -247,7 +247,12 @@ class HardwareProbe:
             pass
         return 4096  # conservative default
 
-    def _memory_state(self) -> Tuple[int, int, float, float, bool]:
+    def _memory_state(self) -> Tuple[int, int, float, float]:
+        """Retain the original four-value private probe contract for callers."""
+        return self._memory_state_observed()[:4]
+
+    def _memory_state_observed(self) -> Tuple[int, int, float, float, bool]:
+        """Return the memory estimate with explicit source verification."""
         total = self._memory_total_mb()
         try:
             if self._sys == "linux":
