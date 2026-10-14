@@ -59,8 +59,34 @@ def _parse(rows:tuple[str,...]):
         raise ValueError("crate or player overlaps wall")
     return starts[0],boxes,goals,walls
 
-def solve_grid(rows:tuple[str,...])->tuple[str,int]:
+def solve_grid(
+    rows:tuple[str,...], *,
+    current_player:int|None=None,
+    current_crates:tuple[int,...]|None=None,
+)->tuple[str,int]:
+    """Exact BFS from initial or explicitly supplied current original game state.
+
+    This is useful for active-game hints after the player deviates from the
+    canonical opening. The same bounded solver, tile collisions, movement
+    order and unique-state search are reused for both admissions.
+    """
     start,boxes,goals,walls=_parse(rows)
+    if current_player is not None or current_crates is not None:
+        if (type(current_player) is not int or
+                not isinstance(current_crates,tuple) or
+                len(current_crates)!=len(boxes) or
+                any(type(index) is not int or index<0 or index>=WIDTH*HEIGHT
+                    for index in current_crates)):
+            raise ValueError("bounded live puzzle hint state invalid")
+        if (current_player<0 or current_player>=WIDTH*HEIGHT or
+                current_player in walls or current_player in current_crates or
+                len(set(current_crates))!=len(current_crates) or
+                any(box in walls for box in current_crates)):
+            raise ValueError("live puzzle hint overlaps walls, crates or bounds")
+        start=current_player
+        boxes=tuple(sorted(current_crates))
+        if set(boxes)==goals:
+            return "",1
     initial=(start,boxes)
     parents={initial:None}
     pending=deque((initial,))
@@ -101,7 +127,7 @@ def solve_grid(rows:tuple[str,...])->tuple[str,int]:
         raise ValueError("native puzzle solution exceeds bounded input sequence")
     return solution,len(parents)
 
-def transformed_level(stage:int,seed:int,difficulty:int=4)->tuple[str,...]:
+def transformed_level(stage:int,seed:int,difficulty:int=4,*,procedural:bool=False)->tuple[str,...]:
     if isinstance(stage,bool) or not isinstance(stage,int) or not 0<=stage<MAX_LEVELS:
         raise ValueError("native puzzle level index out of bounds")
     if isinstance(seed,bool) or not isinstance(seed,int) or not 0<=seed<2**32:
@@ -114,9 +140,16 @@ def transformed_level(stage:int,seed:int,difficulty:int=4)->tuple[str,...]:
     if flags&1:rows=tuple(r[::-1] for r in rows)
     if flags&2:rows=tuple(reversed(rows))
     _parse(rows)
+    if type(procedural) is not bool:
+        raise ValueError("procedural native puzzle mode must be a boolean")
+    if procedural:
+        from .dragon_native_puzzle_variants import vary_original_level
+        rows,_=vary_original_level(
+            rows,seed=seed,stage=stage,difficulty=difficulty,solve=solve_grid,
+        )
     return rows
 
-C_SOURCE=r'''/* Dragon Native Sokoban: pure C99, ANSI terminal, no SDL/no WebView.
+C_SOURCE=r'''/* Dragon Native Sokoban: pure C99, ANSI terminal; no GUI or web dependencies.
   Gameplay: push crates onto original goals; undo and reset; bounded levels.
   Each level is solved in advance with a canonical shortest walk trace. */
 #include <stdio.h>
@@ -272,18 +305,61 @@ int main(int argc,char**argv){
 }
 '''
 
-def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4)->dict[str,str]:
+def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4,
+                       procedural:bool=False,
+                       authored_levels:tuple[tuple[str,...],...]|None=None,
+                       hero:str="hatchling",theme:str="ancient_ruins",
+                       palette:str="dmg_green",
+                       campaign_mode:str="branching",
+                       challenge_profile:str="balanced")->dict[str,str]:
     if isinstance(stages,bool) or not isinstance(stages,int) or not 1<=stages<=MAX_LEVELS:
         raise ValueError("native puzzle stages must be 1..8")
-    layouts=[];solutions=[];proofs=[]
+    if type(procedural) is not bool:
+        raise ValueError("procedural native puzzle flag must be a boolean")
+    original_pack=None
+    if authored_levels is not None:
+        if procedural:
+            raise ValueError("custom authored campaign and procedural mode are exclusive")
+        from .dragon_native_puzzle_authoring import validate_authored_levels
+        original_pack=validate_authored_levels(authored_levels)
+        if stages!=len(original_pack.levels):
+            raise ValueError("authored game stage count must match emitted campaign")
+    from .dragon_native_campaign_paths import design_campaign, graph_header, graph_report
+    from .dragon_native_multipath import analyse_routes,route_report
+    from .dragon_native_level_curation import curate_level,curation_report
+    layouts=[];solutions=[];proofs=[];alternatives=[];curation=[]
     for index in range(stages):
-        grid=transformed_level(index,seed,difficulty)
+        if original_pack is not None:
+            grid=original_pack.levels[index].rows
+            curation.append(None)
+        else:
+            grid,picked=curate_level(
+                stage=index,seed=seed,difficulty=difficulty,
+                procedural=procedural,profile=challenge_profile,
+            )
+            curation.append(curation_report(picked))
         path,states=solve_grid(grid)
         start,boxes,goals,walls=_parse(grid)
         layouts.append(grid);solutions.append(path)
+        alternatives.append(route_report(analyse_routes(
+            grid,max_routes=4,expansion_cap=4000,
+        )))
         proofs.append(LevelProof(index,path,len(path),states,len(boxes),
              sha256("\n".join(grid).encode()).hexdigest(),
              sha256(path.encode()).hexdigest()))
+    campaign=design_campaign(
+        stages,seed=seed,mode=campaign_mode,intensity=challenge_profile,
+        stage_difficulty=tuple(
+            document["difficulty_estimate"] for document in alternatives
+        ),
+    )
+    from .dragon_native_challenge_director import (
+        make_challenge_plan,challenge_report,
+    )
+    challenge=make_challenge_plan(
+        tuple(alternatives),profile=challenge_profile,
+        branching=campaign.mode=="branching" and stages>=3,
+    )
     rows=["  {\n"+",\n".join('    "'+row+'"' for row in grid)+"\n  }"
           for grid in layouts]
     header=(
@@ -295,7 +371,8 @@ def emit_native_puzzle(*,seed:int,stages:int=4,difficulty:int=4)->dict[str,str]:
        "static const char* dragon_solutions[LEVEL_COUNT]={"+
        ", ".join('"'+x+'"' for x in solutions)+"};\n"+
        "static const int dragon_solution_length[LEVEL_COUNT]={"+
-       ", ".join(str(len(p)) for p in solutions)+"};\n"
+       ", ".join(str(len(p)) for p in solutions)+"};\n"+
+       graph_header(campaign)+
        "#endif\n"
     )
     cmake="""\
@@ -326,7 +403,19 @@ clean:
       "mode":"original_native_sokoban",
       "search":"exact bounded BFS over player location and crate set",
       "seed":seed,"stages":stages,"difficulty":difficulty,
+      "procedural":procedural,
+      "campaign_mode":campaign_mode,
+      "challenge_profile":challenge_profile,
+      "campaign_graph":graph_report(campaign),
+      "authoring_mode":"authored" if original_pack is not None else "generated",
+      "authoring_digest":original_pack.digest if original_pack is not None else None,
+      "authored_level_rows":[list(level.rows) for level in original_pack.levels]
+                             if original_pack is not None else None,
       "level_proofs":[asdict(p) for p in proofs],
+      "route_analysis":[{"stage":index,**record}
+                        for index,record in enumerate(alternatives)],
+      "challenge_director":challenge_report(challenge),
+      "level_curation":curation,
       "native_runtime_test_required":True,
       "proof_scope":"optimal abstract grid moves, not C executable verification",
     }
@@ -343,7 +432,19 @@ clean:
        " Build/run status remains source_generated until an actual compiler"
        " and runner confirm it.\n"
     )
-    return {"src/main.c":C_SOURCE,"include/dragon_puzzle.h":header,
+    from .dragon_native_puzzle_hints import enable_live_hints
+    from .dragon_native_puzzle_trace import enable_native_trace
+    from .dragon_native_puzzle_challenge import enable_native_challenge
+    from .dragon_native_puzzle_save import enable_native_save
+    runtime=enable_native_save(
+        enable_native_challenge(enable_native_trace(enable_live_hints(C_SOURCE)))
+    )
+    from .dragon_native_campaign_runtime import enable_native_branches
+    runtime=enable_native_branches(runtime)
+    from .dragon_native_puzzle_graphics import enable_puzzle_graphics
+    native={"src/main.c":runtime,"include/dragon_puzzle.h":header,
             "CMakeLists.txt":cmake,"Makefile":make,
             "dragon-puzzle-proof.json":json.dumps(info,sort_keys=True,indent=2)+"\n",
             "README.puzzle.md":readme}
+    return enable_puzzle_graphics(native,hero=hero,theme=theme,
+                                  palette=palette,seed=seed)

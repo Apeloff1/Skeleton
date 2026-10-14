@@ -161,7 +161,8 @@ CATALOG = {target.id: target for target in TARGETS}
 assert len(CATALOG)==len(TARGETS), "catalog cardinality invariant"
 
 STYLES = (
-    "arcade_score_attack","fixed_screen_puzzle","top_down_adventure",
+    "arcade_score_attack","fixed_screen_puzzle","world_route_adventure","maze_route_adventure",
+    "top_down_adventure",
     "side_scrolling_platformer","metroidvania","tactical_rpg","turn_based_rpg",
     "roguelike","bullet_hell","run_and_gun","puzzle_platformer",
     "visual_novel","rhythm_game","fighting_game","racing",
@@ -184,7 +185,8 @@ def target_catalog(*, family: str | None = None) -> tuple[dict, ...]:
             continue
         row=asdict(t)
         row["supported_styles"]=(
-            tuple(sorted(set(GENRES)|{"rhythm_game","fixed_screen_puzzle"})) if t.id in desktop
+            tuple(sorted(set(GENRES)|{"rhythm_game","fixed_screen_puzzle",
+                                      "world_route_adventure","maze_route_adventure"})) if t.id in desktop
             else ("arcade_score_attack","side_scrolling_platformer") if t.id in ("game_boy","nes","game_boy_pocket","game_boy_light")
             else ("arcade_score_attack",) if t.id in source_ids else ()
         )

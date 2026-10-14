@@ -85,13 +85,15 @@ class GameExperienceTests(unittest.TestCase):
         self.assertEqual(report.levels[0].hazard_hits, 0)
 
     def test_rejects_tampered_action_receipts(self):
-        fake = replace(
-            self.proof,
-            action_receipts=(
-                replace(self.proof.action_receipts[0], before_digest="0" * 64),
-            ) + self.proof.action_receipts[1:],
-        )
         with self.assertRaises(GameplayError):
+            # Either typed construction or full replay analysis must reject
+            # corrupted first-action boundary evidence.
+            fake = replace(
+                self.proof,
+                action_receipts=(
+                    replace(self.proof.action_receipts[0], before_digest="0" * 64),
+                ) + self.proof.action_receipts[1:],
+            )
             analyze_replay(self.world, fake, authorized=True)
 
     def test_rejects_crossworld_replay(self):

@@ -30,6 +30,8 @@ class P2RepositoryControlTests(unittest.TestCase):
         self.assertEqual(result["work_package_count"], 31)
         self.assertEqual(result["aiq_task_count"], 42)
         self.assertEqual(result["wave_count"], 8)
+        # Debt is derived from the canonical ledger; historical 24-item
+        # fixtures must not override current closed/reconciled evidence.
         self.assertEqual(
             result["debt_count"],
             len(MODULE._load(ROOT, "machine/technical_debt_ledger.json")["items"]),

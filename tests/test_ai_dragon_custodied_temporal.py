@@ -19,7 +19,9 @@ def setup():
     root=LayerReceipt(AnalysisLayer.SOURCE_INTEGRITY,(),"c"*64,2,True,False)
     dispatch=LayerDispatch(AnalysisLayer.TEMPORAL_SEGMENTATION,
         ("c"*64,),"temporal","v1")
-    frames=(FeatureFrame(0,"f0",(0.,)),FeatureFrame(100,"f1",(1.,)))
+    # FeatureFrame uses (timestamp_ms, normalized_features, source_frame_id).
+    # Source IDs must not be silently accepted in the vector slot.
+    frames=(FeatureFrame(0,(0.,),"f0"),FeatureFrame(100,(1.,),"f1"))
     return q,ledger,c,j,root,dispatch,frames
 
 

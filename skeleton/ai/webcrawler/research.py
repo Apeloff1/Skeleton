@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 from .core import CrawlDocument
 
 _WORD = re.compile(r"[a-z0-9]{2,}", re.I)
-_YEAR = re.compile(r"(?<!\\d)((?:19|20)\\d{2})(?!\\d)")
+_YEAR = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
 _NEG = re.compile(r"\b(?:not|never|no|false|denies?|rejects?|without)\b", re.I)
 
 def tokens(text: str) -> frozenset[str]:

@@ -21,7 +21,19 @@ import json,os,platform,shutil,subprocess,sys
 if __package__:
     from .dragon_native_puzzle import emit_native_puzzle
 else:
-    from dragon_native_puzzle import emit_native_puzzle
+    # Direct script execution must not load skeleton.ai's heavyweight package
+    # initializers. Use a private local namespace so the generator's relative
+    # sibling imports resolve, including its bounded campaign/curation helpers.
+    from importlib import import_module
+    from types import ModuleType
+
+    _isolated_name = "_dragon_native_standalone"
+    _isolated = ModuleType(_isolated_name)
+    _isolated.__path__ = [str(Path(__file__).resolve().parent)]
+    sys.modules[_isolated_name] = _isolated
+    emit_native_puzzle = import_module(
+        f"{_isolated_name}.dragon_native_puzzle"
+    ).emit_native_puzzle
 
 RELEASE_NAME="dragon_game.exe" if sys.platform=="win32" else "dragon_game"
 TARGETS={"linux":"pc_linux","windows":"pc_windows","darwin":"pc_macos"}
@@ -118,6 +130,8 @@ def build_native_release(root:Path,*,title:str="Original Dragon Puzzle Quest")->
             raise ValueError("unsafe native release source entry")
         candidate = root.joinpath(*member.parts)
         candidate.parent.mkdir(parents=True,exist_ok=True)
+        if candidate.is_symlink() or not candidate.parent.resolve().is_relative_to(root.resolve()):
+            raise ValueError("unsafe native release source entry")
         candidate.write_text(body,encoding="utf-8")
     source_fingerprint=sha256(json.dumps(
         written,sort_keys=True,separators=(",",":"),ensure_ascii=True,

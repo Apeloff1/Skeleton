@@ -137,6 +137,10 @@ def compile_system_assembly(project_id: str,
         for name in ordered if name in PREVIEW_ACTIONS
     ]
     advanced_smoke = {
+        # Maze/RPG are playable bounded references now; require the same
+        # independent source-bound assembly proof as every other engine.
+        "maze": ("survey",),
+        "rpg": ("talk",),
         "platformer": ("jump_right", "right", "wait"),
         "tactics": ("east", "end_turn"),
         "tower_defense": ("build:0", "tick:4"),
@@ -213,8 +217,12 @@ def compile_system_assembly(project_id: str,
             "sailing":("coast",),
             "physics":("inspect",),
         }
-        if set(scene_smoke) != set(ADVANCED_ENGINE_IDS):
-            raise AssemblyError("every playable editor needs a source-bound scene proof")
+        # Maze/RPG currently reject authored scenes at the engine boundary;
+        # requiring their unsupported scene smoke would claim an integration
+        # that is not implemented. Preserve exhaustive scene coverage for
+        # every independently supported authored-scene reference engine.
+        if set(scene_smoke) != set(ADVANCED_ENGINE_IDS) - {"maze", "rpg"}:
+            raise AssemblyError("every authored-scene engine needs a source-bound scene proof")
         proof=run_advanced_session(editor,configs[editor]["settings"],
                                    scene_smoke[editor],
                                    seed=source["seed"],scene=source)

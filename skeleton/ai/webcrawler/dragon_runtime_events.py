@@ -32,6 +32,10 @@ class DragonRuntimeEventLedger:
    WHERE owner=? AND run_id=? ORDER BY sequence DESC LIMIT 1""",(owner,run_id)).fetchone()
   seq=1 if row is None else row[0]+1;prev="0"*64 if row is None else row[1]
   if row is not None and occurred_at<row[2]: raise ValueError("runtime event time regression")
+  # SQLite REAL affinity returns float even if caller supplied integer time.
+  # Hash exactly the canonical value that will survive storage/reload so a
+  # valid unmodified event chain verifies across both representations.
+  occurred_at=float(occurred_at)
   body=[owner,run_id,seq,event_type,layer,outcome,evidence_fingerprint,error_code,occurred_at,prev]
   h=sha256(json.dumps(body,separators=(",",":"),allow_nan=False).encode()).hexdigest()
   self.db.execute("INSERT INTO dragon_runtime_events VALUES(?,?,?,?,?,?,?,?,?,?,?)",

@@ -6111,7 +6111,7 @@ for _entry in CATALOG:
             {"key": "vessel_class", "kind": "enum", "default": "sloop", "minimum": None, "maximum": None, "options": ["skiff", "sloop", "schooner"]},
         ])
 MINIMUM_PROGRESSION = "advanced"
-ADVANCED_ENGINE_IDS = frozenset({"platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "physics"})
+ADVANCED_ENGINE_IDS = frozenset({"maze", "rpg", "platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "physics"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),
@@ -6413,6 +6413,30 @@ def _simulate(editor_id: str, cfg: Mapping[str, object], actions: Sequence[objec
 def preview_editor(editor_id: str, settings: Mapping[str, object] | None = None,
                    actions: Sequence[object] | None = None) -> dict:
     document = make_editor_document(editor_id, settings)
+    if editor_id in ("maze", "rpg"):
+        # Import lazily: the advanced engine validates editor documents and
+        # would otherwise create a module-level import cycle.
+        from .advanced_gameplay_runtime import run_advanced_session
+        if actions is None:
+            actions = ("survey",) if editor_id == "maze" else ("talk",)
+        if type(actions) not in (list, tuple) or len(actions) > MAX_ACTIONS:
+            raise SystemEditorError("preview actions must be a bounded sequence")
+        session = run_advanced_session(
+            editor_id, document["settings"], actions, seed=0,
+        )
+        payload = {
+            "schema": "skeleton.game_builder.system_preview.v1",
+            "editor": editor_id,
+            "configuration_digest": document["digest"],
+            "actions": list(actions),
+            "state": session["state"],
+            "status": "deterministic_prototype",
+            "simulation_executed": True,
+            "runtime_head_digest": session["head_digest"],
+            "native_hardware_verified": False,
+            "publication_certified": False,
+        }
+        return {**payload, "digest": sha256(_canonical(payload).encode()).hexdigest()}
     if editor_id not in PREVIEW_ACTIONS:
         return {"schema":"skeleton.game_builder.system_preview.v1",
                 "editor":editor_id,"configuration_digest":document["digest"],

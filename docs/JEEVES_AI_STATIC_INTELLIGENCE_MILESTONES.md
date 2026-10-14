@@ -1,8 +1,8 @@
 # Jeeves and AI capability intelligence — October 13, 2026
 
-**Milestone branch:** `feat/jeeves-ai-capability-intelligence-20261013`  
-**Depends on:** draft Jeeves appwide fabric PR #3718; not independently mergeable to main.  
-**Canonical owner:** `skeleton/ai/game_builder/` existing governed Jeeves/Studio appwide adapter.  
+**Milestone branch:** `feat/jeeves-ai-capability-intelligence-20261013`\
+**Depends on:** draft Jeeves appwide fabric PR #3718; not independently mergeable to main.\
+**Canonical owner:** `skeleton/ai/game_builder/` existing governed Jeeves/Studio appwide adapter.\
 **Trust boundary:** deterministic code inspection only; no AI model, tool authority, shell, source mutation, or promotion.
 
 ## Implemented, source-linked deliverables

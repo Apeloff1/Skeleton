@@ -323,6 +323,18 @@ class RobotsCache:
         parser = RobotFileParser()
         parser.set_url(origin.rstrip("/") + "/robots.txt")
         parser.parse(robots_text.splitlines())
+        # stdlib RobotFileParser matches the *first* applicable rule. RFC 9309
+        # instead selects the longest path match, with Allow winning ties.
+        # Sort only rule lines within each parsed agent group so a broad
+        # Allow: / cannot accidentally override Disallow: /private.
+        groups = [*parser.entries]
+        if parser.default_entry is not None:
+            groups.append(parser.default_entry)
+        for group in groups:
+            group.rulelines.sort(
+                key=lambda rule: (len(rule.path), rule.allowance),
+                reverse=True,
+            )
         self._parsers[origin] = parser
         self._meta[origin] = {"fetched_at": fetched_at, "etag": etag, "last_modified": last_modified}
 
@@ -494,9 +506,9 @@ class CrawlEngine:
             return None
         if not self.robots.allowed(item.url):
             return None
-        host = urlsplit(item.url).hostname or ""
-        delay = max(self.policy.min_host_delay_seconds, self.robots.crawl_delay(item.url) or 0.0)
-        self._host_ready[host] = now + delay
+        # Redirect-aware fetch_with_policy performs the per-hop host cooldown
+        # check and commits its reservation. Reserving here first makes that
+        # very same first hop appear too early and rejects positive crawl delays.
         try:
             from .redirects import fetch_with_policy
             response = fetch_with_policy(self, item.url, now=now)
@@ -518,9 +530,12 @@ class CrawlEngine:
             item.url,
         ) if successful else None
         novel = bool(doc and not self.store.has_content(doc.content_hash))
-        if not hasattr(self.fetcher,"fetch_once"):
-            self.budget.charge_response(len(body), accepted=novel)
-        elif novel:
+        # fetch_with_policy already charged each network response, including
+        # redirect hops, against the request/byte budget. Only a novel,
+        # accepted document remains to be charged here. Counting the same
+        # request a second time for fetchers without fetch_once exhausted
+        # small budgets prematurely and understated crawl availability.
+        if novel:
             self.budget.documents += 1
         if not doc:
             return None

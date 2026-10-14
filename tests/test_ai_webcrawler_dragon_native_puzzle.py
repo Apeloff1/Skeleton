@@ -117,4 +117,6 @@ def test_native_c99_compilation_and_actual_solution_replay(tmp_path):
     keyboard=subprocess.run([str(binary)],input="h\nq\n",
         capture_output=True,text=True,timeout=10)
     assert keyboard.returncode==0
-    assert "Canonical first input:" in keyboard.stdout
+    # H now searches the actual player/crate state. The pre-upgrade
+    # "Canonical first input" message would mislead after moving crates.
+    assert "Next shortest move from current position:" in keyboard.stdout

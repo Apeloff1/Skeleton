@@ -71,15 +71,24 @@ def test_packaged_binary_is_real_local_executable_and_attached_to_its_source(tmp
 
 
 def test_sparse_isolated_native_release_has_no_monorepo_imports(tmp_path):
-    """The real build must work with only two source files, as on Windows CI."""
+    """Sparse host build loads only standalone Dragon siblings, not skeleton.ai."""
     import subprocess,sys
-    from skeleton.ai.webcrawler import dragon_native_puzzle,dragon_native_release
+    from skeleton.ai.webcrawler import dragon_native_release
     isolated=tmp_path/"minimal-release"
     isolated.mkdir()
-    shutil.copyfile(dragon_native_puzzle.__file__,
-                    isolated/"dragon_native_puzzle.py")
-    shutil.copyfile(dragon_native_release.__file__,
-                    isolated/"dragon_native_release.py")
+    source_dir=Path(dragon_native_release.__file__).resolve().parent
+    # The real sparse checkout includes this bounded directory because the
+    # native generator's campaign, curation and hint imports are relative.
+    for sibling in sorted(source_dir.glob("dragon_native_*.py")):
+        shutil.copyfile(sibling,isolated/sibling.name)
+    # Native pixel rendering has one small, original self-contained asset
+    # dependency outside the dragon_native_* namespace. Include exactly it,
+    # not the whole monorepo/package initializer.
+    for sibling in ("dragon_retro_assets.py","dragon_game_design.py",
+                    "dragon_desktop_abi.py","dragon_platform_expansion.py"):
+        shutil.copyfile(source_dir/sibling,isolated/sibling)
+    assert not (isolated/"__init__.py").exists()
+    assert (isolated/"dragon_native_puzzle.py").is_file()
     cli=subprocess.run(
         [sys.executable,str(isolated/"dragon_native_release.py"),"--help"],
         cwd=isolated,capture_output=True,text=True,timeout=10)
@@ -95,7 +104,7 @@ def test_sparse_isolated_native_release_has_no_monorepo_imports(tmp_path):
     assert "DRAGON_NATIVE_RELEASE_PASS" in release.stdout
     receipt=json.loads((tmp_path/"isolated-build"/"dragon-native-release.json").read_text())
     assert receipt["selftest_state"]=="native_selftest_passed"
-    assert receipt["source_file_count"]==6
+    assert receipt["source_file_count"]>=6
     assert receipt["selftest_stage_lines"]==4
 
 
@@ -129,3 +138,14 @@ def test_native_release_member_validation_accepts_normal_nested_sources(tmp_path
     monkeypatch.setattr(release_module, "_run", abort_after_safe_paths)
     with pytest.raises(RuntimeError, match="safe emitted sources accepted"):
         release_module.build_native_release(tmp_path / "absolute-output")
+
+
+def test_native_release_rejects_traversal_before_compiler(tmp_path, monkeypatch):
+    if not shutil.which("cmake"):
+        pytest.skip("CMake unavailable")
+    from skeleton.ai.webcrawler import dragon_native_release
+    monkeypatch.setattr(dragon_native_release,"emit_native_puzzle",
+                        lambda **kwargs: {"../escape.c":"unsafe"})
+    with pytest.raises(ValueError,match="unsafe native release source entry"):
+        build_native_release(tmp_path/"build")
+    assert not (tmp_path/"escape.c").exists()

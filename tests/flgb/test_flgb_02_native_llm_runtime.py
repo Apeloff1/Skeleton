@@ -681,7 +681,7 @@ class TestNativeLLMRuntime(unittest.TestCase):
         self.assertEqual(next(stream).kind, "prompt")
         self.assertEqual(next(stream).kind, "token")
         runtime.tokenizer._digest = "0" * 64
-        with self.assertRaisesRegex(RuntimeContractError, "tokenizer mutated"):
+        with self.assertRaisesRegex(RuntimeContractError, "runtime binding changed during generation|tokenizer mutated"):
             list(stream)
 
 

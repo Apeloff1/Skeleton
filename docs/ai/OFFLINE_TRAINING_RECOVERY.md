@@ -1,7 +1,7 @@
 # Offline training and capability-evaluation recovery
 
-**Date:** 2026-10-13  
-**Source identity:** PR #3593, commit `7f9be557bac3a4108dfc683716b15437de30f547`  
+**Date:** 2026-10-13\
+**Source identity:** PR #3593, commit `7f9be557bac3a4108dfc683716b15437de30f547`\
 **Integration:** fresh `main`-based branch, additive files only
 
 The original algorithmically synthetic `offline_foundations_v1` curriculum is

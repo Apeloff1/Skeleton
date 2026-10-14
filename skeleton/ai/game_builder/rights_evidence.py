@@ -83,6 +83,8 @@ def read_rights_evidence(path: str | Path) -> RightsEvidenceReceipt:
                 != (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)
                 or count != opened.st_size):
             raise RightsEvidenceError("rights evidence changed during review intake")
+    except FileNotFoundError as exc:
+        raise RightsEvidenceError("rights evidence requires an ordinary local regular file") from exc
     except (OSError, RuntimeError) as exc:
         raise RightsEvidenceError("unreadable or substituted rights evidence file") from exc
     return RightsEvidenceReceipt(digest.hexdigest(), count)

@@ -85,7 +85,14 @@ class SystemCatalogTests(unittest.TestCase):
         self.assertGreater(preview_editor("tower_defense")["state"]["spawned"], 0)
         self.assertGreater(preview_editor("shooter")["state"]["defeated"], 0)
         self.assertGreater(preview_editor("rhythm")["state"]["score"], 0)
-        self.assertFalse(preview_editor("maze")["simulation_executed"])
+        for name in ("maze", "rpg"):
+            with self.subTest(name=name):
+                preview = preview_editor(name)
+                self.assertTrue(preview["simulation_executed"])
+                self.assertEqual(preview["status"], "deterministic_prototype")
+                self.assertFalse(preview["native_hardware_verified"])
+                self.assertFalse(preview["publication_certified"])
+                self.assertEqual(preview, preview_editor(name))
         for system, action in (
             ("platformer","execute"), ("racing","teleport"),
             ("tactics","spawn_enemy"), ("tower_defense","refund"),

@@ -286,7 +286,10 @@ class TestNativeModelService(unittest.TestCase):
         self.assertFalse(
             any(event.kind in {"token", "stopped", "completed"} for event in result.events)
         )
-        self.assertEqual([event.kind for event in result.events], ["admitted", "prompt"])
+        # A deadline can expire before the prompt event is exposed. Both
+        # bounded prefixes are valid, but no generated output may escape.
+        kinds = [event.kind for event in result.events]
+        self.assertIn(kinds, (["admitted"], ["admitted", "prompt"]))
 
     def test_runtime_contract_failure_becomes_sanitized_model_error(self):
         service = NativeModelService(self.runtime())

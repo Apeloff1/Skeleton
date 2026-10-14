@@ -98,3 +98,36 @@ def test_unrelated_sources_cannot_be_compared():
             store.read("alice", first.snapshot_id, authorized=True),
             store.read("alice", second.snapshot_id, authorized=True),
         )
+
+
+def test_integer_clock_roundtrip_and_duplicate_capture_is_idempotent():
+    store = archive()
+    first = capture(store, b"repeated evidence", observed=100)
+    # SQLite stores observed_at in a REAL field, not the caller's integer type.
+    assert store.read("alice", first.snapshot_id, authorized=True)[1] == b"repeated evidence"
+    again = capture(store, b"repeated evidence", observed=100)
+    assert again.snapshot_id == first.snapshot_id
+    assert len(store.timeline("alice", URL, authorized=True)) == 1
+
+
+def test_legacy_integer_timestamp_snapshot_is_readable_and_not_forked():
+    import hashlib
+    import json
+    store = archive()
+    evidence = b"preserve old evidence"
+    digest = hashlib.sha256(evidence).hexdigest()
+    identity = json.dumps(
+        [URL, 200, digest], separators=(",", ":"),
+        ensure_ascii=True, allow_nan=False,
+    )
+    legacy_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+    store.db.execute(
+        "INSERT INTO archivex_snapshots VALUES (?,?,?,?,?,?,?,?,?)",
+        ("alice", legacy_id, URL, 200.0, digest, len(evidence),
+         "text/plain", "Authorized excerpt", evidence),
+    )
+    store.db.commit()
+    assert store.read("alice", legacy_id, authorized=True)[1] == evidence
+    recaptured = capture(store, evidence, observed=200)
+    assert recaptured.snapshot_id == legacy_id
+    assert len(store.timeline("alice", URL, authorized=True)) == 1
