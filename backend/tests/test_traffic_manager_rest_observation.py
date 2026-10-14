@@ -103,9 +103,9 @@ def test_status_inventory_pages_beyond_100_queued_runs(monkeypatch):
     def fake_gh_json(args: list[str]):
         url = args[1]
         requests.append(url)
-        if "status=queued" in url and "page=1" in url:
+        if "status=queued" in url and "&page=1" in url:
             return [_row(number) for number in range(1, 101)]
-        if "status=queued" in url and "page=2" in url:
+        if "status=queued" in url and "&page=2" in url:
             return [_row(number) for number in range(101, 183)]
         return []
 
