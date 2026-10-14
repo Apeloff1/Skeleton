@@ -354,25 +354,43 @@ class ReviewedKnowledgeStore:
     to the embedding process. Never expose this object as an unauthenticated API.
     """
 
-    def __init__(self, path: str | Path, *, policy: KnowledgePolicy | None = None) -> None:
+    def __init__(
+        self, path: str | Path, *,
+        policy: KnowledgePolicy | None = None,
+        read_only: bool = False,
+    ) -> None:
         self.policy = policy or KnowledgePolicy()
         if not isinstance(self.policy, KnowledgePolicy):
             raise KnowledgeError("KnowledgePolicy required")
-        self.db = sqlite3.connect(str(path), timeout=10, isolation_level=None)
+        if type(read_only) is not bool:
+            raise KnowledgeError("read_only must be a boolean")
+        self.read_only = read_only
+        if read_only:
+            source = Path(path).expanduser()
+            if source.is_symlink() or not source.is_file():
+                raise ValueError("read-only knowledge requires an existing regular SQLite file")
+            self.db = sqlite3.connect(
+                source.resolve().as_uri() + "?mode=ro",
+                timeout=10, isolation_level=None, uri=True,
+            )
+            self.db.execute("PRAGMA query_only = ON")
+        else:
+            self.db = sqlite3.connect(str(path), timeout=10, isolation_level=None)
         self.db.execute("PRAGMA busy_timeout = 10000")
         self.db.execute("PRAGMA foreign_keys = ON")
-        self.db.execute("PRAGMA journal_mode = WAL")
-        self.db.execute(
-            """CREATE TABLE IF NOT EXISTS game_builder_knowledge (
-                owner TEXT NOT NULL,
-                source_id TEXT NOT NULL,
-                revision INTEGER NOT NULL,
-                parent_digest TEXT,
-                payload TEXT NOT NULL,
-                digest TEXT NOT NULL,
-                PRIMARY KEY(owner, source_id, revision)
-            )"""
-        )
+        if not read_only:
+            self.db.execute("PRAGMA journal_mode = WAL")
+            self.db.execute(
+                """CREATE TABLE IF NOT EXISTS game_builder_knowledge (
+                    owner TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    revision INTEGER NOT NULL,
+                    parent_digest TEXT,
+                    payload TEXT NOT NULL,
+                    digest TEXT NOT NULL,
+                    PRIMARY KEY(owner, source_id, revision)
+                )"""
+            )
 
     def close(self) -> None:
         self.db.close()
@@ -474,6 +492,8 @@ class ReviewedKnowledgeStore:
         expected_parent_digest: str | None,
         authorized: bool,
     ) -> RevisionReceipt:
+        if self.read_only:
+            raise PermissionError("read-only knowledge store cannot import documents")
         if not authorized:
             raise PermissionError("game knowledge admission requires external authorization")
         if not isinstance(document, ReviewedDocument):
@@ -705,6 +725,8 @@ class ReviewedKnowledgeStore:
             raise KnowledgeError("brief contradiction status was altered")
 
     def erase_owner(self, owner: str, *, authorized: bool) -> int:
+        if self.read_only:
+            raise PermissionError("read-only knowledge store cannot erase owners")
         if not authorized:
             raise PermissionError("knowledge erasure requires authorization")
         owner = _id(owner, "owner")
