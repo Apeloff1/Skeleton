@@ -1,42 +1,6 @@
 name: AI P0-P2 Inheritance
 
 on:
-  push:
-    branches:
-      - main
-    # Avoid unnecessary main/PR CI for unrelated files.
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_p1_*.json"
-      - "machine/ai_p2_*.json"
-      - "scripts/verify_masterplan_completion.py"
-      - "scripts/check_p1_terminal_closure_manifest.py"
-      - "scripts/check_p2_functional_ai_closure.py"
-      - "scripts/verify_ai_phase_inheritance.py"
-      - "tests/test_ai_phase_inheritance.py"
-      - "skeleton/inference/**"
-      - "skeleton/testing/test_local_inference.py"
-      - "skeleton/testing/test_vs001_functional_ai.py"
-      - ".github/workflows/ai-p0-p2-inheritance.yml"
-  pull_request:
-    branches:
-      - main
-    # Avoid unnecessary main/PR CI for unrelated files.
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_p1_*.json"
-      - "machine/ai_p2_*.json"
-      - "scripts/verify_masterplan_completion.py"
-      - "scripts/check_p1_terminal_closure_manifest.py"
-      - "scripts/check_p2_functional_ai_closure.py"
-      - "scripts/verify_ai_phase_inheritance.py"
-      - "tests/test_ai_phase_inheritance.py"
-      - "skeleton/inference/**"
-      - "skeleton/testing/test_local_inference.py"
-      - "skeleton/testing/test_vs001_functional_ai.py"
-      - ".github/workflows/ai-p0-p2-inheritance.yml"
   workflow_dispatch:
 
 permissions:

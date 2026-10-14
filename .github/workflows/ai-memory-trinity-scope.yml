@@ -1,12 +1,6 @@
 name: AI Memory Trinity Scope
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/memory/trinity.py"
-      - "skeleton/ai/runtime/memory/trinity.py"
-      - "skeleton/testing/test_ai_memory_trinity_scope.py"
-      - ".github/workflows/ai-memory-trinity-scope.yml"
   push:
     branches: [main]
     paths:

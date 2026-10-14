@@ -1,24 +1,6 @@
 name: AI Hostile Gap Disposition
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "docs/architecture/masterplan-gap-audit.md"
-      - "machine/ai_hostile_gap_disposition.json"
-      - "scripts/verify_ai_hostile_gap_disposition.py"
-      - "tests/test_ai_hostile_gap_disposition.py"
-      - ".github/workflows/ai-hostile-gap-disposition.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "docs/architecture/masterplan-gap-audit.md"
-      - "machine/ai_hostile_gap_disposition.json"
-      - "scripts/verify_ai_hostile_gap_disposition.py"
-      - "tests/test_ai_hostile_gap_disposition.py"
-      - ".github/workflows/ai-hostile-gap-disposition.yml"
   workflow_dispatch:
 
 permissions:

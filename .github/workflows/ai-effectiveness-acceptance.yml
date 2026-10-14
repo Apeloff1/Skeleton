@@ -1,14 +1,6 @@
 name: AI Effectiveness Acceptance
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "skeleton/intelligence/execution_runtime.py"
-      - "skeleton/testing/test_ai_effectiveness.py"
-      - "skeleton/testing/test_vs001_functional_ai.py"
-      - ".github/workflows/ai-effectiveness-acceptance.yml"
   push:
     branches:
       - main

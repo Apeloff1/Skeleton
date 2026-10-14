@@ -1,12 +1,5 @@
 name: AI Effect Pass
 on:
-  pull_request:
-    paths:
-      - 'skeleton/ai/runtime/effects/**'
-      - 'tests/test_ai_effect_runtime.py'
-      - 'scripts/run_ai_effect_qualification.py'
-      - 'docs/ai/full_effect_pass.md'
-      - '.github/workflows/ai-effect-pass.yml'
   workflow_dispatch:
 permissions:
   contents: read

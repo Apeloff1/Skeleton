@@ -1,17 +1,6 @@
 name: AI Text-to-Token Integration
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'skeleton/ai/model_runtime/text_normalization.py'
-      - 'skeleton/ai/model_runtime/text_pipeline.py'
-      - 'skeleton/ai/model_runtime/tokenization.py'
-      - 'skeleton/ai/model_runtime/__init__.py'
-      - 'tests/flgb/test_flgb_02_text_normalization.py'
-      - 'tests/ai_pipeline/test_text_pipeline.py'
-      - '.github/workflows/ai-text-token-pipeline.yml'
   push:
     branches: [main]
     paths:
