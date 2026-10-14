@@ -1,7 +1,7 @@
 import asyncio, pytest
 from skeleton.inference import *
 from skeleton.inference.async_runtime import consume_provider_stream,StreamDeadlineExceeded,StreamBudgetExceeded
-from skeleton.providers.contract import ProviderDelta,ProviderDeltaKind
+from skeleton.providers.contract import ProviderDelta,ProviderDeltaKind,FinishReason
 H="a"*64
 def q(deadline=1000): return ModelRequest("op",H,"m","p",64,deadline)
 @pytest.mark.asyncio
@@ -16,7 +16,7 @@ async def test_cancellation_becomes_terminal_and_propagates():
 async def test_completed_stream_is_not_reclassified():
     s=InferenceSession(q())
     async def stream():
-        yield ProviderDelta(sequence=0,kind=ProviderDeltaKind.FINAL)
+        yield ProviderDelta(sequence=0,kind=ProviderDeltaKind.FINAL,finish_reason=FinishReason.COMPLETED)
         yield ProviderDelta(sequence=1,kind=ProviderDeltaKind.TEXT,text="late")
     out=await consume_provider_stream(s,stream())
     assert len(out)==1 and s._terminal=="final"
@@ -40,5 +40,5 @@ async def test_event_budget_stops_before_excess_provider_output():
 async def test_invalid_budget_rejected_before_stream_consumption():
     s=InferenceSession(q())
     async def stream():
-        yield ProviderDelta(sequence=0,kind=ProviderDeltaKind.FINAL)
+        yield ProviderDelta(sequence=0,kind=ProviderDeltaKind.FINAL,finish_reason=FinishReason.COMPLETED)
     with pytest.raises(InferenceContractError): await consume_provider_stream(s,stream(),max_events=0)
