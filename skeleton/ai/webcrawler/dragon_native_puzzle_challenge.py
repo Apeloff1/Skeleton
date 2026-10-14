@@ -82,6 +82,9 @@ static int challenge_selftest(void){
    if(!perform(solution[i]))return 43;
   if(!level_done()||native_puzzle_stars()!=3||
      native_puzzle_efficiency()!=100)return 44;
+  /* Exercise the scored gameplay contract in the native binary; this
+     also ensures the bonus function is never an unused C99 artifact. */
+  if(native_puzzle_bonus()!=1300)return 45;
   printf("PUZZLE_CHALLENGE_PASS level=%d stars=%d optimal=%d\n",
          level+1,native_puzzle_stars(),dragon_solution_length[level]);
  }

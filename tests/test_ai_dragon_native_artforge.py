@@ -186,7 +186,9 @@ def test_original_hero_animation_runs_on_real_controller_movement(target,expecte
     else:
         assert "PreviousPlayerX: ds 1" in source
         assert "PreviousPlayerY: ds 1" in source
-        assert "ld [OAM+2], a" in source
+        # OAM is an RGBDS reserved symbol; compiled source uses the
+        # explicitly namespaced output-register constant.
+        assert "ld [DRAGON_OAM+2], a" in source
         assert "ld a, 2\n.drawHeroFrame:" in source
     assert verify_source_release(make_source_release(project,approved)[0])["evidence"]=="source_generated"
 

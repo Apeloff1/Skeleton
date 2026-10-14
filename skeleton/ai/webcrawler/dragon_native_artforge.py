@@ -169,7 +169,7 @@ GB_PLATFORMER_OLD="""    ld hl,AnimationClock
 .normal:
     ld a,2
 .tile:
-    ld [OAM+2],a"""
+    ld [DRAGON_OAM+2],a"""
 
 GB_PLATFORMER_NEW="""    ld hl,AnimationClock
     inc [hl]
@@ -194,7 +194,7 @@ GB_PLATFORMER_NEW="""    ld hl,AnimationClock
 .heroInAir:
     ld a,6
 .heroTile:
-    ld [OAM+2],a
+    ld [DRAGON_OAM+2],a
     ld a,[PlayerWorldX]
     ld [PreviousWorldX],a"""
 
@@ -321,7 +321,11 @@ def verify_motion_source(source:str,*,target:str,style:str)->None:
     if style!="arcade_score_attack" or target not in TARGETS:
         return
     if target in ("game_boy","game_boy_color"):
-        if (GB_NEW_MOTION not in source or
+        # Final RGBDS-safe source consistently uses DRAGON_OAM, after the
+        # generator rewrites reserved identifiers. Demand the full original
+        # motion program, not merely a movement label or sprite presence.
+        compiled_motion=GB_NEW_MOTION.replace("[OAM+", "[DRAGON_OAM+")
+        if (compiled_motion not in source or
                 "PreviousPlayerX: ds 1" not in source or
                 "PreviousPlayerY: ds 1" not in source):
             raise ValueError("native GB motion-controlled animation source missing")
