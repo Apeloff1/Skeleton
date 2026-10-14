@@ -385,3 +385,30 @@ def test_malware_gate_preserves_per_push_evidence() -> None:
         in workflow
     )
     assert 'python scripts/check_malware_policy.py --base "$MALWARE_BASE"' in workflow
+
+
+
+def test_native_platform_pr_runs_preempt_only_obsolete_heads() -> None:
+    workflows = Path(__file__).resolve().parents[2] / ".github" / "workflows"
+    preemptible = (
+        "game-builder-native-sms.yml",
+        "game-builder-native-coleco.yml",
+        "game-builder-native-nes.yml",
+        "game-builder-native-msx1.yml",
+        "game-builder-native-vectrex.yml",
+        "game-builder-native-sms-cpu.yml",
+        "game-builder-native-coleco-cpu.yml",
+    )
+    for name in preemptible:
+        text = (workflows / name).read_text(encoding="utf-8")
+        assert "  pull_request:" in text, name
+        assert "  workflow_dispatch:" in text, name
+        assert "github.event.pull_request.number || github.ref" in text, name
+        assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in text, name
+        assert _scan(text, name) == [], name
+
+    # Expensive cross-target and Spectrum qualification deliberately preserve
+    # the currently running source evidence and coalesce only pending requests.
+    for name in ("game-builder-native-spectrum.yml", "game-builder-native-portfolio.yml"):
+        text = (workflows / name).read_text(encoding="utf-8")
+        assert "  cancel-in-progress: false" in text, name
