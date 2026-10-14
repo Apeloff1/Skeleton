@@ -5,32 +5,17 @@ name: Backend Quality
 
 on:
   push:
-    branches: [main, master]
+    # PR checks already validate application changes before merge. Keep a
+    # narrow post-merge self-check for security gate/policy modifications.
+    branches: [main]
     paths:
-      - ".emergent/cron/**"
+      - ".github/workflows/backend-quality.yml"
       - ".github/ci/security-exceptions.json"
-      - "backend/**"
-      - "skeleton/**"
-      - "frontend/**"
-      - "docs/ARCHITECTURE.md"
-      - "docs/CANONICAL_MODULE_BOUNDARIES.md"
-      - "docs/SECURITY_INCIDENT_RESPONSE.md"
-      - "scripts/check_architecture_boundaries.py"
-      - "scripts/check_provider_runtime_boundary.py"
-      - "scripts/check_context_execution_boundary.py"
-      - "scripts/check_instruction_policy_boundary.py"
-      - "scripts/check_quality_gate_parity.py"
-      - "scripts/check_repository_python_sast.py"
-      - "scripts/container_digest_refresh.py"
       - "scripts/quality-gates.sh"
-      - "tests/test_architecture_boundaries.py"
-      - "tests/test_provider_runtime_boundary.py"
-      - "tests/test_context_execution_boundary.py"
-      - "tests/test_instruction_policy_boundary.py"
-      - "backend/tests/test_conversation_governance.py"
-      - ".github/workflows/**"
-      - "!.github/workflows/branch-clean.yml"
+      - "scripts/check_repository_python_sast.py"
+      - "scripts/check_quality_gate_parity.py"
   pull_request:
+    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".emergent/cron/**"
@@ -56,6 +41,8 @@ on:
       - "backend/tests/test_conversation_governance.py"
       - ".github/workflows/**"
       - "!.github/workflows/branch-clean.yml"
+
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -3,10 +3,10 @@ name: Keep pull-request branches flowing
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '7,37 * * * *'
 
 # One trusted-base updater is enough. Main-push events intentionally do not
-# execute this write-capable workflow: the five-minute sweep catches behind
+# execute this write-capable workflow: the half-hour sweep catches behind
 # branches without turning every merge into up to four new CI fan-outs.
 concurrency:
   group: branch-flow-${{ github.repository }}

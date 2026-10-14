@@ -9,8 +9,8 @@ on:
       - "*"
       - "**"
   schedule:
-    # Avoid push-storm starvation: one durable cleanup sweep every five minutes.
-    - cron: '3-58/5 * * * *'
+    # Stagger branch pruning to twice hourly; workflow-run wakeups remain active.
+    - cron: '3,33 * * * *'
   push:
     branches: [main]
     # Immediate kick only when this maintenance workflow itself changes.

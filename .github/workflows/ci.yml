@@ -4,7 +4,7 @@
 name: CI/CD
 on:
   push:
-    branches: [main, develop]
+    branches: [develop]
     paths:
       - '**'
       - '!docs/**'
@@ -22,6 +22,8 @@ on:
       - '.github/workflows/ci.yml'
   workflow_dispatch:
 
+# PR and develop pushes keep CI; main instead uses the canonical Merge
+# Readiness aggregate plus independent security gates, avoiding duplicate CI.
 # Collapse superseded validation for the same PR so rapid pushes do not occupy
 # runner capacity with stale commits. Non-PR runs use a per-commit group so a
 # later main/develop push cannot replace an earlier pending commit.
