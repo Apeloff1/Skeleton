@@ -87,3 +87,49 @@ __all__ += [
     "RLEnvironmentSpec",
     "RLStepReceipt",
 ]
+
+
+# Reconcile the previously implemented P3 training adapters without importing
+# optional NumPy/native tooling whenever the training package is imported.
+# Attribute access loads only the requested authority-bound adapter.  Keeping
+# this out of __all__ preserves lightweight wildcard imports on small devices.
+_LAZY_EXPORTS = {
+    "learning_pipeline": frozenset({
+        "ExecutedCurriculumReceipt", "ExecutedEpisodeReceipt",
+        "ExecutedEvaluationReceipt", "LocalPolicyObservation",
+        "LocalPostTrainingPolicy", "PostTrainingExecutionError",
+        "PostTrainingExecutionSpec", "PostTrainingQualificationReceipt",
+        "PostTrainingRunner",
+    }),
+    "elastic_trainer": frozenset({"ElasticLocalTrainer", "ElasticTrainingArtifact"}),
+    "preference_trainer": frozenset({
+        "PreferenceLocalTrainer", "PreferencePair", "PreferenceTrainingArtifact",
+    }),
+    "neural_trainer": frozenset({"NeuralLocalTrainer", "NeuralTrainingArtifact"}),
+    "distributed_trainer": frozenset({
+        "LocalDataParallelTrainer", "LocalDataParallelArtifact",
+    }),
+    "observability": frozenset({
+        "TrainingObserver", "TrainingObservationReport", "TrainingObservationError",
+    }),
+    "checkpoint_archive": frozenset({
+        "TrainingCheckpointArchive", "CheckpointArchiveReceipt",
+        "CheckpointArchiveError", "CheckpointArchiveContents",
+    }),
+    "verifier": frozenset({
+        "EvaluationModelSource", "LocalVerifier", "MeasuredVerifierRunner",
+        "MeasuredVerifierReceipt", "MeasuredVerifierQualification",
+        "MeasuredVerifierError", "VerifierGatePolicy",
+    }),
+}
+
+
+def __getattr__(name: str):
+    for module_name, names in _LAZY_EXPORTS.items():
+        if name in names:
+            from importlib import import_module
+
+            value = getattr(import_module("." + module_name, __name__), name)
+            globals()[name] = value
+            return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
