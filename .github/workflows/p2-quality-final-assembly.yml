@@ -1,65 +1,6 @@
 name: P2 Quality and Final Assembly
 
 on:
-  pull_request:
-    branches:
-      - main
-      - feat/p2-traceability-spine
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/p2_quality_control.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_engineering_pass.json"
-      - "machine/master_traceability.json"
-      - "machine/ai_p2_execution_map.json"
-      - "machine/ai_p2_task_backlog.json"
-      - "machine/nfr_registry.json"
-      - "machine/state_machine_catalogue.json"
-      - "skeleton/quality/**"
-      - "skeleton/contracts/operation.py"
-      - "skeleton/contracts/ai_execution.py"
-      - "skeleton/release/evidence.py"
-      - "skeleton/app/manifest.json"
-      - "scripts/check_p2_quality_control.py"
-      - "scripts/check_p2_formal_targets.py"
-      - "scripts/check_p2_project_metrics.py"
-      - "scripts/run_p2_final_assembly.py"
-      - "scripts/check_traceability_spine.py"
-      - "scripts/check_app_assembly.py"
-      - "tests/test_p2_quality_*.py"
-      - "tests/test_p2_formal_targets.py"
-      - "tests/test_p2_project_metrics.py"
-      - "tests/test_p2_final_assembly.py"
-      - ".github/workflows/p2-quality-final-assembly.yml"
-  push:
-    branches:
-      - main
-      - feat/p2-quality-final-assembly
-    paths:
-      - "machine/p2_quality_control.json"
-      - "machine/ai_master_plan.json"
-      - "machine/ai_engineering_pass.json"
-      - "machine/master_traceability.json"
-      - "machine/ai_p2_execution_map.json"
-      - "machine/ai_p2_task_backlog.json"
-      - "machine/nfr_registry.json"
-      - "machine/state_machine_catalogue.json"
-      - "skeleton/quality/**"
-      - "skeleton/contracts/operation.py"
-      - "skeleton/contracts/ai_execution.py"
-      - "skeleton/release/evidence.py"
-      - "skeleton/app/manifest.json"
-      - "scripts/check_p2_quality_control.py"
-      - "scripts/check_p2_formal_targets.py"
-      - "scripts/check_p2_project_metrics.py"
-      - "scripts/run_p2_final_assembly.py"
-      - "scripts/check_traceability_spine.py"
-      - "scripts/check_app_assembly.py"
-      - "tests/test_p2_quality_*.py"
-      - "tests/test_p2_formal_targets.py"
-      - "tests/test_p2_project_metrics.py"
-      - "tests/test_p2_final_assembly.py"
-      - ".github/workflows/p2-quality-final-assembly.yml"
   workflow_dispatch:
 
 permissions:

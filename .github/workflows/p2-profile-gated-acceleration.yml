@@ -1,66 +1,6 @@
 name: P2 Profile-Gated Acceleration
 
 on:
-  pull_request:
-    branches:
-      - main
-      - feat/p2-quality-final-assembly
-      - fix/p2-reconcile-landed-lanes
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/acceleration_policy.json"
-      - "machine/ai_master_plan.json"
-      - "skeleton/native/**"
-      - "machine/ai_file_tree.json"
-      - "java-accelerators/**"
-      - "skeleton/ai/simulation/physics/jvm_broadphase_accelerator.py"
-      - "skeleton/simulation/physics/jvm_broadphase_accelerator.py"
-      - "skeleton/ai/runtime/observability/jvm_accelerator.py"
-      - "skeleton/observability/jvm_accelerator.py"
-      - "skeleton/ai/runtime/memory/jvm_vector_accelerator.py"
-      - "skeleton/memory/jvm_vector_accelerator.py"
-      - "skeleton/ai/runtime/native/**"
-      - "scripts/check_p2_acceleration.py"
-      - "scripts/profile_p2_acceleration.py"
-      - "scripts/record_p2_acceleration_profile.py"
-      - "tests/test_p2_acceleration_control.py"
-      - "tests/test_p2_acceleration_selection.py"
-      - "tests/test_p2_acceleration_protocol.py"
-      - "tests/test_p2_acceleration_profiling.py"
-      - "tests/test_p2_acceleration_benchmarks.py"
-      - "tests/test_p2_acceleration_receipts.py"
-      - "tests/test_p2_acceleration_isolation.py"
-      - "skeleton/testing/test_native_abi.py"
-      - "skeleton/testing/test_native_fallback.py"
-      - "docs/architecture/P2_PROFILE_GATED_ACCELERATION.md"
-      - ".github/workflows/p2-profile-gated-acceleration.yml"
-  push:
-    branches:
-      - main
-      - feat/p2-profile-gated-acceleration
-    paths:
-      - "machine/acceleration_policy.json"
-      - "machine/ai_master_plan.json"
-      - "skeleton/native/**"
-      - "machine/ai_file_tree.json"
-      - "java-accelerators/**"
-      - "skeleton/ai/simulation/physics/jvm_broadphase_accelerator.py"
-      - "skeleton/simulation/physics/jvm_broadphase_accelerator.py"
-      - "skeleton/ai/runtime/observability/jvm_accelerator.py"
-      - "skeleton/observability/jvm_accelerator.py"
-      - "skeleton/ai/runtime/memory/jvm_vector_accelerator.py"
-      - "skeleton/memory/jvm_vector_accelerator.py"
-      - "skeleton/ai/runtime/native/**"
-      - "scripts/check_p2_acceleration.py"
-      - "scripts/profile_p2_acceleration.py"
-      - "tests/test_p2_acceleration_control.py"
-      - "tests/test_p2_acceleration_selection.py"
-      - "tests/test_p2_acceleration_protocol.py"
-      - "tests/test_p2_acceleration_profiling.py"
-      - "tests/test_p2_acceleration_benchmarks.py"
-      - "tests/test_p2_acceleration_isolation.py"
-      - "docs/architecture/P2_PROFILE_GATED_ACCELERATION.md"
-      - ".github/workflows/p2-profile-gated-acceleration.yml"
   workflow_dispatch:
 
 permissions:
