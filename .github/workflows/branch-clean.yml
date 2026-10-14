@@ -413,11 +413,33 @@ jobs:
                 echo '::warning::Main was rewritten while pruning; stopping without further deletes.'
                 exit 0
               fi
-              batch_branches=("${safe_delete_branches[@]:offset:delete_batch_size}")
-              batch_tips=("${safe_delete_tips[@]:offset:delete_batch_size}")
+              # Open PRs can be created after classification. Re-read the
+              # authoritative head/base inventory before each destructive batch.
+              if ! load_open_pr_refs; then
+                echo '::warning::Could not revalidate open PRs before deletion batch; stopping safely.'
+                exit 0
+              fi
+              batch_branches=()
+              batch_tips=()
+              for ((i=offset; i<${#safe_delete_branches[@]} && i<offset+delete_batch_size; i++)); do
+                branch="${safe_delete_branches[$i]}"
+                tip="${safe_delete_tips[$i]}"
+                if [[ -n "${open_pr_heads[$branch]+x}" ]]; then
+                  late_open_pr_count=$((late_open_pr_count + 1))
+                  continue
+                fi
+                if [[ -n "${open_pr_bases[$branch]+x}" ]]; then
+                  late_open_pr_base_count=$((late_open_pr_base_count + 1))
+                  continue
+                fi
+                batch_branches+=("$branch")
+                batch_tips+=("$tip")
+              done
+              if (( ${#batch_branches[@]} == 0 )); then
+                continue
+              fi
               lease_args=()
               refspecs=()
-
               for ((i=0; i<${#batch_branches[@]}; i++)); do
                 branch="${batch_branches[$i]}"
                 tip="${batch_tips[$i]}"
@@ -430,12 +452,24 @@ jobs:
                 continue
               fi
 
-              # Isolate a moved or ruleset-protected ref instead of blocking the
-              # rest of the batch. The expected-tip lease prevents deleting a
-              # branch that received a new commit after classification.
+              # Atomic rejection may indicate a freshly opened PR, not just a
+              # moved tip. Refresh protection before falling back to per-ref
+              # expected-SHA leases; fail closed if the snapshot is missing.
+              if ! load_open_pr_refs; then
+                echo '::warning::Could not revalidate open PRs after atomic rejection; stopping safely.'
+                exit 0
+              fi
               for ((i=0; i<${#batch_branches[@]}; i++)); do
                 branch="${batch_branches[$i]}"
                 tip="${batch_tips[$i]}"
+                if [[ -n "${open_pr_heads[$branch]+x}" ]]; then
+                  late_open_pr_count=$((late_open_pr_count + 1))
+                  continue
+                fi
+                if [[ -n "${open_pr_bases[$branch]+x}" ]]; then
+                  late_open_pr_base_count=$((late_open_pr_base_count + 1))
+                  continue
+                fi
                 if git push --quiet "--force-with-lease=refs/heads/${branch}:${tip}" origin ":refs/heads/${branch}"; then
                   deleted=$((deleted + 1))
                 else
@@ -474,6 +508,7 @@ jobs:
               echo '- Unknown creation history preserves refs unless the exact mature merged-PR head is proven or the tip is a main ancestor committed at least seven days ago.'
               echo '- A DeleteEvent at or after the latest CreateEvent preserves the live ref as a delayed recreation.'
               echo '- Open PR heads and non-main open PR base branches are never cleanup candidates.'
+              echo '- Every deletion batch and per-ref fallback revalidates active PR head/base protection.'
               echo '- Failure to load PR refs, merged-PR evidence, or branch-event history produces zero deletions.'
               echo '- Every deletion uses an expected-tip lease.'
               if [[ -s ../preserved-branches.txt ]]; then
