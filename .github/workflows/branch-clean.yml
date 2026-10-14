@@ -5,9 +5,9 @@ on:
   workflow_run:
     workflows: ["Actions Housekeeping CLI"]
     types: [completed]
-    branches:
-      - "*"
-      - "**"
+    # Admit only default-branch housekeeping completions. Non-main sources
+    # were always skipped by the prune job but still created workflow runs.
+    branches: [main]
   schedule:
     # Bound full graph fetches to hourly; housekeeping completion and manual
     # recovery still wake this controller independently of the timer.
