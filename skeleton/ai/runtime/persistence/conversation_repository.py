@@ -8,6 +8,9 @@ branch lineage, and transcript reconstruction.
 
 from __future__ import annotations
 
+import base64
+import binascii
+
 from dataclasses import replace
 from datetime import datetime, timezone
 import json
@@ -15,7 +18,7 @@ from pathlib import Path
 import sqlite3
 import threading
 from typing import Iterable
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
@@ -44,6 +47,48 @@ class ConversationConflict(ConversationRepositoryError):
 
 class ConversationRepositoryCorruption(ConversationRepositoryError):
     """Persisted conversation state violates the canonical contract."""
+
+
+def conversation_search_text(value: str) -> str:
+    """Normalize a bounded literal title query; never interpret query syntax."""
+    if not isinstance(value, str) or len(value) > 200 or "\x00" in value:
+        raise ValueError("conversation search must contain at most 200 characters")
+    return value.strip()
+
+
+def conversation_data_class_rank(value: str) -> int:
+    return ("public", "internal", "confidential", "restricted").index(value)
+
+
+def encode_thread_cursor(updated_at: datetime, thread_id: str) -> str:
+    instant = _utc(updated_at)
+    if str(UUID(thread_id)) != thread_id:
+        raise ValueError("conversation cursor thread identity is invalid")
+    raw = json.dumps(
+        {"version": 1, "updated_at": instant.isoformat(), "thread_id": thread_id},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def decode_thread_cursor(value: str) -> tuple[datetime, str]:
+    if not isinstance(value, str) or not 1 <= len(value) <= 1024:
+        raise ValueError("conversation cursor is invalid")
+    try:
+        raw = base64.b64decode(value + "=" * (-len(value) % 4), altchars=b"-_", validate=True)
+        payload = json.loads(raw)
+        if set(payload) != {"version", "updated_at", "thread_id"} or type(payload["version"]) is not int:
+            raise ValueError("conversation cursor fields are invalid")
+        if payload["version"] != 1:
+            raise ValueError("conversation cursor version is invalid")
+        instant = _utc(datetime.fromisoformat(payload["updated_at"]))
+        thread_id = payload["thread_id"]
+        if encode_thread_cursor(instant, thread_id) != value:
+            raise ValueError("conversation cursor is not canonical")
+        return instant, thread_id
+    except (ValueError, TypeError, KeyError, AttributeError, binascii.Error, UnicodeDecodeError) as exc:
+        raise ValueError("conversation cursor is invalid") from exc
 
 
 def _utc(value: datetime | None = None) -> datetime:

@@ -1,5 +1,5 @@
 # Dragon research supervisor — queue-aware, idle-only dispatcher
-**Implemented:** 2026-10-12 UTC  
+**Implemented:** 2026-10-12 UTC
 **Scope:** Dragon PR #3605, 248 curated candidate sources and canonical policy-stage admission.
 
 ## Milestone outcome

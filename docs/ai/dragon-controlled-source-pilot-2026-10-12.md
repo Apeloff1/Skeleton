@@ -1,5 +1,5 @@
 # Dragon controlled source-acquisition pilot
-**Implementation:** 2026-10-12 UTC  
+**Implementation:** 2026-10-12 UTC
 **Depends on:** Source Capture Permission Authority and the existing signed nest, resource scheduler, 248-source atlas, policy/capture ledgers, and Glean Matrix.
 
 ## Milestone

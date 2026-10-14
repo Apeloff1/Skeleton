@@ -1,6 +1,6 @@
 # Dragon research — signed crash recovery, health observability and exact Python gate
 
-**Authored:** 2026-10-12 UTC  
+**Authored:** 2026-10-12 UTC
 **Feature branch:** `feat/dragon-wisdom-review-20261010` / PR #3605.
 
 ## Milestone 1: Independent signed worker-stop evidence

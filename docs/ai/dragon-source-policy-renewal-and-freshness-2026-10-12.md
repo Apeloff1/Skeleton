@@ -1,5 +1,5 @@
 # Dragon source policy renewal and freshness ledger
-**Authored:** 2026-10-12 UTC  
+**Authored:** 2026-10-12 UTC
 **Target:** PR #3605, existing 248 technical-source candidates.
 
 ## Milestone A — Explicit acquisition-policy renewal
