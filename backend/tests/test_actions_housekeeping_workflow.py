@@ -81,3 +81,19 @@ def test_housekeeping_inventory_fails_closed_at_installation_rate_limit() -> Non
     assert "Skipping cache cleanup under GitHub API rate pressure." in text
     assert "Skipping artifact deletion under GitHub API rate pressure." in text
     assert "Skipping old-run deletion under GitHub API rate pressure." in text
+
+
+def test_old_run_cleanup_has_single_well_formed_loop_and_summary() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    step = text.split("      - name: Prune stale unsuccessful workflow runs\n", 1)[1]
+
+    # Regression: a split IFS token and duplicated summary previously left
+    # this workflow's destructive cleanup shell invalid.
+    assert "while IFS=$'\\t' read -r id created conclusion name; do" in step
+    assert "while IFS=\n" not in step
+    assert step.count('done < "$inventory"') == 1
+    assert step.count("Old unsuccessful runs deleted:") == 1
+    assert step.count("rate_limited=false") == 1
+    assert step.count('[[ "$id" != "$GITHUB_RUN_ID" ]]') == 1
+    assert step.count('gh run delete "$id" --repo "$REPO"') == 1
+    assert step.count("created_epoch >= cutoff || deleted >= MAX_RUN_DELETES") == 1
