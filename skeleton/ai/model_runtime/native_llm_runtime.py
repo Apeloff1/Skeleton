@@ -650,10 +650,19 @@ class NativeLLMRuntime:
         )
 
         def assert_binding() -> None:
+            # Identify mutable tokenizer drift before the aggregate binding
+            # comparison. Both are fatal; the specific error is important to
+            # distinguish vocabulary identity tampering from other runtime drift.
+            try:
+                self.tokenizer.assert_unchanged()
+            except TokenizerContractError as exc:
+                raise RuntimeContractError("tokenizer mutated during generation") from exc
             if admitted_binding != (
                 self.model_digest, self.tokenizer.digest, self.architecture.digest,
                 self.device.digest, self.device_policy, self.limits,
             ):
+                if self.tokenizer.digest != admitted_binding[1]:
+                    raise RuntimeContractError("tokenizer mutated during generation")
                 raise RuntimeContractError("runtime binding changed during generation")
 
         config_digest = self._config_digest(config)
