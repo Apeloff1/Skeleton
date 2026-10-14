@@ -1290,19 +1290,49 @@ async def ai_chat(
             thread_id=request.thread_id, tenant_id=tenant_id, owner_id=owner_id,
             attachment_refs=request.attachment_refs, created_at=user_message.created_at,
         ) if request.attachment_refs else None
+        context_envelope = _compile_chat_context(
+            thread=thread,
+            transcript=transcript,
+            user_message=user_message,
+            tenant_id=tenant_id,
+            operation_id=operation_id,
+            execution_id=execution_id,
+            request_context=request.context,
+            budget=selected_budget,
+            attachment_segments=() if admitted_files is None else admitted_files.segments,
+        )
+        # Source material is not admitted merely because a URI was accepted.
+        # Every attachment must survive the actual budgeted compiler selection.
+        if admitted_files is not None:
+            included = {
+                segment.segment_id for segment in context_envelope.selected_segments
+            }
+            if any(segment.segment_id not in included for segment in admitted_files.segments):
+                raise ChatAttachmentError(
+                    "Attachment text does not fit the selected model context", 413
+                )
     except ChatAttachmentError as exc:
+        # The canonical user message already committed. Terminalize the turn
+        # rather than indefinitely blocking new turns behind a vanished source.
+        try:
+            await chat_turn_lifecycle.fail(
+                chat_turn, tenant_id=tenant_id, owner_id=owner_id,
+                reason_code="attachment_context_unavailable",
+            )
+            current_thread = await conversation_authority.get_thread(
+                request.thread_id, tenant_id=tenant_id, owner_id=owner_id,
+            )
+            await _commit_chat_terminal_marker(
+                thread=current_thread, user_message=user_message,
+                tenant_id=tenant_id, owner_id=owner_id,
+                operation_id=operation_id, execution_id=execution_id,
+                terminal_state="failed", failure_code="attachment_context_unavailable",
+            )
+        except Exception:
+            logger.exception(
+                "failed to close rejected attachment turn operation=%s", operation_id
+            )
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-    context_envelope = _compile_chat_context(
-        thread=thread,
-        transcript=transcript,
-        user_message=user_message,
-        tenant_id=tenant_id,
-        operation_id=operation_id,
-        execution_id=execution_id,
-        request_context=request.context,
-        budget=selected_budget,
-        attachment_segments=() if admitted_files is None else admitted_files.segments,
-    )
     try:
         chat_turn = await chat_turn_lifecycle.advance(
             chat_turn,
