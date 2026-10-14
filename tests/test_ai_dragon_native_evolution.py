@@ -66,7 +66,9 @@ def test_game_evolution_admission_guards_unbounded_jobs(options):
 def test_original_edition_does_not_build_without_publication_approval(tmp_path):
     with pytest.raises(PermissionError):
         build_evolution_series(series(),tmp_path,authorized=False)
-    assert not tmp_path.exists()
+    # pytest's tmp_path directory already exists; verify no release files
+    # were created instead of asserting its impossible nonexistence.
+    assert not any(tmp_path.iterdir())
 
 
 def test_game_evolution_real_source_archives_chained_adaptation_and_replay(tmp_path):
@@ -144,7 +146,9 @@ def test_original_evolution_preview_does_not_publish_artifacts(tmp_path):
     item=series(targets=("game_boy","ps5"))
     planned=build_evolution_series(item,tmp_path,authorized=True,dry_run=True)
     assert planned["status"]=="blocked"
-    assert not tmp_path.exists()
+    # pytest's tmp_path directory already exists; verify no release files
+    # were created instead of asserting its impossible nonexistence.
+    assert not any(tmp_path.iterdir())
 
 
 def test_original_game_series_refuses_external_unreviewed_rights_documentation():

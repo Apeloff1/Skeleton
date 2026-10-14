@@ -81,6 +81,11 @@ def test_sparse_isolated_native_release_has_no_monorepo_imports(tmp_path):
     # native generator's campaign, curation and hint imports are relative.
     for sibling in sorted(source_dir.glob("dragon_native_*.py")):
         shutil.copyfile(sibling,isolated/sibling.name)
+    # Native pixel rendering has one small, original self-contained asset
+    # dependency outside the dragon_native_* namespace. Include exactly it,
+    # not the whole monorepo/package initializer.
+    shutil.copyfile(source_dir/"dragon_retro_assets.py",
+                    isolated/"dragon_retro_assets.py")
     assert not (isolated/"__init__.py").exists()
     assert (isolated/"dragon_native_puzzle.py").is_file()
     cli=subprocess.run(

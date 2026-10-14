@@ -23,7 +23,14 @@ def test_native_c_game_embeds_bounded_sokoban_shortest_solver():
     assert "--hint-selftest" in runtime
     assert "Restart to view canonical opening move" not in runtime
     from skeleton.ai.webcrawler.dragon_native_puzzle_trace import enable_native_trace
-    assert runtime==enable_native_trace(enable_live_hints(C_SOURCE))
+    from skeleton.ai.webcrawler.dragon_native_puzzle_challenge import enable_native_challenge
+    from skeleton.ai.webcrawler.dragon_native_puzzle_save import enable_native_save
+    from skeleton.ai.webcrawler.dragon_native_campaign_runtime import enable_native_branches
+    # Preserve every independently owned runtime layer: shortest hints,
+    # state tracing, graded challenge, verified saves, and campaign branching.
+    expected=enable_native_branches(enable_native_save(
+        enable_native_challenge(enable_native_trace(enable_live_hints(C_SOURCE)))))
+    assert runtime==expected
     assert generated==emit_native_puzzle(seed=17,stages=5,difficulty=6)
 
 def test_hint_insertion_refuses_changed_or_incomplete_native_runtime():
