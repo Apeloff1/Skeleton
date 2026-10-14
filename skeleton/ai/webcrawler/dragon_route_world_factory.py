@@ -15,7 +15,7 @@ import json
 
 from .dragon_route_world import (
     Place,Traverse,World,Traveller,plan,portfolio,validate_world,
-    SCHEMA,MAX_EDGES,
+    SCHEMA,MAX_EDGES,MAX_MINUTES,
 )
 from .dragon_route_taxonomy import MODES
 
