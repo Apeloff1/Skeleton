@@ -1,26 +1,6 @@
 name: AI Chat Evidence Citation Closure
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/verification/**"
-      - "skeleton/ai/assistant/evidence.py"
-      - "skeleton/ai/assistant/response_acceptance.py"
-      - "skeleton/ai/assistant/__init__.py"
-      - "skeleton/testing/test_ai_chat_evidence_citations.py"
-      - "skeleton/testing/test_ai_chat_response_acceptance.py"
-      - "backend/core/claim_identity.py"
-      - "backend/core/citation_integrity.py"
-      - "backend/tests/test_claim_identity_citation_calibration.py"
-      - "backend/tests/test_citation_structural_laundering.py"
-      - "backend/tests/test_citation_gate_adversarial.py"
-      - "backend/tests/test_verification_facade_parity.py"
-      - "machine/ai_chat_evidence_citations.json"
-      - "scripts/check_ai_chat_evidence_citations.py"
-      - "scripts/verify_ai_chat_evidence_citations.py"
-      - "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
-      - ".github/workflows/ai-chat-evidence-citations.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,17 +1,6 @@
 name: AI Chat Model Routing Closure
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "backend/core/model_router.py"
-      - "backend/tests/test_model_router.py"
-      - "skeleton/ai/compat/backend_core/model_router.py"
-      - "machine/ai_chat_model_routing.json"
-      - "scripts/check_ai_chat_model_routing.py"
-      - "scripts/verify_ai_chat_model_routing.py"
-      - "docs/plan/AI_CHAT_MASTERPLAN_2026-10-06.md"
-      - ".github/workflows/ai-chat-model-routing-closure.yml"
   workflow_dispatch:
 
 permissions:
