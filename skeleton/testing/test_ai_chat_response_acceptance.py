@@ -533,8 +533,12 @@ def test_live_gate_rejects_present_but_rejected_claim_evidence() -> None:
 
 
 def test_live_claim_binding_is_content_minimized() -> None:
-    binding = live_claim_binding()
-    encoded = str(binding.as_dict())
+    operation_id = "44444444-4444-4444-8444-444444444444"
+    binding = live_claim_binding(operation_id=operation_id)
+    payload = binding.as_dict()
+    assert payload["operation_id"] == operation_id
+    assert binding.accepted is True
+    encoded = str(payload)
     assert "System A decreases latency by 10 percent." not in encoded
     assert CLAIM_ID not in encoded
     assert binding.authority_scope == "live-claim-evidence-binding-only"

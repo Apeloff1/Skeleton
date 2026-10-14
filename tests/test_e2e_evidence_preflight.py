@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "scripts/e2e_evidence.py"
@@ -89,19 +90,21 @@ class TestPreE2EEvidence(unittest.TestCase):
             self.assertTrue(any(x["kind"] == "missing-shard"
                                 for x in receipt["issues"]))
 
-    def test_aggregate_requires_one_head_and_five_passing_shards(self):
+    def test_aggregate_requires_one_head_and_all_manifest_shards(self):
         with tempfile.TemporaryDirectory() as directory:
             artifacts = Path(directory) / "shards"
             artifacts.mkdir()
-            expected = ("stage7-engine", "stage7-cross-service",
-                        "stage7-browser", "frontend-product", "backend-local-ai-chat")
+            expected = [s["id"] for s in load_runner().load_manifest(ROOT / "machine/e2e_suites.json")
+                        if s["tier"] == "offline"]
             for suite in expected:
                 folder = artifacts / ("e2e-" + suite)
                 folder.mkdir()
                 (folder / "report.json").write_text(json.dumps({
                     "schema": "skeleton.e2e.evidence.v1", "mode": "offline-e2e",
                     "head_sha": "a" * 40, "run_id": "fixture",
-                    "suites": [{"id": suite, "status": "passed", "duration_seconds": 1}]
+                    "status": "passed", "issues_count": 0, "executed_suites": 1,
+                    "suites": [{"id": suite, "status": "passed", "duration_seconds": 1,
+                                "exit_code": 0, "timed_out": False}]
                 }))
                 (folder / "issues.json").write_text(json.dumps({
                     "schema": "skeleton.e2e.issues.v1", "issues": []
@@ -116,6 +119,76 @@ class TestPreE2EEvidence(unittest.TestCase):
             receipt = json.loads((output / "aggregate.json").read_text())
             self.assertTrue(receipt["passed"])
             self.assertEqual(receipt["exact_head"], "a" * 40)
+            first = artifacts / ("e2e-" + expected[0]) / "report.json"
+            original = first.read_text()
+            for change in ("missing-head", "nonzero-exit", "timeout", "report-failed", "bad-count"):
+                with self.subTest(change=change):
+                    payload = json.loads(original)
+                    if change == "missing-head":
+                        del payload["head_sha"]
+                    elif change == "nonzero-exit":
+                        payload["suites"][0]["exit_code"] = 1
+                    elif change == "timeout":
+                        payload["suites"][0]["timed_out"] = True
+                    elif change == "report-failed":
+                        payload["status"] = "failed"
+                    else:
+                        payload["issues_count"] = 1
+                    first.write_text(json.dumps(payload))
+                    completed = subprocess.run(
+                        [sys.executable, str(ROOT / "scripts/e2e_merge_evidence.py"),
+                         "--artifacts", str(artifacts), "--output-dir", str(output)],
+                        cwd=ROOT, capture_output=True, timeout=25)
+                    self.assertEqual(completed.returncode, 1)
+                    self.assertFalse(json.loads((output / "aggregate.json").read_text())["passed"])
+
+    def test_offline_default_excludes_live_and_nonpytest_python_runs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "manifest.json"
+            suites = [{"id": tier, "tier": tier, "cwd": ".", "required_files": [],
+                       "timeout_seconds": 5, "command": ["python", "-c", "print('fixture completed')"]}
+                      for tier in ("offline", "live")]
+            manifest.write_text(json.dumps({"version": 1, "suites": suites}))
+            command = [sys.executable, str(RUNNER), "--mode", "offline-e2e",
+                       "--manifest", str(manifest)]
+            completed = subprocess.run(command + ["--output-dir", str(root / "default")],
+                                       cwd=ROOT, capture_output=True, timeout=25)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            report = json.loads((root / "default/report.json").read_text())
+            self.assertEqual([s["id"] for s in report["suites"]], ["offline"])
+            rejected = subprocess.run(command + ["--suite", "offline", "--suite", "live",
+                                     "--output-dir", str(root / "rejected")],
+                                      cwd=ROOT, capture_output=True, timeout=25)
+            self.assertEqual(rejected.returncode, 2)
+            self.assertFalse((root / "rejected/logs").exists())
+
+    def test_empty_and_skipped_junit_are_unverified(self):
+        runner = load_runner()
+        for body, kind in (("<testsuite/>", "empty-junit"),
+                           ('<testsuite><testcase name="playtest"><skipped message="missing engine"/></testcase></testsuite>',
+                            "unverified-test")):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory)
+                recorder = runner.Recorder(output, lambda value: value)
+                raw = output / "raw.xml"
+                raw.write_text(body)
+                self.assertEqual(runner.parse_junit(raw, "fixture", recorder), 1)
+                self.assertEqual(recorder.issues[0]["kind"], kind)
+                recorder.finish("offline-e2e")
+
+    def test_confirmed_syntax_error_blocks_static_preflight(self):
+        spec = importlib.util.spec_from_file_location("e2e_advanced", ADVANCED)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "backend/tests").mkdir(parents=True)
+            (root / "backend/tests/live_service_tests.json").write_text('{"tests": []}')
+            (root / "test_broken.py").write_text('def test_broken(:\n    pass\n')
+            with patch.object(module, "ROOT", root), patch.object(module, "tracked", return_value=["test_broken.py"]), \
+                    patch.object(sys, "argv", [str(ADVANCED), "--output-dir", str(root / "out")]):
+                self.assertEqual(module.main(), 2)
 
 if __name__ == "__main__":
     unittest.main()

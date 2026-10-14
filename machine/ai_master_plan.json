@@ -4246,7 +4246,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Represent roots, capabilities, contracts, ownership and construction status in validated manifests.",
         "Version manifest schemas and reject unknown/ambiguous references.",
@@ -4289,7 +4289,7 @@
         "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
       ],
       "accountability_id": "ACC-VOL-054",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-041-080",
@@ -10563,7 +10563,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Simulation cannot grant real authority or execute external side effects.",
         "Compare allow/deny/abstain deltas and affected populations/workloads."
@@ -10600,7 +10600,7 @@
         "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-166",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -10614,7 +10614,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Map threats to concrete components and controls.",
         "Review threat model when authority/data/network boundaries change."
@@ -10654,7 +10654,7 @@
         "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-167",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -10731,7 +10731,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Every privileged crossing needs authenticated identity and explicit authorization.",
         "Boundary failures must degrade closed without widening access."
@@ -10771,7 +10771,7 @@
         "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-169",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -10896,7 +10896,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Default deny unapproved destinations for privileged sandboxes/tools.",
         "Resolve DNS/rebinding and redirect behavior within policy."
@@ -10940,7 +10940,7 @@
         "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-172",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -10954,7 +10954,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Secrets are referenced by handles/scopes rather than copied into general state.",
         "Detect and redact accidental secret propagation."
@@ -10994,7 +10994,7 @@
         "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-173",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11008,7 +11008,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Separate key material from metadata/identifiers.",
         "Design rotation and restore so old data/evidence remains verifiable where required."
@@ -11047,7 +11047,7 @@
         "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-174",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11061,7 +11061,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Attach tenant scope before lookup/ranking/execution.",
         "Test cross-tenant negative access paths continuously."
@@ -11101,7 +11101,7 @@
         "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-175",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11115,7 +11115,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Propagate privacy labels into derived data and artifacts.",
         "Block incompatible processing/export based on policy and jurisdictional scope."
@@ -11152,7 +11152,7 @@
         "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-176",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11166,7 +11166,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Track deletion scope through replicas, indexes, caches, artifacts and backups.",
         "Prevent restore/rebuild from resurrecting deleted data."
@@ -11208,7 +11208,7 @@
         "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-177",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11222,7 +11222,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Bind SBOM to exact build artifact digest.",
         "Include direct/transitive/native/container components."
@@ -11259,7 +11259,7 @@
         "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-178",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11321,7 +11321,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Specify SLI, target, window and excluded conditions explicitly.",
         "Use SLOs to drive operations and capacity rather than decorative dashboards."
@@ -11359,7 +11359,7 @@
         "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-180",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11373,7 +11373,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Calculate budgets from authoritative SLI data and declared windows.",
         "Prevent budget override from silently disabling safety/reliability gates."
@@ -11411,7 +11411,7 @@
         "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-181",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11425,7 +11425,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Declare allowed label sets and high-cardinality exceptions.",
         "Reject secrets/user content as uncontrolled telemetry dimensions."
@@ -11463,7 +11463,7 @@
         "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-182",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11477,7 +11477,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Use stable operation/correlation identity across process boundaries.",
         "Record causal links without making telemetry authoritative state."
@@ -11515,7 +11515,7 @@
         "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-183",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11529,7 +11529,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Profile before optimization and retain workload/environment identity.",
         "Separate steady-state, startup and tail-path costs."
@@ -11567,7 +11567,7 @@
         "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-184",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11581,7 +11581,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Set percentile budgets per operation class and environment.",
         "Expose budget exhaustion/degradation rather than hiding latency with retries."
@@ -11619,7 +11619,7 @@
         "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-185",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11633,7 +11633,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Reserve/charge/refund costs using durable accounting semantics.",
         "Budget exhaustion may reduce capability only through declared safe fallback."
@@ -11671,7 +11671,7 @@
         "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-186",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",
@@ -11685,7 +11685,7 @@
       "status": "specified",
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "requirements": [
         "Use hardware/workload-normalized measurements.",
         "Require quality/reliability equivalence for efficiency claims."
@@ -11723,7 +11723,7 @@
         "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
       ],
       "accountability_id": "ACC-VOL-187",
-      "completion_checkbox": false,
+      "completion_checkbox": true,
       "completion_checkbox_mark": "[ ]",
       "signing_required": true,
       "depth_pass": "DP-161-200",

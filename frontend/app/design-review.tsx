@@ -16,7 +16,9 @@ import type { DesignFocus, DesignReview } from '../src/product/designReview';
 export default function DesignReviewRoute() {
   const router=useRouter();
   const params=useLocalSearchParams<{game?:string|string[]}>();
-  const gameId=validProjectId(Array.isArray(params.game)?params.game[0]:params.game);
+  const [hydrated,setHydrated]=React.useState(false);
+  React.useEffect(()=>{setHydrated(true);},[]);
+  const gameId=hydrated?validProjectId(Array.isArray(params.game)?params.game[0]:params.game):'';
   const [kb,setKb]=React.useState<unknown>(null);
   const [sourceState,setSourceState]=React.useState<'loading'|'ready'|'error'>('loading');
   const [focus,setFocus]=React.useState<DesignFocus>('gameplay');

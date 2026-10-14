@@ -6,7 +6,7 @@
   "source_pins": {
     "master_plan": {
       "path": "machine/ai_master_plan.json",
-      "git_blob_sha": "1eac3bd5aa251c72e864c4f0ae3e3d5625ee9682"
+      "git_blob_sha": "9b9a758c300d378fa22fcb5de3beac9afa1eefa9"
     },
     "advanced_ladder": {
       "path": "machine/advanced_ai_structure_100.json",
@@ -14,11 +14,11 @@
     },
     "accountability_index": {
       "path": "machine/ai_masterplan_parse_index.json",
-      "git_blob_sha": "bba4a05e16ec082481486af3691ff63091b4dc18"
+      "git_blob_sha": "4cc8ec8fb8fc23eb0c197da30c552e69d0c37454"
     },
     "accountability": {
       "path": "machine/ai_build_accountability.json",
-      "git_blob_sha": "17813f9acb6ad5f8faea3f3232930fff7e5e339b"
+      "git_blob_sha": "eb7e52f8291ff4217afc76c793ef74d51ec41534"
     }
   },
   "invariants": [
@@ -769,7 +769,8 @@
             "skeleton/ai/runtime/distributed/network/remote_execution.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_remote_execution_protocol.py"
+            "skeleton/testing/test_remote_execution_protocol.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Model partitions, ordering, leases/fencing, clocks, idempotency and consistency choices explicitly.",
@@ -785,7 +786,8 @@
             "skeleton/ai/runtime/distributed/network/model_placement.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_model_placement.py"
+            "skeleton/testing/test_model_placement.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Inventory CPU/GPU/RAM/VRAM/storage/network/NUMA/interconnect resources with freshness.",
@@ -1131,7 +1133,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_installer_lifecycle.py"
+            "skeleton/testing/test_installer_lifecycle.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Verify package provenance and integrity before mutation.",
@@ -1164,7 +1167,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_installer_lifecycle.py"
+            "skeleton/testing/test_installer_lifecycle.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Diagnose before repair and preserve evidence of detected faults.",
@@ -1205,7 +1209,8 @@
             "skeleton/release/lifecycle.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_installer_lifecycle.py"
+            "skeleton/testing/test_installer_lifecycle.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Classify every installed artifact as removable, shared, retained or user-owned.",
@@ -1424,7 +1429,8 @@
             ".github/workflows"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_release_qualification.py"
+            "skeleton/testing/test_release_qualification.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Bind artifacts to exact source/config/dependency/build identities.",
@@ -1440,7 +1446,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_migration_rollback_compatibility.py"
+            "skeleton/testing/test_migration_rollback_compatibility.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Model deployment as explicit staged state transitions.",
@@ -1456,7 +1463,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_migration_rollback_compatibility.py"
+            "skeleton/testing/test_migration_rollback_compatibility.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Version environment declarations and dependency locks.",
@@ -1472,7 +1480,8 @@
             "backend"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_migration_rollback_compatibility.py"
+            "skeleton/testing/test_migration_rollback_compatibility.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Define explicit precedence across defaults/file/env/remote/user scopes.",
@@ -1547,7 +1556,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_disaster_recovery_qualification.py"
+            "skeleton/testing/test_disaster_recovery_qualification.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Define incident severity, roles, escalation and communication paths.",
@@ -1563,7 +1573,8 @@
             "skeleton"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_capacity_qualification.py"
+            "skeleton/testing/test_capacity_qualification.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Define representative workloads and percentile/resource metrics.",
@@ -1579,7 +1590,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_capacity_qualification.py"
+            "skeleton/testing/test_capacity_qualification.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Model CPU/GPU/RAM/VRAM/storage/network and concurrency limits explicitly.",
@@ -1595,7 +1607,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_budget_accounting_ledger.py"
+            "skeleton/testing/test_budget_accounting_ledger.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Record cost units with operation/tenant/capability provenance.",
@@ -1636,7 +1649,8 @@
             "skeleton/ai/evaluation/quality_vector.py"
           ],
           "acceptance_tests": [
-            "tests/test_vol070_quality_vector.py"
+            "tests/test_vol070_quality_vector.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Define task-relevant dimensions such as correctness, groundedness, safety, latency, cost and robustness.",
@@ -1652,7 +1666,8 @@
             "machine/ai_domain_registry.json"
           ],
           "acceptance_tests": [
-            "tests/test_vol071_specialized_intelligence.py"
+            "tests/test_vol071_specialized_intelligence.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Declare domain scope, required sources/tools and forbidden assumptions.",
@@ -1668,7 +1683,8 @@
             "skeleton/ai/agents/jeeves/evidence_response.py"
           ],
           "acceptance_tests": [
-            "tests/test_vol072_jeeves_domain.py"
+            "tests/test_vol072_jeeves_domain.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Keep Jeeves orchestration under canonical runtime, memory, retrieval, tool and evidence contracts.",
@@ -1742,7 +1758,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_release_qualification.py"
+            "skeleton/testing/test_release_qualification.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Give every artifact stable identity, version, media type, provenance and producer operation.",
@@ -1758,7 +1775,8 @@
             "skeleton/release/qualification.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_release_qualification.py"
+            "skeleton/testing/test_release_qualification.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Use explicit digest algorithm/version and canonical byte semantics.",
@@ -1867,7 +1885,8 @@
             "skeleton/contracts/formal_targets.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vol081_formal_methods.py"
+            "skeleton/testing/test_vol081_formal_methods.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Select formal-method targets by consequence and ambiguity rather than prestige.",
@@ -2082,7 +2101,8 @@
             "skeleton/observability/__init__.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vol091_runbooks.py"
+            "skeleton/testing/test_vol091_runbooks.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Write runbooks against named signals, commands, authority and rollback points.",
@@ -2098,7 +2118,8 @@
             "skeleton/repo_machine/__init__.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vol092_repository_maintenance.py"
+            "skeleton/testing/test_vol092_repository_maintenance.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Classify maintenance actions by risk and require bounded automated mutation.",
@@ -2114,7 +2135,8 @@
             "machine/repository_engineering_control.json"
           ],
           "acceptance_tests": [
-            "tests/test_p2_repository_engineering.py"
+            "tests/test_p2_repository_engineering.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Give backlog items stable IDs, source rationale, owner, dependency and closure rule.",
@@ -2169,7 +2191,8 @@
             "skeleton/automation/work_packages.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_work_package_integrity.py"
+            "skeleton/testing/test_work_package_integrity.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Require objective, non-goals, dependencies, interfaces, state owners, risks, tests and rollback in each package.",
@@ -2200,7 +2223,8 @@
             "backend"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vs001_transaction_contract.py"
+            "skeleton/testing/test_vs001_transaction_contract.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Start from durable conversation and explicit user objective.",
@@ -2216,7 +2240,8 @@
             "skeleton/repo_intelligence"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vs002_mutation_custody.py"
+            "skeleton/testing/test_vs002_mutation_custody.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Use repository graph and explicit task objective to produce a bounded change plan.",
@@ -2231,7 +2256,8 @@
             "skeleton/ai/research.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vs003_scientific_research_contracts.py"
+            "skeleton/testing/test_vs003_scientific_research_contracts.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Capture source identity, method, claim scope and limitations before synthesis.",
@@ -2272,7 +2298,8 @@
             "skeleton/ai/build"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vs004_coordination_contracts.py"
+            "skeleton/testing/test_vs004_coordination_contracts.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Assign explicit roles, scopes, leases and handoff packets to each agent.",
@@ -2288,7 +2315,8 @@
             "skeleton/learning"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vs005_promotion_control.py"
+            "skeleton/testing/test_vs005_promotion_control.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Generate candidates only in isolated experiment scope.",
@@ -2304,7 +2332,8 @@
             "skeleton/network"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vs006_distributed_reconciliation.py"
+            "skeleton/testing/test_vs006_distributed_reconciliation.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Distribute only work with explicit identity, lease/fencing and idempotency semantics.",
@@ -2320,7 +2349,8 @@
             "skeleton/app/installer.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vs007_release_continuity.py"
+            "skeleton/testing/test_vs007_release_continuity.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Install from signed release artifact on clean supported environment.",
@@ -2376,7 +2406,8 @@
             "skeleton/eval/autonomy_acceptance.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_autonomous_worker_acceptance.py"
+            "skeleton/testing/test_autonomous_worker_acceptance.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Require bounded objectives, budgets, checkpoints, human override and durable recovery.",
@@ -2391,7 +2422,8 @@
             "skeleton/eval/research_acceptance.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_research_system_acceptance.py"
+            "skeleton/testing/test_research_system_acceptance.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Require source provenance, claim/evidence scope, contradiction handling and reproducibility records.",
@@ -2406,7 +2438,8 @@
             "skeleton/eval/sota_qualification.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_sota_candidate_claims.py"
+            "skeleton/testing/test_sota_candidate_claims.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Require credible baselines, reproducibility, contamination analysis and statistical support.",
@@ -2421,7 +2454,8 @@
             "skeleton/eval/antipatterns.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_anti_pattern_registry.py"
+            "skeleton/testing/test_anti_pattern_registry.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Tie each anti-pattern to concrete failure history, detection and preferred alternative.",
@@ -2461,7 +2495,8 @@
             "skeleton/automation/build_order.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_build_order.py"
+            "skeleton/testing/test_build_order.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Represent hard dependencies, soft overlap and stop conditions explicitly.",
@@ -2493,7 +2528,8 @@
             "skeleton/automation/construction_packet.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_construction_packet_format.py"
+            "skeleton/testing/test_construction_packet_format.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Require objectives, non-goals, dependencies, interfaces, authority, state, failure, tests, rollback and evidence sections.",
@@ -2509,7 +2545,8 @@
             "skeleton/automation/traceability.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_master_traceability.py"
+            "skeleton/testing/test_master_traceability.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Give every traceable node stable identity and typed edges.",
@@ -2550,7 +2587,8 @@
             "skeleton/ai/__init__.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_capability_map.py"
+            "skeleton/testing/test_capability_map.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Give capabilities stable IDs, owners, maturity and dependency metadata.",
@@ -2566,7 +2604,8 @@
             "skeleton/automation/technology_radar.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_technology_radar.py"
+            "skeleton/testing/test_technology_radar.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Record candidate purpose, baseline, risks, owner, budget and decision horizon.",
@@ -2582,7 +2621,8 @@
             "skeleton/automation/technical_debt.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_technical_debt_ledger.py"
+            "skeleton/testing/test_technical_debt_ledger.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Record debt source, affected contracts, risk, owner and target disposition.",
@@ -2598,7 +2638,8 @@
             "skeleton/automation/architecture_fitness.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_architecture_fitness.py"
+            "skeleton/testing/test_architecture_fitness.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Turn high-value architecture rules into deterministic executable checks.",
@@ -2639,7 +2680,8 @@
             "skeleton/observability/project_metrics.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_project_metrics.py"
+            "skeleton/testing/test_project_metrics.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Separate activity, throughput, quality, risk and outcome metrics.",
@@ -2655,7 +2697,8 @@
             "skeleton/automation/roadmap_control.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_roadmap_control.py"
+            "skeleton/testing/test_roadmap_control.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Link roadmap items to work packages, risks, dependencies and acceptance gates.",
@@ -2671,7 +2714,8 @@
             "skeleton/ai/build/automation/completion_model.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_completion_model.py"
+            "skeleton/testing/test_completion_model.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Use signed atomic task/accountability records as the completion source.",
@@ -2687,7 +2731,8 @@
             "skeleton/testing/test_final_assembly.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_final_assembly.py"
+            "skeleton/testing/test_final_assembly.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Run applicable vertical slices in release-like environment from signed artifacts.",
@@ -2728,7 +2773,8 @@
             "skeleton/ai/build/automation/master_appendices.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_master_appendices.py"
+            "skeleton/testing/test_master_appendices.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Keep appendices derived from or linked to canonical machine contracts.",
@@ -2744,7 +2790,8 @@
             "docs/plan"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_requirement_registry.py"
+            "planned:skeleton/testing/test_requirement_registry.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Write requirements as observable obligations with explicit scope and acceptance.",
@@ -2760,7 +2807,8 @@
             "benchmarks"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_nfr_registry.py"
+            "planned:skeleton/testing/test_nfr_registry.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Every NFR must specify threshold, unit, workload, environment and measurement method.",
@@ -2776,7 +2824,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_capability_taxonomy.py"
+            "planned:skeleton/testing/test_capability_taxonomy.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Assign stable capability IDs and parent/child relationships.",
@@ -2817,7 +2866,8 @@
             "machine/ai_build_accountability.json"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_capability_maturity.py"
+            "planned:skeleton/testing/test_capability_maturity.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Make maturity cumulative and machine-checkable.",
@@ -2833,7 +2883,8 @@
             "skeleton/testing"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_behavior_specs.py"
+            "planned:skeleton/testing/test_behavior_specs.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Specify normal, degraded and failure behavior independently of implementation structure.",
@@ -2849,7 +2900,8 @@
             "skeleton"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_state_machine_catalogue.py"
+            "planned:skeleton/testing/test_state_machine_catalogue.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Give each state machine one owner and stable version.",
@@ -2865,7 +2917,8 @@
             "docs"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_interface_standard.py"
+            "planned:skeleton/testing/test_interface_standard.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Require explicit error/result and compatibility semantics.",
@@ -2995,7 +3048,8 @@
             "skeleton/ai/runtime/storage/cas"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_distributed_transactions.py"
+            "skeleton/testing/test_distributed_transactions.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Choose atomic transaction, saga or reconciliation model per operation.",
@@ -3011,7 +3065,8 @@
             "skeleton/frontier"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_outbox_inbox.py"
+            "planned:skeleton/testing/test_outbox_inbox.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Write outbox records atomically with authoritative state.",
@@ -3027,7 +3082,8 @@
             "skeleton/ai/runtime/storage/cas"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_cache_architecture.py"
+            "skeleton/testing/test_cache_architecture.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Never let cache contents become sole authoritative state.",
@@ -3043,7 +3099,8 @@
             "skeleton/ai/runtime/storage/cas"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_content_addressing.py"
+            "skeleton/testing/test_content_addressing.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Canonicalize bytes before digest where a format requires it.",
@@ -3084,7 +3141,8 @@
             "skeleton/ai/runtime/data/ingestion.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_data_ingestion.py"
+            "skeleton/testing/test_data_ingestion.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Preserve source identity, acquisition time, rights/classification and parser version.",
@@ -3100,7 +3158,8 @@
             "skeleton/ai/runtime/data/document_intelligence.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_document_intelligence.py"
+            "skeleton/testing/test_document_intelligence.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Preserve page/region coordinates and extraction method for every derived claim.",
@@ -3116,7 +3175,8 @@
             "skeleton/ai/runtime/data/lineage_governance.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_data_lineage.py"
+            "skeleton/testing/test_data_lineage.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Record transformation identity, inputs, outputs and environment/version.",
@@ -3132,7 +3192,8 @@
             "skeleton/ai/runtime/data/quality.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_data_quality.py"
+            "skeleton/testing/test_data_quality.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Define quality checks per dataset/use case and retain raw measurements.",
@@ -3173,7 +3234,8 @@
             "skeleton/ai/runtime/data/dataset_registry.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_dataset_registry.py"
+            "skeleton/testing/test_dataset_registry.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Give every dataset/split immutable identity and provenance.",
@@ -3189,7 +3251,8 @@
             "skeleton/ai/runtime/data/synthetic.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_synthetic_data_factory.py"
+            "skeleton/testing/test_synthetic_data_factory.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Label synthetic origin and generator configuration permanently.",
@@ -3204,7 +3267,8 @@
             "skeleton/training/control_plane.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_training_control_plane.py"
+            "skeleton/testing/test_training_control_plane.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Require registered inputs and explicit resource/budget admission.",
@@ -3219,7 +3283,8 @@
             "skeleton/training/distributed.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_distributed_training.py"
+            "skeleton/testing/test_distributed_training.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Define data/model parallel topology and collective timeouts explicitly.",
@@ -3259,7 +3324,8 @@
             "skeleton/training/checkpointing.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_training_checkpointing.py"
+            "skeleton/testing/test_training_checkpointing.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Checkpoint all state required for semantically equivalent resume.",
@@ -3274,7 +3340,8 @@
             "skeleton/training/elastic_recovery.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_elastic_training_recovery.py"
+            "skeleton/testing/test_elastic_training_recovery.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Record consumed data position and optimizer semantics across membership changes.",
@@ -3289,7 +3356,8 @@
             "skeleton/training/observability.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_training_observability.py"
+            "skeleton/testing/test_training_observability.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Capture enough telemetry to diagnose divergence without leaking restricted data.",
@@ -3304,7 +3372,8 @@
             "skeleton/training/eval_gates.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_training_eval_gates.py"
+            "skeleton/testing/test_training_eval_gates.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Evaluate candidates before registry promotion using fixed/versioned suites.",
@@ -3344,7 +3413,8 @@
             "skeleton/training/post_training.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_post_training_lab.py"
+            "skeleton/testing/test_post_training_lab.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Separate experimental post-training from production model authority.",
@@ -3359,7 +3429,8 @@
             "skeleton/training/rl_environment.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_rl_environments.py"
+            "skeleton/testing/test_rl_environments.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Keep environment side effects sandboxed and reproducible.",
@@ -3374,7 +3445,8 @@
             "skeleton/training/curriculum.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_curriculum_engine.py"
+            "skeleton/testing/test_curriculum_engine.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Represent curriculum transitions and prerequisites explicitly.",
@@ -3389,7 +3461,8 @@
             "skeleton/training/verifier_models.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_verifier_model_program.py"
+            "skeleton/testing/test_verifier_model_program.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Keep verifier authority separate from generator confidence.",
@@ -3430,7 +3503,8 @@
             "skeleton/artifacts/multimodal_ingestion.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_multimodal_ingestion.py"
+            "skeleton/testing/test_multimodal_ingestion.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Preserve source bytes/digests, metadata classification and transformation lineage.",
@@ -3445,7 +3519,8 @@
             "skeleton/vision/pipeline.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vision_pipeline.py"
+            "skeleton/testing/test_vision_pipeline.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Validate dimensions/format/resources before decode/inference.",
@@ -3460,7 +3535,8 @@
             "skeleton/document_vision/fusion.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_document_vision.py"
+            "skeleton/testing/test_document_vision.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Keep OCR text linked to page coordinates and confidence.",
@@ -3475,7 +3551,8 @@
             "skeleton/audio/pipeline.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_audio_pipeline.py"
+            "skeleton/testing/test_audio_pipeline.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Preserve sample rate/channel/time offsets across transformations.",
@@ -3515,7 +3592,8 @@
             "skeleton/speech/runtime.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_live_speech_runtime.py"
+            "skeleton/testing/test_live_speech_runtime.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Distinguish provisional transcripts from authoritative final segments.",
@@ -3530,7 +3608,8 @@
             "skeleton/video/pipeline.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_video_pipeline.py"
+            "skeleton/testing/test_video_pipeline.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Bound decode/frame sampling workloads before processing.",
@@ -3545,7 +3624,8 @@
             "skeleton/ai/runtime/extensions/multimodal.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+            "skeleton/testing/test_p3_deferred_multimodal_tools.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Normalize cross-modal evidence into comparable provenance-bearing results.",
@@ -3560,7 +3640,8 @@
             "skeleton/ai/runtime/extensions/ecosystem.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+            "skeleton/testing/test_p3_deferred_multimodal_tools.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Require schemas, authority scope, side-effect class, idempotency and timeout metadata.",
@@ -3600,7 +3681,8 @@
             "skeleton/connectors/framework.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_connector_framework.py"
+            "skeleton/testing/test_connector_framework.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Separate connector discovery/configuration from credential-bearing execution.",
@@ -3615,7 +3697,8 @@
             "skeleton/plugins/lifecycle.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_plugin_ecosystem.py"
+            "skeleton/testing/test_plugin_ecosystem.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Plugins must declare capabilities, permissions and compatibility before activation.",
@@ -3630,7 +3713,8 @@
             "skeleton/ai/runtime/extensions/ecosystem.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_p3_deferred_multimodal_tools.py"
+            "skeleton/testing/test_p3_deferred_multimodal_tools.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Verify provenance/signatures and permission declarations.",
@@ -3705,7 +3789,8 @@
             "skeleton/ai/runtime/security/policy_simulation.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_policy_simulation.py"
+            "skeleton/testing/test_policy_simulation.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Simulation cannot grant real authority or execute external side effects.",
@@ -3721,7 +3806,8 @@
             "skeleton/ai/runtime/security/threat_model.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_threat_model.py"
+            "skeleton/testing/test_threat_model.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Map threats to concrete components and controls.",
@@ -3779,7 +3865,8 @@
             "skeleton/ai/runtime/security/boundaries.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_security_boundaries.py"
+            "skeleton/testing/test_security_boundaries.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Every privileged crossing needs authenticated identity and explicit authorization.",
@@ -3811,7 +3898,8 @@
             "skeleton/network/architecture.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_network_architecture.py"
+            "skeleton/testing/test_network_architecture.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Separate public ingress from internal control/data paths.",
@@ -3886,7 +3974,8 @@
             "skeleton/ai/runtime/security/key_management.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_key_management.py"
+            "skeleton/testing/test_key_management.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Separate key material from metadata/identifiers.",
@@ -3902,7 +3991,8 @@
             "skeleton/ai/runtime/security/tenant_isolation.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_tenant_isolation_deep.py"
+            "skeleton/testing/test_tenant_isolation_deep.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Attach tenant scope before lookup/ranking/execution.",
@@ -3918,7 +4008,8 @@
             "skeleton/ai/runtime/security/privacy_engine.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_privacy_engine.py"
+            "skeleton/testing/test_privacy_engine.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Propagate privacy labels into derived data and artifacts.",
@@ -3976,7 +4067,8 @@
             "skeleton/ai/runtime/extensions/supply_chain/sbom.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_sbom.py"
+            "skeleton/testing/test_sbom.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Bind SBOM to exact build artifact digest.",
@@ -3991,7 +4083,8 @@
             "skeleton/supply_chain/model_bom.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_model_bom.py"
+            "skeleton/testing/test_model_bom.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Bind MBOM to immutable model artifact/version.",
@@ -4193,7 +4286,8 @@
             "skeleton/ai/runtime/deferred/reliability_release.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_ai_chaos_recovery_controls.py"
+            "skeleton/testing/test_ai_chaos_recovery_controls.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Chaos experiments require bounded blast radius and abort controls.",
@@ -4234,7 +4328,8 @@
             "docs"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_ai_chaos_recovery_controls.py"
+            "skeleton/testing/test_ai_chaos_recovery_controls.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Drills must exercise real procedures/artifacts in representative environments.",
@@ -4250,7 +4345,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_ai_release_qualification_policy.py"
+            "skeleton/testing/test_ai_release_qualification_policy.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Map every release class to mandatory tests/evidence and allowed waivers.",
@@ -4266,7 +4362,8 @@
             "skeleton/observability"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_ai_deployment_safety.py"
+            "skeleton/testing/test_ai_deployment_safety.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Define canary cohort, duration, success/failure thresholds and abort controls.",
@@ -4282,7 +4379,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_ai_deployment_safety.py"
+            "skeleton/testing/test_ai_deployment_safety.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Flags must have owner, default, scope, expiry and rollback semantics.",
@@ -4323,7 +4421,8 @@
             "skeleton/resilience"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_ai_deployment_safety.py"
+            "skeleton/testing/test_ai_deployment_safety.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Rollback plans must account for forward-written durable data.",
@@ -4339,7 +4438,8 @@
             "docs"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vol194_developer_experience.py"
+            "skeleton/testing/test_vol194_developer_experience.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Provide fast local validation aligned with CI.",
@@ -4413,7 +4513,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vol197_simulation_mode.py"
+            "skeleton/testing/test_vol197_simulation_mode.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Simulation must never silently invoke production effects.",
@@ -4429,7 +4530,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vol198_contract_fuzzing.py"
+            "skeleton/testing/test_vol198_contract_fuzzing.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Fuzz parsers/validators before privileged execution boundaries.",
@@ -4445,7 +4547,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_property_invariants.py"
+            "skeleton/testing/test_property_invariants.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Map properties to named invariants/state machines.",
@@ -4461,7 +4564,8 @@
             "skeleton/ai/runtime/contracts/formal_candidates.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_vol200_formal_candidates.py"
+            "skeleton/testing/test_vol200_formal_candidates.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Select candidates where concurrency/authority/recovery ambiguity justifies cost.",
@@ -4536,7 +4640,8 @@
             "skeleton/ai/agents"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_agent_performance_evidence.py"
+            "skeleton/testing/test_agent_performance_evidence.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Score completion, correctness, recovery, cost and human intervention separately.",
@@ -4552,7 +4657,8 @@
             "skeleton/ai/agents"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_agent_economics.py"
+            "skeleton/testing/test_agent_economics.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Attribute costs per agent/task/delegation chain.",
@@ -4610,7 +4716,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_consensus_disagreement.py"
+            "skeleton/testing/test_consensus_disagreement.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Keep independent evidence visible before aggregation.",
@@ -4685,7 +4792,8 @@
             "skeleton/ai/artifact_review.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_artifact_review_workflow.py"
+            "skeleton/testing/test_artifact_review_workflow.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Preserve artifact version under review and review lineage.",
@@ -4701,7 +4809,8 @@
             "experiments"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_research_agent_team.py"
+            "planned:skeleton/testing/test_research_agent_team.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Assign distinct research roles and evidence ownership.",
@@ -4717,7 +4826,8 @@
             "planned:skeleton/research"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_literature_watch.py"
+            "planned:skeleton/testing/test_literature_watch.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Track publication/version/retraction/correction identity.",
@@ -4733,7 +4843,8 @@
             "skeleton/retrieval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_citation_graph.py"
+            "planned:skeleton/testing/test_citation_graph.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Represent citations, claims, replication and contradiction separately.",
@@ -4774,7 +4885,8 @@
             "planned:skeleton/artifacts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_reproduction_packages.py"
+            "planned:skeleton/testing/test_reproduction_packages.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Bind package to exact claim/result and artifact digests.",
@@ -4790,7 +4902,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_experiment_comparison.py"
+            "planned:skeleton/testing/test_experiment_comparison.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Reject comparisons with material uncontrolled differences unless explicitly qualified.",
@@ -4806,7 +4919,8 @@
             "experiments"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_statistical_analysis.py"
+            "planned:skeleton/testing/test_statistical_analysis.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Declare population/sample/metric assumptions and missing-data handling.",
@@ -4822,7 +4936,8 @@
             "benchmarks"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_model_eval_harness.py"
+            "planned:skeleton/testing/test_model_eval_harness.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Freeze evaluation spec/environment before comparative runs.",
@@ -4863,7 +4978,8 @@
             "skeleton/ai/agents"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_agent_eval_harness.py"
+            "planned:skeleton/testing/test_agent_eval_harness.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Score end-to-end task outcome and policy adherence separately.",
@@ -4879,7 +4995,8 @@
             "skeleton/ai/agents"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_long_horizon_benchmarks.py"
+            "planned:skeleton/testing/test_long_horizon_benchmarks.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Benchmarks must include restart/checkpoint and stale-world conditions.",
@@ -4895,7 +5012,8 @@
             "datasets"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_contamination_auditor.py"
+            "planned:skeleton/testing/test_contamination_auditor.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Fingerprint exact and near-duplicate content across datasets.",
@@ -4911,7 +5029,8 @@
             "frontend"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_human_evaluation.py"
+            "planned:skeleton/testing/test_human_evaluation.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Protect rater privacy and separate identity from public results.",
@@ -4948,7 +5067,8 @@
           "title": "Model Card System",
           "accountability": "ACC-VOL-221",
           "contract_targets": [
-            "skeleton/ai/governance/cards.py"
+            "skeleton/ai/governance/cards.py",
+            "skeleton/volumes/wave4/engine.py"
           ],
           "acceptance_tests": [
             "skeleton/testing/test_model_cards.py",
@@ -4964,7 +5084,8 @@
           "title": "Dataset Card System",
           "accountability": "ACC-VOL-222",
           "contract_targets": [
-            "skeleton/ai/governance/cards.py"
+            "skeleton/ai/governance/cards.py",
+            "skeleton/volumes/wave4/engine.py"
           ],
           "acceptance_tests": [
             "skeleton/testing/test_dataset_cards.py",
@@ -4980,7 +5101,8 @@
           "title": "Tool Card System",
           "accountability": "ACC-VOL-223",
           "contract_targets": [
-            "skeleton/ai/governance/cards.py"
+            "skeleton/ai/governance/cards.py",
+            "skeleton/volumes/wave4/engine.py"
           ],
           "acceptance_tests": [
             "skeleton/testing/test_tool_cards.py",
@@ -4996,7 +5118,8 @@
           "title": "Agent Card System",
           "accountability": "ACC-VOL-224",
           "contract_targets": [
-            "skeleton/ai/governance/cards.py"
+            "skeleton/ai/governance/cards.py",
+            "skeleton/volumes/wave4/engine.py"
           ],
           "acceptance_tests": [
             "skeleton/testing/test_agent_cards.py",
@@ -5037,7 +5160,8 @@
           "title": "Component Health Scorecard",
           "accountability": "ACC-VOL-225",
           "contract_targets": [
-            "skeleton/ai/governance/health.py"
+            "skeleton/ai/governance/health.py",
+            "skeleton/volumes/wave4/engine.py"
           ],
           "acceptance_tests": [
             "skeleton/testing/test_component_health_scorecard.py",
@@ -5053,7 +5177,8 @@
           "title": "Dependency Health",
           "accountability": "ACC-VOL-226",
           "contract_targets": [
-            "skeleton/ai/governance/health.py"
+            "skeleton/ai/governance/health.py",
+            "skeleton/volumes/wave4/engine.py"
           ],
           "acceptance_tests": [
             "skeleton/testing/test_dependency_health.py",
@@ -5069,7 +5194,8 @@
           "title": "Vendor / Provider Risk",
           "accountability": "ACC-VOL-227",
           "contract_targets": [
-            "skeleton/ai/providers/provider_risk.py"
+            "skeleton/ai/providers/provider_risk.py",
+            "skeleton/volumes/wave4/engine.py"
           ],
           "acceptance_tests": [
             "skeleton/testing/test_provider_risk.py",
@@ -5085,7 +5211,8 @@
           "title": "Provider Failover",
           "accountability": "ACC-VOL-228",
           "contract_targets": [
-            "skeleton/ai/providers/failover.py"
+            "skeleton/ai/providers/failover.py",
+            "skeleton/volumes/wave4/engine.py"
           ],
           "acceptance_tests": [
             "skeleton/testing/test_provider_failover.py",
@@ -5251,7 +5378,8 @@
             "skeleton/observability"
           ],
           "acceptance_tests": [
-            "planned:frontend audit UI tests"
+            "planned:frontend audit UI tests",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "UI is a projection of append-only/canonical audit data.",
@@ -5267,7 +5395,8 @@
             "skeleton/observability"
           ],
           "acceptance_tests": [
-            "planned:frontend operations dashboard tests"
+            "planned:frontend operations dashboard tests",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Expose freshness/degraded telemetry state explicitly.",
@@ -5308,7 +5437,8 @@
             "skeleton/ai/agents"
           ],
           "acceptance_tests": [
-            "planned:frontend agent operations tests"
+            "planned:frontend agent operations tests",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Human controls act through governed APIs, not UI-local state.",
@@ -5324,7 +5454,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:frontend research dashboard tests"
+            "planned:frontend research dashboard tests",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Separate evidence state from generated narrative.",
@@ -5340,7 +5471,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_model_operations.py"
+            "planned:skeleton/testing/test_model_operations.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Every deployed model maps to immutable artifact/config/eval evidence.",
@@ -5356,7 +5488,8 @@
             "recovery"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_model_rollback.py"
+            "planned:skeleton/testing/test_model_rollback.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Keep rollback-compatible prior artifacts/configs available.",
@@ -5397,7 +5530,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_instruction_registry.py"
+            "planned:skeleton/testing/test_instruction_registry.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Separate immutable policy/authority rules from editable prompting.",
@@ -5413,7 +5547,8 @@
             "benchmarks"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_prompt_regression.py"
+            "planned:skeleton/testing/test_prompt_regression.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Pin model/config/tool context for comparative prompt tests.",
@@ -5429,7 +5564,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_routing_policy_registry.py"
+            "planned:skeleton/testing/test_routing_policy_registry.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Routing rules must encode capability/privacy/cost/reliability constraints explicitly.",
@@ -5445,7 +5581,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_memory_policy_registry.py"
+            "planned:skeleton/testing/test_memory_policy_registry.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Policy must distinguish authoritative, inferred and user-editable memory.",
@@ -5486,7 +5623,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_retrieval_policy_registry.py"
+            "planned:skeleton/testing/test_retrieval_policy_registry.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Tenant/classification/time filters apply before ranking.",
@@ -5502,7 +5640,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_knowledge_refresh.py"
+            "planned:skeleton/testing/test_knowledge_refresh.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Refresh must not overwrite history required for temporal queries.",
@@ -5518,7 +5657,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_temporal_knowledge.py"
+            "planned:skeleton/testing/test_temporal_knowledge.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Every time-sensitive claim supports scope/validity intervals where known.",
@@ -5576,7 +5716,8 @@
             "experiments"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_hypothesis_engine.py"
+            "planned:skeleton/testing/test_hypothesis_engine.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Preserve competing hypotheses until evidence resolves them.",
@@ -5592,7 +5733,8 @@
             "experiments"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_causal_knowledge.py"
+            "planned:skeleton/testing/test_causal_knowledge.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Every causal edge records evidence/method/assumptions.",
@@ -5811,7 +5953,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_migration_engine.py"
+            "planned:skeleton/testing/test_migration_engine.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Migrations are resumable/idempotent or explicitly atomic.",
@@ -5852,7 +5995,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_legacy_compatibility.py"
+            "planned:skeleton/testing/test_legacy_compatibility.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Legacy compatibility must not create second authority.",
@@ -5868,7 +6012,8 @@
             "docs"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_deprecation_process.py"
+            "planned:skeleton/testing/test_deprecation_process.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Deprecation state is versioned and machine-readable.",
@@ -5884,7 +6029,8 @@
             "docs/plan"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_architecture_archaeology.py"
+            "planned:skeleton/testing/test_architecture_archaeology.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Preserve provenance and uncertainty of inferred intent.",
@@ -5900,7 +6046,8 @@
             "machine/ai_file_tree.json"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_repository_consolidation.py"
+            "planned:skeleton/testing/test_repository_consolidation.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Consolidation must declare source/destination owner and compatibility strategy.",
@@ -5941,7 +6088,8 @@
             "skeleton/ai/build"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_code_provenance.py"
+            "planned:skeleton/testing/test_code_provenance.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Preserve imported/generated code source identity and licensing metadata.",
@@ -5957,7 +6105,8 @@
             "skeleton/ai/build"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_duplication_detector.py"
+            "planned:skeleton/testing/test_duplication_detector.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Differentiate intentional adapters/generated mirrors from accidental duplication.",
@@ -5973,7 +6122,8 @@
             "machine/ai_file_tree.json"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_module_ownership.py"
+            "planned:skeleton/testing/test_module_ownership.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Every production module has one canonical ownership zone.",
@@ -5989,7 +6139,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_codeowners_generation.py"
+            "planned:skeleton/testing/test_codeowners_generation.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Generated rules are deterministic and reviewable.",
@@ -6030,7 +6181,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_documentation_as_code.py"
+            "planned:skeleton/testing/test_documentation_as_code.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Documentation references to contracts/paths are validated.",
@@ -6046,7 +6198,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_diagram_as_code.py"
+            "planned:skeleton/testing/test_diagram_as_code.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Diagrams declare source model/version.",
@@ -6062,7 +6215,8 @@
             "release"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_architecture_snapshots.py"
+            "planned:skeleton/testing/test_architecture_snapshots.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Snapshot includes machine manifests and relevant dependency graph identities.",
@@ -6078,7 +6232,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_release_reproducibility.py"
+            "planned:skeleton/testing/test_release_reproducibility.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Preserve build environment/toolchain identity.",
@@ -6119,7 +6274,8 @@
             ".github/workflows"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_build_hermeticity.py"
+            "planned:skeleton/testing/test_build_hermeticity.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Declare all build inputs/dependencies.",
@@ -6135,7 +6291,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_build_cache.py"
+            "planned:skeleton/testing/test_build_cache.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Cache keys include toolchain/config/dependency inputs.",
@@ -6151,7 +6308,8 @@
             "installer"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_binary_provenance.py"
+            "planned:skeleton/testing/test_binary_provenance.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Attestation references immutable artifact digest.",
@@ -6167,7 +6325,8 @@
             "skeleton/security"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_installer_security.py"
+            "planned:skeleton/testing/test_installer_security.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Verify signatures/digests before privileged writes.",
@@ -6208,7 +6367,8 @@
             "skeleton/security"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_update_security.py"
+            "planned:skeleton/testing/test_update_security.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Verify signed metadata/artifacts before activation.",
@@ -6224,7 +6384,8 @@
             "installer"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_bootstrap_recovery.py"
+            "planned:skeleton/testing/test_bootstrap_recovery.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Recovery path has fewer dependencies than normal bootstrap.",
@@ -6240,7 +6401,8 @@
             "repair"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_crash_diagnostics.py"
+            "planned:skeleton/testing/test_crash_diagnostics.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Crash collection must survive partial subsystem failure.",
@@ -6256,7 +6418,8 @@
             "skeleton/observability"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_support_bundle.py"
+            "planned:skeleton/testing/test_support_bundle.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Bundle contents are allowlisted/classified, not arbitrary filesystem dumps.",
@@ -6297,7 +6460,8 @@
             "repair"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_doctor_command.py"
+            "planned:skeleton/testing/test_doctor_command.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Separate diagnosis from repair and report evidence for every finding.",
@@ -6313,7 +6477,8 @@
             "skeleton/runtime"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_self_diagnosis.py"
+            "planned:skeleton/testing/test_self_diagnosis.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Self-diagnosis is advisory and cannot self-certify production health.",
@@ -6329,7 +6494,8 @@
             "skeleton/security"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_safe_repair.py"
+            "planned:skeleton/testing/test_safe_repair.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Repair plan declares affected state and rollback before mutation.",
@@ -6345,7 +6511,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_system_digital_twin.py"
+            "planned:skeleton/testing/test_system_digital_twin.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Twin state records freshness/uncertainty and never authorizes real effects.",
@@ -6386,7 +6553,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_deployment_planner.py"
+            "planned:skeleton/testing/test_deployment_planner.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Plans respect compatibility, blast radius, SLO and resource constraints.",
@@ -6402,7 +6570,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_resource_scheduler.py"
+            "planned:skeleton/testing/test_resource_scheduler.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Admission must reserve bounded resources before work starts.",
@@ -6418,7 +6587,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_fairness_starvation.py"
+            "planned:skeleton/testing/test_fairness_starvation.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Track wait age/tenant/share and apply bounded anti-starvation policy.",
@@ -6434,7 +6604,8 @@
             "skeleton/frontier"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_backpressure.py"
+            "planned:skeleton/testing/test_backpressure.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Every unbounded producer/consumer boundary must define pressure semantics.",
@@ -6475,7 +6646,8 @@
             "skeleton/runtime"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_load_shedding.py"
+            "planned:skeleton/testing/test_load_shedding.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Define shed priority/class and response semantics.",
@@ -6491,7 +6663,8 @@
             "skeleton/automation"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_queue_congestion.py"
+            "planned:skeleton/testing/test_queue_congestion.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Measure depth/age/service rate and enforce queue budgets.",
@@ -6507,7 +6680,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_retry_budgets.py"
+            "planned:skeleton/testing/test_retry_budgets.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Retry only classified transient failures with idempotency safety.",
@@ -6523,7 +6697,8 @@
             "skeleton/network"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_circuit_breaker_standard.py"
+            "planned:skeleton/testing/test_circuit_breaker_standard.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Breaker state is scoped per dependency/failure domain.",
@@ -6564,7 +6739,8 @@
             "skeleton/runtime"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_bulkheads.py"
+            "planned:skeleton/testing/test_bulkheads.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Define concurrency/resource pools by critical domain.",
@@ -6580,7 +6756,8 @@
             "skeleton/automation"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_dead_letter_workflow.py"
+            "planned:skeleton/testing/test_dead_letter_workflow.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "DLQ entries preserve original identity, attempts and failure cause.",
@@ -6596,7 +6773,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_operation_replay.py"
+            "planned:skeleton/testing/test_operation_replay.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Replay distinguishes read-only reconstruction, simulation and real side-effect retry.",
@@ -6612,7 +6790,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_determinism_envelope.py"
+            "planned:skeleton/testing/test_determinism_envelope.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Tests use appropriate equivalence/tolerance for each determinism class.",
@@ -6653,7 +6832,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_time_architecture.py"
+            "planned:skeleton/testing/test_time_architecture.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Never use wall clock for elapsed-duration correctness.",
@@ -6669,7 +6849,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_identifier_standard.py"
+            "planned:skeleton/testing/test_identifier_standard.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "IDs never encode mutable/display-sensitive authority data.",
@@ -6685,7 +6866,8 @@
             "skeleton/network"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_logical_clocks.py"
+            "planned:skeleton/testing/test_logical_clocks.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Use sequence/fencing/logical-clock semantics per domain.",
@@ -6701,7 +6883,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_master_control_plane.py"
+            "planned:skeleton/testing/test_master_control_plane.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Control plane orchestrates only through canonical contracts and independent policy gates.",
@@ -6742,7 +6925,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_system_objectives.py"
+            "planned:skeleton/testing/test_system_objectives.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Distinguish requested objective from inferred subgoals.",
@@ -6758,7 +6942,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_objective_normalization.py"
+            "planned:skeleton/testing/test_objective_normalization.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Normalization records interpretations/assumptions.",
@@ -6774,7 +6959,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_constraint_engine.py"
+            "planned:skeleton/testing/test_constraint_engine.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Hard constraints cannot be traded away by utility scoring.",
@@ -6790,7 +6976,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_decision_engine.py"
+            "planned:skeleton/testing/test_decision_engine.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Decision process separates admissibility from preference optimization.",
@@ -6831,7 +7018,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_decision_record_graph.py"
+            "planned:skeleton/testing/test_decision_record_graph.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Decision records are immutable; corrections/supersession append new nodes.",
@@ -6847,7 +7035,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_workflow_ir.py"
+            "planned:skeleton/testing/test_workflow_ir.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "IR includes dependencies, inputs/outputs, authority, retries, timeouts and compensation.",
@@ -6863,7 +7052,8 @@
             "docs"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_workflow_dsl.py"
+            "planned:skeleton/testing/test_workflow_dsl.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "DSL cannot express undeclared privilege or bypass policy.",
@@ -6879,7 +7069,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_workflow_compiler.py"
+            "planned:skeleton/testing/test_workflow_compiler.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Compilation is deterministic for identical source/version.",
@@ -6920,7 +7111,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_workflow_versioning.py"
+            "planned:skeleton/testing/test_workflow_versioning.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "In-flight operations retain the workflow version they started with unless explicit migration occurs.",
@@ -6936,7 +7128,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_workflow_migration.py"
+            "planned:skeleton/testing/test_workflow_migration.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Migration declares state mapping and irreversible transformations.",
@@ -6952,7 +7145,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_semantic_task_types.py"
+            "planned:skeleton/testing/test_semantic_task_types.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Task type drives default policy/budgets/tests but cannot grant privilege.",
@@ -6968,7 +7162,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_task_complexity.py"
+            "planned:skeleton/testing/test_task_complexity.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Estimator exposes uncertainty and calibration.",
@@ -7009,7 +7204,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_task_decomposition.py"
+            "planned:skeleton/testing/test_task_decomposition.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Subtasks preserve parent constraints/authority.",
@@ -7025,7 +7221,8 @@
             "skeleton/automation"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_critical_path.py"
+            "planned:skeleton/testing/test_critical_path.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Use real dependency/state data rather than narrative estimates alone.",
@@ -7041,7 +7238,8 @@
             "skeleton/runtime"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_scheduling_algorithms.py"
+            "planned:skeleton/testing/test_scheduling_algorithms.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Schedulers respect hard dependencies/leases/authority before optimization.",
@@ -7057,7 +7255,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_scheduling_simulator.py"
+            "planned:skeleton/testing/test_scheduling_simulator.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Simulation is non-authoritative and labels assumptions.",
@@ -7098,7 +7297,8 @@
             "experiments"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_autonomy_control.py"
+            "planned:skeleton/testing/test_autonomy_control.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Controllers cannot exceed policy/authority or resource bounds.",
@@ -7131,7 +7331,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_autonomy_escalation.py"
+            "planned:skeleton/testing/test_autonomy_escalation.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Escalation requires explicit eligibility and approval policy.",
@@ -7299,7 +7500,8 @@
             "docs"
           ],
           "acceptance_tests": [
-            "planned:frontend human-factors tests"
+            "planned:frontend human-factors tests",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Prioritize clear consequence/authority/status communication for high-risk actions.",
@@ -7315,7 +7517,8 @@
             "frontend"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_approval_fatigue.py"
+            "planned:skeleton/testing/test_approval_fatigue.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Batch/remember approvals only within explicit scope/time/version boundaries.",
@@ -7331,7 +7534,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_trust_calibration.py"
+            "planned:skeleton/testing/test_trust_calibration.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Surface evidence, uncertainty and degraded modes without inflated confidence language.",
@@ -7372,7 +7576,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_user_intent_continuity.py"
+            "planned:skeleton/testing/test_user_intent_continuity.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Record authoritative user instructions separately from inferred intent.",
@@ -7388,7 +7593,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_project_memory.py"
+            "planned:skeleton/testing/test_project_memory.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Project memory is isolated by project/tenant and trust class.",
@@ -7404,7 +7610,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_workspace_model.py"
+            "planned:skeleton/testing/test_workspace_model.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Workspace links reference canonical underlying objects rather than duplicate them.",
@@ -7420,7 +7627,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_resource_namespace.py"
+            "planned:skeleton/testing/test_resource_namespace.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Namespace resolution includes tenant/project/version scope.",
@@ -7461,7 +7669,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_resource_resolution.py"
+            "planned:skeleton/testing/test_resource_resolution.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Resolution checks authority and lifecycle before returning handles.",
@@ -7477,7 +7686,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_artifact_dependency_graph.py"
+            "planned:skeleton/testing/test_artifact_dependency_graph.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Edges are typed and version-specific.",
@@ -7493,7 +7703,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_artifact_rebuild.py"
+            "planned:skeleton/testing/test_artifact_rebuild.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Rebuild only from verified inputs/producer versions.",
@@ -7509,7 +7720,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_impact_analysis.py"
+            "planned:skeleton/testing/test_impact_analysis.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Use architecture/trace/dependency ownership graphs.",
@@ -7550,7 +7762,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_change_risk_estimator.py"
+            "planned:skeleton/testing/test_change_risk_estimator.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Estimator does not replace hard gates.",
@@ -7566,7 +7779,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_safe_change_planner.py"
+            "planned:skeleton/testing/test_safe_change_planner.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Plan must satisfy ownership/compatibility/risk/budget constraints before mutation.",
@@ -7582,7 +7796,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_system_compiler.py"
+            "planned:skeleton/testing/test_system_compiler.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Compiler outputs are derived artifacts, never new authority.",
@@ -7598,7 +7813,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_contract_codegen.py"
+            "planned:skeleton/testing/test_contract_codegen.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Generated files are clearly marked and reproducible.",
@@ -7639,7 +7855,8 @@
             "backend"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_api_client_generator.py"
+            "planned:skeleton/testing/test_api_client_generator.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Generated clients bind to exact API contract version.",
@@ -7655,7 +7872,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_internal_sdk.py"
+            "planned:skeleton/testing/test_internal_sdk.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "SDK exports only supported boundaries and hides implementation details.",
@@ -7671,7 +7889,8 @@
             "backend"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_provider_sdk.py"
+            "planned:skeleton/testing/test_provider_sdk.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Provider-native objects terminate at adapter boundary.",
@@ -7687,7 +7906,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_storage_sdk.py"
+            "planned:skeleton/testing/test_storage_sdk.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Callers declare state class/consistency needs instead of choosing stores arbitrarily.",
@@ -7728,7 +7948,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_event_sdk.py"
+            "planned:skeleton/testing/test_event_sdk.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Generated/handwritten publishers use canonical envelope/versioning.",
@@ -7744,7 +7965,8 @@
             "benchmarks"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_evaluation_sdk.py"
+            "planned:skeleton/testing/test_evaluation_sdk.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Eval plugins declare inputs/outputs/version/dependencies.",
@@ -7760,7 +7982,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_benchmark_plugins.py"
+            "planned:skeleton/testing/test_benchmark_plugins.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Plugins cannot bypass dataset rights/security/resource controls.",
@@ -7776,7 +7999,8 @@
             "skeleton/data"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_data_contracts.py"
+            "planned:skeleton/testing/test_data_contracts.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Contract includes field meaning, nullability, units, freshness and classification.",
@@ -7817,7 +8041,8 @@
             "skeleton/data"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_data_service_slos.py"
+            "planned:skeleton/testing/test_data_service_slos.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "SLIs align to consumer-visible semantics.",
@@ -7833,7 +8058,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_embedding_lifecycle.py"
+            "planned:skeleton/testing/test_embedding_lifecycle.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Embedding vectors bind to model/version/dimension/preprocessing identity.",
@@ -7849,7 +8075,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_vector_index_migration.py"
+            "planned:skeleton/testing/test_vector_index_migration.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Use versioned shadow indexes and atomic routing cutover.",
@@ -7865,7 +8092,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_search_index_lifecycle.py"
+            "planned:skeleton/testing/test_search_index_lifecycle.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Indexes remain derived/rebuildable from authoritative sources.",
@@ -7906,7 +8134,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_retrieval_freshness.py"
+            "planned:skeleton/testing/test_retrieval_freshness.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Freshness compares source validity/update watermark, not only cache age.",
@@ -7922,7 +8151,8 @@
             "skeleton/security"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_source_trust.py"
+            "planned:skeleton/testing/test_source_trust.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Trust is scoped by claim/domain/time and evidence.",
@@ -7938,7 +8168,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_source_diversity.py"
+            "planned:skeleton/testing/test_source_diversity.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Diversity accounts for source lineage/ownership/citation dependence.",
@@ -7954,7 +8185,8 @@
             "skeleton/retrieval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_claim_deduplication.py"
+            "planned:skeleton/testing/test_claim_deduplication.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Deduplication never merges claims with materially different scope/time.",
@@ -7995,7 +8227,8 @@
             "skeleton/retrieval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_claim_scope.py"
+            "planned:skeleton/testing/test_claim_scope.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Scope is first-class, not hidden prose metadata.",
@@ -8011,7 +8244,8 @@
             "skeleton/retrieval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_claim_expiration.py"
+            "planned:skeleton/testing/test_claim_expiration.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Expiration marks knowledge stale without deleting historical lineage.",
@@ -8027,7 +8261,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_knowledge_reconciliation.py"
+            "planned:skeleton/testing/test_knowledge_reconciliation.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Do not collapse disagreement without justified resolution rule.",
@@ -8043,7 +8278,8 @@
             "planned:skeleton/artifacts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_knowledge_snapshots.py"
+            "planned:skeleton/testing/test_knowledge_snapshots.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Snapshot records source/index/model/schema watermarks.",
@@ -8194,7 +8430,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_cognitive_strategy_registry.py"
+            "planned:skeleton/testing/test_cognitive_strategy_registry.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Strategies are versioned capabilities, not hidden prompt fragments.",
@@ -8210,7 +8447,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_strategy_selection.py"
+            "planned:skeleton/testing/test_strategy_selection.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Selection remains within allowed strategy set and budgets.",
@@ -8226,7 +8464,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_reasoning_cost.py"
+            "planned:skeleton/testing/test_reasoning_cost.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Attribute cost by operation/strategy/model/version.",
@@ -8301,7 +8540,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_plan_static_analyzer.py"
+            "planned:skeleton/testing/test_plan_static_analyzer.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Analysis is deterministic over versioned plan IR.",
@@ -8317,7 +8557,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_plan_simulation.py"
+            "planned:skeleton/testing/test_plan_simulation.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Simulation receipts are marked non-production evidence.",
@@ -8358,7 +8599,8 @@
             "skeleton/tools"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_tool_composition.py"
+            "planned:skeleton/testing/test_tool_composition.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Composition cannot aggregate permissions into broader authority.",
@@ -8374,7 +8616,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_tool_dependency_graph.py"
+            "planned:skeleton/testing/test_tool_dependency_graph.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Dependencies are versioned and typed.",
@@ -8390,7 +8633,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_tool_health.py"
+            "planned:skeleton/testing/test_tool_health.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Health distinguishes transport success from semantic correctness.",
@@ -8406,7 +8650,8 @@
             "skeleton/security"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_tool_discovery.py"
+            "planned:skeleton/testing/test_tool_discovery.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Discovery data is untrusted until validated/signed according to source.",
@@ -8447,7 +8692,8 @@
             "skeleton/security"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_tool_result_trust.py"
+            "planned:skeleton/testing/test_tool_result_trust.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Tool output is data, not instructions or authority.",
@@ -8463,7 +8709,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_side_effect_ledger.py"
+            "planned:skeleton/testing/test_side_effect_ledger.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Ledger entries are durable before/after effects according to operation class.",
@@ -8479,7 +8726,8 @@
             "skeleton/reliability"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_compensation_engine.py"
+            "planned:skeleton/testing/test_compensation_engine.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Compensation semantics are explicit and not assumed equivalent to rollback.",
@@ -8495,7 +8743,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_saga_workflows.py"
+            "planned:skeleton/testing/test_saga_workflows.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Saga state is durable and resumable across process failure.",
@@ -8536,7 +8785,8 @@
             "skeleton/network"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_model_placement.py"
+            "skeleton/testing/test_model_placement.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Control state is fenced/versioned to avoid split-brain scheduling.",
@@ -8552,7 +8802,8 @@
             "skeleton/network/model_placement.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_model_placement.py"
+            "skeleton/testing/test_model_placement.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Placement validates compatibility before load.",
@@ -8568,7 +8819,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_gpu_memory_manager.py"
+            "planned:skeleton/testing/test_gpu_memory_manager.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Admission reserves memory before load/request batch.",
@@ -8584,7 +8836,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_model_eviction.py"
+            "planned:skeleton/testing/test_model_eviction.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Eviction excludes pinned/in-flight models until safe boundary.",
@@ -8625,7 +8878,8 @@
             "skeleton/network/model_placement.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_model_placement.py"
+            "skeleton/testing/test_model_placement.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Warmup obeys resource/cost budgets.",
@@ -8658,7 +8912,8 @@
             "skeleton/kv"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_kv_cache_service.py"
+            "planned:skeleton/testing/test_kv_cache_service.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Cache entries bind to exact model/config/token prefix/session context.",
@@ -8674,7 +8929,8 @@
             "skeleton/ai"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_prefix_cache.py"
+            "planned:skeleton/testing/test_prefix_cache.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Prefix cache key includes instruction/prompt/model/tokenizer/version.",
@@ -8715,7 +8971,8 @@
             "experiments"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_speculative_inference.py"
+            "planned:skeleton/testing/test_speculative_inference.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Verify draft tokens against target model before acceptance.",
@@ -8748,7 +9005,8 @@
             "skeleton/mesh/capacity_qualification.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_capacity_qualification.py"
+            "skeleton/testing/test_capacity_qualification.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Measure throughput, p95/p99 latency, memory, errors and quality degradation.",
@@ -8764,7 +9022,8 @@
             "skeleton/network/model_placement.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_model_placement.py"
+            "skeleton/testing/test_model_placement.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Topology is versioned/discovered with validation.",
@@ -8805,7 +9064,8 @@
             "benchmarks"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_numa_awareness.py"
+            "planned:skeleton/testing/test_numa_awareness.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Topology-aware policy is optional only when topology irrelevant/unknown.",
@@ -8821,7 +9081,8 @@
             "training"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_gpu_interconnect.py"
+            "planned:skeleton/testing/test_gpu_interconnect.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Do not assume homogeneous connectivity.",
@@ -8837,7 +9098,8 @@
             "planned:skeleton/artifacts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_storage_tiering.py"
+            "planned:skeleton/testing/test_storage_tiering.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Tier movement preserves digest/metadata/availability semantics.",
@@ -8853,7 +9115,8 @@
             "skeleton/data"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_data_locality.py"
+            "planned:skeleton/testing/test_data_locality.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Locality is optimization after security/authority constraints.",
@@ -8894,7 +9157,8 @@
             "skeleton/network/model_placement.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_model_placement.py"
+            "skeleton/testing/test_model_placement.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Topology updates invalidate stale placement assumptions.",
@@ -8910,7 +9174,8 @@
             "skeleton/network"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_remote_execution_protocol.py"
+            "skeleton/testing/test_remote_execution_protocol.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Worker executes only signed/authorized task envelope and declared inputs.",
@@ -8926,7 +9191,8 @@
             "skeleton/network/remote_execution.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_remote_execution_protocol.py"
+            "skeleton/testing/test_remote_execution_protocol.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Attestation policy is scoped by workload risk.",
@@ -8942,7 +9208,8 @@
             "scripts"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_build_farm.py"
+            "planned:skeleton/testing/test_build_farm.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Jobs run from immutable source/build inputs.",
@@ -8983,7 +9250,8 @@
             "skeleton/runtime"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_evaluation_farm.py"
+            "planned:skeleton/testing/test_evaluation_farm.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Distribute evaluation jobs from immutable eval/model/dataset specs.",
@@ -8999,7 +9267,8 @@
             "skeleton/runtime"
           ],
           "acceptance_tests": [
-            "planned:skeleton/testing/test_research_compute_queue.py"
+            "planned:skeleton/testing/test_research_compute_queue.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Queue experiments/reproductions/research workloads with priority, quota and provenance.",
@@ -9015,7 +9284,8 @@
             "skeleton/observability/budget_accounting.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_budget_accounting_ledger.py"
+            "skeleton/testing/test_budget_accounting_ledger.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Enforce per-tenant/project/team/workload compute limits across CPU/GPU/time/storage.",
@@ -9031,7 +9301,8 @@
             "skeleton/persistence"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_budget_accounting_ledger.py"
+            "skeleton/testing/test_budget_accounting_ledger.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Record monetary/token/compute/storage budgets, reservations, charges, refunds and adjustments immutably.",
@@ -9106,7 +9377,8 @@
             "skeleton/ai/runtime/deferred/lifecycle_governance.py"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_lifecycle_governance.py"
+            "skeleton/testing/test_lifecycle_governance.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Track software/model/data licenses, obligations, compatibility and provenance per artifact/version.",
@@ -9122,7 +9394,8 @@
             "skeleton/security"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_lifecycle_governance.py"
+            "skeleton/testing/test_lifecycle_governance.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Represent permitted purposes, geography, retention, training/eval/use restrictions and consent for data.",
@@ -9180,7 +9453,8 @@
             "docs"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_lifecycle_governance.py"
+            "skeleton/testing/test_lifecycle_governance.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Gate sensitive human/data/dual-use research activities through explicit risk, consent and oversight criteria.",
@@ -9196,7 +9470,8 @@
             "skeleton/ai/providers"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_lifecycle_governance.py"
+            "skeleton/testing/test_lifecycle_governance.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Govern model intake, training, evaluation, deployment, operation, update, retirement and archive states.",
@@ -9212,7 +9487,8 @@
             "machine"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_lifecycle_governance.py"
+            "skeleton/testing/test_lifecycle_governance.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Deprecate models with usage inventory, replacement path, deadline, compatibility and rollback considerations.",
@@ -9253,7 +9529,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_lifecycle_governance.py"
+            "skeleton/testing/test_lifecycle_governance.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Migrate external/internal providers through capability, policy, quality, cost and data-boundary parity evidence.",
@@ -9269,7 +9546,8 @@
             "skeleton/eval"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_shadow_traffic.py"
+            "skeleton/testing/test_shadow_traffic.py",
+            "tests/flgb/test_masterplan_closure.py"
           ],
           "required_outcome": [
             "Replay or mirror eligible requests to candidate systems without affecting authoritative user outcomes.",
@@ -9302,7 +9580,8 @@
             "skeleton/security"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_lifecycle_governance.py"
+            "skeleton/testing/test_lifecycle_governance.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Run new capabilities behind isolated scopes, synthetic/shadow traffic and explicit kill switches.",
@@ -9343,7 +9622,8 @@
             "docs/plan"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_lifecycle_governance.py"
+            "skeleton/testing/test_lifecycle_governance.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Separate research branches/experiments from production integration while preserving lineage and merge criteria.",
@@ -9359,7 +9639,8 @@
             "docs"
           ],
           "acceptance_tests": [
-            "skeleton/testing/test_lifecycle_governance.py"
+            "skeleton/testing/test_lifecycle_governance.py",
+            "tests/flgb/test_volume_wave4_completion.py"
           ],
           "required_outcome": [
             "Retire algorithms/strategies/tools no longer competitive, safe or maintainable while preserving reproducibility history.",

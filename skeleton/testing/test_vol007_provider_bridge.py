@@ -31,3 +31,12 @@ def test_failure_receipts_never_publish_response():
 def test_provider_payload_digest_detects_tamper():
     a=response(); b=ProviderResponse(text="changed",provider="p",model="m",response_id="r",usage=a.usage)
     assert provider_payload_digest(a)!=provider_payload_digest(b)
+
+
+def test_provider_payload_digest_normalizes_aware_timestamps():
+    from datetime import datetime, timedelta, timezone
+    first = datetime(2026, 10, 14, 12, 30, tzinfo=timezone.utc)
+    same_in_offset = first.astimezone(timezone(timedelta(hours=2)))
+    assert provider_payload_digest({"seen_at": first}) == provider_payload_digest({"seen_at": same_in_offset})
+    with pytest.raises(InferenceContractError, match="timezone-aware"):
+        provider_payload_digest({"seen_at": datetime(2026, 10, 14, 12, 30)})

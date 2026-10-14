@@ -63,10 +63,15 @@ class TestLargeMilestoneExecution(unittest.TestCase):
         self.assertEqual(state["volumes_covered"], 421)
         self.assertEqual(state["independently_qualified_milestones"], 0)
 
-    def test_evidence_shortlist_identifies_real_unverified_volumes(self):
-        state = run()
+    def test_evidence_shortlist_identifies_partial_source_groups(self):
+        index = copy.deepcopy(self.sources["accountability_index"])
+        index["fast_sets"]["fully_complete"] = [
+            "VOL-035", "VOL-036", "VOL-037", "VOL-038",
+        ]
+        state = report(self.roadmap, index)
         self.assertEqual(len(state["evidence_proximity_shortlist"]), 10)
         self.assertEqual(state["evidence_proximity_shortlist"][0], "MDM-008")
+        self.assertEqual(state["independently_qualified_milestones"], 0)
         focus = next(m for m in state["milestones"] if m["id"] == "MDM-008")
         self.assertEqual(focus["signed_source_volumes"], 4)
         self.assertEqual([row["volume"] for row in focus["remaining"]], ["VOL-039"])

@@ -47,6 +47,19 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _bson_datetime(value: object) -> datetime:
+    """BSON datetimes are UTC, including the driver's default naïve decode.
+
+    Normalize only the persistence boundary. API/domain timestamps still
+    require an explicit timezone and the shared legacy client stays unchanged.
+    """
+    if not isinstance(value, datetime):
+        raise ConversationStorageUnavailable("invalid persisted conversation timestamp")
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _thread_doc(thread: ConversationThread) -> dict[str, Any]:
     payload = thread.as_dict()
     payload["_id"] = thread.thread_id
@@ -90,8 +103,8 @@ def _thread_from_doc(doc: dict[str, Any]) -> ConversationThread:
         thread_id=str(doc["thread_id"]),
         tenant_id=str(doc["tenant_id"]),
         owner_id=str(doc["owner_id"]),
-        created_at=doc["created_at"],
-        updated_at=doc["updated_at"],
+        created_at=_bson_datetime(doc["created_at"]),
+        updated_at=_bson_datetime(doc["updated_at"]),
         version=int(doc["version"]),
         message_sequence=int(doc["message_sequence"]),
         active_branch_id=str(doc["active_branch_id"]),
@@ -109,7 +122,7 @@ def _message_from_doc(doc: dict[str, Any]) -> ConversationMessage:
         branch_id=str(doc["branch_id"]),
         sequence=int(doc["sequence"]),
         author_type=ConversationAuthorType(str(doc["author_type"])),
-        created_at=doc["created_at"],
+        created_at=_bson_datetime(doc["created_at"]),
         idempotency_key=str(doc["idempotency_key"]),
         content=doc.get("content"),
         content_ref=doc.get("content_ref"),

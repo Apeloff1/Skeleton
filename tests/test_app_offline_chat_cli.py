@@ -241,7 +241,7 @@ class HeadlessOfflineChatTests(unittest.TestCase):
                 os.replace(replacement, source)
             return direct_open(file, flags, *args, **kwargs)
 
-        with patch("skeleton.app.offline_chat_cli.os.open",
+        with patch("skeleton.app.offline_knowledge.os.open",
                    side_effect=replace_then_open):
             with self.assertRaisesRegex(
                 ValueError, "reference changed during file admission"

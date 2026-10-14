@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       run_offline:
-        description: "Explicitly execute all five bounded offline E2E shards"
+        description: "Explicitly execute all bounded offline E2E shards"
         required: true
         type: boolean
         default: false
@@ -58,6 +58,7 @@ jobs:
         with:
           name: e2e-preflight-${{ github.run_id }}-${{ github.run_attempt }}
           path: .e2e-evidence/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 90
 
@@ -82,6 +83,10 @@ jobs:
             language: node
           - suite: backend-local-ai-chat
             language: python
+          - suite: native-runtime
+            language: python
+          - suite: app-cli-forge
+            language: python
     env:
       E2E_HEAD_SHA: ${{ github.sha }}
       PYTHONPATH: ".:backend"
@@ -100,7 +105,7 @@ jobs:
         if: matrix.language == 'python'
         run: >-
           python -m pip install --disable-pip-version-check
-          -e ".[dev]"
+          -e ".[dev,local-inference]"
           "httpx==0.28.1"
           "PyJWT==2.14.0"
           "python-dotenv==1.2.3"
@@ -110,6 +115,23 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
+      - name: Install pinned headless Godot for the forge playtest
+        if: matrix.suite == 'app-cli-forge'
+        run: |
+          godot_archive_path="$RUNNER_TEMP/godot-4.4.1.zip"
+          curl --fail --location --retry 2 --connect-timeout 15 --max-time 180 \
+            'https://downloads.godotengine.org/?version=4.4.1&flavor=stable&slug=linux.x86_64.zip' \
+            --output "$godot_archive_path"
+          printf '%s  %s\n' 'd6e382fb531019f85630c1f485a561a0d20c4a2344b6c3847735cfee7da812aa' "$godot_archive_path" | sha256sum --check
+          unzip -q "$godot_archive_path" -d "$RUNNER_TEMP/skeleton-godot"
+          chmod +x "$RUNNER_TEMP/skeleton-godot/Godot_v4.4.1-stable_linux.x86_64"
+          echo "SKELETON_GODOT_BIN=$RUNNER_TEMP/skeleton-godot/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Install locked frontend contract dependencies
+        if: matrix.suite == 'frontend-product'
+        working-directory: frontend
+        run: |
+          corepack enable
+          yarn install --frozen-lockfile
       - name: Execute bounded offline suite, capture and classify failures
         env:
           SELECTED_SUITE: ${{ matrix.suite }}
@@ -120,6 +142,7 @@ jobs:
         with:
           name: e2e-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .e2e-evidence/
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 90
 
@@ -149,5 +172,6 @@ jobs:
         with:
           name: e2e-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
           path: .e2e-aggregate/
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 90

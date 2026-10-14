@@ -614,7 +614,20 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parser().parse_args(argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if "--offline-command" in arguments:
+        # The frozen executable shares the canonical offline CLI. This path
+        # is usable on a headless host and never initializes Tk or Compose.
+        if arguments[0] != "--offline-command" or len(arguments) < 2:
+            print("Use --offline-command followed by local-ai or serve-local-ai.")
+            return 2
+        if arguments[1] not in {"local-ai", "serve-local-ai"}:
+            print("Unsupported offline command.")
+            return 2
+        from skeleton.app.cli import run_app_cli
+
+        return run_app_cli(arguments[1:])
+    args = parser().parse_args(arguments)
     root = installation_root()
     if args.local_http:
         if (bool(args.local_native_checkpoint) ==

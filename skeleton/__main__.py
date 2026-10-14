@@ -741,10 +741,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
     if cmd == "test": return _cmd_test(rest)
     if cmd == "dev":
-        from skeleton.developer.cli import dev_exit_code, run_dev_cli
-        result = run_dev_cli(rest)
-        if isinstance(result, dict): print(json.dumps(result, indent=2, default=str))
-        return dev_exit_code(result)
+        from skeleton.developer.cli import main as developer_main
+        return developer_main(rest)
     if cmd == "eras": return _cmd_eras(rest)
     if cmd == "generations": return _cmd_generations(rest)
     if cmd == "plan": return _cmd_plan(rest)

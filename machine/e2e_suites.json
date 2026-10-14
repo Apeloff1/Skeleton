@@ -9,7 +9,9 @@
       "required_files": [
         "skeleton/testing/test_ai_golden_journeys.py",
         "skeleton/testing/test_execution_runtime.py",
-        "skeleton/observability/redaction.py"
+        "skeleton/observability/redaction.py",
+        "skeleton/testing/test_engine_provider_status.py",
+        "skeleton/testing/test_engine_browser_cors.py"
       ],
       "command": [
         "python",
@@ -22,7 +24,9 @@
         "-p",
         "pytest_asyncio.plugin",
         "skeleton/testing/test_ai_golden_journeys.py",
-        "skeleton/testing/test_execution_runtime.py::test_crash_after_provider_response_before_checkpoint_fails_closed_without_retry"
+        "skeleton/testing/test_execution_runtime.py::test_crash_after_provider_response_before_checkpoint_fails_closed_without_retry",
+        "skeleton/testing/test_engine_provider_status.py",
+        "skeleton/testing/test_engine_browser_cors.py"
       ]
     },
     {
@@ -32,7 +36,11 @@
       "timeout_seconds": 540,
       "required_files": [
         "backend/tests/test_engine_cross_service_closure.py",
-        "backend/tests/test_ai_chat_engine_cutover.py"
+        "backend/tests/test_ai_chat_engine_cutover.py",
+        "backend/tests/test_conversation_bson_timestamps.py",
+        "backend/tests/test_ai_chat_turn_persistence.py",
+        "backend/tests/test_graceful_drain_signals.py",
+        "backend/tests/test_storage_lazy_registry.py"
       ],
       "command": [
         "python",
@@ -45,7 +53,11 @@
         "-p",
         "pytest_asyncio.plugin",
         "backend/tests/test_engine_cross_service_closure.py",
-        "backend/tests/test_ai_chat_engine_cutover.py"
+        "backend/tests/test_ai_chat_engine_cutover.py",
+        "backend/tests/test_conversation_bson_timestamps.py",
+        "backend/tests/test_ai_chat_turn_persistence.py",
+        "backend/tests/test_graceful_drain_signals.py",
+        "backend/tests/test_storage_lazy_registry.py"
       ]
     },
     {
@@ -70,12 +82,12 @@
       "cwd": "frontend",
       "timeout_seconds": 240,
       "required_files": [
-        "frontend/scripts/test-product-journeys.mjs"
+        "frontend/scripts/test-product-journeys.mjs",
+        "frontend/scripts/run-e2e-contracts.mjs"
       ],
       "command": [
         "node",
-        "--test",
-        "scripts/test-product-journeys.mjs"
+        "scripts/run-e2e-contracts.mjs"
       ]
     },
     {
@@ -97,6 +109,66 @@
         "-p",
         "pytest_asyncio.plugin",
         "backend/tests/test_ai_chat_local_engine_e2e.py"
+      ]
+    },
+    {
+      "id": "native-runtime",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 720,
+      "required_files": [
+        "tests/flgb",
+        "tests/test_e2e_inference_receipt.py",
+        "tests/test_app_offline_chat_cli.py",
+        "tests/test_app_offline_http.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "-p",
+        "pytest_asyncio.plugin",
+        "tests/flgb",
+        "tests/test_e2e_inference_receipt.py",
+        "tests/test_app_offline_chat_cli.py",
+        "tests/test_app_offline_http.py"
+      ]
+    },
+    {
+      "id": "app-cli-forge",
+      "tier": "offline",
+      "cwd": ".",
+      "timeout_seconds": 720,
+      "required_files": [
+        "tests/test_autonomous_builder_e2e_contract.py",
+        "skeleton/testing/test_cli_e2e_matrix.py",
+        "skeleton/testing/test_cli_e2e_inprocess.py",
+        "skeleton/testing/test_cli_e2e_subprocess.py",
+        "skeleton/testing/test_gameforge_http_e2e.py",
+        "skeleton/testing/test_materialise_e2e_acceptance.py",
+        "skeleton/testing/test_cortex_e2e.py"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "--tb=short",
+        "--noconftest",
+        "-p",
+        "pytest_asyncio.plugin",
+        "tests/test_autonomous_builder_e2e_contract.py",
+        "skeleton/testing/test_cli_e2e_matrix.py",
+        "skeleton/testing/test_cli_e2e_inprocess.py",
+        "skeleton/testing/test_cli_e2e_subprocess.py",
+        "skeleton/testing/test_gameforge_http_e2e.py",
+        "skeleton/testing/test_materialise_e2e_acceptance.py",
+        "skeleton/testing/test_cortex_e2e.py"
       ]
     },
     {

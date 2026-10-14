@@ -297,9 +297,9 @@ def test_torch_prefill_is_batched_before_incremental_decode(monkeypatch):
     original = accel._cached_step
     calls = []
 
-    def traced(token_id):
+    def traced(token_id, *, interrupt=None):
         calls.append(token_id)
-        return original(token_id)
+        return original(token_id, interrupt=interrupt)
 
     monkeypatch.setattr(accel, "_cached_step", traced)
     expected = accel.logits((1, 2, 3))
@@ -527,11 +527,11 @@ def test_training_serializes_against_resident_kv_decode(monkeypatch):
     errors = []
     original_step = accel._cached_step
 
-    def blocked_step(token):
+    def blocked_step(token, *, interrupt=None):
         entered_step.set()
         if not release_step.wait(timeout=5):
             raise TimeoutError("test could not release blocked decoder")
-        return original_step(token)
+        return original_step(token, interrupt=interrupt)
 
     monkeypatch.setattr(accel, "_cached_step", blocked_step)
 
@@ -835,9 +835,9 @@ def test_short_prompt_extension_reuses_prefix_kv_without_full_prefill(monkeypatc
     original = accel._cached_step
     visited = []
 
-    def visited_step(token):
+    def visited_step(token, *, interrupt=None):
         visited.append(token)
-        return original(token)
+        return original(token, interrupt=interrupt)
 
     def no_prefill(*args, **kwargs):
         raise AssertionError("continuation unexpectedly triggered full prefill")
@@ -1060,7 +1060,7 @@ def test_failed_cache_operation_cannot_replay_stale_cached_logits(monkeypatch):
     assert accel._cached_logits is not None
     original = accel._cached_step
 
-    def unavailable(_):
+    def unavailable(_, *, interrupt=None):
         raise RuntimeError("injected downstream kernel failure")
 
     monkeypatch.setattr(accel, "_cached_step", unavailable)

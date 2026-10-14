@@ -2,7 +2,7 @@
  * Human-reviewed bridge from an existing game's KB to the canonical
  * /api/design-spec/compile endpoint. Pure presentation helpers only.
  */
-import { mapWorldEvidence, validProjectId } from './worldWorkspace';
+import { mapWorldEvidence, validProjectId } from './worldWorkspace.ts';
 
 export type DesignFocus = 'gameplay'|'world'|'narrative'|'visuals';
 export type DesignReview = {

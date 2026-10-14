@@ -117,6 +117,11 @@ class NativeConversationService:
         with self._lock:
             return len(self._sessions)
 
+    def can_admit(self) -> bool:
+        """Use the same capacity boundary for creation and durable reattachment."""
+        with self._lock:
+            return len(self._sessions) < self.max_sessions
+
     def list_sessions(self) -> tuple[SessionRecord, ...]:
         with self._lock:
             return tuple(self.describe(sid) for sid in sorted(self._sessions))
