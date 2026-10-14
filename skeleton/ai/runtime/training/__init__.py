@@ -93,7 +93,11 @@ __all__ += [
 # optional NumPy/native tooling whenever the training package is imported.
 # Attribute access loads only the requested authority-bound adapter.  Keeping
 # this out of __all__ preserves lightweight wildcard imports on small devices.
+__all__ += ["MaterializedDatasetReceipt", "MaterializedTrainingSource", "SourceAuthorityBinding"]
+
 _LAZY_EXPORTS = {
+    "data": frozenset({"MaterializedDatasetReceipt", "MaterializedTrainingSource",
+                       "SourceAuthorityBinding"}),
     "learning_pipeline": frozenset({
         "ExecutedCurriculumReceipt", "ExecutedEpisodeReceipt",
         "ExecutedEvaluationReceipt", "LocalPolicyObservation",

@@ -97,7 +97,18 @@ __all__ = [
 
 # Preserve stable P3 multimodal evidence and measured-rollout APIs from the
 # reconciled source modules without eagerly loading optional runtime backends.
+__all__ += ["VerifierEvaluationReceipt", "MigrationParityCase", "ModelMigrationEvaluationReceipt",
+            "ModelMigrationReceipt", "ModelMigrationRollbackReceipt", "LifecycleBackupReceipt",
+            "ModelLifecyclePersistenceError", "SQLiteModelLifecycleRepository",
+            "MultimodalTrainingManifest", "MultimodalTrainingSample"]
+
 _LAZY_EXPORTS = {
+    "learning": frozenset({"VerifierEvaluationReceipt"}),
+    "lifecycle": frozenset({"MigrationParityCase", "ModelMigrationEvaluationReceipt",
+                            "ModelMigrationReceipt", "ModelMigrationRollbackReceipt"}),
+    "lifecycle_repository": frozenset({"LifecycleBackupReceipt", "ModelLifecyclePersistenceError",
+                                       "SQLiteModelLifecycleRepository"}),
+    "multimodal": frozenset({"MultimodalTrainingManifest", "MultimodalTrainingSample"}),
     "content_retrieval": frozenset({
         "ContentSignalIndex", "ContentFeatureReceipt", "ContentSimilarityHit",
     }),
