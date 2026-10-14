@@ -5,11 +5,14 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
+import re
 import sys
 
-EXPECTED = ("stage7-engine", "stage7-cross-service", "stage7-browser",
-            "frontend-product", "backend-local-ai-chat")
+from e2e_evidence import DEFAULT_MANIFEST, load_manifest
+
+EXPECTED = tuple(suite["id"] for suite in load_manifest(DEFAULT_MANIFEST) if suite["tier"] == "offline")
 MAX_BYTES = 2_000_000
 
 
@@ -61,7 +64,7 @@ def main() -> int:
                 if report.get("mode") != "offline-e2e":
                     continue
                 suites = report.get("suites")
-                if not isinstance(suites, list) or len(suites) != 1:
+                if not isinstance(suites, list) or len(suites) != 1 or not isinstance(suites[0], dict):
                     raise ValueError("one shard must carry exactly one suite receipt")
                 suite = suites[0].get("id")
                 if suite not in EXPECTED:
@@ -74,6 +77,23 @@ def main() -> int:
                 items = issue_payload.get("issues")
                 if not isinstance(items, list):
                     raise ValueError("missing issue list")
+                if not re.fullmatch(r"[0-9a-f]{40}", str(report.get("head_sha", ""))):
+                    raise ValueError("shard must identify an exact commit")
+                receipt = suites[0]
+                duration = receipt.get("duration_seconds")
+                if isinstance(duration, bool) or not isinstance(duration, (int, float)) or not math.isfinite(duration) or duration < 0:
+                    raise ValueError("invalid duration")
+                if report.get("issues_count") != len(items) or report.get("executed_suites") != 1:
+                    raise ValueError("report counts disagree with shard evidence")
+                if receipt.get("status") not in ("passed", "failed"):
+                    raise ValueError("shard did not execute")
+                if receipt["status"] == "passed" and (
+                    report.get("status") != "passed" or items or type(receipt.get("exit_code")) is not int
+                    or receipt["exit_code"] != 0 or receipt.get("timed_out") is not False
+                ):
+                    raise ValueError("passing shard contradicts its execution evidence")
+                if any(not isinstance(item, dict) or not isinstance(item.get("id"), str) for item in items):
+                    raise ValueError("invalid issue item")
                 receipts[suite] = {
                     "artifact": folder.name, "status": suites[0].get("status"),
                     "duration_seconds": suites[0].get("duration_seconds"),
@@ -82,8 +102,6 @@ def main() -> int:
                     "issues": len(items),
                 }
                 for item in items:
-                    if not isinstance(item, dict) or not isinstance(item.get("id"), str):
-                        raise ValueError("invalid issue item")
                     key = item["id"]
                     # Retain normalized metadata only: no arbitrary exception
                     # payloads are re-read from raw console logs.

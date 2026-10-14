@@ -143,7 +143,10 @@ class DragonNativeCurriculum:
                 continue
             # Prefer a genuinely new capability over farming 8 near-duplicates.
             score=step.weight-16*count
-            if step.target in built:score-=8
+            # A new genre/mechanic on proven hardware is a new capability,
+            # not an eight-point repeat penalty. Only penalize a previously
+            # attempted target+genre; existing count penalty still applies.
+            if step.target in built and count > 0:score-=8
             recommendations.append(CurriculumRecommendation(
                 step.target,step.genre,step.milestone_id,
                 ("New hardware/genre acquisition" if count==0 else

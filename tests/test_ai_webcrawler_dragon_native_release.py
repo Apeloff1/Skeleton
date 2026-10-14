@@ -108,6 +108,38 @@ def test_sparse_isolated_native_release_has_no_monorepo_imports(tmp_path):
     assert receipt["selftest_stage_lines"]==4
 
 
+@pytest.mark.parametrize("entry,body", [
+    ("../escape.c", "x"), ("src/../escape.c", "x"),
+    ("/tmp/escape.c", "x"), ("C:/escape.c", "x"),
+    ("src\\escape.c", "x"), ("src//main.c", "x"),
+    ("./main.c", "x"), ("", "x"), ("src/./main.c", "x"),
+    ("src/secret\x00.c", "x"), ("main.c", 123),
+])
+def test_native_release_rejects_untrusted_emitter_paths_before_compilation(tmp_path, monkeypatch, entry, body):
+    from skeleton.ai.webcrawler import dragon_native_release as release_module
+    monkeypatch.setattr(release_module.shutil, "which", lambda program: "/fake/cmake")
+    monkeypatch.setattr(release_module, "emit_native_puzzle",
+                        lambda **kwargs: {entry: body})
+    with pytest.raises(ValueError, match="unsafe native release source entry"):
+        release_module.build_native_release(tmp_path / "absolute-output")
+
+
+def test_native_release_member_validation_accepts_normal_nested_sources(tmp_path, monkeypatch):
+    from skeleton.ai.webcrawler import dragon_native_release as release_module
+    # CMake is intentionally stubbed only AFTER safe sources have been written.
+    monkeypatch.setattr(release_module.shutil, "which", lambda program: "/fake/cmake")
+    monkeypatch.setattr(release_module, "emit_native_puzzle",
+                        lambda **kwargs: {"CMakeLists.txt": "cmake_minimum_required(VERSION 3.10)",
+                                          "src/main.c": "int main(void) { return 0; }"})
+    def abort_after_safe_paths(*args, **kwargs):
+        assert (tmp_path / "absolute-output" / "CMakeLists.txt").is_file()
+        assert (tmp_path / "absolute-output" / "src" / "main.c").is_file()
+        raise RuntimeError("safe emitted sources accepted")
+    monkeypatch.setattr(release_module, "_run", abort_after_safe_paths)
+    with pytest.raises(RuntimeError, match="safe emitted sources accepted"):
+        release_module.build_native_release(tmp_path / "absolute-output")
+
+
 def test_native_release_rejects_traversal_before_compiler(tmp_path, monkeypatch):
     if not shutil.which("cmake"):
         pytest.skip("CMake unavailable")

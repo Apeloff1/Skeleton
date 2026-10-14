@@ -559,7 +559,7 @@ def register_repository_atlas_tools(
             raise ToolDenied("host denied source atlas access")
 
     def _search(args: dict[str, Any], context: Any) -> dict[str, Any]:
-        _permit("app.files", args, context)
+        _permit("app_files", args, context)
         return atlas.search(
             query=args.get("query", ""),
             limit=args.get("limit", 30),
@@ -569,11 +569,11 @@ def register_repository_atlas_tools(
         )
 
     def _duplicates(args: dict[str, Any], context: Any) -> dict[str, Any]:
-        _permit("app.exact_duplicates", args, context)
+        _permit("app_exact_duplicates", args, context)
         return atlas.exact_duplicate_groups(limit=args.get("limit", 20))
 
     def _plan_context(args: dict[str, Any], context: Any) -> dict[str, Any]:
-        _permit("app.source_context", args, context)
+        _permit("app_source_context", args, context)
         from skeleton.jeeves.agent.file_atlas_context import JeevesFileContextPlanner
         plan = JeevesFileContextPlanner(atlas).compile(
             args["objective"],
@@ -588,7 +588,7 @@ def register_repository_atlas_tools(
 
     entries = (
         (ToolSpec(
-            name="app.files",
+            name="app_files",
             description="Query bounded indexed source paths, owners and feature families.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -600,7 +600,7 @@ def register_repository_atlas_tools(
             ),
         ), _search),
         (ToolSpec(
-            name="app.source_context",
+            name="app_source_context",
             description="Compile budgeted source bookmarks relevant to a task without loading source code.",
             risk=RiskTier.READ_ONLY,
             arguments=(
@@ -615,7 +615,7 @@ def register_repository_atlas_tools(
             ),
         ), _plan_context),
         (ToolSpec(
-            name="app.exact_duplicates",
+            name="app_exact_duplicates",
             description="Find fingerprint-identical indexed source files; no file reads.",
             risk=RiskTier.READ_ONLY,
             arguments=(ArgumentRule(

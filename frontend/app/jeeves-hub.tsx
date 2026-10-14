@@ -1,3 +1,4 @@
+import { LazyMount } from '../src/utils/lazyMount';
 import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /jeeves-hub — Jeeves operator console.
@@ -220,7 +221,7 @@ async function fetchJsonWithTimeout(url: string): Promise<unknown> {
   }
 }
 
-export default function JeevesHubScreen() {
+function JeevesHubScreen() {
   const router = useRouter();
   const flagVoice = useFeatureFlag('experimental_voice');
   const flagAudioTest = useFeatureFlag('jeeves_audio_test');
@@ -776,3 +777,8 @@ const styles = StyleSheet.create({
   secondaryButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 11, borderRadius: 11, backgroundColor: '#181B22', borderWidth: 1, borderColor: '#2B2F39' },
   secondaryButtonText: { color: '#C4B5FD', fontSize: 11, fontWeight: '900' },
 });
+
+// Device feature flags and service observations are loaded on the client.
+export default function JeevesHubRoute() {
+  return <LazyMount><JeevesHubScreen /></LazyMount>;
+}

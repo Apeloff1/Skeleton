@@ -1,0 +1,47 @@
+{
+  "schema_version": "skeleton.ai.game_learning_runtime.v1",
+  "status": "implementation_candidate",
+  "owners": {
+    "catalog": "skeleton/jeeves/game_console_catalog.py",
+    "adapter": "skeleton/jeeves/game_learning_runtime.py",
+    "existing_rasterizer": "skeleton/jeeves/game_engine_rendering.py",
+    "existing_3d": "skeleton/jeeves/game_engine_3d.py",
+    "native_inventory": "skeleton/ai/webcrawler/dragon_native_targets.py",
+    "native_gameplay": "skeleton/jeeves/game_dragon_runtime.py"
+  },
+  "mirrors": "Exact byte copies under skeleton/ai/agents/jeeves",
+  "apis": {
+    "catalog": "console_catalog/resolve_console/execution_inventory expose the eleven exact coded era profiles, seven Forge generation envelopes and all canonical Dragon hardware/source declarations under dragon_native:<native_id>; source-only, toolchain-adapter, licensed-SDK and historical statuses are preserved. Reference association never grants native binary execution",
+    "learning": "GameEnvironmentSpec and EpisodeStep declare exact finite numeric observations, available actions, component reward semantics and episode budget",
+    "reference": "GameLearningEnvironment(target_id,max_steps,gameplay_dialect,tree) reset/step/observe/preview/snapshot/restore runs existing native machines with exact project/source identity",
+    "factory": "create_game_environment accepts ROM bytes only for the separately declared experimental game_boy runtime and exact generated-grid configs through the generation owner. Native-source profiles without an actual generated config or independently compiled execution bridge reject step admission; unsupported source/target combinations never fall back",
+    "simulation": "simulate_game executes bounded caller actions with cancellation probes and returns native state/frame identities, actual transition chains, final snapshot and exact measured reward components",
+    "thumby": "dragon_native:thumby executes the exact existing canonical GAME fresh/_rand/_bound/step numeric gameplay functions through a bounded allowlisted AST module containing only integer constants and those functions. No uploaded code, imports, attributes, unbounded loops, device API or provider is executed. Exact template/module/adapter/Python identities fence replay. Actual health, score, enemy and goal changes supply rewards. Device firmware graphics remain unverified; host preview uses original fixed bitmap bytes at observed positions and declares its limited scope",
+    "raster": "Additive RasterImage plus render_reference_image and ThreeDMachine.reference_image expose the exact RGB buffer already computed by the existing software rasterizer; existing render_reference_scene/reference_raster return values and algorithms remain unchanged"
+  },
+  "bounds": {
+    "episode_steps": 4096,
+    "snapshot_bytes": 2000000,
+    "report_bytes": 4000000,
+    "native_frame_bytes": 262144,
+    "frame_projection_rows": 128,
+    "project_files": 96,
+    "project_bytes": 1000000,
+    "json_depth": 20,
+    "raster_max_width": 320,
+    "raster_max_height": 240,
+    "studio_preview_width": 96
+  },
+  "integrity": "Reference snapshots restore by executing the exact recorded seed/actions in a separate environment and comparing all native state, frame, goal and transition identities before replacing receiver state. Source code, tree, task/reward schema and budget are bound to environment identity. JSON duplicate keys, nonfinite values and structural/byte excess fail before native execution.",
+  "preview": "RGB pixels are captured only when preview is requested, hashed against the existing raster color digest and bound to current native state. Reference command projections identify truncation and never claim fabricated pixel textures, real GPU execution or commercial-console compatibility.",
+  "limitations": [
+    "Reference machines execute fixed coded worlds plus bounded tuning; arbitrary uploaded scenes/Python are not executed",
+    "Rewards are declared local task utilities, not evidence of general game mastery",
+    "ROM visual-change rewards are exploration metrics, not game-success measurements",
+    "GB-20 is biomechanical range of motion, unrelated to Game Boy hardware",
+    "No automated tests are written or run in this user-directed implementation session; compatibility and acceptance remain unverified"
+  ],
+  "failure": "Invalid source/tree/seed/action, unsupported mapper/instruction, foreign snapshot or code identity, exhausted resources and cancelled work fail explicitly without granting promotion authority",
+  "production_model_promotion_authorized": false,
+  "masterplan_completion_authorized": false
+}

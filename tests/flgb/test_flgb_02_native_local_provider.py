@@ -530,11 +530,15 @@ def _verified(_request, candidate: str, context_digest: str):
 
 
 async def _wait_result(service, execution_id: str):
-    for _ in range(300):
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + 10.0
+    while loop.time() < deadline:
         result = service.repository.result(execution_id)
         if result is not None:
             return result
-        await asyncio.sleep(0)
+        # Native execution uses a worker thread. Give it actual scheduler
+        # time rather than making the acceptance bound depend on busy-loop speed.
+        await asyncio.sleep(0.01)
     raise AssertionError("native local engine execution did not complete")
 
 

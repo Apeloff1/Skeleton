@@ -149,15 +149,16 @@ def test_rejects_loss_of_queue_pressure_guard() -> None:
     assert "queue-pressure contract missing" in _messages(source)
 
 
-def test_branch_control_plane_uses_general_runner_capacity() -> None:
-    for workflow_name in (
-        "branch-flow.yml",
-        "branch-clean.yml",
-        "branch-archive.yml",
-        "branch-repair-100.yml",
-    ):
+def test_branch_control_plane_uses_declared_independent_runner_capacity() -> None:
+    for workflow_name, runner in {
+        "branch-flow.yml": "ubuntu-latest",
+        "branch-clean.yml": "ubuntu-24.04-arm",
+        "branch-archive.yml": "ubuntu-24.04-arm",
+        "branch-repair-100.yml": "ubuntu-latest",
+    }.items():
         source = (
             REPO_ROOT / ".github" / "workflows" / workflow_name
         ).read_text(encoding="utf-8")
-        assert "runs-on: ubuntu-latest" in source
-        assert "runs-on: ubuntu-24.04-arm" not in source
+        actual = [line.split("runs-on:", 1)[1].strip() for line in source.splitlines()
+                  if line.lstrip().startswith("runs-on:")]
+        assert actual == [runner]

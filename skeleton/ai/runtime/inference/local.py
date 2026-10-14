@@ -914,6 +914,7 @@ class LocalModelAdapter(ProviderAdapter):
 
     def status(self) -> dict[str, Any]:
         status = super().status()
+        status["execution_mode"] = "local"
         status["network_policy"] = "none"
         status["model_digest"] = self.engine.model.model_digest
         status["runtime_digest"] = self.runtime_digest

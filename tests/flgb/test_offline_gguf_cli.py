@@ -97,7 +97,7 @@ class TestPublicGGUFCLI(unittest.TestCase):
             self.assertFalse(report["hosted_provider_used"])
             self.assertFalse(report["model_downloaded"])
             self.assertFalse(report["model_quality_certified"])
-            self.assertIsNone(report["execution_receipt_digest"])
+            self.assertRegex(report["execution_receipt_digest"], r"^[0-9a-f]{64}$")
             self.assertEqual(len(report["request_sha256"]), 64)
 
     @unittest.skipIf(os.name == "nt", "POSIX shebang subprocess fixture")
@@ -125,7 +125,8 @@ class TestPublicGGUFCLI(unittest.TestCase):
             self.assertEqual(len(session.history), 4)
             self.assertEqual(session.model_digest, hashlib.sha256(weights.read_bytes()).hexdigest())
             self.assertEqual(first.model_digest, second.model_digest)
-            self.assertIsNone(first.execution_receipt_digest)
+            self.assertRegex(first.execution_receipt_digest, r"^[0-9a-f]{64}$")
+            self.assertNotEqual(first.execution_receipt_digest, second.execution_receipt_digest)
             self.assertEqual(session.ui_output_budget, 32)
             self.assertFalse(hasattr(session, "export_transcript"))
             self.assertFalse(hasattr(session, "import_transcript"))
@@ -138,7 +139,7 @@ class TestPublicGGUFCLI(unittest.TestCase):
             with self.assertRaises((OSError, ValueError, RuntimeError)):
                 OfflineGGUFSession(Path(directory) / "missing", weights)
 
-    def test_gguf_desktop_disables_native_only_actions(self):
+    def test_ephemeral_gguf_desktop_disables_durable_only_actions(self):
         from skeleton.app.local_ai import OfflineAIWindow
 
         class Button:
@@ -154,22 +155,26 @@ class TestPublicGGUFCLI(unittest.TestCase):
             window.session = OfflineGGUFSession(llama, model)
             window.active = False
             for name in (
-                "load_button", "gguf_button", "train_button",
-                "improve_button", "benchmark_button", "send_button",
-                "clear_button", "cancel_button", "open_history_button",
-                "save_history_button",
+                "load_button", "load_gguf_button", "prepare_gguf_button",
+                "send_button", "clear_button", "cancel_button", "resume_button",
+                "find_session_button", "delete_button", "fork_button",
+                "export_button", "import_button", "copy_button",
+                "text_export_button", "instructions_button", "session_picker",
+                "budget_input", "grounded_button", "add_reference_button",
+                "search_reference_button", "retry_button",
             ):
                 setattr(window, name, Button())
             window._refresh()
             for name in (
-                "improve_button", "benchmark_button",
-                "open_history_button", "save_history_button",
+                "resume_button", "find_session_button", "delete_button",
+                "fork_button", "export_button", "import_button",
+                "instructions_button", "retry_button",
             ):
                 with self.subTest(button=name):
                     self.assertEqual(getattr(window, name).state, "disabled")
             self.assertEqual(window.send_button.state, "normal")
             self.assertEqual(window.clear_button.state, "normal")
-            self.assertEqual(window.gguf_button.state, "normal")
+            self.assertEqual(window.load_gguf_button.state, "normal")
 
     def test_desktop_never_displays_or_persists_rejected_generation(self):
         from skeleton.app.local_ai import OfflineAIWindow
@@ -192,6 +197,9 @@ class TestPublicGGUFCLI(unittest.TestCase):
         window = OfflineAIWindow.__new__(OfflineAIWindow)
         window.closed = False
         window.active = True
+        window.loading_model = False
+        window.pending_prompt = "private user prompt"
+        window.pending_request = ("session", "request", "private user prompt", 32, False)
         window.events = Queue()
         window.composer = Composer()
         window.status = Status()
@@ -199,25 +207,29 @@ class TestPublicGGUFCLI(unittest.TestCase):
         rendered = []
         window._append = lambda role, text: rendered.append((role, text))
         window._refresh = lambda: None
+        displayed = []
+        window._display_history = lambda: displayed.append("canonical history")
+        window._update_sessions = lambda: None
 
-        window.events.put(("generation_error", ("private user prompt", "cancelled")))
+        window.events.put(("error", "cancelled"))
         window._drain()
         self.assertEqual(rendered, [])
+        self.assertEqual(displayed, [])
+        self.assertIsNotNone(window.pending_request)
         self.assertEqual(window.composer.text, "private user prompt")
         self.assertIn("cancelled", window.status.text)
 
         window.composer.text = ""
         answer = SimpleNamespace(
             text="accepted local answer", input_tokens=3, output_tokens=4,
-            execution_receipt_digest=None,
+            execution_receipt_digest="a" * 64,
         )
-        window.events.put(("answer", ("verified user prompt", answer)))
+        window.events.put(("answer", answer))
         window._drain()
-        self.assertEqual(rendered, [
-            ("You", "verified user prompt"),
-            ("Skeleton · Local", "accepted local answer"),
-        ])
-        self.assertIn("no execution receipt", window.status.text)
+        self.assertEqual(rendered, [])
+        self.assertEqual(displayed, ["canonical history"])
+        self.assertIsNone(window.pending_request)
+        self.assertIn("receipt aaaaaaaaaaaa", window.status.text)
 
     def test_explicit_model_runtime_and_prompt_are_all_required(self):
         missing = (

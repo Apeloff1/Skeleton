@@ -349,12 +349,31 @@ function patchReactNativeRnGetPolyfillsExport() {
   console.log('[patch-node-modules] ✓ react-native rn-get-polyfills export');
 }
 
+function patchExpoStaticIndexPath() {
+  const pkgPath = path.join(ROOT, 'node_modules/@expo/cli/package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  const version = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version;
+  if (version !== '54.0.27') throw new Error(`[patch-node-modules] Expo CLI ${version} requires static path review`);
+  const target = path.join(ROOT, 'node_modules/@expo/cli/build/src/export/exportStaticAsync.js');
+  const source = fs.readFileSync(target, 'utf8');
+  // The upstream optional-slash regex strips "index" from "story-index",
+  // rendering /story- into story-index.html and breaking root hydration.
+  const before = "pathname: filePathLocation.replace(/(\\/?index)?$/, '')";
+  const after = "pathname: filePathLocation === 'index' ? '' : filePathLocation.replace(/\\/index$/, '')";
+  if (source.includes(after)) { skipped++; return; }
+  if (!source.includes(before)) throw new Error('[patch-node-modules] Expo static path target changed shape; review required');
+  fs.writeFileSync(target, source.replace(before, after), 'utf8');
+  patched++;
+  console.log('[patch-node-modules] ✓ Expo static index path segment');
+}
+
 patchImageSizeDoS();
 patchBracesDepthDoS();
 patchHttpCacheSemanticsMaxStale();
 patchNodeForgeNestedDigestAlgorithm();
 patchWorkletsStaticRendering();
 patchReactNativeRnGetPolyfillsExport();
+patchExpoStaticIndexPath();
 
 console.log(
   `[patch-node-modules] done: ${patched} patched, ${skipped} already-clean, ${missing} missing`,

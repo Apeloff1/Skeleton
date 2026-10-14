@@ -5,8 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, Mapping
 
 from .game_engine_lab import (
     EngineEra,
@@ -21,9 +21,11 @@ from .game_engine_lab import (
 from .game_engine_legacy import InputButton, InputFrame
 from .game_engine_rendering import (
     RasterFrame,
+    RasterImage,
     RasterPipeline,
     RenderTriangle,
     RenderVertex,
+    render_reference_image,
     render_reference_scene,
 )
 
@@ -121,18 +123,13 @@ def three_d_hardware(era: EngineEra | str) -> ThreeDHardwareSpec:
     try:
         return THREE_D_HARDWARE[key]
     except KeyError as exc:
-        raise GameEngineLabError(
-            f"3D runtime unavailable for {key.value}"
-        ) from exc
+        raise GameEngineLabError(f"3D runtime unavailable for {key.value}") from exc
 
 
 def default_3d_tuning(era: EngineEra | str) -> dict[str, float]:
     key = era if isinstance(era, EngineEra) else EngineEra(str(era))
     three_d_hardware(key)
-    return {
-        name: values[0]
-        for name, values in THREE_D_TUNING[key].items()
-    }
+    return {name: values[0] for name, values in THREE_D_TUNING[key].items()}
 
 
 def normalize_3d_tuning(
@@ -142,9 +139,7 @@ def normalize_3d_tuning(
     key = era if isinstance(era, EngineEra) else EngineEra(str(era))
     bounds = THREE_D_TUNING.get(key)
     if bounds is None:
-        raise GameEngineLabError(
-            f"3D runtime unavailable for {key.value}"
-        )
+        raise GameEngineLabError(f"3D runtime unavailable for {key.value}")
     source = default_3d_tuning(key) if tuning is None else dict(tuning)
     if set(source) != set(bounds):
         raise GameEngineLabError("3D tuning keys mismatch")
@@ -152,14 +147,10 @@ def normalize_3d_tuning(
     for name, (_, low, high) in bounds.items():
         raw = source[name]
         if isinstance(raw, bool) or not isinstance(raw, (int, float)):
-            raise GameEngineLabError(
-                f"3D tuning {name} must be numeric"
-            )
+            raise GameEngineLabError(f"3D tuning {name} must be numeric")
         value = float(raw)
         if not math.isfinite(value) or not low <= value <= high:
-            raise GameEngineLabError(
-                f"3D tuning {name} outside [{low}, {high}]"
-            )
+            raise GameEngineLabError(f"3D tuning {name} outside [{low}, {high}]")
         out[name] = value
     return out
 
@@ -169,20 +160,14 @@ def compile_3d_tuning(
     tree: VirtualFileTree,
 ) -> dict[str, float]:
     try:
-        payload = json.loads(
-            tree.read("engine/3d_tuning.json")
-        )
+        payload = json.loads(tree.read("engine/3d_tuning.json"))
     except (
         GameEngineLabError,
         json.JSONDecodeError,
     ) as exc:
-        raise GameEngineLabError(
-            "3D tuning missing or invalid"
-        ) from exc
+        raise GameEngineLabError("3D tuning missing or invalid") from exc
     if not isinstance(payload, dict):
-        raise GameEngineLabError(
-            "3D tuning must be object"
-        )
+        raise GameEngineLabError("3D tuning must be object")
     return normalize_3d_tuning(era, payload)
 
 
@@ -202,9 +187,7 @@ def _q(
     value: float,
 ) -> float:
     if not math.isfinite(value):
-        raise GameEngineLabError(
-            "3D state must be finite"
-        )
+        raise GameEngineLabError("3D state must be finite")
     if profile.numeric_mode is NumericMode.FIXED16:
         return round(value * 65536) / 65536
     if profile.numeric_mode is NumericMode.FIXED8:
@@ -318,9 +301,7 @@ class ThreeDMachine:
         tuning: Mapping[str, object] | None = None,
     ) -> None:
         if era not in THREE_D_ERAS:
-            raise GameEngineLabError(
-                f"3D machine unavailable for {era.value}"
-            )
+            raise GameEngineLabError(f"3D machine unavailable for {era.value}")
         self.profile = engine_era_profile(era)
         self.spec = three_d_hardware(era)
         self.tuning = normalize_3d_tuning(
@@ -339,15 +320,9 @@ class ThreeDMachine:
         self,
         frame: InputFrame | None = None,
     ) -> ThreeDFrame:
-        frame = (
-            InputFrame(self.tick)
-            if frame is None
-            else frame
-        )
+        frame = InputFrame(self.tick) if frame is None else frame
         if frame.tick != self.tick:
-            raise GameEngineLabError(
-                f"input tick mismatch: expected {self.tick}, got {frame.tick}"
-            )
+            raise GameEngineLabError(f"input tick mismatch: expected {self.tick}, got {frame.tick}")
         self._move(frame)
         commands, culled, state_changes = self._render()
         packet = ThreeDFrame(
@@ -365,10 +340,7 @@ class ThreeDMachine:
         self,
         frames: Iterable[InputFrame],
     ) -> tuple[ThreeDFrame, ...]:
-        return tuple(
-            self.step(frame)
-            for frame in frames
-        )
+        return tuple(self.step(frame) for frame in frames)
 
     def _move(
         self,
@@ -387,14 +359,12 @@ class ThreeDMachine:
         self.camera = Vec3(
             _q(
                 self.profile,
-                self.camera.x
-                + math.sin(radians) * amount,
+                self.camera.x + math.sin(radians) * amount,
             ),
             self.camera.y,
             _q(
                 self.profile,
-                self.camera.z
-                + math.cos(radians) * amount,
+                self.camera.z + math.cos(radians) * amount,
             ),
         )
         self.yaw = _q(
@@ -403,9 +373,7 @@ class ThreeDMachine:
         )
 
     def snapshot(self) -> ThreeDSnapshot:
-        state = tuple(
-            sorted(self._export().items())
-        )
+        state = tuple(sorted(self._export().items()))
         payload = {
             "era": self.profile.era.value,
             "tick": self.tick,
@@ -423,33 +391,23 @@ class ThreeDMachine:
         snapshot: ThreeDSnapshot,
     ) -> None:
         if snapshot.era is not self.profile.era:
-            raise GameEngineLabError(
-                "3D snapshot era mismatch"
-            )
+            raise GameEngineLabError("3D snapshot era mismatch")
         payload = {
             "era": snapshot.era.value,
             "tick": snapshot.tick,
             "state": snapshot.state,
         }
         if _digest(payload) != snapshot.digest:
-            raise GameEngineLabError(
-                "3D snapshot digest mismatch"
-            )
+            raise GameEngineLabError("3D snapshot digest mismatch")
         self.tick = snapshot.tick
-        self._import(
-            dict(snapshot.state)
-        )
+        self._import(dict(snapshot.state))
 
     def fingerprint(self) -> str:
         return _digest(
             {
                 "era": self.profile.era.value,
                 "tick": self.tick,
-                "state": tuple(
-                    sorted(
-                        self._export().items()
-                    )
-                ),
+                "state": tuple(sorted(self._export().items())),
             }
         )
 
@@ -467,12 +425,8 @@ class ThreeDMachine:
         self,
         state: Mapping[str, object],
     ) -> None:
-        self.camera = Vec3(
-            *state["camera"]
-        )
-        self.yaw = float(
-            state["yaw"]
-        )
+        self.camera = Vec3(*state["camera"])
+        self.yaw = float(state["yaw"])
 
     def _camera_space(
         self,
@@ -501,20 +455,10 @@ class ThreeDMachine:
             (),
         )
         for obj in objects:
-            camera_vertices: list[
-                RenderVertex
-            ] = []
+            camera_vertices: list[RenderVertex] = []
             for vertex in obj.mesh.vertices:
-                y = (
-                    vertex.y
-                    + obj.position.y
-                )
-                if (
-                    self.profile.era
-                    is EngineEra.SHADER
-                    and obj.shader
-                    == "skinned"
-                ):
+                y = vertex.y + obj.position.y
+                if self.profile.era is EngineEra.SHADER and obj.shader == "skinned":
                     phase = float(
                         getattr(
                             self,
@@ -522,23 +466,12 @@ class ThreeDMachine:
                             0.0,
                         )
                     )
-                    y += (
-                        math.sin(
-                            phase
-                            + vertex.x
-                            * 0.75
-                        )
-                        * self.tuning[
-                            "bone_wave"
-                        ]
-                    )
+                    y += math.sin(phase + vertex.x * 0.75) * self.tuning["bone_wave"]
                 camera = self._camera_space(
                     Vec3(
-                        vertex.x
-                        + obj.position.x,
+                        vertex.x + obj.position.x,
                         y,
-                        vertex.z
-                        + obj.position.z,
+                        vertex.z + obj.position.z,
                     )
                 )
                 camera_vertices.append(
@@ -554,15 +487,9 @@ class ThreeDMachine:
                         obj.object_id,
                         obj.material,
                         (
-                            camera_vertices[
-                                indices[0]
-                            ],
-                            camera_vertices[
-                                indices[1]
-                            ],
-                            camera_vertices[
-                                indices[2]
-                            ],
+                            camera_vertices[indices[0]],
+                            camera_vertices[indices[1]],
+                            camera_vertices[indices[2]],
                         ),
                         obj.shader,
                         (
@@ -573,91 +500,59 @@ class ThreeDMachine:
                                     0.0,
                                 )
                             )
-                            if obj.shader
-                            == "skinned"
+                            if obj.shader == "skinned"
                             else 0.0
                         ),
                     )
                 )
         return tuple(values)
 
-    def reference_raster(
+    def _reference_raster_options(
         self,
         *,
         width: int = 96,
-    ) -> RasterFrame:
-        """Rasterize current scene state through the era's historical pipeline."""
-        if (
-            type(width) is not int
-            or not 16 <= width <= 256
-        ):
-            raise GameEngineLabError(
-                "reference raster width outside [16, 256]"
-            )
+    ) -> dict[str, object]:
+        """Shared unchanged viewport and pipeline inputs for both projections."""
+        if type(width) is not int or not 16 <= width <= 256:
+            raise GameEngineLabError("reference raster width outside [16, 256]")
         height = max(
             16,
-            int(
-                round(
-                    width
-                    * self.spec.height
-                    / self.spec.width
-                )
-            ),
+            round(width * self.spec.height / self.spec.width),
         )
-        if (
-            self.profile.era
-            is EngineEra.EARLY_3D
-        ):
-            focal = self.tuning[
-                "focal_length"
-            ]
-            fov_y = math.degrees(
-                2.0
-                * math.atan(
-                    self.spec.height
-                    / (
-                        2.0
-                        * focal
-                    )
-                )
-            )
+        if self.profile.era is EngineEra.EARLY_3D:
+            focal = self.tuning["focal_length"]
+            fov_y = math.degrees(2.0 * math.atan(self.spec.height / (2.0 * focal)))
             far = 512.0
-            pipeline = (
-                RasterPipeline.PAINTER
-            )
-        elif (
-            self.profile.era
-            is EngineEra.FIXED_3D
-        ):
-            fov_y = self.tuning[
-                "fov_deg"
-            ]
-            far = self.tuning[
-                "far_plane"
-            ]
-            pipeline = (
-                RasterPipeline.FIXED
-            )
+            pipeline = RasterPipeline.PAINTER
+        elif self.profile.era is EngineEra.FIXED_3D:
+            fov_y = self.tuning["fov_deg"]
+            far = self.tuning["far_plane"]
+            pipeline = RasterPipeline.FIXED
         else:
-            fov_y = self.tuning[
-                "fov_deg"
-            ]
-            far = self.tuning[
-                "far_plane"
-            ]
-            pipeline = (
-                RasterPipeline.PROGRAMMABLE
-            )
+            fov_y = self.tuning["fov_deg"]
+            far = self.tuning["far_plane"]
+            pipeline = RasterPipeline.PROGRAMMABLE
+        return {
+            "width": width,
+            "height": height,
+            "near": self.tuning["near_plane"],
+            "far": far,
+            "fov_y_deg": fov_y,
+            "pipeline": pipeline,
+        }
+
+    def reference_raster(self, *, width: int = 96) -> RasterFrame:
+        """Rasterize current scene state through the era's historical pipeline."""
         return render_reference_scene(
             self.reference_triangles(),
-            width=width,
-            height=height,
-            near=self.tuning[
-                "near_plane"
-            ],
-            far=far,
-            fov_y_deg=fov_y,
-            pipeline=pipeline,
+            **self._reference_raster_options(width=width),
+        )
+
+    def reference_image(self, *, width: int = 96) -> RasterImage:
+        """Capture actual RGB pixels through the same bounded raster pipeline."""
+        return render_reference_image(
+            self.reference_triangles(),
+            **self._reference_raster_options(width=width),
         )
 
     def _render(
@@ -707,21 +602,9 @@ class SoftwareBspMachine(ThreeDMachine):
     def _bsp_order(
         self,
     ) -> tuple[SceneObject, ...]:
-        west = tuple(
-            obj
-            for obj in self.objects
-            if obj.position.x < 0
-        )
-        east = tuple(
-            obj
-            for obj in self.objects
-            if obj.position.x >= 0
-        )
-        return (
-            east + west
-            if self.camera.x < 0
-            else west + east
-        )
+        west = tuple(obj for obj in self.objects if obj.position.x < 0)
+        east = tuple(obj for obj in self.objects if obj.position.x >= 0)
+        return east + west if self.camera.x < 0 else west + east
 
     def _render(
         self,
@@ -730,65 +613,39 @@ class SoftwareBspMachine(ThreeDMachine):
         int,
         int,
     ]:
-        focal = self.tuning[
-            "focal_length"
-        ]
-        near = self.tuning[
-            "near_plane"
-        ]
-        commands: list[
-            TriangleCommand
-        ] = []
+        focal = self.tuning["focal_length"]
+        near = self.tuning["near_plane"]
+        commands: list[TriangleCommand] = []
         culled = 0
         for obj in self._bsp_order():
             camera_vertices = [
                 self._camera_space(
                     Vec3(
-                        vertex.x
-                        + obj.position.x,
-                        vertex.y
-                        + obj.position.y,
-                        vertex.z
-                        + obj.position.z,
+                        vertex.x + obj.position.x,
+                        vertex.y + obj.position.y,
+                        vertex.z + obj.position.z,
                     )
                 )
-                for vertex
-                in obj.mesh.vertices
+                for vertex in obj.mesh.vertices
             ]
             for triangle in obj.mesh.triangles:
-                vertices = [
-                    camera_vertices[index]
-                    for index in triangle
-                ]
-                depth = (
-                    sum(
-                        vertex.z
-                        for vertex in vertices
-                    )
-                    / 3
-                )
+                vertices = [camera_vertices[index] for index in triangle]
+                depth = sum(vertex.z for vertex in vertices) / 3
                 if depth <= near:
                     culled += 1
                     continue
                 points = tuple(
                     (
                         round(
-                            self.spec.width / 2
-                            + vertex.x
-                            * focal
-                            / vertex.z,
+                            self.spec.width / 2 + vertex.x * focal / vertex.z,
                             3,
                         ),
                         round(
-                            self.spec.height / 2
-                            - vertex.y
-                            * focal
-                            / vertex.z,
+                            self.spec.height / 2 - vertex.y * focal / vertex.z,
                             3,
                         ),
                     )
-                    for vertex
-                    in vertices
+                    for vertex in vertices
                 )
                 commands.append(
                     TriangleCommand(
@@ -806,9 +663,7 @@ class SoftwareBspMachine(ThreeDMachine):
                 command.points,
             )
         )
-        commands = commands[
-            : self.profile.draw_budget
-        ]
+        commands = commands[: self.profile.draw_budget]
         return (
             tuple(commands),
             culled,
@@ -857,38 +712,13 @@ class FixedFunctionMachine(ThreeDMachine):
         self,
         obj: SceneObject,
     ) -> Vec3 | None:
-        point = self._camera_space(
-            obj.position
-        )
-        near = self.tuning[
-            "near_plane"
-        ]
-        far = self.tuning[
-            "far_plane"
-        ]
-        if (
-            point.z - obj.radius
-            < near
-            or point.z - obj.radius
-            > far
-        ):
+        point = self._camera_space(obj.position)
+        near = self.tuning["near_plane"]
+        far = self.tuning["far_plane"]
+        if point.z - obj.radius < near or point.z - obj.radius > far:
             return None
-        half = (
-            math.tan(
-                math.radians(
-                    self.tuning[
-                        "fov_deg"
-                    ]
-                )
-                / 2
-            )
-            * point.z
-        )
-        if (
-            abs(point.x)
-            - obj.radius
-            > half
-        ):
+        half = math.tan(math.radians(self.tuning["fov_deg"]) / 2) * point.z
+        if abs(point.x) - obj.radius > half:
             return None
         return point
 
@@ -899,9 +729,7 @@ class FixedFunctionMachine(ThreeDMachine):
         int,
         int,
     ]:
-        rows: list[
-            Draw3DCommand
-        ] = []
+        rows: list[Draw3DCommand] = []
         culled = 0
         for obj in self.objects:
             point = self._visible(obj)
@@ -913,10 +741,7 @@ class FixedFunctionMachine(ThreeDMachine):
                     obj.object_id,
                     obj.material,
                     len(obj.mesh.vertices),
-                    len(
-                        obj.mesh.triangles
-                    )
-                    * 3,
+                    len(obj.mesh.triangles) * 3,
                     round(
                         point.z,
                         6,
@@ -942,11 +767,7 @@ class FixedFunctionMachine(ThreeDMachine):
                 changes += 1
                 last = row.state_key
         return (
-            tuple(
-                rows[
-                    : self.profile.draw_budget
-                ]
-            ),
+            tuple(rows[: self.profile.draw_budget]),
             culled,
             changes,
         )
@@ -972,24 +793,10 @@ class ShaderProgram:
             "fog",
             "tint",
         }
-        if (
-            not set(self.vertex_ops)
-            <= allowed_vertex
-            or not set(
-                self.pixel_ops
-            )
-            <= allowed_pixel
-        ):
-            raise GameEngineLabError(
-                "unsupported shader op"
-            )
-        if (
-            self.constants < 0
-            or self.constants > 64
-        ):
-            raise GameEngineLabError(
-                "shader constant budget exceeded"
-            )
+        if not set(self.vertex_ops) <= allowed_vertex or not set(self.pixel_ops) <= allowed_pixel:
+            raise GameEngineLabError("unsupported shader op")
+        if self.constants < 0 or self.constants > 64:
+            raise GameEngineLabError("shader constant budget exceeded")
 
 
 SHADERS = {
@@ -1066,11 +873,7 @@ class ShaderConsoleMachine(ThreeDMachine):
         super()._move(frame)
         self.animation_phase = _q(
             self.profile,
-            (
-                self.animation_phase
-                + 0.05
-            )
-            % math.tau,
+            (self.animation_phase + 0.05) % math.tau,
         )
 
     def _render(
@@ -1080,51 +883,23 @@ class ShaderConsoleMachine(ThreeDMachine):
         int,
         int,
     ]:
-        rows: list[
-            Draw3DCommand
-        ] = []
+        rows: list[Draw3DCommand] = []
         culled = 0
-        near = self.tuning[
-            "near_plane"
-        ]
-        far = self.tuning[
-            "far_plane"
-        ]
-        half_tangent = math.tan(
-            math.radians(
-                self.tuning[
-                    "fov_deg"
-                ]
-            )
-            / 2
-        )
+        near = self.tuning["near_plane"]
+        far = self.tuning["far_plane"]
+        half_tangent = math.tan(math.radians(self.tuning["fov_deg"]) / 2)
         for obj in self.objects:
-            point = self._camera_space(
-                obj.position
-            )
-            if (
-                point.z < near
-                or point.z > far
-                or abs(point.x)
-                > (
-                    point.z
-                    * half_tangent
-                    + obj.radius
-                )
-            ):
+            point = self._camera_space(obj.position)
+            if point.z < near or point.z > far or abs(point.x) > (point.z * half_tangent + obj.radius):
                 culled += 1
                 continue
-            program = SHADERS[
-                obj.shader
-            ]
+            program = SHADERS[obj.shader]
             constants = {
                 "phase": round(
                     self.animation_phase,
                     6,
                 ),
-                "wave": self.tuning[
-                    "bone_wave"
-                ],
+                "wave": self.tuning["bone_wave"],
                 "camera": (
                     self.camera.x,
                     self.camera.y,
@@ -1136,10 +911,7 @@ class ShaderConsoleMachine(ThreeDMachine):
                     obj.object_id,
                     obj.material,
                     len(obj.mesh.vertices),
-                    len(
-                        obj.mesh.triangles
-                    )
-                    * 3,
+                    len(obj.mesh.triangles) * 3,
                     round(
                         point.z,
                         6,
@@ -1147,16 +919,12 @@ class ShaderConsoleMachine(ThreeDMachine):
                     (
                         obj.material,
                         int(
-                            hashlib.sha256(
-                                program.name.encode("utf-8")
-                            ).hexdigest()[:8],
+                            hashlib.sha256(program.name.encode("utf-8")).hexdigest()[:8],
                             16,
                         ),
                     ),
                     shader=program.name,
-                    constants_digest=_digest(
-                        constants
-                    ),
+                    constants_digest=_digest(constants),
                 )
             )
         rows.sort(
@@ -1178,11 +946,7 @@ class ShaderConsoleMachine(ThreeDMachine):
                 changes += 1
                 last = state
         return (
-            tuple(
-                rows[
-                    : self.profile.draw_budget
-                ]
-            ),
+            tuple(rows[: self.profile.draw_budget]),
             culled,
             changes,
         )
@@ -1191,9 +955,7 @@ class ShaderConsoleMachine(ThreeDMachine):
         self,
     ) -> dict[str, object]:
         out = super()._export()
-        out[
-            "animation_phase"
-        ] = self.animation_phase
+        out["animation_phase"] = self.animation_phase
         return out
 
     def _import(
@@ -1201,37 +963,21 @@ class ShaderConsoleMachine(ThreeDMachine):
         state: Mapping[str, object],
     ) -> None:
         super()._import(state)
-        self.animation_phase = float(
-            state[
-                "animation_phase"
-            ]
-        )
+        self.animation_phase = float(state["animation_phase"])
 
 
 def create_3d_machine(
     era: EngineEra | str,
     tuning: Mapping[str, object] | None = None,
 ) -> ThreeDMachine:
-    key = (
-        era
-        if isinstance(era, EngineEra)
-        else EngineEra(str(era))
-    )
+    key = era if isinstance(era, EngineEra) else EngineEra(str(era))
     if key is EngineEra.EARLY_3D:
-        return SoftwareBspMachine(
-            tuning
-        )
+        return SoftwareBspMachine(tuning)
     if key is EngineEra.FIXED_3D:
-        return FixedFunctionMachine(
-            tuning
-        )
+        return FixedFunctionMachine(tuning)
     if key is EngineEra.SHADER:
-        return ShaderConsoleMachine(
-            tuning
-        )
-    raise GameEngineLabError(
-        f"3D runtime unavailable for {key.value}"
-    )
+        return ShaderConsoleMachine(tuning)
+    raise GameEngineLabError(f"3D runtime unavailable for {key.value}")
 
 
 def create_3d_machine_from_tree(
@@ -1251,11 +997,7 @@ def build_3d_engine_tree(
     era: EngineEra | str,
     gameplay_dialect: str | None = None,
 ) -> VirtualFileTree:
-    key = (
-        era
-        if isinstance(era, EngineEra)
-        else EngineEra(str(era))
-    )
+    key = era if isinstance(era, EngineEra) else EngineEra(str(era))
     spec = three_d_hardware(key)
     profile = engine_era_profile(key)
     base = build_engine_file_tree(
@@ -1266,31 +1008,20 @@ def build_3d_engine_tree(
         "engine/3d_pipeline.json": {
             "pipeline": spec.pipeline,
             "z_buffer": spec.z_buffer,
-            "texture_units":
-                spec.texture_units,
-            "max_lights":
-                spec.max_lights,
-            "matrix_stack":
-                spec.matrix_stack,
-            "draw_budget":
-                profile.draw_budget,
+            "texture_units": spec.texture_units,
+            "max_lights": spec.max_lights,
+            "matrix_stack": spec.matrix_stack,
+            "draw_budget": profile.draw_budget,
         },
         "engine/visibility.json": {
             "mode": spec.visibility,
-            "near_clip":
-                default_3d_tuning(
-                    key
-                )[
-                    "near_plane"
-                ],
+            "near_clip": default_3d_tuning(key)["near_plane"],
         },
-        "engine/3d_tuning.json":
-            default_3d_tuning(key),
+        "engine/3d_tuning.json": default_3d_tuning(key),
         "assets/scene3d.json": {
             "mesh": "cube",
             "objects": 3,
-            "coordinate_system":
-                "x_right_y_up_z_forward",
+            "coordinate_system": "x_right_y_up_z_forward",
         },
     }
     patches = [
@@ -1303,16 +1034,12 @@ def build_3d_engine_tree(
             )
             + "\n",
         )
-        for path, payload
-        in files.items()
+        for path, payload in files.items()
     ]
     patches.append(
         SandboxPatch(
             "engine/3d_runtime.py",
-            (
-                f'ENGINE_ERA = "{key.value}"\n'
-                f'MACHINE = "{create_3d_machine(key).__class__.__name__}"\n'
-            ),
+            (f'ENGINE_ERA = "{key.value}"\n' f'MACHINE = "{create_3d_machine(key).__class__.__name__}"\n'),
         )
     )
     if key is EngineEra.SHADER:
@@ -1322,19 +1049,11 @@ def build_3d_engine_tree(
                 json.dumps(
                     {
                         name: {
-                            "vertex_ops":
-                                list(
-                                    program.vertex_ops
-                                ),
-                            "pixel_ops":
-                                list(
-                                    program.pixel_ops
-                                ),
-                            "constants":
-                                program.constants,
+                            "vertex_ops": list(program.vertex_ops),
+                            "pixel_ops": list(program.pixel_ops),
+                            "constants": program.constants,
                         }
-                        for name, program
-                        in SHADERS.items()
+                        for name, program in SHADERS.items()
                     },
                     indent=2,
                     sort_keys=True,
@@ -1362,17 +1081,11 @@ class ThreeDQualityReport:
 
     @property
     def passed(self) -> bool:
-        return all(
-            probe.passed
-            for probe in self.probes
-        )
+        return all(probe.passed for probe in self.probes)
 
     @property
     def score(self) -> float:
-        return sum(
-            probe.passed
-            for probe in self.probes
-        ) / max(
+        return sum(probe.passed for probe in self.probes) / max(
             1,
             len(self.probes),
         )
@@ -1381,11 +1094,7 @@ class ThreeDQualityReport:
     def failed(
         self,
     ) -> tuple[str, ...]:
-        return tuple(
-            probe.name
-            for probe in self.probes
-            if not probe.passed
-        )
+        return tuple(probe.name for probe in self.probes if not probe.passed)
 
 
 class ThreeDEngineAdversary:
@@ -1395,15 +1104,9 @@ class ThreeDEngineAdversary:
     ) -> tuple[InputFrame, ...]:
         frames = []
         for tick in range(count):
-            buttons = (
-                InputButton.UP
-                if tick % 30 < 18
-                else InputButton.NONE
-            )
+            buttons = InputButton.UP if tick % 30 < 18 else InputButton.NONE
             if tick % 20 < 8:
-                buttons |= (
-                    InputButton.RIGHT
-                )
+                buttons |= InputButton.RIGHT
             frames.append(
                 InputFrame(
                     tick,
@@ -1417,18 +1120,11 @@ class ThreeDEngineAdversary:
         era: EngineEra | str,
         tree: VirtualFileTree | None = None,
     ) -> ThreeDQualityReport:
-        key = (
-            era
-            if isinstance(era, EngineEra)
-            else EngineEra(str(era))
-        )
+        key = era if isinstance(era, EngineEra) else EngineEra(str(era))
         spec = three_d_hardware(key)
-        active = (
-            tree
-            or build_3d_engine_tree(
-                key,
-                "boomer_shooter",
-            )
+        active = tree or build_3d_engine_tree(
+            key,
+            "boomer_shooter",
         )
         required = {
             "engine/3d_pipeline.json",
@@ -1438,21 +1134,13 @@ class ThreeDEngineAdversary:
             "engine/3d_runtime.py",
         }
         if key is EngineEra.SHADER:
-            required.add(
-                "engine/shaders.json"
-            )
-        tree_ok = required <= set(
-            active.files
-        )
+            required.add("engine/shaders.json")
+        tree_ok = required <= set(active.files)
         probes = [
             ThreeDProbe(
                 "file_tree",
                 tree_ok,
-                (
-                    "3D runtime tree present"
-                    if tree_ok
-                    else "3D runtime files missing"
-                ),
+                ("3D runtime tree present" if tree_ok else "3D runtime files missing"),
             )
         ]
         try:
@@ -1464,9 +1152,7 @@ class ThreeDEngineAdversary:
             tuning = None
             detail = str(exc)
         else:
-            detail = (
-                "bounded 3D tuning compiled"
-            )
+            detail = "bounded 3D tuning compiled"
         probes.append(
             ThreeDProbe(
                 "tuning",
@@ -1503,33 +1189,19 @@ class ThreeDEngineAdversary:
             key,
             tuning,
         )
-        first_packets = first.run(
-            script
-        )
-        second_packets = second.run(
-            script
-        )
+        first_packets = first.run(script)
+        second_packets = second.run(script)
         probes.append(
             ThreeDProbe(
                 "determinism",
-                (
-                    first.fingerprint()
-                    == second.fingerprint()
-                    and first_packets
-                    == second_packets
-                ),
+                (first.fingerprint() == second.fingerprint() and first_packets == second_packets),
                 "identical input replay",
             )
         )
         probes.append(
             ThreeDProbe(
                 "draw_budget",
-                all(
-                    len(packet.commands)
-                    <= first.profile.draw_budget
-                    for packet
-                    in first_packets
-                ),
+                all(len(packet.commands) <= first.profile.draw_budget for packet in first_packets),
                 "bounded 3D command buffers",
             )
         )
@@ -1538,9 +1210,7 @@ class ThreeDEngineAdversary:
             key,
             tuning,
         )
-        snapshot_machine.run(
-            self._script(40)
-        )
+        snapshot_machine.run(self._script(40))
         snapshot = snapshot_machine.snapshot()
         before = snapshot_machine.fingerprint()
         snapshot_machine.run(
@@ -1552,16 +1222,11 @@ class ThreeDEngineAdversary:
                 for index in range(10)
             )
         )
-        snapshot_machine.restore(
-            snapshot
-        )
+        snapshot_machine.restore(snapshot)
         probes.append(
             ThreeDProbe(
                 "snapshot",
-                (
-                    snapshot_machine.fingerprint()
-                    == before
-                ),
+                (snapshot_machine.fingerprint() == before),
                 "3D state roundtrip",
             )
         )
@@ -1569,32 +1234,16 @@ class ThreeDEngineAdversary:
         if key is EngineEra.EARLY_3D:
             order_ok = all(
                 all(
-                    frame.commands[index].depth
-                    >= frame.commands[
-                        index + 1
-                    ].depth
-                    for index
-                    in range(
-                        len(
-                            frame.commands
-                        )
-                        - 1
-                    )
+                    frame.commands[index].depth >= frame.commands[index + 1].depth
+                    for index in range(len(frame.commands) - 1)
                 )
-                for frame
-                in first_packets
+                for frame in first_packets
             )
             probes.append(
                 ThreeDProbe(
                     "pipeline",
-                    (
-                        order_ok
-                        and not spec.z_buffer
-                    ),
-                    (
-                        "BSP/painter ordering "
-                        "without z buffer"
-                    ),
+                    (order_ok and not spec.z_buffer),
+                    ("BSP/painter ordering " "without z buffer"),
                 )
             )
         elif key is EngineEra.FIXED_3D:
@@ -1608,18 +1257,12 @@ class ThreeDEngineAdversary:
                                 command,
                                 Draw3DCommand,
                             )
-                            and command.shader
-                            == "fixed"
-                            for frame
-                            in first_packets
-                            for command
-                            in frame.commands
+                            and command.shader == "fixed"
+                            for frame in first_packets
+                            for command in frame.commands
                         )
                     ),
-                    (
-                        "fixed-function "
-                        "z-buffer pipeline"
-                    ),
+                    ("fixed-function " "z-buffer pipeline"),
                 )
             )
         else:
@@ -1633,22 +1276,13 @@ class ThreeDEngineAdversary:
                                 command,
                                 Draw3DCommand,
                             )
-                            and command.shader
-                            in SHADERS
-                            and len(
-                                command.constants_digest
-                            )
-                            == 64
-                            for frame
-                            in first_packets
-                            for command
-                            in frame.commands
+                            and command.shader in SHADERS
+                            and len(command.constants_digest) == 64
+                            for frame in first_packets
+                            for command in frame.commands
                         )
                     ),
-                    (
-                        "bounded programmable "
-                        "shader pipeline"
-                    ),
+                    ("bounded programmable " "shader pipeline"),
                 )
             )
         raster_first = create_3d_machine(
@@ -1660,29 +1294,15 @@ class ThreeDEngineAdversary:
             tuning,
         ).reference_raster()
         raster_ok = (
-            raster_first
-            == raster_second
-            and len(
-                raster_first.digest
-            )
-            == 64
-            and raster_first.stats.covered_pixels
-            > 0
-            and raster_first.stats.rasterized_triangles
-            > 0
-            and raster_first.stats.min_depth
-            is not None
-            and raster_first.stats.max_depth
-            is not None
+            raster_first == raster_second
+            and len(raster_first.digest) == 64
+            and raster_first.stats.covered_pixels > 0
+            and raster_first.stats.rasterized_triangles > 0
+            and raster_first.stats.min_depth is not None
+            and raster_first.stats.max_depth is not None
         )
-        if (
-            key is EngineEra.EARLY_3D
-        ):
-            raster_ok = (
-                raster_ok
-                and raster_first.stats.depth_rejected_fragments
-                == 0
-            )
+        if key is EngineEra.EARLY_3D:
+            raster_ok = raster_ok and raster_first.stats.depth_rejected_fragments == 0
         probes.append(
             ThreeDProbe(
                 "raster",
@@ -1709,7 +1329,7 @@ class ThreeDEngineSandbox:
     def apply(
         self,
         patches: Iterable[SandboxPatch],
-    ) -> "ThreeDEngineSandbox":
+    ) -> ThreeDEngineSandbox:
         return ThreeDEngineSandbox(
             self.era,
             self.tree.apply(patches),
@@ -1748,26 +1368,16 @@ class ThreeDImprovementResult:
 class ThreeDEngineLab:
     def __init__(
         self,
-        adversary:
-            ThreeDEngineAdversary
-            | None = None,
+        adversary: ThreeDEngineAdversary | None = None,
     ) -> None:
-        self.adversary = (
-            adversary
-            or ThreeDEngineAdversary()
-        )
+        self.adversary = adversary or ThreeDEngineAdversary()
 
     def create(
         self,
         era: EngineEra | str,
-        gameplay_dialect:
-            str | None = None,
+        gameplay_dialect: str | None = None,
     ) -> ThreeDEngineSandbox:
-        key = (
-            era
-            if isinstance(era, EngineEra)
-            else EngineEra(str(era))
-        )
+        key = era if isinstance(era, EngineEra) else EngineEra(str(era))
         three_d_hardware(key)
         return ThreeDEngineSandbox(
             key,
@@ -1805,24 +1415,13 @@ class ThreeDEngineLab:
             "assets/scene3d.json",
             "engine/3d_runtime.py",
         }
-        if (
-            sandbox.era
-            is EngineEra.SHADER
-        ):
-            protected.add(
-                "engine/shaders.json"
-            )
-        patches: list[
-            SandboxPatch
-        ] = []
+        if sandbox.era is EngineEra.SHADER:
+            protected.add("engine/shaders.json")
+        patches: list[SandboxPatch] = []
         for path in sorted(protected):
             wanted = canonical.read(path)
             try:
-                current = (
-                    sandbox.tree.read(
-                        path
-                    )
-                )
+                current = sandbox.tree.read(path)
             except GameEngineLabError:
                 current = None
             if current != wanted:
@@ -1830,9 +1429,7 @@ class ThreeDEngineLab:
                     SandboxPatch(
                         path,
                         wanted,
-                        sandbox.tree.file_digest(
-                            path
-                        ),
+                        sandbox.tree.file_digest(path),
                     )
                 )
         return tuple(patches)
@@ -1845,24 +1442,12 @@ class ThreeDEngineLab:
         improver=None,
     ) -> ThreeDImprovementResult:
         if not 0 < target <= 1:
-            raise GameEngineLabError(
-                "target must be within (0, 1]"
-            )
+            raise GameEngineLabError("target must be within (0, 1]")
         current = sandbox
-        report = self.evaluate(
-            current
-        )
-        rounds: list[
-            ThreeDImprovementRound
-        ] = []
-        strategy = (
-            improver
-            or self.canonical_repair
-        )
-        if (
-            report.passed
-            and report.score >= target
-        ):
+        report = self.evaluate(current)
+        rounds: list[ThreeDImprovementRound] = []
+        strategy = improver or self.canonical_repair
+        if report.passed and report.score >= target:
             return ThreeDImprovementResult(
                 current,
                 report,
@@ -1881,23 +1466,12 @@ class ThreeDEngineLab:
             )
             if not patches:
                 break
-            candidate = current.apply(
-                patches
-            )
-            next_report = self.evaluate(
-                candidate
-            )
+            candidate = current.apply(patches)
+            next_report = self.evaluate(candidate)
             accepted = (
-                candidate.tree.digest
-                != current.tree.digest
-                and next_report.score
-                >= report.score
-                and len(
-                    next_report.failed
-                )
-                <= len(
-                    report.failed
-                )
+                candidate.tree.digest != current.tree.digest
+                and next_report.score >= report.score
+                and len(next_report.failed) <= len(report.failed)
             )
             rounds.append(
                 ThreeDImprovementRound(
@@ -1914,17 +1488,11 @@ class ThreeDEngineLab:
                 break
             current = candidate
             report = next_report
-            if (
-                report.passed
-                and report.score >= target
-            ):
+            if report.passed and report.score >= target:
                 break
         return ThreeDImprovementResult(
             current,
             report,
             tuple(rounds),
-            (
-                report.passed
-                and report.score >= target
-            ),
+            (report.passed and report.score >= target),
         )

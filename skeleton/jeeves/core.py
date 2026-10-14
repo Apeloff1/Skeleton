@@ -127,7 +127,8 @@ class Jeeves:
                           shadow_write_authorize=None, shadow_review_verify=None,
                           shadow_admission_verify=None, shadow_consume_verify=None,
                           file_atlas=None, file_atlas_read_authorize=None,
-                          source_read_authorize=None):
+                          source_read_authorize=None,
+                          studio_handlers=None, studio_authorize=None):
         """Assemble app discovery tools and optionally host-owned creator actions.
 
         By default every tool is READ_ONLY. Editor dispatch is opt-in and only
@@ -188,6 +189,11 @@ class Jeeves:
                 )
         elif source_read_authorize is not None:
             raise ValueError("source read authorization requires a scoped file atlas")
+        if (studio_handlers is None) != (studio_authorize is None):
+            raise ValueError("studio owner handlers and exact-command authorizer required together")
+        if studio_handlers is not None:
+            from skeleton.jeeves.game_studio_tools import register_studio_tools
+            register_studio_tools(registry, handlers=studio_handlers, authorize=studio_authorize)
         return registry
 
     def app_capability_catalog(self, *, query: str = "", limit: int = 20, offset: int = 0, root=None):

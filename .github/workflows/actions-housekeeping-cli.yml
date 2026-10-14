@@ -36,7 +36,10 @@ jobs:
       ARTIFACT_RETENTION_DAYS: '14'
       FAILED_RUN_RETENTION_DAYS: '21'
       MAX_CACHE_DELETES: '500'
-      MAX_RUN_DELETES: '1000'
+      # A 1,000-delete sweep held the independent ARM lane for eleven minutes,
+      # starving branch pruning while hundreds of CI jobs were queued. Process
+      # cold history in bounded batches; later scheduled/woken sweeps continue.
+      MAX_RUN_DELETES: '150'
       LIVE_RUN_STALE_MINUTES: '10'
       LIVE_FORCE_CANCEL_STALE_MINUTES: '1440'
       # Provider-stuck runs can reject force-cancel indefinitely. Keep a

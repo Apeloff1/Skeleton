@@ -1017,6 +1017,9 @@ def create_app() -> Any:
 
     fastapi = _get_fastapi()
     app = fastapi.FastAPI(title="Skeleton API", version="16.0.0", description="AI game engine / agent orchestration framework")
+    from starlette.middleware.cors import CORSMiddleware
+    from skeleton.config.settings import get_settings
+
     runtime_lifecycle = RuntimeServiceLifecycle("skeleton")
     app.state.runtime_lifecycle = runtime_lifecycle
     install_error_handlers(app)
@@ -1067,6 +1070,15 @@ def create_app() -> Any:
         body_limits=_gate_body_limits(),
     )
     install_gate(app, policy=gate_policy)
+    # Wrap gate/lifecycle denials as well as successful route responses. CORS
+    # admits a browser origin; protected commands still need engine authority.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().server.cors_origins,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
 
     @app.on_event("startup")
     async def startup():

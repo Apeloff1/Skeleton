@@ -336,7 +336,10 @@ class NativeLLMRuntime:
         size = logical_bytes(snapshot)
         if size > self.limits.max_model_bytes:
             raise RuntimeContractError("mutated model exceeds runtime memory budget")
-        tokenizer = NativeTokenizer(self.model)
+        try:
+            tokenizer = NativeTokenizer(self.model)
+        except TokenizerContractError as exc:
+            raise RuntimeContractError("native tokenizer re-admission failed") from exc
         architecture = self._architecture()
         if self.limits.max_context > self.model.ctx:
             raise RuntimeContractError("mutated model context below runtime limit")

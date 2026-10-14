@@ -24,8 +24,12 @@ const COLORS = { background:'#080A11', panel:'#111827', border:'#293247',
 export default function WorldWorkbench() {
   const router = useRouter();
   const params = useLocalSearchParams<{ game?: string|string[]; build?: string|string[] }>();
-  const gameId = validProjectId(Array.isArray(params.game) ? params.game[0] : params.game) ||
-    validProjectId(Array.isArray(params.build) ? params.build[0] : params.build);
+  const [hydrated, setHydrated] = React.useState(false);
+  React.useEffect(() => { setHydrated(true); }, []);
+  // Static exports have no query context. Match that guard on the first
+  // browser render before loading the authorized project selected by URL.
+  const gameId = hydrated ? (validProjectId(Array.isArray(params.game) ? params.game[0] : params.game) ||
+    validProjectId(Array.isArray(params.build) ? params.build[0] : params.build)) : '';
   const { width } = useWindowDimensions();
   const wide = width >= 780;
 

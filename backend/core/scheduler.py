@@ -14,6 +14,7 @@ so a failure is logged to the PROOD event bus but never crashes the loop.
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 _scheduler = None          # AsyncIOScheduler singleton
@@ -56,6 +57,17 @@ async def fabric_snapshot():
         await omega_fabric._persist_state(force=True)
         return {"persisted": True}
     return await _safe("fabric_snapshot", _snap())
+
+
+async def studio_campaign_recovery():
+    """Recover bounded, explicitly authorized campaigns in the existing scheduler."""
+    from core.game_studio_learning import ensure_campaign_indexes, recover_studio_campaigns
+
+    async def recover():
+        await ensure_campaign_indexes()
+        return await recover_studio_campaigns(limit=32)
+
+    return await _safe("studio_campaign_recovery", recover())
 
 
 async def idle_augment():
@@ -108,6 +120,9 @@ def start_scheduler() -> bool:
                 max_instances=1, coalesce=True)
     sch.add_job(idle_augment, "interval", minutes=15, id="idle_augment",
                 max_instances=1, coalesce=True)
+    sch.add_job(studio_campaign_recovery, "interval", seconds=30, id="studio_campaign_recovery",
+                next_run_time=datetime.now(timezone.utc), max_instances=1, coalesce=True,
+                misfire_grace_time=30)
     try:
         sch.start()
     except Exception:  # noqa: BLE001
@@ -125,7 +140,8 @@ def scheduler_status() -> Dict:
 
 async def run_job_now(job_id: str) -> Dict:
     """Manually trigger a scheduled job (for demos / ops)."""
-    mapping = {"lafs_online_sweep": lafs_online_sweep,
+    mapping = {"studio_campaign_recovery": studio_campaign_recovery,
+               "lafs_online_sweep": lafs_online_sweep,
                "legion_drill": legion_drill,
                "fabric_snapshot": fabric_snapshot,
                "idle_augment": idle_augment}

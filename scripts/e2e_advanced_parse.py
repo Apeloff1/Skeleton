@@ -155,7 +155,8 @@ def main():
     lines.extend(["", "Static signals are review candidates, not confirmed defects or test-pass evidence.", ""])
     (output / "advanced-parse.md").write_text("\n".join(lines))
     print("E2E static scan: " + str(len(suites)) + " modules; " + str(len(candidates)) + " candidates")
-    return 2 if any(x["severity"] == "critical" for x in candidates) else 0
+    return 2 if any(x["severity"] == "critical" or x["kind"] == "syntax-error"
+                    for x in candidates) else 0
 
 if __name__ == "__main__":
     raise SystemExit(main())

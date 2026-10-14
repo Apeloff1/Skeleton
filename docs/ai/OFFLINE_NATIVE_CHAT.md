@@ -198,7 +198,7 @@ Every API call requires the `Authorization: Bearer <private-token>` header. All 
 
     {"message":"hello","request_id":"my-stable-retry-001","max_output_tokens":32}
 
-The server binds exclusively to numeric 127.0.0.1, checks the Host and Origin, denies cross-origin requests and encoded paths, uses no permissive CORS, restricts HTTP body and connection budgets, and never logs prompts or secrets. The token is held in browser tab memory only. Reusing a request ID with identical inputs replays the recorded answer; changing its inputs rejects the request without a new model execution.
+The server binds exclusively to numeric 127.0.0.1, checks the Host and Origin, denies cross-origin requests and encoded paths, uses no permissive CORS, restricts HTTP body and connection budgets, and never logs prompts or secrets. The token is held in browser tab memory only. Reusing a request ID with identical inputs replays the recorded answer; changing its inputs rejects the request without a new model execution. While a generation is active, the synchronous `/turn` endpoint returns HTTP 409 to concurrent submissions. Retry with the same request ID and inputs after the active turn settles to recover its committed answer without generating or committing a second turn.
 
 The browser UI supports model status, multi-turn chat, full saved-history recall, new sessions, deletion, forking and portable backup. **Backups remain plaintext** and should be protected as private records. This local single-user surface is not yet an independently security-assessed, authenticated multi-user product.
 

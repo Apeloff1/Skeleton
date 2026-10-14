@@ -10,7 +10,7 @@ from __future__ import annotations
 from argparse import ArgumentParser
 from dataclasses import asdict,dataclass
 from hashlib import sha256
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from time import monotonic
 from zipfile import ZIP_DEFLATED,ZipFile,ZipInfo
 import json,os,platform,shutil,subprocess,sys
@@ -118,20 +118,17 @@ def build_native_release(root:Path,*,title:str="Original Dragon Puzzle Quest")->
     written=emit_native_puzzle(seed=seed,stages=4,difficulty=4)
     root.mkdir(parents=True,exist_ok=True)
     for name,body in written.items():
-        # Check the source *entry*, not root/name: root is commonly absolute.
-        # Checking the joined path rejected every ordinary source on CI.
-        if (
-            not isinstance(name,str) or not name or "\\u0000" in name
-            or "\\\\" in name or not isinstance(body,str)
-        ):
+        # Validate the emitter-owned *member*, never the joined output path:
+        # root is normally absolute, but each source name must be relative.
+        if (not isinstance(name, str) or not name or "\\" in name or ":" in name
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in name)
+                or not isinstance(body, str)):
             raise ValueError("unsafe native release source entry")
-        relative=Path(name)
-        if (
-            relative.is_absolute() or relative.drive
-            or ".." in relative.parts or "." in relative.parts
-        ):
+        member = PurePosixPath(name)
+        if (member.is_absolute() or any(part in (".", "..") for part in name.split("/"))
+                or "" in name.split("/") or member.as_posix() != name):
             raise ValueError("unsafe native release source entry")
-        candidate=root/relative
+        candidate = root.joinpath(*member.parts)
         candidate.parent.mkdir(parents=True,exist_ok=True)
         if candidate.is_symlink() or not candidate.parent.resolve().is_relative_to(root.resolve()):
             raise ValueError("unsafe native release source entry")

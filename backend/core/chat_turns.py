@@ -79,6 +79,15 @@ def _aware_utc(value: datetime, field_name: str) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _stored_utc(value: object, field_name: str) -> datetime:
+    """Decode BSON's UTC datetime without relaxing caller clock validation."""
+    if not isinstance(value, datetime):
+        raise ChatTurnCorruption(f"persisted {field_name} must be a datetime")
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return _aware_utc(value, field_name)
+
+
 def _operation_doc(turn: PersistedChatTurn) -> dict[str, Any]:
     snapshot = turn.snapshot
     return {
@@ -102,6 +111,7 @@ def _operation_doc(turn: PersistedChatTurn) -> dict[str, Any]:
         "lease_heartbeat_sequence": 0,
         "lease_previous_digest": None,
         "lease_digest": None,
+        "lease_token": None,
         "ownership_receipt_digest": None,
         "ownership_audit_sequence": 0,
         "created_at": turn.created_at,
@@ -126,8 +136,8 @@ def _turn_from_doc(doc: Mapping[str, Any]) -> PersistedChatTurn:
         turn = PersistedChatTurn(
             snapshot=snapshot,
             binding=binding,
-            created_at=_aware_utc(doc["created_at"], "created_at"),
-            updated_at=_aware_utc(doc["updated_at"], "updated_at"),
+            created_at=_stored_utc(doc["created_at"], "created_at"),
+            updated_at=_stored_utc(doc["updated_at"], "updated_at"),
             snapshot_digest=str(doc["snapshot_digest"]),
         )
     except (
@@ -160,24 +170,53 @@ def _lease_from_doc(doc: Mapping[str, Any]) -> TurnLeaseToken | None:
     holder = doc.get("lease_holder_id")
     if holder is None:
         return None
+    for field in ("lease_epoch", "lease_heartbeat_sequence"):
+        if isinstance(doc.get(field), bool) or not isinstance(doc.get(field), int):
+            raise ChatTurnCorruption("Mongo lease counters must be integers")
+    if doc.get("lease_token") is not None:
+        # BSON dates have millisecond precision. The existing canonical token
+        # envelope preserves the exact instants bound by its digest; materialized
+        # BSON fields remain useful for database queries and must agree with it.
+        token = _lease_from_payload(doc["lease_token"])
+        if token is None or any((
+            token.operation_id != doc.get("operation_id"),
+            token.tenant_id != doc.get("tenant_id"),
+            token.owner_id != doc.get("owner_id"),
+            token.holder_id != holder,
+            token.epoch != doc.get("lease_epoch"),
+            token.heartbeat_sequence != doc.get("lease_heartbeat_sequence"),
+            token.previous_lease_digest != doc.get("lease_previous_digest"),
+            token.digest != doc.get("lease_digest"),
+        )):
+            raise ChatTurnCorruption("Mongo lease materialization drifted")
+        for key, expected in (("lease_granted_at", token.granted_at),
+                              ("lease_expires_at", token.expires_at)):
+            materialized = _stored_utc(doc.get(key), key)
+            if (materialized.replace(microsecond=materialized.microsecond // 1000 * 1000)
+                    != expected.replace(microsecond=expected.microsecond // 1000 * 1000)):
+                raise ChatTurnCorruption("Mongo lease timestamp materialization drifted")
+        return token
     granted = doc.get("lease_granted_at")
     expires = doc.get("lease_expires_at")
     if not isinstance(granted, datetime) or not isinstance(expires, datetime):
         raise ChatTurnCorruption("Mongo lease timestamps must be datetimes")
     try:
-        return TurnLeaseToken(
-            operation_id=str(doc["operation_id"]),
-            tenant_id=str(doc["tenant_id"]),
-            owner_id=str(doc["owner_id"]),
-            holder_id=str(holder),
-            epoch=int(doc.get("lease_epoch") or 0),
-            heartbeat_sequence=int(doc.get("lease_heartbeat_sequence") or 0),
-            granted_at=_aware_utc(granted, "lease_granted_at"),
-            expires_at=_aware_utc(expires, "lease_expires_at"),
+        token = TurnLeaseToken(
+            operation_id=doc["operation_id"],
+            tenant_id=doc["tenant_id"],
+            owner_id=doc["owner_id"],
+            holder_id=holder,
+            epoch=doc["lease_epoch"],
+            heartbeat_sequence=doc["lease_heartbeat_sequence"],
+            granted_at=_stored_utc(granted, "lease_granted_at"),
+            expires_at=_stored_utc(expires, "lease_expires_at"),
             previous_lease_digest=doc.get("lease_previous_digest"),
         )
     except (KeyError, TypeError, ValueError, ChatTurnRepositoryError) as exc:
         raise ChatTurnCorruption("persisted Mongo turn lease is invalid") from exc
+    if doc.get("lease_digest") != token.digest:
+        raise ChatTurnCorruption("legacy Mongo lease digest cannot be recovered exactly")
+    return token
 
 
 def _lease_from_payload(raw: object) -> TurnLeaseToken | None:
@@ -187,14 +226,14 @@ def _lease_from_payload(raw: object) -> TurnLeaseToken | None:
         raise ChatTurnCorruption("prepared event lease binding is invalid")
     try:
         token = TurnLeaseToken(
-            operation_id=str(raw["operation_id"]),
-            tenant_id=str(raw["tenant_id"]),
-            owner_id=str(raw["owner_id"]),
-            holder_id=str(raw["holder_id"]),
-            epoch=int(raw["epoch"]),
-            heartbeat_sequence=int(raw["heartbeat_sequence"]),
-            granted_at=datetime.fromisoformat(str(raw["granted_at"])),
-            expires_at=datetime.fromisoformat(str(raw["expires_at"])),
+            operation_id=raw["operation_id"],
+            tenant_id=raw["tenant_id"],
+            owner_id=raw["owner_id"],
+            holder_id=raw["holder_id"],
+            epoch=raw["epoch"],
+            heartbeat_sequence=raw["heartbeat_sequence"],
+            granted_at=datetime.fromisoformat(raw["granted_at"]),
+            expires_at=datetime.fromisoformat(raw["expires_at"]),
             previous_lease_digest=raw.get("previous_lease_digest"),
         )
     except (KeyError, TypeError, ValueError) as exc:
@@ -378,6 +417,7 @@ class MongoChatTurnAuthority:
             "lease_heartbeat_sequence": 0,
             "lease_previous_digest": None,
             "lease_digest": None,
+            "lease_token": None,
             "ownership_receipt_digest": None,
             "ownership_audit_sequence": 0,
         }
@@ -715,6 +755,7 @@ class MongoChatTurnAuthority:
                 "lease_heartbeat_sequence": token.heartbeat_sequence,
                 "lease_previous_digest": token.previous_lease_digest,
                 "lease_digest": token.digest,
+                "lease_token": token.as_dict(),
                 "ownership_receipt_digest": receipt.digest,
                 "ownership_audit_sequence": sequence,
             }
@@ -796,6 +837,7 @@ class MongoChatTurnAuthority:
                         "lease_heartbeat_sequence": renewed.heartbeat_sequence,
                         "lease_previous_digest": renewed.previous_lease_digest,
                         "lease_digest": renewed.digest,
+                        "lease_token": renewed.as_dict(),
                         "ownership_receipt_digest": receipt.digest,
                         "ownership_audit_sequence": sequence,
                     }
@@ -860,6 +902,7 @@ class MongoChatTurnAuthority:
                         "lease_heartbeat_sequence": 0,
                         "lease_previous_digest": current.digest,
                         "lease_digest": current.digest,
+                        "lease_token": None,
                         "ownership_receipt_digest": receipt.digest,
                         "ownership_audit_sequence": sequence,
                     }

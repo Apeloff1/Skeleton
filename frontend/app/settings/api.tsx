@@ -1,3 +1,4 @@
+import { LazyMount } from '../../src/utils/lazyMount';
 /**
  * Settings → API Controller
  * Live observability + control surface for the SOTA API layer.
@@ -31,7 +32,7 @@ interface ServerStats {
   rate_limit: { per_minute: number; burst: number; exempt_ips: string[] };
 }
 
-export default function ApiSettings() {
+function ApiSettings() {
   const router = useRouter();
   const [client, setClient] = useState<TelemetrySnapshot>(api.getTelemetry());
   const [server, setServer] = useState<ServerStats | null>(null);
@@ -270,3 +271,8 @@ const s = StyleSheet.create({
   dim: { color: '#94A3B8', fontSize: 12, fontStyle: 'italic' },
   footer: { color: '#64748B', fontSize: 10, textAlign: 'center', marginTop: 6, fontStyle: 'italic' },
 });
+
+// Live API counters belong to this browser process, not the static export.
+export default function ApiSettingsRoute() {
+  return <LazyMount><ApiSettings /></LazyMount>;
+}

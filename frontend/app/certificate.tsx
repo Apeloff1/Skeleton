@@ -1,3 +1,4 @@
+import { LazyMount } from '../src/utils/lazyMount';
 /**
  * Certificate — printable / shareable diploma page for completed classes.
  * Reads ?class=ID&title=Title from URL params.
@@ -13,7 +14,7 @@ import theme from '../theme/tokens';
 import { Screen, AppHeader } from '../components/UI';
 import { toast } from '../components/Toast';
 
-export default function CertificateScreen() {
+function CertificateScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ class?: string; title?: string }>();
   const user = useUser();
@@ -145,3 +146,8 @@ const s = StyleSheet.create({
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 10 },
   actionText: { color: '#fff', fontWeight: '800', fontSize: 12 },
 });
+
+// Certificate dates and the current learner profile are browser state.
+export default function CertificateRoute() {
+  return <LazyMount><CertificateScreen /></LazyMount>;
+}

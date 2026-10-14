@@ -3,10 +3,10 @@ name: Drain superseded Actions queue
 on:
   workflow_dispatch:
   workflow_run:
-    # Wake on terminal critical validation runs as well as the canonical merge
-    # gate. The drainer independently proves every cancellation candidate, so
-    # extra wakeups improve recovery latency without weakening fail-closed rules.
-    workflows: ["Merge Readiness", "CI/CD", "Backend Quality", "Frontier Contracts"]
+    # One canonical validation completion is enough to wake recovery. The
+    # five-minute schedule catches missed wakes without multiplying queued
+    # drainer runs for every CI/CD, Backend Quality, and Frontier completion.
+    workflows: ["Merge Readiness"]
     types: [completed]
     branches: [main]
   schedule:
@@ -16,10 +16,10 @@ on:
     branches: [main]
     paths: ['.github/workflows/queue-drain.yml']
 
-# v4 escapes provider-stuck queued v3 recovery, while retaining one
-# non-preemptive worker and one coalesced pending run per repository.
+# v5 escapes provider-stuck v4 recovery. Bound every sweep so future v5
+# signals share one non-preemptive worker and one coalesced pending run.
 concurrency:
-  group: queue-drain-v4-${{ github.repository }}
+  group: queue-drain-v5-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -70,6 +70,10 @@ jobs:
               'User-Agent': 'skeleton-queue-drainer',
           }
           retryable = frozenset({0, 429, 500, 502, 503, 504})
+          max_cancellation_attempts = 80
+          deadline = time.monotonic() + 450
+          cancellation_attempts = 0
+          budget_exhausted = False
 
           # These workflows form the branch-flow / queue-recovery control plane.
           # They are designed either to follow a moving main, provide canonical
@@ -101,7 +105,7 @@ jobs:
                   method=method,
               )
               try:
-                  with urllib.request.urlopen(req, timeout=30) as response:
+                  with urllib.request.urlopen(req, timeout=15) as response:
                       raw = response.read()
                       return response.status, json.loads(raw) if raw else None
               except urllib.error.HTTPError as exc:
@@ -419,7 +423,11 @@ jobs:
           # push. Each pass resolves main again, so the drainer follows the live
           # repository rather than a stale workflow-event SHA.
           for pass_no in range(1, 5):
-              if rate_limit_hit:
+              if rate_limit_hit or budget_exhausted:
+                  break
+              if time.monotonic() >= deadline:
+                  budget_exhausted = True
+                  print('Queue drain time budget reached before pass; deferring remaining runs.')
                   break
               head = main_sha()
               latest_main = head
@@ -564,7 +572,12 @@ jobs:
 
               accepted = moved = deferred = failed = 0
               for run in selected:
+                  if cancellation_attempts >= max_cancellation_attempts or time.monotonic() >= deadline:
+                      budget_exhausted = True
+                      print('Queue drain write/time budget reached; deferring remaining runs.')
+                      break
                   run_id = int(run['id'])
+                  cancellation_attempts += 1
                   status = cancel(run_id, security_lane=security_lane(run))
                   if status == 429:
                       # Retain the rest of this inventory for a later sweep;
@@ -626,7 +639,7 @@ jobs:
               )
               print(line)
               pass_lines.append(line)
-              if pass_no < 4 and not rate_limit_hit:
+              if pass_no < 4 and not rate_limit_hit and not budget_exhausted:
                   time.sleep(8)
 
           summary = os.environ.get('GITHUB_STEP_SUMMARY')
@@ -635,6 +648,8 @@ jobs:
                   handle.write('## Actions queue drain\n')
                   handle.write(f'- Latest live main SHA: `{latest_main}`\n')
                   handle.write(f'- API rate-limit backpressure: {rate_limit_hit}\n')
+                  handle.write(f'- Cancellation attempt budget: {cancellation_attempts}/{max_cancellation_attempts}\n')
+                  handle.write(f'- Time or cancellation budget exhausted: {budget_exhausted}\n')
                   handle.write('- Sweep passes: 4 over ~24 seconds\n')
                   handle.write(
                       '- Branch control-plane observations preserved: '

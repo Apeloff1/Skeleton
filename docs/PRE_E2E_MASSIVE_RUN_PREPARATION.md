@@ -19,7 +19,7 @@ The PR workflow always runs **preflight only**:
 
 To run the bounded offline E2E shards, explicitly dispatch
 **Pre-E2E Evidence and Massive Offline Journeys**, selecting
-**run_offline=true**. Five shards then run with independent verdicts,
+**run_offline=true**. Seven shards then run with independent verdicts,
 30-minute job ceilings, suite-level timeouts, and max three parallel jobs.
 The offline runner refuses any suite labeled live.
 
@@ -38,7 +38,8 @@ and a separately defined integration environment.
   size and sanitized by the existing observability redaction utility.
 - **junit/SUITE.xml**: structured case-level pytest failure/error evidence
   parsed and sanitized before being uploaded. Missing/malformed XML is
-  a failure rather than a green result.
+  a failure rather than a green result. Empty receipts and skipped/expected-failure
+  cases also become explicit unverified-test issues.
 - **issues.json**, **issues.md** and **summary.md**: stable issue signature,
   phase, severity, failing testcase, evidence path and explicit open
   disposition. Success in one shard never hides another shard failure.
@@ -46,8 +47,8 @@ and a separately defined integration environment.
   risk flags, estimated test counts, issue candidates, and categorized
   coverage. Static flags are candidates, not confirmed defects.
 
-A final aggregator downloads the five independent shard receipts, requires all
-five passes at one exact SHA, and emits aggregate.json and aggregate.md.
+A final aggregator downloads the manifest-defined independent shard receipts, requires all
+seven passes at one exact SHA, and emits aggregate.json and aggregate.md.
 Missing, duplicate, malformed and failed shards become open issues rather
 than disappearing from the status report.
 
@@ -94,6 +95,43 @@ These are preparedness findings, **not observed runtime test failures**.
 
 ## Local operator commands
 
+### Resume the disposable assembled campaign
+
+Install the repository Python requirements and locked frontend dependencies,
+and select a local MongoDB executable. Commit the candidate before starting:
+
+    python scripts/e2e_assembled_system.py --mongod /absolute/path/to/mongod --output-dir .e2e-evidence/assembled
+
+The campaign clones the exact candidate into a temporary checkout, builds its
+Expo export, trains a small credential-free model fixture, and starts isolated
+Mongo, engine, backend and browser services. `--backend-port`, `--engine-port`
+and `--web-port` select distinct loopback ports when another campaign is active.
+Installed frontend dependencies may be selected with `--node-modules`.
+
+The evidence binds every exported asset, the frontend lockfile, the candidate
+commit and fixture model build. It exercises authenticated provider status,
+cross-principal conversation denial, concurrent idempotent replay, two-turn
+lineage, an immutable edit branch, browser refresh, project-loaded world/design
+views, mobile companion controls, process restart, governed conversation
+deletion, and engine-outage degradation. Seeded project artifacts verify view
+wiring; they do not certify game generation. Unreached journeys are recorded
+explicitly. Forced shutdown or incomplete cleanup fails the campaign, while
+uvicorn's final SIGTERM exit requires a shutdown-completion marker from that
+specific process generation.
+
+The optional `--web-export` accepts only an export with a sibling
+`NAME.receipt.json` containing the exact `head_sha`, `assets_sha256`,
+`backend_url` and `engine_url`. Building directly from the candidate is the
+default. A selected local Godot binary is forwarded only to `app-cli-forge`:
+
+    SKELETON_GODOT_BIN=/absolute/path/to/godot python scripts/e2e_evidence.py --mode offline-e2e --suite app-cli-forge --output-dir .e2e-evidence/forge
+
+The selected executable is checked and its digest recorded. Provider secrets
+remain excluded. Skipped tests, unexpected passes and missing structured test
+receipts fail evidence qualification. Fixture-model execution, Chromium mobile
+viewports and headless Godot runs do not qualify model quality, installed mobile
+devices, desktop installers, live providers or enterprise readiness.
+
     python scripts/e2e_evidence.py --mode preflight --output-dir .e2e-evidence
     python scripts/e2e_advanced_parse.py --output-dir .e2e-evidence
     python -m unittest discover -s tests -p test_e2e_evidence_preflight.py -v
@@ -104,3 +142,37 @@ After installing dependencies and explicitly choosing an offline suite:
 
 The harness self-tests exercise only manifest parsing, evidence output,
 redaction and non-execution contracts; they do not run product E2E.
+
+## Disposable assembled system run
+
+`scripts/e2e_assembled_system.py` clones the committed candidate into a temporary
+checkout and runs a private Mongo replica set, canonical engine, backend and
+Expo static export. It exercises authenticated conversation writes, principal
+isolation, desktop/mobile navigation and local-model chat, restart replay without
+duplicate commits, engine outage reporting and graceful cleanup.
+
+Install the backend requirements plus Playwright and its Chromium browser. Build
+the Expo web export with API URLs `http://127.0.0.1:38001` and
+`http://127.0.0.1:38010`, then run:
+
+    python scripts/e2e_assembled_system.py --mongod /absolute/path/to/mongod --web-export /absolute/path/to/web-export --output-dir .e2e-evidence/assembled-system
+
+Ports 33000, 38001 and 38010 must be free. The runner creates disposable
+credentials, sanitizes traces/logs and removes temporary state. Forced shutdown
+is a failed cleanup result. Its tiny trained native model verifies execution
+and service assembly; it does not certify answer quality, a release model,
+installed device behavior or live providers. The expanded `app-cli-forge` shard
+reports a missing Godot binary as an unverified playtest rather than silently
+certifying that journey. Set `SKELETON_GODOT_BIN` to a real supported executable
+when qualifying the headless game playtest.
+
+The CI forge shard installs Godot 4.4.1 from the official download service and
+checks its pinned archive SHA-256 before executing that playtest.
+
+For production-style ingress qualification, build the web export without
+explicit backend or engine URL overrides and add `--nginx /absolute/path/to/nginx`.
+The runner uses the repository's ingress configuration with loopback fixture
+upstreams. `--audit-all-routes` opens every exported public route, including a
+concrete dynamic gate URL; `--audit-route /path` reproduces selected routes.
+The route audit checks initial rendering and HTTP 5xx responses. It does not
+certify every feature or complete every workflow behind each page.
