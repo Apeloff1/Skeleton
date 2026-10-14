@@ -573,6 +573,30 @@ def _compile_chat_context(
     )
 
 
+def _chat_engine() -> EngineClient:
+    """Resolve only an operator-configured engine for governed chat/recovery."""
+    try:
+        engine = EngineClient.from_env()
+    except EngineClientError as exc:
+        raise HTTPException(
+            status_code=503, detail="AI engine configuration is unavailable"
+        ) from exc
+    if engine is None:
+        raise HTTPException(status_code=503, detail="AI engine is unavailable")
+    return engine
+
+
+def _engine_chat_error(exc: EngineClientError) -> HTTPException:
+    """Translate engine failure without leaking provider credentials or payloads."""
+    if isinstance(exc, EngineNotFoundError):
+        return HTTPException(status_code=404, detail="AI execution is unavailable")
+    if isinstance(exc, EngineUnavailableError):
+        return HTTPException(status_code=503, detail="AI engine is unavailable")
+    if isinstance(exc, EngineExecutionFailed):
+        return HTTPException(status_code=502, detail="AI execution failed")
+    return HTTPException(status_code=502, detail="AI engine request failed")
+
+
 def _engine_configured() -> bool:
     try:
         return EngineClient.from_env() is not None
