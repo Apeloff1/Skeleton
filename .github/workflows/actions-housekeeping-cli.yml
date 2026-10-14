@@ -685,7 +685,7 @@ jobs:
           kept=0
           rate_limited=false
           while IFS=$'\t' read -r id created conclusion name; do
-            [[ -n "\${id:-}" && -n "\${created:-}" ]] || continue
+            [[ -n "${id:-}" && -n "${created:-}" ]] || continue
             [[ "$id" != "$GITHUB_RUN_ID" ]] || continue
             created_epoch=$(date -u -d "$created" +%s)
             # Keep an independent local age guard against broad API results.
@@ -710,7 +710,7 @@ jobs:
             echo "- Recent/over-cap unsuccessful runs preserved: $kept"
             echo "- Run deletion failures: $failed"
             echo "- Rate-limit backpressure activated: $rate_limited"
-            echo "- Unsuccessful-run retention threshold: \${FAILED_RUN_RETENTION_DAYS} days"
-            echo "- Per-sweep run deletion cap: \${MAX_RUN_DELETES}"
-            echo "- Server-side stale-run cutoff: <\${cutoff_iso}"
+            echo "- Unsuccessful-run retention threshold: ${FAILED_RUN_RETENTION_DAYS} days"
+            echo "- Per-sweep run deletion cap: ${MAX_RUN_DELETES}"
+            echo "- Server-side stale-run cutoff: <${cutoff_iso}"
           } >> "$GITHUB_STEP_SUMMARY"
