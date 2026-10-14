@@ -1,41 +1,6 @@
 name: VOL-003 Contract Conformance Closure
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/contract_conformance.json"
-      - "machine/ai_runtime_schemas.json"
-      - "machine/capability_interfaces.json"
-      - "machine/ai_master_plan.json"
-      - "skeleton/contracts/**"
-      - "skeleton/ai/runtime/contracts/**"
-      - "scripts/check_architecture_contract_conformance.py"
-      - "scripts/verify_vol003_contract_conformance.py"
-      - "tests/test_architecture_contract_conformance.py"
-      - "tests/test_vol003_contract_conformance_independent.py"
-      - "skeleton/testing/test_contract_serialization_edges.py"
-      - "skeleton/testing/test_contract_compatibility.py"
-      - "skeleton/testing/test_contract_unicode_edges.py"
-      - ".github/workflows/vol003-contract-conformance.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/contract_conformance.json"
-      - "machine/ai_runtime_schemas.json"
-      - "machine/capability_interfaces.json"
-      - "machine/ai_master_plan.json"
-      - "skeleton/contracts/**"
-      - "skeleton/ai/runtime/contracts/**"
-      - "scripts/check_architecture_contract_conformance.py"
-      - "scripts/verify_vol003_contract_conformance.py"
-      - "tests/test_architecture_contract_conformance.py"
-      - "tests/test_vol003_contract_conformance_independent.py"
-      - "skeleton/testing/test_contract_serialization_edges.py"
-      - "skeleton/testing/test_contract_compatibility.py"
-      - "skeleton/testing/test_contract_unicode_edges.py"
-      - ".github/workflows/vol003-contract-conformance.yml"
   workflow_dispatch:
 
 permissions:

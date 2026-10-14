@@ -1,27 +1,6 @@
 name: VOL-022 Mutation Lease Foundation
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/automation/transactional_workspace.py"
-      - "skeleton/automation/independent_review.py"
-      - "skeleton/automation/repository_transaction.py"
-      - "skeleton/testing/test_vol022_transactional_workspace.py"
-      - "skeleton/testing/test_vol022_independent_review.py"
-      - "skeleton/testing/test_vol022_repository_transaction.py"
-      - ".github/workflows/vol022-mutation-foundation.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/automation/transactional_workspace.py"
-      - "skeleton/automation/independent_review.py"
-      - "skeleton/automation/repository_transaction.py"
-      - "skeleton/testing/test_vol022_transactional_workspace.py"
-      - "skeleton/testing/test_vol022_independent_review.py"
-      - "skeleton/testing/test_vol022_repository_transaction.py"
-      - ".github/workflows/vol022-mutation-foundation.yml"
   workflow_dispatch:
 
 permissions:

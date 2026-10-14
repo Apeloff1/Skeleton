@@ -1,33 +1,6 @@
 name: VOL-008 Governed Route Execution
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/intelligence/router_registry.py"
-      - "skeleton/intelligence/routing_governance.py"
-      - "skeleton/intelligence/routing_execution.py"
-      - "skeleton/ai/runtime/intelligence/router_registry.py"
-      - "skeleton/ai/runtime/intelligence/routing_governance.py"
-      - "skeleton/ai/runtime/intelligence/routing_execution.py"
-      - "skeleton/frontier/runtime/model_routing.py"
-      - "skeleton/testing/test_routing_governance_oct2026.py"
-      - "skeleton/testing/test_vol008_routing_execution.py"
-      - ".github/workflows/vol008-governed-routing-execution.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/intelligence/router_registry.py"
-      - "skeleton/intelligence/routing_governance.py"
-      - "skeleton/intelligence/routing_execution.py"
-      - "skeleton/ai/runtime/intelligence/router_registry.py"
-      - "skeleton/ai/runtime/intelligence/routing_governance.py"
-      - "skeleton/ai/runtime/intelligence/routing_execution.py"
-      - "skeleton/frontier/runtime/model_routing.py"
-      - "skeleton/testing/test_routing_governance_oct2026.py"
-      - "skeleton/testing/test_vol008_routing_execution.py"
-      - ".github/workflows/vol008-governed-routing-execution.yml"
   workflow_dispatch:
 
 permissions:

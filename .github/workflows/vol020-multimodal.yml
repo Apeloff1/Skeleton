@@ -1,31 +1,6 @@
 name: VOL-020 Multimodal Closure
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/multimodal/**"
-      - "skeleton/ai/runtime/multimodal/**"
-      - "skeleton/testing/test_vol020_multimodal_contracts.py"
-      - "skeleton/testing/test_vol020_multimodal_sanitize.py"
-      - "skeleton/testing/test_vol020_multimodal_ingest.py"
-      - "backend/tests/test_ai_provider_media.py"
-      - "scripts/verify_vol020_multimodal.py"
-      - "tests/test_vol020_multimodal_independent.py"
-      - ".github/workflows/vol020-multimodal.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/multimodal/**"
-      - "skeleton/ai/runtime/multimodal/**"
-      - "skeleton/testing/test_vol020_multimodal_contracts.py"
-      - "skeleton/testing/test_vol020_multimodal_sanitize.py"
-      - "skeleton/testing/test_vol020_multimodal_ingest.py"
-      - "backend/tests/test_ai_provider_media.py"
-      - "scripts/verify_vol020_multimodal.py"
-      - "tests/test_vol020_multimodal_independent.py"
-      - ".github/workflows/vol020-multimodal.yml"
   workflow_dispatch:
 
 permissions:

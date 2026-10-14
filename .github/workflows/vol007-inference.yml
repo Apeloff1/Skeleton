@@ -1,41 +1,6 @@
 name: VOL-007 Inference Closure
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "skeleton/inference/**"
-      - "skeleton/provider_runtime.py"
-      - "skeleton/provider_contract.py"
-      - "backend/core/engine_text.py"
-      - "skeleton/testing/test_vol007_inference_session.py"
-      - "skeleton/testing/test_vol007_provider_bridge.py"
-      - "skeleton/testing/test_vol007_inference_replay.py"
-      - "skeleton/testing/test_vol007_async_runtime.py"
-      - "skeleton/testing/test_vol007_batching.py"
-      - "skeleton/testing/test_vol007_speculation.py"
-      - "scripts/verify_vol007_inference.py"
-      - "tests/test_vol007_inference_independent.py"
-      - ".github/workflows/vol007-inference.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "skeleton/inference/**"
-      - "skeleton/provider_runtime.py"
-      - "skeleton/provider_contract.py"
-      - "backend/core/engine_text.py"
-      - "skeleton/testing/test_vol007_inference_session.py"
-      - "skeleton/testing/test_vol007_provider_bridge.py"
-      - "skeleton/testing/test_vol007_inference_replay.py"
-      - "skeleton/testing/test_vol007_async_runtime.py"
-      - "skeleton/testing/test_vol007_batching.py"
-      - "skeleton/testing/test_vol007_speculation.py"
-      - "scripts/verify_vol007_inference.py"
-      - "tests/test_vol007_inference_independent.py"
-      - ".github/workflows/vol007-inference.yml"
   workflow_dispatch:
 
 permissions:

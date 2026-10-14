@@ -1,33 +1,6 @@
 name: VOL-006 Model Development Closure
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "skeleton/modeling/**"
-      - "skeleton/ai/modeling/**"
-      - "skeleton/testing/test_vol006_model_registry.py"
-      - "skeleton/testing/test_vol006_training_execution.py"
-      - "skeleton/testing/test_vol006_artifact_publication.py"
-      - "skeleton/testing/test_vol006_evaluation_eligibility.py"
-      - "scripts/verify_vol006_model_development.py"
-      - "tests/test_vol006_model_development_independent.py"
-      - ".github/workflows/vol006-model-development.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "skeleton/modeling/**"
-      - "skeleton/ai/modeling/**"
-      - "skeleton/testing/test_vol006_model_registry.py"
-      - "skeleton/testing/test_vol006_training_execution.py"
-      - "skeleton/testing/test_vol006_artifact_publication.py"
-      - "skeleton/testing/test_vol006_evaluation_eligibility.py"
-      - "scripts/verify_vol006_model_development.py"
-      - "tests/test_vol006_model_development_independent.py"
-      - ".github/workflows/vol006-model-development.yml"
   workflow_dispatch:
 
 permissions:

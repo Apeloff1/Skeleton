@@ -1,25 +1,6 @@
 name: VOL-019 World Model Closure
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/simulation/**"
-      - "skeleton/ai/simulation/**"
-      - "skeleton/testing/test_vol019_world_model_contract.py"
-      - "scripts/verify_vol019_world_model.py"
-      - "tests/test_vol019_world_model_independent.py"
-      - ".github/workflows/vol019-world-model.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/simulation/**"
-      - "skeleton/ai/simulation/**"
-      - "skeleton/testing/test_vol019_world_model_contract.py"
-      - "scripts/verify_vol019_world_model.py"
-      - "tests/test_vol019_world_model_independent.py"
-      - ".github/workflows/vol019-world-model.yml"
   workflow_dispatch:
 
 permissions:

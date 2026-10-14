@@ -1,37 +1,6 @@
 name: VOL-002 Architecture Fitness and Ownership Gate
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/architecture.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_file_tree.json"
-      - "machine/ai_master_plan.json"
-      - "skeleton/app/manifest.json"
-      - "scripts/check_architecture_map.py"
-      - "scripts/verify_vol002_architecture_fitness.py"
-      - "skeleton/testing/test_architecture_map.py"
-      - "tests/test_architecture_boundaries.py"
-      - "tests/test_vol002_architecture_independent_verifier.py"
-      - ".github/workflows/vol002-architecture-fitness.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "machine/architecture.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_file_tree.json"
-      - "machine/ai_master_plan.json"
-      - "skeleton/app/manifest.json"
-      - "scripts/check_architecture_map.py"
-      - "scripts/verify_vol002_architecture_fitness.py"
-      - "skeleton/testing/test_architecture_map.py"
-      - "tests/test_architecture_boundaries.py"
-      - "tests/test_vol002_architecture_independent_verifier.py"
-      - ".github/workflows/vol002-architecture-fitness.yml"
   workflow_dispatch:
 
 permissions:

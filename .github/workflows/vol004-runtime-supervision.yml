@@ -1,61 +1,6 @@
 name: VOL-004 Runtime Supervision Closure
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/runtime_supervision.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_architecture_runtime_supervision.py"
-      - "scripts/verify_vol004_runtime_supervision.py"
-      - "skeleton/kernel/runtime_supervision.py"
-      - "skeleton/ai/runtime/kernel/runtime_supervision.py"
-      - "skeleton/kernel/supervisor.py"
-      - "skeleton/shells/cancellation.py"
-      - "skeleton/provider_runtime.py"
-      - "skeleton/automation/free_model.py"
-      - "skeleton/automation/chatgpt_adapter.py"
-      - "skeleton/automation/shift_supervisor/model_gateway.py"
-      - "skeleton/api/server.py"
-      - "skeleton/api/engine_runtime.py"
-      - "skeleton/api/engine_service.py"
-      - "backend/server.py"
-      - "backend/core/engine_client.py"
-      - "tests/test_architecture_runtime_supervision.py"
-      - "tests/test_vol004_runtime_supervision_independent.py"
-      - "skeleton/testing/test_vol004_runtime_supervision_v2.py"
-      - "skeleton/testing/test_kernel_supervisor_cancellation.py"
-      - "backend/tests/test_engine_cross_service_closure.py"
-      - "docs/architecture/RUNTIME_SUPERVISION.md"
-      - ".github/workflows/vol004-runtime-supervision.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/runtime_supervision.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_master_plan.json"
-      - "scripts/check_architecture_runtime_supervision.py"
-      - "scripts/verify_vol004_runtime_supervision.py"
-      - "skeleton/kernel/runtime_supervision.py"
-      - "skeleton/ai/runtime/kernel/runtime_supervision.py"
-      - "skeleton/provider_runtime.py"
-      - "skeleton/automation/free_model.py"
-      - "skeleton/automation/chatgpt_adapter.py"
-      - "skeleton/automation/shift_supervisor/model_gateway.py"
-      - "skeleton/api/server.py"
-      - "skeleton/api/engine_runtime.py"
-      - "skeleton/api/engine_service.py"
-      - "backend/server.py"
-      - "backend/core/engine_client.py"
-      - "tests/test_architecture_runtime_supervision.py"
-      - "tests/test_vol004_runtime_supervision_independent.py"
-      - "skeleton/testing/test_vol004_runtime_supervision_v2.py"
-      - "skeleton/testing/test_kernel_supervisor_cancellation.py"
-      - "backend/tests/test_engine_cross_service_closure.py"
-      - "docs/architecture/RUNTIME_SUPERVISION.md"
-      - ".github/workflows/vol004-runtime-supervision.yml"
   workflow_dispatch:
 
 permissions:
