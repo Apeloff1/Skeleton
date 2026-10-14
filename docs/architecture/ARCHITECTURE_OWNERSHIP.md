@@ -1,6 +1,6 @@
 # Architecture Ownership
 
-<!-- machine-git-blob: machine/architecture_ownership.json@a40faf5fc7ec9ef4f6ad2e73a9f9cb076a9c53a6 -->
+<!-- machine-git-blob: machine/architecture_ownership.json@429282f802fb49d83a8885f7dd913aaf576fd37b -->
 
 Machine authority: `machine/architecture_ownership.json`
 
