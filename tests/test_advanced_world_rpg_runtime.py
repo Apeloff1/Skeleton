@@ -70,3 +70,21 @@ def test_rpg_rejects_free_rewards_and_unapproved_scene_documents():
         run_advanced_session("rpg", scene={"editor": "rpg"})
     with pytest.raises(AdvancedRuntimeError):
         run_advanced_session("maze", actions=["teleport"])
+
+
+def test_editor_preview_uses_actual_bounded_maze_and_rpg_engines():
+    from skeleton.ai.game_builder.system_editors import preview_editor
+    for editor, settings, commands in (
+        ("maze", {"width": 5, "height": 5}, ["south", "survey"]),
+        ("rpg", {"party_size": 3}, ["talk", "accept"]),
+    ):
+        view = preview_editor(editor, settings, commands)
+        assert view["status"] == "deterministic_prototype"
+        assert view["simulation_executed"] is True
+        assert view["native_hardware_verified"] is False
+        assert view["publication_certified"] is False
+        assert view["state"]["tick"] == len(commands)
+        assert len(view["digest"]) == 64
+        assert view == preview_editor(editor, settings, commands)
+    with pytest.raises(AdvancedRuntimeError):
+        preview_editor("rpg", actions=["resolve"])
