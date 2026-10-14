@@ -1731,7 +1731,7 @@
       "source": "skeleton/data",
       "destination": "skeleton/ai/runtime/data",
       "kind": "tree",
-      "source_git_object_sha": "5c39deb49b2195a62896759b1185123f5365754e",
+      "source_git_object_sha": "05ef7871a6c3da51f4f4e6d10291e7f2420aa449",
       "role": "Cache, event bus, schema evolution, migrations, and lineage helpers are governed runtime data/state infrastructure.",
       "work_package_refs": [
         "WP-W03",
@@ -3085,7 +3085,7 @@
       "destination": "skeleton/ai/research/historical/sheaf",
       "kind": "tree",
       "source_git_object_sha": "d9164c7fee370ad9680b0cabe39253f56e0c3b68",
-      "role": "Sheaf/\u010cech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
       "work_package_refs": [
         "WP-W09",
         "WP-W26"
@@ -7514,8 +7514,8 @@
       "policy": "Refresh exact Git object identities and aggregate mapping counts after P3T2 storage and subsequent current-main merges; this metadata repair grants no cutover, completion, promotion, implementation signoff, or independent verification authority."
     },
     "p3t2_data_candidate": {
-      "implementation_head_sha": "6ea2f5bb41bd6f0fe01e2ed35d6cc21e0a3239c5",
-      "source_tree_sha": "5c39deb49b2195a62896759b1185123f5365754e",
+      "implementation_head_sha": "31c555861eeb0d895a50a6ea6f4cd03b1d73f147",
+      "source_tree_sha": "05ef7871a6c3da51f4f4e6d10291e7f2420aa449",
       "task_id": "P3T2-DATA-01",
       "volume_refs": [
         "VOL-137",
@@ -7525,7 +7525,10 @@
         "VOL-141",
         "VOL-142"
       ],
-      "policy": "Applied after current-main global mapping reconciliation; preserves existing mapping identities while binding the hardened P3-T2 data implementation tree, adversarial validation, and exact mirror evidence without granting closure authority."
+      "policy": "Applied after current-main global mapping reconciliation; preserves existing mapping identities while binding the hardened P3-T2 data implementation tree, adversarial validation, and exact mirror evidence without granting closure authority.",
+      "previous_implementation_head_sha": "6ea2f5bb41bd6f0fe01e2ed35d6cc21e0a3239c5",
+      "previous_source_tree_sha": "5c39deb49b2195a62896759b1185123f5365754e",
+      "reconciliation_kind": "current-main source-tree identity refresh; candidate remains unsigned"
     },
     "masterplan_completion_ai_tree_reconciliation_2026_10_05": {
       "base_main_sha": "03a5ff12967a0d597784112a1208c73718098d5b",
@@ -8208,7 +8211,7 @@
       "kind": "tree",
       "ownership_mode": "canonical_native",
       "residual_only": true,
-      "role": "Residual canonical AI-native runtime surfaces\u2014including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion\u2014not claimed by more-specific mappings or native owners.",
+      "role": "Residual canonical AI-native runtime surfaces—including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion—not claimed by more-specific mappings or native owners.",
       "volume_refs": [
         "VOL-006",
         "VOL-007",
