@@ -7,6 +7,7 @@ credentials, instantiates provider SDKs, or chooses a provider transport.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import hashlib
 import json
@@ -203,6 +204,8 @@ class EngineChat:
         self._history: list[dict[str, str]] = []
         self._evidence: list[dict[str, str]] = []
         self._queued_prompt: str | None = None
+        # One mutable conversation projection must have one in-flight turn.
+        self._send_lock = asyncio.Lock()
 
     def with_model(self, provider: str, model: str) -> "EngineChat":
         # Routing metadata only; canonical engine policy owns provider choice.
@@ -401,6 +404,16 @@ class EngineChat:
         self,
         message: Any,
     ) -> EngineChatResponse:
+        # A single chat facade owns mutable history and turn idempotency.
+        # Serialize requests through their terminal append to avoid two
+        # concurrent sends building against the same prior context.
+        async with self._send_lock:
+            return await self._send_message_serial(message)
+
+    async def _send_message_serial(
+        self,
+        message: Any,
+    ) -> EngineChatResponse:
         prompt = self._prompt_text(message).strip()
         if not prompt:
             raise ValueError(
@@ -434,12 +447,26 @@ class EngineChat:
         response: EngineTextResponse = await self._engine_executor(
             request
         )
+        if not isinstance(response, EngineTextResponse):
+            raise EngineTextError(
+                "engine chat requires a canonical typed terminal response"
+            )
         self._history.append(
             {"role": "user", "content": prompt}
         )
         self._history.append(
             {"role": "assistant", "content": response.text}
         )
+        # This is a bounded rebuildable view, not the persisted conversation
+        # record. Retain complete user/assistant pairs and evict oldest first.
+        while (
+            len(self._history) > 100
+            or sum(len(item["content"].encode("utf-8")) for item in self._history)
+            > 512 * 1024
+        ):
+            self._history.pop(0)
+            while self._history and self._history[0]["role"] == "assistant":
+                self._history.pop(0)
         return EngineChatResponse(
             response.text,
             operation_id=response.operation_id,
