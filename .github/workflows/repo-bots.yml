@@ -9,8 +9,13 @@ on:
         default: all
         type: choice
         options: [all, triage, ci, security, cleanup]
+  # The bot manager already inventories due work hourly. Running four
+  # independent model-backed proposal workers each hour amplified Actions
+  # pressure and ignored the six-hour cooldown used for bot planning.
+  # Keep automatic proposals on four staggered daily sweeps; manual dispatch
+  # remains available for urgent CI/security review.
   schedule:
-    - cron: "17 * * * *"
+    - cron: "43 1,7,13,19 * * *"
 
 concurrency:
   group: repo-bots-${{ github.ref }}
@@ -31,6 +36,8 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
+      # Bound simultaneous model-backed proposals on busy GitHub runners.
+      max-parallel: 2
       matrix:
         bot: [triage, ci, security, cleanup]
     steps:
