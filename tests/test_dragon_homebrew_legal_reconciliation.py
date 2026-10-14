@@ -125,3 +125,25 @@ def test_unchanged_primary_source_never_infers_a_legal_change():
     assert report["events"] == []
     assert report["affected_cells"] == []
     assert report["release_authority"] is False
+
+
+@pytest.mark.parametrize("url", (
+    "\nhttps://lovdata.no/dokument/NL/lov/1961-05-12-2",
+    "https://lovdata.no/path\r\n",
+    "https://lovdata.no:invalid/dokument/",
+    "https://lovdata.no",
+    "https://lovdata.no/dokument/#fragment",
+    "https://lovdata.no.evil.example/dokument/",
+))
+def test_primary_source_url_cannot_hide_whitespace_or_ambiguous_authority(url):
+    with pytest.raises(ValueError):
+        LegalSourceObservation(
+            source_id="legal-source",
+            url=url,
+            jurisdiction="NO",
+            areas=frozenset({"copyright"}),
+            content_digest=ARTIFACT,
+            captured_at=1_000,
+            custody_evidence_digest=MECHANIC,
+            provenance=_authority("crawler-legal-custody", MECHANIC),
+        )
