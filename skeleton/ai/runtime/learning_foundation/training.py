@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import hashlib
 import json
-from typing import Mapping, Sequence
+import math
+from collections.abc import Mapping, Sequence
+from copy import deepcopy
+from dataclasses import asdict, dataclass
+from functools import wraps
+from threading import RLock
 
 from skeleton.ai.runtime.learning_foundation.data import (
     ContentAddressedStore,
@@ -19,11 +23,21 @@ from skeleton.learning.model_program import (
     ReferenceNGramTrainer,
     TrainingReceipt,
     TrainingSpec,
+    corpus_digest,
 )
 
 
 class TrainingControlError(RuntimeError):
     """Training state cannot be reproduced, resumed or independently gated."""
+
+
+def _serialized(method):
+    @wraps(method)
+    def call(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return call
 
 
 def _json(value: object) -> str:
@@ -82,7 +96,11 @@ class DistributedTrainingPlan:
         if len(set(workers)) != len(workers) or not workers:
             raise TrainingControlError("worker_ids must be unique and non-empty")
         object.__setattr__(self, "worker_ids", workers)
-        if isinstance(self.min_workers, bool) or not isinstance(self.min_workers, int) or not 1 <= self.min_workers <= len(workers):
+        if (
+            isinstance(self.min_workers, bool)
+            or not isinstance(self.min_workers, int)
+            or not 1 <= self.min_workers <= len(workers)
+        ):
             raise TrainingControlError("min_workers must be within worker inventory")
         if not self.shards:
             raise TrainingControlError("distributed plan requires shards")
@@ -106,6 +124,8 @@ class TrainingObservation:
             if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
                 raise TrainingControlError(f"metric {name} must be numeric")
             normalized[name] = float(raw_value)
+            if not math.isfinite(normalized[name]):
+                raise TrainingControlError(f"metric {name} must be finite")
         object.__setattr__(self, "metrics", normalized)
         object.__setattr__(self, "observation_digest", _sha("observation_digest", self.observation_digest))
 
@@ -123,7 +143,14 @@ class TrainingCheckpoint:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "run_id", _text("run_id", self.run_id))
-        for name in ("spec_digest", "plan_digest", "model_digest", "training_receipt_digest", "payload_digest", "content_digest"):
+        for name in (
+            "spec_digest",
+            "plan_digest",
+            "model_digest",
+            "training_receipt_digest",
+            "payload_digest",
+            "content_digest",
+        ):
             object.__setattr__(self, name, _sha(name, getattr(self, name)))
         if isinstance(self.step, bool) or not isinstance(self.step, int) or self.step <= 0:
             raise TrainingControlError("checkpoint step must be positive")
@@ -148,6 +175,15 @@ class RecoveryReceipt:
         object.__setattr__(self, "available_workers", workers)
         if self.status not in {"resumable", "insufficient_capacity"}:
             raise TrainingControlError("invalid recovery status")
+        if (
+            isinstance(self.required_workers, bool)
+            or not isinstance(self.required_workers, int)
+            or self.required_workers <= 0
+        ):
+            raise TrainingControlError("required_workers must be positive")
+        expected = "resumable" if len(workers) >= self.required_workers else "insufficient_capacity"
+        if self.status != expected:
+            raise TrainingControlError("recovery status contradicts observed capacity")
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +196,12 @@ class MetricGate:
         object.__setattr__(self, "metric", _text("metric", self.metric))
         if self.minimum is None and self.maximum is None:
             raise TrainingControlError("metric gate requires a bound")
+        for name in ("minimum", "maximum"):
+            value = getattr(self, name)
+            if value is not None:
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                    raise TrainingControlError(f"metric gate {name} must be finite numeric")
+                object.__setattr__(self, name, float(value))
         if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
             raise TrainingControlError("metric gate minimum exceeds maximum")
 
@@ -175,7 +217,12 @@ class TrainingEvaluationDecision:
     def __post_init__(self) -> None:
         object.__setattr__(self, "run_id", _text("run_id", self.run_id))
         object.__setattr__(self, "verifier_id", _text("verifier_id", self.verifier_id))
-        object.__setattr__(self, "checks", {str(k): bool(v) for k, v in self.checks.items()})
+        if not isinstance(self.passed, bool) or any(not isinstance(v, bool) for v in self.checks.values()):
+            raise TrainingControlError("evaluation verdict and checks must be boolean")
+        checks = {_text("check", k): v for k, v in self.checks.items()}
+        if self.passed != (bool(checks) and all(checks.values())):
+            raise TrainingControlError("evaluation verdict contradicts checks")
+        object.__setattr__(self, "checks", checks)
         object.__setattr__(self, "decision_digest", _sha("decision_digest", self.decision_digest))
 
 
@@ -195,6 +242,8 @@ class PostTrainingReceipt:
             object.__setattr__(self, name, _sha(name, getattr(self, name)))
         if self.isolated is not True:
             raise TrainingControlError("post-training lab must be isolated")
+        if not isinstance(self.promotion_eligible, bool):
+            raise TrainingControlError("promotion_eligible must be boolean")
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +268,9 @@ class LocalTrainingControlPlane:
         self.registry = registry or ModelDevelopmentRegistry()
         self.checkpoint_store = checkpoint_store or ContentAddressedStore(max_object_bytes=16 * 1024 * 1024)
         self._runs: dict[str, TrainingRun] = {}
+        self._lock = RLock()
+        self._run_bindings: dict[str, str] = {}
+        self._evaluations: dict[str, tuple[TrainingEvaluationDecision, str]] = {}
 
     @staticmethod
     def plan(
@@ -230,7 +282,11 @@ class LocalTrainingControlPlane:
         workers = tuple(_text("worker_id", item) for item in worker_ids)
         if not workers or len(set(workers)) != len(workers):
             raise TrainingControlError("worker_ids must be unique and non-empty")
-        if isinstance(min_workers, bool) or not isinstance(min_workers, int) or not 1 <= min_workers <= len(workers):
+        if (
+            isinstance(min_workers, bool)
+            or not isinstance(min_workers, int)
+            or not 1 <= min_workers <= len(workers)
+        ):
             raise TrainingControlError("min_workers must be within worker inventory")
         shards = tuple(
             TrainingShard(
@@ -263,6 +319,7 @@ class LocalTrainingControlPlane:
             plan_digest=_digest(payload),
         )
 
+    @_serialized
     def run(
         self,
         spec: TrainingSpec,
@@ -274,20 +331,43 @@ class LocalTrainingControlPlane:
     ) -> TrainingRun:
         if not isinstance(spec, TrainingSpec):
             raise TypeError("spec must be TrainingSpec")
-        if spec.run_id in self._runs:
-            return self._runs[spec.run_id]
-
+        # Snapshot caller-owned containers before admitting a replay or executing.
+        spec = deepcopy(spec)
+        datasets = deepcopy(tuple(datasets))
+        corpora = {key: tuple(value) for key, value in corpora.items()}
         by_identity = {record.identity: record for record in datasets}
-        if set(by_identity) != set(spec.dataset_ids):
+        if len(by_identity) != len(datasets) or set(by_identity) != set(spec.dataset_ids):
             raise TrainingControlError("training spec dataset identity coverage drift")
+        if set(corpora) != set(spec.dataset_ids):
+            raise TrainingControlError("training corpus identity coverage drift")
+        plan = self.plan(spec, worker_ids=worker_ids, min_workers=min_workers)
+        try:
+            binding = _digest(
+                {
+                    "spec": spec.as_dict(),
+                    "plan": asdict(plan),
+                    "datasets": [asdict(by_identity[key]) for key in spec.dataset_ids],
+                    "corpora": {key: corpus_digest(corpora[key]) for key in spec.dataset_ids},
+                }
+            )
+        except ModelProgramError as exc:
+            raise TrainingControlError(str(exc)) from exc
+        if spec.run_id in self._runs:
+            if self._run_bindings[spec.run_id] != binding:
+                raise TrainingControlError("run identity is bound to different training inputs")
+            return deepcopy(self._runs[spec.run_id])
         for record in datasets:
             try:
                 training_dataset = record.as_training_dataset()
             except DataPlaneError as exc:
                 raise TrainingControlError(str(exc)) from exc
+            if (
+                len(corpora[record.identity]) != training_dataset.sample_count
+                or corpus_digest(corpora[record.identity]) != training_dataset.content_digest
+            ):
+                raise TrainingControlError("training corpus differs from registered dataset content")
             self.registry.register_dataset(training_dataset)
 
-        plan = self.plan(spec, worker_ids=worker_ids, min_workers=min_workers)
         try:
             artifact, receipt = self.registry.train(
                 spec,
@@ -296,6 +376,27 @@ class LocalTrainingControlPlane:
             )
         except ModelProgramError as exc:
             raise TrainingControlError(str(exc)) from exc
+        # An injected registry is an execution dependency, not an authority to
+        # rebind this request. Its replay path may predate stricter admission.
+        expected_datasets = tuple(by_identity[key].training_content_digest for key in spec.dataset_ids)
+        if (
+            receipt.spec_digest != spec.digest
+            or receipt.run_id != spec.run_id
+            or receipt.trainer_id != spec.trainer_id
+            or receipt.code_revision != spec.code_revision
+            or receipt.dataset_digests != expected_datasets
+            or receipt.model_id != spec.model_id
+            or artifact.model_id != spec.model_id
+            or artifact.training_run_id != spec.run_id
+            or receipt.model_digest != artifact.model_digest
+            or receipt.artifact_digest != artifact.artifact_digest
+        ):
+            raise TrainingControlError("registry training receipt identity differs from admitted request")
+        try:
+            artifact = ModelArtifact(**asdict(artifact))
+            artifact.load_reference_model()
+        except (ModelProgramError, ValueError, TypeError) as exc:
+            raise TrainingControlError("registry model artifact failed integrity verification") from exc
 
         observation_payload = {
             "run_id": spec.run_id,
@@ -309,7 +410,7 @@ class LocalTrainingControlPlane:
             observation_digest=_digest(observation_payload),
         )
         checkpoint_payload = {
-            "schema_version": 1,
+            "schema_version": 2,
             "run_id": spec.run_id,
             "spec_digest": spec.digest,
             "plan_digest": plan.plan_digest,
@@ -317,9 +418,13 @@ class LocalTrainingControlPlane:
             "model_digest": artifact.model_digest,
             "training_receipt_digest": receipt.digest,
             "artifact_digest": artifact.artifact_digest,
+            "min_workers": plan.min_workers,
+            "worker_count": len(plan.worker_ids),
         }
         payload_bytes = _json(checkpoint_payload).encode("utf-8")
-        content = self.checkpoint_store.put(payload_bytes, media_type="application/vnd.skeleton.training-checkpoint+json")
+        content = self.checkpoint_store.put(
+            payload_bytes, media_type="application/vnd.skeleton.training-checkpoint+json"
+        )
         checkpoint = TrainingCheckpoint(
             run_id=spec.run_id,
             spec_digest=spec.digest,
@@ -338,9 +443,11 @@ class LocalTrainingControlPlane:
             checkpoint=checkpoint,
             observation=observation,
         )
-        self._runs[spec.run_id] = result
-        return result
+        self._runs[spec.run_id] = deepcopy(result)
+        self._run_bindings[spec.run_id] = binding
+        return deepcopy(result)
 
+    @_serialized
     def recover(
         self,
         checkpoint: TrainingCheckpoint,
@@ -348,14 +455,83 @@ class LocalTrainingControlPlane:
         available_workers: Sequence[str],
         required_workers: int,
     ) -> RecoveryReceipt:
-        payload = self.checkpoint_store.get(checkpoint.content_digest)
+        if not isinstance(checkpoint, TrainingCheckpoint):
+            raise TypeError("checkpoint must be TrainingCheckpoint")
+        try:
+            payload = self.checkpoint_store.get(checkpoint.content_digest)
+        except (KeyError, DataPlaneError) as exc:
+            raise TrainingControlError("checkpoint content is unavailable or corrupt") from exc
         if hashlib.sha256(payload).hexdigest() != checkpoint.content_digest:
             raise TrainingControlError("checkpoint content digest mismatch")
+
+        def strict_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+            out: dict[str, object] = {}
+            for key, value in pairs:
+                if key in out:
+                    raise TrainingControlError("checkpoint contains duplicate JSON keys")
+                out[key] = value
+            return out
+
+        try:
+            decoded = json.loads(payload, object_pairs_hook=strict_object)
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise TrainingControlError("checkpoint payload is not valid JSON") from exc
+        if (
+            not isinstance(decoded, dict)
+            or type(decoded.get("schema_version")) is not int
+            or decoded.get("schema_version") != 2
+        ):
+            raise TrainingControlError("unsupported checkpoint payload schema")
+        if set(decoded) != {
+            "schema_version",
+            "run_id",
+            "spec_digest",
+            "plan_digest",
+            "step",
+            "model_digest",
+            "training_receipt_digest",
+            "artifact_digest",
+            "min_workers",
+            "worker_count",
+        }:
+            raise TrainingControlError("checkpoint payload field coverage mismatch")
+        if type(decoded["step"]) is not int or decoded["step"] <= 0:
+            raise TrainingControlError("checkpoint step must be positive")
+        if _digest(decoded) != checkpoint.payload_digest or _json(decoded).encode("utf-8") != payload:
+            raise TrainingControlError("checkpoint payload digest or canonical encoding mismatch")
+        for name in (
+            "run_id",
+            "spec_digest",
+            "plan_digest",
+            "step",
+            "model_digest",
+            "training_receipt_digest",
+        ):
+            if decoded.get(name) != getattr(checkpoint, name):
+                raise TrainingControlError(f"checkpoint {name} binding mismatch")
+        _sha("artifact_digest", decoded.get("artifact_digest"))
+        for name in ("min_workers", "worker_count"):
+            value = decoded.get(name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise TrainingControlError(f"checkpoint {name} must be positive")
+        if decoded["min_workers"] > decoded["worker_count"]:
+            raise TrainingControlError("checkpoint worker capacity is inconsistent")
+        known = self._runs.get(checkpoint.run_id)
+        if known is not None and (
+            known.checkpoint != checkpoint or known.artifact.artifact_digest != decoded["artifact_digest"]
+        ):
+            raise TrainingControlError("checkpoint differs from admitted training run")
         workers = tuple(_text("worker_id", item) for item in available_workers)
         if len(set(workers)) != len(workers):
             raise TrainingControlError("available workers must be unique")
-        if isinstance(required_workers, bool) or not isinstance(required_workers, int) or required_workers <= 0:
+        if (
+            isinstance(required_workers, bool)
+            or not isinstance(required_workers, int)
+            or required_workers <= 0
+        ):
             raise TrainingControlError("required_workers must be positive")
+        if required_workers < decoded["min_workers"]:
+            raise TrainingControlError("recovery cannot lower admitted worker minimum")
         status = "resumable" if len(workers) >= required_workers else "insufficient_capacity"
         payload_obj = {
             "run_id": checkpoint.run_id,
@@ -373,6 +549,7 @@ class LocalTrainingControlPlane:
             receipt_digest=_digest(payload_obj),
         )
 
+    @_serialized
     def evaluate(
         self,
         run_id: str,
@@ -389,9 +566,13 @@ class LocalTrainingControlPlane:
         if verifier == run.receipt.trainer_id:
             raise TrainingControlError("trainer cannot independently verify training gate")
         checks: dict[str, bool] = {}
+        gate_policy = []
         for gate in gates:
             if not isinstance(gate, MetricGate):
                 raise TypeError("gates must contain MetricGate")
+            if gate.metric in checks:
+                raise TrainingControlError("duplicate metric gates cannot overwrite prior checks")
+            gate_policy.append(asdict(gate))
             value = run.receipt.metrics.get(gate.metric)
             ok = value is not None
             if value is not None and gate.minimum is not None:
@@ -406,15 +587,20 @@ class LocalTrainingControlPlane:
             "verifier_id": verifier,
             "checks": checks,
             "training_receipt_digest": run.receipt.digest,
+            "model_digest": run.artifact.model_digest,
+            "gate_policy": gate_policy,
         }
-        return TrainingEvaluationDecision(
+        decision = TrainingEvaluationDecision(
             run_id=rid,
             passed=passed,
             verifier_id=verifier,
             checks=checks,
             decision_digest=_digest(payload),
         )
+        self._evaluations[decision.decision_digest] = (deepcopy(decision), _json(payload))
+        return deepcopy(decision)
 
+    @_serialized
     def post_train(
         self,
         run_id: str,
@@ -425,8 +611,20 @@ class LocalTrainingControlPlane:
             run = self._runs[rid]
         except KeyError as exc:
             raise TrainingControlError("unknown training run") from exc
+        if not isinstance(decision, TrainingEvaluationDecision):
+            raise TypeError("decision must be TrainingEvaluationDecision")
         if decision.run_id != rid:
             raise TrainingControlError("evaluation decision run mismatch")
+        issued = self._evaluations.get(decision.decision_digest)
+        if issued is None or issued[0] != decision:
+            raise TrainingControlError("evaluation decision was not issued by this control plane")
+        evaluation_payload = json.loads(issued[1])
+        if (
+            evaluation_payload["training_receipt_digest"] != run.receipt.digest
+            or evaluation_payload["model_digest"] != run.artifact.model_digest
+            or _digest(evaluation_payload) != decision.decision_digest
+        ):
+            raise TrainingControlError("evaluation decision training identity drift")
         payload = {
             "run_id": rid,
             "model_digest": run.artifact.model_digest,
