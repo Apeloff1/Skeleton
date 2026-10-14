@@ -69,7 +69,8 @@ class DragonMicroKnowledge:
         if authorized is not True:
             raise PermissionError("microknowledge indexing requires authorization")
         _id(owner); _id(concept_id); _id(evidence_ref)
-        if isinstance(expires_at, bool) or not isfinite(expires_at):
+        if (isinstance(expires_at, bool) or not isinstance(expires_at, (int, float))
+                or not isfinite(expires_at) or expires_at < 0):
             raise ValueError("invalid evidence expiry")
         self._facets(facets)
         row = self.db.execute("SELECT domain,statement FROM dragon_knowledge_concepts WHERE owner=? AND concept_id=?",
