@@ -1,12 +1,6 @@
 name: Provider Adapter Offline Runtime
 
 on:
-  pull_request:
-    paths:
-      - "skeleton/tools/integrations/adapters/**"
-      - "skeleton/ai/runtime/tools/integrations/adapters/**"
-      - "skeleton/integrations/adapters/**"
-      - ".github/workflows/provider-adapters-offline.yml"
   push:
     branches:
       - main

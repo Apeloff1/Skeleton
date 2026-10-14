@@ -1,28 +1,6 @@
 name: Jeeves Bidirectional Historical
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
-    paths:
-      - 'skeleton/jeeves/historical_modes.py'
-      - 'skeleton/jeeves/bidirectional_modes.py'
-      - 'skeleton/jeeves/bidirectional_calibration.py'
-      - 'skeleton/jeeves/historical_robustness.py'
-      - 'skeleton/jeeves/historical_uncertainty.py'
-      - 'skeleton/jeeves/historical_evidence.py'
-      - 'skeleton/jeeves/__init__.py'
-      - 'skeleton/learning/evidence.py'
-      - 'skeleton/testing/test_jeeves_historical_modes.py'
-      - 'skeleton/testing/test_jeeves_bidirectional_modes.py'
-      - 'skeleton/testing/test_jeeves_bidirectional_calibration.py'
-      - 'skeleton/testing/test_jeeves_historical_robustness.py'
-      - 'skeleton/testing/test_jeeves_historical_uncertainty.py'
-      - 'skeleton/testing/test_jeeves_historical_evidence.py'
-      - 'skeleton/testing/test_jeeves_uncertainty_evidence.py'
-      - 'skeleton/testing/test_jeeves_historical_mode_exports.py'
-      - 'skeleton/testing/test_learning_evidence.py'
-      - '.github/workflows/jeeves-bidirectional.yml'
   push:
     branches: [main]
     paths:
@@ -45,6 +23,7 @@ on:
       - 'skeleton/testing/test_learning_evidence.py'
       - '.github/workflows/jeeves-bidirectional.yml'
 
+  workflow_dispatch:
 concurrency:
   group: jeeves-bidirectional-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

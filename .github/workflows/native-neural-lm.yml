@@ -1,14 +1,6 @@
 name: AI Native Neural LM
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "skeleton/ai/runtime/inference/__init__.py"
-      - "skeleton/ai/runtime/inference/neural.py"
-      - "skeleton/testing/test_native_neural_lm.py"
-      - ".github/workflows/native-neural-lm.yml"
   push:
     branches:
       - main

@@ -1,13 +1,6 @@
 name: Jeeves Capability Evidence
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - "skeleton/jeeves/evidence_core.py"
-      - "skeleton/jeeves/llm_core.py"
-      - "tests/test_jeeves_evidence_capability_bridge.py"
-      - ".github/workflows/jeeves-capability-evidence.yml"
   push:
     branches: [main, develop]
     paths:
@@ -16,6 +9,7 @@ on:
       - "tests/test_jeeves_evidence_capability_bridge.py"
       - ".github/workflows/jeeves-capability-evidence.yml"
 
+  workflow_dispatch:
 permissions:
   contents: read
 

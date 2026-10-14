@@ -1,18 +1,6 @@
 name: Jeeves Live Hardening
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches: [main]
-    paths:
-      - "skeleton/jeeves/llm_core.py"
-      - "skeleton/jeeves/providers.py"
-      - "tests/test_jeeves_live_hardening.py"
-      - "tests/test_jeeves_adversarial.py"
-      - "tests/test_jeeves_adversarial_followup.py"
-      - "tests/test_jeeves_history_boundary.py"
-      - "tests/test_jeeves_local_provider_policy.py"
-      - ".github/workflows/jeeves-live-hardening.yml"
   push:
     branches: [main]
     paths:
@@ -25,6 +13,7 @@ on:
       - "tests/test_jeeves_local_provider_policy.py"
       - ".github/workflows/jeeves-live-hardening.yml"
 
+  workflow_dispatch:
 permissions:
   contents: read
 

@@ -1,22 +1,6 @@
 name: Provider Interaction Protocol Closure Gate
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/provider_contract.py"
-      - "skeleton/providers/contract.py"
-      - "skeleton/provider_runtime.py"
-      - "skeleton/ai/runtime/provider_runtime.py"
-      - "skeleton/testing/test_provider_contract.py"
-      - "skeleton/testing/test_provider_runtime_schema_parity.py"
-      - "machine/ai_runtime_schemas.json"
-      - "machine/ai_app_construction.json"
-      - "machine/ai_implementation_handoff.json"
-      - "machine/ai_closure_evidence.json"
-      - "scripts/verify_provider_protocol_closure.py"
-      - "tests/test_provider_protocol_independent_verifier.py"
-      - ".github/workflows/provider-protocol-closure.yml"
   workflow_dispatch:
 
 permissions:

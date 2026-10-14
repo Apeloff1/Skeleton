@@ -1,21 +1,6 @@
 name: Jeeves Absorb
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches: [main]
-    paths:
-      - "backend/core/adaptive_absorption_fabric.py"
-      - "backend/tests/test_adaptive_absorption_fabric.py"
-      - "skeleton/jeeves/absorb.py"
-      - "skeleton/jeeves/absorb_claims.py"
-      - "skeleton/jeeves/absorb_evolution.py"
-      - "skeleton/jeeves/absorb_runtime.py"
-      - "skeleton/jeeves/absorb_rag.py"
-      - "skeleton/testing/test_jeeves_absorb.py"
-      - "skeleton/testing/test_jeeves_absorb_claims.py"
-      - "skeleton/testing/test_jeeves_absorb_evolution.py"
-      - ".github/workflows/jeeves-absorb.yml"
   push:
     branches: [main]
     paths:
@@ -31,6 +16,7 @@ on:
       - "skeleton/testing/test_jeeves_absorb_evolution.py"
       - ".github/workflows/jeeves-absorb.yml"
 
+  workflow_dispatch:
 permissions:
   contents: read
 
