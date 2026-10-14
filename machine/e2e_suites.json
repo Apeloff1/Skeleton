@@ -39,7 +39,8 @@
         "backend/tests/test_ai_chat_engine_cutover.py",
         "backend/tests/test_conversation_bson_timestamps.py",
         "backend/tests/test_ai_chat_turn_persistence.py",
-        "backend/tests/test_graceful_drain_signals.py"
+        "backend/tests/test_graceful_drain_signals.py",
+        "backend/tests/test_storage_lazy_registry.py"
       ],
       "command": [
         "python",
@@ -55,7 +56,8 @@
         "backend/tests/test_ai_chat_engine_cutover.py",
         "backend/tests/test_conversation_bson_timestamps.py",
         "backend/tests/test_ai_chat_turn_persistence.py",
-        "backend/tests/test_graceful_drain_signals.py"
+        "backend/tests/test_graceful_drain_signals.py",
+        "backend/tests/test_storage_lazy_registry.py"
       ]
     },
     {

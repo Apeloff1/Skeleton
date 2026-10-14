@@ -17,10 +17,29 @@ so this never double-imports.
 """
 from __future__ import annotations
 
+import importlib
 import pathlib
 import sys
 
-from core.unbulk import lazy_import
+
+class _LazyModule:
+    """Defer execution while retaining Python's normal import locking/cache."""
+
+    __slots__ = ("_module_name",)
+
+    def __init__(self, module_name: str):
+        self._module_name = module_name
+
+    def __getattr__(self, name: str):
+        return getattr(importlib.import_module(self._module_name), name)
+
+    def __repr__(self):
+        return f"<lazy module {self._module_name!r}>"
+
+
+def lazy_import(module_name: str):
+    """Create a proxy without importing or registering its target module."""
+    return _LazyModule(module_name)
 
 _proxies: dict = {}
 _DIR = pathlib.Path(__file__).resolve().parent
