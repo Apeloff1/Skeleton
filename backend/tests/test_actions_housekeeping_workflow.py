@@ -57,3 +57,13 @@ def test_live_reaper_preserves_non_pr_security_runs_and_never_force_escalates_th
         "Security/provenance/artifact/dependency PR runs are never "
         "force-cancelled after an ordinary cancellation failure."
     ) in text
+
+
+def test_cleanup_stops_at_rate_limits_instead_of_spamming_delete_calls() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    for resource in ("cache", "artifact", "old-run"):
+        assert f"{resource}-delete-error.txt" in text
+    assert text.count("grep -Eqi '(rate.limit|abuse detection)'") >= 3
+    assert "Rate-limit backpressure activated: $rate_limited" in text
+    assert "Old-run cleanup deferred: GitHub API rate limit reached." in text
