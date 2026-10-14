@@ -3459,6 +3459,29 @@ class ProviderRegistry:
             for provider_id in candidate_ids
         )
 
+    def require_selected(self, provider_id: str, model_id: str) -> ProviderAdapter:
+        """Select exactly one configured, architecture-acknowledged model.
+
+        An explicit user selection cannot silently fall back to a different
+        provider or model, even when the automatic route has fallbacks.
+        """
+        if (
+            not isinstance(provider_id, str)
+            or not provider_id
+            or provider_id != provider_id.strip()
+            or not isinstance(model_id, str)
+            or not model_id
+            or model_id != model_id.strip()
+        ):
+            raise ProviderUnavailableError("explicit provider selection is malformed")
+        adapter = self._adapters.get(provider_id)
+        if adapter is None or getattr(adapter, "model", None) != model_id:
+            raise ProviderUnavailableError("selected provider/model is not configured")
+        self._architecture_receipt(provider_id)
+        if not adapter.available:
+            raise ProviderUnavailableError("selected provider/model is unavailable")
+        return adapter
+
     def require_active(self) -> ProviderAdapter:
         adapter = self.active
         if adapter is None:
