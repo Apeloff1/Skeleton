@@ -268,9 +268,13 @@ class Campaign:
         env = dict(self.env, CI="1", EXPO_NO_TELEMETRY="1",
                    EXPO_PUBLIC_BACKEND_URL=self.frontend_backend_url,
                    EXPO_PUBLIC_SKELETON_URL=self.frontend_engine_url)
+        patches = self.start("web-patches", ["node", "scripts/patch-node-modules.js"],
+                             env, self.source / "frontend")
+        if patches.wait(timeout=30) != 0:
+            raise RuntimeError("reviewed frontend dependency patches failed; see web-patches.log")
         process = self.start("web-build", ["node", str(modules / "expo" / "bin" / "cli"),
             "export", "--platform", "web", "--output-dir", str(self.web_export)], env, self.source / "frontend")
-        if process.wait(timeout=240) != 0 or not (self.web_export / "index.html").is_file():
+        if process.wait(timeout=self.args.web_build_timeout) != 0 or not (self.web_export / "index.html").is_file():
             raise RuntimeError("exact-head Expo export failed; see web-build.log")
         self.rec.emit("web.exported", head_sha=self.head, assets_sha256=export_digest(self.web_export))
 
@@ -656,6 +660,8 @@ def main():
     parser.add_argument("--backend-port", type=int, default=38001)
     parser.add_argument("--engine-port", type=int, default=38010)
     parser.add_argument("--web-port", type=int, default=33000)
+    parser.add_argument("--web-build-timeout", type=int, default=600,
+                        help="Bounded cold Expo export budget in seconds (60 through 1800)")
     parser.add_argument("--output-dir", type=Path, default=ROOT / ".e2e-evidence" / "assembled-system")
     parser.add_argument("--audit-product-routes", action="store_true",
                         help="also open every destination declared in the product journey catalog")
@@ -666,6 +672,8 @@ def main():
     parser.add_argument("--audit-route", action="append", default=[],
                         help="audit a specific relative route; repeat to reproduce individual failures")
     args = parser.parse_args()
+    if not 60 <= args.web_build_timeout <= 1800:
+        parser.error("web build timeout must be between 60 and 1800 seconds")
     ports = (args.backend_port, args.engine_port, args.web_port)
     if len(set(ports)) != 3 or any(not 1024 <= port <= 65535 for port in ports):
         parser.error("campaign ports must be distinct unprivileged ports")
