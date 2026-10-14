@@ -109,3 +109,13 @@ def test_index_replacement_does_not_keep_stale_facet_or_postings():
     assert cache.retrieve("alice", "combat", {"genre": "rpg"}, plan, now=10, authorized=True).hits == ()
     result = cache.retrieve("alice", "combat", {"genre": "strategy"}, plan, now=10, authorized=True)
     assert result.hits[0].evidence_ref == "source2"
+
+
+@pytest.mark.parametrize("expiry", [None, "60", True, -1, float("inf"), float("nan")])
+def test_index_refuses_untyped_or_invalid_evidence_expiry(expiry):
+    graph, cache, _ = context()
+    graph.put_concept("alice", KnowledgeConcept("combat", "gameplay", "Bounded combat evidence"), authorized=True)
+    with pytest.raises(ValueError, match="invalid evidence expiry"):
+        cache.index("alice", "combat", {}, evidence_ref="source1",
+                    expires_at=expiry, authorized=True)
+    assert graph.db.execute("SELECT COUNT(*) FROM dragon_microknowledge").fetchone()[0] == 0
