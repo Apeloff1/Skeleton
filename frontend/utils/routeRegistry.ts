@@ -123,6 +123,12 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/story-index', title: 'Story Index', category: 'ai' },
   { path: '/world-workbench', title: 'World Workbench', category: 'build' },
 
+  // Reconciled governed AI and Dragon routes (actual Expo Router screens).
+  { path: '/ai-chat', title: 'Governed AI Chat', category: 'ai', heavy: true },
+  { path: '/dragon-delivery', title: 'Dragon Delivery', category: 'build', heavy: true },
+  { path: '/dragon-research', title: 'Dragon Research', category: 'ai', heavy: true },
+  { path: '/game-learning', title: 'Game Learning', category: 'learn', heavy: true },
+
   // Filesystem-discovered routes kept in the same canonical registry so
   // route coverage fails closed when screens are added or removed.
   { path: '/agent-memory', title: 'Agent Memory', category: 'ai' },
