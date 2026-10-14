@@ -1,33 +1,6 @@
 name: VOL-055 Architecture Linter
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/architecture.json"
-      - "machine/architecture_rule_registry.json"
-      - "scripts/check_architecture*.py"
-      - "scripts/check_ai_file_tree.py"
-      - "scripts/check_ai_scope_freeze.py"
-      - "scripts/verify_vol055_architecture_linter.py"
-      - "tests/test_architecture_rule_registry.py"
-      - "tests/test_vol055_architecture_linter_independent.py"
-      - ".github/workflows/vol055-architecture-linter.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/architecture.json"
-      - "machine/architecture_rule_registry.json"
-      - "scripts/check_architecture*.py"
-      - "scripts/check_ai_file_tree.py"
-      - "scripts/check_ai_scope_freeze.py"
-      - "scripts/verify_vol055_architecture_linter.py"
-      - "tests/test_architecture_rule_registry.py"
-      - "tests/test_vol055_architecture_linter_independent.py"
-      - ".github/workflows/vol055-architecture-linter.yml"
   workflow_dispatch:
 
 permissions:

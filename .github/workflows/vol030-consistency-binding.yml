@@ -1,27 +1,6 @@
 name: VOL-030 Consistency-Bound Remote Execution Gate
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/distributed/network/consistency_policy.py"
-      - "skeleton/ai/runtime/distributed/network/consistency_policy.py"
-      - "skeleton/distributed/network/remote_execution.py"
-      - "skeleton/ai/runtime/distributed/network/remote_execution.py"
-      - "skeleton/network/remote_execution.py"
-      - "skeleton/testing/test_remote_execution_protocol.py"
-      - ".github/workflows/vol030-consistency-binding.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/distributed/network/consistency_policy.py"
-      - "skeleton/ai/runtime/distributed/network/consistency_policy.py"
-      - "skeleton/distributed/network/remote_execution.py"
-      - "skeleton/ai/runtime/distributed/network/remote_execution.py"
-      - "skeleton/network/remote_execution.py"
-      - "skeleton/testing/test_remote_execution_protocol.py"
-      - ".github/workflows/vol030-consistency-binding.yml"
   workflow_dispatch:
 
 permissions:

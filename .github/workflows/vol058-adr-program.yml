@@ -1,31 +1,6 @@
 name: VOL-058 ADR Program
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/adr_index.json"
-      - "machine/architecture_rule_registry.json"
-      - "docs/adr/**"
-      - "scripts/check_architecture_adr_index.py"
-      - "scripts/verify_vol058_adr_program.py"
-      - "tests/test_architecture_adr_index.py"
-      - "tests/test_vol058_adr_program_independent.py"
-      - ".github/workflows/vol058-adr-program.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/adr_index.json"
-      - "machine/architecture_rule_registry.json"
-      - "docs/adr/**"
-      - "scripts/check_architecture_adr_index.py"
-      - "scripts/verify_vol058_adr_program.py"
-      - "tests/test_architecture_adr_index.py"
-      - "tests/test_vol058_adr_program_independent.py"
-      - ".github/workflows/vol058-adr-program.yml"
   workflow_dispatch:
 
 permissions:

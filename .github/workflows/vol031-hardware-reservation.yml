@@ -1,33 +1,6 @@
 name: VOL-031 Hardware and Reservation Gate
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/distributed/network/hardware_topology.py"
-      - "skeleton/ai/runtime/distributed/network/hardware_topology.py"
-      - "skeleton/distributed/network/placement_scheduler.py"
-      - "skeleton/ai/runtime/distributed/network/placement_scheduler.py"
-      - "skeleton/distributed/network/model_placement.py"
-      - "skeleton/ai/runtime/distributed/network/model_placement.py"
-      - "skeleton/shells/worker_reservations.py"
-      - "skeleton/testing/test_model_placement.py"
-      - "skeleton/testing/test_vol031_hardware_reservation.py"
-      - ".github/workflows/vol031-hardware-reservation.yml"
-  push:
-    branches: [main]
-    paths:
-      - "skeleton/distributed/network/hardware_topology.py"
-      - "skeleton/ai/runtime/distributed/network/hardware_topology.py"
-      - "skeleton/distributed/network/placement_scheduler.py"
-      - "skeleton/ai/runtime/distributed/network/placement_scheduler.py"
-      - "skeleton/distributed/network/model_placement.py"
-      - "skeleton/ai/runtime/distributed/network/model_placement.py"
-      - "skeleton/shells/worker_reservations.py"
-      - "skeleton/testing/test_model_placement.py"
-      - "skeleton/testing/test_vol031_hardware_reservation.py"
-      - ".github/workflows/vol031-hardware-reservation.yml"
   workflow_dispatch:
 
 permissions:

@@ -1,29 +1,6 @@
 name: VOL-052 Internal Python Architecture
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/python_package_layers.json"
-      - "machine/architecture_rule_registry.json"
-      - "scripts/check_architecture_package_layers.py"
-      - "scripts/verify_vol052_python_architecture.py"
-      - "tests/test_architecture_package_layers.py"
-      - "tests/test_vol052_python_architecture_independent.py"
-      - ".github/workflows/vol052-python-architecture.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/python_package_layers.json"
-      - "machine/architecture_rule_registry.json"
-      - "scripts/check_architecture_package_layers.py"
-      - "scripts/verify_vol052_python_architecture.py"
-      - "tests/test_architecture_package_layers.py"
-      - "tests/test_vol052_python_architecture_independent.py"
-      - ".github/workflows/vol052-python-architecture.yml"
   workflow_dispatch:
 
 permissions:

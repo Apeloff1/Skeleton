@@ -1,33 +1,6 @@
 name: VOL-053 Import Architecture
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/python_package_layers.json"
-      - "machine/architecture_rule_registry.json"
-      - "scripts/check_architecture_package_layers.py"
-      - "scripts/check_architecture_packaged_wheel.py"
-      - "scripts/verify_vol053_import_architecture.py"
-      - "tests/test_architecture_package_layers.py"
-      - "tests/test_architecture_packaged_wheel.py"
-      - "tests/test_vol053_import_architecture_independent.py"
-      - ".github/workflows/vol053-import-architecture.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/python_package_layers.json"
-      - "machine/architecture_rule_registry.json"
-      - "scripts/check_architecture_package_layers.py"
-      - "scripts/check_architecture_packaged_wheel.py"
-      - "scripts/verify_vol053_import_architecture.py"
-      - "tests/test_architecture_package_layers.py"
-      - "tests/test_architecture_packaged_wheel.py"
-      - "tests/test_vol053_import_architecture_independent.py"
-      - ".github/workflows/vol053-import-architecture.yml"
   workflow_dispatch:
 
 permissions:

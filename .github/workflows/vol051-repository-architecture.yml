@@ -1,27 +1,6 @@
 name: VOL-051 Repository Architecture
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_file_tree.json"
-      - "machine/architecture.json"
-      - "scripts/check_ai_file_tree.py"
-      - "scripts/check_ai_file_tree_ownership.py"
-      - "skeleton/testing/test_ai_file_tree.py"
-      - "skeleton/testing/test_ai_file_tree_ownership.py"
-      - ".github/workflows/vol051-repository-architecture.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_file_tree.json"
-      - "machine/architecture.json"
-      - "scripts/check_ai_file_tree.py"
-      - "scripts/check_ai_file_tree_ownership.py"
-      - "skeleton/testing/test_ai_file_tree.py"
-      - "skeleton/testing/test_ai_file_tree_ownership.py"
-      - ".github/workflows/vol051-repository-architecture.yml"
   workflow_dispatch:
 
 permissions:

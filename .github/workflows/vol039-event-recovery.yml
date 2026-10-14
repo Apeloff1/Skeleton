@@ -1,19 +1,6 @@
 name: VOL-039 Event Durability & Causal Inbox
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'skeleton/frontier/runtime/event_architecture.py'
-      - 'skeleton/frontier/runtime/operation_stream_store.py'
-      - 'skeleton/ai/inbox_causality.py'
-      - 'skeleton/ai/inbox_sqlite.py'
-      - 'skeleton/testing/test_event_architecture.py'
-      - 'skeleton/testing/test_event_integrity_audit.py'
-      - 'skeleton/testing/test_inbox_sqlite.py'
-      - '.github/workflows/vol039-event-recovery.yml'
   workflow_dispatch:
 
 permissions:

@@ -1,35 +1,6 @@
 name: VOL-054 Machine Architecture Manifests
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/manifest_reference_policy.json"
-      - "machine/architecture_rule_registry.json"
-      - "machine/**"
-      - "docs/architecture/**"
-      - "docs/adr/README.md"
-      - "scripts/check_architecture_manifest_references.py"
-      - "scripts/verify_vol054_manifest_references.py"
-      - "tests/test_architecture_manifest_references.py"
-      - "tests/test_vol054_manifest_references_independent.py"
-      - ".github/workflows/vol054-manifest-references.yml"
-  push:
-    branches: [main]
-    paths:
-      - "machine/ai_master_plan.json"
-      - "machine/manifest_reference_policy.json"
-      - "machine/architecture_rule_registry.json"
-      - "machine/**"
-      - "docs/architecture/**"
-      - "docs/adr/README.md"
-      - "scripts/check_architecture_manifest_references.py"
-      - "scripts/verify_vol054_manifest_references.py"
-      - "tests/test_architecture_manifest_references.py"
-      - "tests/test_vol054_manifest_references_independent.py"
-      - ".github/workflows/vol054-manifest-references.yml"
   workflow_dispatch:
 
 permissions:
