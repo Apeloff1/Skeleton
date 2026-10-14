@@ -75,6 +75,42 @@ jobs:
           cancellation_attempts = 0
           budget_exhausted = False
 
+          # GitHub returned HTTP 409 to both cancellation endpoints on all
+          # 28 independently verified stale, non-security run IDs at 22:55Z
+          # (Actions run 38650689441). Do not exhaust quota every ten minutes.
+          # Keep these runs visible in raw queued counts and retry on Oct 22.
+          provider_conflict_retry_after = 1792627200
+          provider_conflict_run_ids = frozenset({
+              38320664775,
+              38320665862,
+              38320664778,
+              38320296726,
+              37539069791,
+              34952531648,
+              34952526576,
+              34952518480,
+              34952509012,
+              34952531743,
+              34952526568,
+              34952518541,
+              34952509095,
+              34952531771,
+              34952526563,
+              34952518481,
+              34952509059,
+              37655530898,
+              37655496094,
+              37642383890,
+              37642358530,
+              37642355681,
+              37642345734,
+              37655522865,
+              37655521563,
+              37655496139,
+              37642398161,
+              37642398159,
+          })
+
           # Preserve privileged controllers and per-event receipts from broad
           # last-main supersession. Only explicitly idempotent, queued sweeps
           # may be coalesced when a newer live sweep is independently verified.
@@ -452,6 +488,7 @@ jobs:
               'active_seen': 0,
               'control_plane_preserved': 0,
               'coalesced_control_plane_queued': 0,
+              'provider_conflicts_backed_off': 0,
               'obsolete_main': 0,
               'obsolete_main_active': 0,
               'duplicates': 0,
@@ -536,6 +573,10 @@ jobs:
               ):
                   run_id = int(run.get('id') or 0)
                   if not run_id or run_id == current or run_id in attempted:
+                      continue
+                  if run_id in provider_conflict_run_ids and time.time() < provider_conflict_retry_after:
+                      totals['provider_conflicts_backed_off'] += 1
+                      local['provider_conflicts_backed_off'] += 1
                       continue
                   if stale_pr_run(run, open_pr_heads):
                       selected.append(run)
@@ -730,6 +771,7 @@ jobs:
                   f'active={len(active)} selected={len(selected)} '
                   f'control_plane_preserved={local["control_plane_preserved"]} '
                   f'coalesced_control_plane_queued={local["coalesced_control_plane_queued"]} '
+                  f'provider_conflicts_backed_off={local["provider_conflicts_backed_off"]} '
                   f'obsolete_main={local["obsolete_main"]} '
                   f'obsolete_main_active={local["obsolete_main_active"]} '
                   f'obsolete_pr_queued={local["obsolete_pr_queued"]} '
@@ -768,6 +810,10 @@ jobs:
                   handle.write(
                       '- Superseded queued periodic-controller sweeps: '
                       f'{totals["coalesced_control_plane_queued"]}\n'
+                  )
+                  handle.write(
+                      '- Provider 409 conflict run observations backed off until Oct 22: '
+                      f'{totals["provider_conflicts_backed_off"]}\n'
                   )
                   handle.write(
                       f'- Obsolete main selections: {totals["obsolete_main"]}\n'
