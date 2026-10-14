@@ -40,6 +40,7 @@ jobs:
       MAX_QUEUED_ACTIONS_RUNS: '40'
     outputs:
       proceed: ${{ steps.guard.outputs.proceed }}
+      snapshot_since: ${{ steps.guard.outputs.snapshot_since }}
     steps:
       - name: Read queued Actions pressure
         id: guard
@@ -50,11 +51,16 @@ jobs:
           set -euo pipefail
           queued_count=$(gh api "/repos/${REPO}/actions/runs?status=queued&per_page=1" --jq '.total_count')
           threshold="$MAX_QUEUED_ACTIONS_RUNS"
-          if ! [[ "$queued_count" =~ ^[0-9]+$ && "$threshold" =~ ^[0-9]+$ ]]; then
+          # Limit the state snapshot to current work. On high fan-out, hold
+          # instead of failing from a truncated identity-sensitive scan.
+          snapshot_since=$(date -u -d '2 hours ago' '+%Y-%m-%dT%H:%M:%SZ')
+          recent_count=$(gh api "/repos/${REPO}/actions/runs?created=%3E${snapshot_since}&per_page=1" --jq '.total_count')
+          echo "snapshot_since=$snapshot_since" >> "$GITHUB_OUTPUT"
+          if ! [[ "$recent_count" =~ ^[0-9]+$ && "$queued_count" =~ ^[0-9]+$ && "$threshold" =~ ^[0-9]+$ ]]; then
             echo '::error::Idle Studio queue guard received invalid queue evidence.'
             exit 1
           fi
-          if (( queued_count >= threshold )); then
+          if (( queued_count >= threshold || recent_count >= 400 )); then
             echo 'proceed=false' >> "$GITHUB_OUTPUT"
             {
               echo '## Idle Studio queue guard'
@@ -62,6 +68,7 @@ jobs:
               echo 'Status: **safe no-op due to Actions queue pressure**.'
               echo
               echo "- Queued Actions runs: $queued_count"
+              echo "- Actions runs in last two hours: $recent_count (snapshot limit: 400)"
               echo "- Backpressure threshold: $threshold"
               echo '- Model calls, branch publication, and PR publication: skipped'
             } >> "$GITHUB_STEP_SUMMARY"
@@ -126,6 +133,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          SNAPSHOT_SINCE: ${{ needs.pressure.outputs.snapshot_since }}
         shell: bash
         run: |
           set -euo pipefail
@@ -146,6 +154,9 @@ jobs:
           base_sha = os.environ["BASE_SHA"].casefold()
           if COMMIT_OID_RE.fullmatch(base_sha) is None:
               raise SystemExit("idle-studio base SHA must be a 40-character hex commit OID")
+          snapshot_since = os.environ.get("SNAPSHOT_SINCE", "")
+          if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", snapshot_since) is None:
+              raise SystemExit("idle-studio snapshot window requires a UTC cutoff")
 
           def gh_json(path: str):
               result = subprocess.run(
@@ -181,7 +192,7 @@ jobs:
               if not str(item.get("title", "")).strip().lower().startswith("bot:")
           ]
           state = {
-              "runs": list_pages(f"/repos/{REPO}/actions/runs", key="workflow_runs"),
+              "runs": list_pages(f"/repos/{REPO}/actions/runs?created=%3E{snapshot_since}", key="workflow_runs"),
               "issues": issues,
               "pulls": list_pages(
                   f"/repos/{REPO}/pulls?state=open&sort=updated&direction=desc"
