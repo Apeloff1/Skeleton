@@ -2,17 +2,11 @@ name: P2 CI Qualification Evidence
 
 on:
   workflow_run:
-    workflows:
-      - Backend Quality
-      - P2 Repository Engineering Control
-      - Provider Surface Closure Gate
-      - Repository Hygiene Gate
-      - State Recovery Drill
-      - Workflow Input Security
+    # Qualify once after the canonical aggregate completes, rather than on six
+    # separate producer completions (including skipped and cancelled ones).
+    workflows: ["Merge Readiness"]
     types: [completed]
-    branches:
-      - "*"
-      - "**"
+    branches: ["**"]
 
 permissions:
   actions: read

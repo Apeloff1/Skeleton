@@ -2,12 +2,8 @@ name: Autonomous Build Feedback
 
 on:
   workflow_run:
-    workflows:
-      - "Autonomous Studio Smoke"
-      - "Backend Quality"
-      - "CI/CD"
-      - "ARM64 Ubuntu Validation"
-      - "Repository Hygiene Gate"
+    # Use the canonical PR gate instead of spawning five independent consumers.
+    workflows: ["Merge Readiness"]
     types: [completed]
     branches:
       - "*"
@@ -16,10 +12,9 @@ on:
       # produce only skipped fan-out; exclude them at event admission.
       - "!main"
 
-# Preserve one feedback stream per source gate while coalescing retries and
-# superseded attempts for the same immutable workflow-run + source-workflow identity.
+# One feedback stream per exact head, coalescing superseded attempts.
 concurrency:
-  group: autonomous-build-feedback-${{ github.event.workflow_run.head_sha }}-${{ github.event.workflow_run.workflow_id }}
+  group: autonomous-build-feedback-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 permissions:
