@@ -12,7 +12,7 @@ This document is a deterministic projection of machine authority. It has no comp
 | --- | --- |
 | `machine/ai_master_plan.json` | `69f2be498502387429927e251185ff49c438920b` |
 | `machine/ai_p2_execution_map.json` | `85f22876166ad284af7f1f05dff0532d43a60753` |
-| `machine/ai_p2_task_backlog.json` | `91b610d9dfdecfe655f3e250d0920f561555d0c1` |
+| `machine/ai_p2_task_backlog.json` | `f39dbcb8bf54cc1efd3f4962cb8941f583569bc6` |
 
 ## P2 execution boundary
 
