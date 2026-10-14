@@ -70,3 +70,14 @@ def test_cleanup_stops_at_rate_limits_instead_of_spamming_delete_calls() -> None
     # Backpressure must persist across subsequent cleanup steps.
     assert text.count('touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"') == 2
     assert text.count('if [[ -f "$RUNNER_TEMP/actions-housekeeping-rate-limited" ]]') == 2
+
+
+def test_housekeeping_inventory_fails_closed_at_installation_rate_limit() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    for inventory in ("live", "cache", "artifact", "failed-run"):
+        assert f"{inventory}-inventory-api-error.txt" in text
+    assert text.count("Housekeeping inventory deferred due to GitHub API limits.") == 4
+    assert text.count('touch "$RUNNER_TEMP/actions-housekeeping-rate-limited"') >= 6
+    assert "Skipping cache cleanup under GitHub API rate pressure." in text
+    assert "Skipping artifact deletion under GitHub API rate pressure." in text
+    assert "Skipping old-run deletion under GitHub API rate pressure." in text
