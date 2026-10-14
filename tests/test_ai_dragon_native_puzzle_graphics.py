@@ -97,7 +97,13 @@ def test_original_graphics_source_is_covered_by_independent_release_replay():
         enable_original_native_hud(C_GRAPHICS)
     )
     # Match the original authored seed used by this source release.
-    assert sources["include/dragon_puzzle_pixels.h"]==pixel_header(seed=17)
+    # The portable source carries vga_dusk palette, not pixel_header's
+    # independent dmg_green default. Reconstruct the exact authored profile
+    # to prove the archive did not silently recolor native gameplay sprites.
+    design=item.portable_design
+    assert sources["include/dragon_puzzle_pixels.h"]==pixel_header(
+        hero=design.hero,theme=design.quest_theme,
+        palette=design.palette,seed=item.seed)
 
 
 

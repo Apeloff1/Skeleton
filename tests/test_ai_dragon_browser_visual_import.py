@@ -50,7 +50,7 @@ def test_unknown_observation_transport_id_is_rejected_even_with_valid_envelope_h
  cq,_,e=setup();obs=replace(e.observations[0],frame_id="f"*64)
  unsigned=replace(e,observations=(obs,),payload_fingerprint="")
  changed=replace(unsigned,payload_fingerprint=canonical_browser_visual_fingerprint(unsigned))
- with pytest.raises(ValueError,match="unknown browser frame"):
+ with pytest.raises(ValueError,match="invalid browser observation frame id"):
   accept_browser_visual(cq,changed,now=3,authorized=True)
 
 

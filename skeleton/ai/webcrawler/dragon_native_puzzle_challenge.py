@@ -33,6 +33,10 @@ def grade(original_solution_length:int,actual_moves:int,pushes:int,
     if not solved:
         return ChallengeResult(SCHEMA,False,original_solution_length,
                                actual_moves,pushes,0,0,0)
+    # A completed solution cannot beat the independently proved shortest
+    # path. Reject fabricated solved flags rather than handing out medals.
+    if actual_moves < original_solution_length:
+        raise ValueError("completed puzzle move count contradicts BFS proof")
     efficiency=min(100,(100*original_solution_length)//max(1,actual_moves))
     if actual_moves<=original_solution_length:
         stars=3

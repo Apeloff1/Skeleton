@@ -84,8 +84,9 @@ def test_sparse_isolated_native_release_has_no_monorepo_imports(tmp_path):
     # Native pixel rendering has one small, original self-contained asset
     # dependency outside the dragon_native_* namespace. Include exactly it,
     # not the whole monorepo/package initializer.
-    shutil.copyfile(source_dir/"dragon_retro_assets.py",
-                    isolated/"dragon_retro_assets.py")
+    for sibling in ("dragon_retro_assets.py","dragon_game_design.py",
+                    "dragon_desktop_abi.py","dragon_platform_expansion.py"):
+        shutil.copyfile(source_dir/sibling,isolated/sibling)
     assert not (isolated/"__init__.py").exists()
     assert (isolated/"dragon_native_puzzle.py").is_file()
     cli=subprocess.run(
