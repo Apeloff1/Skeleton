@@ -25,6 +25,7 @@ from core.model_catalog import model_catalog
 from core.chat_turn_lifecycle import ChatTurnLifecycle
 from core.chat_turns import chat_turn_authority
 from core.conversations import ConversationStorageUnavailable, conversation_authority
+from core.dragon_runtime_bridge import dragon_context_budget, dragon_foreground
 from core.engine_client import (
     EngineClient,
     EngineClientError,
@@ -1081,7 +1082,7 @@ async def ai_assist(request: AIAssistRequest) -> AIAssistResponse:
     )
 
 
-@router.post("/chat")
+@router.post("/chat", dependencies=[Depends(dragon_foreground)])
 async def ai_chat(
     request: AIChatRequest,
     user=Depends(require_role("viewer")),
@@ -1258,6 +1259,7 @@ async def ai_chat(
         operation_id=operation_id,
         execution_id=execution_id,
         request_context=request.context,
+        budget=dragon_context_budget(CHAT_CONTEXT_BUDGET),
     )
     try:
         chat_turn = await chat_turn_lifecycle.advance(
