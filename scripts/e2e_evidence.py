@@ -130,9 +130,12 @@ class Recorder:
             "| --- | --- | ---: | --- |",
         ]
         for item in self.suites:
+            evidence = item.get("log") or (
+                "events.jsonl" if item["status"] in ("passed", "failed") else "not executed"
+            )
             lines.append(
                 f"| {item['id']} | {item['status']} | {item['duration_seconds']:.2f} "
-                f"| {item.get('log', 'not executed')} |"
+                f"| {evidence} |"
             )
         lines += ["", "## Issues", ""]
         if self.issues:
