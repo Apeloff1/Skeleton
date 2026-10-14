@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from dataclasses import replace
 import hashlib
 import json
+import re
 from typing import Any, Awaitable, Callable, Mapping
 from uuid import uuid4
 
@@ -38,6 +39,8 @@ from skeleton.persistence.conversation_repository import (
     ConversationConflict,
     ConversationNotFound,
     ConversationRepositoryError,
+    decode_thread_cursor,
+    conversation_search_text,
 )
 
 
@@ -981,27 +984,35 @@ class MongoConversationAuthority:
         owner_id: str,
         include_archived: bool = False,
         limit: int = 50,
+        search: str = "",
+        cursor: str | None = None,
     ) -> tuple[ConversationThread, ...]:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
             raise ValueError("limit must be between 1 and 200")
         states = ["active", "archived"] if include_archived else ["active"]
+        query: dict[str, Any] = {
+            "tenant_id": tenant_id,
+            "owner_id": owner_id,
+            "state": {"$in": states},
+        }
+        literal = conversation_search_text(search)
+        if literal:
+            query["title"] = {"$regex": re.escape(literal), "$options": "i"}
+        if cursor is not None:
+            instant, thread_id = decode_thread_cursor(cursor)
+            query["$or"] = [
+                {"updated_at": {"$lt": instant}},
+                {"updated_at": instant, "_id": {"$gt": thread_id}},
+            ]
         try:
             docs = await (
-                self.threads.find(
-                    {
-                        "tenant_id": tenant_id,
-                        "owner_id": owner_id,
-                        "state": {"$in": states},
-                    }
-                )
+                self.threads.find(query)
                 .sort([("updated_at", DESCENDING), ("_id", ASCENDING)])
                 .limit(limit)
                 .to_list(length=limit)
             )
         except PyMongoError as exc:
-            raise ConversationStorageUnavailable(
-                "conversation storage is unavailable"
-            ) from exc
+            raise ConversationStorageUnavailable("conversation storage is unavailable") from exc
         return tuple(_thread_from_doc(doc) for doc in docs)
 
     async def rename_thread(

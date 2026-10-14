@@ -18,6 +18,7 @@ from skeleton.contracts.conversation import (
 from skeleton.persistence.conversation_repository import (
     ConversationConflict,
     ConversationNotFound,
+    encode_thread_cursor,
 )
 
 
@@ -124,19 +125,33 @@ async def create_conversation(
 async def list_conversations(
     include_archived: bool = False,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    q: Annotated[str, Query(max_length=200)] = "",
+    cursor: Annotated[str | None, Query(max_length=1024)] = None,
     user=Depends(require_role("viewer")),
 ):
     tenant_id, owner_id = _identity(user)
     try:
-        threads = await conversation_authority.list_threads(
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-            include_archived=include_archived,
-            limit=limit,
-        )
+        options = {
+            "tenant_id": tenant_id,
+            "owner_id": owner_id,
+            "include_archived": include_archived,
+            "limit": limit,
+        }
+        if q:
+            options["search"] = q
+        if cursor is not None:
+            options["cursor"] = cursor
+        threads = await conversation_authority.list_threads(**options)
     except Exception as exc:
         raise _translate(exc) from exc
-    return {"threads": [thread.as_dict() for thread in threads], "count": len(threads)}
+    next_cursor = (
+        encode_thread_cursor(threads[-1].updated_at, threads[-1].thread_id) if len(threads) == limit else None
+    )
+    return {
+        "threads": [thread.as_dict() for thread in threads],
+        "count": len(threads),
+        "next_cursor": next_cursor,
+    }
 
 
 @router.patch("/{thread_id}")
