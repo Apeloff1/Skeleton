@@ -10,7 +10,7 @@ This document is a deterministic projection of machine authority. It has no comp
 
 | Source | Git blob SHA-1 |
 | --- | --- |
-| `machine/ai_master_plan.json` | `9b9a758c300d378fa22fcb5de3beac9afa1eefa9` |
+| `machine/ai_master_plan.json` | `1733c3843d7dfe3e1bb609b65e1dee5686285942` |
 | `machine/ai_p2_execution_map.json` | `85f22876166ad284af7f1f05dff0532d43a60753` |
 | `machine/ai_p2_task_backlog.json` | `91b610d9dfdecfe655f3e250d0920f561555d0c1` |
 
