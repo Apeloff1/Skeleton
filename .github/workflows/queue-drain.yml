@@ -39,7 +39,9 @@ jobs:
       contents: read
     # Queue recovery must not depend on the scarcer ARM lane it may be trying
     # to recover when repository-wide workflow fanout is saturated.
-    runs-on: ubuntu-latest
+    # Keep obsolete-run recovery off the congested default x64 runner pool.
+    # This step uses only standard Python and the Actions API and is ARM-safe.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
