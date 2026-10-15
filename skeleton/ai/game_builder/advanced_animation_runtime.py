@@ -40,7 +40,7 @@ def default_layout(config, seed):
             "duration": 2 + ((seed + i * 3) % 8),
             "root_delta": (0 if name == "idle" else 1 if name == "walk"
                            else 2 if name == "run" else 0),
-            "event_tick": 1 + (seed + i) % (2 + (seed + i * 3) % 8),
+            "event_tick": 1 + (seed + i) % max(1, (2 + (seed + i * 3) % 8) - 1),
         } for i, name in enumerate(names)],
         "entry": names[0],
         "rig_bones": config["bones"],

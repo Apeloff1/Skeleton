@@ -80,7 +80,7 @@ def normalize_layout(config, layout):
             or len(keys) != len(set(keys)) or any(key not in _KEYS for key in keys)):
         raise LocalizationActionError("unsupported original source text key")
     if (type(locales) is not list or not 1 <= len(locales) <= min(4,config["language_count"])
-            or locales[0].get("id") != "en"):
+            or type(locales[0]) is not dict or locales[0].get("id") != "en"):
         raise LocalizationActionError("source locale must be the first valid real text catalogue")
     cleaned = []
     seen = set()

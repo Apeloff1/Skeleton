@@ -8,7 +8,7 @@ from skeleton.ai.game_builder.advanced_gameplay_runtime import (
     ENGINES, AdvancedRuntimeError, run_advanced_session, verify_advanced_session,
 )
 from skeleton.ai.game_builder.advanced_level_scenes import (
-    make_advanced_scene, SceneError,
+    make_advanced_scene, validate_advanced_scene, SceneError,
 )
 from skeleton.jeeves.game_studio_environment import (
     make_studio_source, StudioGameEnvironment,
@@ -58,7 +58,7 @@ class ExecutableSubsystems(unittest.TestCase):
     def test_audio_real_channel_budget_and_sample_clock(self):
         cfg={"channels":1,"dynamic_layers":4,"mix_strategy":"priority"}
         doc=run_advanced_session("audio",cfg,[
-            "play:0","play:1","far","mix","tick:4096","tick:4096","finish"],seed=0)
+            "play:0","play:1","far","mix","tick:4096","tick:4096","tick:4096","tick:4096","tick:4096","finish"],seed=0)
         self.assertTrue(doc["state"]["finished"])
         self.assertEqual(doc["state"]["stolen"],1)
         self.assertEqual(doc["state"]["completed"],1)
@@ -84,11 +84,7 @@ class ExecutableSubsystems(unittest.TestCase):
                 tampered=deepcopy(scene)
                 tampered["layout"]["title"]="changed"
                 with self.assertRaises(SceneError):
-                    make_advanced_scene(editor,seed=13,layout=tampered["layout"]
-                                        ) if False else (
-                      __import__("skeleton.ai.game_builder.advanced_level_scenes",
-                                  fromlist=["validate_advanced_scene"])
-                      .validate_advanced_scene(tampered))
+                    validate_advanced_scene(tampered)
                 env.close()
 
 

@@ -85,3 +85,34 @@ replay, and Q-policy learning all apply.
 Every family implements the exact `ACTIONS/start/step/default_layout/normalize_layout/apply_scene` contract, uses the same content-addressed authored scene, playable session and replay-verifiable learning adapter. Crucially, the central gameplay dispatcher now catches bound engine action errors and rethrows canonical `AdvancedRuntimeError`, avoiding uncaught engine-specific action failures.
 
 These four are **logical reference execution subsystems**, not complete physical networking, file-backed persistence, audio devices or rig rendering. They need exact-head execution tests before release.
+
+## Batch 6 — four further source-executable product subsystems
+
+* `ui_hud`: focus navigation, actual selection dispatch, hierarchical menus,
+  view-panel visibility, text scaling and nonvisual focus hints. This is not a native UI renderer.
+* `accessibility`: bijective input remaps, witnessed remapped gameplay controls,
+  alternative symbol/shape/audio cue metadata, captions, reduced-motion toggles
+  and font scale. This is not an assistive-technology or compliance certification.
+* `localization`: real original string lookup, English/French/Arabic/Japanese
+  plural rules and bidirectional layout metadata, explicit missing-key
+  fallbacks and release-blocking when requested. It does NOT translate all
+  up to 150 declared languages or invent any machine translation output.
+* `platform_profile`: finite, conserved source-declared NPC/asset memory,
+  quality profile and synthetic frame-work budgets; never asserts observed
+  console performance, real GPU FPS or actual native build compatibility.
+
+All eight former editor-only cross-cutting systems now implement
+`ACTIONS/start/step/default_layout/normalize_layout/apply_scene` with
+bounded original source, strict scene integrity, action replay and Jeeves's
+emulator-style game-policy protocol. An exact test suite for the final four
+is `tests/test_game_builder_advanced_remaining_product_engines.py`; the
+previous four are covered in
+`tests/test_game_builder_advanced_product_engines.py`.
+
+**Important scope distinction:** 43 / 43 registered studio editor families
+now have source-executable *reference* sessions, not 43 native engines,
+renderers, network transports, persistence backends or platform emulators.
+The entire AI game-production app is NOT complete. No hardware tests or
+production Jeeves model-weight training have been performed in this change.
+Exact-head unit, scene/replay, security, TypeScript and integration checks
+remain mandatory for release.

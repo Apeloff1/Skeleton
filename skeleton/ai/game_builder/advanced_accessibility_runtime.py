@@ -136,7 +136,10 @@ def step(state, config, action):
             raise AccessibilityActionError("color-only feedback forbidden by source")
         state["cues"].append(mode)
         state["alternatives_used"] += 1
-        events.append("authored_shape_or_symbol_cue_emitted")
+        events.append(
+            "authored_shape_or_symbol_cue_emitted"
+            if mode in ("shape", "symbol") else "nonvisual_audio_cue_requested"
+        )
     elif action == "cue:audio":
         state["cues"].append("audio")
         events.append("alternative_audio_cue_requested_not_rendered")
