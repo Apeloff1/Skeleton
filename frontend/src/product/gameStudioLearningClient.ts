@@ -47,3 +47,109 @@ export async function getStudioLessonPage(projectId: string, query = '', cursor?
   const value = await request<{ lessons: StudioLesson[]; next_cursor: string | null; search_mode?: string; legacy_indexing_pending?: boolean }>('get', '/projects/' + id(projectId) + '/lessons?q=' + encodeURIComponent(query.slice(0, 256)) + '&limit=32' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''), null, input);
   if (!Array.isArray(value.lessons) || value.lessons.length > 32 || value.next_cursor !== null && (typeof value.next_cursor !== 'string' || value.next_cursor.length > 256) || JSON.stringify(value).length > 4 * 1024 * 1024) invalid('The remembered lesson page is invalid.'); return value;
 }
+
+
+export type StudioMirrorFrame = {
+  schema_version?: string; data_uri?: string; frame_digest?: string; step?: number;
+  state?: Record<string, unknown>; telemetry_raster_available?: boolean;
+  pixel_frame_available?: boolean; runtime_kind?: string;
+};
+export type StudioMirrorLane = {
+  angle: string; seed: number; steps: number; actions: string[];
+  rejected_actions: number; total_reward: number;
+  source_digest: string; environment_digest: string;
+  snapshot_digest: string; last_observation: Record<string, number>;
+  frames: StudioMirrorFrame[]; digest: string; native_frames: false;
+};
+export type StudioMirrorViews = {
+  schema_version: string; campaign_id: string; campaign_cursor: number;
+  campaign_status: string; sample: number; angles: string[];
+  lanes: StudioMirrorLane[]; workers_used: number;
+  spectator_only: true; frames_show_training_episodes: false;
+  view_kind: string; digest: string;
+};
+export type StudioScenarioDraft = {
+  proposal: {
+    schema_version: string; proposal_id: string; base_digest: string;
+    reason: string; scene_seed: number | null;
+    operations: { scope: string; path: string; op: string; value: unknown }[];
+  };
+  variant_source_digest: string; support: string;
+  mechanics_inspiration: string[]; sales_rank_is_quality_evidence: false;
+};
+export type StudioScenarioDiscovery = {
+  schema_version: string; campaign_id: string; engine: string;
+  scenarios: StudioScenarioDraft[]; measured_committed_rounds: number;
+  requires_rights_and_operator_training_admission: true;
+  automatic_training_performed: false; scenarios_verified_as_successful: false;
+};
+export type StudioEngineTestManifest = {
+  schema_version: string; engine: string; registered_action_count: number;
+  registered_actions: string[]; field_axes: {
+    name: string; type: string; cases: unknown[]; checks: string[];
+  }[]; mandatory_checks: { id: string; required: boolean; count?: number }[];
+  angles: string[]; verified_passes: number; execution_status: 'not_run';
+  combinatorial_state_exhaustiveness_claimed: false; digest: string;
+};
+export type StudioSalesReference = {
+  reference: string; chart: string; rank: number; units_millions: number | null;
+  editor: string; motif: string;
+};
+export type StudioSalesCatalog = {
+  schema_version: string; entries: StudioSalesReference[];
+  sources: Record<string, { source_url: string; as_of: string;
+    type: string; region: string; limitations: string }>;
+  evidence_use: string; digest: string;
+};
+
+export async function getStudioMirrorViews(
+  campaignId: string, sample: number, lanes = 4, steps = 12,
+  input: LearningRequest = {},
+): Promise<StudioMirrorViews> {
+  if (!Number.isSafeInteger(sample) || sample < 0 || sample > 255
+      || !Number.isSafeInteger(lanes) || lanes < 1 || lanes > 6
+      || !Number.isSafeInteger(steps) || steps < 1 || steps > 24) invalid('Spectator limits differ.');
+  const result = await request<StudioMirrorViews>(
+    'get', '/campaigns/' + id(campaignId) + '/mirror-views?sample=' + sample +
+    '&lanes=' + lanes + '&steps=' + steps, null, input,
+  );
+  if (result.campaign_id !== campaignId || !result.spectator_only
+      || result.frames_show_training_episodes !== false
+      || !Array.isArray(result.lanes) || result.lanes.length > lanes
+      || result.lanes.some(lane => !Array.isArray(lane.frames)
+          || lane.frames.length > 5 || lane.native_frames !== false
+          || !Number.isSafeInteger(lane.steps) || lane.steps > steps
+          || !/^[a-f0-9]{64}$/.test(lane.digest))
+      || JSON.stringify(result).length > 3 * 1024 * 1024) invalid('Mirrored simulation source or limits differ.');
+  return result;
+}
+export async function getStudioScenarioDrafts(campaignId: string, input: LearningRequest = {}) {
+  const result = await request<StudioScenarioDiscovery>(
+    'get', '/campaigns/' + id(campaignId) + '/scenario-drafts?limit=4', null, input,
+  );
+  if (result.campaign_id !== campaignId || !Array.isArray(result.scenarios)
+      || result.scenarios.length > 4 || result.automatic_training_performed !== false
+      || result.scenarios_verified_as_successful !== false
+      || JSON.stringify(result).length > 65536) invalid('Scenario drafts have unapproved source or authority.');
+  return result;
+}
+export async function getStudioEngineTestManifest(editor: string, input: LearningRequest = {}) {
+  const result = await request<StudioEngineTestManifest>(
+    'get', '/engines/' + id(editor) + '/test-manifest', null, input,
+  );
+  if (result.engine !== editor || result.execution_status !== 'not_run'
+      || result.verified_passes !== 0 || result.combinatorial_state_exhaustiveness_claimed !== false
+      || !Array.isArray(result.registered_actions) || !Array.isArray(result.field_axes)
+      || !Array.isArray(result.mandatory_checks)
+      || JSON.stringify(result).length > 262144) invalid('Engine test manifest is not an unverified bounded plan.');
+  return result;
+}
+export async function getStudioSalesReferences(input: LearningRequest = {}) {
+  const result = await request<StudioSalesCatalog>(
+    'get', '/research/sales-informed-scenarios', null, input,
+  );
+  if (!Array.isArray(result.entries) || result.entries.length > 100
+      || typeof result.sources !== 'object' || JSON.stringify(result).length > 65536
+  ) invalid('Original game design references contain invalid ranking evidence.');
+  return result;
+}
