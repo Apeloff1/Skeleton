@@ -3363,6 +3363,10 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Public source-only archive identity, not credentials or private records.
+    # Cross-origin web clients need these headers to verify ZIP integrity.
+    expose_headers=["X-Content-SHA256", "X-Dragon-Claim", "X-Dragon-Request-Id",
+                    "Content-Disposition"],
 )
 
 # ── SOTA API controller server-side counterpart ─────────────────────
