@@ -76,6 +76,7 @@ async def document(scope, project_id):
         "project": project,
         "document": authored.as_dict(),
         "scene_graph": authored.scene_graph.as_dict(),
+        "native_graph_compatibility": authored.native_graph_compatibility(),
         "profile": console_profile(project["console_id"]).as_dict(),
         "manifest_digest": file_manifest_digest(files),
     }

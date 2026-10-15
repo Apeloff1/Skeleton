@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useReducedMotion } from './useDragonMotion';
@@ -47,6 +48,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
   telemetry?: CompanionTelemetry;
   academy?: CompanionAcademyInput;
 }) {
+  const router = useRouter();
   const [showResearch, setShowResearch] = useState(false);
   const [showAcademy,setShowAcademy]=useState(false);
   const verifiedProgress=validateDragonProgress(academy?.progress);
@@ -95,7 +97,7 @@ export default function DragonCompanionPanel({ draft, lastUserText, telemetry, a
       onOpenDemo={academy?.onOpenDemo} onStopPractice={academy?.onStopPractice}
       onRevokePractice={academy?.onRevokePractice}
       busy={academy?.practiceBusy} />}
-    <Text style={s.note}>Petting and animation are just for fun. System reduced-motion settings take priority. These reactions never start research or change memory.</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open source review and measured reference practice" onPress={() => router.push('/crawler?pane=review' as never)} style={s.academyButton}><Ionicons name="library-outline" color="#fbbf24" size={16} /><Text style={s.academyText}>Source review & measured reference practice</Text></Pressable><Text style={s.note}>Captured passages need a separate human decision. Practice reports only actual reference-environment observations; reviewing a source does not award XP or grant model-training rights.</Text><Text style={s.note}>Petting and animation are just for fun. System reduced-motion settings take priority. These reactions never start research or change memory.</Text>
     <Text style={s.note}>Conversation creates interest signals. Only policy-compliant, provenance-preserved acquisitions may become distilled memory.</Text>
   </View>;
 }

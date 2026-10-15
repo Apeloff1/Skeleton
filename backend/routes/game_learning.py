@@ -117,9 +117,65 @@ class TrainRequest(WriteRequest):
     parent_policy_id: str | None = Field(default=None, max_length=128)
     fresh_policy: bool = False
     workers: int = Field(default=1, ge=1, le=8, strict=True)
-    resource_profile: Literal["cpu"] = "cpu"
+    resource_profile: Literal["cpu", "cpu_throughput"] = "cpu"
     demonstration_ids: list[str] = Field(default_factory=list, max_length=16)
     frame_stride: int = Field(default=8, ge=1, le=256, strict=True)
+    alpha: float = Field(default=0.25, gt=0, le=1, strict=True, allow_inf_nan=False)
+    gamma: float = Field(default=0.95, ge=0, le=1, strict=True, allow_inf_nan=False)
+    epsilon: float = Field(default=0.3, ge=0, le=1, strict=True, allow_inf_nan=False)
+    epsilon_decay: float = Field(default=0.98, gt=0, le=1, strict=True, allow_inf_nan=False)
+    min_epsilon: float = Field(default=0.03, ge=0, le=1, strict=True, allow_inf_nan=False)
+    reward_clip: float = Field(default=100, gt=0, le=1_000_000, strict=True, allow_inf_nan=False)
+    imitation_strength: float = Field(default=1, ge=0, le=16, strict=True, allow_inf_nan=False)
+    max_states: int = Field(default=4096, ge=1, le=16384, strict=True)
+    exploration_strategy: Literal["uniform", "least_visited"] = "uniform"
+    n_step: int = Field(default=1, ge=1, le=16, strict=True)
+    evaluation_seeds: int = Field(default=4, ge=1, le=8, strict=True)
+    min_improvement: float = Field(default=0, ge=0, le=1_000_000_000, strict=True, allow_inf_nan=False)
+    max_worst_seed_regression: float = Field(
+        default=0, ge=0, le=1_000_000_000, strict=True, allow_inf_nan=False
+    )
+    execution_seconds: int = Field(default=300, ge=5, le=300, strict=True)
+
+    @model_validator(mode="after")
+    def learning_budget(self):
+        if self.min_epsilon > self.epsilon:
+            raise ValueError("minimum exploration cannot exceed initial exploration")
+        if self.epochs * self.episode_steps > 65536:
+            raise ValueError("online training must fit65536 actual transition updates")
+        for values in (self.demonstration_ids, self.session_ids):
+            if len(set(values)) != len(values) or any(
+                not value or value != value.strip() or len(value) > 128 for value in values
+            ):
+                raise ValueError("training references must be distinct bounded identifiers")
+        if self.fresh_policy and self.parent_policy_id is not None:
+            raise ValueError("choose either a fresh policy or an explicit parent")
+        return self
+
+    def admitted_request(self):
+        payload = self.model_dump(exclude_none=True)
+        # Preserve exact idempotent bodies of older clients that never offered
+        # these controls. Resolved numerical defaults are separately frozen in
+        # the job's complete learning_config, not inferred again on resume.
+        for name in (
+            "alpha",
+            "gamma",
+            "epsilon",
+            "epsilon_decay",
+            "min_epsilon",
+            "reward_clip",
+            "imitation_strength",
+            "max_states",
+            "exploration_strategy",
+            "n_step",
+            "evaluation_seeds",
+            "min_improvement",
+            "max_worst_seed_regression",
+            "execution_seconds",
+        ):
+            if name not in self.model_fields_set:
+                payload.pop(name, None)
+        return payload
 
 
 class GenerateRequest(WriteRequest):
@@ -246,9 +302,7 @@ async def simulate(project_id: str, body: SimulationRequest, user: User):
 @router.post("/projects/{project_id}/train")
 async def train(project_id: str, body: TrainRequest, user: User):
     return {
-        "job": await _call(
-            workspace.start_job(_scope(user), project_id, "train", body.model_dump(exclude_none=True))
-        )
+        "job": await _call(workspace.start_job(_scope(user), project_id, "train", body.admitted_request()))
     }
 
 

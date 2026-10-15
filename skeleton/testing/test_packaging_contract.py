@@ -43,7 +43,10 @@ def test_runtime_image_excludes_development_payload() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     assert '.[dev]' not in dockerfile
-    assert 'pip install --no-cache-dir ".[local-inference]"' in dockerfile
+    assert "p['optional-dependencies']['local-inference']" in dockerfile
+    assert "p['optional-dependencies']['hosted-inference']" in dockerfile
+    assert "pip install --no-cache-dir -r /tmp/skeleton-runtime-requirements.txt" in dockerfile
+    assert "pip install --no-cache-dir --no-deps --no-build-isolation ." in dockerfile
     assert "pip install --no-cache-dir -e" not in dockerfile
     assert "COPY tests" not in dockerfile
     assert "USER appuser" in dockerfile
@@ -74,7 +77,10 @@ def test_runtime_dockerfiles_keep_security_hardening() -> None:
     frontend_nginx = (ROOT / "frontend" / "nginx.conf").read_text(encoding="utf-8")
 
     # Production/build base images must be immutable and runtime users non-root.
-    assert "python:3.14-alpine@sha256:" in root_dockerfile
+    assert "ARG PYTHON_IMAGE=python:3.14-slim@sha256:" in root_dockerfile
+    assert "FROM ${PYTHON_IMAGE}" in root_dockerfile
+    assert "apt-get install -y --no-install-recommends ca-certificates libgomp1 libstdc++6" in root_dockerfile
+    assert "rm -rf /var/lib/apt/lists/*" in root_dockerfile
     assert "USER appuser" in root_dockerfile
     assert "/sbin/nologin" in root_dockerfile
     assert "urllib.request.urlopen" in root_dockerfile
@@ -97,7 +103,9 @@ def test_runtime_dockerfiles_keep_security_hardening() -> None:
 
     # Do not add OS packages just to probe the local service.
     assert "urllib.request.urlopen" in backend_dockerfile
-    assert "RUN apt-get" not in root_dockerfile
+    # Local glibc inference permits only a bounded set of runtime OS packages;
+    # the separately pinned Alpine backend retains no apt dependency.
+    assert "apt-get install -y --no-install-recommends ca-certificates libgomp1 libstdc++6" in root_dockerfile
     assert "RUN apt-get" not in backend_dockerfile
     assert "curl -f http://localhost:8001/api/health" not in backend_dockerfile
 

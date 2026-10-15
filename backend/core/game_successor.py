@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from functools import partial
 import hashlib
 import json
 import time
@@ -351,7 +352,7 @@ async def _execute_thread(scope, job, cancelled, emit_event, operation):
             raise GameLearningError("job_cancelled", "Successor work was cancelled.", 409)
         call_bounded(emit_event(dict(payload)))
 
-    worker = asyncio.create_task(asyncio.to_thread(operation, authorize, event))
+    worker = loop.run_in_executor(None, partial(operation, authorize, event))
     try:
         return await asyncio.shield(worker)
     except asyncio.CancelledError:

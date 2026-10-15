@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 import hashlib
 import json
+import logging
 import math
 import os
 from pathlib import Path
@@ -41,6 +42,7 @@ from .local import (
 )
 
 
+_COMPLETION_EOG_TRAILERS = (" [end of text]\n\n\n", " [end of text]\n")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _ENV_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _TOKEN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
@@ -164,6 +166,7 @@ class LlamaCppConfig:
     environment: Mapping[str, str] = field(default_factory=dict)
     reject_model_symlink: bool = True
     rehash_artifacts_each_run: bool = False
+    output_framing: str = "raw"
 
     def __post_init__(self) -> None:
         if not isinstance(self.executable, str) or not self.executable.strip():
@@ -204,6 +207,10 @@ class LlamaCppConfig:
             or not 0 <= float(self.temperature) <= 10
         ):
             raise ValueError("temperature must be finite and in [0, 10]")
+        if not isinstance(self.output_framing, str) or self.output_framing not in {
+            "raw", "llama_completion_eog"
+        }:
+            raise ValueError("output_framing must be raw or llama_completion_eog")
         normalized_args: list[str] = []
         for item in self.extra_args:
             if not isinstance(item, str) or not item:
@@ -615,6 +622,8 @@ class LlamaCppModel:
             "gpu_layers": self.config.gpu_layers,
             "temperature": float(self.config.temperature),
             "extra_args": list(self.config.extra_args),
+            "output_framing": self.config.output_framing,
+            "output_framing_suffixes": (list(_COMPLETION_EOG_TRAILERS) if self.config.output_framing == "llama_completion_eog" else []),
             "timeout_seconds": float(self.config.timeout_seconds),
             "max_output_bytes": self.config.max_output_bytes,
             "max_stderr_bytes": self.config.max_stderr_bytes,
@@ -869,6 +878,28 @@ class LlamaCppModel:
             return json.loads(text, object_pairs_hook=unique_object,
                               parse_constant=reject_constant)
         except (json.JSONDecodeError, RecursionError) as exc:
+            categories = {
+                "Extra data": "extra_data",
+                "Expecting value": "expected_value",
+                "Unterminated string starting at": "unterminated_string",
+                "Expecting property name enclosed in double quotes": "expected_property",
+                "Expecting ',' delimiter": "expected_comma",
+                "Expecting ':' delimiter": "expected_colon",
+                "Invalid \\escape": "invalid_escape",
+                "Invalid control character at": "invalid_control",
+            }
+            prefix_class = (
+                "object" if text.startswith("{") else "array" if text.startswith("[")
+                else "empty" if not text else "other"
+            )
+            logging.getLogger(__name__).warning(
+                "Local JSON failure: exception=%s category=%s pos=%s line=%s column=%s "
+                "chars=%d prefix=%s declared_eog_tail=%s",
+                type(exc).__name__,
+                "depth" if isinstance(exc, RecursionError) else categories.get(exc.msg, "other_decoder"),
+                getattr(exc, "pos", None), getattr(exc, "lineno", None), getattr(exc, "colno", None),
+                len(text), prefix_class, text.endswith(" [end of text]"),
+            )
             raise LlamaCppRuntimeError("local model output is not valid bounded JSON") from exc
 
     def _parse_output(
@@ -1102,6 +1133,16 @@ class LlamaCppModel:
                 matches = [position for position in matches if position >= 0]
                 if matches:
                     raw = raw[:min(matches)]
+            # Operator-declared completion protocol only: the exact fixed
+            # upstream EOG trailer is outside generated content. Preserve the
+            # full original stdout checksum below. No JSON substring recovery.
+            if self.config.output_framing == "llama_completion_eog":
+                # b11429 emits EOG LF, then a fixed final pair of LFs. The
+                # single-LF form remains the explicit older completion form.
+                for trailer in _COMPLETION_EOG_TRAILERS:
+                    if raw.endswith(trailer):
+                        raw = raw[:-len(trailer)]
+                        break
             text, tool_calls, structured, finish_reason = self._parse_output(raw, request)
             input_estimate = _approx_tokens(rendered_prompt)
             output_estimate = _approx_tokens(raw)
@@ -1132,6 +1173,8 @@ class LlamaCppModel:
                 response_id=response_id,
                 execution_receipt_digest=_digest({
                     "schema": "skeleton.llama-cpp.execution-receipt.v1",
+                    "raw_stdout_digest": hashlib.sha256(stdout_bytes).hexdigest(),
+                    "output_framing": self.config.output_framing,
                     "request": request.digest,
                     "execution_profile": execution_profile,
                     "response_id": response_id,

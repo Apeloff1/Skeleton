@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import math
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence
 from uuid import NAMESPACE_URL, uuid5
 
 from core.route_privacy import require_route_provider_transfer
@@ -39,10 +39,17 @@ from skeleton.contracts.context import (
 from skeleton.context.compiler import ContextCompiler, project_provider_context
 from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.vault.data_governance import DataGovernanceDenied
+from skeleton.skills.tool_contract import validate_json_schema
 
 
 class EngineTextError(RuntimeError):
     """A backend compatibility text request cannot be executed safely."""
+
+
+class EngineTextContextError(EngineTextError):
+    """The current prompt/framing was not admitted by canonical context policy."""
+
+    code = "engine_context_too_small"
 
 
 def _text(value: object, field: str, *, maximum: int) -> str:
@@ -78,6 +85,8 @@ class EngineTextRequest:
     model_id: str | None = None
     temperature: float | None = None
 
+    structured_output_schema: Mapping[str, Any] | None = None
+
     def __post_init__(self) -> None:
         if (self.provider_id is None) != (self.model_id is None):
             raise EngineTextError("provider_id and model_id must be supplied together")
@@ -92,6 +101,19 @@ class EngineTextRequest:
             or not 0 <= self.temperature <= 2
         ):
             raise EngineTextError("temperature must be finite in [0,2]")
+        if self.structured_output_schema is not None:
+            try:
+                encoded = json.dumps(
+                    dict(self.structured_output_schema),
+                    allow_nan=False,
+                    ensure_ascii=False,
+                )
+                if len(encoded.encode()) > 65536:
+                    raise ValueError("structured output schema exceeds64KiB")
+                schema = validate_json_schema(json.loads(encoded))
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise EngineTextError("structured output schema is invalid") from exc
+            object.__setattr__(self, "structured_output_schema", schema)
         object.__setattr__(
             self,
             "instructions",
@@ -254,6 +276,11 @@ class EngineTextRequest:
                 "verification_profile": self.verification_profile,
                 "data_class": self.data_class,
                 "purpose": self.purpose,
+                **(
+                    {}
+                    if self.structured_output_schema is None
+                    else {"structured_output_schema": self.structured_output_schema}
+                ),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -320,6 +347,7 @@ def _terminal_response(
         request.provider_id is None
         and request.model_id is None
         and request.temperature is None
+        and request.structured_output_schema is None
         and legacy_prompt in snapshot
     ):
         raise EngineTextError("chat idempotency identity was reused with different request semantics")
@@ -581,12 +609,17 @@ async def execute_engine_text(
         _stable_uuid("backend-engine-prompt", operation_id + ":prompt:" + request.request_identity_digest),
         hashlib.sha256(request.prompt.encode("utf-8")).hexdigest(),
     )
-    if expected_prompt not in set(envelope.source_snapshot):
-        raise EngineTextError("current prompt does not fit the compiled model context")
+    selected_prompts = {
+        (segment.segment_id, segment.content_digest)
+        for segment in envelope.evidence_segments
+        if segment.kind is ContextKind.USER_MESSAGE
+    }
+    projection = project_provider_context(envelope)
+    if expected_prompt not in selected_prompts or projection.prompt != request.prompt:
+        raise EngineTextContextError("current prompt does not fit the selected model context")
     if selection["context_tokenizer"] in {"utf8_bytes", "reference_tokens"}:
         from skeleton.ai.runtime.inference.local import LocalInferenceRequest, _TOKEN
 
-        projection = project_provider_context(envelope)
         rendered = LocalInferenceRequest(
             prompt=projection.prompt,
             instructions=projection.instructions,
@@ -598,7 +631,7 @@ async def execute_engine_text(
             else sum(1 for _ in _TOKEN.finditer(rendered))
         )
         if estimate > envelope.budget.input_capacity(tools_enabled=False):
-            raise EngineTextError("complete framed conversation does not fit the selected model")
+            raise EngineTextContextError("complete framed conversation does not fit the selected model")
     command = command_from_context(
         context=envelope,
         actor_id=request.actor_id,
@@ -618,6 +651,7 @@ async def execute_engine_text(
         provider_id=selection["selection_provider_id"],
         model_id=selection["selection_model_id"],
         temperature=request.temperature,
+        structured_output_schema=request.structured_output_schema,
         max_tool_calls=1,
         max_repeat_tool_batches=1,
         context_seed_refs=(
@@ -669,6 +703,7 @@ async def execute_engine_text(
 
 
 __all__ = [
+    "EngineTextContextError",
     "EngineTextError",
     "EngineTextRequest",
     "EngineTextResponse",

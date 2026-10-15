@@ -815,6 +815,7 @@ class ServerState:
         )
         provider_registry = ProviderRegistry.from_env(
             admission_runtime=provider_admission_runtime,
+            retain_unavailable=True,
         )
         coordinator = EngineExecutionCoordinator(
             service,

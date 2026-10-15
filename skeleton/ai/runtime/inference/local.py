@@ -376,7 +376,9 @@ class ReferenceNGramModel:
         transitions: dict[tuple[str, ...], dict[str, int]] = {}
         for index, row in enumerate(rows):
             if not isinstance(row, Mapping):
-                raise ValueError(f"transition row {index} must be an object")
+                raise ValueError(  # noqa: TRY004 -- artifact validation compatibility
+                    f"transition row {index} must be an object"
+                )
             unknown_row_keys = set(row) - {"context", "counts"}
             if unknown_row_keys:
                 raise ValueError(
@@ -585,13 +587,12 @@ class LocalInferenceEngine:
                     await asyncio.shield(worker)
                 except asyncio.CancelledError:
                     continue
-                except Exception:
+                except Exception:  # noqa: BLE001 -- wait for any backend failure to quiesce
                     break
-            if worker.done():
-                try:
-                    worker.result()
-                except (asyncio.CancelledError, Exception):
-                    pass
+            if worker.done() and not worker.cancelled():
+                # Retrieve a failed backend outcome without replacing the
+                # caller's cancellation after actual worker quiescence.
+                worker.exception()
             raise
 
     def _key(self, request: LocalInferenceRequest) -> str:
@@ -811,7 +812,7 @@ class LocalInferenceScheduler:
         except asyncio.CancelledError:
             item.future.cancel()
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- forward arbitrary model failures to their owning future
             if not item.future.done():
                 item.future.set_exception(exc)
         else:
@@ -938,7 +939,16 @@ class LocalModelAdapter(ProviderAdapter):
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
         if not isinstance(request, ProviderRequest):
             raise TypeError("request must be ProviderRequest")
-        max_tokens = request.max_output_tokens or 256
+        if getattr(request, "temperature", None) is not None:
+            raise ProviderPolicyError("local model does not support request temperature")
+        budget = request.resource_budget
+        max_tokens = (
+            min(256, budget.max_output_tokens)
+            if request.max_output_tokens is None
+            else request.max_output_tokens
+        )
+        if type(max_tokens) is not int or max_tokens < 1 or max_tokens > budget.max_output_tokens:
+            raise ProviderPolicyError("local output token budget exceeded")
         seed_material = "|".join(
             item or ""
             for item in (
@@ -961,6 +971,15 @@ class LocalModelAdapter(ProviderAdapter):
             ),
             context_digest=request.context_digest,
         )
+        if isinstance(self.engine.model, ReferenceNGramModel):
+            input_tokens = len(_tokenize(local_request.rendered_input))
+        else:
+            render = getattr(self.engine.model, "_render_prompt", None)
+            full_prompt = render(local_request) if callable(render) else local_request.rendered_input
+            input_tokens = len(full_prompt.encode("utf-8")) + 1
+        if input_tokens > budget.max_input_tokens:
+            raise ProviderPolicyError("local input token budget exceeded")
+        remaining = float(budget.max_wall_seconds)
         if request.deadline is not None:
             if (
                 not isinstance(request.deadline, datetime)

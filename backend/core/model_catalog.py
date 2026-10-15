@@ -7,6 +7,7 @@ credentials, activation, policy and inference remain in the engine process.
 from __future__ import annotations
 
 import hashlib
+import asyncio
 import json
 import re
 from collections.abc import Mapping
@@ -102,6 +103,10 @@ _READINESS = {
         "The selected model is currently unavailable.",
         "Choose another ready model or review its readiness message.",
     ),
+    "model_context_too_small": (
+        "This model has too little configured context for chat policy and output reserves.",
+        "Increase the local model context setting or choose another configured model.",
+    ),
     "model_temperature_unsupported": (
         "The selected model does not support temperature settings.",
         "Use its default sampling settings or choose a supported model.",
@@ -148,7 +153,11 @@ def _activation(value: object, model_id: str | None) -> dict[str, Any] | None:
     if not isinstance(value, Mapping):
         raise EngineProtocolError("model catalog artifact identity is invalid")
     schema = _text(value.get("schema"), maximum=128)
-    if schema not in {"reference_ngram", "skeleton.numpy_recurrent_lm.v1"}:
+    if schema not in {
+        "reference_ngram",
+        "skeleton.numpy_recurrent_lm.v1",
+        "skeleton.local_model.deployment.v1",
+    }:
         raise EngineProtocolError("model catalog artifact schema is unsupported")
     artifact_model = _text(value.get("model_id"), maximum=256)
     if model_id != artifact_model:
@@ -159,6 +168,25 @@ def _activation(value: object, model_id: str | None) -> dict[str, Any] | None:
         if not isinstance(digest, str) or _DIGEST.fullmatch(digest) is None:
             raise EngineProtocolError("model catalog artifact digest is invalid")
         digests[key] = digest
+    if schema == "skeleton.local_model.deployment.v1":
+        extra = {}
+        for key in ("manifest_digest", "runtime_digest"):
+            value_digest = value.get(key)
+            if not isinstance(value_digest, str) or _DIGEST.fullmatch(value_digest) is None:
+                raise EngineProtocolError("model catalog deployment digest is invalid")
+            extra[key] = value_digest
+        reference = "local-model-deployment:" + extra["manifest_digest"]
+        if value.get("reference") != reference or value.get("runtime_kind") != "llama.cpp-cli":
+            raise EngineProtocolError("model catalog deployment identity is invalid")
+        return {
+            "schema": schema,
+            "model_id": artifact_model,
+            **digests,
+            **extra,
+            "artifact_bytes": _integer(value.get("artifact_bytes"), maximum=1024**4),
+            "runtime_kind": "llama.cpp-cli",
+            "reference": reference,
+        }
     reference = "local-model-artifact:" + digests["artifact_sha256"]
     if value.get("reference", reference) != reference:
         raise EngineProtocolError("model catalog artifact reference is invalid")
@@ -176,10 +204,11 @@ def _local_handoff(*, activated: bool) -> dict[str, Any]:
         "credential_free": True,
         "activated": activated,
         "operator_required": True,
-        "configuration_keys": ["AI_PROVIDER", "AI_LOCAL_MODEL_PATH"],
+        "configuration_keys": ["AI_PROVIDER", "AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH"],
+        "configuration_exclusive_alternatives": [["AI_LOCAL_MODEL_PATH", "AI_LOCAL_DEPLOYMENT_PATH"]],
         "required_provider_value": "local",
         "restart_required": True,
-        "instruction": "An administrator can export a governed local model, configure the engine to use that artifact, and restart the engine. No hosted AI credentials are required.",
+        "instruction": "An administrator can export a governed local model, configure AI_LOCAL_MODEL_PATH or an approved AI_LOCAL_DEPLOYMENT_PATH manifest exclusively, and restart the engine. No hosted AI credentials are required.",
         "production_promotion_authorized": False,
     }
 
@@ -253,12 +282,11 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
         context_window = _integer(raw.get("context_window"), maximum=1_048_576)
         max_output = _integer(raw.get("max_output_tokens"), maximum=16_384)
         default_output = _integer(raw.get("default_output_tokens"), maximum=max_output)
-        if (
-            max_output >= context_window
-            or default_output + 3072 >= context_window
-            or raw.get("limits_source") != "engine_chat_policy"
-        ):
+        if raw.get("limits_source") != "engine_chat_policy":
             raise EngineProtocolError("model inventory context/output capacity is invalid")
+        if max_output >= context_window or default_output + 3072 >= context_window:
+            available, code = False, "model_context_too_small"
+            providers[-1].update(available=False, readiness=readiness(code))
         tokenizer = raw.get("tokenizer")
         if tokenizer not in {"utf8_bytes", "reference_tokens", "approximate_text"} or (
             not local and tokenizer != "approximate_text"
@@ -322,7 +350,16 @@ def catalog_from_inventory(inventory: Mapping[str, Any]) -> dict[str, Any]:
         "schema_version": CATALOG_SCHEMA,
         "engine": "skeleton-engine",
         "available": available,
-        "automatic_available": inventory["available"],
+        "automatic_available": inventory["available"]
+        and not any(
+            row["readiness"]["code"] == "model_context_too_small"
+            and (
+                row["active"]
+                or row["provider_id"]
+                in {provider["provider_id"] for provider in providers if provider["fallback"]}
+            )
+            for row in models
+        ),
         "active": active,
         "models": models,
         "providers": providers,
@@ -346,13 +383,13 @@ async def model_catalog(client: EngineClient | None, *, actor_id: str, tenant_id
     if not callable(scoped):
         return unavailable_catalog("tenant_inventory_unavailable")
     try:
-        inventory = await scoped(actor_id=actor_id, tenant_id=tenant_id)
+        inventory = await asyncio.wait_for(scoped(actor_id=actor_id, tenant_id=tenant_id), timeout=2)
         return catalog_from_inventory(inventory)
     except EngineAuthorizationError:
         return unavailable_catalog("engine_access_denied")
     except EngineProtocolError:
         return unavailable_catalog("engine_inventory_invalid")
-    except EngineClientError:
+    except (EngineClientError, asyncio.TimeoutError):
         return unavailable_catalog("engine_unavailable")
 
 

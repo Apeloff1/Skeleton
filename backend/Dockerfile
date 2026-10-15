@@ -11,25 +11,35 @@ FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d75060
 
 WORKDIR /app
 
-# uv is a build-time tool only. Build dependencies are isolated to this stage.
-RUN apk add --no-cache --virtual .build-deps \
-      build-base \
-      cargo \
-      libffi-dev \
-      openssl-dev \
-      linux-headers \
-    && pip install --no-cache-dir uv==0.12.4
-
-COPY backend/pyproject.toml ./
-COPY backend/requirements.txt ./
+# Copy dependency metadata before installing the build toolchain. Keeping the
+# toolchain and dependency transaction in one layer avoids repeatedly copying
+# a large intermediate filesystem on Docker daemons that use the vfs driver.
+COPY backend/pyproject.toml backend/requirements.txt ./
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     PIP_DISABLE_PIP_VERSION_CHECK=1
-RUN uv venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-RUN uv pip install -r requirements.txt \
-    && uv pip install "msgpack>=1.2.1" "setuptools>=78.1.1"
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    apk add --no-cache --virtual .build-deps \
+      build-base cargo libffi-dev openssl-dev linux-headers \
+    && pip install --no-cache-dir uv==0.12.4 \
+    && uv venv /opt/venv \
+    && uv pip install --python /opt/venv/bin/python -r requirements.txt \
+    && uv pip install --python /opt/venv/bin/python "msgpack>=1.2.1" "setuptools>=78.1.1" \
+    && apk del .build-deps \
+    && rm -rf /root/.cache /tmp/*
+
+# Prepare the existing flat backend layout in a source-only stage. The
+# Dockerfile-specific context allowlist excludes secrets and runtime data.
+FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72 AS runtime-source
+WORKDIR /source
+COPY . .
+RUN mv backend /runtime \
+    && mv skeleton machine docs /runtime/ \
+    && test ! -e /runtime/scripts/check_jeeves_training_modules.py \
+    && test ! -L /runtime/scripts/check_jeeves_training_modules.py \
+    && cp scripts/check_jeeves_training_modules.py /runtime/scripts/check_jeeves_training_modules.py
 
 # Stage 2: Production
 FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72 AS production
@@ -37,7 +47,9 @@ FROM python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d75060
 # Apply the current Alpine security repository updates to the runtime layer.
 # The pinned base remains reproducible while util-linux and other OS packages
 # receive fixes released after the base-image snapshot.
-RUN apk upgrade --no-cache
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    apk upgrade --no-cache
 
 # pip is not required to serve the production application. pip 26.2+ carries
 # vendored packages and an embedded CycloneDX SBOM under pip/_vendor, so keep
@@ -67,20 +79,7 @@ RUN addgroup -S -g 10001 appuser \
 COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY --chown=appuser:appuser backend/ .
-COPY --chown=appuser:appuser skeleton/ ./skeleton/
-COPY --chown=appuser:appuser machine/manifest.json ./machine/manifest.json
-COPY --chown=appuser:appuser machine/architecture.json ./machine/architecture.json
-COPY --chown=appuser:appuser machine/ai_app_construction.json ./machine/ai_app_construction.json
-COPY --chown=appuser:appuser machine/capability_interfaces.json ./machine/capability_interfaces.json
-COPY --chown=appuser:appuser machine/state_topology.json ./machine/state_topology.json
-COPY --chown=appuser:appuser machine/ai_capabilities.json ./machine/ai_capabilities.json
-COPY --chown=appuser:appuser machine/ai_runtime_schemas.json ./machine/ai_runtime_schemas.json
-COPY --chown=appuser:appuser machine/ai_implementation_handoff.json ./machine/ai_implementation_handoff.json
-COPY --chown=appuser:appuser machine/ai_closure_evidence.json ./machine/ai_closure_evidence.json
-COPY --chown=appuser:appuser machine/enterprise_ai_superiority.json ./machine/enterprise_ai_superiority.json
-COPY --chown=appuser:appuser machine/enterprise_ai_implementation_notes_index.json ./machine/enterprise_ai_implementation_notes_index.json
-COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md
+COPY --from=runtime-source --chown=appuser:appuser /runtime/ .
 
 USER appuser
 
@@ -102,7 +101,9 @@ ENV ENVIRONMENT=development \
     CORS_ORIGINS=*
 
 USER root
-RUN python -m ensurepip --upgrade \
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    python -m ensurepip --upgrade \
     && python -m pip install --no-cache-dir "pytest>=8,<9" pytest-cov "ruff==0.9.*"
 USER appuser
 

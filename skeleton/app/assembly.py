@@ -11,11 +11,11 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from dataclasses import dataclass, field
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field, replace
 from importlib import resources
 from pathlib import Path
-from typing import Iterable, Mapping
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 
 @dataclass(frozen=True)
@@ -36,7 +36,7 @@ class ServiceSpec:
     profile: str = ""
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> "ServiceSpec":
+    def from_mapping(cls, value: Mapping[str, object]) -> ServiceSpec:
         name = str(value.get("name", "")).strip()
         role = str(value.get("role", "")).strip()
         path = str(value.get("path", "")).strip()
@@ -224,9 +224,7 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     for service in services:
         missing = set(service.depends_on) - set(names)
         if missing:
-            raise ValueError(
-                f"service {service.name!r} depends on unknown services: {sorted(missing)}"
-            )
+            raise ValueError(f"service {service.name!r} depends on unknown services: {sorted(missing)}")
 
         if service.name in service.depends_on:
             raise ValueError(f"service {service.name!r} cannot depend on itself")
@@ -241,9 +239,7 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
                 raise ValueError(f"service {service.name!r} ingress_prefix must not end with '/'")
             owner = ingress_prefixes.get(prefix)
             if owner is not None:
-                raise ValueError(
-                    f"ingress_prefix {prefix!r} is shared by {owner!r} and {service.name!r}"
-                )
+                raise ValueError(f"ingress_prefix {prefix!r} is shared by {owner!r} and {service.name!r}")
             ingress_prefixes[prefix] = service.name
             if service.health_path and prefix != "/" and not service.health_path.startswith(prefix + "/"):
                 raise ValueError(
@@ -256,12 +252,9 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     contract_prefix = public_contract["prefix"]
     backend_prefix = backend.ingress_prefix
     if not backend_prefix or (
-        contract_prefix != backend_prefix
-        and not contract_prefix.startswith(backend_prefix.rstrip("/") + "/")
+        contract_prefix != backend_prefix and not contract_prefix.startswith(backend_prefix.rstrip("/") + "/")
     ):
-        raise ValueError(
-            "public application contract must live inside backend ingress prefix"
-        )
+        raise ValueError("public application contract must live inside backend ingress prefix")
 
     required_paths = payload.get("required_paths", ())
     if not isinstance(required_paths, list):
@@ -291,7 +284,6 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     )
 
 
-
 def load_manifest() -> AssemblyManifest:
     """Load and validate the packaged application assembly manifest."""
 
@@ -300,6 +292,7 @@ def load_manifest() -> AssemblyManifest:
         raise ValueError("application assembly manifest root must be an object")
     return parse_manifest(payload)
 
+
 def find_repo_root(start: Path | None = None) -> Path:
     """Find the checkout root without depending on the current working directory."""
 
@@ -307,11 +300,26 @@ def find_repo_root(start: Path | None = None) -> Path:
     if cursor.is_file():
         cursor = cursor.parent
     for candidate in (cursor, *cursor.parents):
-        if (candidate / "pyproject.toml").is_file() and (
-            candidate / "docker-compose.yml"
-        ).is_file():
+        if (candidate / "pyproject.toml").is_file() and (candidate / "docker-compose.yml").is_file():
             return candidate
     raise FileNotFoundError("could not locate Skeleton repository root")
+
+
+def _dotenv_value(raw: str) -> str:
+    """Read ordinary values and the literal secret format written by setup."""
+
+    value = raw.strip()
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        try:
+            decoded = json.loads(value)
+        except ValueError:
+            pass  # Preserve compatibility with older non-JSON quoted values.
+        else:
+            if isinstance(decoded, str):
+                return decoded.replace("$$", "$")
+    if len(value) >= 2 and value[0] == value[-1] == "'":
+        return value[1:-1].replace("\\'", "'")
+    return value.split(" #", 1)[0].rstrip()
 
 
 def _read_dotenv(path: Path) -> dict[str, str]:
@@ -326,8 +334,7 @@ def _read_dotenv(path: Path) -> dict[str, str]:
         key = key.strip()
         if not key:
             continue
-        value = value.strip().strip('"').strip("'")
-        values[key] = value
+        values[key] = _dotenv_value(value)
     return values
 
 
@@ -336,6 +343,58 @@ def _runtime_env(root: Path, environ: Mapping[str, str] | None) -> dict[str, str
     source = os.environ if environ is None else environ
     values.update({str(key): str(value) for key, value in source.items()})
     return values
+
+
+def runtime_manifest(
+    manifest: AssemblyManifest | None = None,
+    *,
+    root: Path | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> AssemblyManifest:
+    """Resolve operator-selected host ports without changing canonical topology."""
+
+    manifest = manifest or load_manifest()
+    values = _runtime_env(root or find_repo_root(), environ)
+    port_keys = {
+        "FRONTEND_PORT": "3000",
+        "BACKEND_PORT": "8001",
+        "SKELETON_PORT": "8010",
+        "MONGO_PORT": "27017",
+        "CHROMA_PORT": "8000",
+    }
+    for key, fallback in port_keys.items():
+        raw = values.get(key, "") or fallback
+        if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
+            raise ValueError(f"{key} must be an integer from 1 to 65535")
+    public_ports = [
+        int(values.get(key, "") or port_keys[key])
+        for key in ("FRONTEND_PORT", "BACKEND_PORT", "SKELETON_PORT", "MONGO_PORT")
+    ]
+    if len(public_ports) != len(set(public_ports)):
+        raise ValueError("FRONTEND_PORT, BACKEND_PORT, SKELETON_PORT and MONGO_PORT must differ")
+    services = []
+    for service in manifest.services:
+        key = {
+            "frontend": "FRONTEND_PORT",
+            "backend": "BACKEND_PORT",
+            "skeleton": "SKELETON_PORT",
+            "chroma": "CHROMA_PORT",
+        }.get(service.name)
+        raw = values.get(key, "") if key else ""
+        if raw and service.public_url:
+            if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
+                raise ValueError(f"{key} must be an integer from 1 to 65535")
+            url = urlsplit(service.public_url)
+            if url.scheme not in {"http", "https"} or url.hostname not in {"localhost", "127.0.0.1", "::1"}:
+                raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
+            host = url.hostname
+            if ":" in host:
+                host = "[" + host + "]"
+            service = replace(
+                service, public_url=urlunsplit((url.scheme, f"{host}:{int(raw)}", url.path, "", ""))
+            )
+        services.append(service)
+    return replace(manifest, services=tuple(services))
 
 
 def public_service_urls(
@@ -351,34 +410,16 @@ def public_service_urls(
     and installed readiness checks must probe the actual configured ports.
     Invalid port overrides fail closed rather than probing the wrong service.
     """
-    from urllib.parse import urlsplit, urlunsplit
-
     manifest = manifest or load_manifest()
     values = _runtime_env(root, environ)
+    resolved = runtime_manifest(manifest, root=root, environ=values)
     ports = {
         "frontend": "FRONTEND_PORT",
         "backend": "BACKEND_PORT",
         "skeleton": "SKELETON_PORT",
-        # The full-profile vector store is published on CHROMA_PORT.
-        # Omitting this made a healthy custom-port full install fail
-        # readiness by probing the stale default localhost:8000.
         "chroma": "CHROMA_PORT",
     }
-    result: dict[str, str] = {}
-    for service_name, key in ports.items():
-        port_text = values.get(key, "").strip()
-        if not port_text:
-            continue
-        if not port_text.isascii() or not port_text.isdecimal() or not 1 <= int(port_text) <= 65535:
-            raise ValueError(f"{key} must be an integer between 1 and 65535")
-        original = manifest.service(service_name).public_url
-        parsed = urlsplit(original)
-        if parsed.scheme not in {"http", "https"} or parsed.hostname not in {"localhost", "127.0.0.1"}:
-            raise ValueError(f"{service_name} has a non-local public URL; port override rejected")
-        result[service_name] = urlunsplit(
-            (parsed.scheme, f"{parsed.hostname}:{int(port_text)}", parsed.path, "", "")
-        )
-    return result
+    return {name: resolved.service(name).public_url for name, key in ports.items() if values.get(key, "")}
 
 
 def _usable_secret(value: str) -> bool:
@@ -413,9 +454,15 @@ def _authenticated_mongo_uri(value: str) -> bool:
         # label such as db.change-me.example.net. Earlier generic substring
         # scrutiny mistakenly rejected valid operator-owned Mongo endpoints.
         if any(
-            value.strip().lower() in {
-                "change-me", "changeme", "replace-me", "your-secret",
-                "your-key-here", "example", "placeholder",
+            value.strip().lower()
+            in {
+                "change-me",
+                "changeme",
+                "replace-me",
+                "your-secret",
+                "your-key-here",
+                "example",
+                "placeholder",
             }
             for value in (parsed.username, parsed.password)
         ):
@@ -512,25 +559,25 @@ def preflight(
             AssemblyCheck(
                 code="runtime:docker",
                 ok=docker is not None,
-                message=(
-                    f"docker available at {docker}" if docker else "docker executable not found"
-                ),
+                message=(f"docker available at {docker}" if docker else "docker executable not found"),
             )
         )
         values = _runtime_env(root, environ)
+        try:
+            runtime_manifest(manifest, root=root, environ=values)
+        except ValueError as exc:
+            checks.append(AssemblyCheck("runtime:ports", False, str(exc)))
         for key in manifest.required_env:
             value = values.get(key, "")
             ok = _usable_secret(value)
             if key in {"MONGO_URL", "SKL_MONGO_URI"}:
                 ok = _authenticated_mongo_uri(value)
-            if key == "SKL_ENGINE_SERVICE_TOKEN":
+            if key in {"SKL_ENGINE_SERVICE_TOKEN", "JWT_SECRET", "GAMEFORGE_JWT_SECRET"}:
                 ok = ok and 32 <= len(value) <= 4096 and value == value.strip()
             if key in {"GAMEFORGE_JWT_SECRET", "GF_SEAL_SECRET"}:
                 ok = ok and len(value) >= 32 and value == value.strip()
             if key == "GF_KEYHOLDER_SEED":
-                ok = ok and len(value) == 64 and all(
-                    char in "0123456789abcdefABCDEF" for char in value
-                )
+                ok = ok and len(value) == 64 and all(char in "0123456789abcdefABCDEF" for char in value)
             checks.append(
                 AssemblyCheck(
                     code=f"env:{key}",
@@ -538,7 +585,28 @@ def preflight(
                     message=(
                         f"runtime value configured: {key}"
                         if ok
-                        else f"runtime value missing, invalid or placeholder: {key}"
+                        else f"runtime value missing, invalid or placeholder: {key}; run python -m skeleton app setup"
+                    ),
+                )
+            )
+        seed_email = values.get("GAMEFORGE_SEED_ADMIN_EMAIL", "").strip()
+        seed_password = values.get("GAMEFORGE_SEED_ADMIN_PASSWORD", "")
+        if seed_email or seed_password:
+            paired = (
+                bool(seed_email and seed_password)
+                and "@" in seed_email
+                and not seed_email.startswith("@")
+                and not seed_email.endswith("@")
+                and len(seed_password) >= 16
+            )
+            checks.append(
+                AssemblyCheck(
+                    "env:GAMEFORGE_SEED_ADMIN",
+                    paired,
+                    (
+                        "optional operator-admin credentials configured"
+                        if paired
+                        else "Configure both GAMEFORGE_SEED_ADMIN_EMAIL and a password of at least 16 characters in private .env, or leave both empty"
                     ),
                 )
             )
@@ -585,9 +653,9 @@ def compose_command(
         command.extend(plan.services)
         return tuple(command)
     if action == "down":
-        return tuple([*base, "down", "--remove-orphans"])
+        return (*base, "down", "--remove-orphans")
     if action == "ps":
-        return tuple([*base, "ps"])
+        return (*base, "ps")
     if action == "logs":
         command = [*base, "logs"]
         if follow:
@@ -598,7 +666,9 @@ def compose_command(
             command.append(service)
         return tuple(command)
     if action == "config":
-        return tuple([*base, "config"])
+        # Rendered Compose output contains Mongo/password/JWT/provider values.
+        # Operator validation must never dump those into a diagnostic receipt.
+        return (*base, "config", "--quiet")
 
     raise ValueError(f"unsupported compose action: {action}")
 

@@ -39,6 +39,10 @@ class CampaignCreate(WriteRequest):
     max_death_regression: float = Field(default=0, ge=0, le=1, strict=True, allow_inf_nan=False)
     max_worst_seed_regression: float = Field(default=0, ge=0, le=1e9, strict=True, allow_inf_nan=False)
 
+    proposal_width: int = Field(default=2, ge=1, le=4, strict=True)
+    exploration_strategy: Literal["uniform", "least_visited"] = "least_visited"
+    n_step: int = Field(default=4, ge=1, le=16, strict=True)
+
     @model_validator(mode="before")
     @classmethod
     def numeric_types(cls, value):
@@ -66,6 +70,9 @@ class CampaignCreate(WriteRequest):
             max_mean_step_ms=self.max_mean_step_ms,
             max_death_regression=self.max_death_regression,
             max_worst_seed_regression=self.max_worst_seed_regression,
+            proposal_width=self.proposal_width,
+            exploration_strategy=self.exploration_strategy,
+            n_step=self.n_step,
         )
         return self
 
@@ -94,6 +101,58 @@ async def campaign_catalog(user=Depends(get_current_user)):
 
     _scope(user)
     return campaign_catalog()
+
+
+@router.get("/projects/{project_id}/policies")
+async def list_policies(
+    project_id: str,
+    limit: int = Query(default=16, ge=1, le=32),
+    cursor: str | None = Query(default=None, min_length=1, max_length=128),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.workspace.list_policies(_scope(user), project_id, limit=limit, cursor=cursor))
+
+
+@router.get("/projects/{project_id}/policies/{policy_id}")
+async def read_policy(project_id: str, policy_id: str, user=Depends(get_current_user)):
+    return await _call(learning.workspace.read_policy(_scope(user), project_id, policy_id))
+
+
+@router.get("/projects/{project_id}/policies/{policy_id}/export")
+async def export_policy(project_id: str, policy_id: str, user=Depends(get_current_user)):
+    return await _call(learning.workspace.export_policy(_scope(user), project_id, policy_id))
+
+
+@router.get("/projects/{project_id}/policies/{policy_id}/episodes")
+async def policy_episodes(
+    project_id: str,
+    policy_id: str,
+    after: int = Query(default=-1, ge=-1, le=255),
+    limit: int = Query(default=16, ge=1, le=32),
+    user=Depends(get_current_user),
+):
+    return await _call(
+        learning.workspace.policy_episodes(_scope(user), project_id, policy_id, after=after, limit=limit)
+    )
+
+
+@router.get("/projects/{project_id}/policies/{policy_id}/episodes/{episode_id}/export")
+async def export_policy_episode(
+    project_id: str, policy_id: str, episode_id: str, user=Depends(get_current_user)
+):
+    return await _call(
+        learning.workspace.export_policy_episode(_scope(user), project_id, policy_id, episode_id)
+    )
+
+
+@router.get("/campaigns/{campaign_id}/evidence/export")
+async def export_campaign_evidence(
+    campaign_id: str,
+    after: int = Query(default=0, ge=0, le=100000),
+    limit: int = Query(default=16, ge=1, le=16),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.export_evidence(_scope(user), campaign_id, after=after, limit=limit))
 
 
 @router.post("/campaigns/{campaign_id}/authorization")

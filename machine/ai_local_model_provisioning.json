@@ -1,0 +1,43 @@
+{
+  "schema_version": "skeleton.application.local_model_provisioning.v1",
+  "status": "implementation_candidate",
+  "owner": "existing skeleton.app installer and canonical local deployment owner",
+  "implementation": "scripts/provision_local_ai.py",
+  "deployment_authority": "skeleton/ai/runtime/inference/deployment.py:LocalModelDeployment",
+  "entrypoint": "python scripts/provision_local_ai.py --target linux-x86_64-glibc --download --output ./data/local-ai",
+  "network": "Explicit operator-only acquisition from two fixed HTTPS public artifact URLs: revision-pinned Qwen3-0.6B-Q8_0 Apache-2.0 weights and release-pinned llama.cpp b11429 Ubuntu x64 MIT runtime. Existing proxy and CA environment remain in effect. No credentials, arbitrary URLs, model invocation, service startup or browser download authority.",
+  "integrity": "Exact expected bytes and SHA256 precede use. Archive extraction materializes only bounded regular libraries, completion executable and license, resolving only archive-internal aliases without creating symlinks. A portable relative-path manifest is admitted by the existing canonical loader before create-only publication. Failed provisioning remains explicitly incomplete and is never activated.",
+  "storage": "Operator-owned model artifact directory only, not application state or a new store. Existing complete directories are verified and reused, never overwritten. Receipt binds all runtime files, model, license/source identity and deployment manifest.",
+  "activation": "Operator sets existing AI_PROVIDER=local, clears AI_LOCAL_MODEL_PATH and sets AI_LOCAL_DEPLOYMENT_PATH to the read-only mounted deployment.json, then restarts the existing engine. No inferred promotion or credentials.",
+  "limits": {
+    "model_bytes": 639446688,
+    "runtime_archive_bytes": 17693462,
+    "extracted_bytes": 134217728,
+    "archive_members": 512,
+    "download_timeout_seconds": 1800
+  },
+  "limitations": [
+    "Bundled acquisition recipe is Linux x86_64 CPU only; other architectures use their compatible operator-provisioned runtime.",
+    "Small CPU model provides a reproducible integration path, not guaranteed planning quality or trained studio mastery.",
+    "Shared-library receipt pins acquisition content; canonical runtime currently independently pins the executable and model.",
+    "Download cleanup failure never produces successful activation; abandoned or partial directories retain incomplete marker. Parent private directories are never made public."
+  ],
+  "automated_tests_run": false,
+  "production_promotion_authorized": false,
+  "masterplan_completion_authorized": false,
+  "transfer_isolation": {
+    "owner": "same existing operator installer; no service/store/scheduler/provider",
+    "network_worker": "fixed stdlib Python -I -S child, exact pinned URL and byte count, only inherited deployment proxy/CA variables; absolute supervisor deadline, terminate/kill/wait before acknowledgement",
+    "local_copy": "No-follow nonblocking regular-file descriptor, exact expected byte ceiling and hash during copy, stable descriptor identity before/after; no unbounded copyfileobj",
+    "reuse": "Existing exact target runtime and configured manifest profile/thread count must match request; no overwrite or implicit reconfiguration"
+  },
+  "target": "Explicit --target linux-x86_64-glibc only. Other host platforms require --prepare-for-container acknowledgement; host/target compatibility reported separately. Artifact preparation does not establish native execution compatibility.",
+  "prompt_profile": "Explicit Qwen3 nonthinking completion template from canonical QWEN3_COMPLETION_CHAT_TEMPLATE, passed as --chat-template after fixed completion flags. --reasoning off controls display only; template has closed empty think prefix. Exact args/template enter manifest/profile digest. Existing older profile directories are never rewritten and conflict with this recipe.",
+  "empty_directory_claim": {
+    "accepted": "New destination, or an existing empty nonsymlink directory owned by the effective operator UID with no group/world write access. Parent symlinks and foreign ownership are rejected.",
+    "claim": "Exclusive create-only .incomplete marker, fsynced before artifact writes; concurrent or incomplete claims are never overwritten. Check emptiness again after claim.",
+    "complete_reuse": "Nonempty destinations require the full previously admitted complete receipt/profile; they are never treated as empty or overwritten.",
+    "compose": "Installer creates host-owned default artifact directory mode0755 before Compose bind mount; a Docker-created foreign root-owned directory is not adopted by another operator.",
+    "permissions": "Only the explicitly selected artifact directory is made0755; no parent permission changes."
+  }
+}

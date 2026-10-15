@@ -35,7 +35,7 @@ class DisasterRecoveryContractTests(unittest.TestCase):
     def test_repository_contract_covers_all_current_authority(self) -> None:
         report = validate_repository_disaster_recovery(ROOT)
         self.assertTrue(report.valid, report.errors)
-        self.assertEqual(len(report.source_of_truth_domains), 14)
+        self.assertEqual(len(report.source_of_truth_domains), 19)
         self.assertEqual(
             report.source_of_truth_domains,
             report.covered_domains,
@@ -45,6 +45,35 @@ class DisasterRecoveryContractTests(unittest.TestCase):
             report.covered_backup_stores[: len(report.required_backup_stores)],
         )
         self.assertEqual(len(report.contract_digest), 64)
+
+    def test_new_studio_and_dragon_source_domains_require_distinct_recovery_owners(self) -> None:
+        report = self.validate()
+        self.assertTrue(report.valid, report.errors)
+        authoritative = {
+            domain["id"] for domain in self.topology["state_domains"]
+            if domain.get("source_of_truth") is True
+        }
+        coverage = [
+            domain for unit in self.contract["recovery_units"]
+            for domain in unit["domain_ids"]
+        ]
+        self.assertEqual(set(coverage), authoritative)
+        self.assertEqual(len(coverage), len(set(coverage)))
+        for domain in (
+            "backend-curiosity-file-state",
+            "dragon-crawler-application",
+            "dragon-practice-state",
+            "dragon-reviewed-design-knowledge",
+            "jeeves-game-learning-workspace",
+        ):
+            self.assertIn(domain, coverage)
+            stripped = copy.deepcopy(self.contract)
+            for unit in stripped["recovery_units"]:
+                if domain in unit["domain_ids"]:
+                    unit["domain_ids"].remove(domain)
+            outcome = self.validate(contract=stripped)
+            self.assertFalse(outcome.valid)
+            self.assertIn(f"uncovered source-of-truth domain: {domain}", outcome.errors)
 
     def test_new_source_of_truth_domain_fails_until_recovery_plan_is_updated(self) -> None:
         topology = copy.deepcopy(self.topology)

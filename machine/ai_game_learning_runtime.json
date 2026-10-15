@@ -104,7 +104,7 @@
       "route": "GET /api/game-studio-learning/campaigns/{id}/mirror-views",
       "ui": "frontend/features/Jeeves/GameStudioScenarioLabPanel.tsx",
       "bounded_lanes": 6,
-      "maximum_workers_per_request": 4,
+      "maximum_workers_per_request": 1,
       "maximum_steps_per_view": 24,
       "min_refresh_seconds": 9,
       "scope": "authenticated owner's read-only spectator simulations of current champion source",
@@ -225,7 +225,7 @@
         "channel_derivation"
       ],
       "simulation_runs_per_default_spectator": 10,
-      "maximum_spectator_workers_per_request": 4,
+      "maximum_spectator_workers_per_request": 1,
       "maximum_spectator_steps_per_run": 24,
       "maximum_new_campaign_training_episodes_per_round": 10,
       "maximum_mirrored_candidate_scenario_runs": 20,
@@ -348,6 +348,26 @@
         "source_governance_fields_immutable": true,
         "production_model_changed": false
       }
+    },
+    "shared_compute_admission": {
+      "owner": "backend/core/game_studio_learning.py",
+      "capacity_owner": "existing workspace.workers canonical CPU training_credit_ids from core.game_play.resource_profiles; no separate resource pool",
+      "endpoints": [
+        "scenario_mirror_views",
+        "engine_probe_page",
+        "scenario_shadow_audit",
+        "multifactor_plan_preview",
+        "multifactor_verified_experiments"
+      ],
+      "credits_per_request": 1,
+      "internal_parallel_workers_per_request": 1,
+      "busy_behavior": "Immediate bounded capacity-busy response; no queued executor work before physical credit admission",
+      "lease_seconds": 30,
+      "heartbeat_seconds": 1,
+      "cancellation": "Shield the raw executor future and drain it across repeated caller cancellation; keep credit and heartbeat until physical thread and any bounded internal executor have quiesced",
+      "failure_scope": "Lease/heartbeat loss requests cooperative cancellation and rejects publication after finite work drains. Pure helpers without cancellation hooks finish their existing bounded work; no force-kill or cross-replica exclusion guarantee during a remote storage outage.",
+      "publication": "No training-state writes or model promotion; only existing capacity-control rows are leased and released.",
+      "current_source_authority": "Campaign-bound endpoints recheck current scoped source and teacher rights after physical compute before publishing; captured cursor, seed and source receipts retain their original identities."
     }
   }
 }

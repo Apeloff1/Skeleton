@@ -28,7 +28,7 @@ export type GameTrainingInstance = {
   metrics?: Record<string, unknown>; task?: string; resource?: string; [key: string]: unknown;
 };
 export type GameTrainingInstances = { job_id: string; instances: GameTrainingInstance[]; status?: string; stream_id?: string };
-export type GameResourceProfile = { profile_id: string; label: string; max_training_workers: number; max_live_plays: number; host_cpu_count?: number; effective_cpu_count?: number; memory_limit_bytes?: number };
+export type GameResourceProfile = { profile_id: string; label: string; max_training_workers: number; max_live_plays: number; host_cpu_count?: number; effective_cpu_count?: number; memory_limit_bytes?: number; available?: boolean; readiness?: { code: string; message: string }; combined_instance_capacity?: number; shared_single_capacity?: boolean; global_actor_safety_ceiling?: number; instance_memory_allowance_bytes?: number; capacity_scope?: string };
 function invalid(message: string): never { throw new ChatClientError(message, { kind: 'protocol', retryable: false }); }
 function identity(value: string): string { if (!value || value.length > 128) invalid('The game session identity is invalid.'); return encodeURIComponent(value); }
 async function request<T>(method: 'get' | 'post', path: string, body: unknown, input: LearningRequest = {}, key?: string): Promise<T> {
@@ -123,7 +123,13 @@ export async function getGameTrainingInstances(jobId: string, input: LearningReq
 
 export async function getGameResources(input: LearningRequest = {}): Promise<{ profiles: GameResourceProfile[]; gpu_available: boolean }> {
   const result = await request<{ profiles: GameResourceProfile[]; gpu_available: boolean }>('get', '/resources', null, input);
-  if (!Array.isArray(result.profiles) || result.profiles.length > 16 || typeof result.gpu_available !== 'boolean' || result.profiles.some(profile => !profile || typeof profile.profile_id !== 'string' || typeof profile.label !== 'string' || !Number.isSafeInteger(profile.max_training_workers) || profile.max_training_workers < 1 || profile.max_training_workers > 8)) invalid('The compute resource catalogue is invalid.');
+  if (!Array.isArray(result.profiles) || result.profiles.length > 16 || typeof result.gpu_available !== 'boolean') invalid('The compute resource catalogue is invalid.');
+  for (const profile of result.profiles) {
+    if (!profile || typeof profile.profile_id !== 'string' || typeof profile.label !== 'string' || !Number.isSafeInteger(profile.max_training_workers) || profile.max_training_workers < 0 || profile.max_training_workers > 8 || !Number.isSafeInteger(profile.max_live_plays) || profile.max_live_plays < 0 || profile.max_live_plays > 4 || profile.available !== undefined && typeof profile.available !== 'boolean') invalid('The compute resource profile is invalid.');
+    if (profile.available === false) { if (profile.max_training_workers !== 0 || profile.max_live_plays !== 0 || profile.combined_instance_capacity !== 0) invalid('Unavailable compute must have zero admitted capacity.'); }
+    else if (profile.max_training_workers < 1 || profile.max_live_plays < 1 || profile.combined_instance_capacity === 0) invalid('Zero compute capacity requires an explicit unavailable profile.');
+    if (profile.combined_instance_capacity !== undefined && (!Number.isSafeInteger(profile.combined_instance_capacity) || profile.combined_instance_capacity < 0 || profile.combined_instance_capacity > 12)) invalid('The combined instance capacity is invalid.');
+  }
   return result;
 }
 

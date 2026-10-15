@@ -798,6 +798,11 @@ def parser() -> argparse.ArgumentParser:
     mode.add_argument("--start", action="store_true")
     mode.add_argument("--stop", action="store_true")
     mode.add_argument("--open", action="store_true")
+    mode.add_argument(
+        "--studio-tool",
+        choices=("modules", "adaptive", "boomerang"),
+        help="open a studio tool in the visible launcher",
+    )
     mode.add_argument("--local-ai", action="store_true", help="open Docker-free native AI conversation")
     mode.add_argument("--local-ai-smoke", action="store_true", help="verify bundled native CPU inference without Docker")
     mode.add_argument("--local-ai-dataset-smoke", action="store_true", help="check local dataset split contracts")
@@ -890,7 +895,15 @@ def main(argv: list[str] | None = None) -> int:
     if os.name != "nt":
         print("Skeleton Windows launcher requires Windows.")
         return 2
-    return WindowsLauncher(root).run()
+    launcher = WindowsLauncher(root)
+    if args.studio_tool:
+        action = {
+            "modules": launcher.inspect_jeeves_modules,
+            "adaptive": launcher.run_adaptive_sim,
+            "boomerang": launcher.run_boomerang_queue,
+        }[args.studio_tool]
+        launcher.window.after(150, action)
+    return launcher.run()
 
 
 if __name__ == "__main__":

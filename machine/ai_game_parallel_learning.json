@@ -24,6 +24,12 @@
   "automated_tests_authorized": false,
   "production_promotion_authorized": false,
   "masterplan_completion_authorized": false,
+  "rollout_seed_storage": {
+    "algorithm": "int(episode_identity_sha256[:16],16) modulo2**63",
+    "range": "0..2**63-1",
+    "authority": "Deterministic per-assignment rollout RNG; identical creation and resume reconstruction, fits existing Mongo signed64 storage.",
+    "compatibility": "Changed implementation digest fences all old batches; no grandfathered unsigned64 pending assignments or silently transformed old checkpoints. Failed zero-progress jobs require a fresh admitted operator request."
+  },
   "studio_extension": {
     "status": "implementation_candidate_pending_exact_head_verification",
     "request_kind": "studio",

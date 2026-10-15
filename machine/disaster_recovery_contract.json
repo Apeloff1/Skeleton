@@ -84,6 +84,31 @@
       "authority": "authoritative",
       "owner_plane": "reasoning-verification",
       "physical_store": "engine-cognitive-sqlite"
+    },
+    "jeeves-game-learning-workspace": {
+      "authority": "authoritative",
+      "owner_plane": "application-api",
+      "physical_store": "mongo"
+    },
+    "dragon-crawler-application": {
+      "authority": "authoritative",
+      "owner_plane": "application-api",
+      "physical_store": "mongo"
+    },
+    "backend-curiosity-file-state": {
+      "authority": "authoritative",
+      "owner_plane": "feedback-learning",
+      "physical_store": "backend-data-volume"
+    },
+    "dragon-reviewed-design-knowledge": {
+      "authority": "authoritative",
+      "owner_plane": "retrieval",
+      "physical_store": "backend-data-volume"
+    },
+    "dragon-practice-state": {
+      "authority": "authoritative",
+      "owner_plane": "feedback-learning",
+      "physical_store": "backend-data-volume"
     }
   },
   "recovery_units": [
@@ -94,7 +119,9 @@
       "domain_ids": [
         "backend-core-app-state",
         "conversation-message-state",
-        "conversation-thread-state"
+        "conversation-thread-state",
+        "dragon-crawler-application",
+        "jeeves-game-learning-workspace"
       ],
       "backup_policy_store_ids": [],
       "depends_on_units": [],
@@ -370,6 +397,86 @@
         "journal-checksum-chain",
         "operator-selected-workspace",
         "provenance-schema"
+      ]
+    },
+    {
+      "unit_id": "backend-curiosity-files",
+      "strategy": "restore-then-reconcile",
+      "restore_order": 120,
+      "domain_ids": [
+        "backend-curiosity-file-state"
+      ],
+      "backup_policy_store_ids": [],
+      "depends_on_units": [
+        "mongo-backend-core"
+      ],
+      "rto_seconds": 3600,
+      "rpo_seconds": 3600,
+      "required_for_global_traffic": true,
+      "verification_refs": [
+        "backend/core/curiosity_service.py",
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py"
+      ],
+      "post_restore_checks": [
+        "curiosity-ledger-integrity",
+        "no-live-worker-before-restore",
+        "original-file-owner-and-permissions",
+        "restored-complete-curiosity-directory"
+      ]
+    },
+    {
+      "unit_id": "dragon-reviewed-knowledge-files",
+      "strategy": "restore-then-reconcile",
+      "restore_order": 130,
+      "domain_ids": [
+        "dragon-reviewed-design-knowledge"
+      ],
+      "backup_policy_store_ids": [],
+      "depends_on_units": [
+        "backend-curiosity-files",
+        "mongo-backend-core"
+      ],
+      "rto_seconds": 3600,
+      "rpo_seconds": 3600,
+      "required_for_global_traffic": true,
+      "verification_refs": [
+        "backend/core/dragon_runtime.py",
+        "machine/ai_dragon_knowledge_runtime.json",
+        "skeleton/ai/game_builder/reviewed_knowledge.py"
+      ],
+      "post_restore_checks": [
+        "consistent-sqlite-backup-and-owner",
+        "mongo-current-consent-revocation-recheck",
+        "no-missing-database-recreation",
+        "review-revision-and-source-identity"
+      ]
+    },
+    {
+      "unit_id": "dragon-practice-files",
+      "strategy": "restore-then-reconcile",
+      "restore_order": 140,
+      "domain_ids": [
+        "dragon-practice-state"
+      ],
+      "backup_policy_store_ids": [],
+      "depends_on_units": [
+        "dragon-reviewed-knowledge-files",
+        "mongo-backend-core"
+      ],
+      "rto_seconds": 3600,
+      "rpo_seconds": 3600,
+      "required_for_global_traffic": true,
+      "verification_refs": [
+        "backend/core/dragon_reference_practice.py",
+        "machine/ai_dragon_knowledge_runtime.json",
+        "skeleton/ai/webcrawler/dragon_practice_lab.py"
+      ],
+      "post_restore_checks": [
+        "consistent-sqlite-backup-and-owner",
+        "no-premature-new-attempts",
+        "practice-receipt-checkpoint-lineage",
+        "source-withdrawal-fence"
       ]
     }
   ],

@@ -44,8 +44,13 @@ export default function GameStudioScenarioLabPanel({
   const sample = useRef(0);
   const tenantToken = useRef(getAuthToken());
   const owner = useRef(campaign.campaign_id);
+  const mounted = useRef(true);
+  const actions = useRef(new Map<string, AbortController>());
+  const scope = useRef({ campaignId: campaign.campaign_id, editor });
+  scope.current = { campaignId: campaign.campaign_id, editor };
 
   useEffect(() => {
+    mounted.current = true;
     sample.current = 0;
     setWatch(false);
     setViews(null);
@@ -59,7 +64,10 @@ export default function GameStudioScenarioLabPanel({
     setFactorOffset(0);
     owner.current = campaign.campaign_id;
     tenantToken.current = getAuthToken();
-  }, [campaign.campaign_id]);
+    setSales(null); setError(null); setLoading(false);
+    setProbePending(false); setShadowPending(false); setFactorPending(false);
+    return () => { mounted.current = false; actions.current.forEach(request => request.abort()); actions.current.clear(); };
+  }, [campaign.campaign_id, editor]);
 
   useEffect(() => {
     if (!watch) return;
@@ -78,10 +86,9 @@ export default function GameStudioScenarioLabPanel({
         );
         if (closed || token !== getAuthToken() || owner.current !== campaignId) return;
         setViews(result);
-        setError(null);
         sample.current = (sample.current + 1) % 256;
       } catch (issue) {
-        if (!closed && !running.signal.aborted) {
+        if (!closed && !running.signal.aborted && token === getAuthToken() && owner.current === campaignId) {
           setError(issue instanceof Error ? issue.message : 'The sampled simulator views could not be loaded.');
         }
       } finally {
@@ -100,91 +107,36 @@ export default function GameStudioScenarioLabPanel({
     };
   }, [watch, campaign.campaign_id, campaign.status, lanes, steps]);
 
-  const loadDrafts = async () => {
-    setError(null);
-    try {
-      const result = await getStudioScenarioDrafts(campaign.campaign_id);
-      if (owner.current === campaign.campaign_id && tenantToken.current === getAuthToken()) setDrafts(result);
-    } catch (issue) {
-      setError(issue instanceof Error ? issue.message : 'Cannot review scenario draft evidence.');
-    }
+  const action = async <T,>(
+    key: string, execute: (signal: AbortSignal) => Promise<T>, publish: (value: T) => void,
+    fallback: string, pending?: (value: boolean) => void,
+  ) => {
+    if (actions.current.has(key) || !mounted.current || tenantToken.current !== getAuthToken()) return;
+    const request = new AbortController(); const pin = scope.current; const token = getAuthToken();
+    const current = () => mounted.current && !request.signal.aborted && token === getAuthToken()
+      && pin.campaignId === scope.current.campaignId && pin.editor === scope.current.editor;
+    actions.current.set(key, request); pending?.(true); setError(null);
+    try { const value = await execute(request.signal); if (current()) publish(value); }
+    catch (issue) { if (current()) setError(issue instanceof Error ? issue.message : fallback); }
+    finally { if (actions.current.get(key) === request) actions.current.delete(key); if (current()) pending?.(false); }
   };
-  const loadTests = async () => {
-    setError(null);
-    try {
-      const result = await getStudioEngineTestManifest(editor);
-      if (owner.current === campaign.campaign_id && tenantToken.current === getAuthToken()) setTests(result);
-    } catch (issue) {
-      setError(issue instanceof Error ? issue.message : 'Cannot read this engine test plan.');
-    }
-  };
-  const probeEngine = async () => {
-    if (probePending) return;
-    const last = probePages[probePages.length - 1];
-    const offset = last ? last.actions.next_offset : 0;
+  const cancelAction = (key: string) => { actions.current.get(key)?.abort(); actions.current.delete(key); };
+  const loadDrafts = () => action('drafts', signal => getStudioScenarioDrafts(campaign.campaign_id, { signal }), setDrafts, 'Cannot review scenario draft evidence.');
+  const loadTests = () => action('tests', signal => getStudioEngineTestManifest(editor, { signal }), setTests, 'Cannot read this engine test plan.');
+  const probeEngine = () => {
+    const last = probePages[probePages.length - 1]; const offset = last ? last.actions.next_offset : 0;
     if (offset === null) return;
-    setProbePending(true);
-    setError(null);
-    try {
-      const result = await runStudioEngineProbePage(editor, offset);
-      if (owner.current !== campaign.campaign_id || tenantToken.current !== getAuthToken()) return;
-      setProbePages(current => [...current, result]);
-    } catch (issue) {
-      setError(issue instanceof Error ? issue.message : 'The engine action probe failed.');
-    } finally {
-      setProbePending(false);
-    }
+    return action('probe', signal => runStudioEngineProbePage(editor, offset, { signal }),
+      result => setProbePages(current => current.some(page => page.actions.start === result.actions.start) ? current : [...current, result]),
+      'The engine action probe failed.', setProbePending);
   };
-  const loadShadow = async (maxCycles: number) => {
-    if (shadowPending) return;
-    setShadowPending(true);
-    setShadow(null);
-    setError(null);
-    try {
-      const result = await getStudioShadowAudit(
-        campaign.campaign_id, shadowAngle, maxCycles,
-      );
-      if (owner.current !== campaign.campaign_id ||
-          tenantToken.current !== getAuthToken()) return;
-      setShadow(result);
-    } catch (issue) {
-      setError(issue instanceof Error ? issue.message : 'Shadow scrutiny was not verified.');
-    } finally {
-      setShadowPending(false);
-    }
+  const loadShadow = (maxCycles: number) => action('shadow', signal => getStudioShadowAudit(campaign.campaign_id, shadowAngle, maxCycles, { signal }), setShadow, 'Shadow scrutiny was not verified.', setShadowPending);
+  const inspectFactors = (task: 'catalog' | 'plan' | 'execute') => {
+    if (task === 'catalog') return action('factor', signal => getMultifactorCapabilities(campaign.campaign_id, { signal }), setFactors, 'Multi-factor capabilities unavailable.', setFactorPending);
+    if (task === 'plan') return action('factor', signal => getMultifactorPlan(campaign.campaign_id, factorOffset, { signal }), setFactorPlan, 'Multi-factor plan unavailable.', setFactorPending);
+    return action('factor', signal => getMultifactorExperiments(campaign.campaign_id, factorOffset, factorSteps, { signal }), setFactorEvidence, 'Multi-factor simulation evidence unavailable.', setFactorPending);
   };
-  const inspectFactors = async (task: 'catalog' | 'plan' | 'execute') => {
-    if (factorPending) return;
-    setFactorPending(true);
-    setError(null);
-    try {
-      if (task === 'catalog') {
-        const result=await getMultifactorCapabilities(campaign.campaign_id);
-        if (owner.current === campaign.campaign_id && tenantToken.current===getAuthToken()) setFactors(result);
-      } else if (task === 'plan') {
-        const result=await getMultifactorPlan(campaign.campaign_id,factorOffset);
-        if (owner.current === campaign.campaign_id && tenantToken.current===getAuthToken()) setFactorPlan(result);
-      } else {
-        const result=await getMultifactorExperiments(
-          campaign.campaign_id,factorOffset,factorSteps,
-        );
-        if (owner.current === campaign.campaign_id && tenantToken.current===getAuthToken()) setFactorEvidence(result);
-      }
-    } catch (issue) {
-      setError(issue instanceof Error ? issue.message : 'Multi-factor simulation evidence unavailable.');
-    } finally {
-      setFactorPending(false);
-    }
-  };
-  const loadSales = async () => {
-    setError(null);
-    try {
-      const result = await getStudioSalesReferences();
-      if (owner.current === campaign.campaign_id && tenantToken.current === getAuthToken()) setSales(result);
-    } catch (issue) {
-      setError(issue instanceof Error ? issue.message : 'Sales-informed design references unavailable.');
-    }
-  };
+  const loadSales = () => action('sales', signal => getStudioSalesReferences({ signal }), setSales, 'Sales-informed design references unavailable.');
   const button = (label: string, action: () => void, active = false) => (
     <TouchableOpacity
       accessibilityRole="button"
@@ -205,7 +157,7 @@ export default function GameStudioScenarioLabPanel({
         temporal, causal, perturbation and recovery. Each run undergoes ten scrutiny checks
         and produces ten source-derived numeric analysis bands.
         The concurrent views below execute real source-bound reference simulations while Jeeves trains,
-        but they are spectator samples, not the actual learner's episode frames or a native GPU renderer.
+        but they are spectator samples, not the actual learner’s episode frames or a native GPU renderer.
       </Text>
       <View style={group}>
         {button(watch ? 'Stop spectator lanes' : 'Watch parallel simulations', () => setWatch(current => !current), watch)}
@@ -285,14 +237,14 @@ export default function GameStudioScenarioLabPanel({
           {button('Design triple interactions', () => { void inspectFactors('plan'); })}
           {[2,4].map(value => <React.Fragment key={value}>
             {button(value+' source steps', () => {
-              setFactorSteps(value);setFactorEvidence(null);
+              cancelAction('factor'); setFactorPending(false); setFactorSteps(value);setFactorEvidence(null);
             },factorSteps===value)}
           </React.Fragment>)}
           {button(factorPending ? 'Replaying factor worlds…' : 'Run two audited factor worlds',
             () => { void inspectFactors('execute'); })}
           {button('Next factor bank', () => {
             if (!factors || !factors.total_executable_axes) return;
-            setFactorOffset(current => (current+8<factors.total_executable_axes ? current+8 : 0));
+            cancelAction('factor'); setFactorPending(false); setFactorOffset(current => (current+8<factors.total_executable_axes ? current+8 : 0));
             setFactorPlan(null);setFactorEvidence(null);
           })}
         </View>
@@ -427,7 +379,7 @@ export default function GameStudioScenarioLabPanel({
           {['explore','progress','safety','economy','adversary','boundary',
             'temporal','causal','perturbation','recovery'].map(value =>
             <React.Fragment key={value}>
-              {button(value, () => { setShadowAngle(value); setShadow(null); }, shadowAngle === value)}
+              {button(value, () => { cancelAction('shadow'); setShadowPending(false); setShadowAngle(value); setShadow(null); }, shadowAngle === value)}
             </React.Fragment>)}
         </View>
         <View style={group}>

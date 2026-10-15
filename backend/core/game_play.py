@@ -49,20 +49,31 @@ def _error(code, message, status=409):
 def resource_profiles():
     cpus = os.cpu_count() or 1
     effective = cpus
+    affinity = getattr(os, "sched_getaffinity", None)
+    if callable(affinity):
+        try:
+            effective = min(effective, max(1, len(affinity(0))))
+        except OSError:
+            pass
     memory = None
     try:
         fields = Path("/sys/fs/cgroup/cpu.max").read_text().split()
         if fields[0] != "max":
-            effective = min(cpus, max(1, math.ceil(int(fields[0]) / int(fields[1]))))
+            effective = min(effective, max(1, int(fields[0]) // int(fields[1])))
         raw = Path("/sys/fs/cgroup/memory.max").read_text().strip()
         if raw != "max":
             memory = int(raw)
     except (OSError, ValueError, IndexError, ZeroDivisionError):
         pass
-    actors = min(8, max(1, effective - 1))
+    # Reserve512MiB for the application when a memory quota
+    # exists, then partition one physical-instance budget between both owners.
+    capacity = effective
     if memory is not None:
-        actors = min(actors, max(1, memory // (512 * 1024 * 1024) - 1))
-    return {
+        capacity = min(capacity, max(0, (memory - 512 * 1024 * 1024) // (2 * 1024**3)))
+    actors = min(8, max(1, capacity - 1)) if capacity else 0
+    live = min(4, max(1, capacity - actors)) if capacity else 0
+    shared = capacity == 1
+    result = {
         "profiles": [
             {
                 "profile_id": "cpu",
@@ -71,12 +82,50 @@ def resource_profiles():
                 "effective_cpu_count": effective,
                 "memory_limit_bytes": memory,
                 "max_training_workers": actors,
-                "max_live_plays": min(4, max(1, effective)),
+                "max_live_plays": live,
+                "available": capacity > 0,
+                "readiness": {
+                    "code": ("cpu_memory_ready" if capacity else "native_memory_capacity_unavailable"),
+                    "message": (
+                        "Native-compatible CPU/memory admission is available"
+                        if capacity
+                        else "At least2GiB per native instance plus512MiB application reserve is required"
+                    ),
+                },
+                "combined_instance_capacity": min(capacity, actors + live),
+                "shared_single_capacity": shared,
+                "global_actor_safety_ceiling": 8,
+                "instance_memory_allowance_bytes": 2 * 1024**3,
+                "capacity_scope": "Observed CPU/quota and conservative memory admission; no strict cgroup or FPS guarantee",
             }
         ],
         "gpu_available": False,
-        "interactive_capacity_reserved": True,
+        "interactive_capacity_reserved": capacity > 1,
     }
+    balanced = result["profiles"][0]
+    actor_credits = ["game-learning-actor:" + str(index) for index in range(actors)]
+    balanced["training_credit_ids"] = actor_credits
+    balanced["interactive_capacity_reserved"] = capacity > 1
+    # Borrow the SAME live-play credits when the operator explicitly selects
+    # throughput. Inventing actor:N slots here would overbook a running player.
+    borrowed = [] if shared else ["game-learning-play:" + str(index) for index in range(live)]
+    throughput_credits = (actor_credits + borrowed)[: min(8, balanced["combined_instance_capacity"])]
+    if len(throughput_credits) > actors:
+        result["profiles"].append(
+            {
+                **balanced,
+                "profile_id": "cpu_throughput",
+                "label": "Training throughput — borrow idle play slots",
+                "max_training_workers": len(throughput_credits),
+                "training_credit_ids": throughput_credits,
+                "interactive_capacity_reserved": False,
+                "readiness": {
+                    **balanced["readiness"],
+                    "message": "Uses existing CPU/memory credits including idle play slots. Active human play retains its credit; new live play may wait for training to finish.",
+                },
+            }
+        )
+    return result
 
 
 def _worker(request, options, commands, outputs, stopped):
@@ -103,8 +152,14 @@ def _worker(request, options, commands, outputs, stopped):
         if os.name == "posix":
             os.setsid()
         resource.setrlimit(resource.RLIMIT_NOFILE, (128, 128))
-        resource.setrlimit(resource.RLIMIT_CPU, (900, 900))
-        resource.setrlimit(resource.RLIMIT_AS, (1536 * 1024 * 1024, 1536 * 1024 * 1024))
+        native = isinstance(request, dict) and request.get("kind") == "libretro"
+        # Keep supervisor soft bounds, while allowing the existing isolated
+        # native worker to apply its own declared hard limits after exec.
+        resource.setrlimit(resource.RLIMIT_CPU, (900, 3600 if native else 900))
+        resource.setrlimit(
+            resource.RLIMIT_AS,
+            (1536 * 1024 * 1024, (2048 if native else 1536) * 1024 * 1024),
+        )
     except (ImportError, OSError, ValueError):
         pass
     from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
@@ -394,11 +449,18 @@ def _worker(request, options, commands, outputs, stopped):
         checkpoint()
         emit("terminal", {"state": "stopped", "steps": steps, "reward": reward, "observation": observation})
     except BaseException as exc:
+        code = getattr(exc, "code", None)
+        if (
+            not isinstance(code, str)
+            or not 1 <= len(code) <= 80
+            or any(character not in "abcdefghijklmnopqrstuvwxyz0123456789_" for character in code)
+        ):
+            code = "play_worker_rejected"
         try:
             outputs.put(
                 {
                     "kind": "failed",
-                    "payload": {"code": "play_worker_rejected", "error_type": type(exc).__name__},
+                    "payload": {"code": code, "error_type": type(exc).__name__},
                 },
                 timeout=1,
             )
@@ -512,6 +574,10 @@ class GamePlayAuthority:
                 raise _error("idempotency_conflict", "Play key binds different controls.")
             await self._schedule(identifier, scope)
             return self.public(previous)
+        if not resource_profiles()["profiles"][0]["available"]:
+            raise _error(
+                "play_capacity", "Current CPU/memory budget cannot admit a native-compatible instance.", 429
+            )
         binding = await self.workspace._input(
             scope, project, source_id=body.get("source_id"), episode_steps=body.get("max_steps", 4096)
         )
@@ -1027,8 +1093,27 @@ class GamePlayAuthority:
 
     async def _run(self, identifier, scope):
         token, slot = str(uuid4()), None
-        for index in range(resource_profiles()["profiles"][0]["max_live_plays"]):
-            candidate = "game-learning-play:" + str(index)
+        profile = resource_profiles()["profiles"][0]
+        candidates = (
+            ["game-learning-actor:0"]
+            if profile["shared_single_capacity"]
+            else ["game-learning-play:" + str(index) for index in range(profile["max_live_plays"])]
+        )
+        allowed = candidates + [
+            "game-learning-actor:" + str(index) for index in range(profile["max_training_workers"])
+        ]
+        # Old larger deployments may still be draining a native process. Do
+        # not add another human instance while its historical credit is live.
+        legacy = await self.workers.find_one(
+            {
+                "_id": {"$regex": r"^game-learning-(actor|play):[0-9]+$", "$nin": allowed},
+                "worker_token": {"$exists": True},
+                "lease_until": {"$gt": _now()},
+            }
+        )
+        if legacy is not None:
+            return
+        for candidate in candidates:
             await self.workers.update_one(
                 {"_id": candidate},
                 {"$setOnInsert": {"lease_until": datetime(1970, 1, 1, tzinfo=timezone.utc)}},
@@ -1041,7 +1126,9 @@ class GamePlayAuthority:
                         "worker_token": token,
                         "play_id": identifier,
                         "lease_until": _now() + timedelta(seconds=30),
-                    }
+                        "credit_kind": "native_play",
+                    },
+                    "$unset": {"job_id": ""},
                 },
                 return_document=ReturnDocument.AFTER,
             )
@@ -1097,8 +1184,10 @@ class GamePlayAuthority:
                     else None
                 ),
             )
+            options = self.workspace._stored_evidence(options)
+            runtime_request = self.workspace._stored_evidence(row["request"])
             process = ctx.Process(
-                target=_worker, args=(row["request"], options, commands, outputs, stopped), daemon=True
+                target=_worker, args=(runtime_request, options, commands, outputs, stopped), daemon=True
             )
             process.start()
             self.stops[identifier], self.commands[identifier] = stopped, commands
@@ -1293,11 +1382,17 @@ class GamePlayAuthority:
                 if time.monotonic() - last_lease > 1 and not terminal:
                     await self.workspace._authority(scope, row["input"])
                     lease = await self.plays.update_one(
-                        {"_id": identifier, **scope, "worker_token": token, "_input_fenced": {"$ne": True}},
+                        {
+                            "_id": identifier,
+                            **scope,
+                            "worker_token": token,
+                            "_input_fenced": {"$ne": True},
+                            "lease_until": {"$gt": _now()},
+                        },
                         {"$set": {"lease_until": _now() + timedelta(seconds=30)}},
                     )
                     slot_live = await self.workers.update_one(
-                        {"_id": slot, "worker_token": token},
+                        {"_id": slot, "worker_token": token, "lease_until": {"$gt": _now()}},
                         {"$set": {"lease_until": _now() + timedelta(seconds=30)}},
                     )
                     if not lease.modified_count or not slot_live.modified_count:
@@ -1384,5 +1479,8 @@ class GamePlayAuthority:
             self.commands.pop(identifier, None)
             await self.workers.update_one(
                 {"_id": slot, "worker_token": token},
-                {"$set": {"lease_until": _now()}, "$unset": {"worker_token": "", "play_id": ""}},
+                {
+                    "$set": {"lease_until": _now()},
+                    "$unset": {"worker_token": "", "play_id": "", "credit_kind": ""},
+                },
             )

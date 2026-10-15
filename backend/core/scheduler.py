@@ -70,6 +70,13 @@ async def studio_campaign_recovery():
     return await _safe("studio_campaign_recovery", recover())
 
 
+async def crawler_recovery():
+    """Consume explicit finite crawler grants through the existing scheduler."""
+    from core.dragon_crawler import recover_crawler_runs
+
+    return await _safe("crawler_recovery", recover_crawler_runs(limit=16))
+
+
 async def idle_augment():
     """If Jeeves has been idle > 4h, SPEND the whole free-tier budget augmenting
     his knowledge — run online-learning sweeps whose accepted sheets queue for
@@ -123,6 +130,9 @@ def start_scheduler() -> bool:
     sch.add_job(studio_campaign_recovery, "interval", seconds=30, id="studio_campaign_recovery",
                 next_run_time=datetime.now(timezone.utc), max_instances=1, coalesce=True,
                 misfire_grace_time=30)
+    sch.add_job(crawler_recovery, "interval", seconds=10, id="crawler_recovery",
+                next_run_time=datetime.now(timezone.utc), max_instances=1, coalesce=True,
+                misfire_grace_time=10)
     try:
         sch.start()
     except Exception:  # noqa: BLE001
@@ -140,7 +150,8 @@ def scheduler_status() -> Dict:
 
 async def run_job_now(job_id: str) -> Dict:
     """Manually trigger a scheduled job (for demos / ops)."""
-    mapping = {"studio_campaign_recovery": studio_campaign_recovery,
+    mapping = {"crawler_recovery": crawler_recovery,
+               "studio_campaign_recovery": studio_campaign_recovery,
                "lafs_online_sweep": lafs_online_sweep,
                "legion_drill": legion_drill,
                "fabric_snapshot": fabric_snapshot,

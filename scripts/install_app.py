@@ -7,8 +7,9 @@ sys.path and delegating to the canonical application CLI.
 
 from __future__ import annotations
 
-from pathlib import Path
+import os
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -18,6 +19,7 @@ from skeleton.app.cli import run_app_cli
 
 
 def main() -> int:
+    os.chdir(ROOT)
     return run_app_cli(["install", *sys.argv[1:]])
 
 

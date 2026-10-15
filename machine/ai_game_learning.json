@@ -86,6 +86,9 @@
     "studio_agent_client": "frontend/src/product/gameStudioAgentClient.ts",
     "studio_recovery_scheduler": "backend/core/scheduler.py",
     "studio_review_product": "frontend/features/Jeeves/GameStudioReviewPanel.tsx",
+    "studio_readiness_application": "backend/core/game_studio_health.py",
+    "studio_readiness_api": "backend/routes/game_studio_health.py",
+    "studio_readiness_product": "frontend/features/Jeeves/GameStudioReadinessPanel.tsx",
     "studio_reference_adapter": "skeleton/jeeves/game_studio_environment.py",
     "studio_policy_training_cli": "skeleton/jeeves/game_studio_policy_cli.py",
     "studio_editor_runtime": "skeleton/ai/game_builder/advanced_gameplay_runtime.py"
@@ -207,6 +210,15 @@
     "automated_tests_authorized": false
   },
   "advanced_work_report": "docs/plan/JEEVES_STUDIO_ADVANCED_2026-10-14.md",
+  "continued_studio_pass_2": {
+    "started_utc": "2026-10-14T07:52:51Z",
+    "scope": "Actualstudioactivation, nativegraphport/nativeobservations, compositionallearner andscoped appassistant recovery",
+    "automated_tests_run": false,
+    "production_promotion": false,
+    "masterplan_closure": false,
+    "report": "docs/plan/JEEVES_STUDIO_RUNTIME_2026-10-14.md",
+    "evidence": "machine/ai_game_studio_session_evidence_2026-10-14.json#runtime_continuation"
+  },
   "studio_engine_environment_extension": {
     "status": "implementation_candidate_pending_exact_head_verification",
     "app_owner": "backend/core/game_learning.py",
@@ -218,7 +230,8 @@
       "API/frontend access depends on project authoring support and exact-head execution validation",
       "No native hardware pixels from authoring-only engines",
       "No automatic live production transformer weight updates"
-    ]
+    ],
+    "legacy_source_precedence": "An existing successor spec remains the active authored runtime when its retained inactive console editor document is also present. New studio roots cannot compete with successor/editor/generated authoritative sources; authored plus generated root collisions remain rejected."
   },
   "studio_engine_corpus_training": {
     "status": "implemented_pending_exact_head_verification",
