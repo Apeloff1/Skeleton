@@ -15,7 +15,8 @@ from scripts.audit_original_gameboy_cpu_opcodes import _cartridge
 from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
 from skeleton.jeeves.game_emulator_cross_game_lab import (
     CrossGameConfig, CrossGameComparisonError, _validate,
-    compare_real_emulator_games,
+    compare_real_emulator_games, verify_cross_game_comparison_receipt,
+    _digest,
 )
 from skeleton.jeeves.game_rom_runtime import GameBoyROMEnvironment
 
@@ -67,6 +68,37 @@ class ControlledSourceMultiGameExperiments(unittest.TestCase):
                 for transition in phase["controlled_source_step_receipts"]:
                     self.assertEqual(len(transition["measured_source_projection_sha256"]), 64)
                     self.assertIsNone(transition["declared_native_transition_sha256"])
+
+    def test_rehashed_fake_frame_and_pairwise_metrics_cannot_pass_source_gate(self):
+        real = compare_real_emulator_games(
+            [approved_request(1), approved_request(2)],
+            PROGRAMS, rights_acknowledged=True,
+        )
+        self.assertTrue(verify_cross_game_comparison_receipt(real)["accepted"])
+        cases = (
+            ("reported_frame_change", lambda item:
+                item["game_receipts"][0]["controller_programs"][0].__setitem__(
+                    "actual_frame_change_events", 1
+                )),
+            ("changed_action_order", lambda item:
+                item["game_receipts"][0]["controller_programs"][2][
+                    "controlled_source_step_receipts"][0].__setitem__("action", "b")),
+            ("invented_pairwise_difference", lambda item:
+                item["pairwise_measured_evidence"][0].__setitem__(
+                    "visual_event_rate_differences", [1.0] * len(PROGRAMS)
+                )),
+            ("invented_neural_learning", lambda item:
+                item.__setitem__("ai_training_gradient_updates", 99)),
+        )
+        for label, change in cases:
+            with self.subTest(label=label):
+                forged = copy.deepcopy(real)
+                change(forged)
+                forged["report_digest"] = _digest({
+                    k: v for k, v in forged.items() if k != "report_digest"
+                })
+                with self.assertRaises(CrossGameComparisonError):
+                    verify_cross_game_comparison_receipt(forged)
 
     def test_three_owned_ROM_variants_keep_source_identities_and_waves_separate(self):
         report = compare_real_emulator_games(
