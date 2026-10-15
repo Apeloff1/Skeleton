@@ -2,7 +2,7 @@
 """Reject unsafe *new* repository filenames and ambiguous checkout paths.
 
 Validates the entire prospective Git tree for case/Unicode collisions, while
-grandfathering pre-existing long historical snapshot paths. Do not rename or
+grandfathering unchanged historical paths and collisions. New aliases are blocked. Do not rename or
 delete archived evidence simply to satisfy a new-file hygiene check.
 """
 
@@ -18,11 +18,11 @@ import unicodedata
 MAX_NEW_PATH_LENGTH = 240
 MAX_COMPONENT_BYTES = 240
 INVALID_WINDOWS_CHARACTERS = re.compile(r'[<>:"\\|?*\x00-\x1f]')
-RESERVED_WINDOWS_NAMES = re.compile(r"^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$", re.I)
+RESERVED_WINDOWS_NAMES = re.compile(r"^(?:CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[1-9¹²³]|LPT[1-9¹²³])(?:\..*)?$", re.I)
 
 
 def _identity(part: str) -> str:
-    return unicodedata.normalize("NFC", unicodedata.normalize("NFC", part).casefold())
+    return unicodedata.normalize("NFC", part.casefold())
 
 
 def tree_paths(ref: str) -> set[str]:
@@ -47,8 +47,8 @@ def unsafe_filename(path: str) -> list[str]:
         path.encode("utf-8", errors="strict")
     except UnicodeEncodeError:
         return [f"{path!r}: path is not valid UTF-8"]
-    if not path or len(path) > MAX_NEW_PATH_LENGTH:
-        errors.append(f"{path!r}: exceeds {MAX_NEW_PATH_LENGTH} character portable path limit")
+    if not path or len(path.encode("utf-16-le")) // 2 > MAX_NEW_PATH_LENGTH:
+        errors.append(f"{path!r}: exceeds {MAX_NEW_PATH_LENGTH} Windows UTF-16 code-unit portable path limit")
     for component in path.split("/"):
         if not component or component in {".", ".."}:
             errors.append(f"{path!r}: empty or relative path component")
@@ -64,29 +64,50 @@ def unsafe_filename(path: str) -> list[str]:
     return errors
 
 
+def _collisions(paths: set[str]) -> dict[tuple[str, ...], frozenset[tuple[str, str]]]:
+    """Find ambiguous files AND directory prefixes, not only leaf filenames."""
+    nodes: dict[tuple[str, ...], tuple[str, str]] = {}
+    conflicts: dict[tuple[str, ...], set[tuple[str, str]]] = {}
+    for path in sorted(paths):
+        components = path.split("/")
+        normalized = tuple(_identity(component) for component in components)
+        for index in range(1, len(components) + 1):
+            identity = normalized[:index]
+            entry = ("/".join(components[:index]), "file" if index == len(components) else "directory")
+            existing = nodes.setdefault(identity, entry)
+            if existing != entry:
+                conflicts.setdefault(identity, {existing}).add(entry)
+    return {identity: frozenset(aliases) for identity, aliases in conflicts.items()}
+
+
 def check_paths(previous: set[str], current: set[str]) -> list[str]:
-    """Check new paths plus every full-tree normalized path and ancestor."""
+    """Reject new unsafe paths while allowing unchanged historical collisions."""
     errors: set[str] = set()
-    for path in current - previous:
+    added = current - previous
+    for path in added:
         errors.update(unsafe_filename(path))
 
-    # Detect case-only and Unicode-equivalent *directory* collisions too:
-    # Foo/a.py vs foo/b.py is unsafe even though no leaf names are equal.
-    nodes: dict[tuple[str, ...], tuple[str, str]] = {}
-    for path in sorted(current):
-        components = path.split("/")
-        for index in range(1, len(components) + 1):
-            prefix = "/".join(components[:index])
-            identity = tuple(_identity(p) for p in components[:index])
-            kind = "file" if index == len(components) else "directory"
-            existing = nodes.get(identity)
-            if existing is None:
-                nodes[identity] = (prefix, kind)
-            elif existing != (prefix, kind):
-                errors.add(
-                    "case/Unicode filename collision: "
-                    f"{existing[0]!r} ({existing[1]}) versus {prefix!r} ({kind})"
-                )
+    # The repository contains legacy snapshot trees with UI/ and ui/ prefixes.
+    # Checking *all* current collisions without comparing the base would make
+    # every unrelated PR fail. Never allow new aliases or paths into these
+    # pre-existing ambiguous trees, however.
+    old_collisions = _collisions(previous)
+    new_collisions = _collisions(current)
+    for identity, aliases in new_collisions.items():
+        introduced = aliases - old_collisions.get(identity, frozenset())
+        if introduced:
+            paths = ", ".join(repr(prefix) + " (" + kind + ")" for prefix, kind in sorted(aliases))
+            errors.add("case/Unicode filename collision: " + paths)
+
+    ambiguous_prefixes = {
+        prefix
+        for aliases in new_collisions.values()
+        for prefix, _kind in aliases
+    }
+    for path in added:
+        if any(path == prefix or path.startswith(prefix + "/") for prefix in ambiguous_prefixes):
+            errors.add(f"{path!r}: newly introduced path lies inside an ambiguous case/Unicode directory")
+
     return sorted(errors)
 
 
