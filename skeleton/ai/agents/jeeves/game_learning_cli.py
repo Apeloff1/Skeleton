@@ -322,6 +322,53 @@ def _evaluate(args) -> dict[str, Any]:
     }
 
 
+def _fit_emulator_world_model(args) -> dict[str, Any]:
+    from .game_emulator_neural_world import (
+        NeuralWorldConfig,
+        train_neural_world_from_evidence,
+    )
+
+    if args.model_file.exists() or args.training_report_file.exists():
+        raise FileExistsError("Neural-world outputs must be new, not overwrite a previous checkpoint")
+    paths = [
+        args.policy_file.resolve(strict=False),
+        args.evidence_file.resolve(strict=False),
+        args.model_file.resolve(strict=False),
+        args.training_report_file.resolve(strict=False),
+    ]
+    if len(set(paths)) != len(paths):
+        raise ValueError("Neural training source and destination paths must be distinct")
+    policy = _json_read(args.policy_file)
+    evidence = _json_read(args.evidence_file)
+    model, report = train_neural_world_from_evidence(
+        evidence, policy,
+        config=NeuralWorldConfig(
+            seed=args.seed,
+            width=args.width,
+            epochs=args.epochs,
+            minibatch=args.minibatch,
+            learning_rate=args.learning_rate,
+            weight_decay=args.weight_decay,
+            clip_gradient=args.clip_gradient,
+            max_samples=args.max_samples,
+            min_relative_holdout_gain=args.min_relative_holdout_gain,
+        ),
+    )
+    _write_json(args.model_file, model, replace=False)
+    _write_json(args.training_report_file, report, replace=False)
+    return {
+        "status": report["candidate_status"],
+        "candidate_model_file": str(args.model_file),
+        "training_report_file": str(args.training_report_file),
+        "candidate_model_sha256": model["model_digest"],
+        "actual_neural_optimizer_steps": model["real_optimizer_steps"],
+        "actual_gradient_evaluations": model["gradient_evaluations"],
+        "heldout_relative_improvement": report["relative_reduction_vs_mean_baseline"],
+        "jeeves_production_weight_updates": 0,
+        "production_model_promotion": False,
+    }
+
+
 def _cross_core_comparison(args) -> dict[str, Any]:
     from .game_emulator_cross_core_lab import CrossCoreConfig, compare_real_emulator_cores
 
@@ -460,6 +507,10 @@ def _deep_emulator(args) -> dict[str, Any]:
     )
     _write_json(args.policy_file, result["policy_snapshot"], replace=False)
     evidence = {key: value for key, value in result.items() if key != "policy_snapshot"}
+    evidence["policy_snapshot_digest"] = result["policy_snapshot"]["snapshot_digest"]
+    evidence["evidence_digest"] = hashlib.sha256(
+        json.dumps(evidence, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    ).hexdigest()
     _write_json(args.evidence_file, evidence, replace=False)
     return {
         "status": result["status"],
@@ -510,6 +561,24 @@ def parser() -> argparse.ArgumentParser:
 
 
 
+
+    world = commands.add_parser(
+        "fit-emulator-world-model",
+        help="Perform REAL bounded neural optimizer steps on verified ROM traces; never promote Jeeves weights",
+    )
+    world.add_argument("--policy-file", type=Path, required=True)
+    world.add_argument("--evidence-file", type=Path, required=True)
+    world.add_argument("--model-file", type=Path, required=True)
+    world.add_argument("--training-report-file", type=Path, required=True)
+    world.add_argument("--seed", type=int, default=0)
+    world.add_argument("--width", type=int, default=20)
+    world.add_argument("--epochs", type=int, default=8)
+    world.add_argument("--minibatch", type=int, default=16)
+    world.add_argument("--learning-rate", type=float, default=0.003)
+    world.add_argument("--weight-decay", type=float, default=0.0001)
+    world.add_argument("--clip-gradient", type=float, default=3.0)
+    world.add_argument("--max-samples", type=int, default=2048)
+    world.add_argument("--min-relative-holdout-gain", type=float, default=0.01)
     cross = commands.add_parser(
         "compare-emulator-cores",
         help="Execute the same owned ROM and exact controls on 2-4 approved libretro cores",
@@ -621,6 +690,8 @@ def main(argv: list[str] | None = None) -> int:
             result = _emulator_experiment(args)
         elif args.command == "compare-emulator-cores":
             result = _cross_core_comparison(args)
+        elif args.command == "fit-emulator-world-model":
+            result = _fit_emulator_world_model(args)
         else:
             result = _native(args)
         print(json.dumps(result, sort_keys=True, allow_nan=False))
