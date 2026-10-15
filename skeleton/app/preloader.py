@@ -176,6 +176,19 @@ def inspect_host(
                 runner=runner,
             )
         )
+        # Compose can render configuration while Docker Desktop is stopped.
+        # Confirm that the daemon is accepting connections before claiming the
+        # first-install host is ready. This step does not mutate Docker state.
+        checks.append(
+            _command_check(
+                [docker, "info", "--format", "{{.ServerVersion}}"],
+                code="host:docker-daemon",
+                label="Docker daemon",
+                remediation="Start Docker Desktop and wait for the engine to finish starting.",
+                runner=runner,
+                timeout=15.0,
+            )
+        )
 
     usage = shutil.disk_usage(root)
     checks.append(
