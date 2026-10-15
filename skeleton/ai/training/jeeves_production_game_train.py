@@ -306,6 +306,11 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             "architecture": "torch-stack" if torch_stack else "TinyTransformer",
             "expected_optimizer_updates": expected_steps,
             "batch_size": 8,
+            "trainer_code_sha256": sha256(Path(__file__).read_bytes()).hexdigest(),
+            "native_or_torch_kernel_sha256": sha256((
+                Path(__file__).parents[2] / "cortex" /
+                ("torch_lm.py" if torch_stack else "transformer.py")
+            ).read_bytes()).hexdigest(),
         }, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
             allow_nan=False).encode("utf-8")).hexdigest()
         progress = CandidateProgress(
@@ -318,6 +323,15 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         if restored is None:
             progress.write(0, model.snapshot())
         else:
+            # A stage with a valid local digest can still have been assembled
+            # from unrelated tensors. Stage zero must equal the same
+            # production-derived, optionally BPE-grown baseline re-created
+            # from the attested parent, before loading any resumed weights.
+            expected_initial = model.snapshot()
+            if progress.initial_snapshot() != expected_initial:
+                raise ProductionCheckpointError(
+                    "optimizer stage zero differs from reconstructed production-derived baseline"
+                )
             start_batch, state = restored
             resumed_snapshot = state["snapshot"]
             # The resumable architecture and token IDs must match the exact
