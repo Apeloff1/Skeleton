@@ -39,7 +39,8 @@
     "python scripts/audit_original_gameboy_alu_flags.py",
     "python scripts/audit_original_gameboy_interrupts.py",
     "python scripts/audit_game_emulator_disc_first_boot.py",
-    "python scripts/audit_original_gameboy_bus_arbitration.py"
+    "python scripts/audit_original_gameboy_bus_arbitration.py",
+    "python scripts/audit_original_gameboy_serial_port.py"
   ],
   "experimental_conditions": [
     "passive neutral",
@@ -143,7 +144,9 @@
     "skeleton/testing/test_game_original_cpu_conformance.py",
     "skeleton/testing/test_game_original_cpu_interrupts.py",
     "skeleton/testing/test_game_emulator_disc_first_boot.py",
-    "skeleton/testing/test_game_original_cpu_bus_arbitration.py"
+    "skeleton/testing/test_game_original_cpu_bus_arbitration.py",
+    "skeleton/testing/test_game_rom_serial_port.py",
+    "skeleton/testing/test_game_original_serial_source_acceptance.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -342,7 +345,8 @@
       "artifact content integrity and report custody validation",
       "real source OAM DMA clocked-byte/scanline test with mid-transfer rewind custody",
       "seven bounded repeated original-ROM CPU controller branches, including three multi-action temporal schedules with exact physical source input ledger",
-      "21 CPU-access isolation checks across HRAM, OAM DMA, VRAM/OAM PPU modes and same-source savestate"
+      "21 CPU-access isolation checks across HRAM, OAM DMA, VRAM/OAM PPU modes and same-source savestate",
+      "original CPU instruction-driven FF01/FF02 serial 8192Hz internal/external clock source replay and IF interrupt"
     ],
     "failure": "nonzero subprocess and phase_*.json status, absence of suite-acceptance.json",
     "production_model_promotion": false,
@@ -642,5 +646,30 @@
     ],
     "actual_acceptance_executed_during_authoring": false,
     "production_weights_updated": 0
+  },
+  "dmg_serial_source_clock": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "operator": "python scripts/audit_original_gameboy_serial_port.py",
+    "actual_cpu_source": "original homebrew cartridge CPU executes writes to SB FF01 and SC FF02",
+    "internal_clock_hz": 8192,
+    "cpu_tcycles_per_bit": 512,
+    "bits_per_byte": 8,
+    "hardware_cycles_per_complete_byte": 4096,
+    "peer": "none, input line idles high; disconnected transfer receives FF",
+    "external_clock": "pending without invented serial edges or interrupt",
+    "source_irq": "request IF serial bit3 once on real internal byte completion",
+    "snapshot": "serial_active, serial_bits, serial_phase, raw SB/SC/IF state",
+    "stop_halt": "STOP freezes internal serial oscillator; HALT continues it",
+    "source_instruction_microtraces": "serial SB/SC, real bit progress, IF and source-register clock phases",
+    "source_regressions": [
+      "skeleton/testing/test_game_rom_serial_port.py",
+      "skeleton/testing/test_game_original_serial_source_acceptance.py"
+    ],
+    "manual_acceptance": "scripts/run_game_rom_acceptance_suite.py requires two actual source CPU program and exact snapshot replay receipts",
+    "interconsole_link_peer_implemented": false,
+    "CGB_high_speed_serial_implemented": false,
+    "actual_local_execution_during_authoring": false,
+    "production_model_weights_updated": 0
   }
 }
