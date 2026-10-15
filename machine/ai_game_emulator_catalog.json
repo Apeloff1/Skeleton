@@ -84,7 +84,7 @@
     "emulator_content_extensions"
   ],
   "failure": "Unknown target, unmapped/absent/unapproved core, malformed manifest, changed SHA/scope, wrong architecture, missing ABI/firmware, unsafe filename/descriptor, exhausted bounds and missing disc dependency fail explicitly. Modern/closed systems remain unavailable unless a declared adapter exists; the target count never implies emulator availability.",
-  "qualification": "NO TESTS user instruction persists. Static compile/lint/source review only. Actual core compilation/installation and later gameplay are separate operator/product work; no universal commercial-ROM or production-model qualification claim.",
+  "qualification": "NO TESTS historical qualification applies to the 2026-10-14 wave. The 2026-10-15 recipe expansion is source-only: native binary compilation, external firmware acquisition and actual gameplay have not occurred in this change. Execution and promotion must remain fail-closed until individually evidenced.",
   "production_promotion_authorized": false,
   "dependencies": [
     "skeleton/ai/webcrawler/dragon_native_targets.py",
@@ -127,7 +127,17 @@
     "parallel_n64": "a8280501a71c1bcd4c85c5b8bfe75cfa62cd6127",
     "fbneo": "abe41e850b515c4ffc4dca054d1d61b828e9200c",
     "ppsspp": "e26225c99b401f259a670e45d25be4f4615bdbc5",
-    "flycast": "6b41116a315bc372d6f813439e1bd04a57718b1c"
+    "flycast": "6b41116a315bc372d6f813439e1bd04a57718b1c",
+    "a5200": "40c6f2f1ad4a3145b328d5baaf010fae6c7e752b",
+    "mupen64plus_next": "12edd2c74a517ff86dfa8cfc71ad75e4c10486d5",
+    "nestopia": "06a8949e0b3cf60e3a38a374b1426bf40fccb9a0",
+    "mesen": "0102910c39ad1a62bc3f784466f3f67ca9eae335",
+    "vba_next": "788192f215ad0a1413f1625b40ebba3423fa0ade",
+    "fmsx": "4de11755ce4f196ac1c8a7bb20bb4eccbc87a7d4",
+    "bluemsx": "e3086eb5d36d77fa11704cf53dc176686e70127d",
+    "px68k": "0ad84d7058a12b7db4f7f7a906e87fad4e2f26f6",
+    "vice_x64": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "vice_x64sc": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
   },
   "two_hour_expansion": {
     "started_utc": "2026-10-14T04:39:16Z",
@@ -263,7 +273,7 @@
     "system_assets": "Only public artifacts already in the exact pinned source tree may be copied under an explicit recipe, bounded1024 files/64MiB and immutable exact SHA256. Retained upstream licenses do not grant ROM or commercial-use rights.",
     "operator_dependencies": "Build-only header paths and OpenGL library paths may be supplied explicitly through the local CLI. Installed dependency bytes are observed and recorded; the command does not fetch/install dependencies or enable hardware rendering. Actual isolated runtime admission remains separate.",
     "inactive_gpu_scope": "Flycast can be compiled/inspected under an exact pinned recipe but is registered approved:false because the isolated host has no approved hardware rendering context. Compilation does not imply Dreamcast gameplay availability.",
-    "core_recipe_count": 35,
+    "core_recipe_count": 45,
     "default_bootstrap_cores": [
       "gambatte",
       "fceumm",
@@ -281,7 +291,38 @@
       "license_bytes": 8388608
     },
     "license_aliases": "An upstream license symlink may be resolved only to a nonsymlink regular file inside the exact pinned source root. Copy its actual text under an immutable regular destination and record the source alias/target; external targets and unsafe installed-library paths remain rejected.",
-    "bootstrap_pins_count": 35,
-    "static_compilation_scope": "34 ELF libretro core libraries built locally at this wave end, including28 additional.29 operator-approved mappings cover46 canonical hardware targets; 4 firmware-missing candidates and1 hardware-rendering candidate remain inactive. No automated tests or actual game compatibility verification. Local artifact evidence is separate from portable checked-in source."
+    "bootstrap_pins_count": 45,
+    "static_compilation_scope": "34 ELF libretro core libraries built locally at this wave end, including28 additional.29 operator-approved mappings cover46 canonical hardware targets; 4 firmware-missing candidates and1 hardware-rendering candidate remain inactive. No automated tests or actual game compatibility verification. Local artifact evidence is separate from portable checked-in source. This is historical local evidence only. The newer additional pinned recipes are source instructions, not proof that additional binaries were compiled.",
+    "follow_up_2026_10_15": {
+      "scope": "Add 10 source-pinned operator build recipes (including the two identified-but-unimplemented upstream pins); no automatic download or BIOS/game distribution.",
+      "added_core_ids": [
+        "a5200",
+        "mupen64plus_next",
+        "nestopia",
+        "mesen",
+        "vba_next",
+        "fmsx",
+        "bluemsx",
+        "px68k",
+        "vice_x64",
+        "vice_x64sc"
+      ],
+      "candidate_only": [
+        "mupen64plus_next",
+        "fmsx",
+        "bluemsx",
+        "vice_x64",
+        "vice_x64sc"
+      ],
+      "requires_external_firmware": [
+        "a5200",
+        "px68k"
+      ],
+      "executable_core_requirement": "Every run still requires an installed ELF library, an exact approved local operator registry record, isolated host activation and valid owned content.",
+      "operator_command": "python scripts/install_game_emulator_cores.py --list-recipes; explicit --all-cores requires --source-root --install-root and --fetch-sources for acquisition",
+      "batch_failure_policy": "--continue-on-error returns per-core failure records and a nonzero exit code on any partial installation, rather than silently counting failures as successes",
+      "no_binary_or_game_assets_shipped": true,
+      "source_provenance": "Public pinned GitHub revisions and source inspection; build and runtime checks pending"
+    }
   }
 }

@@ -400,6 +400,16 @@ _CORE_CONTENT_EXTENSIONS = {
     "fbneo": "zip|cue|chd",
     "ppsspp": "elf|iso|cso|prx|pbp|chd",
     "flycast": "chd|cdi|elf|cue|gdi|lst|bin|dat|m3u",
+    "a5200": "a52|bin|car",
+    "mupen64plus_next": "n64|v64|z64",
+    "nestopia": "nes|unif|unf",
+    "mesen": "nes|unif|unf",
+    "vba_next": "gba|bin",
+    "fmsx": "rom|mx1|mx2|dsk|cas|m3u",
+    "bluemsx": "rom|ri|mx1|mx2|dsk|col|sg|sc|sf|cas|m3u",
+    "px68k": "dim|xdf|hdf|d88|m3u",
+    "vice_x64": "d64|g64|d71|prg|p00|tap|t64|crt|m3u",
+    "vice_x64sc": "d64|g64|d71|prg|p00|tap|t64|crt|m3u",
 }
 
 

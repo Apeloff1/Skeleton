@@ -393,6 +393,110 @@ PINNED_CORES.update(
             "build_dependency": "Operator-installed OpenGL development headers and libGL.so.1",
             "firmware_mode": "Upstream Dreamcast HLE; no external proprietary BIOS installed; Naomi and Atomiswave excluded",
         },
+
+        "a5200": {
+            "repository": "https://github.com/libretro/a5200.git",
+            "revision": "40c6f2f1ad4a3145b328d5baaf010fae6c7e752b",
+            "artifact": "a5200_libretro.so",
+            "license": "License.txt",
+            "targets": ["atari_5200"],
+            "makefile": "Makefile",
+            "firmware": ["5200.rom"],
+            "firmware_mode": "External operator-supplied Atari 5200 BIOS only; no BIOS is fetched",
+        },
+        "mupen64plus_next": {
+            "repository": "https://github.com/libretro/mupen64plus-libretro-nx.git",
+            "revision": "12edd2c74a517ff86dfa8cfc71ad75e4c10486d5",
+            "artifact": "mupen64plus_next_libretro.so",
+            "license": "LICENSE",
+            "targets": ["nintendo_64"],
+            "makefile": "Makefile",
+            "make_variables": {"WITH_DYNAREC": "", "HAVE_PARALLEL_RSP": "0", "HAVE_PARALLEL_RDP": "0"},
+            "candidate_only": True,
+            "unavailable_requirements": ["Software-only framebuffer operation has not been qualified in the isolated host; GPU context is unavailable"],
+        },
+        "nestopia": {
+            "repository": "https://github.com/libretro/nestopia.git",
+            "revision": "06a8949e0b3cf60e3a38a374b1426bf40fccb9a0",
+            "artifact": "libretro/nestopia_libretro.so",
+            "license": "COPYING",
+            "targets": ["nes"],
+            "build_directory": "libretro",
+            "makefile": "Makefile",
+            "feature_limits": "NES cartridges only; Famicom Disk System BIOS is not bundled or approved",
+        },
+        "mesen": {
+            "repository": "https://github.com/libretro/mesen.git",
+            "revision": "0102910c39ad1a62bc3f784466f3f67ca9eae335",
+            "artifact": "Libretro/mesen_libretro.so",
+            "license": "LICENSE",
+            "targets": ["nes"],
+            "build_directory": "Libretro",
+            "makefile": "Makefile",
+            "feature_limits": "NES cartridge scope only; no FDS firmware approved",
+        },
+        "vba_next": {
+            "repository": "https://github.com/libretro/vba-next.git",
+            "revision": "788192f215ad0a1413f1625b40ebba3423fa0ade",
+            "artifact": "vba_next_libretro.so",
+            "license": "LICENSE",
+            "targets": ["game_boy_advance", "game_boy_micro", "game_boy_player"],
+            "makefile": "Makefile.libretro",
+            "feature_limits": "GBA cartridge scope; hardware accessories and original BIOS execution are not certified",
+        },
+        "fmsx": {
+            "repository": "https://github.com/libretro/fmsx-libretro.git",
+            "revision": "4de11755ce4f196ac1c8a7bb20bb4eccbc87a7d4",
+            "artifact": "fmsx_libretro.so",
+            "license": "LICENSE",
+            "targets": ["msx1", "msx2"],
+            "makefile": "Makefile",
+            "candidate_only": True,
+            "unavailable_requirements": ["Exact required MSX system ROM inventory and core boot behavior are not qualified; operator must inspect legitimately owned firmware"],
+        },
+        "bluemsx": {
+            "repository": "https://github.com/libretro/blueMSX-libretro.git",
+            "revision": "e3086eb5d36d77fa11704cf53dc176686e70127d",
+            "artifact": "bluemsx_libretro.so",
+            "license": "license.txt",
+            "targets": ["msx1", "msx2", "msx_turbo_r"],
+            "makefile": "Makefile.libretro",
+            "system_assets": {"system/bluemsx": "bluemsx"},
+            "candidate_only": True,
+            "unavailable_requirements": ["Bundled C-BIOS source assets must be license-reviewed and core system-directory discovery qualified before approval"],
+        },
+        "px68k": {
+            "repository": "https://github.com/libretro/px68k-libretro.git",
+            "revision": "0ad84d7058a12b7db4f7f7a906e87fad4e2f26f6",
+            "artifact": "px68k_libretro.so",
+            "license": "COPYING",
+            "targets": ["sharp_x68000"],
+            "makefile": "Makefile.libretro",
+            "firmware": ["iplrom.dat", "cgrom.dat"],
+            "firmware_mode": "Exact operator-owned IPL and character ROMs; no firmware is fetched",
+        },
+        "vice_x64": {
+            "repository": "https://github.com/libretro/vice-libretro.git",
+            "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+            "artifact": "vice_x64_libretro.so",
+            "license": "COPYING",
+            "targets": ["commodore_64"],
+            "makefile": "Makefile",
+            "make_variables": {"EMUTYPE": "x64"},
+            "candidate_only": True,
+            "unavailable_requirements": ["VICE system ROM assets have not been operator-admitted or qualified"],
+        },
+        "vice_x64sc": {
+            "repository": "https://github.com/libretro/vice-libretro.git",
+            "revision": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+            "artifact": "vice_x64sc_libretro.so",
+            "license": "COPYING",
+            "targets": ["commodore_64"],
+            "makefile": "Makefile",
+            "make_variables": {"EMUTYPE": "x64sc"},
+            "candidate_only": True,
+            "unavailable_requirements": ["VICE system ROM assets have not been operator-admitted or qualified"],
+        },
     }
 )
 
@@ -606,11 +710,14 @@ def install(args):
     _private_directory(args.install_root)
     for name in ("cores", "system", "licenses", "logs", "identities"):
         _private_directory(args.install_root / name)
-    records = []
-    selected = args.core or list(DEFAULT_CORES)
+    if args.all_cores and args.core:
+        raise ValueError("--all-cores and individual --core selection are mutually exclusive")
+    selected = list(PINNED_CORES) if args.all_cores else (args.core or list(DEFAULT_CORES))
     if len(selected) != len(set(selected)):
         raise ValueError("Core selection cannot repeat")
-    for identity in selected:
+    records, failures = [], []
+
+    def _install_one(identity):
         pin = PINNED_CORES[identity]
         directory = args.source_root / identity
         log = args.install_root / "logs" / (identity + ".log")
@@ -867,14 +974,26 @@ def install(args):
             / (identity + "-" + hashlib.sha256(encoded).hexdigest() + ".json")
         )
         _write_once(identity_path, encoded)
-        records.append(record)
+        return record
+
+    for identity in selected:
+        try:
+            records.append(_install_one(identity))
+        except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
+            if not args.continue_on_error:
+                raise
+            failures.append({"core_id": identity, "error_type": type(exc).__name__, "message": str(exc)})
     registry = GameEmulatorRegistry(args.install_root / "cores.json")
     return {
-        "status": "compiled_artifacts_installed",
+        "status": "partial_core_installation" if failures else "compiled_artifacts_installed",
         "registry_digest": registry.registry_digest,
         "registry_path": str(args.install_root / "cores.json"),
         "environment_variable": "SKL_GAME_EMULATOR_REGISTRY",
         "cores": records,
+        "selected_count": len(selected),
+        "installed_count": len(records),
+        "failed_count": len(failures),
+        "failures": failures,
         "execution_checked": False,
         "tests_run": False,
     }
@@ -882,9 +1001,12 @@ def install(args):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--install-root", type=Path, required=True)
+    parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--install-root", type=Path)
     parser.add_argument("--core", action="append", choices=sorted(PINNED_CORES))
+    parser.add_argument("--all-cores", action="store_true", help="Explicitly select every pinned build recipe")
+    parser.add_argument("--continue-on-error", action="store_true", help="Attempt remaining selected cores after a recorded per-core failure; return nonzero if any failed")
+    parser.add_argument("--list-recipes", action="store_true", help="Read-only pinned recipe inventory; no downloads, builds or registry writes")
     parser.add_argument("--fetch-sources", action="store_true")
     parser.add_argument(
         "--adopt-built", action="store_true", help="Inspect/install already compiled pinned source artifacts"
@@ -907,11 +1029,36 @@ def main(argv=None):
         help="Explicit canonical installed OpenGL library for software-fallback recipes; no runtime rendering permission is granted",
     )
     args = parser.parse_args(argv)
-    if not 1 <= args.jobs <= 8 or not 30 <= args.timeout <= 3600:
-        parser.error("jobs must be 1..8 and command timeout30..3600 seconds")
-    try:
-        print(json.dumps(install(args), indent=2))
+    if args.list_recipes:
+        if args.fetch_sources or args.adopt_built or args.continue_on_error:
+            parser.error("--list-recipes must be read-only")
+        if args.all_cores and args.core:
+            parser.error("--all-cores and --core cannot be combined")
+        selected = list(PINNED_CORES) if args.all_cores else (args.core or list(PINNED_CORES))
+        print(json.dumps({
+            "schema_version": "skeleton.game.emulator_recipes.v1",
+            "recipe_count": len(selected),
+            "default_bootstrap_count": len(DEFAULT_CORES),
+            "recipes": [{
+                "core_id": name,
+                "source_repository": PINNED_CORES[name]["repository"],
+                "source_revision": PINNED_CORES[name]["revision"],
+                "targets": PINNED_CORES[name]["targets"],
+                "candidate_only": bool(PINNED_CORES[name].get("candidate_only")),
+                "required_firmware": PINNED_CORES[name].get("firmware", []),
+                "requirements": PINNED_CORES[name].get("unavailable_requirements", []),
+            } for name in selected],
+            "compiled_or_installed": False,
+        }, indent=2))
         return 0
+    if args.source_root is None or args.install_root is None:
+        parser.error("--source-root and --install-root are required for installation")
+    if not 1 <= args.jobs <= 8 or not 30 <= args.timeout <= 3600:
+        parser.error("jobs must be 1..8 and command timeout 30..3600 seconds")
+    try:
+        result = install(args)
+        print(json.dumps(result, indent=2))
+        return 2 if result["failed_count"] else 0
     except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
         print(json.dumps({"status": "installation_rejected", "message": str(exc)}), file=sys.stderr)
         return 2
