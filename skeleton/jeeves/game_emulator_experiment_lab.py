@@ -172,7 +172,7 @@ def _build_sequences(
         ("ordered_a_then_b", [a, b] + [idle] * (length - 2), "ordering"),
         ("ordered_b_then_a", [b, a] + [idle] * (length - 2), "ordering"),
         ("alternating", [a if index % 2 == 0 else b for index in range(length)], "combination"),
-        ("recovery_after_input", [a] + [idle] * (length - 1), "recovery"),
+        ("recovery_after_input", [a] * max(1, length // 2) + [idle] * (length - max(1, length // 2)), "recovery"),
     ]
     for action in active[:6]:
         tests.append(("single_" + action, [action] + [idle] * (length - 1), "action_ablation"))
@@ -194,7 +194,9 @@ def _build_sequences(
             ("four_player", four, "multi_player"),
         ]
         if config.include_keyboard:
-            controls.append(("keyboard", [_policy_controls("key_enter")], "keyboard"))
+            keyboard = _policy_controls("key_enter")
+            keyboard["keys"] = sorted(set(keyboard["keys"] + _policy_controls("key_space")["keys"]))
+            controls.append(("keyboard_chord", [keyboard], "keyboard"))
         for name, ports, facet in controls:
             if len(ports) > 1 and not config.include_multiplayer:
                 continue
