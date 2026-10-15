@@ -432,10 +432,10 @@ PINNED_CORES.update(
             "makefile": "Makefile.libretro",
             "targets": ["msx1", "msx2"],
             "system_assets": {
-                "system/bluemsx/Databases": "Databases",
-                "system/bluemsx/Machines/MSX - C-BIOS": "Machines/MSX - C-BIOS",
-                "system/bluemsx/Machines/MSX2 - C-BIOS": "Machines/MSX2 - C-BIOS",
-                "system/bluemsx/Machines/MSX2+ - C-BIOS": "Machines/MSX2+ - C-BIOS",
+                "system/bluemsx/Databases": "bluemsx/Databases",
+                "system/bluemsx/Machines/MSX - C-BIOS": "bluemsx/Machines/MSX - C-BIOS",
+                "system/bluemsx/Machines/MSX2 - C-BIOS": "bluemsx/Machines/MSX2 - C-BIOS",
+                "system/bluemsx/Machines/MSX2+ - C-BIOS": "bluemsx/Machines/MSX2+ - C-BIOS",
             },
             "candidate_only": True,
             "unavailable_requirements": [
