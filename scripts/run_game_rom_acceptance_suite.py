@@ -163,20 +163,22 @@ def _verify_original_pipeline(directory: Path) -> dict[str, Any]:
 def _verify_mapper_bus(directory: Path) -> dict[str, Any]:
     report, reference = _json_file(directory / "original-mapper-bus.json")
     _verify_digest(report, "report_digest")
-    names = ("rom_only", "mbc1", "mbc2", "mbc3", "mbc5")
+    names = ("rom_only", "mbc1_large", "mbc1_ram", "mbc2", "mbc3", "mbc5")
+    categories = ("rom_only", "mbc1", "mbc2", "mbc3", "mbc5")
     if (
         report.get("schema_version") != "skeleton.game.original_mapper_bus_matrix.v1"
         or report.get("status") != "original_cartridge_mapper_bus_checks_passed"
-        or report.get("mapped_cartridge_categories") != list(names)
+        or report.get("mapped_cartridge_categories") != list(categories)
         or report.get("tested_actual_mapper_categories") != 5
+        or report.get("tested_bank_geometry_profiles") != len(names)
         or report.get("source_original_cartridge_only") is not True
         or report.get("native_libretro_hardware_certified") is not False
         or report.get("production_model_weights_updated") != 0
     ):
         raise AcceptanceSuiteError("original synthetic mapper proof has missing categories or unsupported claims")
     cases = report.get("mapper_results")
-    if not isinstance(cases, list) or len(cases) != 5:
-        raise AcceptanceSuiteError("mapper matrix must provide exactly five independent cartridge receipts")
+    if not isinstance(cases, list) or len(cases) != len(names):
+        raise AcceptanceSuiteError("mapper matrix must prove six geometry profiles across five mapper categories")
     total = 0
     for name, proof in zip(names, cases, strict=True):
         if not isinstance(proof, dict):
@@ -185,6 +187,7 @@ def _verify_mapper_bus(directory: Path) -> dict[str, Any]:
         checks = proof.get("verified_register_and_memory_cases")
         if (
             proof.get("mapper") != name
+            or proof.get("actual_mapper_type") != ("mbc1" if name.startswith("mbc1_") else name)
             or proof.get("actual_memory_cpu_savestate_roundtrip") is not True
             or not isinstance(checks, list)
             or len(checks) < 4 or len(set(checks)) != len(checks)
@@ -198,7 +201,8 @@ def _verify_mapper_bus(directory: Path) -> dict[str, Any]:
         raise AcceptanceSuiteError("source mapper executed bus-check totals differ")
     return {
         "accepted": True,
-        "real_interpreter_mapper_types": list(names),
+        "real_interpreter_mapper_types": list(categories),
+        "verified_cartridge_geometry_profiles": len(names),
         "source_bus_checks": total,
         "mapper_receipt": reference,
         "native_libretro_core_certified": False,
