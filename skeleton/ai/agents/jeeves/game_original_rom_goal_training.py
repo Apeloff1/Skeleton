@@ -307,3 +307,61 @@ def train_original_rom_goal_policy(
     }
     result["receipt_digest"] = _digest(result)
     return result
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Explicit local source-verified authored-goal training operator."""
+    import argparse
+    import os
+    import sys
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--max-steps", type=int, default=1024)
+    parser.add_argument("--max-frames-per-tile", type=int, default=12)
+    parser.add_argument("--evidence-file", type=Path, required=True)
+    args = parser.parse_args(argv)
+    try:
+        if args.evidence_file.exists() or args.evidence_file.is_symlink():
+            raise OriginalGameGoalError("goal evidence must use a new private file")
+        if not args.evidence_file.parent.is_dir():
+            raise OriginalGameGoalError("operator output directory must already exist")
+        report = train_original_rom_goal_policy(
+            seed=args.seed, max_steps=args.max_steps,
+            max_frames_per_tile=args.max_frames_per_tile,
+        )
+        data = (
+            json.dumps(report, sort_keys=True, indent=2, allow_nan=False) + "\n"
+        ).encode("utf-8")
+        if len(data) > 8 * 1024 * 1024:
+            raise OriginalGameGoalError("authored-goal evidence exceeds finite output capacity")
+        fd = os.open(
+            args.evidence_file,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        with os.fdopen(fd, "wb") as target:
+            target.write(data)
+            target.flush()
+            os.fsync(target.fileno())
+        print(json.dumps({
+            "status": report["status"],
+            "actual_source_goal_completion": report["source_actual_goal_completion"],
+            "actual_emulated_frames": report["executed_input_frames"],
+            "real_goal_q_updates": report["real_goal_conditioned_q_updates"],
+            "evidence_file": str(args.evidence_file),
+            "production_weights_updated": 0,
+        }, sort_keys=True))
+        return 0
+    except (ValueError, OSError, TypeError) as exc:
+        print(json.dumps({
+            "status": "authored_original_rom_goal_rejected",
+            "reason": str(exc)[:500],
+            "production_weights_updated": 0,
+        }, sort_keys=True), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
