@@ -20,7 +20,9 @@ FEATURES = (
     "chr_tile_count", "bank_local_unique_tile_count",
     "bank_local_duplicate_count", "graphic_edge_density",
     "reachable_static_instruction_count", "static_control_flow_edge_count",
-    "packaged_resource_count",
+    "packaged_resource_count", "decoded_image_pixels",
+    "nonopaque_pixel_fraction", "audio_sample_rate",
+    "audio_duration_seconds",
 )
 MAX_RECORDS = 128
 MAX_EPOCHS = 64
@@ -114,7 +116,8 @@ def _load_candidate(row: Mapping[str, Any]) -> dict[str, Any]:
 def _features(row: Mapping[str, Any]) -> list[float]:
     measured = row["measured_features"]
     # Fixed normalizers prevent held-out statistics leaking into training.
-    caps = (8192, 8192, 8192, 1, 4096, 8192, 128)
+    caps = (8192, 8192, 8192, 1, 4096, 8192, 128,
+            1024 * 1024, 1, 96000, 10)
     output=[]
     for name,cap in zip(FEATURES,caps,strict=True):
         val = float(measured.get(name,0))
