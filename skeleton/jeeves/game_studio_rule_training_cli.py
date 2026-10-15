@@ -72,6 +72,7 @@ def train_rule_curriculum(
     *, base_source: dict, proposals: list[dict], output: Path,
     authorized: bool, rights_cleared: bool, seed: int = 0,
     episodes_per_scenario: int = 4, max_steps: int = 24,
+    neural_corpus_output: Path | None = None,
 ) -> dict:
     """Train *one* scenario-conditioned Q policy and independently evaluate it."""
     if authorized is not True or rights_cleared is not True:
@@ -174,10 +175,42 @@ def train_rule_curriculum(
         "original_engine_rules_persistently_modified": False,
         "automatic_policy_promotion": False,
     }
-    sha = _write_candidate(output, record)
+    neural_sha = None
+    if neural_corpus_output is not None:
+        from skeleton.ai.training.jeeves_studio_rule_corpus import (
+            build_rule_training_corpus, publish_rule_training_corpus,
+        )
+        if Path(neural_corpus_output).expanduser().absolute() == Path(output).expanduser().absolute():
+            raise RuleCurriculumError("candidate and neural corpus cannot share a file path")
+        examples = []
+        # One actual witnessed training episode for every distinct scenario.
+        # This keeps the trainer budget bounded and preserves the disjoint
+        # independent heldout episodes (never exported for optimization).
+        for trace in result.traces[:circumstances]:
+            scenario = plan["scenarios"][trace["seed"] % circumstances]
+            examples.append({
+                "scenario_id": scenario["scenario_id"],
+                "seed": trace["seed"],
+                "actions": [row["action"] for row in trace["transitions"]],
+            })
+        corpus = build_rule_training_corpus(
+            plan, examples, authorized=authorized, rights_cleared=rights_cleared,
+        )
+        neural_sha = publish_rule_training_corpus(neural_corpus_output, corpus)
+    try:
+        sha = _write_candidate(output, record)
+    except BaseException:
+        if neural_sha is not None:
+            Path(neural_corpus_output).expanduser().absolute().unlink(missing_ok=True)
+        raise
     return {
         "candidate": str(Path(output).expanduser().absolute()),
         "candidate_sha256": sha,
+        "neural_training_corpus": (
+            None if neural_corpus_output is None
+            else str(Path(neural_corpus_output).expanduser().absolute())
+        ),
+        "neural_corpus_sha256": neural_sha,
         "rule_plan_digest": plan["digest"],
         "editor": base_source["editor"],
         "circumstances": circumstances,
@@ -202,6 +235,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="reviewed AI-generated JSON proposal list")
     parser.add_argument("--output", type=Path, required=True,
                         help="new private candidate path; never an active policy")
+    parser.add_argument("--neural-corpus-output", type=Path,
+                        help="optional replay-verified multi-rule input for checkpoint candidate training")
     parser.add_argument("--episodes-per-scenario", type=int, default=4)
     parser.add_argument("--max-steps", type=int, default=24)
     parser.add_argument("--seed", type=int, default=0)
@@ -229,6 +264,7 @@ def main(argv: list[str] | None = None) -> int:
         authorized=args.authorized, rights_cleared=args.rights_cleared,
         seed=args.seed, episodes_per_scenario=args.episodes_per_scenario,
         max_steps=args.max_steps,
+        neural_corpus_output=args.neural_corpus_output,
     )
     print(json.dumps(result, sort_keys=True, ensure_ascii=True))
     return 0
