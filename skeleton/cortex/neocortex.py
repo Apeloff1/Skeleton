@@ -648,10 +648,6 @@ class JeevesCortex:
             self._winner_mouth = str(blob.get("winner") or "neo")
         if "mouth_override" in blob:
             self._mouth_override = blob.get("mouth_override")
-        if getattr(self, "bpe", None) is not None:
-            self.transformer.bpe = self.bpe
-            if getattr(self, "neo_rms", None) is not None:
-                self.neo_rms.bpe = self.bpe
         if blob.get("contact"):
             self.contact_engine.restore(blob.get("contact"))
         if blob.get("genos"):
@@ -667,6 +663,13 @@ class JeevesCortex:
         if blob.get("bpe"):
             from skeleton.cortex.bpe import BytePairEncoder
             self.bpe = BytePairEncoder.from_snapshot(blob["bpe"])
+        # Bind the restored encoder, not the bootstrap encoder.  This must
+        # happen AFTER loading the saved BPE vocabulary and merge rules so
+        # that resumed production inference uses the tokenizer it persisted.
+        if getattr(self, "bpe", None) is not None:
+            self.transformer.bpe = self.bpe
+            if getattr(self, "neo_rms", None) is not None:
+                self.neo_rms.bpe = self.bpe
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def recent_events(self, topic: str = "*", n: int = 20) -> List[DomainEvent]:
