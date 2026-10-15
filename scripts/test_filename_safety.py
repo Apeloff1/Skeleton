@@ -93,6 +93,27 @@ class FilenameSafetyTests(unittest.TestCase):
         path = "data/" + "a" * 229 + ".json"
         self.assertEqual(unsafe_filename(path), [])
 
+    def test_component_windows_utf16_limit(self):
+        # Each emoji takes two UTF-16 code units, regardless of Python length.
+        issues = unsafe_filename("icons/" + "😀" * 91 + ".png")
+        self.assertTrue(any("component exceeds" in issue and "UTF-16" in issue for issue in issues), issues)
+
+    def test_component_utf8_byte_limit(self):
+        issues = unsafe_filename("assets/" + "é" * 91 + ".dat")
+        self.assertTrue(any("UTF-8 bytes" in issue for issue in issues), issues)
+
+    def test_git_metadata_component_is_invalid(self):
+        self.assertTrue(any("Git metadata" in issue for issue in unsafe_filename("Assets/.GIT/config")))
+
+    def test_directional_filename_controls_are_rejected(self):
+        self.assertTrue(any("bidirectional" in issue for issue in unsafe_filename("src/name\u202e.txt")))
+
+    def test_extended_windows_control_codes(self):
+        self.assertTrue(any("unsupported by Windows" in issue for issue in unsafe_filename("docs/a\u0085b.md")))
+
+    def test_clock_device_name_is_reserved(self):
+        self.assertTrue(any("reserved Windows" in issue for issue in unsafe_filename("docs/CLOCK$.txt")))
+
     def test_remove_existing_bad_file(self):
         old = "legacy/con.txt"
         self.assertEqual(check_paths({old}, set()), [])
