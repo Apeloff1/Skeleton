@@ -156,6 +156,52 @@ def _verify_original_pipeline(directory: Path) -> dict[str, Any]:
     }
 
 
+def _verify_mapper_bus(directory: Path) -> dict[str, Any]:
+    report, reference = _json_file(directory / "original-mapper-bus.json")
+    _verify_digest(report, "report_digest")
+    names = ("rom_only", "mbc1", "mbc2", "mbc3", "mbc5")
+    if (
+        report.get("schema_version") != "skeleton.game.original_mapper_bus_matrix.v1"
+        or report.get("status") != "original_cartridge_mapper_bus_checks_passed"
+        or report.get("mapped_cartridge_categories") != list(names)
+        or report.get("tested_actual_mapper_categories") != 5
+        or report.get("source_original_cartridge_only") is not True
+        or report.get("native_libretro_hardware_certified") is not False
+        or report.get("production_model_weights_updated") != 0
+    ):
+        raise AcceptanceSuiteError("original synthetic mapper proof has missing categories or unsupported claims")
+    cases = report.get("mapper_results")
+    if not isinstance(cases, list) or len(cases) != 5:
+        raise AcceptanceSuiteError("mapper matrix must provide exactly five independent cartridge receipts")
+    total = 0
+    for name, proof in zip(names, cases, strict=True):
+        if not isinstance(proof, dict):
+            raise AcceptanceSuiteError("typed source mapper receipt required")
+        _verify_digest(proof, "receipt_digest")
+        checks = proof.get("verified_register_and_memory_cases")
+        if (
+            proof.get("mapper") != name
+            or proof.get("actual_memory_cpu_savestate_roundtrip") is not True
+            or not isinstance(checks, list)
+            or len(checks) < 4 or len(set(checks)) != len(checks)
+            or proof.get("real_source_bus_checks") != len(checks)
+            or proof.get("hardware_cycle_accuracy_certified") is not False
+            or proof.get("real_native_libretro_core_tested") is not False
+        ):
+            raise AcceptanceSuiteError(f"source mapper {name} has incomplete native bus evidence")
+        total += len(checks)
+    if report.get("verified_source_bus_checks") != total:
+        raise AcceptanceSuiteError("source mapper executed bus-check totals differ")
+    return {
+        "accepted": True,
+        "real_interpreter_mapper_types": list(names),
+        "source_bus_checks": total,
+        "mapper_receipt": reference,
+        "native_libretro_core_certified": False,
+        "hardware_timing_accuracy_certified": False,
+    }
+
+
 def _verify_game_goal(directory: Path) -> dict[str, Any]:
     goal, reference = _json_file(directory / "original-goal-q.json")
     _verify_digest(goal, "receipt_digest")
@@ -294,6 +340,16 @@ def run_acceptance_suite(
                 output_directory, "focused_synthetic_and_real_original_rom_regressions",
                 seconds=process_timeout_seconds,
             ))
+        mapper_path = output_directory / "original-mapper-bus.json"
+        processes.append(_run(
+            [
+                sys.executable, "scripts/audit_original_gameboy_mapper_matrix.py",
+                "--evidence-file", str(mapper_path),
+            ],
+            output_directory, "source_gameboy_mapper_bus_proof",
+            seconds=process_timeout_seconds,
+        ))
+        mapper = _verify_mapper_bus(output_directory)
         original_path = output_directory / "original"
         processes.append(_run(
             [
@@ -325,11 +381,13 @@ def run_acceptance_suite(
             "tests_requested": tests,
             "focused_tests_executed": tests,
             "source_cpu_interpreter_executed": True,
+            "original_cartridge_bus_matrix_verified": True,
             "source_q_rewind_proven": True,
             "neural_candidate_optimized_and_scored": True,
             "source_goal_replay_and_neutral_control_verified": True,
             "original_training": original,
             "original_goal_training": goal,
+            "real_cartridge_bus_matrix": mapper,
             "bounded_worker_receipts": processes,
             "real_libretro_installed_core_tested": False,
             "independent_game_hardware_accuracy_certified": False,
