@@ -662,18 +662,21 @@ class JeevesCortex:
         if blob.get("transformer"):
             snap = blob["transformer"]
             if (snap or {}).get("kind") == "torch-stack":
-                try:
-                    from skeleton.cortex.torch_lm import TorchTransformer
-                    self.transformer = TorchTransformer.from_snapshot(snap)
-                except Exception:
-                    from skeleton.cortex.transformer import TinyTransformer
-                    self.transformer = TinyTransformer.from_snapshot(snap)
+                # Failure to restore the actual torch architecture must not
+                # silently replace its trained weights with a random native LM.
+                from skeleton.cortex.torch_lm import TorchTransformer
+                self.transformer = TorchTransformer.from_snapshot(snap)
             else:
                 from skeleton.cortex.transformer import TinyTransformer
                 self.transformer = TinyTransformer.from_snapshot(snap)
         if blob.get("neo_rms"):
-            from skeleton.cortex.transformer import TinyTransformer
-            self.neo_rms = TinyTransformer.from_snapshot(blob["neo_rms"])
+            rms_snapshot = blob["neo_rms"]
+            if (rms_snapshot or {}).get("kind") == "torch-stack":
+                from skeleton.cortex.torch_lm import TorchTransformer
+                self.neo_rms = TorchTransformer.from_snapshot(rms_snapshot)
+            else:
+                from skeleton.cortex.transformer import TinyTransformer
+                self.neo_rms = TinyTransformer.from_snapshot(rms_snapshot)
         if blob.get("winner"):
             self._winner_mouth = str(blob.get("winner") or "neo")
         if "mouth_override" in blob:
