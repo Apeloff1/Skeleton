@@ -171,6 +171,20 @@ def runtime_status(root: Path | None = None) -> tuple[bool, str]:
     return probes_ok(results), "\n".join(lines)
 
 
+def open_running_application(root: Path | None = None) -> tuple[bool, str]:
+    """Probe off the GUI thread and open the browser only after readiness."""
+    online, detail = runtime_status(root)
+    if not online:
+        return False, "Application not ready:\n" + detail
+    try:
+        opened = webbrowser.open(APP_URL)
+    except (OSError, webbrowser.Error) as exc:
+        return False, f"Application ready at {APP_URL}; browser failed: {type(exc).__name__}"
+    if not opened:
+        return False, f"Application ready at {APP_URL}; no browser accepted the URL"
+    return True, f"Application opened at {APP_URL}\n" + detail
+
+
 class WindowsLauncher:
     """Small Windows setup/runtime control surface."""
 
@@ -341,13 +355,11 @@ class WindowsLauncher:
         )
 
     def open_app(self) -> None:
-        online, detail = runtime_status(self.app_root)
-        self._set_log(detail)
-        if online:
-            webbrowser.open(APP_URL)
-            self.status.set("Application opened")
-        else:
-            self.status.set("Application is not ready")
+        self._run_worker(
+            "Checking application before opening…",
+            lambda: open_running_application(self.app_root),
+            lambda result: result[1],
+        )
 
     def local_ai(self) -> None:
         """Run real native checkpoint inference inside the installed GUI.
@@ -586,13 +598,10 @@ def _headless(args: argparse.Namespace, root: Path) -> int:
             print(detail)
         return 0 if ok else 1
     if args.open:
-        online, detail = runtime_status(root)
+        opened, detail = open_running_application(root)
         if not args.quiet:
             print(detail)
-        if online:
-            webbrowser.open(APP_URL)
-            return 0
-        return 1
+        return 0 if opened else 1
     return -1
 
 
