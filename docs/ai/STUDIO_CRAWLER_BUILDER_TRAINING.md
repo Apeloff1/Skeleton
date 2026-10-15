@@ -241,3 +241,7 @@ episodes; source withdrawal enforcement; and a UI chat recovered after reload.
 Each observation retains its actual source and package identity. Every-console
 compatibility, semantic understanding of arbitrary ROMs, universal native editors
 and guaranteed improvement remain outside this continuation's evidence.
+
+## Recorded operational qualification
+
+See [the original creation and playable-learning qualification](STUDIO_CREATION_QUALIFICATION_2026-10-15.md) for executed workflow results, installation observations and the remaining console and model-learning limits.
