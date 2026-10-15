@@ -168,6 +168,52 @@ def persist() -> dict:
     return saved
 
 
+def initialize_persisted_production(*, epochs: int = 1) -> dict[str, Any]:
+    """Operator-only FIRST-BOOT training of this exact app-owned Jeeves.
+
+    This runs *inside* the already initialized app process and is never a
+    scratch checkpoint substitution for an existing serving model. It must
+    execute while the compiled app is in private maintenance/bootstrap mode,
+    before user requests are admitted. Existing production state is immutable.
+    The app must restart and restore the just-persisted state before a
+    separate specialization session can attest it.
+    """
+    with _LOCK:
+        if os.environ.get("SKELETON_JEEVES_BOOTSTRAP", "").strip() != "1":
+            raise CortexPersistenceError("first-boot production training requires explicit operator bootstrap mode")
+        if type(epochs) is not int or epochs != 1:
+            raise CortexPersistenceError("first-boot production bootstrap is limited to exactly one epoch")
+        if not persistence_configured():
+            raise CortexPersistenceError("first-boot production training requires SKELETON_OWN")
+        if _live_cortex is None or _LAST_LOAD.get("loaded") or _LAST_LOAD.get("reason") != "missing_snapshot":
+            raise CortexPersistenceError("bootstrap requires initialized app-owned Jeeves with no restored state")
+        target = own_path()
+        if target.is_symlink() or target.exists():
+            raise CortexPersistenceError("never initialize over an existing production snapshot")
+        if not target.parent.is_dir():
+            raise CortexPersistenceError("configure an existing private production state directory first")
+        if getattr(_live_cortex.transformer, "steps", 0) != 0:
+            raise CortexPersistenceError("bootstrap transformer must be new, not previously trained")
+        original_steps = _live_cortex.transformer.steps
+        result = _live_cortex.train(epochs=1, auto_surpass=False)
+        if _live_cortex.transformer.steps <= original_steps:
+            raise CortexPersistenceError("bootstrap executed without actual production model weight steps")
+        saved = persist()
+        if not target.is_file():
+            raise CortexPersistenceError("trained production checkpoint was not persisted")
+        return {
+            "status": "production_first_boot_checkpoint_created_restart_required",
+            "production_model_trained": True,
+            "training_steps": int(_live_cortex.transformer.steps),
+            "model_file": str(target.resolve()),
+            "snapshot_restored_in_current_process": False,
+            "ready_to_attest": False,
+            "requires_restart": True,
+            "separate_game_specialization_not_started": True,
+            "automatic_promotion": False,
+        }
+
+
 def attest_training_checkpoint(destination: str | Path) -> dict[str, Any]:
     """Operator seam to attest the *already running* Jeeves in this process.
 
