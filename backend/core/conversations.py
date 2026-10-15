@@ -371,7 +371,9 @@ class MongoConversationAuthority:
         try:
             inventory = await reader(tenant_id=str(tenant_id))
         except Exception as exc:
-            raise ConversationStorageUnavailable("conversation governance inventory is unavailable") from exc
+            raise ConversationStorageUnavailable(
+                "conversation governance inventory is unavailable"
+            ) from exc
         if (
             not isinstance(inventory, Mapping)
             or inventory.get("tenant_id") != str(tenant_id)
@@ -759,7 +761,9 @@ class MongoConversationAuthority:
         try:
             inventory = await reader(tenant_id=str(tenant_id))
         except Exception as exc:
-            raise ConversationStorageUnavailable("conversation governance inventory is unavailable") from exc
+            raise ConversationStorageUnavailable(
+                "conversation governance inventory is unavailable"
+            ) from exc
         if (
             not isinstance(inventory, Mapping)
             or inventory.get("tenant_id") != str(tenant_id)

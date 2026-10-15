@@ -834,9 +834,7 @@ async def regenerate_assistant_message(
         if projected.get("terminal") or projected.get("state") == "cancellation_requested":
             return projected
         if projected.get("state") == "awaiting_admission":
-            await _submit_regeneration(
-                record, command, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user
-            )
+            await _submit_regeneration(record, command, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user)
         if body.response_mode == "wait":
             try:
                 import asyncio
@@ -970,9 +968,7 @@ async def resume_regeneration_turn(
         if projected.get("terminal") or projected.get("state") == "cancellation_requested":
             return projected
         if projected.get("state") == "awaiting_admission":
-            await _submit_regeneration(
-                record, command, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user
-            )
+            await _submit_regeneration(record, command, tenant_id=tenant_id, owner_id=owner_id, engine=engine, user=user)
         if body.response_mode == "wait":
             try:
                 import asyncio

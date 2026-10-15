@@ -1,3 +1,1 @@
-# Install the canonical package metadata, including its database, validation
-# and security dependencies. Keep one source of truth in pyproject.toml.
 -e .

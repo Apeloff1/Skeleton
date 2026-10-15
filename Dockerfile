@@ -41,7 +41,7 @@ COPY --chown=appuser:appuser . .
 # installer/toolchain surface from the final runtime.
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    pip install --no-cache-dir --no-deps --no-build-isolation -e . \
+    pip install --no-cache-dir --no-deps --no-build-isolation . \
     && pip uninstall -y msgpack setuptools \
     && rm -rf /usr/local/lib/python3.14/site-packages/msgpack* \
               /usr/local/lib/python3.14/site-packages/setuptools* \

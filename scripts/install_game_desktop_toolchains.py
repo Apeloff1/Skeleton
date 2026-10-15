@@ -97,57 +97,6 @@ def sha_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def private_root(value: str) -> Path:
-    root = Path(value)
-    if (
-        not re.fullmatch(r"/[A-Za-z0-9._/-]{1,4095}", value)
-        or str(root) != value
-        or not root.is_absolute()
-        or root.is_symlink()
-        or root.resolve() != root
-    ):
-        raise ValueError("Operator directory must be canonical and absolute, without symlinks")
-    root.mkdir(parents=True, mode=0o700, exist_ok=True)
-    info = root.stat()
-    if not root.is_dir() or info.st_uid != os.geteuid() or info.st_mode & 0o022:
-        raise ValueError("Operator directory must be owned by this user and not group/world writable")
-    return root
-
-
-def clean_environment(*, network=False):
-    result = {
-        "PATH": "/usr/bin:/bin",
-        "LANG": "C.UTF-8",
-        "LC_ALL": "C.UTF-8",
-        "SOURCE_DATE_EPOCH": "0",
-        "GIT_TERMINAL_PROMPT": "0",
-        "GIT_CONFIG_NOSYSTEM": "1",
-        "GIT_CONFIG_GLOBAL": "/dev/null",
-        "GIT_CONFIG_SYSTEM": "/dev/null",
-        "GIT_NO_REPLACE_OBJECTS": "1",
-        "GIT_ASKPASS": "/usr/bin/false",
-        "SSH_ASKPASS": "/usr/bin/false",
-    }
-    if network:
-        for key in (
-            "HTTP_PROXY",
-            "HTTPS_PROXY",
-            "ALL_PROXY",
-            "NO_PROXY",
-            "http_proxy",
-            "https_proxy",
-            "all_proxy",
-            "no_proxy",
-            "SSL_CERT_FILE",
-            "SSL_CERT_DIR",
-            "CURL_CA_BUNDLE",
-            "GIT_SSL_CAINFO",
-        ):
-            if key in os.environ:
-                result[key] = os.environ[key]
-    return result
-
-
 def _stop(process):
     with contextlib.suppress(ProcessLookupError):
         os.killpg(process.pid, signal.SIGTERM)
@@ -237,6 +186,59 @@ def run(
         if process.stdout:
             process.stdout.close()
     return bytes(captured).decode("utf-8").strip() if capture else None
+
+
+def private_root(value: str) -> Path:
+    root = Path(value)
+    if (
+        not re.fullmatch(r"/[A-Za-z0-9._/-]{1,4095}", value)
+        or str(root) != value
+        or not root.is_absolute()
+        or root.is_symlink()
+        or root.resolve() != root
+    ):
+        raise ValueError("Operator directory must be canonical and absolute, without symlinks")
+    root.mkdir(parents=True, mode=0o700, exist_ok=True)
+    info = root.stat()
+    if not root.is_dir() or info.st_uid != os.geteuid() or info.st_mode & 0o022:
+        raise ValueError("Operator directory must be owned by this user and not group/world writable")
+    return root
+
+
+def clean_environment(*, network=False):
+    result = {
+        "PATH": "/usr/bin:/bin",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "SOURCE_DATE_EPOCH": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_ASKPASS": "/usr/bin/false",
+        "SSH_ASKPASS": "/usr/bin/false",
+    }
+    if network:
+        for key in (
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+            "NO_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "all_proxy",
+            "no_proxy",
+            "SSL_CERT_FILE",
+            "SSL_CERT_DIR",
+            "CURL_CA_BUNDLE",
+            "GIT_SSL_CAINFO",
+        ):
+            if key in os.environ:
+                result[key] = os.environ[key]
+    return result
+
+
 
 
 def archive(root: Path, recipe: dict) -> Path:
