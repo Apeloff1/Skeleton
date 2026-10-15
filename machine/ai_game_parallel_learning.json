@@ -29,5 +29,13 @@
     "range": "0..2**63-1",
     "authority": "Deterministic per-assignment rollout RNG; identical creation and resume reconstruction, fits existing Mongo signed64 storage.",
     "compatibility": "Changed implementation digest fences all old batches; no grandfathered unsigned64 pending assignments or silently transformed old checkpoints. Failed zero-progress jobs require a fresh admitted operator request."
+  },
+  "studio_extension": {
+    "status": "implementation_candidate_pending_exact_head_verification",
+    "request_kind": "studio",
+    "owner": "skeleton/jeeves/game_learning_parallel.py",
+    "protocol": "Exact source-bound original engine GameEnvironmentRequest traverses existing local rollout-actor IPC, frozen policy, trace checks and Q-update commits.",
+    "integrity": "Source and runtime SHA are included in GameEnvironmentSpec.environment_digest; actor validates matching policy/spec before admitting rollout.",
+    "limitation": "Unverified until exact-head local child-process training runs; not production neural model fine-tuning."
   }
 }

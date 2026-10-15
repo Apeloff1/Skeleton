@@ -43,5 +43,331 @@
   ],
   "failure": "Invalid source/tree/seed/action, unsupported mapper/instruction, foreign snapshot or code identity, exhausted resources and cancelled work fail explicitly without granting promotion authority",
   "production_model_promotion_authorized": false,
-  "masterplan_completion_authorized": false
+  "masterplan_completion_authorized": false,
+  "studio_game_environment": {
+    "status": "implementation_candidate_pending_exact_head_verification",
+    "canonical_owner": "skeleton/jeeves/game_studio_environment.py",
+    "studio_source": "skeleton/ai/game_builder/advanced_gameplay_runtime.py",
+    "request_kind": "studio",
+    "target_format": "studio:<registered_advanced_engine>",
+    "scope": "All registered original-game reference engine sessions execute through existing advanced-session action replay and verified hashed receipts; no added model-provider, renderer or native emulator.",
+    "learning": "Emulator-compatible GameEnvironmentSpec/EpisodeStep reset/step/preview/snapshot/restore; local Q policy uses actual runtime state deltas; original scene, settings, seed and implementation hash bound; invalid inputs terminate with negative reward instead of inventing state.",
+    "training_cli": "python -m skeleton.jeeves.game_studio_policy_cli --engine economy --output /private/new-candidate.json --authorized --rights-cleared",
+    "guarantees": [
+      "bounded actions and episodes",
+      "no executable external sources",
+      "deterministic strict scene and action replay",
+      "rejected commands do not grant game progress",
+      "snapshot restored via independent re-execution",
+      "candidate policy cannot auto-promote"
+    ],
+    "limitations": [
+      "reference preview contains state only; no fabricated pixels/audio",
+      "reward shaping measures declared engine state, not general game design quality",
+      "no live production neural weight update",
+      "requires operator rights and training admission",
+      "CI and independent validation pending"
+    ]
+  },
+  "ai_rule_variation": {
+    "status": "implementation_candidate_not_verified",
+    "owner": "skeleton/jeeves/game_studio_rule_curriculum.py",
+    "trainer": "skeleton/jeeves/game_studio_rule_training_cli.py",
+    "neural_corpus": "skeleton/ai/training/jeeves_studio_rule_corpus.py",
+    "campaign_owner": "skeleton/jeeves/game_studio_learning.py",
+    "interface": "AI model supplies bounded declarative source-specific rules; typed original-game editor and scene validators authenticate changes, no arbitrary executable source.",
+    "evaluation": "Single scenario-conditioned GamePolicyLearner, disjoint heldout scenario seeds, parent policy baseline, replay receipts. Current studio campaign also supports bounded typed rule mutations in its existing champion/adversarial evaluation.",
+    "production": "Training-derived candidate policy and optional replay-verifiable corpus only; real attested neural checkpoint required for separate candidate neural optimization and independent acceptance.",
+    "hard_limits": [
+      "maximum seven simultaneous model-proposed variants",
+      "maximum twelve edits per variant",
+      "source SHA bound",
+      "no arbitrary code, filesystem, network or provider invocation",
+      "no rule/policy promotion without separate authorization",
+      "no hardware game execution claim"
+    ],
+    "verification": "Not yet passed exact-head runtime tests, security and benchmark review.",
+    "isolated_worker_request": {
+      "kind": "studio_rules",
+      "target_id": "studio-rules:<registered_editor>",
+      "exact_tree_file": "game/studio/rule_curriculum.json",
+      "fixed_environment_identity": "source_digest + rule_plan_digest + gameplay implementation digest + rule executor source digest",
+      "status": "implementation_candidate_pending_exact_head_actor_verification",
+      "note": "Current local CLI instantiates the same typed request; the existing parallel worker supports this kind, but no worker run was executed in this conversation."
+    }
+  },
+  "advanced_scenario_lab": {
+    "owner": "skeleton/jeeves/game_studio_scenario_lab.py",
+    "status": "implementation_pending_exact_head_e2e_validation",
+    "registration": "All 43 original-game studio reference families have source-bound manifests; scenarios are independently executed via the canonical StudioGameEnvironment.",
+    "concurrent_viewer": {
+      "route": "GET /api/game-studio-learning/campaigns/{id}/mirror-views",
+      "ui": "frontend/features/Jeeves/GameStudioScenarioLabPanel.tsx",
+      "bounded_lanes": 6,
+      "maximum_workers_per_request": 1,
+      "maximum_steps_per_view": 24,
+      "min_refresh_seconds": 9,
+      "scope": "authenticated owner's read-only spectator simulations of current champion source",
+      "caution": "sampled telemetry, not actual training-episode frames, native renderer or live weights"
+    },
+    "generator": {
+      "route": "GET /api/game-studio-learning/campaigns/{id}/scenario-drafts",
+      "evidence": "committed scoped campaign rounds, canonical editor limits, source integrity",
+      "promotion": "never automatic",
+      "self_learning": "Governed campaign evaluates and retains candidate rule mutations via existing measured Q-training and acceptance gates; optional CLI trains scenario-conditioned candidate Q policy with replay-verified neural corpus"
+    },
+    "exhaustive_test_plan": {
+      "route": "GET /api/game-studio-learning/engines/{editor}/test-manifest",
+      "dimensions": [
+        "every registered action",
+        "every declared editor field",
+        "six mirrored logical perspectives",
+        "18 contract categories"
+      ],
+      "limitations": "Declarative coverage, not tests already executed or exhaustive Cartesian world-space proof"
+    },
+    "ranked_research": {
+      "nintendo": "https://www.nintendo.co.jp/ir/en/finance/software/switch.html",
+      "circana_rank": "https://www.statista.com/statistics/1285658/top-ranked-video-games-sales-annual/",
+      "permitted": "factually cited popularity reference plus original abstract mechanics hypotheses only",
+      "forbidden": "commercial assets, levels, dialogue, copied source, unauthorized proprietary training data"
+    },
+    "executable_engine_probes": {
+      "owner": "skeleton/jeeves/game_studio_engine_diagnostics.py",
+      "route": "GET /api/game-studio-learning/engines/{editor}/probes",
+      "capacity": {
+        "max_actions_per_diagnostics_cli_page": 64,
+        "max_actions_per_api_page": 16,
+        "max_concurrent_api_probes": 1
+      },
+      "evidence": "each original registered command tested independently from reset, same-seed source replay and verified snapshot; accepted/rejected differentiated",
+      "completion": "not certified, check pages and native/genre/e2e quality gates remain required"
+    },
+    "concurrent_training_campaign": {
+      "owner": "skeleton/jeeves/game_studio_learning.py",
+      "scope": "Studio-only independent candidate/champion ordinary and adversarial evaluation uses bounded four-thread executor; six additional source-matched mirror perspectives independently measure declared rule changes.",
+      "acceptance": "worst observed mirror reward delta must satisfy configured worst-seed regression bound; no automatic live model weight promotion",
+      "caveat": "Actual measured round-frame stream not yet wired to the spectator preview; those frames remain separate."
+    },
+    "effective_learning": {
+      "status": "committed_logic_pending_exact_head_execution_validation",
+      "measurements": [
+        "accepted_vs_rejected_controls",
+        "non-time productive_gameplay_state_changes",
+        "distinct numeric game states",
+        "replay action applications",
+        "paired baseline-to-candidate state-trajectory differences",
+        "novelty per replay work"
+      ],
+      "promotion_gates": [
+        "no regression beyond configured limits",
+        "actual measured mechanics change",
+        "seed-matched independent mirror checks",
+        "Dragon and adversarial evaluation retained"
+      ],
+      "budgets": "pre-admit up to twelve auxiliary source-mirror episodes per changed-rule candidate per round; actual executed steps checked before committing",
+      "scenario_efficiency": "bounded local parameter perturbations with canonical source digests and exclusion of previously explored committed settings",
+      "limitations": "not proof of neural generalization, human creative quality, model training completion or hardware frame rates",
+      "candidate_trainer": {
+        "owner": "skeleton/jeeves/game_studio_rule_training_cli.py",
+        "behavior": "scenario-balanced measured Q-policy sweeps; early-stop on two full entirely nonproductive sweeps, after all scenarios seen twice",
+        "metrics": [
+          "accepted action counts",
+          "rejected action counts",
+          "productive non-explicit-time state changes",
+          "distinct observed gameplay states",
+          "actual Q updates",
+          "real versus budgeted episode counts"
+        ],
+        "neural_corpus": "select most productive observed training trace per source scenario, rebuild source-authoritative examples, no heldout contamination or automatic model promotion",
+        "verification": "unexecuted regression test cases included; not a successful checkpoint model training claim"
+      }
+    },
+    "ten_run_multispectral": {
+      "status": "committed_implementation_pending_exact_head_execution",
+      "executor": "skeleton/jeeves/game_studio_scenario_lab.py",
+      "auditor": "skeleton/jeeves/game_studio_multispectral.py",
+      "local_training_cli": "skeleton/jeeves/game_studio_multispectral_training.py",
+      "lenses": [
+        "explore",
+        "progress",
+        "safety",
+        "economy",
+        "adversary",
+        "boundary",
+        "temporal",
+        "causal",
+        "perturbation",
+        "recovery"
+      ],
+      "analysis_bands": [
+        "motion",
+        "economy",
+        "vitals",
+        "objectives",
+        "reward",
+        "events",
+        "control",
+        "temporal",
+        "novelty",
+        "safety"
+      ],
+      "audit_gates": [
+        "source_custody",
+        "runtime_identity",
+        "seed_bounds",
+        "action_allowlist",
+        "transition_chain",
+        "reward_finiteness",
+        "terminal_and_command_counts",
+        "final_state_custody",
+        "reverse_checkpoint_replay",
+        "channel_derivation"
+      ],
+      "simulation_runs_per_default_spectator": 10,
+      "maximum_spectator_workers_per_request": 1,
+      "maximum_spectator_steps_per_run": 24,
+      "maximum_new_campaign_training_episodes_per_round": 10,
+      "maximum_mirrored_candidate_scenario_runs": 20,
+      "candidate_training": "ten actual source-game Q policy episodes prioritized using ten source-audited exploratory mirrors; three independent heldout seeds; consent and rights required; no automatic production promotion",
+      "evidence_sources": [
+        "original_game_runtime",
+        "independent_source_replay",
+        "real_numeric_telemetry",
+        "real_local_Q_updates"
+      ],
+      "physical_hardware_spectra_claimed": false,
+      "native_renderer_camera_training_claimed": false,
+      "production_neural_checkpoint_modified": false,
+      "independent_test_verification": "not verified; new tests committed but not executed"
+    },
+    "shadow_saturation": {
+      "status": "committed_candidate_pending_exact_head_execution",
+      "core": "skeleton/jeeves/game_studio_shadow_saturation.py",
+      "operator_cli": "skeleton/jeeves/game_studio_shadow_cli.py",
+      "backend": "GET /api/game-studio-learning/campaigns/{id}/shadow-audit (read-only, one angle)",
+      "ui": "frontend/features/Jeeves/GameStudioScenarioLabPanel.tsx",
+      "ten_rule": "Ten consecutive independently audited zero-learning cycles *after* the most recent novel original-game behavior or significant Q-policy gain, per parent simulation",
+      "shadow_clones": "Exact parent intermediate snapshot is restored in an isolated engine and branched using an alternate registered action, then independently replayed and verified",
+      "novelty": "new action/acceptance/state-delta-direction/reward-sign/terminal witnesses, excluding source-seed/timestamp-only novelty",
+      "policy_training": "optional local real GamePolicyLearner Q episodes per cycle with new visited state-action pairs and source-measured maximum Q delta (default tolerance 1e-4) governing convergence",
+      "peak_scrutiny": "20 multispectral baseline checks per parent-plus-clone cycle, escalating by one independent extra check each successive cycle to a peak of 28; repeated at peak",
+      "evidence": "SHA256 receipt chain with full per-step evidence for both branches, original and shadow checkpoint digests, reverse replay, spectral proofs, exact source/Q update counts, measured novelty and budget usage",
+      "persistence": "exclusive append-only fsync-per-cycle JSONL ledger with independent final certificate only on completed verified run",
+      "resources": "max 64 cycles per parent, max 12 steps per simulation, 4 concurrent threads, finite replay-work budget; an exhausted budget MUST report unproven",
+      "native_sensors_claimed": false,
+      "universal_exhaustion_claimed": false,
+      "production_neural_weights_changed": false,
+      "verification": "focused tests committed; not run at exact head"
+    },
+    "multifactor_training": {
+      "status": "candidate_implementation_committed_pending_exact_head_tests",
+      "owner": "skeleton/jeeves/game_studio_multifactor.py",
+      "local_q_cli": "skeleton/jeeves/game_studio_multifactor_cli.py",
+      "neural_corpus": "skeleton/ai/training/jeeves_studio_multifactor_corpus.py",
+      "neural_checkpoint_entry": "skeleton/ai/training/jeeves_production_game_train.py (optional separately pinned studio_corpus input)",
+      "coverage": "up to 8 executable axes per source bank and 512 bounded candidate worlds for greedy pair/three-way covering",
+      "categories": [
+        "items",
+        "abilities",
+        "weapons",
+        "tools",
+        "style",
+        "movement",
+        "expression",
+        "reaction",
+        "consequence",
+        "actions",
+        "environment",
+        "ambience",
+        "music",
+        "apparel",
+        "status_effects",
+        "npc_behavior",
+        "quests",
+        "physics",
+        "economy",
+        "camera",
+        "time",
+        "accessibility",
+        "localization",
+        "network",
+        "save_load"
+      ],
+      "real_execution": "Only runtime-declared settings and approved action palette. All absent controls report unimplemented_for_this_engine.",
+      "measurements": [
+        "base vs joint on identical seed",
+        "ten-pass source-audited action traces",
+        "one-at-a-time factor removals",
+        "selected two-factor difference-of-differences",
+        "actual local Q parameter delta",
+        "newly visited Q state-action pairs",
+        "sum/max signed Q changes",
+        "heldout 2-seed baseline vs candidate performance"
+      ],
+      "default_training": "3 source-matched local-Q episodes per selected combo (operator rights admission required), 2 disjoint heldout seeds; up to 8 combos",
+      "independent_neural": "Only independently replayed, operator-SHA-pinned training data can enter an existing checkpoint candidate optimizer, not automatic model promotion",
+      "ui": [
+        "GET /campaigns/{id}/multifactor-capabilities",
+        "GET /campaigns/{id}/multifactor-plan",
+        "GET /campaigns/{id}/multifactor-experiments"
+      ],
+      "production_neural_parameters_modified": false,
+      "native_media_supported_without_runtime": false,
+      "successful_exact_head_execution_confirmed": false
+    },
+    "factorial_scrutiny": {
+      "status": "source_committed_pending_exact_head_execution",
+      "owner": "skeleton/jeeves/game_studio_factorial_scrutiny.py",
+      "execution": "complete 2^k factorial source-game intervention lattice for k=2 or 3 selected active axes, each on 2 or 3 disjoint seeds; original registered actions and source-validated settings only",
+      "per_corner": "ten-pass independently replayed multispectral audit, complete original-game action/observation/reward/transition receipts",
+      "reverse": "re-execute fully modified and unmodified worlds in reverse execution order on each tested seed and reject divergent receipts",
+      "action_order": "replay genuine reverse command sequences on matching world/seed and record reward, action acceptance and state-trajectory differences",
+      "effects": "exact signed main, pair and triple inclusion/exclusion contrasts with per-seed mean, worst, min/max, spread and sign-reversal evidence",
+      "risk_queue": "bounded ordered source-derived reasons and proposed seeds; no automatically scheduled or executed followup",
+      "parameter_scrutiny": "signed Q-value deltas, positive/negative counts, absolute drift quantiles p50/p90/p99, top 96 sampled state-action before/after changes, per-action weight movement, full Q snapshot digest",
+      "viewer": "Jeeves panel displays factorial coverage, order effects, adversarial followup recommendations",
+      "claims_excluded": [
+        "full original-game causal identification",
+        "real native audiovisual sensor fidelity",
+        "statistical significance with two or three seeds",
+        "production neural weight improvements",
+        "automatic policy or world promotion"
+      ],
+      "verification": "tests added; exact-head CI and integration not yet complete",
+      "coverage_ledger": {
+        "offered_valid_candidate_pool_scope_only": true,
+        "per_order_witness_counts": [
+          1,
+          2,
+          3
+        ],
+        "records_all_enabled_factor_witnesses": true,
+        "default_spectator_steps": 4,
+        "quick_spectator_steps": 2,
+        "source_governance_fields_immutable": true,
+        "production_model_changed": false
+      }
+    },
+    "shared_compute_admission": {
+      "owner": "backend/core/game_studio_learning.py",
+      "capacity_owner": "existing workspace.workers canonical CPU training_credit_ids from core.game_play.resource_profiles; no separate resource pool",
+      "endpoints": [
+        "scenario_mirror_views",
+        "engine_probe_page",
+        "scenario_shadow_audit",
+        "multifactor_plan_preview",
+        "multifactor_verified_experiments"
+      ],
+      "credits_per_request": 1,
+      "internal_parallel_workers_per_request": 1,
+      "busy_behavior": "Immediate bounded capacity-busy response; no queued executor work before physical credit admission",
+      "lease_seconds": 30,
+      "heartbeat_seconds": 1,
+      "cancellation": "Shield the raw executor future and drain it across repeated caller cancellation; keep credit and heartbeat until physical thread and any bounded internal executor have quiesced",
+      "failure_scope": "Lease/heartbeat loss requests cooperative cancellation and rejects publication after finite work drains. Pure helpers without cancellation hooks finish their existing bounded work; no force-kill or cross-replica exclusion guarantee during a remote storage outage.",
+      "publication": "No training-state writes or model promotion; only existing capacity-control rows are leased and released.",
+      "current_source_authority": "Campaign-bound endpoints recheck current scoped source and teacher rights after physical compute before publishing; captured cursor, seed and source receipts retain their original identities."
+    }
+  }
 }

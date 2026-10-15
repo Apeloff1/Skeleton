@@ -477,7 +477,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "28305c291f27ea9a5f2d27930bd24279b219e6f8",
+      "source_git_object_sha": "c73f02976d17cf16674882e8c4b6fc68872b92fc",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -5755,7 +5755,10 @@
         "jeeves_adaptive_sim_training.py",
         "jeeves_capacity_growth.py",
         "jeeves_capability_replay.py",
-        "jeeves_boomerang_queue.py"
+        "jeeves_boomerang_queue.py",
+        "jeeves_studio_curriculum.py",
+        "jeeves_studio_multifactor_corpus.py",
+        "jeeves_studio_rule_corpus.py"
       ],
       "overlay_note": "Current main already implements these governed AI-only training modules. Declare their existing placement without copying them into the legacy tree or changing training authority."
     },

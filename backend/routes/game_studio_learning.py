@@ -15,7 +15,7 @@ router = APIRouter(prefix="/game-studio-learning", tags=["Studio learning"])
 class CampaignCreate(WriteRequest):
     round_limit: int = Field(default=100000, ge=1, le=100000, strict=True)
     slice_rounds: int = Field(default=4, ge=1, le=8, strict=True)
-    episodes: int = Field(default=1, ge=1, le=4, strict=True)
+    episodes: int = Field(default=10, ge=1, le=10, strict=True)
     max_steps: int = Field(default=256, ge=1, le=4096, strict=True)
     seed: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
     policy_id: str | None = Field(default=None, min_length=1, max_length=128)
@@ -56,7 +56,10 @@ class CampaignCreate(WriteRequest):
 
     @model_validator(mode="after")
     def slice_budget(self):
-        if self.slice_rounds * (self.episodes + 4 * self.evaluation_seeds) * self.max_steps > 131072:
+        if self.slice_rounds * (
+            (self.episodes + 4 * self.evaluation_seeds) * self.max_steps
+            + 20 * min(6,self.max_steps)
+        ) > 131072:
             raise ValueError("all training/play/adversarial slice transitions must fit131072steps")
         from skeleton.jeeves.game_studio_learning import CampaignConfig
 
@@ -240,3 +243,94 @@ async def get_lessons(
     user=Depends(get_current_user),
 ):
     return await _call(learning.lessons(_scope(user), project_id, q, limit, cursor))
+
+
+@router.get("/campaigns/{campaign_id}/mirror-views")
+async def mirror_views(
+    campaign_id: str,
+    lanes: int = Query(default=4,ge=1,le=6),
+    steps: int = Query(default=12,ge=1,le=24),
+    sample: int = Query(default=0,ge=0,le=255),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.scenario_mirror_views(
+        _scope(user), campaign_id, lanes=lanes, steps=steps, sample=sample,
+    ))
+
+
+@router.get("/campaigns/{campaign_id}/scenario-drafts")
+async def scenario_drafts(
+    campaign_id: str,
+    limit: int = Query(default=4,ge=1,le=5),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.scenario_drafts(_scope(user),campaign_id,limit=limit))
+
+
+@router.get("/engines/{editor}/test-manifest")
+async def original_engine_test_manifest(editor: str,user=Depends(get_current_user)):
+    return await _call(learning.scenario_engine_test_manifest(_scope(user),editor))
+
+
+@router.get("/research/sales-informed-scenarios")
+async def sales_informed_design_references(user=Depends(get_current_user)):
+    from skeleton.jeeves.game_studio_scenario_lab import sales_informed_catalog
+    return sales_informed_catalog()
+
+
+@router.get("/engines/{editor}/probes")
+async def executable_engine_test_page(
+    editor: str,
+    offset: int = Query(default=0,ge=0,le=100000),
+    limit: int = Query(default=8,ge=1,le=16),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.engine_probe_page(
+        _scope(user),editor,offset=offset,limit=limit,
+    ))
+
+
+@router.get("/campaigns/{campaign_id}/shadow-audit")
+async def shadow_audit(
+    campaign_id:str,
+    angle:str=Query(default="explore",min_length=3,max_length=24),
+    steps:int=Query(default=2,ge=1,le=4),
+    max_cycles:int=Query(default=12,ge=10,le=16),
+    replay_budget:int=Query(default=600,ge=100,le=1000),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.scenario_shadow_audit(
+        _scope(user),campaign_id,angle=angle,steps=steps,
+        max_cycles=max_cycles,replay_budget=replay_budget,
+    ))
+
+
+@router.get("/campaigns/{campaign_id}/multifactor-capabilities")
+async def multifactor_capabilities(campaign_id:str,user=Depends(get_current_user)):
+    return await _call(learning.multifactor_control_catalog(_scope(user),campaign_id))
+
+
+@router.get("/campaigns/{campaign_id}/multifactor-plan")
+async def multifactor_plan(
+    campaign_id:str,
+    axis_offset:int=Query(default=0,ge=0,le=63),
+    count:int=Query(default=6,ge=2,le=8),
+    order:int=Query(default=3,ge=2,le=3),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.multifactor_plan_preview(
+        _scope(user),campaign_id,axis_offset=axis_offset,count=count,order=order,
+    ))
+
+
+@router.get("/campaigns/{campaign_id}/multifactor-experiments")
+async def multifactor_experiments(
+    campaign_id:str,
+    axis_offset:int=Query(default=0,ge=0,le=63),
+    count:int=Query(default=2,ge=2,le=3),
+    steps:int=Query(default=2,ge=1,le=4),
+    user=Depends(get_current_user),
+):
+    return await _call(learning.multifactor_verified_experiments(
+        _scope(user),campaign_id,axis_offset=axis_offset,count=count,steps=steps,
+    ))
