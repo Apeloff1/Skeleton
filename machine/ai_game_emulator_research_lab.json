@@ -1,0 +1,115 @@
+{
+  "schema_version": "skeleton.ai.game_emulator_research_lab.v1",
+  "status": "source_committed_not_hardware_or_model_verification",
+  "scope": "actual retro worker or bounded experimental DMG interpreter, source/content rights asserted by operator",
+  "owners": [
+    "skeleton/jeeves/game_emulator_experiment_lab.py",
+    "skeleton/jeeves/game_emulator_curriculum.py",
+    "skeleton/jeeves/game_emulator_cross_core_lab.py",
+    "skeleton/jeeves/game_emulator_neural_world.py"
+  ],
+  "governed_mirrors": [
+    "skeleton/ai/agents/jeeves/game_emulator_experiment_lab.py",
+    "skeleton/ai/agents/jeeves/game_emulator_curriculum.py",
+    "skeleton/ai/agents/jeeves/game_emulator_cross_core_lab.py",
+    "skeleton/ai/agents/jeeves/game_emulator_neural_world.py"
+  ],
+  "entrypoints": [
+    "python -m skeleton.jeeves.game_learning_cli train-emulator-deep",
+    "python -m skeleton.jeeves.game_learning_cli experiment-emulator",
+    "python -m skeleton.jeeves.game_learning_cli compare-emulator-cores",
+    "python -m skeleton.jeeves.game_learning_cli fit-emulator-world-model"
+  ],
+  "experimental_conditions": [
+    "passive neutral",
+    "pulse",
+    "sustained",
+    "delayed",
+    "second action",
+    "A then B",
+    "B then A",
+    "alternating action",
+    "release/recovery",
+    "single action ablation",
+    "multi-button chord",
+    "two-controller source inputs",
+    "four-controller source inputs",
+    "multi-key input"
+  ],
+  "research_controls": {
+    "physical_axes": 24,
+    "independent_repeated_trials": 2,
+    "repeat_budget_max": 5,
+    "anchored_actual_savestates_max": 8,
+    "condition_budget_max": 128,
+    "actual_native_step_budget_max": 8192,
+    "raw_native_memory_export": false,
+    "operator_declared_memory_watches_max": 8,
+    "source_trace_exact_replay_required": true,
+    "visual_novelty_is_not_game_success": true,
+    "cutscene_like_heuristics_not_cinematic_scene_labels": true,
+    "hardware_correctness_not_inferred_from_core_agreement": true
+  },
+  "curriculum": {
+    "first_runs": "mandatory ten perspectives, one each",
+    "later_runs": "source-replay-grounded UCB priority; novelty, counterfactual disagreement, revisit uncertainty, replay cost",
+    "rare_actions": "use evidence of least-observed finite control",
+    "convergence": "10 sequential runs without new coarse visual state AND Q-value motion above 1e-6; not universal proof of no further learnability",
+    "boomerang": "seeded reshuffled reparse intervals and historical reservoir",
+    "auditable": false
+  },
+  "cross_core": {
+    "cores_min": 2,
+    "cores_max": 4,
+    "same_content_digest_required": true,
+    "same_console_target_required": true,
+    "identical_controller_sequences": true,
+    "attempt_native_availability": false,
+    "report_diff": "per-feature absolute sensor differences, exact frame digest agreements, measured reward deltas, per-core repeat stability",
+    "support_only": "already operator-approved real libretro cores"
+  },
+  "actual_neural_optimizer": {
+    "module": "game_emulator_neural_world.py",
+    "algorithm": "deterministic two hidden layer tanh MLP, minibatch AdamW",
+    "objective": "one-step source-measured numeric telemetry delta and reward",
+    "features": "all actual available observation channels and action one hot",
+    "episode_holdout": "SHA256-seeded trace-group disjoint holdout; no validation gradients or normalization leakage",
+    "optimizer_max": {
+      "hidden_width": 64,
+      "epochs": 40,
+      "minibatch": 64,
+      "source_examples": 8192
+    },
+    "receipt_validation": "reconstitute policy+evidence SHA256 report; verify every committed episode/trace/sequence and rights assertion",
+    "optimizer_measures": [
+      "real backprop gradient evaluations",
+      "actual optimizer steps",
+      "heldout MSE vs training-mean baseline",
+      "actual finite parameter count",
+      "SHA256 candidate checkpoint"
+    ],
+    "automatic_jeeves_production_transformer_update": false,
+    "automatic_promotion": false,
+    "weights_trained_in_this_commit": false,
+    "requirement_for_success": "independent local executable run on rights-cleared real ROMs and non-degenerate heldout improvement"
+  },
+  "tests_added": [
+    "skeleton/testing/test_game_emulator_training_lab.py",
+    "skeleton/testing/test_game_emulator_advanced_experiments.py",
+    "skeleton/testing/test_game_emulator_neural_world.py"
+  ],
+  "tests_executed": false,
+  "limitations": [
+    "No new native core compiled or ABI-verified by this PR",
+    "No real ROM replay or profile/e2e completion proved",
+    "Original in-process DMG runtime remains experimental",
+    "Native libretro requires approved external binaries and sandbox",
+    "Source-rights assertion is not third-party independent legal clearance",
+    "No game-event semantic classifier, joystick skill mastery, audiovisual cinematic labels, realtime cross-platform debugger, production LLM weight update or capability promotion has been verified"
+  ],
+  "operator_docs": [
+    "docs/ROM_EMULATOR_COMPLETION.md",
+    "docs/ROM_EMULATOR_TRAINING_LAB.md",
+    "docs/ROM_EMULATOR_ADVANCED_RESEARCH.md"
+  ]
+}
