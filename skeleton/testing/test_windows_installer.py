@@ -244,4 +244,3 @@ def test_host_preload_rejects_stopped_docker_daemon(monkeypatch, tmp_path):
     assert report.ready is False
     assert daemon.required is True
     assert "Start Docker Desktop" in daemon.remediation
-
