@@ -190,26 +190,45 @@ def inspect_host(
             )
         )
 
-    usage = shutil.disk_usage(root)
+    try:
+        free_bytes = shutil.disk_usage(root).free
+    except OSError as exc:
+        # A deleted, inaccessible or unplugged installation filesystem must
+        # produce a normal actionable report, not crash the Windows launcher.
+        free_bytes = None
+        disk_error = type(exc).__name__
+    else:
+        disk_error = ""
+
+    disk_ready = free_bytes is not None and free_bytes >= min_free_bytes
+    recommended_ready = free_bytes is not None and free_bytes >= recommended_free_bytes
     checks.append(
         PreloadCheck(
             code="host:disk",
-            ok=usage.free >= min_free_bytes,
-            detail=f"{usage.free / 1024**3:.1f} GiB free on application filesystem",
-            remediation=f"Free at least {min_free_bytes / 1024**3:.0f} GiB before installing.",
+            ok=disk_ready,
+            detail=(
+                f"{free_bytes / 1024**3:.1f} GiB free on application filesystem"
+                if free_bytes is not None
+                else f"cannot inspect installation filesystem: {disk_error}"
+            ),
+            remediation=f"Make the destination accessible and free at least {min_free_bytes / 1024**3:.0f} GiB.",
         )
     )
     checks.append(
         PreloadCheck(
             code="host:disk-recommended",
-            ok=usage.free >= recommended_free_bytes,
+            ok=recommended_ready,
             required=False,
             detail=(
-                f"recommended Docker build headroom available ({usage.free / 1024**3:.1f} GiB)"
-                if usage.free >= recommended_free_bytes
-                else f"less than recommended {recommended_free_bytes / 1024**3:.0f} GiB Docker build headroom"
+                f"recommended Docker build headroom available ({free_bytes / 1024**3:.1f} GiB)"
+                if recommended_ready
+                else (
+                    f"less than recommended {recommended_free_bytes / 1024**3:.0f} GiB Docker build headroom"
+                    if free_bytes is not None
+                    else f"cannot inspect installation filesystem: {disk_error}"
+                )
             ),
-            remediation="Free additional disk space for faster, safer image builds.",
+            remediation="Free additional disk space for safer image builds.",
         )
     )
 

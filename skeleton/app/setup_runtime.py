@@ -153,7 +153,11 @@ def ensure_runtime_environment(
         configured.append("MONGO_INITDB_ROOT_USERNAME")
 
     password = values.get("MONGO_INITDB_ROOT_PASSWORD", "")
-    if rotate_secrets or _is_placeholder(password):
+    # MongoDB's root user is initialized only when its persistent data volume
+    # is empty. Changing .env alone does NOT rotate the database user password.
+    # Generic --rotate-secrets must preserve existing credentials; database
+    # password rotation needs a separate authenticated DB operation.
+    if _is_placeholder(password):
         password = secrets.token_urlsafe(24)
         text = _replace_env_value(text, "MONGO_INITDB_ROOT_PASSWORD", password)
         values["MONGO_INITDB_ROOT_PASSWORD"] = password

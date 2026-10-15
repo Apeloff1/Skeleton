@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from tempfile import TemporaryFile
 from typing import Callable, Sequence
 
 from skeleton.app.assembly import (
@@ -222,14 +223,20 @@ def install_application(
         hot=hot,
     )
     try:
-        completed = runner(
-            list(command),
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            env=compose_env,
-        )
+        # Docker image builds can emit massive output on first installation.
+        # Stream it to a private temporary file rather than retaining the
+        # whole build log in GUI/Python process memory. Never echo credentials
+        # from Compose output into installer receipts.
+        with TemporaryFile(mode="w+t", encoding="utf-8") as build_log:
+            completed = runner(
+                list(command),
+                cwd=root,
+                check=False,
+                stdout=build_log,
+                stderr=subprocess.STDOUT,
+                text=True,
+                env=compose_env,
+            )
         ok = completed.returncode == 0
         detail = (
             "application services started"

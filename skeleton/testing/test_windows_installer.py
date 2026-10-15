@@ -347,3 +347,18 @@ def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):
     assert not success
     assert "exit 5" in detail
     assert secret not in detail
+
+def test_disk_preflight_fails_closed_when_installation_drive_disappears(tmp_path, monkeypatch):
+    monkeypatch.setattr("skeleton.app.preloader.preflight", lambda *args, **kwargs: ())
+    monkeypatch.setattr("skeleton.app.preloader.checks_ok", lambda checks: True)
+    monkeypatch.setattr("skeleton.app.preloader.shutil.which", lambda name: None)
+    def disk_missing(root):
+        raise OSError("drive missing")
+    monkeypatch.setattr("skeleton.app.preloader.shutil.disk_usage", disk_missing)
+
+    report = inspect_host(tmp_path, require_python=False, require_pip=False)
+    disk = next(item for item in report.checks if item.code == "host:disk")
+    assert not disk.ok
+    assert report.ready is False
+    assert "cannot inspect installation filesystem" in disk.detail
+    assert "drive missing" not in disk.detail

@@ -386,3 +386,59 @@ def test_invalid_existing_signing_seed_is_flagged_without_destruction(tmp_path):
     receipt = ensure_runtime_environment(tmp_path)
     assert "GF_KEYHOLDER_SEED must be exactly 32 bytes of hexadecimal data" in receipt.warnings
     assert _read_values(tmp_path / ".env")["GF_KEYHOLDER_SEED"] == "operator-invalid-seed"
+
+def test_generic_secret_rotation_keeps_persistent_mongodb_credentials(tmp_path):
+    (tmp_path / ".env.example").write_text(ENV_TEMPLATE, encoding="utf-8")
+    ensure_runtime_environment(tmp_path)
+    before = _read_values(tmp_path / ".env")
+    result = ensure_runtime_environment(tmp_path, rotate_secrets=True)
+    after = _read_values(tmp_path / ".env")
+
+    assert after["MONGO_INITDB_ROOT_PASSWORD"] == before["MONGO_INITDB_ROOT_PASSWORD"]
+    assert after["MONGO_URL"] == before["MONGO_URL"]
+    assert after["SKL_MONGO_URI"] == before["SKL_MONGO_URI"]
+    assert "MONGO_INITDB_ROOT_PASSWORD" in result.preserved_keys
+    assert after["JWT_SECRET"] != before["JWT_SECRET"]
+    assert after["SKL_ENGINE_SERVICE_TOKEN"] != before["SKL_ENGINE_SERVICE_TOKEN"]
+
+
+def test_first_install_build_output_streams_to_file_instead_of_memory(tmp_path, monkeypatch):
+    from skeleton.app.installer import install_application
+
+    report = PreloadReport(
+        root=tmp_path, platform="Windows", python="bundled",
+        checks=(PreloadCheck("host:ready", True, "ready"),),
+    )
+    monkeypatch.setattr("skeleton.app.installer.inspect_host", lambda *args, **kwargs: report)
+    monkeypatch.setattr("skeleton.app.installer.preflight", lambda *args, **kwargs: ())
+    monkeypatch.setattr("skeleton.app.installer.checks_ok", lambda checks: True)
+    monkeypatch.setattr(
+        "skeleton.app.installer.ensure_runtime_environment",
+        lambda root, **kwargs: SetupResult(Path(root) / ".env", False, False, (), (), ()),
+    )
+    monkeypatch.setattr(
+        "skeleton.app.installer.compose_command",
+        lambda action, **kwargs: ("docker", "compose", action),
+    )
+    class Result:
+        service = "backend"
+        ok = True
+    monkeypatch.setattr(
+        "skeleton.app.health.wait_for_application",
+        lambda **kwargs: (Result(),),
+    )
+
+    calls = []
+    def runner(command, **kwargs):
+        calls.append((tuple(command), dict(kwargs)))
+        if command[-1] == "up":
+            assert "capture_output" not in kwargs
+            assert kwargs["stderr"] is subprocess.STDOUT
+            assert kwargs["stdout"].fileno() >= 0
+            kwargs["stdout"].write("pretend-secret-which-must-not-be-reported\n")
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    receipt = install_application(tmp_path, start=True, install_python=False, runner=runner)
+    assert receipt.ok
+    assert len(calls) == 2
+    assert "pretend-secret" not in repr(receipt.to_dict())
