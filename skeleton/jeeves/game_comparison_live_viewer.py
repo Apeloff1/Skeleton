@@ -238,6 +238,55 @@ function nativeAudioMonitor(frame){
  region.append(button,player,description);
  return region
 }
+function discDeckFor(id){
+ const lane=current.lanes[id],status=lane.native_disc_status;
+ const section=txt("section","","deck");
+ section.append(txt("strong","Native console media · installed core only"));
+ if(!status?.supported||status.image_count<2){
+  section.append(txt("small","No multi-disc interface registered by this native core."));
+  return section
+ }
+ const summary=txt("p","Disc "+(status.image_index===null?"not inserted":(status.image_index+1))+
+    " of "+status.image_count+" · "+(status.ejected?"tray ejected":"tray closed")+
+    " · swaps "+lane.native_disc_change_count+"/32","subtle");
+ const controls=txt("div","","inline"),select=document.createElement("select");
+ select.setAttribute("aria-label","Select previously loaded console disc");
+ for(let i=0;i<status.image_count;i++)select.append(choose(String(i),"Disc "+(i+1)));
+ select.value=String(status.image_index??0);
+ const button=txt("button","Switch to selected disc");
+ button.type="button";
+ button.disabled=lane.status!=="running"||status.ejected||lane.native_disc_change_count>=32;
+ button.onclick=async()=>{
+  const target=Number(select.value);
+  if(!Number.isInteger(target)||target<0||target>=status.image_count){
+   msg("Disc change rejected: invalid preloaded disc");return
+  }
+  if(target===status.image_index){
+   msg("That native disc is already inserted");return
+  }
+  try{
+   msg("Requesting actual libretro eject/select/insert transaction…");
+   const result=await request("/api/disc_swap",{game_id:id,image_index:target});
+   await load();
+   msg(result.changed?"Native core changed disc; advance a frame to observe game response":
+       "Native disc unchanged or worker rejected the swap; inspect lane status")
+  }catch(error){msg("Native disc switch rejected: "+error.message);await load()}
+ };
+ controls.append(select,button);
+ section.append(summary,controls);
+ const discEvents=(lane.recent_native_events||[]).filter(x=>x.event_kind==="native_disc_swap");
+ const details=document.createElement("details");
+ details.append(txt("summary","Disc-change evidence · "+discEvents.length+" recent receipt(s)"));
+ discEvents.forEach(event=>{
+  const r=event.receipt;
+  details.append(txt("div","Disc "+(r.previous_image_index+1)+" → "+(r.selected_image_index+1)+
+     " · step "+r.episode_step+" · host "+r.native_host_disc_receipt_sha256.slice(0,12)+
+     " · chain "+r.receipt_sha256.slice(0,12),"stats"))
+ });
+ section.append(details);
+ section.append(txt("small","Only core-preloaded, hash-pinned media. No new files, automatic model learning or claimed console fidelity."));
+ return section
+}
 function panel(side){
  const root=$(side),id=selected[side],lane=current.lanes[id];
  root.replaceChildren();
@@ -255,6 +304,7 @@ function panel(side){
  }else stage.append(txt("p",lane.status==="running"?"Actual frame exceeds bounded preview limit":lane.status,"subtle"));
  root.append(stage);
  root.append(deckFor(id));
+ root.append(discDeckFor(id));
  root.append(nativeAudioMonitor(frame));
  const actions=txt("div","","inline"),doStep=txt("button","Advance native frame"),doReset=txt("button","Reset this emulator");
  doStep.disabled=lane.status!=="running"||lane.lifetime_steps>=lane.max_lifetime_steps;doReset.disabled=lane.status==="native_execution_failed"||lane.reset_count>=4;
