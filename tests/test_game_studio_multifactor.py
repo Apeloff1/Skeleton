@@ -66,6 +66,12 @@ class MultifactorExperimentTests(unittest.TestCase):
         )
         self.assertEqual(self.source,prior)
         self.assertEqual(result["actual_q_weight_updates"],0)
+        self.assertTrue(all(
+            set(entry["selected_registered_actions"][:2]).issubset(
+                set(result["experiments"][entry["index"]]["scripted_actions"])
+            ) for entry in result["plan"]["scenarios"]
+            if len(entry["selected_registered_actions"])<=2
+        ))
         self.assertFalse(result["production_neural_weights_modified"])
         self.assertFalse(result["automatic_promotion"])
         self.assertGreaterEqual(result["scenarios_executed"],2)
@@ -103,6 +109,16 @@ class MultifactorExperimentTests(unittest.TestCase):
                 {row["seed"]+9000+i for i in range(3)}
             ))
             gain=training["parameter_gain"]
+            efficiency=training["measured_learning_efficiency"]
+            self.assertGreater(efficiency["actual_q_updates"],0)
+            self.assertGreaterEqual(efficiency["accepted_game_actions"],0)
+            self.assertEqual(efficiency["neural_parameter_updates_observed"],0)
+            self.assertFalse(efficiency["claimed_converged_or_SOTA"])
+            self.assertEqual(len(training["training_episode_actions"]),3)
+            self.assertTrue(all(
+                1<=len(e["actions"])<=2 and len(e["trace_digest"])==64
+                for e in training["training_episode_actions"]
+            ))
             self.assertGreater(gain["newly_visited_state_action_parameters"],0)
             self.assertEqual(gain["model_kind"],"local_tabular_Q_not_neural_transformer")
             self.assertEqual(gain["production_neural_parameters_updated"],0)

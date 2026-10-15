@@ -642,7 +642,7 @@ because it is intentionally restricted to short read-only previews.
 
 ## High-order multi-item/ability/weapon/tool/movement/sensory factor training
 
-The new `skeleton/jeeves/game_studio_multifactor.py` defines 26
+The new `skeleton/jeeves/game_studio_multifactor.py` defines 25
 independent *declared factor categories*: items, abilities, weapons,
 tools, style, movement, expression, reaction, consequence, actions,
 environment, ambience, music, apparel, status effects, NPC behavior,
@@ -752,3 +752,18 @@ native multimedia rendering, full weapon/ability/tool
 simulation fidelity, user-perceived emotion/music quality,
 per-modality benchmark improvements, load/soak/E2E, and
 all-engine production completeness remain pending.
+
+### Parameter-gain effectiveness receipts
+
+Every local-Q candidate now records an explicit
+`measured_learning_efficiency` section: exact optimizer update count,
+actual source-accepted commands, productive non-clock state transitions,
+newly explored state-action parameters per 100 updates, changed Q
+parameters per 100 updates, absolute Q-weight movement per update,
+independent holdout mean-return delta and negative transfer detection.
+This is machine-readable source evidence and must not be confused
+with production transformer training or universal game design
+generalization. Every action selected as an item, ability, tool or
+weapon factor is scheduled early enough to actually be exercised
+within the requested bounded episode depth; seed jitter cannot
+silently omit it from the tested source path.

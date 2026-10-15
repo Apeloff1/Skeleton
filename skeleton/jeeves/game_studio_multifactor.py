@@ -300,12 +300,16 @@ def _action_script(source:dict, selected:list[str],steps:int,seed:int)->tuple[st
     palette=source["actions"]
     if not palette:
         raise MultiFactorError("source game has no executable commands")
-    queue=list(dict.fromkeys(selected))
-    # Each declared item/tool/ability action is exercised in a mixed
-    # multi-action schedule; fallback controls remain registered.
-    queue+=list(dict.fromkeys(palette))
-    queue=list(dict.fromkeys(queue))
-    return tuple(queue[(i+(seed%len(queue)))%len(queue)] for i in range(steps))
+    mandatory=list(dict.fromkeys(selected))
+    # Chosen combination actions MUST actually execute early in a short
+    # scenario; seed jitter must never hide an item/ability/tool intervention.
+    # Other registered controls fill the remaining bounded horizon.
+    fallback=[x for x in palette if x not in mandatory]
+    if not fallback:
+        fallback=mandatory or list(palette)
+    tail=[fallback[(seed+i)%len(fallback)] for i in range(max(0,steps-len(mandatory)))]
+    queue=mandatory+tail
+    return tuple(queue[:steps])
 
 
 def _gain(before:dict,after:dict)->dict:
@@ -477,10 +481,42 @@ def execute_multifactor_scenarios(
                     trial_seed+14000+i for i in range(2)
                 ],baseline_snapshot=before,
             ).as_dict()
+            gain=_gain(before,after)
+            valid_steps=0
+            changed_states=0
+            for trace in observed.traces:
+                for transition in trace["transitions"]:
+                    accepted=(transition.get("info") or {}).get("evidence",{}).get("accepted") is True
+                    valid_steps+=int(accepted)
+                    old=transition["observation"]
+                    new=transition["next_observation"]
+                    changed_states+=int(accepted and any(
+                        abs(float(new[key])-float(old[key]))>1e-8
+                        for key in old if key!="time"
+                    ))
+            useful={
+                "actual_q_updates":observed.updates,
+                "accepted_game_actions":valid_steps,
+                "productive_non_time_transitions":changed_states,
+                "new_q_state_actions_per_100_updates":round(
+                    100*gain["newly_visited_state_action_parameters"]/max(1,observed.updates),6,
+                ),
+                "changed_q_parameters_per_100_updates":round(
+                    100*gain["changed_q_parameters"]/max(1,observed.updates),6,
+                ),
+                "absolute_q_weight_change_per_update":round(
+                    gain["sum_absolute_q_weight_change"]/max(1,observed.updates),9,
+                ),
+                "heldout_mean_return_difference":heldout["mean_return_difference"],
+                "heldout_regression_observed":heldout["mean_return_difference"]<0,
+                "neural_parameter_updates_observed":0,
+                "claimed_converged_or_SOTA":False,
+            }
             learned={
                 "policy_before_digest":before["snapshot_digest"],
                 "policy_after_digest":after["snapshot_digest"],
-                "parameter_gain":_gain(before,after),
+                "parameter_gain":gain,
+                "measured_learning_efficiency":useful,
                 "actual_training_updates":observed.updates,
                 "training_trace_digests":[t["trace_digest"] for t in observed.traces],
                 "training_episode_actions":[{
