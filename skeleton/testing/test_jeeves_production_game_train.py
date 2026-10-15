@@ -66,6 +66,43 @@ class ProductionGameCheckpointTests(unittest.TestCase):
                     with self.assertRaisesRegex(ProductionCheckpointError, fragment):
                         _production_source(None, sha256(data).hexdigest())
 
+    def test_active_rms_mouth_fine_tunes_neo_rms_not_transformer(self) -> None:
+        from skeleton.ai.training.jeeves_production_game_train import _active_snapshot
+        snap = {"itos": ["__unk__"], "E": [[0.1]], "layers": [{}],
+                "dim": 8, "ctx": 6, "steps": 7, "fitted": 1}
+        state = {"transformer": dict(snap),
+                 "neo_rms": {**snap, "steps": 13},
+                 "winner": "rms", "mouth_override": None}
+        key, selected, mouth = _active_snapshot(state)
+        self.assertEqual((key, mouth), ("neo_rms", "rms"))
+        self.assertEqual(selected["steps"], 13)
+        state["mouth_override"] = "gelu"
+        key, selected, mouth = _active_snapshot(state)
+        self.assertEqual((key, mouth), ("transformer", "gelu"))
+        self.assertEqual(selected["steps"], 7)
+
+    def test_no_silent_fallback_for_unknown_or_torch_mouth(self) -> None:
+        from skeleton.ai.training.jeeves_production_game_train import _active_snapshot
+        xf = {"itos": ["__unk__"], "E": [[0.1]], "layers": [{}],
+              "dim": 8, "ctx": 6, "steps": 10, "fitted": 1}
+        with self.assertRaisesRegex(ProductionCheckpointError, "unsupported active"):
+            _active_snapshot({"transformer": xf, "winner": "pfc"})
+        with self.assertRaisesRegex(ProductionCheckpointError, "torch-stack"):
+            _active_snapshot({"transformer": {**xf, "kind": "torch-stack"}, "winner": "neo"})
+        with self.assertRaisesRegex(ProductionCheckpointError, "speaking weights missing"):
+            _active_snapshot({"transformer": xf, "winner": "rms"})
+
+    def test_missing_persisted_bpe_does_not_claim_production_ready(self) -> None:
+        snap = {"itos": ["__unk__"], "E": [[0.1]], "layers": [{}],
+                "dim": 8, "ctx": 6, "steps": 7, "fitted": 1}
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "own.json"
+            raw = json.dumps({"own": {}, "lms": {}, "transformer": snap}).encode()
+            state.write_bytes(raw)
+            with patch.dict(os.environ, {"SKELETON_OWN": str(state)}):
+                with self.assertRaisesRegex(ProductionCheckpointError, "BPE tokenizer"):
+                    _production_source(None, sha256(raw).hexdigest())
+
     def test_candidate_publishing_never_overwrites(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "candidate.json"
