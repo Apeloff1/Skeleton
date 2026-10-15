@@ -158,7 +158,7 @@ class EmulatorTrainingCustodyTests(unittest.TestCase):
             checkpoint_stride=2, boomerang_interval=2, boomerang_retained=2,
             heldout_episodes=1,
         )
-        with patch.object(GameEnvironmentRequest, "build", side_effect=ControlledNativeFixture):
+        with patch.object(GameEnvironmentRequest, "build", side_effect=lambda **_: ControlledNativeFixture()):
             report = run_emulator_training_lab(
                 _request(), source_lineage={"rights_acknowledged": True, "operator": "fixture"},
                 config=config,
