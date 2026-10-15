@@ -708,6 +708,22 @@
       "guard": "Same study/game ID with different pinned ROM/core bytes across batches fails closed",
       "purpose": "Allows multiple 10-game cohorts of one 30-title study to coexist and be merged without silently overwriting or double-counting outcomes",
       "native_execution_verified_in_patch": false
+    },
+    "original_project_variant_forge": {
+      "module": "skeleton/jeeves/game_comparison_variant_forge.py",
+      "cli": "python3 scripts/forge_game_comparison_variants.py --result /path/observed.result.json --game first --game second --target nes --output-dir /path/originals",
+      "stages": [
+        "earlier",
+        "middle",
+        "after"
+      ],
+      "source": "2–30 independently observed game records, digest-verified; optional locally reviewed numerical hypotheses with actual observation receipts",
+      "output": "Three original canonical ConsoleProject documents and original source file trees, using existing target-specific editor and validation",
+      "original_scene_variation": "Author-generated seeds, original palettes, new editor tilemap barriers/alternate paths with reachability gate; no source art, asset, music, dialogue, ROM or map copying",
+      "parameter_proposals": "Keep reviewer-authored numerical values as evidence-bound hypotheses. Do not apply unverified game values or train model weights.",
+      "runnable_native_roms_compiled": false,
+      "tests": "tests/test_game_comparison_variant_forge.py source tests added but not executed against native ROMs in this edit",
+      "rights": "No source game ROM bytes appear in variant output, only SHA-256 stage and original ROM digests"
     }
   }
 }
