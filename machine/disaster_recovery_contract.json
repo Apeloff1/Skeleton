@@ -419,10 +419,10 @@
         "skeleton/testing/test_state_recovery_drill.py"
       ],
       "post_restore_checks": [
-        "restored-complete-curiosity-directory",
-        "original-file-owner-and-permissions",
         "curiosity-ledger-integrity",
-        "no-live-worker-before-restore"
+        "no-live-worker-before-restore",
+        "original-file-owner-and-permissions",
+        "restored-complete-curiosity-directory"
       ]
     },
     {
@@ -434,22 +434,22 @@
       ],
       "backup_policy_store_ids": [],
       "depends_on_units": [
-        "mongo-backend-core",
-        "backend-curiosity-files"
+        "backend-curiosity-files",
+        "mongo-backend-core"
       ],
       "rto_seconds": 3600,
       "rpo_seconds": 3600,
       "required_for_global_traffic": true,
       "verification_refs": [
-        "skeleton/ai/game_builder/reviewed_knowledge.py",
         "backend/core/dragon_runtime.py",
-        "machine/ai_dragon_knowledge_runtime.json"
+        "machine/ai_dragon_knowledge_runtime.json",
+        "skeleton/ai/game_builder/reviewed_knowledge.py"
       ],
       "post_restore_checks": [
         "consistent-sqlite-backup-and-owner",
-        "review-revision-and-source-identity",
         "mongo-current-consent-revocation-recheck",
-        "no-missing-database-recreation"
+        "no-missing-database-recreation",
+        "review-revision-and-source-identity"
       ]
     },
     {
@@ -461,22 +461,22 @@
       ],
       "backup_policy_store_ids": [],
       "depends_on_units": [
-        "mongo-backend-core",
-        "dragon-reviewed-knowledge-files"
+        "dragon-reviewed-knowledge-files",
+        "mongo-backend-core"
       ],
       "rto_seconds": 3600,
       "rpo_seconds": 3600,
       "required_for_global_traffic": true,
       "verification_refs": [
-        "skeleton/ai/webcrawler/dragon_practice_lab.py",
         "backend/core/dragon_reference_practice.py",
-        "machine/ai_dragon_knowledge_runtime.json"
+        "machine/ai_dragon_knowledge_runtime.json",
+        "skeleton/ai/webcrawler/dragon_practice_lab.py"
       ],
       "post_restore_checks": [
         "consistent-sqlite-backup-and-owner",
+        "no-premature-new-attempts",
         "practice-receipt-checkpoint-lineage",
-        "source-withdrawal-fence",
-        "no-premature-new-attempts"
+        "source-withdrawal-fence"
       ]
     }
   ],
