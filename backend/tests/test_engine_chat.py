@@ -509,6 +509,24 @@ def test_explicit_turn_identity_survives_retrieval_drift() -> None:
     )
 
 
+@pytest.mark.asyncio
+async def test_engine_chat_byte_eviction_never_leaves_orphaned_assistant() -> None:
+    async def execute(request):
+        assert len(request.history) == 2
+        return EngineTextResponse(
+            text="ok", execution_id="bounded-history",
+            verification=None, evidence_refs=(), usage={},
+        )
+
+    chat = EngineChat(engine_executor=execute)
+    chat.add_history_message("user", "U" * 250_000)
+    chat.add_history_message("assistant", "A" * 250_000)
+    answer = await chat.send_message("P" * 30_000)
+    assert answer == "ok"
+    assert [part["role"] for part in chat._history] == ["user", "assistant"]
+    assert chat._history[0]["content"] == "P" * 30_000
+
+
 def test_engine_chat_rejects_duplicate_evidence_source() -> None:
     chat = EngineChat(session_id="evidence-duplicates")
     chat.add_evidence("same", "first")

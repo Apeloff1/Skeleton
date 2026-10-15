@@ -114,7 +114,7 @@ def test_unsupported_abstract_genres_cannot_fake_playable_implementations():
 
 @pytest.mark.parametrize("style",MODES)
 def test_build_and_run_native_sdl_campaign_on_real_toolchain(tmp_path,style):
-    if not shutil.which("cmake") or not shutil.which("cc"):
+    if not all(shutil.which(x) for x in ("cmake", "cc", "pkg-config")):
         pytest.skip("CMake or native C compiler unavailable")
     probe=subprocess.run(["pkg-config","--exists","sdl2"],
         check=False,timeout=10,capture_output=True)

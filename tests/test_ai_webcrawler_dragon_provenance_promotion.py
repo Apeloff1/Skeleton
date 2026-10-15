@@ -11,7 +11,7 @@ from skeleton.ai.webcrawler.dragon_provenance_registry import (
 )
 from skeleton.ai.webcrawler.dragon_provenance_assurance import AssurancePolicy
 from skeleton.ai.webcrawler.dragon_provenance_promotion import (
-    assess_custodied_promotion,
+    EmpiricalCitation, assess_custodied_promotion,
 )
 
 
@@ -54,7 +54,26 @@ def analyze(items=None, sources=None, policy=RELAXED):
         items if items is not None else corpus(),
         sources if sources is not None else manifest(),
         (), (), authorized=True, policy=policy,
+        empirical_citations=citations(items, sources), now=1000,
+        attestation_registry=verified_registry(),
     )
+
+
+def citations(items=None, sources=None):
+    items = corpus() if items is None else items
+    sources = manifest() if sources is None else sources
+    return tuple(EmpiricalCitation(
+        s.source_id, "v1", "buffered-jump", s.canonical_uri, s.content_digest,
+        "study-" + s.source_id, s.canonical_uri + "/data", s.content_digest,
+        "benchmark", "Run 100 recorded input sequences on the documented build.",
+        "95 of 100 inputs produced a jump in the measured buffer window.", 100,
+        "Applies only to the recorded build and input settings.",
+        "Synthetic fixture; no external empirical claim is made.",
+        "independent_lab", s.canonical_uri + "/methods",
+        "reviewer", s.canonical_uri + "/review",
+        tuple(sorted({r.evidence_locator for r in items if r.source_id == s.source_id})),
+        900, 2000,
+    ) for s in sources if any(r.source_id == s.source_id for r in items))
 
 
 def test_complete_distinct_custody_reaches_decision_boundary():
@@ -155,6 +174,7 @@ def test_promotion_accepts_distinct_attested_owners_with_relaxed_other_gates():
         authorized=True, policy=RELAXED,
         assurance_policy=AssurancePolicy(require_attestations=True),
         attestation_registry=verified_registry(),
+        empirical_citations=citations(), now=1000,
     )
     assert result.assurance.candidate_for_review
     assert result.decision.eligible
@@ -166,4 +186,98 @@ def test_promotion_requires_verified_registry_when_attestations_mandatory():
             "buffered-jump", corpus(), manifest(), (), (),
             authorized=True, policy=RELAXED,
             assurance_policy=AssurancePolicy(require_attestations=True),
+        )
+
+
+def empirical_review(records=None, **kwargs):
+    return assess_custodied_promotion(
+        "buffered-jump", corpus(), manifest(), (), (), authorized=True,
+        policy=RELAXED, attestation_registry=verified_registry(),
+        empirical_citations=citations() if records is None else records,
+        now=kwargs.pop("now", 1000), **kwargs,
+    )
+
+
+def test_missing_empirical_citations_fail_closed_even_with_relaxed_policy():
+    result = empirical_review(())
+    assert not result.decision.eligible
+    assert sum("Empirical citation review missing" in x for x in result.decision.reasons) == 2
+
+
+@pytest.mark.parametrize("clock", [None, 899, 2000, 2500])
+def test_empirical_review_requires_current_trusted_clock(clock):
+    assert not empirical_review(now=clock).decision.eligible
+
+
+@pytest.mark.parametrize("field,value", [
+    ("study_id", "study-first"), ("artifact_digest", "a" * 64),
+])
+def test_shared_experiment_or_artifact_cannot_be_two_sources(field, value):
+    records = citations()
+    result = empirical_review((records[0], replace(records[1], **{field: value})))
+    assert result.assurance.independent_groups == 1
+    assert not result.decision.eligible
+
+
+@pytest.mark.parametrize("field,value", [
+    ("source_digest", "f" * 64), ("source_revision", "v2"),
+    ("claim_id", "another-claim"), ("reviewed_locators", ("unrelated-section",)),
+    ("source_url", "https://unrelated.example/page"),
+])
+def test_empirical_citation_cannot_be_rebound(field, value):
+    records = citations()
+    with pytest.raises(ValueError, match="bind exact"):
+        empirical_review((replace(records[0], **{field: value}), records[1]))
+
+
+@pytest.mark.parametrize("field,value", [
+    ("methods", ""), ("measured_result", ""), ("limitations", ""),
+    ("applicability", ""), ("sample_size", True), ("sample_size", 0),
+    ("reputation_basis", "popular"), ("evidence_kind", "opinion"),
+    ("artifact_digest", ""), ("reputation_reference", "http://127.0.0.1/"),
+    ("expires_at", float("nan")),
+])
+def test_reputation_never_substitutes_for_empirical_review(field, value):
+    records = citations()
+    with pytest.raises(ValueError):
+        empirical_review((replace(records[0], **{field: value}), records[1]))
+
+
+def test_review_digest_binds_methods_clock_and_citations_order_independently():
+    first = empirical_review()
+    assert first.empirical_review_digest == empirical_review(tuple(reversed(citations()))).empirical_review_digest
+    assert first.empirical_review_digest != empirical_review(now=1001).empirical_review_digest
+    records = citations()
+    changed = empirical_review((replace(records[0], methods="Different measured protocol"), records[1]))
+    assert first.empirical_review_digest != changed.empirical_review_digest
+    assert first.citations == tuple(sorted(citations(), key=lambda c: c.source_id))
+
+
+def test_publisher_ownership_attestation_is_mandatory_for_empirical_gate():
+    result = assess_custodied_promotion(
+        "buffered-jump", corpus(), manifest(), (), (), authorized=True,
+        policy=RELAXED, empirical_citations=citations(), now=1000,
+    )
+    assert not result.decision.eligible
+    assert "Verified publisher ownership registry required" in result.decision.reasons
+
+
+def test_duplicate_reviews_and_unbounded_inputs_fail_closed():
+    from itertools import repeat
+    with pytest.raises(ValueError, match="duplicate"):
+        empirical_review((citations()[0], citations()[0]))
+    with pytest.raises(ValueError, match="budget"):
+        assess_custodied_promotion(
+            "buffered-jump", repeat(corpus()[0]), manifest(), (), (),
+            authorized=True, policy=RELAXED,
+        )
+    with pytest.raises(ValueError, match="budget"):
+        empirical_review(repeat(citations()[0]))
+
+
+def test_truthy_authorization_cannot_admit_empirical_reviews():
+    with pytest.raises(PermissionError):
+        assess_custodied_promotion(
+            "buffered-jump", corpus(), manifest(), (), (),
+            authorized="yes", policy=RELAXED,
         )
