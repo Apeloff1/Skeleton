@@ -22,7 +22,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 SCHEMA = "skeleton.game.native_emulator_first_boot_matrix.v1"
-MAX_CONTENT = 2 * 1024 * 1024
+# Match the libretro content admission ceiling, not the experimental
+# Game Boy interpreter's much smaller cartridge-bus ROM limit. Disc-based
+# multi-file media still needs the separately governed manifest path.
+from skeleton.jeeves.game_emulator_catalog import MAX_CONTENT_BYTES
+
+MAX_CONTENT = MAX_CONTENT_BYTES
 MAX_CASES = 32
 MAX_REPORT = 8 * 1024 * 1024
 
