@@ -127,7 +127,8 @@
     "skeleton/testing/test_game_original_rom_ai_acceptance.py",
     "skeleton/testing/test_game_original_rom_goal_training.py",
     "skeleton/testing/test_game_rom_acceptance_suite.py",
-    "skeleton/testing/test_game_original_mapper_bus_audit.py"
+    "skeleton/testing/test_game_original_mapper_bus_audit.py",
+    "skeleton/testing/test_game_rom_virtual_rtc.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -285,6 +286,8 @@
       "mbc1_ram",
       "mbc2",
       "mbc3",
+      "mbc3_timer_only",
+      "mbc3_timer_ram",
       "mbc5"
     ],
     "source": "synthetic owned cartridge headers with bank markers, never third-party ROM media",
@@ -300,7 +303,7 @@
     "first_execution_confirmed": false,
     "hardware_accuracy_certified": false,
     "hardware_mapper_families": 5,
-    "independent_cartridge_geometry_profiles": 6,
+    "independent_cartridge_geometry_profiles": 8,
     "mbc1_wiring_gate": "1-2MiB source ROM only with <=8KiB SRAM; four SRAM banks only with <=512KiB ROM"
   },
   "manual_acceptance_runner": {
@@ -330,5 +333,22 @@
     "validation": "fail closed on size_code>=5 with >8192 bytes RAM",
     "source": "https://gbdev.io/pandocs/MBC1.html",
     "independent_acceptance_executed": false
+  },
+  "mbc3_virtual_rtc": {
+    "owner": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "cartridges": [
+      "0x0F timer-only",
+      "0x10 timer with RAM"
+    ],
+    "clock_source": "emulated CPU cycles only, 4,194,304 cycles/second",
+    "registers": "selected A000 RTC 0x08-0x0C, latched by 0-to-1 write at 6000",
+    "halt_and_carry": true,
+    "source_snapshot": "schema 2 RTC-equipped only with live, latched, previous latch bit and fractional cycle accumulator",
+    "battery_backed_wall_clock": false,
+    "standby_time_catchup": false,
+    "hardware_accuracy_verified": false,
+    "test": "skeleton/testing/test_game_rom_virtual_rtc.py",
+    "reference": "https://gbdev.io/pandocs/MBC3.html"
   }
 }
