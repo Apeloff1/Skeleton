@@ -17,16 +17,16 @@ from pathlib import Path
 
 SOURCE_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".py", ".json", ".md", ".toml")
 MAX_SCAN_BYTES = 262144
-STALE_UI = re.compile(r"(?:(?:components/|@/components/)UI/|(?:\\.\\.?/)UI/)")
+STALE_UI = re.compile(r"(?:(?:components/|@/components/)UI/|(?:\.\.?/)UI/)")
 STUB = re.compile(
-    r"\\b(?:TODO|FIXME|NotImplementedError)\\b|"
-    r"throw\\s+new\\s+Error\\s*\\(\\s*['\\\"](?:not implemented|TODO)",
+    r"\b(?:TODO|FIXME|NotImplementedError)\b|"
+    r"throw\s+new\s+Error\s*\(\s*['\\"](?:not implemented|TODO)",
     re.I,
 )
-TRUNC = re.compile(r"\\[truncated\\]|<truncated>|content truncated|output truncated", re.I)
-WINDOWS_CHARS = re.compile(r'[<>:"\\\\|?*\\x00-\\x1f\\x7f-\\x9f]')
+TRUNC = re.compile(r"\[truncated\]|<truncated>|content truncated|output truncated", re.I)
+WINDOWS_CHARS = re.compile(r'[<>:"\\|?*\x00-\x1f\x7f-\x9f]')
 DEVICE = re.compile(
-    r"^(?:CON|PRN|AUX|NUL|CONIN\\$|CONOUT\\$|CLOCK\\$|COM[1-9¹²³]|LPT[1-9¹²³])(?:\\..*)?$",
+    r"^(?:CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|CLOCK\$|COM[1-9¹²³]|LPT[1-9¹²³])(?:\..*)?$",
     re.I,
 )
 
@@ -34,12 +34,12 @@ def run_git(*args: str) -> bytes:
     return subprocess.run(["git", *args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True).stdout
 
 def paths_at(ref: str) -> list[tuple[str, str, int]]:
-    records = run_git("ls-tree", "-r", "-l", "-z", ref, "--", "satellites/").split(b"\\0")
+    records = run_git("ls-tree", "-r", "-l", "-z", ref, "--", "satellites/").split(b"\0")
     result = []
     for rec in records:
         if not rec:
             continue
-        header, path = rec.split(b"\\t", 1)
+        header, path = rec.split(b"\t", 1)
         fields = header.decode("ascii").split()
         if len(fields) != 4 or fields[1] != "blob":
             continue
@@ -81,17 +81,17 @@ def content_audit(records: list[tuple[str, str, int]], max_bytes: int, max_examp
     try:
         for path, sha in candidates:
             if sha not in content_cache:
-                proc.stdin.write((sha + "\\n").encode("ascii"))
+                proc.stdin.write((sha + "\n").encode("ascii"))
                 proc.stdin.flush()
                 header = proc.stdout.readline().decode("ascii", "replace").strip().split()
                 if len(header) != 3 or header[0] != sha or header[1] != "blob":
                     raise ValueError(f"unexpected Git object header: {header}")
                 length = int(header[2])
                 content_cache[sha] = proc.stdout.read(length)
-                if proc.stdout.read(1) != b"\\n":
+                if proc.stdout.read(1) != b"\n":
                     raise ValueError("missing Git object separator")
             raw = content_cache[sha]
-            if b"\\0" in raw:
+            if b"\0" in raw:
                 continue
             txt = raw.decode("utf-8", "replace")
             is_frontend = "/frontend/" in path and path.endswith((".ts", ".tsx", ".js", ".jsx"))
@@ -103,7 +103,7 @@ def content_audit(records: list[tuple[str, str, int]], max_bytes: int, max_examp
                 if match:
                     counts[kind] += 1
                     if len(findings) < max_examples:
-                        line = txt.count("\\n", 0, match.start()) + 1
+                        line = txt.count("\n", 0, match.start()) + 1
                         findings.append({"kind": kind, "path": path, "line": line,
                                          "sample": txt.splitlines()[line - 1].strip()[:160]})
             if path.endswith(".json"):
