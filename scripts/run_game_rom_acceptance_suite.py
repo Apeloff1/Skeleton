@@ -255,6 +255,8 @@ def _verify_serial_source(directory: Path) -> dict[str, Any]:
             or row.get("actual_cpu_clock_advance_instructions") != 1021
             or row.get("source_program_cpu_instruction_calls") != 1025
             or row.get("serial_start_opcode_clocked_tcycles") != 12
+            or row.get("actual_source_SB_SC_program_tcycles") != 40
+            or row.get("real_serial_phase_just_after_SC_opcode") != (12 if index == 0 else 0)
             or row.get("hardware_clock_t_cycles_observed") != 4096
             or row.get("exact_source_cpu_replay") is not True
             or row.get("source_finished_snapshot_sha256") != row.get("source_replayed_snapshot_sha256")
