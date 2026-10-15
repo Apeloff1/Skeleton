@@ -107,6 +107,7 @@ FIRST_PARTY_PREFIXES = (
     "machine/",
     "packaging/",
     "volume_forge/",  # repository-owned volume assembly tooling, not canonical runtime
+    "data/conversational/",  # first-party authored model-training corpus, not runtime
     "complete/",
     "volume_forge/",
     "apps/",
