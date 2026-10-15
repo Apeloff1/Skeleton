@@ -165,8 +165,8 @@ services:
     build:
       context: ./frontend
       args:
-        EXPO_PUBLIC_BACKEND_URL: ${EXPO_PUBLIC_BACKEND_URL:-http://localhost:8001}
-        EXPO_PUBLIC_SKELETON_URL: ${EXPO_PUBLIC_SKELETON_URL:-http://localhost:8010}
+        EXPO_PUBLIC_BACKEND_URL: ${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}
+        EXPO_PUBLIC_SKELETON_URL: ${EXPO_PUBLIC_SKELETON_URL:-http://localhost:${SKELETON_PORT:-8010}}
       target: ${FRONTEND_BUILD_TARGET:-development}
     container_name: tutolage-frontend
     restart: unless-stopped
