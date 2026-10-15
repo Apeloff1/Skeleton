@@ -121,14 +121,15 @@ def train_rule_curriculum(
     # A round-robin modulo scheme proves each training scenario is visited.
     # Evaluation seeds are disjoint from *all* training seeds, no matter which
     # candidate the agent selected during the earlier rollout.
+    train_origin = seed - seed % circumstances
     train_seeds = [
-        seed + index * circumstances + scenario
+        train_origin + index * circumstances + scenario
         for index in range(episodes_per_scenario)
         for scenario in range(circumstances)
     ]
     if train_seeds[-1] > 2**63 - 1:
         raise RuleCurriculumError("scenario training seeds overflow the transport budget")
-    eval_base = seed + 1_000_000
+    eval_base = train_origin + (episodes_per_scenario + 1_000_000) * circumstances
     if eval_base + circumstances > 2**63 - 1:
         raise RuleCurriculumError("disjoint evaluation seed budget overflow")
     heldout = [eval_base + scenario for scenario in range(circumstances)]
@@ -160,6 +161,25 @@ def train_rule_curriculum(
             "heldout_baseline_return": details["episodes"][i]["baseline"]["return"],
             "heldout_trace_digest": details["episodes"][i]["candidate"]["trace_digest"],
         })
+    from .game_studio_scenario_lab import ANGLES, mirrored_rule_comparison
+    if heldout[-1] > 2**31-7:
+        # Studio engines accept 31-bit replay seeds; skip independent mirror
+        # analysis rather than wrap heldout identities into training overlap.
+        mirrors = []
+        mirror_analysis_status = "unavailable_due_to_engine_seed_bounds"
+    else:
+        mirrors = [
+            {
+                "scenario_id":row["scenario_id"],
+                **mirrored_rule_comparison(
+                    plan["base_source"], row["source"],
+                    seed=heldout[index], steps=min(12,max_steps),
+                    angles=ANGLES,
+                ),
+            }
+            for index,row in enumerate(plan["scenarios"][1:],start=1)
+        ]
+        mirror_analysis_status = "source_executed_six_angle_heldout_checks"
     record = {
         "schema_version": "skeleton.game_builder.ai_rule_policy_candidate.v1",
         "candidate_status": "trained_not_promoted",
@@ -179,6 +199,8 @@ def train_rule_curriculum(
         ],
         "evaluation": details,
         "evaluation_by_circumstance": records,
+        "mirror_analysis_status": mirror_analysis_status,
+        "mirrored_scenario_evaluations": mirrors,
         "candidate_improvement_claimed": False,
         "production_neural_weights_modified": False,
         "original_engine_rules_persistently_modified": False,
@@ -228,6 +250,19 @@ def train_rule_curriculum(
         "heldout_seed_count": len(heldout),
         "heldout_mean_return_difference": details["mean_return_difference"],
         "per_circumstance_evaluation": records,
+        "mirror_analysis_status": mirror_analysis_status,
+        "mirrored_scenario_evaluations": [
+            {
+                "scenario_id":item["scenario_id"],
+                "mean_return_difference":item["mean_return_difference"],
+                "worst_return_difference":item["worst_return_difference"],
+                "possibly_viable_under_bounded_mirror_checks":item[
+                    "possibly_viable_under_bounded_mirror_checks"
+                ],
+                "digest":item["digest"],
+            }
+            for item in mirrors
+        ],
         "model_promotion": "not_authorized",
         "production_neural_weights_modified": False,
     }

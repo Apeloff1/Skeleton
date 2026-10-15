@@ -95,5 +95,42 @@
       "status": "implementation_candidate_pending_exact_head_actor_verification",
       "note": "Current local CLI instantiates the same typed request; the existing parallel worker supports this kind, but no worker run was executed in this conversation."
     }
+  },
+  "advanced_scenario_lab": {
+    "owner": "skeleton/jeeves/game_studio_scenario_lab.py",
+    "status": "implementation_pending_exact_head_e2e_validation",
+    "registration": "All 43 original-game studio reference families have source-bound manifests; scenarios are independently executed via the canonical StudioGameEnvironment.",
+    "concurrent_viewer": {
+      "route": "GET /api/game-studio-learning/campaigns/{id}/mirror-views",
+      "ui": "frontend/features/Jeeves/GameStudioScenarioLabPanel.tsx",
+      "bounded_lanes": 6,
+      "maximum_workers_per_request": 4,
+      "maximum_steps_per_view": 24,
+      "min_refresh_seconds": 9,
+      "scope": "authenticated owner's read-only spectator simulations of current champion source",
+      "caution": "sampled telemetry, not actual training-episode frames, native renderer or live weights"
+    },
+    "generator": {
+      "route": "GET /api/game-studio-learning/campaigns/{id}/scenario-drafts",
+      "evidence": "committed scoped campaign rounds, canonical editor limits, source integrity",
+      "promotion": "never automatic",
+      "self_learning": "Governed campaign evaluates and retains candidate rule mutations via existing measured Q-training and acceptance gates; optional CLI trains scenario-conditioned candidate Q policy with replay-verified neural corpus"
+    },
+    "exhaustive_test_plan": {
+      "route": "GET /api/game-studio-learning/engines/{editor}/test-manifest",
+      "dimensions": [
+        "every registered action",
+        "every declared editor field",
+        "six mirrored logical perspectives",
+        "18 contract categories"
+      ],
+      "limitations": "Declarative coverage, not tests already executed or exhaustive Cartesian world-space proof"
+    },
+    "ranked_research": {
+      "nintendo": "https://www.nintendo.co.jp/ir/en/finance/software/switch.html",
+      "circana_rank": "https://www.statista.com/statistics/1285658/top-ranked-video-games-sales-annual/",
+      "permitted": "factually cited popularity reference plus original abstract mechanics hypotheses only",
+      "forbidden": "commercial assets, levels, dialogue, copied source, unauthorized proprietary training data"
+    }
   }
 }

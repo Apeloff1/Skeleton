@@ -239,3 +239,70 @@ The training CLI itself now uses this `GameEnvironmentRequest` factory
 for local measured updates and heldout evaluation. It does not
 automatically start parallel workers, and CI/live worker execution
 has not been independently observed for this commit.
+
+## Advanced scenario laboratory and parallel visible simulations (2026-10-15)
+
+The existing game-learning campaign UI now exposes
+`GameStudioScenarioLabPanel` for source-registered `studio:*` projects.
+Users can control 2, 4 or 6 mirrored spectator angles and per-view step
+budgets, with a finite four-worker thread pool and one user-authorized
+scoped preview route. The 96 × 64 visual panels are sampled real
+`StudioGameEnvironment.preview()` state telemetry, **not** native
+rendered gameplay, actual training episode captures, neural output,
+libretro video or production-world camera recordings. Every frame/summary
+derives from actual engine state and source-bound replay data. Spectators
+do not mutate game source, campaign progress, policies or weight updates.
+
+GET `/api/game-studio-learning/campaigns/{id}/mirror-views?lanes=4&steps=12&sample=0`
+uses the campaign's scoped current champion source, code and rights guards,
+bounded concurrency and per-request deterministic seeds. The frontend
+refreshes these **read-only spectator runs** while the campaign is active
+only when the user enables viewing; it stops/aborts on component unload
+or account/campaign switch. No hidden perpetual background simulator is
+created.
+
+GET `/api/game-studio-learning/campaigns/{id}/scenario-drafts` consumes
+a bounded page of *committed* measured campaign evidence and asks
+`propose_scenarios` for strictly typed, source-sha-bound feasible rule
+changes. Outputs explicitly distinguish hypothetical variants from
+supported failure-stress cases. It cannot execute untrusted suggestions
+as Python, claim known successful scenarios or approve adoption. The
+existing governed Jeeves campaign engine supports such rule settings as
+candidate mutations and learns from actual Q-updates, held-out
+perturbations, Dragon checks and replay receipts.
+
+GET `/api/game-studio-learning/engines/{id}/test-manifest` enumerates
+every registered source action, every bounded editor field's min/default/
+max or enum axes, six mirrored perspectives and eighteen mandatory
+contract checks (scene checksum, replay, snapshot, invalid controls,
+resource conservation, rights, heldout contamination, telemetry, etc.).
+An unexecuted checklist is **not** a passed test. Full combinations of
+game states cannot be exhaustively enumerated for nontrivial worlds;
+the matrix covers declared types and risk categories instead.
+
+Source-informed original scenario motifs use public factual charts:
+Nintendo official June 30, 2026 publisher-reported worldwide lifetime
+Switch software units (e.g. Mario Kart 8 Deluxe 71.53M,
+Animal Crossing: New Horizons 50.29M, Super Smash Bros. Ultimate 38.14M),
+and the separate US 2025 full-year **dollar-sales ranking** reported by
+Circana (e.g. Battlefield 6 #1, NBA 2K26 #2, Borderlands 4 #3).
+These two scales cannot be merged or normalized into game-quality scores.
+No copyrighted levels, characters, dialogue, images, code, ROM, physics
+tables or maps are captured or redistributed; only original high-level
+mechanic stress questions are drafted. A sale rank is not causal proof
+that one game design decision is best.
+
+`mirrored_rule_comparison` pairs baseline and proposed rule worlds on the
+same seeds across six named angles, with bounded concurrent execution,
+source/transition identities, rejection counts and worst-case return
+differences. The separate rule-candidate trainer now stores these
+checks against heldout scenario seeds alongside its real Q-learning,
+but **does not** automatically promote a scenario for merely passing a
+sampled angle test or train the live Jeeves production checkpoint.
+
+Release limitations: exact-head CI and tests unverified; long-running
+resource/performance load, native audio/GPU/network/hardware emulation,
+all possible training angles, actual neural candidate updates and
+independently proven game-design quality are not complete. This is a
+substantial reference-engine **training and research plane** rather
+than full implementation of every physical production engine.

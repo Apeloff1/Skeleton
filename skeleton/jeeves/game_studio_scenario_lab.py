@@ -354,6 +354,57 @@ def mirrored_simulations(source: Mapping[str,object], *,
     return {**record,"digest":_hash(record)}
 
 
-__all__=["ANGLES","MAX_LANES","ScenarioLabError","sales_informed_catalog",
+
+def mirrored_rule_comparison(baseline: Mapping[str,object],
+                             candidate: Mapping[str,object],
+                             *, seed: int=0, steps: int=12,
+                             angles: Sequence[str]=ANGLES) -> dict:
+    """Paired-seed, six-angle evidence for *hypothesized* original rules.
+
+    This is held out from policy gradients, and does not certify subjective
+    game design quality, sales success or hardware compatibility.
+    """
+    baseline=parse_studio_source(_plain(baseline))
+    candidate=parse_studio_source(_plain(candidate))
+    if baseline["editor"]!=candidate["editor"] or baseline["actions"]!=candidate["actions"]:
+        raise ScenarioLabError("mirrors cannot compare foreign engines or differing action alphabets")
+    first=mirrored_simulations(baseline,seed=seed,steps=steps,
+                               angles=angles,workers=4)
+    second=mirrored_simulations(candidate,seed=seed,steps=steps,
+                                angles=angles,workers=4)
+    observations=[]
+    for a,b in zip(first["lanes"],second["lanes"],strict=True):
+        observations.append({
+            "angle":a["angle"],
+            "seed":a["seed"],
+            "baseline_return":a["total_reward"],
+            "candidate_return":b["total_reward"],
+            "return_difference":round(b["total_reward"]-a["total_reward"],6),
+            "baseline_rejected_actions":a["rejected_actions"],
+            "candidate_rejected_actions":b["rejected_actions"],
+            "baseline_snapshot":a["snapshot_digest"],
+            "candidate_snapshot":b["snapshot_digest"],
+            "baseline_evidence_digest":a["digest"],
+            "candidate_evidence_digest":b["digest"],
+        })
+    result={
+        "schema_version":"skeleton.game_builder.mirrored_rule_comparison.v1",
+        "engine":baseline["editor"],
+        "baseline_source_digest":source_digest(baseline),
+        "candidate_source_digest":source_digest(candidate),
+        "mirrors":observations,
+        "mean_return_difference":round(sum(x["return_difference"] for x in observations)/len(observations),6),
+        "worst_return_difference":min(x["return_difference"] for x in observations),
+        "possibly_viable_under_bounded_mirror_checks":all(
+            x["return_difference"]>=-1 for x in observations
+        ),
+        "independent_human_review_required":True,
+        "source_promotion_authorized":False,
+        "claimed_exhaustive_game_state_coverage":False,
+    }
+    return {**result,"digest":_hash(result)}
+
+
+__all__=["ANGLES","MAX_LANES","ScenarioLabError","mirrored_rule_comparison","sales_informed_catalog",
          "test_manifest","all_engine_test_manifests",
          "propose_scenarios","mirrored_simulations"]

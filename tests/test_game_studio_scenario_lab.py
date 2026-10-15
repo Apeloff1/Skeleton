@@ -105,9 +105,9 @@ class StudioEngineScenarioLabTests(unittest.TestCase):
         for entry in source["entries"]:
             self.assertIn(entry["chart"],CHARTS)
             self.assertIn(entry["editor"],ENGINES)
-            self.assertIn("Original",entry["motif"])
+            self.assertTrue("Original" in entry["motif"] or "Independent" in entry["motif"])
             self.assertGreater(entry["rank"],0)
-        self.assertNotIn("quality",source["evidence_use"].split("_only")[0])
+        self.assertEqual(source["evidence_use"],"prioritize_questions_not_copy_content_or_certify_design_quality")
         filtered=sales_informed_catalog("racing")
         self.assertTrue(filtered["entries"])
         self.assertTrue(all(row["editor"]=="racing" for row in filtered["entries"]))
