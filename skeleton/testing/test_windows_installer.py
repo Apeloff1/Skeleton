@@ -117,6 +117,17 @@ def test_windows_build_is_pinned_and_hashes_installer():
     source = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
 
     assert '"pyinstaller==6.22.3"' in source
+    assert '"pydantic>=2.14.0,<3"' in source
+    assert '"pydantic-settings>=2.15.0,<3"' in source
+    assert 'Join-Path $PayloadDir "packaging\\windows\\launcher_entry.py"' in source
+    assert 'Join-Path $PayloadDir "packaging\\windows\\offline_cli_entry.py"' in source
+    assert 'Join-Path $PayloadDir "packaging\\windows\\SkeletonSetup.iss"' in source
+    assert '"--paths", $PayloadDir' in source
+    assert "Push-Location -LiteralPath $PayloadDir" in source
+    assert "Pop-Location" in source
+    assert "Installer version does not match archived SourceRef" in source
+    assert "& subst $ShortDrive /D | Out-Null" in source
+    assert '"--paths", $RepoRoot' not in source
     assert "$RuntimePaths = @(" in source
     assert '"backend"' in source
     assert '"frontend"' in source
@@ -177,7 +188,8 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
 
     assert "runs-on: windows-latest" in source
-    assert 'PYTHON_VERSION: "3.14.7"' in source
+    assert 'PYTHON_VERSION: "3.11.16"' in source
+    assert '"pydantic>=2.14.0,<3"' in source
     assert "JRSoftware.InnoSetup.7" in source
     assert "--version 7.1.0" in source
     assert "core.longpaths true" in source
