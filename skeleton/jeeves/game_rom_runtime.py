@@ -758,27 +758,19 @@ class GameBoyMachine:
                 if not flags & 0x80 or row[x] == 0:
                     self.framebuffer[line * WIDTH + x] = 255 - (palette >> (color * 2) & 3) * 85
 
-    def _advance(self, cycles: int) -> None:
-        for _ in range(cycles):
-            if self.timer_reload_delay:
-                self.timer_reload_delay -= 1
-                if not self.timer_reload_delay:
-                    self.memory[0xFF05] = self.memory[0xFF06]
-                    self.memory[0xFF0F] |= 4
-            old_signal = self._timer_signal()
-            self.divider = (self.divider + 1) & 65535
-            self._timer_apply_edge(old_signal)
-            self._dma_tick()
-        self.cycles += cycles
-        self._rtc_advance(cycles)
+    def _ppu_tick(self) -> None:
+        """Clock the raster and STAT edge after this T-cycle's DMA byte."""
         if not self.memory[0xFF40] & 0x80:
             self.stat_line = False
             return
-        self.line_cycles += cycles
-        while self.line_cycles >= 456:
+        self.line_cycles += 1
+        if self.line_cycles >= 456:
             self.line_cycles -= 456
             line = self.memory[0xFF44]
             if line < HEIGHT:
+                # Capture sprites with the exact OAM bytes already
+                # transferred at the end of THIS scanline. A later
+                # instruction cannot retroactively modify this raster.
                 self._draw_line(line)
             line = (line + 1) % 154
             self.memory[0xFF44] = line
@@ -796,6 +788,24 @@ class GameBoyMachine:
         if requested and not self.stat_line:
             self.memory[0xFF0F] |= 2
         self.stat_line = requested
+
+    def _advance(self, cycles: int) -> None:
+        # Timer, DMA, and PPU are coupled to the SAME emulated T-cycle.
+        # Do not advance DMA for an entire opcode then render earlier lines
+        # with future sprite bytes; that poisons source image/replay labels.
+        for _ in range(cycles):
+            if self.timer_reload_delay:
+                self.timer_reload_delay -= 1
+                if not self.timer_reload_delay:
+                    self.memory[0xFF05] = self.memory[0xFF06]
+                    self.memory[0xFF0F] |= 4
+            old_signal = self._timer_signal()
+            self.divider = (self.divider + 1) & 65535
+            self._timer_apply_edge(old_signal)
+            self._dma_tick()
+            self._ppu_tick()
+        self.cycles += cycles
+        self._rtc_advance(cycles)
 
     def instruction(self) -> int:
         pending = self.memory[0xFFFF] & self.memory[0xFF0F] & 31
