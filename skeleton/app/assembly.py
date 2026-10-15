@@ -479,6 +479,12 @@ def preflight(
             ok = _usable_secret(value)
             if key == "SKL_ENGINE_SERVICE_TOKEN":
                 ok = ok and 32 <= len(value) <= 4096 and value == value.strip()
+            if key in {"GAMEFORGE_JWT_SECRET", "GF_SEAL_SECRET"}:
+                ok = ok and len(value) >= 32 and value == value.strip()
+            if key == "GF_KEYHOLDER_SEED":
+                ok = ok and len(value) == 64 and all(
+                    char in "0123456789abcdefABCDEF" for char in value
+                )
             checks.append(
                 AssemblyCheck(
                     code=f"env:{key}",
