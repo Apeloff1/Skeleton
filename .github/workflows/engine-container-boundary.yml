@@ -179,6 +179,34 @@ jobs:
           print("Stage-5 closure contract is internally consistent")
           PY
 
+      - name: Initialize isolated engine-test secret material
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Never weaken Compose required-variable checks or commit fallback
+          # credentials. Each ephemeral CI job receives independent test-only
+          # signing, authentication and encryption material.
+          python - <<'PY'
+          import os
+          import secrets
+
+          required = (
+              "GF_SEAL_SECRET",
+              "GF_KEYHOLDER_SEED",
+              "GAMEFORGE_JWT_SECRET",
+              "SKELETON_MASTER_SECRET",
+          )
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as target:
+              for name in required:
+                  target.write(f"{name}={secrets.token_hex(32)}\\n")
+          print(f"Initialized {len(required)} ephemeral test secret identities")
+          PY
+
+      - name: Validate isolated test Compose environment
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml config --quiet
+
       - name: Build and start canonical engine topology
         run: |
           set -euo pipefail
