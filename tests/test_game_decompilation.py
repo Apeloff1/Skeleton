@@ -33,6 +33,7 @@ from skeleton.jeeves.game_decompilation_learning import (
     infer_shadow_asset_quality,
 )
 from skeleton.jeeves.game_decompilation_quality import derive_game_quality_brief
+from skeleton.jeeves.game_decompilation_evidence import (verify_game_decompilation_report, verify_human_label_against_report)
 from skeleton.jeeves.game_learning_ingestion import _GB_LOGO
 
 
@@ -363,6 +364,53 @@ class RuntimeNativeRGBContracts(unittest.TestCase):
                   ({**meta,"pixel_sha256":digest(bad)},bad)])
         with self.assertRaises(ValueError):
             call([(meta,rgba),({**meta,"native_run_cursor":16},rgba)])
+
+
+class OfflineGameDecompilationEvidenceContracts(unittest.TestCase):
+    def test_source_code_assets_and_review_receipts_are_locally_verified(self):
+        source=synthetic_nrom()
+        report=decompile_authorized_game(
+            source,"original.nes",grant=grant(source),
+            authorize=lambda *_:True,export_previews=True,
+        )
+        status=verify_game_decompilation_report(
+            report.report,expected_source_sha256=digest(source),
+            expected_rights_sha256="a"*64,
+        )
+        self.assertTrue(status["locally_consistent"])
+        self.assertGreater(status["static_instructions_verified_structurally"],0)
+        self.assertEqual(status["authorized_preview_receipts"],1)
+        self.assertFalse(status["gameplay_fidelity_or_rights_independently_verified"])
+
+    def test_evidence_tampering_with_recomputed_outer_hash_is_still_detected(self):
+        from skeleton.jeeves.game_decompilation_quality import _digest
+        source=synthetic_nrom()
+        data=copy.deepcopy(decompile_authorized_game(
+            source,"original.nes",grant=grant(source),
+            authorize=lambda *_:True,
+        ).report)
+        data["code_analysis"]["instructions"][0]["file_offset"]=len(source)+100
+        data["report_sha256"]=_digest({k:v for k,v in data.items() if k!="report_sha256"})
+        with self.assertRaises(ValueError):
+            verify_game_decompilation_report(data)
+
+    def test_human_training_label_bound_to_original_unchanged_review(self):
+        source=synthetic_nrom()
+        g=grant(source)
+        result=decompile_authorized_game(
+            source,"original.nes",grant=g,authorize=lambda *_:True,
+        )
+        label=prepare_reviewed_training_candidate(
+            result,grant=g,authorize=lambda *_:True,
+            human_score=79,reviewer_ref="reviewer",
+            label_evidence_digest="b"*64,
+        )
+        checked=verify_human_label_against_report(label,result.report)
+        self.assertTrue(checked["sources_and_rights_bound"])
+        bad=copy.deepcopy(label)
+        bad["training_rights_digest"]="c"*64
+        with self.assertRaises(ValueError):
+            verify_human_label_against_report(bad,result.report)
 
 
 class ShadowQualityTrainingContracts(unittest.TestCase):
