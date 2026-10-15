@@ -1849,12 +1849,71 @@ def _recipe_coverage_matrix():
     }
 
 
+def install_fleet(args):
+    """Explicit isolated native core compilation/approval; no runtime validation.
+
+    This adapter retains the existing source/firmware/registry admission code
+    and makes each operator-selected build independent of the previous result.
+    """
+    from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry
+
+    selected = list(args.core or sorted(PINNED_CORES))
+    if len(selected) != len(set(selected)):
+        raise ValueError("Core selection cannot repeat")
+    if not selected or any(identity not in PINNED_CORES for identity in selected):
+        raise ValueError("Unknown or empty core selection")
+    completed, failures = [], []
+    for identity in selected:
+        single = argparse.Namespace(**vars(args))
+        single.core = [identity]
+        single.continue_on_error = False
+        try:
+            result = install(single)
+            if len(result["cores"]) != 1 or result["cores"][0]["core_id"] != identity:
+                raise ValueError("Core bootstrap returned inconsistent build evidence")
+            completed.append(result["cores"][0])
+        except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
+            failures.append({
+                "core_id": identity,
+                "status": "failed",
+                "error_class": type(exc).__name__,
+                "message": str(exc)[:1200],
+            })
+    registry_path = args.install_root / "cores.json"
+    digest = (
+        GameEmulatorRegistry(registry_path).registry_digest
+        if registry_path.is_file() else None
+    )
+    approved = sum(
+        row.get("approval_status") == "operator_approved_installation"
+        for row in completed
+    )
+    unapproved = len(completed) - approved
+    return {
+        "schema_version": "skeleton.game.emulator_fleet_install.v1",
+        "status": "completed" if not failures and not unapproved else "incomplete",
+        "selected_core_ids": selected,
+        "attempted": len(selected),
+        "compiled": len(completed),
+        "approved": approved,
+        "candidate_unapproved": unapproved,
+        "failed": len(failures),
+        "registry_path": str(registry_path),
+        "registry_digest": digest,
+        "results": completed,
+        "failures": failures,
+        "execution_checked": False,
+        "tests_run": False,
+    }
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path)
     parser.add_argument("--install-root", type=Path)
     parser.add_argument("--core", action="append", choices=sorted(PINNED_CORES))
     parser.add_argument("--continue-on-error", action="store_true", help="Attempt all selected cores, record each failure and exit nonzero if any failed")
+    parser.add_argument("--fleet", action="store_true", help="Explicit isolated multi-core build with per-core approvals and failure receipts")
     parser.add_argument(
         "--profile", choices=("starter", "broad", "all"), default="starter",
         help="starter=original six, broad=all non-deferred recipes, all=include explicitly deferred candidates",
@@ -1944,9 +2003,9 @@ def main(argv=None):
     if not 1 <= args.jobs <= 8 or not 30 <= args.timeout <= 3600:
         parser.error("jobs must be 1..8 and command timeout30..3600 seconds")
     try:
-        report = install(args)
+        report = install_fleet(args) if args.fleet else install(args)
         print(json.dumps(report, indent=2))
-        return 2 if report["failed_count"] else 0
+        return 2 if (report["status"] == "incomplete" if args.fleet else report["failed_count"] > 0) else 0
     except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
         print(json.dumps({"status": "installation_rejected", "message": str(exc)}), file=sys.stderr)
         return 2

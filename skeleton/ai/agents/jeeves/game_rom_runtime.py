@@ -1,7 +1,7 @@
 """Bounded, experimental DMG cartridge execution for the Jeeves engine lab.
 
 This executes real cartridge instructions; it is not a complete or certified
-Game Boy emulator. It deliberately excludes audio, RTC, CGB-only cartridges,
+Game Boy emulator. It deliberately excludes audio, battery-backed wall-time RTC, CGB-only cartridges,
 cycle-perfect bus contention and unsupported mappers. No boot ROM is bundled.
 """
 
@@ -15,8 +15,10 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-MAX_ROM_BYTES = 2_097_152
+MAX_ROM_BYTES = 8_388_608
 FRAME_CYCLES = 70_224
+RTC_CYCLES_PER_SECOND = 4_194_304
+SERIAL_INTERNAL_BIT_CYCLES = 512
 WIDTH, HEIGHT = 160, 144
 Z, N, H, C = 0x80, 0x40, 0x20, 0x10
 BUTTONS = ("right", "left", "up", "down", "a", "b", "select", "start")
@@ -42,24 +44,44 @@ def inspect_dmg_cartridge(rom: bytes) -> dict[str, Any]:
     if rom[0x143] == 0xC0:
         raise GameRomRuntimeError("Color-only cartridges are not supported by the DMG runtime")
     cartridge = rom[0x147]
-    if cartridge not in (0x00, 0x01, 0x02, 0x03, 0x08, 0x09):
+    if cartridge not in (0x00, 0x01, 0x02, 0x03, 0x05, 0x06, 0x08, 0x09, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x19, 0x1A, 0x1B):
         raise GameRomRuntimeError(f"Cartridge mapper 0x{cartridge:02x} is not supported")
     size_code = rom[0x148]
-    if size_code > 6 or len(rom) != 32768 << size_code:
+    if size_code > 8 or len(rom) != 32768 << size_code:
         raise GameRomRuntimeError("Cartridge bytes do not match the declared ROM bank count")
     if cartridge in (0x00, 0x08, 0x09) and size_code != 0:
         raise GameRomRuntimeError("ROM-only cartridges must have two ROM banks")
+    if cartridge in (0x05, 0x06) and size_code > 3:
+        raise GameRomRuntimeError("MBC2 supports no more than 16 ROM banks")
+    if cartridge in (0x01, 0x02, 0x03, 0x0F, 0x10, 0x11, 0x12, 0x13) and size_code > 6:
+        raise GameRomRuntimeError("MBC1/MBC3 ROM banking cannot address this cartridge size")
     checksum = 0
     for byte in rom[0x134:0x14D]:
         checksum = (checksum - byte - 1) & 255
     if checksum != rom[0x14D]:
         raise GameRomRuntimeError("Cartridge header checksum does not match")
     ram_code = rom[0x149]
-    if ram_code not in (0, 1, 2, 3):
+    if ram_code not in (0, 1, 2, 3, 4, 5):
         raise GameRomRuntimeError("Cartridge RAM size is unsupported")
-    ram_bytes = (0, 2048, 8192, 32768)[ram_code]
-    if cartridge in (0, 1) and ram_bytes:
+    ram_bytes = (0, 2048, 8192, 32768, 131072, 65536)[ram_code]
+    if cartridge in (0x05, 0x06):
+        if ram_code != 0:
+            raise GameRomRuntimeError("MBC2 has fixed internal 512 x 4-bit RAM, not header external SRAM")
+        ram_bytes = 512
+    if cartridge in (0, 1, 0x0F, 0x11, 0x19) and ram_bytes:
         raise GameRomRuntimeError("Cartridge type declares no external RAM")
+    if cartridge in (2, 3, 0x08, 0x09, 0x10, 0x12, 0x13, 0x1A, 0x1B) and not ram_bytes:
+        raise GameRomRuntimeError("Cartridge type requires external RAM")
+    if ram_bytes > 32768 and cartridge not in (0x1A, 0x1B):
+        raise GameRomRuntimeError("Declared RAM exceeds this mapper's address space")
+    # Standard MBC1 boards cannot wire the two upper selector bits to
+    # extended ROM and four-bank RAM simultaneously: >512 KiB needs the
+    # selector for ROM and therefore exposes at most one 8 KiB RAM bank.
+    # Multi-game MBC1M wiring is not modeled by this single-cartridge core.
+    if cartridge in (0x01, 0x02, 0x03) and size_code >= 5 and ram_bytes > 8192:
+        raise GameRomRuntimeError(
+            "MBC1 cartridges above 512 KiB cannot expose four RAM banks"
+        )
     return {
         "platform": "game_boy",
         "mode": "experimental_dmg_rom",
@@ -67,10 +89,17 @@ def inspect_dmg_cartridge(rom: bytes) -> dict[str, Any]:
         "rom_bytes": len(rom),
         "rom_banks": len(rom) // 16384,
         "ram_bytes": ram_bytes,
-        "mapper": "mbc1" if cartridge in (1, 2, 3) else "rom_only",
+        "mapper": (
+            "mbc1" if cartridge in (1, 2, 3)
+            else "mbc2" if cartridge in (0x05, 0x06)
+            else "mbc3" if cartridge in (0x0F, 0x10, 0x11, 0x12, 0x13)
+            else "mbc5" if cartridge in (0x19, 0x1A, 0x1B)
+            else "rom_only"
+        ),
         "cartridge_type": cartridge,
+        "virtual_rtc": cartridge in (0x0F, 0x10),
         "title": rom[0x134:0x143].split(b"\0", 1)[0].decode("ascii", errors="replace"),
-        "support": "experimental DMG CPU/raster; audio, RTC, color and cycle-perfect timing unavailable",
+        "support": "experimental DMG CPU/raster; deterministic virtual cycle RTC on timer cartridges only; real battery time, audio, color and cycle-perfect timing unavailable",
     }
 
 
@@ -96,6 +125,27 @@ class GameBoyMachine:
         self.cycles, self.frames, self.divider, self.line_cycles = 0, 0, 0xAB00, 0
         self.instructions = 0
         self.stat_line = False
+        # An overflow enters a four T-cycle TIMA=00 interval before TMA
+        # reload and timer IF bit request. This is saved with CPU state.
+        self.timer_reload_delay = 0
+        # DMG OAM DMA: four-T-cycle startup followed by one byte per four
+        # T-cycles. The source is the cartridge/WRAM bus, never fabricated
+        # pre-copied OAM; unsupported FF46 source pages fail closed.
+        self.dma_active = False
+        self.dma_source = 0
+        self.dma_index = 0
+        self.dma_tcycles = 0
+        self.dma_startup = 0
+        self._cpu_bus_active = False
+        self.serial_active = False
+        self.serial_bits = 0
+        self.serial_phase = 0
+        # Battery-backed wall time is intentionally unavailable. RTC grows
+        # only through executed CPU cycles and is sealed in source snapshots.
+        self.rtc_regs = [0, 0, 0, 0, 0]
+        self.rtc_latched = None
+        self.rtc_latch_prev = 0
+        self.rtc_cycle_remainder = 0
         defaults = {
             0xFF00: 0xCF,
             0xFF07: 0,
@@ -112,19 +162,135 @@ class GameBoyMachine:
         for address, value in defaults.items():
             self.memory[address] = value
 
+    def _timer_signal(self) -> bool:
+        """DMG timer input: enabled TAC selector on the internal DIV."""
+        control = self.memory[0xFF07] & 7
+        return bool(control & 4 and self.divider & (1 << (9, 3, 5, 7)[control & 3]))
+
+    def _timer_tick(self) -> None:
+        if self.timer_reload_delay:
+            # A pending overflow ignores further falling edges until reload.
+            return
+        if self.memory[0xFF05] == 255:
+            self.memory[0xFF05] = 0
+            self.timer_reload_delay = 4
+        else:
+            self.memory[0xFF05] += 1
+
+    def _timer_apply_edge(self, old_signal: bool) -> None:
+        if old_signal and not self._timer_signal():
+            self._timer_tick()
+
+    def _dma_tick(self) -> None:
+        if not self.dma_active:
+            return
+        if self.dma_startup:
+            self.dma_startup -= 1
+            return
+        self.dma_tcycles += 1
+        if self.dma_tcycles < 4:
+            return
+        self.dma_tcycles = 0
+        # This CPU interpreter has not yet implemented DMA CPU bus blocking.
+        # Read the source on the actual transfer tick, not at FF46 write.
+        # The PPU can therefore observe the in-flight OAM byte progression.
+        self.memory[0xFE00 + self.dma_index] = self.read(self.dma_source + self.dma_index)
+        self.dma_index += 1
+        if self.dma_index == 160:
+            self.dma_active = False
+
+    def _serial_tick(self) -> None:
+        # DMG internal clock is 8192 Hz: one bit per 512 CPU T-cycles.
+        # No external link peer is attached. The input line therefore
+        # idles high. External clock mode intentionally cannot advance.
+        if not self.serial_active or not self.memory[0xFF02] & 0x01:
+            return
+        self.serial_phase += 1
+        if self.serial_phase != SERIAL_INTERNAL_BIT_CYCLES:
+            return
+        self.serial_phase = 0
+        self.memory[0xFF01] = ((self.memory[0xFF01] << 1) | 1) & 0xFF
+        self.serial_bits += 1
+        if self.serial_bits == 8:
+            self.serial_active = False
+            self.serial_bits = 0
+            self.memory[0xFF02] &= ~0x80
+            self.memory[0xFF0F] |= 0x08
+
+    def _rtc_advance(self, cycles: int) -> None:
+        """Advance the virtual clock in O(1), never using host wall time."""
+        if not self.metadata["virtual_rtc"] or self.rtc_regs[4] & 0x40:
+            return
+        if type(cycles) is not int or cycles < 0:
+            raise GameRomRuntimeError("RTC cycle increment is invalid")
+        seconds, self.rtc_cycle_remainder = divmod(
+            self.rtc_cycle_remainder + cycles, RTC_CYCLES_PER_SECOND
+        )
+        if not seconds:
+            return
+        minutes, self.rtc_regs[0] = divmod(self.rtc_regs[0] + seconds, 60)
+        hours, self.rtc_regs[1] = divmod(self.rtc_regs[1] + minutes, 60)
+        days, self.rtc_regs[2] = divmod(self.rtc_regs[2] + hours, 24)
+        day = self.rtc_regs[3] | ((self.rtc_regs[4] & 1) << 8)
+        day += days
+        carry = bool(self.rtc_regs[4] & 0x80) or day > 511
+        day %= 512
+        self.rtc_regs[3] = day & 255
+        self.rtc_regs[4] = (day >> 8) | (0x80 if carry else 0)
+
+    def _rtc_read(self) -> int:
+        if not self.metadata["virtual_rtc"] or not 8 <= self.bank_high <= 12:
+            raise GameRomRuntimeError("RTC source register selection is unavailable")
+        values = self.rtc_regs if self.rtc_latched is None else self.rtc_latched
+        return values[self.bank_high - 8]
+
+    def _rtc_write(self, value: int) -> None:
+        if not self.metadata["virtual_rtc"] or not 8 <= self.bank_high <= 12:
+            raise GameRomRuntimeError("RTC source register selection is unavailable")
+        index = self.bank_high - 8
+        if index < 2 and value > 59:
+            raise GameRomRuntimeError("RTC seconds/minutes write outside admitted range")
+        if index == 2 and value > 23:
+            raise GameRomRuntimeError("RTC hours write outside admitted range")
+        self.rtc_regs[index] = value & (0xC1 if index == 4 else 0xFF)
+
+    def _cpu_ppu_memory_locked(self, address: int) -> bool:
+        # CPU-only DMG video bus arbitration. Rendering/DMA accesses must
+        # bypass this check. Mode 3 timing remains an approximate 80..251
+        # T-cycle span, not dot-perfect pixel fetch arbitration.
+        if not self._cpu_bus_active or not (self.memory[0xFF40] & 0x80):
+            return False
+        if self.memory[0xFF44] >= HEIGHT:
+            return False
+        mode3 = 80 <= self.line_cycles < 252
+        return (
+            0x8000 <= address < 0xA000 and mode3
+            or 0xFE00 <= address < 0xFEA0 and self.line_cycles < 252
+        )
+
     def read(self, address: int) -> int:
         address &= 65535
+        if self._cpu_bus_active and self.dma_active and not 0xFF80 <= address <= 0xFFFE:
+            return 0xFF
+        if self._cpu_ppu_memory_locked(address):
+            return 0xFF
         if address < 0x8000:
             if address < 0x4000:
                 bank = (self.bank_high << 5) if self.bank_mode and self.metadata["mapper"] == "mbc1" else 0
             else:
-                bank = self.rom_bank | self.bank_high << 5
+                bank = self.rom_bank | (self.bank_high << 5 if self.metadata["mapper"] == "mbc1" else 0)
             bank %= self.metadata["rom_banks"]
             return self.rom[bank * 16384 + (address & 0x3FFF)]
         if 0xA000 <= address < 0xC000:
-            if not self.external_ram or not self.ram_enabled:
+            if not self.ram_enabled:
                 return 255
-            bank = self.bank_high if self.bank_mode else 0
+            if self.metadata["virtual_rtc"] and 8 <= self.bank_high <= 12:
+                return self._rtc_read()
+            if not self.external_ram:
+                return 255
+            if self.metadata["mapper"] == "mbc2":
+                return 0xF0 | (self.external_ram[(address - 0xA000) & 0x1FF] & 0x0F)
+            bank = self.bank_high if self.metadata["mapper"] in ("mbc3", "mbc5") or self.bank_mode else 0
             return self.external_ram[(bank * 8192 + address - 0xA000) % len(self.external_ram)]
         if 0xE000 <= address < 0xFE00:
             address -= 0x2000
@@ -138,8 +304,14 @@ class GameBoyMachine:
             if not select & 0x20:
                 low &= ~((self.buttons >> 4) & 15)
             return 0xC0 | select | low
+        if address == 0xFF02:
+            return 0x7E | (self.memory[address] & 0x81)
         if address == 0xFF04:
             return self.divider >> 8
+        if address == 0xFF07:
+            # DMG TAC bits 7..3 are read-high, while only 2..0 can
+            # select timer enable/frequency.
+            return 0xF8 | (self.memory[address] & 7)
         if address == 0xFF41:
             ly = self.memory[0xFF44]
             mode = (
@@ -156,8 +328,13 @@ class GameBoyMachine:
 
     def write(self, address: int, value: int) -> None:
         address, value = address & 65535, value & 255
+        if self._cpu_bus_active and self.dma_active and not 0xFF80 <= address <= 0xFFFE:
+            return
+        if self._cpu_ppu_memory_locked(address):
+            return
         if address < 0x8000:
-            if self.metadata["mapper"] == "mbc1":
+            mapper = self.metadata["mapper"]
+            if mapper == "mbc1":
                 if address < 0x2000:
                     self.ram_enabled = value & 15 == 10
                 elif address < 0x4000:
@@ -166,18 +343,81 @@ class GameBoyMachine:
                     self.bank_high = value & 3
                 else:
                     self.bank_mode = value & 1
+            elif mapper == "mbc2":
+                # MBC2 address bit A8 qualifies RAM-enable vs bank-select.
+                # 512 built-in four-bit registers mirror through A000-BFFF.
+                if address < 0x2000 and not address & 0x100:
+                    self.ram_enabled = value & 15 == 10
+                elif 0x2000 <= address < 0x4000 and address & 0x100:
+                    self.rom_bank = (value & 15) or 1
+            elif mapper == "mbc3":
+                if address < 0x2000:
+                    self.ram_enabled = value & 15 == 10
+                elif address < 0x4000:
+                    self.rom_bank = (value & 127) or 1
+                elif address < 0x6000:
+                    if value > 3 and not (
+                        self.metadata["virtual_rtc"] and 8 <= value <= 12
+                    ):
+                        raise GameRomRuntimeError("MBC3 unavailable RTC/RAM register")
+                    self.bank_high = value
+                elif self.metadata["virtual_rtc"]:
+                    # Require an explicit 00 -> 01 command sequence.
+                    # Other values cannot silently synthesize a latch edge.
+                    if value in (0, 1):
+                        if self.rtc_latch_prev == 0 and value == 1:
+                            self.rtc_latched = list(self.rtc_regs)
+                        self.rtc_latch_prev = value
+                # RTC-free types ignore the latch command.
+            elif mapper == "mbc5":
+                if address < 0x2000:
+                    self.ram_enabled = value & 15 == 10
+                elif address < 0x3000:
+                    self.rom_bank = (self.rom_bank & 256) | value
+                elif address < 0x4000:
+                    self.rom_bank = (self.rom_bank & 255) | ((value & 1) << 8)
+                elif address < 0x6000:
+                    self.bank_high = value & 15
             return
         if 0xA000 <= address < 0xC000:
+            if self.ram_enabled and self.metadata["virtual_rtc"] and 8 <= self.bank_high <= 12:
+                self._rtc_write(value)
+                return
             if self.external_ram and self.ram_enabled:
-                bank = self.bank_high if self.bank_mode else 0
+                if self.metadata["mapper"] == "mbc2":
+                    self.external_ram[(address - 0xA000) & 0x1FF] = value & 0x0F
+                    return
+                bank = self.bank_high if self.metadata["mapper"] in ("mbc3", "mbc5") or self.bank_mode else 0
                 self.external_ram[(bank * 8192 + address - 0xA000) % len(self.external_ram)] = value
             return
         if 0xE000 <= address < 0xFE00:
             address -= 0x2000
         if 0xFEA0 <= address < 0xFF00 or address == 0xFF44:
             return
+        if address == 0xFF01:
+            if self.serial_active:
+                raise GameRomRuntimeError('serial SB rewrite during active transfer unsupported')
+            self.memory[address] = value
+            return
+        if address == 0xFF02:
+            self.memory[address] = value & 0x81
+            self.serial_active = bool(value & 0x80)
+            self.serial_bits = self.serial_phase = 0
+            return
         if address == 0xFF04:
+            old_signal = self._timer_signal()
             self.divider = 0
+            self._timer_apply_edge(old_signal)
+            return
+        if address == 0xFF05:
+            # TIMA writes during pending overflow cancel the reload and IF.
+            self.timer_reload_delay = 0
+            self.memory[address] = value
+            return
+        if address == 0xFF07:
+            old_signal = self._timer_signal()
+            self.memory[address] = value & 7
+            self._timer_apply_edge(old_signal)
             return
         if address == 0xFF00:
             old = self.read(address)
@@ -186,9 +426,16 @@ class GameBoyMachine:
                 self.memory[0xFF0F] |= 0x10
             return
         if address == 0xFF46:
+            if value > 0xDF:
+                # $E0-$FF source pages have bus-dependent DMG behavior not
+                # modeled by this interpreter: reject rather than invent.
+                raise GameRomRuntimeError("Unsupported OAM DMA source outside ROM/WRAM bus pages")
             self.memory[address] = value
-            for i in range(160):
-                self.memory[0xFE00 + i] = self.read(value * 256 + i)
+            self.dma_source = value << 8
+            self.dma_index = 0
+            self.dma_tcycles = 0
+            self.dma_startup = 4
+            self.dma_active = True
             return
         if address == 0xFF40 and not value & 0x80:
             self.memory[0xFF44] = self.line_cycles = 0
@@ -207,6 +454,8 @@ class GameBoyMachine:
             self.stopped = False
 
     def _fetch(self) -> int:
+        if self._cpu_bus_active and self.dma_active and not 0xFF80 <= self.pc <= 0xFFFE:
+            raise GameRomRuntimeError('DMG CPU attempted opcode fetch outside HRAM during OAM DMA')
         result = self.read(self.pc)
         if self.halt_bug:
             self.halt_bug = False
@@ -384,6 +633,9 @@ class GameBoyMachine:
                 return 20
             if opcode == 0x10:
                 self._fetch()
+                # DMG STOP resets the divider and freezes its oscillator
+                # until joypad activity. No CGB speed-switch emulation.
+                self.write(0xFF04, 0)
                 self.stopped = True
                 return 4
             if opcode == 0x18 or opcode in (0x20, 0x28, 0x30, 0x38):
@@ -565,27 +817,19 @@ class GameBoyMachine:
                 if not flags & 0x80 or row[x] == 0:
                     self.framebuffer[line * WIDTH + x] = 255 - (palette >> (color * 2) & 3) * 85
 
-    def _advance(self, cycles: int) -> None:
-        for _ in range(cycles):
-            previous = self.divider
-            self.divider = (self.divider + 1) & 65535
-            control = self.memory[0xFF07]
-            bit = (9, 3, 5, 7)[control & 3]
-            if control & 4 and previous & 1 << bit and not self.divider & 1 << bit:
-                if self.memory[0xFF05] == 255:
-                    self.memory[0xFF05] = self.memory[0xFF06]
-                    self.memory[0xFF0F] |= 4
-                else:
-                    self.memory[0xFF05] += 1
-        self.cycles += cycles
+    def _ppu_tick(self) -> None:
+        """Clock the raster and STAT edge after this T-cycle's DMA byte."""
         if not self.memory[0xFF40] & 0x80:
             self.stat_line = False
             return
-        self.line_cycles += cycles
-        while self.line_cycles >= 456:
+        self.line_cycles += 1
+        if self.line_cycles >= 456:
             self.line_cycles -= 456
             line = self.memory[0xFF44]
             if line < HEIGHT:
+                # Capture sprites with the exact OAM bytes already
+                # transferred at the end of THIS scanline. A later
+                # instruction cannot retroactively modify this raster.
                 self._draw_line(line)
             line = (line + 1) % 154
             self.memory[0xFF44] = line
@@ -604,11 +848,32 @@ class GameBoyMachine:
             self.memory[0xFF0F] |= 2
         self.stat_line = requested
 
+    def _advance(self, cycles: int) -> None:
+        # Timer, DMA, and PPU are coupled to the SAME emulated T-cycle.
+        # Do not advance DMA for an entire opcode then render earlier lines
+        # with future sprite bytes; that poisons source image/replay labels.
+        for _ in range(cycles):
+            if self.timer_reload_delay:
+                self.timer_reload_delay -= 1
+                if not self.timer_reload_delay:
+                    self.memory[0xFF05] = self.memory[0xFF06]
+                    self.memory[0xFF0F] |= 4
+            old_signal = self._timer_signal()
+            self.divider = (self.divider + 1) & 65535
+            self._timer_apply_edge(old_signal)
+            self._dma_tick()
+            self._serial_tick()
+            self._ppu_tick()
+        self.cycles += cycles
+        self._rtc_advance(cycles)
+
     def instruction(self) -> int:
         pending = self.memory[0xFFFF] & self.memory[0xFF0F] & 31
         if pending:
             self.halted = False
             if self.ime:
+                if self.dma_active:
+                    raise GameRomRuntimeError('DMG IRQ service during OAM DMA requires unavailable bus phase emulation')
                 bit = (pending & -pending).bit_length() - 1
                 self.ime, self.ime_delay = False, 0
                 self.memory[0xFF0F] &= ~(1 << bit)
@@ -616,10 +881,20 @@ class GameBoyMachine:
                 self.pc = 0x40 + bit * 8
                 self._advance(20)
                 return 20
-        if self.halted or self.stopped:
+        if self.stopped:
+            # Advance a bounded scheduler budget so run() cannot spin
+            # indefinitely, while leaving actual divider/TIMA/PPU/RTC
+            # counters frozen. Actual oscillator resume is joypad-gated.
+            self.cycles += 4
+            return 4
+        if self.halted:
             self._advance(4)
             return 4
-        cycles = self._execute()
+        self._cpu_bus_active = True
+        try:
+            cycles = self._execute()
+        finally:
+            self._cpu_bus_active = False
         self.instructions += 1
         if self.ime_delay:
             self.ime_delay -= 1
@@ -669,6 +944,15 @@ class GameBoyMachine:
             "line_cycles",
             "instructions",
             "stat_line",
+            "timer_reload_delay",
+            "dma_active",
+            "dma_source",
+            "dma_index",
+            "dma_tcycles",
+            "dma_startup",
+            "serial_active",
+            "serial_bits",
+            "serial_phase",
         )
         result = {
             "schema_version": 1,
@@ -678,6 +962,15 @@ class GameBoyMachine:
             "external_ram": base64.b64encode(self.external_ram).decode(),
             "framebuffer": base64.b64encode(self.framebuffer).decode(),
         }
+        if self.metadata["virtual_rtc"]:
+            result["schema_version"] = 2
+            result["rtc"] = {
+                "live": list(self.rtc_regs),
+                "latched": None if self.rtc_latched is None else list(self.rtc_latched),
+                "previous_latch_bit": self.rtc_latch_prev,
+                "cycle_remainder": self.rtc_cycle_remainder,
+                "time_basis": "emulated_cpu_cycles_only",
+            }
         result["state_digest"] = _digest(result)
         return result
 
@@ -686,13 +979,15 @@ class GameBoyMachine:
             raise GameRomRuntimeError("ROM snapshot is not an object")
         value = dict(snapshot)
         digest = value.pop("state_digest", None)
+        keys = {"schema_version", "rom_digest", "registers", "memory", "external_ram", "framebuffer"}
+        if self.metadata["virtual_rtc"]:
+            keys.add("rtc")
         if (
-            set(value)
-            != {"schema_version", "rom_digest", "registers", "memory", "external_ram", "framebuffer"}
+            set(value) != keys
             or type(value.get("schema_version")) is not int
             or len(json.dumps(value)) > 400000
             or digest != _digest(value)
-            or value.get("schema_version") != 1
+            or value.get("schema_version") != (2 if self.metadata["virtual_rtc"] else 1)
             or value.get("rom_digest") != self.metadata["rom_digest"]
         ):
             raise GameRomRuntimeError("ROM snapshot identity, size or digest is invalid")
@@ -712,8 +1007,20 @@ class GameBoyMachine:
             "sp": 65535,
             "pc": 65535,
             "ime_delay": 2,
-            "rom_bank": 31,
-            "bank_high": 3,
+            "timer_reload_delay": 4,
+            "dma_source": 0xDF00,
+            "dma_index": 160,
+            "dma_tcycles": 3,
+            "dma_startup": 4,
+            "serial_bits": 7,
+            "serial_phase": SERIAL_INTERNAL_BIT_CYCLES - 1,
+            "rom_bank": (
+                511 if self.metadata["mapper"] == "mbc5"
+                else 127 if self.metadata["mapper"] == "mbc3"
+                else 15 if self.metadata["mapper"] == "mbc2"
+                else 31
+            ),
+            "bank_high": 15 if self.metadata["mapper"] == "mbc5" else 12 if self.metadata["virtual_rtc"] else 3,
             "bank_mode": 1,
             "buttons": 255,
             "cycles": 2**53 - 1,
@@ -729,10 +1036,31 @@ class GameBoyMachine:
                     raise GameRomRuntimeError("ROM snapshot boolean is invalid")
             elif type(item) is not int or not 0 <= item <= bounds[name]:
                 raise GameRomRuntimeError("ROM snapshot register is outside bounds")
-        if registers["f"] & 15 or registers["rom_bank"] == 0:
+        if (
+            registers["f"] & 15
+            or (registers["rom_bank"] == 0 and self.metadata["mapper"] != "mbc5")
+            or (self.metadata["mapper"] != "mbc1" and registers["bank_mode"] != 0)
+            or (self.metadata["mapper"] == "mbc2" and registers["bank_high"] != 0)
+            or (self.metadata["virtual_rtc"] and registers["bank_high"] in (4, 5, 6, 7))
+        ):
             raise GameRomRuntimeError("ROM snapshot flag/bank is invalid")
         if registers["instructions"] * 4 > registers["cycles"]:
             raise GameRomRuntimeError("ROM snapshot CPU counters are inconsistent")
+        if (
+            registers["dma_source"] & 255
+            or (registers["dma_active"] and registers["dma_index"] == 160)
+            or (not registers["dma_active"] and (
+                registers["dma_tcycles"] or registers["dma_startup"]
+                or registers["dma_index"] not in (0, 160)
+            ))
+            or (registers["dma_startup"] and (
+                registers["dma_index"] != 0 or registers["dma_tcycles"] != 0
+            ))
+        ):
+            raise GameRomRuntimeError("ROM snapshot contains impossible in-flight OAM DMA state")
+        # A DIV/TAC write can trigger timer overflow even at source cycle
+        # zero. The bounded pending phase is legal regardless of instruction
+        # count, so only its 0..4 range is validated above.
         decoded = {}
         for name, length in (
             ("memory", 65536),
@@ -740,7 +1068,7 @@ class GameBoyMachine:
             ("framebuffer", WIDTH * HEIGHT),
         ):
             raw = value.get(name)
-            if not isinstance(raw, str) or len(raw) > 90000:
+            if not isinstance(raw, str) or len(raw) > ((length + 2) // 3) * 4:
                 raise GameRomRuntimeError("ROM snapshot memory encoding is invalid")
             try:
                 data = base64.b64decode(raw, validate=True)
@@ -749,10 +1077,58 @@ class GameBoyMachine:
             if len(data) != length:
                 raise GameRomRuntimeError("ROM snapshot memory length is invalid")
             decoded[name] = bytearray(data)
+        if (
+            bool(decoded["memory"][0xFF02] & 0x80) != registers["serial_active"]
+            or decoded["memory"][0xFF02] & ~0x81
+            or (not registers["serial_active"] and (
+                registers["serial_bits"] or registers["serial_phase"]
+            ))
+            or (registers["serial_active"] and not decoded["memory"][0xFF02] & 1
+                and registers["serial_phase"])
+        ):
+            raise GameRomRuntimeError("source serial clock state or SB/SC session is invalid")
+        if registers["dma_active"] and decoded["memory"][0xFF46] != registers["dma_source"] >> 8:
+            raise GameRomRuntimeError("OAM DMA source and programmed bus register differ")
         if decoded["memory"][0xFF44] > 153 or any(
             pixel not in (0, 85, 170, 255) for pixel in decoded["framebuffer"]
         ):
             raise GameRomRuntimeError("ROM snapshot raster state is invalid")
+        if self.metadata["mapper"] == "mbc2" and any(
+            byte & 0xF0 for byte in decoded["external_ram"]
+        ):
+            raise GameRomRuntimeError("MBC2 state contains data outside four-bit internal RAM")
+        validated_rtc = None
+        if self.metadata["virtual_rtc"]:
+            rtc = value["rtc"]
+            if not isinstance(rtc, dict) or set(rtc) != {
+                "live", "latched", "previous_latch_bit", "cycle_remainder", "time_basis"
+            } or rtc["time_basis"] != "emulated_cpu_cycles_only":
+                raise GameRomRuntimeError("MBC3 source RTC snapshot schema is invalid")
+
+            def valid_clock(values: Any) -> bool:
+                return (
+                    isinstance(values, list) and len(values) == 5
+                    and all(type(item) is int for item in values)
+                    and 0 <= values[0] < 60 and 0 <= values[1] < 60
+                    and 0 <= values[2] < 24 and 0 <= values[3] <= 255
+                    and 0 <= values[4] <= 0xC1
+                    and values[4] & ~0xC1 == 0
+                )
+
+            if (
+                not valid_clock(rtc["live"])
+                or rtc["latched"] is not None and not valid_clock(rtc["latched"])
+                or type(rtc["previous_latch_bit"]) is not int
+                or rtc["previous_latch_bit"] not in (0, 1)
+                or type(rtc["cycle_remainder"]) is not int
+                or not 0 <= rtc["cycle_remainder"] < RTC_CYCLES_PER_SECOND
+            ):
+                raise GameRomRuntimeError("MBC3 virtual RTC clock state is invalid")
+            validated_rtc = (
+                list(rtc["live"]),
+                None if rtc["latched"] is None else list(rtc["latched"]),
+                rtc["previous_latch_bit"], rtc["cycle_remainder"],
+            )
         for name, item in registers.items():
             setattr(self, name, item)
         self.memory, self.external_ram, self.framebuffer = (
@@ -760,6 +1136,9 @@ class GameBoyMachine:
             decoded["external_ram"],
             decoded["framebuffer"],
         )
+        if validated_rtc is not None:
+            (self.rtc_regs, self.rtc_latched,
+             self.rtc_latch_prev, self.rtc_cycle_remainder) = validated_rtc
 
     def preview(self) -> dict[str, Any]:
         return {
