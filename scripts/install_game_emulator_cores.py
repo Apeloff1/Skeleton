@@ -397,6 +397,66 @@ PINNED_CORES.update(
 )
 
 
+# Additional exact-source opt-in recipes. These are native binaries, NOT Python
+# emulator imitations. Installing a recipe does not prove ROM compatibility.
+# The original small DEFAULT_CORES remains unchanged to avoid unexpected builds.
+PINNED_CORES.update(
+    {
+        "sameboy": {
+            "repository": "https://github.com/libretro/sameboy.git",
+            "revision": "aa158a889a48b538a0302873704a34577c8eb67d",
+            "artifact": "libretro/sameboy_libretro.so",
+            "license": "LICENSE",
+            "build_directory": "libretro",
+            "makefile": "Makefile",
+            "targets": ["game_boy", "game_boy_color", "game_boy_pocket", "game_boy_light"],
+            "firmware_mode": "Upstream open replacement boot ROMs; proprietary originals not supplied",
+        },
+        "nestopia": {
+            "repository": "https://github.com/libretro/nestopia.git",
+            "revision": "06a8949e0b3cf60e3a38a374b1426bf40fccb9a0",
+            "artifact": "libretro/nestopia_libretro.so",
+            "license": "COPYING",
+            "build_directory": "libretro",
+            "makefile": "Makefile",
+            "targets": ["nes"],
+            "feature_limits": "Famicom Disk System excluded until a separately approved BIOS and content contract exists",
+        },
+        "mesen": {
+            "repository": "https://github.com/libretro/mesen.git",
+            "revision": "0102910c39ad1a62bc3f784466f3f67ca9eae335",
+            "artifact": "Libretro/mesen_libretro.so",
+            "license": "LICENSE",
+            "build_directory": "Libretro",
+            "makefile": "Makefile",
+            "targets": ["nes"],
+            "feature_limits": "Famicom Disk System needs separately supplied disksys.rom; not approved in this NES-only profile",
+        },
+        "snes9x2010": {
+            "repository": "https://github.com/libretro/snes9x2010.git",
+            "revision": "fe690dd321fa5a46b5234a2bde089d2518c62b0e",
+            "artifact": "snes9x2010_libretro.so",
+            "license": "LICENSE.txt",
+            "targets": ["snes"],
+            "license_review": "Upstream Snes9x terms include noncommercial restrictions; operator must review before use",
+            "feature_limits": "Low-power SNES alternative, not a replacement for current Snes9x accuracy",
+        },
+        "mednafen_saturn": {
+            "repository": "https://github.com/libretro/beetle-saturn-libretro.git",
+            "revision": "faef2779a7568c1734addc4fe63cc76e9fa2566b",
+            "artifact": "mednafen_saturn_libretro.so",
+            "license": "COPYING",
+            "makefile": "Makefile",
+            "targets": ["saturn"],
+            # Requiring BOTH official regional BIOS files is conservative: an
+            # installation without lawful exact firmware remains unapproved.
+            "firmware": ["sega_101.bin", "mpr-17933.bin"],
+            "feature_limits": "Disc-image execution only; disc/region compatibility and actual boot unverified",
+        },
+    }
+)
+
+
 def _environment(*, network: bool = False):
     # No inherited provider/Mongo credentials, user git configuration, dynamic
     # loader overrides, compiler injection flags or credential helpers.
