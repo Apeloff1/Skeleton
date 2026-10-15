@@ -47,3 +47,17 @@ outcomes, rejected action penalties, and per-step cost. This is task-specific
 local policy learning; results require independent evaluation before promotion.
 Preview intentionally supplies state fields, not imaginary frames. Full native
 emulator pixels/audio remain exclusive to the approved libretro runtime.
+
+## Opt-in learning from actual gameplay
+
+The same candidate CLI also accepts `--played-actions inspect survey wait`
+with `--consent-ref operator-consent:demo-9`. It executes those controls
+against the real replay-authoritative engine, records the typed episode using
+`GameDemonstrationRecorder`, independently replays all commands with
+`learn_demonstrations`, and only then applies the genuine Q updates and
+an imitation prior. The final candidate includes the demonstration digest
+and number of measured action-derived optimizer updates.
+
+This action-learning path is explicitly consent and rights-gated. It cannot
+accept an uploaded unchecked label as sufficient proof and cannot silently
+write production neural weights.

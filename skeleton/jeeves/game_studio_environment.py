@@ -85,7 +85,12 @@ def _palette(editor: str) -> tuple[str, ...]:
         raise StudioEnvironmentError("original gameplay action catalog contains duplicates")
     # The canonical policy learner permits 32 actions per training policy;
     # explicit overrides can instead choose other real registered actions.
-    return tuple(registered[:32])
+    favored = ("inspect", "wait", "rest", "observe", "survey",
+               "coast", "tick", "end_turn", "guard", "north", "south",
+               "east", "west", "accelerate", "jump", "attack")
+    selected = [name for name in favored if name in registered]
+    selected.extend(name for name in registered if name not in selected)
+    return tuple(selected[:32])
 
 
 def make_studio_source(editor: str, settings: Mapping[str, object] | None = None,

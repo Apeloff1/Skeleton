@@ -89,6 +89,29 @@ class StudioLearningTests(unittest.TestCase):
                             env.spec.environment_digest for entry in trained.traces))
         env.close()
 
+    def test_measured_player_actions_feed_same_actual_policy_optimizer(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "played.json"
+            report = train_studio_policy(
+                editor="economy", output=output, authorized=True,
+                rights_cleared=True, episodes=2, max_steps=5,
+                seed=9, actions=("inspect", "wait", "survey"),
+                played_actions=("inspect", "survey", "wait"),
+                consent_ref="operator-consent:demo-9",
+            )
+            candidate = json.loads(output.read_text())
+            self.assertEqual(report["episodes"], 3)
+            self.assertEqual(report["played_action_q_updates"], 3)
+            self.assertEqual(candidate["played_action_q_updates"], 3)
+            self.assertIsNotNone(candidate["demonstration_digest"])
+            self.assertEqual(candidate["actual_q_updates"], report["q_updates"])
+            with self.assertRaises(ValueError):
+                train_studio_policy(
+                    editor="economy", output=Path(folder) / "bad.json",
+                    authorized=True, rights_cleared=True,
+                    played_actions=("inspect",),
+                )
+
     def test_candidate_only_training_is_authority_gated(self):
         with tempfile.TemporaryDirectory() as folder:
             output = Path(folder) / "candidate.json"

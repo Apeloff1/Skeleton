@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .game_learning import GameLearningConfig, GamePolicyLearner
 from .game_learning_parallel import GameEnvironmentRequest
+from .game_learning_demonstrations import GameDemonstrationRecorder, learn_demonstrations
 from .game_studio_environment import make_studio_source, studio_request_tree
 
 
@@ -21,6 +22,8 @@ def train_studio_policy(
     *, editor: str, output: Path, authorized: bool, rights_cleared: bool,
     episodes: int = 8, max_steps: int = 32, seed: int = 0,
     settings: dict | None = None, actions: tuple[str, ...] | None = None,
+    played_actions: tuple[str, ...] | None = None,
+    consent_ref: str | None = None, actor_id: str = "local_operator",
 ) -> dict:
     if authorized is not True or rights_cleared is not True:
         raise PermissionError("original game training requires explicit operator and source-rights admission")
@@ -28,6 +31,12 @@ def train_studio_policy(
         raise ValueError("bounded training episodes must be in [1,128]")
     if type(seed) is not int or not 0 <= seed <= 2**63-1:
         raise ValueError("bounded policy seed required")
+    if played_actions is not None and (
+        type(played_actions) is not tuple or not 1 <= len(played_actions) <= max_steps
+        or not isinstance(consent_ref, str) or not 3 <= len(consent_ref) <= 128
+        or not isinstance(actor_id, str) or not 2 <= len(actor_id) <= 128
+    ):
+        raise ValueError("played engine actions require explicit bounded consent and actor identity")
     source = make_studio_source(editor, settings, actions=actions)
     request = GameEnvironmentRequest(
         "studio:" + editor, kind="studio", tree=studio_request_tree(source),
@@ -37,8 +46,9 @@ def train_studio_policy(
     spec = environment.spec
     environment.close()
     learner = GamePolicyLearner(
-        spec, GameLearningConfig(seed=seed, max_episodes=episodes,
-                                 max_updates=episodes * max_steps),
+        spec, GameLearningConfig(seed=seed,
+                                 max_episodes=episodes + int(played_actions is not None),
+                                 max_updates=(episodes + int(played_actions is not None)) * max_steps),
         policy_id="studio:" + editor + ":" + str(seed),
         source_lineage={
             "rights_acknowledged": True,
@@ -48,7 +58,38 @@ def train_studio_policy(
         },
     )
     result = learner.train(request.build, episodes=episodes)
-    if result.updates <= 0:
+    demonstration_digest = None
+    human_updates = 0
+    if played_actions is not None:
+        observed = request.build()
+        try:
+            initial_observation = dict(observed.reset(seed))
+            recorder = GameDemonstrationRecorder(
+                spec, episode_id="studio-human:" + editor + ":" + str(seed),
+                seed=seed, source_lineage=learner.source_lineage,
+                actor_id=actor_id, consent_ref=consent_ref,
+                initial_observation=initial_observation,
+                start_snapshot=observed.snapshot(),
+            )
+            for action in played_actions:
+                if observed.done:
+                    raise ValueError("played actions continue after game termination")
+                actual = observed.step(action)
+                recorder.append(
+                    action, actual.observation, actual.reward_components,
+                    actual.terminated, actual.truncated,
+                    info=actual.info, transition_digest=actual.transition_digest,
+                )
+            recording = recorder.finish(collection_stopped=not observed.done)
+        finally:
+            observed.close()
+        learned = learn_demonstrations(
+            learner, request, [recording], authorize=lambda: None,
+        )
+        human_updates = learned["updates"]
+        demonstration_digest = recording.digest
+    actual_updates = result.updates + human_updates
+    if actual_updates <= 0:
         raise RuntimeError("training returned zero real policy updates")
     record = {
         "schema_version": "skeleton.game_builder.policy_candidate.v1",
@@ -56,9 +97,11 @@ def train_studio_policy(
         "status": "candidate_trained_not_promoted",
         "environment_request_digest": request.digest,
         "environment": spec.as_dict(),
-        "policy_snapshot": result.snapshot,
-        "actual_q_updates": result.updates,
-        "episodes": [entry for entry in result.episode_summaries],
+        "policy_snapshot": learner.snapshot(),
+        "actual_q_updates": actual_updates,
+        "played_action_q_updates": human_updates,
+        "demonstration_digest": demonstration_digest,
+        "episodes": learner.snapshot()["episodes"],
         "gameplay_evidence": [trace["trace_digest"] for trace in result.traces],
         "production_neural_weights_modified": False,
         "automatic_promotion": False,
@@ -81,8 +124,10 @@ def train_studio_policy(
         raise
     return {
         "candidate": str(destination), "editor": editor,
-        "episodes": episodes, "q_updates": result.updates,
-        "policy_snapshot_digest": result.snapshot["snapshot_digest"],
+        "episodes": episodes + int(played_actions is not None), "q_updates": actual_updates,
+        "played_action_q_updates": human_updates,
+        "demonstration_digest": demonstration_digest,
+        "policy_snapshot_digest": learner.snapshot()["snapshot_digest"],
         "promotion": "not_authorized",
     }
 
@@ -96,6 +141,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--settings-json")
     parser.add_argument("--actions", nargs="+")
+    parser.add_argument("--played-actions", nargs="+")
+    parser.add_argument("--consent-ref")
+    parser.add_argument("--actor-id", default="local_operator")
     parser.add_argument("--authorized", action="store_true")
     parser.add_argument("--rights-cleared", action="store_true")
     args = parser.parse_args(argv)
@@ -105,6 +153,8 @@ def main(argv: list[str] | None = None) -> int:
         episodes=args.episodes, max_steps=args.max_steps,
         seed=args.seed, settings=settings,
         actions=tuple(args.actions) if args.actions else None,
+        played_actions=tuple(args.played_actions) if args.played_actions else None,
+        consent_ref=args.consent_ref, actor_id=args.actor_id,
         authorized=args.authorized, rights_cleared=args.rights_cleared,
     )
     print(json.dumps(output, sort_keys=True))
