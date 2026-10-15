@@ -671,6 +671,7 @@ class LiveComparison:
                         "native_content_digest":lane.native_content_digest,
                         "core_sha256":lane.env.core.library_sha256,
                         "native_environment_sha256":lane.env.spec.environment_digest,
+                        "configured_frames_per_step":lane.game["frames_per_step"],
                         "seed":lane.game["seed"],
                         "initial_chain_sha256":lane.first_chain,
                         "final_chain_sha256":lane.chain,
