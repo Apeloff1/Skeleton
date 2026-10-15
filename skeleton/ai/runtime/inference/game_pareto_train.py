@@ -13,6 +13,7 @@ import json
 import math
 import os
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -181,6 +182,19 @@ def _losses(model: Any) -> dict[str, float]:
     }
 
 
+def _publish_new_candidate(model: Any, destination: Path, writer: Any) -> Any:
+    """Stage, validate, then exclusively hard-link without overwriting a race winner.
+
+    The underlying local artifact writer uses os.replace(), suitable for an
+    operator-chosen staging pathname but not an absent-only candidate target.
+    """
+    with tempfile.TemporaryDirectory(prefix=".game-pareto-", dir=str(destination.parent)) as stage:
+        staged = Path(stage) / "candidate.json"
+        receipt = writer(model, staged)
+        os.link(staged, destination)  # atomic no-clobber even if another writer wins
+        return receipt
+
+
 def train(args: argparse.Namespace) -> dict[str, object]:
     """Return evidence on success or rejection; rejects never publish a candidate."""
     from .artifact import load_local_model_artifact, write_local_model_artifact
@@ -280,7 +294,7 @@ def train(args: argparse.Namespace) -> dict[str, object]:
         report["rejection_reasons"] = reasons
         return report
 
-    artifact = write_local_model_artifact(model, destination)
+    artifact = _publish_new_candidate(model, destination, write_local_model_artifact)
     report.update({
         "status": "candidate_trained",
         "artifact_written": True,
