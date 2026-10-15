@@ -840,7 +840,7 @@ def run_advanced_session(editor: str, settings: Mapping[str, object] | None = No
         }
         try:
             events=steps[editor](state,rules,action)
-        except (WorldGameError,GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError) as exc:
+        except (WorldGameError,GenreActionError,FarmingActionError,FactoryActionError,ColonyActionError,CityActionError,StealthActionError,ExplorationActionError,SandboxActionError,RoguelikeActionError,RTSActionError,RhythmActionError,FightingActionError,QuestDirectorError,FlightActionError,SailingActionError,PhysicsActionError,*BINDING_ERRORS) as exc:
             raise AdvancedRuntimeError(str(exc)) from exc
         state["events"]=events
         receipt={"index":index,"action":action,"events":events,

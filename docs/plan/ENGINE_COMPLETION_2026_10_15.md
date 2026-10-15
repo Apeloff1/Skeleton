@@ -74,3 +74,14 @@ skippable cuts, recorded decisions and earned end-of-storyboard proof.
 The module only simulates camera/cue/branch timing; there is no claim to
 render pixels or audio. Existing authored-scene verification, evidence
 replay, and Q-policy learning all apply.
+
+## Batch 5 — four executable cross-cutting subsystem reference engines
+
+* `networking`: bounded local authoritative input and packet-delay trial with peer slots, deterministic clock, message queue, acknowledgement and rollback accounting, no sockets/network hosting.
+* `save_system`: actual in-memory source-state snapshots and restore, versioned history, checksum checking, autosave scheduling, schema migration; actual disk durability remains separately owned.
+* `animation`: authored finite clip graph, legal transitions, blend ticks, root motion and witnessed events; not a native renderer.
+* `audio`: integer-sample clock, finite clip/voice ownership, priority stealing, optional spatial gains, ducking, dynamic music layers and expiry; not real audio synthesis/output.
+
+Every family implements the exact `ACTIONS/start/step/default_layout/normalize_layout/apply_scene` contract, uses the same content-addressed authored scene, playable session and replay-verifiable learning adapter. Crucially, the central gameplay dispatcher now catches bound engine action errors and rethrows canonical `AdvancedRuntimeError`, avoiding uncaught engine-specific action failures.
+
+These four are **logical reference execution subsystems**, not complete physical networking, file-backed persistence, audio devices or rig rendering. They need exact-head execution tests before release.

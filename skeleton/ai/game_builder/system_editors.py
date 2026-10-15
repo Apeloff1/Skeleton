@@ -6113,7 +6113,7 @@ for _entry in CATALOG:
 MINIMUM_PROGRESSION = "advanced"
 ADVANCED_ENGINE_IDS = frozenset({"maze", "rpg", "platformer", "tactics", "tower_defense", "racing", "survival", "shooter", "deck_battler", "puzzle", "farming", "factory", "colony", "city_builder", "stealth", "metroidvania", "sandbox", "roguelike", "rts", "rhythm", "fighting", "quest_director", "flight", "sailing", "physics"})
 ADVANCED_ENGINE_IDS = ADVANCED_ENGINE_IDS | frozenset({"procedural_world", "voxel", "parkour", "ecosystem", "sports", "npc_society", "dialogue"})
-ADVANCED_ENGINE_IDS = ADVANCED_ENGINE_IDS | frozenset({"economy", "narrative", "cinematics"})
+ADVANCED_ENGINE_IDS = ADVANCED_ENGINE_IDS | frozenset({"economy", "narrative", "cinematics", "networking", "save_system", "animation", "audio"})
 ADVANCED_REQUIREMENTS = {
     "World": ("persistent_state", "causal_events", "player_choice_consequences",
               "branch_or_nonterminal_world", "evidence_and_fidelity"),

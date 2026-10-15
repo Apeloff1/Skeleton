@@ -16,6 +16,10 @@ from . import advanced_npc_society_runtime as npc_society_engine
 from . import advanced_dialogue_runtime as dialogue_engine
 from . import advanced_narrative_runtime as narrative_engine
 from . import advanced_cinematics_runtime as cinematics_engine
+from . import advanced_networking_runtime as networking_engine
+from . import advanced_save_system_runtime as save_system_engine
+from . import advanced_animation_runtime as animation_engine
+from . import advanced_audio_runtime as audio_engine
 
 MODULES = {
     "procedural_world": procedural_world_engine,
@@ -28,6 +32,10 @@ MODULES = {
     "dialogue": dialogue_engine,
     "narrative": narrative_engine,
     "cinematics": cinematics_engine,
+    "networking": networking_engine,
+    "save_system": save_system_engine,
+    "animation": animation_engine,
+    "audio": audio_engine,
 }
 ACTIONS = {name: module.ACTIONS for name, module in MODULES.items()}
 STARTS = {name: module.start for name, module in MODULES.items()}
@@ -44,7 +52,11 @@ ERRORS = (procedural_world_engine.ProceduralWorldActionError,
           npc_society_engine.SocietyActionError,
           dialogue_engine.DialogueActionError,
           narrative_engine.NarrativeActionError,
-          cinematics_engine.CinematicActionError,)
+          cinematics_engine.CinematicActionError,
+          networking_engine.NetworkingActionError,
+          save_system_engine.SaveSystemActionError,
+          animation_engine.AnimationActionError,
+          audio_engine.AudioActionError,)
 
 __all__ = ["MODULES", "ACTIONS", "STARTS", "STEPS", "DEFAULT_LAYOUTS",
            "NORMALIZE_LAYOUTS", "APPLY_SCENES", "ERRORS"]
