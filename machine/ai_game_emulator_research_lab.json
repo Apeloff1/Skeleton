@@ -10,7 +10,8 @@
     "skeleton/jeeves/game_emulator_planning_lab.py",
     "skeleton/jeeves/game_emulator_goal_lab.py",
     "skeleton/jeeves/game_original_rom_goal_training.py",
-    "skeleton/jeeves/game_rom_instruction_divergence.py"
+    "skeleton/jeeves/game_rom_instruction_divergence.py",
+    "skeleton/jeeves/game_emulator_cross_game_lab.py"
   ],
   "governed_mirrors": [
     "skeleton/ai/agents/jeeves/game_emulator_experiment_lab.py",
@@ -20,7 +21,8 @@
     "skeleton/ai/agents/jeeves/game_emulator_planning_lab.py",
     "skeleton/ai/agents/jeeves/game_emulator_goal_lab.py",
     "skeleton/ai/agents/jeeves/game_original_rom_goal_training.py",
-    "skeleton/ai/agents/jeeves/game_rom_instruction_divergence.py"
+    "skeleton/ai/agents/jeeves/game_rom_instruction_divergence.py",
+    "skeleton/ai/agents/jeeves/game_emulator_cross_game_lab.py"
   ],
   "entrypoints": [
     "python -m skeleton.jeeves.game_learning_cli train-emulator-deep",
@@ -40,7 +42,8 @@
     "python scripts/audit_original_gameboy_interrupts.py",
     "python scripts/audit_game_emulator_disc_first_boot.py",
     "python scripts/audit_original_gameboy_bus_arbitration.py",
-    "python scripts/audit_original_gameboy_serial_port.py"
+    "python scripts/audit_original_gameboy_serial_port.py",
+    "python scripts/audit_rom_cross_game_comparison.py --manifest-file /private/owned-comparison.json --evidence-file /private/evidence/comparison.json --rights-acknowledged"
   ],
   "experimental_conditions": [
     "passive neutral",
@@ -146,7 +149,9 @@
     "skeleton/testing/test_game_emulator_disc_first_boot.py",
     "skeleton/testing/test_game_original_cpu_bus_arbitration.py",
     "skeleton/testing/test_game_rom_serial_port.py",
-    "skeleton/testing/test_game_original_serial_source_acceptance.py"
+    "skeleton/testing/test_game_original_serial_source_acceptance.py",
+    "skeleton/testing/test_game_emulator_cross_game_lab.py",
+    "skeleton/testing/test_game_emulator_cross_game_operator.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -346,7 +351,8 @@
       "real source OAM DMA clocked-byte/scanline test with mid-transfer rewind custody",
       "seven bounded repeated original-ROM CPU controller branches, including three multi-action temporal schedules with exact physical source input ledger",
       "21 CPU-access isolation checks across HRAM, OAM DMA, VRAM/OAM PPU modes and same-source savestate",
-      "original CPU instruction-driven FF01/FF02 serial 8192Hz internal/external clock source replay and IF interrupt"
+      "original CPU instruction-driven FF01/FF02 serial 8192Hz internal/external clock source replay and IF interrupt",
+      "real original source multiple-ROM replay and pairwise controlled comparison with adversarially rehashed report rejection"
     ],
     "failure": "nonzero subprocess and phase_*.json status, absence of suite-acceptance.json",
     "production_model_promotion": false,
@@ -697,5 +703,53 @@
     "production_weights_updated": 0,
     "actual_workflow_runs_confirmed": 0,
     "draft_PR_has_not_merged": true
+  },
+  "cross_emulator_controlled_comparison": {
+    "canonical_source": "skeleton/jeeves/game_emulator_cross_game_lab.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_emulator_cross_game_lab.py",
+    "operator_entrypoint": "scripts/audit_rom_cross_game_comparison.py",
+    "private_manifest_schema": "skeleton.game.operator_cross_emulator_source_manifest.v1",
+    "report_schema": "skeleton.game.cross_emulator_controlled_observation.v1",
+    "admitted_execution": [
+      "original owned single-ROM DMG execution through actual GameBoyROMEnvironment",
+      "approved real libretro core through GameEnvironmentRequest native sandbox"
+    ],
+    "game_library_min": 2,
+    "game_library_max": 30,
+    "game_wave_selection_size": 10,
+    "simultaneous_native_core_processes": 1,
+    "max_controlled_programs_per_game": 6,
+    "max_actions_per_program": 8,
+    "max_cumulative_actions_per_game": 32,
+    "maximum_pairwise_projections_per_study": 435,
+    "required_control": "idle passive first",
+    "actual_source_evidence": [
+      "exact environment/request source digest",
+      "per-program save-state start and end SHA256",
+      "actual frame SHA256 and observed frame-change rate",
+      "measured rewards scoped strictly to each game",
+      "independently repeated input sequences and identical source state",
+      "per-step measured source projection SHA",
+      "exact independent report and pairwise comparison re-verification"
+    ],
+    "cannot_claim": [
+      "equal game reward scale between consoles",
+      "pixel identity across systems and resolutions",
+      "game causation or game-victory when only frame changes observed",
+      "model weight or gradient updates",
+      "ten concurrently executing libretro cores",
+      "native ROM boots when installed/approved cores and media are absent"
+    ],
+    "max_inline_operator_ROM_bytes": 2097152,
+    "large_disc_route": "scripts/audit_game_emulator_disc_first_boot.py",
+    "source_integrity": "explicit local rights, size/SHA256, safe absolute source paths, and same exact validation in CLI and programmatic calls",
+    "focused_tests": [
+      "skeleton/testing/test_game_emulator_cross_game_lab.py",
+      "skeleton/testing/test_game_emulator_cross_game_operator.py"
+    ],
+    "manual_acceptance_runner": "scripts/run_game_rom_acceptance_suite.py",
+    "actual_operator_study_executed_during_authoring": false,
+    "actual_native_emulator_studies_verified": 0,
+    "production_neural_optimizer_steps": 0
   }
 }
