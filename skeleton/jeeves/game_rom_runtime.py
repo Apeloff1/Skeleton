@@ -18,6 +18,7 @@ from typing import Any
 MAX_ROM_BYTES = 8_388_608
 FRAME_CYCLES = 70_224
 RTC_CYCLES_PER_SECOND = 4_194_304
+SERIAL_INTERNAL_BIT_CYCLES = 512
 WIDTH, HEIGHT = 160, 144
 Z, N, H, C = 0x80, 0x40, 0x20, 0x10
 BUTTONS = ("right", "left", "up", "down", "a", "b", "select", "start")
@@ -136,6 +137,9 @@ class GameBoyMachine:
         self.dma_tcycles = 0
         self.dma_startup = 0
         self._cpu_bus_active = False
+        self.serial_active = False
+        self.serial_bits = 0
+        self.serial_phase = 0
         # Battery-backed wall time is intentionally unavailable. RTC grows
         # only through executed CPU cycles and is sealed in source snapshots.
         self.rtc_regs = [0, 0, 0, 0, 0]
@@ -282,6 +286,8 @@ class GameBoyMachine:
             if not select & 0x20:
                 low &= ~((self.buttons >> 4) & 15)
             return 0xC0 | select | low
+        if address == 0xFF02:
+            return 0x7E | (self.memory[address] & 0x81)
         if address == 0xFF04:
             return self.divider >> 8
         if address == 0xFF07:
@@ -369,6 +375,16 @@ class GameBoyMachine:
         if 0xE000 <= address < 0xFE00:
             address -= 0x2000
         if 0xFEA0 <= address < 0xFF00 or address == 0xFF44:
+            return
+        if address == 0xFF01:
+            if self.serial_active:
+                raise GameRomRuntimeError('serial SB rewrite during active transfer unsupported')
+            self.memory[address] = value
+            return
+        if address == 0xFF02:
+            self.memory[address] = value & 0x81
+            self.serial_active = bool(value & 0x80)
+            self.serial_bits = self.serial_phase = 0
             return
         if address == 0xFF04:
             old_signal = self._timer_signal()
