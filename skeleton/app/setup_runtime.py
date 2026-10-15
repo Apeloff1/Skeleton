@@ -1,320 +1,230 @@
-from __future__ import annotations
+"""Configuration bootstrap for the unified Skeleton application.
 
-from pathlib import Path
-import subprocess
-import json
-import re
-
-import pytest
-
-from skeleton.app.installer import InstallPhase, install_application
-from skeleton.app.preloader import PreloadCheck, PreloadReport
-from skeleton.app.setup_runtime import ensure_runtime_environment
-
-
-ENV_TEMPLATE = """# test runtime
-MONGO_INITDB_ROOT_USERNAME=admin
-MONGO_INITDB_ROOT_PASSWORD=
-MONGO_URL=
-SKL_MONGO_URI=
-JWT_SECRET=
-OPENAI_API_KEY=sk-your-key-here
+This layer owns local setup state and secret generation.  It is intentionally
+idempotent and never returns secret values in receipts or logs.
 """
 
+from __future__ import annotations
 
-def _read_values(path: Path) -> dict[str, str]:
-    values = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
+from dataclasses import dataclass
+import os
+from pathlib import Path
+import secrets
+from tempfile import NamedTemporaryFile
+from urllib.parse import quote
+
+from skeleton.app.assembly import find_repo_root
+
+
+@dataclass(frozen=True)
+class SetupResult:
+    env_path: Path
+    created: bool
+    changed: bool
+    configured_keys: tuple[str, ...]
+    preserved_keys: tuple[str, ...]
+    warnings: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "env_path": str(self.env_path),
+            "created": self.created,
+            "changed": self.changed,
+            "configured_keys": list(self.configured_keys),
+            "preserved_keys": list(self.preserved_keys),
+            "warnings": list(self.warnings),
+        }
+
+
+def _parse_env(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        values[key] = value
+        key = key.strip()
+        if key:
+            values[key] = value.strip().strip('"').strip("'")
     return values
 
 
-def test_setup_runtime_creates_complete_secret_backed_environment(tmp_path):
-    (tmp_path / ".env.example").write_text(ENV_TEMPLATE, encoding="utf-8")
+def _is_placeholder(value: str) -> bool:
+    stripped = value.strip()
+    if not stripped:
+        return True
+    lowered = stripped.lower()
+    # Do not treat the word "example" inside a real Mongo hostname or
+    # operator-provided secret as a placeholder (e.g. db.example.net).
+    return any(
+        token in lowered
+        for token in (
+            "change-me",
+            "changeme",
+            "your-key-here",
+            "your-secret",
+            "replace-me",
+        )
+    ) or lowered in {"example", "example-value", "example-secret"}
 
-    result = ensure_runtime_environment(tmp_path)
-    values = _read_values(tmp_path / ".env")
 
-    assert result.created is True
-    assert result.changed is True
-    assert values["MONGO_INITDB_ROOT_PASSWORD"]
-    assert len(values["JWT_SECRET"]) == 64
-    assert len(values["SKL_ENGINE_SERVICE_TOKEN"]) == 64
-    assert values["SKL_ENGINE_SERVICE_TOKEN"] != values["JWT_SECRET"]
-    assert values["MONGO_URL"].startswith("mongodb://admin:")
-    assert "@mongo:27017/tutolage?authSource=admin" in values["MONGO_URL"]
-    assert "@mongo:27017/skeleton?authSource=admin" in values["SKL_MONGO_URI"]
-    assert set(result.configured_keys) >= {
-        "MONGO_INITDB_ROOT_PASSWORD",
-        "MONGO_URL",
-        "SKL_MONGO_URI",
-        "JWT_SECRET",
-        "SKL_ENGINE_SERVICE_TOKEN",
+def _replace_env_value(text: str, key: str, value: str) -> str:
+    lines = text.splitlines()
+    replacement = f"{key}={value}"
+    found = False
+    for index, line in enumerate(lines):
+        if line.strip().startswith("#") or "=" not in line:
+            continue
+        existing_key, _ = line.split("=", 1)
+        if existing_key.strip() == key:
+            lines[index] = replacement
+            found = True
+    # Compose uses the last assignment. Repair every occurrence so an older
+    # duplicate cannot override a generated credential on the next startup.
+    if found:
+        return "\n".join(lines) + "\n"
+    if lines and lines[-1].strip():
+        lines.append("")
+    lines.append(replacement)
+    return "\n".join(lines) + "\n"
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as handle:
+        handle.write(text)
+        handle.flush()
+        os.fsync(handle.fileno())
+        temporary = Path(handle.name)
+    try:
+        os.replace(temporary, path)
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
+    finally:
+        if temporary.exists():
+            temporary.unlink(missing_ok=True)
+
+
+def ensure_runtime_environment(
+    root: Path | None = None,
+    *,
+    rotate_secrets: bool = False,
+) -> SetupResult:
+    """Create or repair .env without overwriting valid existing values."""
+
+    root = (root or find_repo_root()).resolve()
+    env_path = root / ".env"
+    example_path = root / ".env.example"
+    created = not env_path.exists()
+    warnings: list[str] = []
+
+    if env_path.exists():
+        text = env_path.read_text(encoding="utf-8")
+    elif example_path.is_file():
+        text = example_path.read_text(encoding="utf-8")
+    else:
+        text = (
+            "# Generated by Skeleton application setup\n"
+            "MONGO_INITDB_ROOT_USERNAME=admin\n"
+            "MONGO_INITDB_ROOT_PASSWORD=\n"
+            "MONGO_URL=\n"
+            "SKL_MONGO_URI=\n"
+            "JWT_SECRET=\n"
+        )
+        warnings.append(".env.example was missing; generated a minimal runtime template")
+
+    values = _parse_env(text)
+    configured: list[str] = []
+    preserved: list[str] = []
+    local_credentials_changed = False
+
+    username = values.get("MONGO_INITDB_ROOT_USERNAME", "admin").strip() or "admin"
+    if not values.get("MONGO_INITDB_ROOT_USERNAME", "").strip():
+        text = _replace_env_value(text, "MONGO_INITDB_ROOT_USERNAME", username)
+        values["MONGO_INITDB_ROOT_USERNAME"] = username
+        configured.append("MONGO_INITDB_ROOT_USERNAME")
+        local_credentials_changed = True
+
+    password = values.get("MONGO_INITDB_ROOT_PASSWORD", "")
+    if rotate_secrets or _is_placeholder(password):
+        password = secrets.token_urlsafe(24)
+        text = _replace_env_value(text, "MONGO_INITDB_ROOT_PASSWORD", password)
+        values["MONGO_INITDB_ROOT_PASSWORD"] = password
+        configured.append("MONGO_INITDB_ROOT_PASSWORD")
+        local_credentials_changed = True
+    else:
+        preserved.append("MONGO_INITDB_ROOT_PASSWORD")
+
+    jwt_secret = values.get("JWT_SECRET", "")
+    if rotate_secrets or _is_placeholder(jwt_secret):
+        jwt_secret = secrets.token_hex(32)
+        text = _replace_env_value(text, "JWT_SECRET", jwt_secret)
+        values["JWT_SECRET"] = jwt_secret
+        configured.append("JWT_SECRET")
+    else:
+        preserved.append("JWT_SECRET")
+
+    # The backend and engine must share this value before Compose can start.
+    # Upgrade existing .env files as well as templates predating Stage-5.
+    service_token = values.get("SKL_ENGINE_SERVICE_TOKEN", "")
+    if (
+        rotate_secrets
+        or _is_placeholder(service_token)
+        or not 32 <= len(service_token) <= 4096
+        or service_token != service_token.strip()
+    ):
+        service_token = secrets.token_hex(32)
+        text = _replace_env_value(text, "SKL_ENGINE_SERVICE_TOKEN", service_token)
+        values["SKL_ENGINE_SERVICE_TOKEN"] = service_token
+        configured.append("SKL_ENGINE_SERVICE_TOKEN")
+    else:
+        preserved.append("SKL_ENGINE_SERVICE_TOKEN")
+
+    user_uri = quote(username, safe="")
+    password_uri = quote(password, safe="")
+
+    mongo_authority = "mongodb://" + user_uri + ":" + password_uri + "@mongo:27017/"
+    generated_uris = {
+        "MONGO_URL": mongo_authority + "tutolage?authSource=admin",
+        "SKL_MONGO_URI": mongo_authority + "skeleton?authSource=admin",
     }
+    for key, generated in generated_uris.items():
+        current = values.get(key, "")
+        local_generated_uri = "@mongo:27017/" in current
+        # A legacy environment may hold a concrete-looking local URI whose
+        # credentials are now stale after a password repair. Keep intentionally
+        # external Mongo targets untouched, but rebind the bundled local ones.
+        if _is_placeholder(current) or (
+            local_generated_uri and (rotate_secrets or local_credentials_changed)
+        ):
+            text = _replace_env_value(text, key, generated)
+            values[key] = generated
+            configured.append(key)
+        else:
+            preserved.append(key)
 
+    for key in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY", "STRIPE_API_KEY"):
+        if _is_placeholder(values.get(key, "")):
+            warnings.append(f"{key} remains optional and unconfigured")
 
-def test_setup_runtime_is_idempotent_and_preserves_existing_secrets(tmp_path):
-    (tmp_path / ".env.example").write_text(ENV_TEMPLATE, encoding="utf-8")
+    changed = created or bool(configured)
+    if changed:
+        _atomic_write(env_path, text)
 
-    first = ensure_runtime_environment(tmp_path)
-    first_text = (tmp_path / ".env").read_text(encoding="utf-8")
-    second = ensure_runtime_environment(tmp_path)
-    second_text = (tmp_path / ".env").read_text(encoding="utf-8")
-
-    assert first.changed is True
-    assert second.created is False
-    assert second.changed is False
-    assert second_text == first_text
-    assert "MONGO_INITDB_ROOT_PASSWORD" in second.preserved_keys
-    assert "JWT_SECRET" in second.preserved_keys
-    assert "SKL_ENGINE_SERVICE_TOKEN" in second.preserved_keys
-
-
-def test_setup_runtime_url_encodes_preserved_mongo_credentials(tmp_path):
-    (tmp_path / ".env").write_text(
-        """MONGO_INITDB_ROOT_USERNAME=local user
-MONGO_INITDB_ROOT_PASSWORD=p@ss:word/with space
-MONGO_URL=
-SKL_MONGO_URI=
-JWT_SECRET=unit-test-jwt-secret-not-sensitive
-""",
-        encoding="utf-8",
+    return SetupResult(
+        env_path=env_path,
+        created=created,
+        changed=changed,
+        configured_keys=tuple(dict.fromkeys(configured)),
+        preserved_keys=tuple(dict.fromkeys(preserved)),
+        warnings=tuple(warnings),
     )
-
-    ensure_runtime_environment(tmp_path)
-    values = _read_values(tmp_path / ".env")
-
-    assert "local%20user:p%40ss%3Aword%2Fwith%20space" in values["MONGO_URL"]
-    assert "local%20user:p%40ss%3Aword%2Fwith%20space" in values["SKL_MONGO_URI"]
-
-
-def test_setup_receipt_never_contains_secret_values(tmp_path):
-    (tmp_path / ".env.example").write_text(ENV_TEMPLATE, encoding="utf-8")
-
-    result = ensure_runtime_environment(tmp_path)
-    values = _read_values(tmp_path / ".env")
-    serialized = repr(result.to_dict())
-
-    assert values["MONGO_INITDB_ROOT_PASSWORD"] not in serialized
-    assert values["JWT_SECRET"] not in serialized
-    assert values["MONGO_URL"] not in serialized
-    assert values["SKL_MONGO_URI"] not in serialized
-    assert values["SKL_ENGINE_SERVICE_TOKEN"] not in serialized
-
-
-@pytest.mark.parametrize("token", ["", "change-me", "short", "x" * 4097])
-def test_setup_repairs_legacy_engine_authentication(tmp_path, token):
-    (tmp_path / ".env").write_text(
-        ENV_TEMPLATE + f"SKL_ENGINE_SERVICE_TOKEN={token}\n", encoding="utf-8"
-    )
-    result = ensure_runtime_environment(tmp_path)
-    values = _read_values(tmp_path / ".env")
-    assert len(values["SKL_ENGINE_SERVICE_TOKEN"]) == 64
-    assert "SKL_ENGINE_SERVICE_TOKEN" in result.configured_keys
-    assert not ensure_runtime_environment(tmp_path).changed
-
-
-def test_setup_repairs_duplicate_assignments_and_rotates_engine_token(tmp_path):
-    (tmp_path / ".env").write_text(
-        ENV_TEMPLATE + "SKL_ENGINE_SERVICE_TOKEN=old\nSKL_ENGINE_SERVICE_TOKEN=\n",
-        encoding="utf-8",
-    )
-    ensure_runtime_environment(tmp_path)
-    before = _read_values(tmp_path / ".env")
-    result = ensure_runtime_environment(tmp_path, rotate_secrets=True)
-    after = _read_values(tmp_path / ".env")
-    assignments = [
-        line.split("=", 1)[1]
-        for line in (tmp_path / ".env").read_text().splitlines()
-        if line.startswith("SKL_ENGINE_SERVICE_TOKEN=")
-    ]
-    assert assignments == [after["SKL_ENGINE_SERVICE_TOKEN"]] * 2
-    assert after["SKL_ENGINE_SERVICE_TOKEN"] != before["SKL_ENGINE_SERVICE_TOKEN"]
-    assert after["SKL_ENGINE_SERVICE_TOKEN"] not in repr(result.to_dict())
-    assert not ensure_runtime_environment(tmp_path).changed
-
-
-def test_setup_covers_every_required_compose_value(tmp_path):
-    """A new Compose requirement cannot silently escape first-run setup."""
-    root = Path(__file__).resolve().parents[2]
-    (tmp_path / ".env.example").write_text(
-        (root / ".env.example").read_text(), encoding="utf-8"
-    )
-    ensure_runtime_environment(tmp_path)
-    values = _read_values(tmp_path / ".env")
-    required = set(re.findall(r"\$\{([A-Z_]+):\?", (root / "docker-compose.yml").read_text()))
-    manifest = json.loads((root / "skeleton/app/manifest.json").read_text())
-    assert required <= set(manifest["runtime"]["required_env"])
-    assert all(values.get(key) for key in required)
-
-
-def test_installer_stops_before_mutation_when_preloader_blocks(tmp_path, monkeypatch):
-    report = PreloadReport(
-        root=tmp_path,
-        platform="test",
-        python="3.11",
-        checks=(PreloadCheck("host:docker", False, "missing", remediation="install docker"),),
-    )
-    monkeypatch.setattr("skeleton.app.installer.inspect_host", lambda root, runner, **kwargs: report)
-
-    called = []
-    monkeypatch.setattr(
-        "skeleton.app.installer.ensure_runtime_environment",
-        lambda *args, **kwargs: called.append(True),
-    )
-
-    receipt = install_application(tmp_path, install_python=False)
-
-    assert receipt.ok is False
-    assert receipt.phases == (
-        InstallPhase("preload", False, "host preloader blocked installation: host:docker"),
-    )
-    assert called == []
-
-
-def test_installer_skip_python_runs_bounded_validation(tmp_path, monkeypatch):
-    (tmp_path / ".env.example").write_text(ENV_TEMPLATE, encoding="utf-8")
-    report = PreloadReport(
-        root=tmp_path,
-        platform="test",
-        python="3.11",
-        checks=(PreloadCheck("host:ready", True, "ready"),),
-    )
-    monkeypatch.setattr("skeleton.app.installer.inspect_host", lambda root, runner, **kwargs: report)
-    monkeypatch.setattr("skeleton.app.installer.preflight", lambda *args, **kwargs: ())
-    monkeypatch.setattr("skeleton.app.installer.checks_ok", lambda checks: True)
-    monkeypatch.setattr(
-        "skeleton.app.installer.compose_command",
-        lambda action, **kwargs: ("docker", "compose", "config"),
-    )
-
-    commands = []
-
-    def runner(command, **kwargs):
-        commands.append(tuple(command))
-        return subprocess.CompletedProcess(command, 0, stdout="valid\n", stderr="")
-
-    receipt = install_application(tmp_path, install_python=False, runner=runner)
-
-    assert receipt.ok is True
-    assert [phase.name for phase in receipt.phases] == [
-        "preload",
-        "setup-runtime",
-        "python-install",
-        "runtime-preflight",
-        "compose-config",
-    ]
-    assert receipt.phases[2].required is False
-    assert commands == [("docker", "compose", "config")]
-
-
-def test_setup_repairs_stale_local_mongo_uris_after_password_repair(tmp_path):
-    (tmp_path / ".env").write_text(
-        "MONGO_INITDB_ROOT_USERNAME=admin\n"
-        "MONGO_INITDB_ROOT_PASSWORD=change-me\n"
-        "MONGO_URL=mongodb://admin:oldpass@mongo:27017/tutolage?authSource=admin\n"
-        "SKL_MONGO_URI=mongodb://admin:oldpass@mongo:27017/skeleton?authSource=admin\n"
-        "JWT_SECRET=some-valid-preserved-jwt-secret\n",
-        encoding="utf-8",
-    )
-    result = ensure_runtime_environment(tmp_path)
-    values = _read_values(tmp_path / ".env")
-    new_password = values["MONGO_INITDB_ROOT_PASSWORD"]
-
-    assert result.changed
-    assert new_password not in ("", "change-me", "oldpass")
-    assert f"mongodb://admin:{new_password}@mongo:27017/" in values["MONGO_URL"]
-    assert f"mongodb://admin:{new_password}@mongo:27017/" in values["SKL_MONGO_URI"]
-    assert {"MONGO_URL", "SKL_MONGO_URI"} <= set(result.configured_keys)
-    assert not ensure_runtime_environment(tmp_path).changed
-
-
-def test_setup_preserves_external_mongo_when_local_credentials_are_repaired(tmp_path):
-    remote_uri = "mongodb://service:remote-password@db.example.net:27017/app"
-    (tmp_path / ".env").write_text(
-        "MONGO_INITDB_ROOT_USERNAME=admin\n"
-        "MONGO_INITDB_ROOT_PASSWORD=change-me\n"
-        f"MONGO_URL={remote_uri}\n"
-        "SKL_MONGO_URI=mongodb://admin:oldpass@mongo:27017/skeleton?authSource=admin\n"
-        "JWT_SECRET=some-valid-preserved-jwt-secret\n",
-        encoding="utf-8",
-    )
-    ensure_runtime_environment(tmp_path)
-    values = _read_values(tmp_path / ".env")
-    assert values["MONGO_URL"] == remote_uri
-    assert values["MONGO_INITDB_ROOT_PASSWORD"] in values["SKL_MONGO_URI"]
-
-
-def test_installer_validates_compose_with_start_mode_environment(tmp_path, monkeypatch):
-    report = PreloadReport(
-        root=tmp_path,
-        platform="test",
-        python="3.11",
-        checks=(PreloadCheck("host:ready", True, "ready"),),
-    )
-    monkeypatch.setattr("skeleton.app.installer.inspect_host", lambda *args, **kwargs: report)
-    monkeypatch.setattr("skeleton.app.installer.preflight", lambda *args, **kwargs: ())
-    monkeypatch.setattr("skeleton.app.installer.checks_ok", lambda checks: True)
-    monkeypatch.setattr(
-        "skeleton.app.installer.ensure_runtime_environment",
-        lambda *args, **kwargs: type("Setup", (), {
-            "created": False, "changed": False,
-            "env_path": tmp_path / ".env", "configured_keys": (),
-        })(),
-    )
-    commands = []
-    def runner(command, **kwargs):
-        commands.append((tuple(command), kwargs.get("env", {})))
-        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
-
-    receipt = install_application(tmp_path, install_python=False, production=True, runner=runner)
-    assert receipt.ok
-    assert len(commands) == 1
-    command, env = commands[0]
-    assert command[-1] == "config"
-    assert env["BUILD_TARGET"] == "production"
-    assert env["FRONTEND_BUILD_TARGET"] == "production"
-    assert env["FRONTEND_CONTAINER_PORT"] == "8080"
-    assert env["NODE_ENV"] == "production"
-
-@pytest.mark.parametrize(
-    "uri",
-    [
-        "mongodb://service:secret@db.example.net:27017/app",
-        "mongodb+srv://service:secret@cluster.example.org/app",
-    ],
-)
-def test_setup_keeps_operator_mongo_uri_with_example_in_host(tmp_path, uri):
-    (tmp_path / ".env").write_text(
-        "MONGO_INITDB_ROOT_USERNAME=admin\n"
-        "MONGO_INITDB_ROOT_PASSWORD=change-me\n"
-        f"MONGO_URL={uri}\n"
-        "SKL_MONGO_URI=\n"
-        "JWT_SECRET=real-secret-that-must-be-preserved\n",
-        encoding="utf-8",
-    )
-    ensure_runtime_environment(tmp_path)
-    values = _read_values(tmp_path / ".env")
-    assert values["MONGO_URL"] == uri
-    assert values["SKL_MONGO_URI"].startswith("mongodb://admin:")
-    assert not ensure_runtime_environment(tmp_path).changed
-
-
-def test_secret_with_word_example_is_not_rotated(tmp_path):
-    real = "long-example-password-managed-by-the-operator"
-    (tmp_path / ".env").write_text(
-        "MONGO_INITDB_ROOT_USERNAME=admin\n"
-        f"MONGO_INITDB_ROOT_PASSWORD={real}\n"
-        "MONGO_URL=\nSKL_MONGO_URI=\n"
-        "JWT_SECRET=a-production-secret-with-example-inside\n",
-        encoding="utf-8",
-    )
-    result = ensure_runtime_environment(tmp_path)
-    values = _read_values(tmp_path / ".env")
-    assert values["MONGO_INITDB_ROOT_PASSWORD"] == real
-    assert values["JWT_SECRET"] == "a-production-secret-with-example-inside"
-    assert "MONGO_INITDB_ROOT_PASSWORD" in result.preserved_keys
-    assert "JWT_SECRET" in result.preserved_keys
