@@ -268,6 +268,14 @@ def test_chat_retry_replays_existing_assistant_without_provider_call(
         created_at=_now(),
         idempotency_key="client-1",
         content="question",
+        attachment_refs=(
+            route._chat_request_identity_ref(
+                route.AIChatRequest(
+                    message="question", thread_id=initial.thread_id,
+                    idempotency_key="client-1", expected_thread_version=1,
+                )
+            ),
+        ),
     )
     operation_id = str(uuid4())
     assistant = ConversationMessage(
@@ -355,6 +363,10 @@ def test_chat_version_conflict_maps_to_409(route, client, monkeypatch):
             append_user_message=append_user_message,
         ),
     )
+
+    # A configured engine is a prerequisite to storage admission. The test
+    # must reach the version fence rather than fail early with HTTP 503.
+    monkeypatch.setattr(route.EngineClient, "from_env", lambda: object())
 
     response = client.post(
         "/ai/chat",
@@ -471,6 +483,14 @@ def test_successful_chat_retry_reuses_committed_assistant_without_provider(
         created_at=_now(),
         idempotency_key="retry-key",
         content="question",
+        attachment_refs=(
+            route._chat_request_identity_ref(
+                route.AIChatRequest(
+                    message="question", thread_id=thread.thread_id,
+                    idempotency_key="retry-key", expected_thread_version=1,
+                )
+            ),
+        ),
     )
     assistant = ConversationMessage(
         message_id=str(uuid4()),

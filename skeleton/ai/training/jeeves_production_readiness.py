@@ -256,8 +256,8 @@ def inspect(
                         "suitable_for_production_game_quality_claim": False,
                     }
                 else:
-                    from .jeeves_game_corpus import load_approved_corpus
-                    train, heldout, corpus_info = load_approved_corpus(dataset_manifest)
+                    from .jeeves_multidomain import load_training_corpus
+                    train, heldout, corpus_info = load_training_corpus(dataset_manifest)
                 all_cases = train + tuple(case for examples in heldout.values() for case in examples)
                 coverage = _token_coverage(model, all_cases)
                 planned_new_tokens = 0

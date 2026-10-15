@@ -5742,7 +5742,14 @@
         "temporal_revocation.py",
         "temporal_signals.py",
         "temporal_uncertainty.py",
-        "training_manifest.py"
+        "training_manifest.py",
+        "jeeves_multidomain.py",
+        "jeeves_parallel_mirrors.py",
+        "jeeves_cinematic_simulation.py",
+        "jeeves_adaptive_sim_training.py",
+        "jeeves_capacity_growth.py",
+        "jeeves_capability_replay.py",
+        "jeeves_boomerang_queue.py"
       ]
     },
     {
@@ -6500,7 +6507,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_45_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_52_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7466,7 +7473,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 45
+    "native_ai_owner_count": 52
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8663,6 +8670,90 @@
       "role": "AI-native game-specific model learning and training progress tracking, owned outside the staged legacy training mirror.",
       "volume_refs": [
         "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-MULTIDOMAIN",
+      "path": "skeleton/ai/training/jeeves_multidomain.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Native rights-gated production-derived Jeeves multidomain training boundary: jeeves_multidomain.py.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-PARALLEL-MIRRORS",
+      "path": "skeleton/ai/training/jeeves_parallel_mirrors.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Native rights-gated production-derived Jeeves multidomain training boundary: jeeves_parallel_mirrors.py.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-CINEMATIC-SIMULATION",
+      "path": "skeleton/ai/training/jeeves_cinematic_simulation.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Real deterministic cutscene camera, props, apparel, reversible audit and bounded multisim specialist with quarantined training candidates.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-ADAPTIVE-SIM-TRAINING",
+      "path": "skeleton/ai/training/jeeves_adaptive_sim_training.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Bounded feedback-guided cinematic situation and environment simulation, counterfactual repair experiment, and quarantined retraining evidence.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-CAPACITY-GROWTH",
+      "path": "skeleton/ai/training/jeeves_capacity_growth.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Attested serving-derived Torch candidate-only function-preserving FFN parameter growth, actual tensor counts and forward equivalence gates.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-CAPABILITY-REPLAY",
+      "path": "skeleton/ai/training/jeeves_capability_replay.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Training-only measured hard-example and retention-replay curriculum preserving gaming/AI/coding specialization and heldout isolation.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-BOOMERANG-QUEUE",
+      "path": "skeleton/ai/training/jeeves_boomerang_queue.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Immutable three-pass archived simulation queue with controlled repeat probes, per-source custody and review-only novelty training drafts.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
       ]
     }
   ]

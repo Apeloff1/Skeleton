@@ -257,6 +257,18 @@ class WindowsLauncher:
         self._add_button(
             offline_buttons, "Stop Offline Browser", self.stop_browser_ai
         )
+        self._add_button(
+            offline_buttons, "Jeeves Training Modules", self.inspect_jeeves_modules
+        )
+        self._add_button(
+            offline_buttons, "Cutscene Multi-Sim", self.run_cutscene_sim
+        )
+        self._add_button(
+            offline_buttons, "Adaptive Simulation", self.run_adaptive_sim
+        )
+        self._add_button(
+            offline_buttons, "Boomerang Sim Queue", self.run_boomerang_queue
+        )
 
         helper = ttk.Frame(outer)
         helper.pack(fill="x", pady=(0, 10))
@@ -381,6 +393,166 @@ class WindowsLauncher:
 
         self._local_ai_window = open_offline_ai(self.window)
         self.status.set("Local AI window opened")
+
+    def inspect_jeeves_modules(self) -> None:
+        """Display actual curriculum readiness without starting model training."""
+        from skeleton.ai.training.jeeves_multidomain import validate_catalog
+
+        def check() -> str:
+            manifest = self.app_root / "machine" / "jeeves_training_modules.json"
+            result = validate_catalog(manifest)
+            return (
+                f"Jeeves curriculum: {result['modules']} specializations across "
+                "gaming, AI and coding.\n"
+                "Four concurrent data evidence mirrors available for approved data.\n"
+                "Two candidate optimizer processes require an attested production "
+                "checkpoint and human-reviewed corpus.\n"
+                "No model weights were trained or promoted by this check.\n"
+                f"Catalog SHA256: {result['catalog_sha256']}"
+            )
+
+        self._run_worker("Inspecting Jeeves curriculum...", check, lambda value: value)
+
+    def run_cutscene_sim(self) -> None:
+        """Opt-in original cutscene rehearsal; never perform model training."""
+        from tkinter import filedialog
+        chosen = filedialog.askopenfilename(
+            parent=self.window, title="Select rights-reviewed original cutscene",
+            filetypes=[("Scene JSON", "*.json"), ("All files", "*.*")])
+        if not chosen:
+            return
+        destination = filedialog.asksaveasfilename(
+            parent=self.window, title="Save new cinematic simulation evidence",
+            defaultextension=".json", filetypes=[("Evidence JSON", "*.json")])
+        if not destination:
+            return
+        path = Path(destination)
+        if path.exists() or path.is_symlink():
+            self._set_log("A new evidence filename is required; existing output is not overwritten.")
+            return
+
+        def simulate() -> str:
+            from skeleton.ai.training.jeeves_cinematic_simulation import (
+                _read_json, _write_new, run_batch, variation_controls)
+            source = _read_json(Path(chosen), 128 * 1024)
+            adjustments = variation_controls(
+                offsets=(-15, 0, 15), pan_rates=(75, 100, 125),
+                item_mass_deltas=(0, 250), apparel_drag_deltas=(0, 15),
+                limit=36)
+            result = run_batch(source, variations=adjustments, workers=2)
+            _write_new(path, result)
+            return (
+                f"Cutscene rehearsals: {result['simulations_executed']}\n"
+                f"Camera/item/apparel observations: {result['forward_observations']}\n"
+                f"Reverse audit observations: {result['reverse_observations']}\n"
+                f"Unique trace sources: {result['unique_trace_digests']}\n"
+                f"Audit failures: {result['reverse_audit_failures']}\n"
+                "Training examples pending independent review; no weights changed.\n"
+                f"Evidence: {path}"
+            )
+
+        self._run_worker("Simulating camera and cutscene variants...", simulate,
+                         lambda value: value)
+
+    def run_adaptive_sim(self) -> None:
+        """Opt-in coverage-guided situation and edge-case stress rehearsal."""
+        from tkinter import filedialog
+        scene_file = filedialog.askopenfilename(
+            parent=self.window, title="Select original, rights-reviewed scenario",
+            filetypes=[("Scene JSON", "*.json"), ("All files", "*.*")])
+        if not scene_file:
+            return
+        output_file = filedialog.asksaveasfilename(
+            parent=self.window, title="Save new adaptive scenario evidence",
+            defaultextension=".json", filetypes=[("Evidence JSON", "*.json")])
+        if not output_file:
+            return
+        evidence = Path(output_file)
+        if evidence.exists() or evidence.is_symlink():
+            self._set_log("Adaptive evidence must use an unused filename.")
+            return
+
+        def simulate() -> str:
+            from skeleton.ai.training.jeeves_adaptive_sim_training import run_campaign
+            from skeleton.ai.training.jeeves_cinematic_simulation import _read_json, _write_new
+            original = _read_json(Path(scene_file), 128*1024)
+            result = run_campaign(original, budget=24, workers=2)
+            _write_new(evidence, result)
+            return (
+                f"Source-bound rehearsals: {result['simulations_executed']}\n"
+                f"Feedback-selected cases: {result['feedback_guided_runs']}\n"
+                f"Coverage features: {result['coverage_feature_count']}\n"
+                f"Recorded failure families: {len(result['risk_families_observed'])}\n"
+                f"Forward observations: {result['forward_observations']}\n"
+                f"Reverse observations: {result['reverse_observations']}\n"
+                "Candidate training remains quarantined pending independent review.\n"
+                f"Evidence file: {evidence}"
+            )
+
+        self._run_worker("Running adaptive environment and adversarial sims...",
+                         simulate, lambda result: result)
+
+    def run_boomerang_queue(self) -> None:
+        """Explicitly queue an archived sim or execute one extra evidence pass."""
+        from tkinter import filedialog, messagebox
+        make_new = messagebox.askyesno(
+            "Jeeves Boomerang Queue",
+            "Create a queue from an earlier adaptive simulation?\n"
+            "Choose No to run the next pass of an existing queue.",
+            parent=self.window)
+        if make_new:
+            original = filedialog.askopenfilename(
+                parent=self.window, title="Select rights-reviewed original scene",
+                filetypes=[("JSON", "*.json")])
+            if not original:
+                return
+            archive = filedialog.askopenfilename(
+                parent=self.window, title="Select existing adaptive sim report",
+                filetypes=[("JSON", "*.json")])
+            if not archive:
+                return
+            queue_file = None
+        else:
+            queue_file = filedialog.askopenfilename(
+                parent=self.window, title="Select previous boomerang queue generation",
+                filetypes=[("JSON", "*.json")])
+            if not queue_file:
+                return
+            original = archive = None
+        target = filedialog.asksaveasfilename(
+            parent=self.window, title="Save NEW boomerang queue generation",
+            defaultextension=".json", filetypes=[("JSON", "*.json")])
+        if not target:
+            return
+        destination = Path(target)
+        if destination.exists() or destination.is_symlink():
+            self._set_log("Boomerang queue output must not overwrite prior evidence.")
+            return
+
+        def execute() -> str:
+            from skeleton.ai.training.jeeves_boomerang_queue import (
+                create_queue, enable_reshuffle, advance_queue, verify_queue)
+            from skeleton.ai.training.jeeves_cinematic_simulation import _read_json, _write_new
+            if make_new:
+                result = enable_reshuffle(create_queue(Path(original), Path(archive)))
+            else:
+                existing = _read_json(Path(queue_file), 16 * 1024 * 1024)
+                result = advance_queue(existing, max_entries=1, probes=8,
+                                       workers=2)
+            summary = verify_queue(result, verify_sources=True)
+            _write_new(destination, result)
+            return (
+                f"Archive sources: {summary['queued_sources']}\n"
+                f"Pending second pass: {summary['pending_second_pass']}\n"
+                f"Pending third pass: {summary['pending_third_pass']}\n"
+                f"Scheduled randomized returns: {summary['scheduled_returns']}\n"
+                f"Next return UTC epoch: {summary['next_return_epoch']}\n"
+                f"Retired sources: {summary['complete_sources']}\n"
+                f"Queue generation: {summary['generation']}\n"
+                "Prior runs were reused; new probes are candidate evidence only.\n"
+                f"Immutable queue: {destination}"
+            )
+        self._run_worker("Running Jeeves Boomerang queue...", execute, lambda x: x)
 
     def _start_browser_service(self, selected: Path, *, gguf: bool) -> str:
         """Start one authenticated loopback service owned by this launcher.
@@ -656,7 +828,21 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from multiprocessing import freeze_support
+    freeze_support()  # required for the two spawned optimizers in frozen Windows.
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "--training-modules":
+        from skeleton.ai.training.jeeves_parallel_mirrors import main as training_main
+        return training_main(arguments[1:])
+    if arguments and arguments[0] == "--cinematic-sim":
+        from skeleton.ai.training.jeeves_cinematic_simulation import main as cinema_main
+        return cinema_main(arguments[1:])
+    if arguments and arguments[0] == "--adaptive-sim":
+        from skeleton.ai.training.jeeves_adaptive_sim_training import main as adaptive_main
+        return adaptive_main(arguments[1:])
+    if arguments and arguments[0] == "--boomerang-queue":
+        from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
+        return boomerang_main(arguments[1:])
     if "--offline-command" in arguments:
         # The frozen executable shares the canonical offline CLI. This path
         # is usable on a headless host and never initializes Tk or Compose.
