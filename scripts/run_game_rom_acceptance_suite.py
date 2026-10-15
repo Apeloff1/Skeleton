@@ -267,8 +267,9 @@ def _verify_cpu_opcode_matrix(directory: Path) -> dict[str, Any]:
         or report.get("actual_base_opcode_single_step_executed") != 244
         or report.get("actual_cb_prefix_expansions_executed") != 256
         or report.get("expected_illegal_base_opcodes_rejected") != 11
-        or report.get("actual_total_single_step_source_replays") != 1000
-        or report.get("source_reference_opcodes_compared_to_actual_timing") != 500
+        or report.get("actual_total_single_step_source_replays") != 1128
+        or report.get("source_reference_opcodes_compared_to_actual_timing") != 564
+        or report.get("conditional_real_executions") != 64
         or report.get("external_sm83_reference_commit")
         != "376f61c86fdac2048f7ce5fe838ae756b306017e"
         or report.get("native_libretro_corpus_tested") is not False
@@ -276,7 +277,35 @@ def _verify_cpu_opcode_matrix(directory: Path) -> dict[str, Any]:
         or report.get("production_jeeves_weights_modified") is not False
     ):
         raise AcceptanceSuiteError("original Game Boy CPU opcode coverage or replay provenance is incomplete")
-    from scripts.audit_original_gameboy_cpu_opcodes import INVALID_BASE
+    from scripts.audit_original_gameboy_cpu_opcodes import (
+        INVALID_BASE, CONDITIONAL_BRANCHES, CONDITIONAL_FLAGS,
+    )
+    conditional = report.get("conditional_source_receipts")
+    if (
+        report.get("conditional_branch_flags_tested") != list(CONDITIONAL_FLAGS)
+        or report.get("conditional_branch_opcodes_tested") != list(CONDITIONAL_BRANCHES)
+        or not isinstance(conditional, list)
+        or len(conditional) != len(CONDITIONAL_BRANCHES) * len(CONDITIONAL_FLAGS)
+    ):
+        raise AcceptanceSuiteError("real CPU conditional branch flag-state corpus is incomplete")
+    for index, case in enumerate(conditional):
+        opcode = CONDITIONAL_BRANCHES[index // len(CONDITIONAL_FLAGS)]
+        flags = CONDITIONAL_FLAGS[index % len(CONDITIONAL_FLAGS)]
+        outcome = case.get("conditional_control_result") if isinstance(case, dict) else None
+        if (
+            not isinstance(outcome, dict)
+            or case.get("opcode") != opcode or case.get("cb") is not None
+            or outcome.get("initial_z_c_flags") != flags
+            or outcome.get("reference_conditional_branch_verified") is not True
+            or outcome.get("expected_pc_after") != outcome.get("observed_pc_after")
+            or outcome.get("expected_sp_after") != outcome.get("observed_sp_after")
+            or case.get("emulated_t_cycles") != case.get("reference_documented_t_cycles")
+            or case.get("real_independent_replay_executed") is not True
+            or case.get("source_snapshot_after_sha256") != case.get("repeated_snapshot_sha256")
+        ):
+            raise AcceptanceSuiteError("actual conditional CPU control, flags, cycles or PC/SP replay disagrees")
+    if sum(row["conditional_control_result"]["expected_branch_taken"] is True for row in conditional) != 32:
+        raise AcceptanceSuiteError("conditional source opcode corpus is missing an actual branch outcome")
 
     base = report.get("base_instruction_receipts")
     cb = report.get("prefixed_instruction_receipts")
@@ -296,7 +325,7 @@ def _verify_cpu_opcode_matrix(directory: Path) -> dict[str, Any]:
             raise AcceptanceSuiteError("CB-prefixed CPU opcode identity or ordering changed")
         if case.get("real_instruction_executed") is not True:
             raise AcceptanceSuiteError("documented CB subopcode did not execute")
-    for case in base + cb:
+    for case in base + cb + conditional:
         if case.get("real_instruction_executed") is True:
             before = case.get("source_snapshot_after_sha256")
             after = case.get("repeated_snapshot_sha256")
@@ -315,8 +344,9 @@ def _verify_cpu_opcode_matrix(directory: Path) -> dict[str, Any]:
         "accepted": True,
         "legal_base_opcode_variants": 245,
         "actual_cb_prefixed_opcode_variants": 256,
-        "source_cpu_instruction_steps_replayed": 1000,
-        "independent_cc0_opcode_cycle_reference_matches": 500,
+        "source_cpu_instruction_steps_replayed": 1128,
+        "independent_cc0_opcode_cycle_reference_matches": 564,
+        "conditional_branch_flag_state_trials": 64,
         "invalid_opcodes_denied": 11,
         "receipt_file": reference,
         "hardware_accuracy_certified": False,
