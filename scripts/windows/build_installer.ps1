@@ -194,6 +194,7 @@ $PyInstallerArgs = @(
     "--hidden-import", "skeleton.ai.training.jeeves_capability_replay",
     "--hidden-import", "skeleton.ai.training.jeeves_cinematic_simulation",
     "--hidden-import", "skeleton.ai.training.jeeves_adaptive_sim_training",
+    "--hidden-import", "skeleton.ai.training.jeeves_boomerang_queue",
     "--hidden-import", "skeleton.app.offline_index_queue",
     "--hidden-import", "skeleton.app.offline_http",
     "--hidden-import", "skeleton.app.offline_knowledge",

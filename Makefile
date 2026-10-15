@@ -37,6 +37,7 @@ precompile:
 	python scripts/check_jeeves_training_modules.py
 	python -m skeleton app cinematic-sim --help
 	python -m skeleton app adaptive-sim --help
+	python -m skeleton app boomerang-queue --help
 	python -m skeleton.ai.training.jeeves_production_game_train --help
 	python -m skeleton.ai.training.jeeves_parallel_mirrors --help
 	python scripts/check_enterprise_ai_superiority.py --json

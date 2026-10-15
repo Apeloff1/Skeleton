@@ -58,6 +58,7 @@ Name: "{group}\Skeleton Local AI (offline)"; Filename: "{app}\{#AppExeName}"; Pa
 Name: "{group}\Skeleton Offline CLI"; Filename: "{app}\SkeletonOffline.exe"; WorkingDir: "{app}"
 Name: "{group}\Jeeves training modules"; Filename: "{app}\{#AppExeName}"; Parameters: "--training-modules"; WorkingDir: "{app}"
 Name: "{group}\Jeeves Adaptive Sim"; Filename: "{app}\{#AppExeName}"; Parameters: "--adaptive-sim --help"; WorkingDir: "{app}"
+Name: "{group}\Jeeves Boomerang Queue"; Filename: "{app}\{#AppExeName}"; Parameters: "--boomerang-queue --help"; WorkingDir: "{app}"
 Name: "{group}\Repair Skeleton"; Filename: "{app}\{#AppExeName}"; Parameters: "--repair"; WorkingDir: "{app}"
 Name: "{userdesktop}\Skeleton"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 

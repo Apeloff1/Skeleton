@@ -220,7 +220,9 @@
     "skeleton/ai/training/jeeves_capacity_growth.py",
     "skeleton/testing/test_jeeves_capacity_growth.py",
     "skeleton/ai/training/jeeves_capability_replay.py",
-    "skeleton/testing/test_jeeves_capability_replay.py"
+    "skeleton/testing/test_jeeves_capability_replay.py",
+    "skeleton/ai/training/jeeves_boomerang_queue.py",
+    "skeleton/testing/test_jeeves_boomerang_queue.py"
   ],
   "architecture": {
     "contract": "machine/architecture.json",

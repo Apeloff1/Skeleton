@@ -236,6 +236,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "adaptive-sim":
         from skeleton.ai.training.jeeves_adaptive_sim_training import main as adaptive_main
         return adaptive_main(arguments[1:])
+    if arguments and arguments[0] == "boomerang-queue":
+        from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
+        return boomerang_main(arguments[1:])
     # Delegate parsing to the existing owners, including their complete help.
     if arguments and arguments[0] == "chat":
         from skeleton.app.offline_chat_cli import main as chat_main

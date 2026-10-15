@@ -230,6 +230,9 @@ class WindowsLauncher:
         self._add_button(
             offline_buttons, "Adaptive Simulation", self.run_adaptive_sim
         )
+        self._add_button(
+            offline_buttons, "Boomerang Sim Queue", self.run_boomerang_queue
+        )
 
         helper = ttk.Frame(outer)
         helper.pack(fill="x", pady=(0, 10))
@@ -454,6 +457,66 @@ class WindowsLauncher:
 
         self._run_worker("Running adaptive environment and adversarial sims...",
                          simulate, lambda result: result)
+
+    def run_boomerang_queue(self) -> None:
+        """Explicitly queue an archived sim or execute one extra evidence pass."""
+        from tkinter import filedialog, messagebox
+        make_new = messagebox.askyesno(
+            "Jeeves Boomerang Queue",
+            "Create a queue from an earlier adaptive simulation?\n"
+            "Choose No to run the next pass of an existing queue.",
+            parent=self.window)
+        if make_new:
+            original = filedialog.askopenfilename(
+                parent=self.window, title="Select rights-reviewed original scene",
+                filetypes=[("JSON", "*.json")])
+            if not original:
+                return
+            archive = filedialog.askopenfilename(
+                parent=self.window, title="Select existing adaptive sim report",
+                filetypes=[("JSON", "*.json")])
+            if not archive:
+                return
+            queue_file = None
+        else:
+            queue_file = filedialog.askopenfilename(
+                parent=self.window, title="Select previous boomerang queue generation",
+                filetypes=[("JSON", "*.json")])
+            if not queue_file:
+                return
+            original = archive = None
+        target = filedialog.asksaveasfilename(
+            parent=self.window, title="Save NEW boomerang queue generation",
+            defaultextension=".json", filetypes=[("JSON", "*.json")])
+        if not target:
+            return
+        destination = Path(target)
+        if destination.exists() or destination.is_symlink():
+            self._set_log("Boomerang queue output must not overwrite prior evidence.")
+            return
+
+        def execute() -> str:
+            from skeleton.ai.training.jeeves_boomerang_queue import (
+                create_queue, advance_queue, verify_queue)
+            from skeleton.ai.training.jeeves_cinematic_simulation import _read_json, _write_new
+            if make_new:
+                result = create_queue(Path(original), Path(archive))
+            else:
+                existing = _read_json(Path(queue_file), 16 * 1024 * 1024)
+                result = advance_queue(existing, max_entries=1, probes=8,
+                                       workers=2)
+            summary = verify_queue(result, verify_sources=True)
+            _write_new(destination, result)
+            return (
+                f"Archive sources: {summary['queued_sources']}\n"
+                f"Pending second pass: {summary['pending_second_pass']}\n"
+                f"Pending third pass: {summary['pending_third_pass']}\n"
+                f"Completed: {summary['complete_sources']}\n"
+                f"Queue generation: {summary['generation']}\n"
+                "Prior runs were reused; new probes are candidate evidence only.\n"
+                f"Immutable queue: {destination}"
+            )
+        self._run_worker("Running Jeeves Boomerang queue...", execute, lambda x: x)
 
     def _start_browser_service(self, selected: Path, *, gguf: bool) -> str:
         """Start one authenticated loopback service owned by this launcher.
@@ -733,6 +796,9 @@ def main(argv: list[str] | None = None) -> int:
     if arguments and arguments[0] == "--adaptive-sim":
         from skeleton.ai.training.jeeves_adaptive_sim_training import main as adaptive_main
         return adaptive_main(arguments[1:])
+    if arguments and arguments[0] == "--boomerang-queue":
+        from skeleton.ai.training.jeeves_boomerang_queue import main as boomerang_main
+        return boomerang_main(arguments[1:])
     if "--offline-command" in arguments:
         # The frozen executable shares the canonical offline CLI. This path
         # is usable on a headless host and never initializes Tk or Compose.

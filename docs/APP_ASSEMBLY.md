@@ -548,3 +548,50 @@ nonfinite losses and source datasets above the explicit inference budget.
 Validation and production promotion remain independent requirements. Increases
 in trainable parameter count or training loss exposure **do not establish**
 a capability uplift without blind external evaluation.
+
+### Boomerang re-analysis queue (second and third pass without replay inflation)
+
+The Jeeves Boomerang queue accepts **completed, rights-reviewed adaptive
+simulation evidence** rather than restarting the original scene. Each
+source-pinned immutable queue entry can be analyzed on return twice, using
+new control settings selected from its archived camera, environment, item,
+apparel and gameplay-risk observations. Old simulation frames are *never*
+executed again merely to advance the queue; only newly selected
+counterfactual scenarios are simulated.
+
+```bash
+python -m skeleton app boomerang-queue --create \
+  --scene original-scene.json --archive adaptive-campaign.json \
+  --output boomerang-0.json
+
+python -m skeleton app boomerang-queue --advance \
+  --queue boomerang-0.json --output boomerang-1.json \
+  --probes 8 --workers 2 --draft-output boomerang-review.jsonl
+
+python -m skeleton app boomerang-queue --advance \
+  --queue boomerang-1.json --output boomerang-2.json --probes 8
+
+python -m skeleton app boomerang-queue --inspect --queue boomerang-2.json
+```
+
+A persisted queue can hold 32 independent archived sources; `--enqueue`
+adds a fresh original report to a **new** queue snapshot. FIFO advancement
+with `--max-entries` caps work per command. The source and report files are
+bound by exact byte SHA256 and original provenance; changed inputs abort
+rather than silently replay incompatible evidence.
+
+**Second pass** explores missed control combinations and previous failure
+signals. **Third pass** prioritizes actual second-pass findings. Each
+pass records novelty compared against *all earlier passes*: new failure
+families, distinct controlled risk signatures, original/novel camera traces,
+per-run forward/reverse checks and before/after targeted risk counts.
+Budgeted fallback exploration is labeled as exploration, not a causal repair.
+Completed entries refuse a fourth boomerang pass.
+
+Optional `--draft-output` emits evidence-grouped, quarantined forward
+diagnosis, reverse-forensic and minimize/retest proposals. Duplicate scene
+sources or already-run scenario IDs are rejected. **These are not fresh
+independent training examples, SGD updates or proven new model capabilities.**
+The Windows GUI has a **Boomerang Sim Queue** control for explicit creation
+and one-pass advancement. Neither the GUI nor CLI automatically modifies
+Jeeves's serving weights.

@@ -270,3 +270,13 @@ def test_windows_packages_capability_replay_and_attested_parameter_training():
     assert '"skeleton.ai.training.jeeves_capability_replay"' in installer
     assert '"--adaptive-replay"' in trainer
     assert '"--max-scored-examples"' in trainer
+
+def test_installed_boomerang_sim_queue_is_source_pinned_and_review_only():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    launcher = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
+    packager = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    assert "test_jeeves_boomerang_queue.py" in workflow
+    assert '"--boomerang-queue", "--help"' in workflow
+    assert '"Boomerang Sim Queue", self.run_boomerang_queue' in launcher
+    assert '"skeleton.ai.training.jeeves_boomerang_queue"' in packager
+    assert "candidate evidence only" in launcher

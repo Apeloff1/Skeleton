@@ -5748,7 +5748,8 @@
         "jeeves_cinematic_simulation.py",
         "jeeves_adaptive_sim_training.py",
         "jeeves_capacity_growth.py",
-        "jeeves_capability_replay.py"
+        "jeeves_capability_replay.py",
+        "jeeves_boomerang_queue.py"
       ]
     },
     {
@@ -6506,7 +6507,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_51_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_52_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7472,7 +7473,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 51
+    "native_ai_owner_count": 52
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8750,6 +8751,18 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Training-only measured hard-example and retention-replay curriculum preserving gaming/AI/coding specialization and heldout isolation.",
+      "volume_refs": [
+        "VOL-006",
+        "VOL-072"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-BOOMERANG-QUEUE",
+      "path": "skeleton/ai/training/jeeves_boomerang_queue.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Immutable three-pass archived simulation queue with controlled repeat probes, per-source custody and review-only novelty training drafts.",
       "volume_refs": [
         "VOL-006",
         "VOL-072"
