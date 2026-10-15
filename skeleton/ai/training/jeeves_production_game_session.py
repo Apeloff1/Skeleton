@@ -55,11 +55,12 @@ def run(
     max_domain_regression: float = 0,
     min_coverage: float = 0.8,
     dry_run: bool = False,
+    expand_vocabulary: bool = False,
 ) -> dict[str, Any]:
     if not isinstance(run_id, str) or not _RUN_ID.fullmatch(run_id):
         raise ProductionCheckpointError("run id must be 3-48 safe lowercase characters")
-    if type(dry_run) is not bool:
-        raise ProductionCheckpointError("dry_run must be boolean")
+    if type(dry_run) is not bool or type(expand_vocabulary) is not bool:
+        raise ProductionCheckpointError("dry_run and expand_vocabulary must be boolean")
     if type(epochs) is not int or not 1 <= epochs <= 3:
         raise ProductionCheckpointError("epochs must be between 1 and 3")
     for label, value, upper in (
@@ -71,7 +72,10 @@ def run(
             raise ProductionCheckpointError("invalid " + label)
     if learning_rate <= 0:
         raise ProductionCheckpointError("training learning rate must be > 0")
-    report = inspect(attestation=attestation, candidate_directory=output_directory)
+    report = inspect(
+        attestation=attestation, candidate_directory=output_directory,
+        allow_vocabulary_expansion=expand_vocabulary,
+    )
     if dry_run or report["status"] != "ready_for_operator_training":
         return {
             "schema_version": SCHEMA,
@@ -108,6 +112,7 @@ def run(
         attestation=attestation,
         candidate_directory=out,
         copy_destination=names["backup"],
+        allow_vocabulary_expansion=expand_vocabulary,
     )
     if _sha(baseline) != _sha(names["backup"]):
         raise ProductionCheckpointError("serving weights differ from prepared backup")
@@ -121,6 +126,7 @@ def run(
         lr=float(learning_rate),
         min_coverage=float(min_coverage),
         max_domain_regression=float(max_domain_regression),
+        expand_vocabulary=expand_vocabulary,
     )
     if _sha(baseline) != start_sha:
         raise ProductionCheckpointError("live serving weights changed during training")
@@ -160,6 +166,7 @@ def run(
         "game_review_report_path": str(names["game_review"].resolve()),
         "game_review_report_sha256": _sha(names["game_review"]),
         "benchmark_prompts": review["fresh_heldout_prompts"],
+        "vocabulary_expansion_opted_in": expand_vocabulary,
         "human_review_complete": False,
         "game_design_improvement_established": False,
         "production_weights_modified": False,
@@ -175,6 +182,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--attestation", required=True, type=Path)
     parser.add_argument("--output-directory", required=True, type=Path)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--expand-vocabulary", action="store_true",
+                        help="opt in to native BPE token growth on cloned candidate")
     parser.add_argument("--epochs", default=1, type=int)
     parser.add_argument("--learning-rate", default=0.005, type=float)
     parser.add_argument("--max-domain-regression", default=0.0, type=float)
@@ -190,6 +199,7 @@ def main(argv: list[str] | None = None) -> int:
             max_domain_regression=args.max_domain_regression,
             min_coverage=args.min_coverage,
             dry_run=args.dry_run,
+            expand_vocabulary=args.expand_vocabulary,
         )
         print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
         return 0 if result["status"] in (
