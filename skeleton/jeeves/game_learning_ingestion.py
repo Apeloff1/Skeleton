@@ -55,6 +55,8 @@ _ROM_EXTENSIONS = {
     ".a78",
     ".sms",
     ".gg",
+    ".nds",
+    ".pbp",
 }
 _ARCHIVE_EXTENSIONS = {".zip", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz"}
 _TEXT_EXTENSIONS = {
@@ -113,6 +115,9 @@ _HARDWARE = {
     "atari_7800": (1984, "8-bit cartridge console"),
     "master_system": (1985, "8-bit cartridge console"),
     "game_gear": (1990, "color handheld"),
+    "nintendo_ds": (2004, "dual-screen handheld"),
+    "nintendo_dsi": (2008, "dual-screen DSi revision"),
+    "psp": (2004, "handheld optical/media console"),
 }
 _GENRE_TERMS = {
     "platformer": ("platformer", "platform game"),
@@ -966,8 +971,99 @@ def _rom_sms(data: bytes, filename: str) -> dict[str, Any]:
     }
 
 
+
+def _rom_nds(data: bytes) -> dict[str, Any]:
+    """Inspect the bounded NDS/DSi header and real ARM9/ARM7 section boundaries."""
+    if len(data) < 0x200:
+        _fail("invalid_rom", "Nintendo DS ROM header is shorter than 512 bytes")
+    unit = data[0x12]
+    if unit not in (0, 2, 3):
+        _fail("invalid_rom", "Nintendo DS card has unsupported unit identity")
+    read32 = lambda at: int.from_bytes(data[at:at + 4], "little")
+    header_size = read32(0x84)
+    if header_size < 0x200 or header_size > len(data) or header_size > 0x4000:
+        _fail("invalid_rom", "NDS header length is not within its signed structural bounds")
+    sections = []
+    layout = [_layout(data, 0, header_size, "nds_header")]
+    for name, at in (("arm9", 0x20), ("arm7", 0x30)):
+        offset, size = read32(at), read32(at + 12)
+        if size == 0 or offset < 0x200 or offset + size > len(data):
+            _fail("invalid_rom", "NDS ARM9/ARM7 executable segments exceed actual cartridge bounds")
+        sections.append({
+            "cpu": name,
+            "rom_offset": offset,
+            "entry_address": read32(at + 4),
+            "ram_address": read32(at + 8),
+            "byte_length": size,
+        })
+        layout.append(_layout(data, offset, size, name + "_binary"))
+    for name, at in (("fnt", 0x40), ("fat", 0x48)):
+        offset, size = read32(at), read32(at + 4)
+        if not offset and not size:
+            continue
+        if not offset or not size or offset + size > len(data):
+            _fail("invalid_rom", "NDS filename/allocation table points outside cartridge")
+        layout.append(_layout(data, offset, size, name + "_table"))
+    return {
+        "console_id": "nintendo_dsi" if unit in (2, 3) else "nintendo_ds",
+        "format": "nintendo_ds_cartridge",
+        "title": _ascii(data[0:12]),
+        "game_code": _ascii(data[0x0C:0x10]),
+        "maker_code": _ascii(data[0x10:0x12]),
+        "unit_code": unit,
+        "rom_revision": data[0x1E],
+        "declared_header_bytes": header_size,
+        "arm_sections": sections,
+        "stored_logo_crc16": int.from_bytes(data[0x15C:0x15E], "little"),
+        "stored_header_crc16": int.from_bytes(data[0x15E:0x160], "little"),
+        "header_offset": 0,
+        "layout": layout,
+        "warnings": [
+            "NDS/DSi header layout does not validate CRC, secure-area encryption, ROM bootability or emulator DSi support.",
+        ],
+    }
+
+
+def _rom_pbp(data: bytes) -> dict[str, Any]:
+    """Inspect exact PSP/PS1 PBP subfile boundaries without parsing executable data."""
+    if len(data) < 40 or data[:4] != b"\x00PBP":
+        _fail("invalid_rom", "PBP requires a 40-byte binary signature and section table")
+    version = int.from_bytes(data[4:8], "little")
+    boundaries = [int.from_bytes(data[at:at + 4], "little")
+                  for at in range(8, 40, 4)]
+    if boundaries[0] < 40 or boundaries[-1] > len(data) or (
+        any(right < left for left, right in zip(boundaries, boundaries[1:]))
+    ):
+        _fail("invalid_rom", "PBP embedded file offsets are unordered or exceed content")
+    names = ("param_sfo", "icon0", "icon1", "pic0", "pic1",
+             "snd0", "data_psp", "data_psar")
+    offsets = boundaries + [len(data)]
+    sections = []
+    layout = [_layout(data, 0, 40, "pbp_header")]
+    for i, name in enumerate(names):
+        start, end = offsets[i], offsets[i + 1]
+        sections.append({"section": name, "offset": start, "byte_length": end - start})
+        if end > start:
+            layout.append(_layout(data, start, end - start, "pbp_section", section=name))
+    return {
+        "console_id": "psp",
+        "format": "psp_pbp_container",
+        "container_version": version,
+        "sections": sections,
+        "header_offset": 0,
+        "layout": layout,
+        "warnings": [
+            "PBP package may contain PSP, PS1, update, data or encrypted sections; no executable content was decoded or authenticated.",
+        ],
+    }
+
+
 def _parse_rom(data: bytes, filename: str) -> dict[str, Any]:
     extension = PurePosixPath(filename).suffix.casefold()
+    if extension == ".nds":
+        return _rom_nds(data)
+    if data[:4] == bytes((0, 80, 66, 80)) or extension == ".pbp":
+        return _rom_pbp(data)
     if data[:4] == b"LYNX" or extension == ".lnx":
         return _rom_lynx(data)
     if len(data) >= 10 and data[1:10] == b"ATARI7800" or extension == ".a78":
@@ -998,6 +1094,7 @@ def _parse_rom(data: bytes, filename: str) -> dict[str, Any]:
 def _has_rom_signature(data: bytes) -> bool:
     return (
         data.startswith(b"NES\x1a")
+        or data[:4] == bytes((0, 80, 66, 80))
         or data[:4] == b"LYNX"
         or len(data) >= 10 and data[1:10] == b"ATARI7800"
         or any(
