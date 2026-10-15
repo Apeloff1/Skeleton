@@ -67,6 +67,13 @@ jobs:
             /skeleton/
             /scripts/
             /packaging/
+            /machine/
+            /docs/
+            /.cursor/rules/architecture.mdc
+            /.github/copilot-instructions.md
+            /AGENTS.md
+            /CLAUDE.md
+            /GEMINI.md
 
       - name: Verify exact head provenance for Windows installer
         shell: pwsh
