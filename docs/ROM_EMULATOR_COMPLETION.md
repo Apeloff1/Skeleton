@@ -45,6 +45,25 @@ python scripts/install_game_emulator_cores.py \
   --jobs 2
 ```
 
+For bulk build orchestration, an **explicit** `--fleet` request attempts all
+currently pinned recipes rather than stopping at the first failure. Each core
+uses the same source, static ABI, firmware and license gates; individual
+failures are retained in the returned `failures` ledger. The CLI returns a
+nonzero exit code if any selected core failed or remains unapproved, even when
+some binaries were successfully installed:
+
+```bash
+python scripts/install_game_emulator_cores.py \
+  --source-root /private/emulator-source \
+  --install-root /private/emulator-installed \
+  --fetch-sources --fleet --jobs 2
+```
+
+Use `--fleet --core sameboy --core nestopia` for a failure-isolated subset.
+These commands are operator examples, **not** a report of completed builds.
+Dependencies such as unsupported GPU contexts and unavailable firmware will
+continue to fail closed rather than be represented as supported machines.
+
 The installer uses declared exact upstream revisions, independently inspects
 the produced shared libraries, stores immutable digest-named artifacts,
 retains license and build identity records, and writes a private approval
