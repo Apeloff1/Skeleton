@@ -203,7 +203,7 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
 
     assert "runs-on: windows-latest" in source
-    assert 'PYTHON_VERSION: "3.11.16"' in source
+    assert 'PYTHON_VERSION: "3.11"' in source
     assert '"pydantic>=2.14.0,<3"' in source
     assert "JRSoftware.InnoSetup.7" in source
     assert "--version 7.1.0" in source
