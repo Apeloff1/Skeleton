@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import re
 import sys
@@ -43,6 +44,28 @@ def _new_receipt(target: Path, payload: dict[str, Any]) -> None:
     data = (json.dumps(payload, sort_keys=True, indent=2,
                        ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
     _save_new_private(target, data)
+
+
+def required_free_bytes(
+    *, checkpoint_bytes: int, snapshot_bytes: int,
+    batches_per_epoch: int, epochs: int,
+) -> int:
+    """Admission budget for immutable batch snapshots and retained evidence.
+
+    Snapshot growth (extra tokens), JSON staging, and concurrent fsync files
+    can raise peak disk use above the sum of finalized artifacts; reserve 2x
+    snapshot storage, 3x parent bytes, and a 512 MiB operating-system margin.
+    """
+    values = (checkpoint_bytes, snapshot_bytes, batches_per_epoch, epochs)
+    if any(type(value) is not int or value < 1 for value in values):
+        raise ProductionCheckpointError("missing valid checkpoint size or optimizer batch estimate")
+    if epochs > 3 or batches_per_epoch > 100:
+        raise ProductionCheckpointError("training snapshot storage estimate exceeds bounds")
+    return (
+        512 * 1024 * 1024
+        + 3 * checkpoint_bytes
+        + 2 * snapshot_bytes * (batches_per_epoch * epochs + 1)
+    )
 
 
 def run(
@@ -79,6 +102,19 @@ def run(
         attestation=attestation, candidate_directory=output_directory,
         allow_vocabulary_expansion=expand_vocabulary,
     )
+    if report["status"] == "ready_for_operator_training":
+        minimum = required_free_bytes(
+            checkpoint_bytes=report["checkpoint_bytes"],
+            snapshot_bytes=report["selected_model_snapshot_bytes"],
+            batches_per_epoch=report["training_batches_per_epoch"],
+            epochs=epochs,
+        )
+        report["estimated_required_free_bytes"] = minimum
+        current_free = shutil.disk_usage(output_directory).free
+        report["currently_free_bytes"] = current_free
+        if current_free < minimum:
+            report["blockers"].append("insufficient_disk_for_immutable_batch_checkpoints")
+            report["status"] = "blocked"
     if dry_run or report["status"] != "ready_for_operator_training":
         return {
             "schema_version": SCHEMA,
