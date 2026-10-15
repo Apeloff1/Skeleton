@@ -62,6 +62,9 @@ def test_concurrent_four_angle_digest_never_claims_weight_training(tmp_path):
     m = _fixture(tmp_path / "corpus")
     train, held, receipt = load_multidomain_corpus(m)
     assert len(train) == 18 and sum(len(v) for v in held.values()) == 9
+    assert "Jeeves module jeeves.gaming.world.construct" in train[0]
+    assert "Objective:" in train[0] and "Lens:" in train[0]
+    assert "Constraints:" in train[0] and " Jeeves: " in train[0]
     assert not receipt["heldout_used_for_training"]
     output = digest_with_mirrors(m, workers=4)
     assert output["active_modules"] == 3 and len(output["mirrors"]) == 4

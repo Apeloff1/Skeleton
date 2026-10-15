@@ -194,9 +194,21 @@ def load_multidomain_corpus(manifest_path: Path) -> tuple[tuple[str, ...], dict[
     if len({r["source_project_id"] for r in train}) < 2 or len({r["source_project_id"] for r in test}) < 2:
         raise _error("each split requires at least two source projects")
     active = sorted({r["module_id"] for r in train + test})
-    training = tuple("User: " + r["prompt"].strip() + " Jeeves: " + r["answer"].strip() for r in train)
-    heldout = {domain: tuple("User: " + r["prompt"].strip() + " Jeeves: " + r["answer"].strip()
-                              for r in test if modules[r["module_id"]]["domain"] == domain)
+
+    def frame(row: dict[str, Any]) -> str:
+        # This is executable specialization: the optimizer actually sees
+        # the module's objective, adversarial lens, and domain constraints.
+        # Heldout references remain separate and are never fit.
+        contract = modules[row["module_id"]]
+        return (
+            f"Jeeves module {contract['module_id']}. "
+            f"Objective: {contract['objective']}. "
+            f"Lens: {contract['assignment']}. "
+            f"Constraints: {contract['anchor_terms']}. "
+            "User: " + row["prompt"].strip() + " Jeeves: " + row["answer"].strip()
+        )
+    training = tuple(frame(r) for r in train)
+    heldout = {domain: tuple(frame(r) for r in test if modules[r["module_id"]]["domain"] == domain)
                for domain in DOMAINS}
     receipt = {"schema_version": SCHEMA, "rights_review_id": config["review_id"],
                "manifest_sha256": sha256(raw).hexdigest(),
@@ -226,7 +238,9 @@ def load_training_corpus(manifest_path: Path):
 def _mirror(name: str, train, heldout, receipt):
     documents = tuple(train) + tuple(t for part in heldout.values() for t in part)
     if name == "structure":
-        evidence = {"bad_dialogue_shapes": sum(not t.startswith("User: ") or " Jeeves: " not in t for t in documents)}
+        evidence = {"bad_dialogue_shapes": sum(
+            not t.startswith("Jeeves module ") or " User: " not in t or " Jeeves: " not in t
+            for t in documents)}
     elif name == "lexical":
         counts = Counter(word for t in documents for word in re.findall(r"[a-z]+", t.casefold()))
         evidence = {"unique_terms": len(counts), "observed_tokens": sum(counts.values()),
