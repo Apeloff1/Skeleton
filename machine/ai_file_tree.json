@@ -937,7 +937,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "0b3b07eaeb8f67e02597d5e2147ceacdf7fc1d4b",
+      "source_git_object_sha": "e81bed1065ad6f5ac8cec82aa24613a56570c1a1",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
