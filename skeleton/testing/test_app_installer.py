@@ -468,8 +468,9 @@ def test_setup_repairs_local_unauthenticated_mongo_urls(tmp_path):
     receipt = ensure_runtime_environment(tmp_path)
     values = _read_values(tmp_path / ".env")
     assert receipt.changed
-    assert values["MONGO_URL"].startswith("mongodb://admin:stable-root-password@mongo:27017/")
-    assert values["SKL_MONGO_URI"].startswith("mongodb://admin:stable-root-password@mongo:27017/")
+    prefix = _test_mongo_uri("admin", "stable-root-password", "mongo:27017", "")
+    assert values["MONGO_URL"].startswith(prefix)
+    assert values["SKL_MONGO_URI"].startswith(prefix)
     assert not ensure_runtime_environment(tmp_path).changed
 
 
