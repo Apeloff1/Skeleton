@@ -1,7 +1,8 @@
 {
   "name": "frontend",
+  "description": "Skeleton studio application: Jeeves chat, Dragon crawler and game creation workspaces.",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "16.0.0",
   "scripts": {
     "check:expo-native-compat": "node ./scripts/check-expo-native-compat.cjs",
     "start": "expo start --port 3000",
