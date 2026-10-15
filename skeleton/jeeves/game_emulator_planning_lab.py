@@ -262,18 +262,32 @@ def run_native_confirmed_planning(
             raise EmulatorPlanningError(
                 "physical planning needs an approved predictive member of a qualified neural ensemble"
             )
-    if model_digest is None:
-        raise EmulatorPlanningError("candidate neural parameters are not checksum-bound")
-    if (
-        not isinstance(training_report, Mapping)
-        or training_report.get("world_model_digest") != model_digest
-        or training_report.get("report_digest") != _digest({
-            key: val for key, val in training_report.items() if key != "report_digest"
-        })
-        or training_report.get("candidate_status") != "candidate_predictive_gain_measured"
-        or model.get("measured_predictive_gate") != "candidate_predictive_gain_measured"
-    ):
-        raise EmulatorPlanningError("unqualified or mismatched neural candidate cannot direct source actions")
+    if not isinstance(training_report, Mapping) or training_report.get("report_digest") != _digest({
+        key: val for key, val in training_report.items() if key != "report_digest"
+    }):
+        raise EmulatorPlanningError("source-trained candidate report evidence differs")
+    if ensemble is None:
+        validated = (
+            training_report.get("world_model_digest") == model_digest
+            and training_report.get("candidate_status") == "candidate_predictive_gain_measured"
+        )
+    else:
+        receipts = training_report.get("member_seed_receipts")
+        validated = (
+            training_report.get("ensemble_digest") == ensemble.get("ensemble_digest")
+            and training_report.get("qualified_for_physical_native_confirmation") is True
+            and isinstance(receipts, list)
+            and any(
+                isinstance(item, Mapping)
+                and item.get("model_digest") == model_digest
+                and item.get("qualified_prediction") == "candidate_predictive_gain_measured"
+                for item in receipts
+            )
+        )
+    if not validated or model.get("measured_predictive_gate") != "candidate_predictive_gain_measured":
+        raise EmulatorPlanningError(
+            "unqualified or mismatched world model cannot direct real ROM experiments"
+        )
     if request.max_steps < config.anchors - 1 + config.horizon:
         raise EmulatorPlanningError("real episode cannot contain the anchor prefix and full proposed horizon")
     if config.objective == "audio_activity" and "audio_rms" not in model.get("observation_features", []):
