@@ -485,6 +485,87 @@ def _measured_signal_channels(pixels: bytes, width: int, height: int,
     }
 
 
+
+def _temporal_signal_channels(
+    previous_pixels: bytes | None, pixels: bytes,
+    width: int, height: int, previous_audio: bytes, audio: bytes,
+) -> dict[str, float]:
+    """Sample exact consecutive native frames and audio without any semantic guesses.
+
+    A motion heat map, spatial centroid, four occupancy quadrants, and an
+    audio change/onset estimate are bounded by 4096 pixels and 4096 pairs.
+    Motion cannot, by itself, certify cutscenes, objects or consequences.
+    """
+    zeros = {
+        "motion_energy": 0.0,
+        "motion_fraction": 0.0,
+        "motion_centroid_x": 0.0,
+        "motion_centroid_y": 0.0,
+        "motion_quadrant_tl": 0.0,
+        "motion_quadrant_tr": 0.0,
+        "motion_quadrant_bl": 0.0,
+        "motion_quadrant_br": 0.0,
+        "frame_luma_drift": 0.0,
+        "audio_energy_change": 0.0,
+        "audio_positive_onset": 0.0,
+        "audio_zero_crossing_shift": 0.0,
+    }
+    def audio_metrics(data: bytes) -> tuple[float, float]:
+        pairs = min(len(data) // 4, 4096)
+        if not pairs:
+            return 0.0, 0.0
+        stride = max(1, (len(data) // 4 + 4095) // 4096)
+        energies, changes, last, count = 0.0, 0, None, 0
+        for i in range(0, len(data) // 4, stride):
+            left, right = struct.unpack_from("<hh", data, i * 4)
+            mono = (left + right) / 2
+            energies += mono * mono
+            changes += int(last is not None and (mono < 0) != (last < 0))
+            last, count = mono, count + 1
+        return math.sqrt(energies / count) / 32768, changes / max(1, count - 1)
+    old_energy, old_crossings = audio_metrics(previous_audio)
+    new_energy, new_crossings = audio_metrics(audio)
+    zeros["audio_energy_change"] = min(1.0, abs(new_energy - old_energy))
+    zeros["audio_positive_onset"] = min(1.0, max(0.0, new_energy - old_energy))
+    zeros["audio_zero_crossing_shift"] = min(1.0, abs(new_crossings - old_crossings))
+    if previous_pixels is None or len(previous_pixels) != len(pixels):
+        return zeros
+    count = width * height
+    stride = max(1, (count + 4095) // 4096)
+    motion_total = 0
+    spatial_x = spatial_y = 0
+    delta_luma = 0
+    changed = 0
+    quadrants = [0, 0, 0, 0]
+    examined = 0
+    for pixel in range(0, count, stride):
+        idx = 3 * pixel
+        delta = sum(abs(pixels[idx + i] - previous_pixels[idx + i]) for i in range(3))
+        motion_total += delta
+        changed += int(delta >= 48)
+        x = pixel % width
+        y = pixel // width
+        spatial_x += x * delta
+        spatial_y += y * delta
+        quadrants[(2 if y * 2 >= height else 0) + int(x * 2 >= width)] += delta
+        old_luma = 77 * previous_pixels[idx] + 150 * previous_pixels[idx + 1] + 29 * previous_pixels[idx + 2]
+        new_luma = 77 * pixels[idx] + 150 * pixels[idx + 1] + 29 * pixels[idx + 2]
+        delta_luma += abs(old_luma - new_luma) / 256
+        examined += 1
+    zeros.update({
+        "motion_energy": motion_total / (765 * examined),
+        "motion_fraction": changed / examined,
+        "motion_centroid_x": spatial_x / (max(1, width - 1) * motion_total) if motion_total else 0.0,
+        "motion_centroid_y": spatial_y / (max(1, height - 1) * motion_total) if motion_total else 0.0,
+        "motion_quadrant_tl": quadrants[0] / motion_total if motion_total else 0.0,
+        "motion_quadrant_tr": quadrants[1] / motion_total if motion_total else 0.0,
+        "motion_quadrant_bl": quadrants[2] / motion_total if motion_total else 0.0,
+        "motion_quadrant_br": quadrants[3] / motion_total if motion_total else 0.0,
+        "frame_luma_drift": delta_luma / (255 * examined),
+    })
+    return zeros
+
+
 class EmulatorEnvironment:
     def __init__(
         self,
@@ -575,6 +656,12 @@ class EmulatorEnvironment:
                     "frame_entropy", "luma_contrast", "spatial_edges",
                     "color_saturation", "color_bias", "audio_peak",
                     "audio_zero_crossing", "stereo_difference",
+                    "motion_energy", "motion_fraction",
+                    "motion_centroid_x", "motion_centroid_y",
+                    "motion_quadrant_tl", "motion_quadrant_tr",
+                    "motion_quadrant_bl", "motion_quadrant_br",
+                    "frame_luma_drift", "audio_energy_change",
+                    "audio_positive_onset", "audio_zero_crossing_shift",
                 )
             },
             ("visual_change",),
@@ -953,6 +1040,9 @@ class EmulatorEnvironment:
         )
         values = [value[0] for value in struct.iter_unpack("<h", audio)]
         rms = math.sqrt(sum(value * value for value in values) / len(values)) / 32768 if values else 0.0
+        temporal = _temporal_signal_channels(
+            self._pixels, pixels, width, height, self._audio, audio,
+        )
         self._pixels, self._frame, self._audio = pixels, dict(metadata), audio
         self._audio_total += len(audio) // 4
         self._observation = {
@@ -961,6 +1051,7 @@ class EmulatorEnvironment:
             "audio_rms": rms,
             "step_fraction": self._steps / self.max_steps,
             **_measured_signal_channels(pixels, width, height, values),
+            **temporal,
         }
         return dict(self._observation)
 
