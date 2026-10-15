@@ -988,6 +988,19 @@
       "isolated_native_test_scope": "Temporary test-only registry binding with homebrew input marker; approved ELF inspection, real worker reset/step callbacks, core-provided input descriptions, video/PCM, native savestate restoration",
       "isolated_native_test_result": "Source added but not run in this container (bubblewrap unavailable), manual-only workflow installs bwrap then executes",
       "production_core_id_added": false
+    },
+    "private_native_savestate_branching": {
+      "owner": "skeleton/jeeves/game_comparison_live.py",
+      "interface": "Two under-screen controls per visible native game: Save private checkpoint; Rewind to checkpoint; loopback authenticated same-origin POST endpoints",
+      "native_state": "Existing EmulatorEnvironment.snapshot/restore in isolated libretro worker, maximum private state capacity <=8MiB per lane; latest checkpoint only, at most 2 checkpoint captures and 2 rewind operations per lane",
+      "budgets": "256 cumulative native inputs and 4 resets remain fixed, no new steps credited by state rewind",
+      "receipt": "SHA-256 chained native_checkpoint and native_rewind receipts record game, core, content, state, original and restored frame identities and episode cursors; no raw savestate/RAM bytes exported",
+      "replay_contract": "Offline verifier validates each branch, but fresh-worker standalone replay refuses rewound sessions until explicit independent savestate custody is implemented",
+      "tests": [
+        "tests/test_game_comparison_live.py",
+        "tests/test_game_comparison_live_http.py"
+      ],
+      "real_commercial_rom_executed": false
     }
   }
 }

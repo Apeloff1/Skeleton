@@ -134,7 +134,7 @@ class LocalComparisonHandler(BaseHTTPRequestHandler):
             self._error("Unknown local studio endpoint",404)
 
     def do_POST(self) -> None:
-        if self.path not in ("/api/step","/api/reset","/api/stop"):
+        if self.path not in ("/api/step","/api/reset","/api/checkpoint","/api/rewind","/api/stop"):
             self._error("Unknown local native action",404)
             return
         if not self._authorized(mutating=True):
@@ -154,10 +154,16 @@ class LocalComparisonHandler(BaseHTTPRequestHandler):
             packet=parse_json(raw,limit=MAX_REQUEST)
             if self.path=="/api/step":
                 value=self.server.session.step(packet)
-            elif self.path=="/api/reset":
-                if not isinstance(packet,dict) or set(packet)!={"game_id"}:
-                    raise ValueError("Reset command needs one exact game_id")
-                value=self.server.session.reset(packet["game_id"])
+            elif self.path in ("/api/reset","/api/checkpoint","/api/rewind"):
+                if (not isinstance(packet,dict) or set(packet)!={"game_id"}
+                    or type(packet["game_id"]) is not str):
+                    raise ValueError("Native state command needs one exact game_id")
+                if self.path=="/api/reset":
+                    value=self.server.session.reset(packet["game_id"])
+                elif self.path=="/api/checkpoint":
+                    value=self.server.session.checkpoint(packet["game_id"])
+                else:
+                    value=self.server.session.rewind(packet["game_id"])
             else:
                 if packet!={}:
                     raise ValueError("Stop command cannot submit extra operations")

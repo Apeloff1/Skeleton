@@ -135,6 +135,22 @@ async function step(ids){
 async function resetGame(id){
  try{await request("/api/reset",{game_id:id});clearInputs(id);await load();msg("Actual native core reset, not a fake frame")}catch(e){msg("Reset rejected: "+e.message)}
 }
+async function checkpointGame(id){
+ try{
+  const data=await request("/api/checkpoint",{game_id:id});
+  await load();
+  msg("Private native checkpoint #"+data.checkpoint_id+" saved · state SHA "+data.state_sha256.slice(0,15)+
+      " · game memory never sent to this browser");
+ }catch(e){msg("Checkpoint rejected: "+e.message)}
+}
+async function rewindGame(id){
+ try{
+  const data=await request("/api/rewind",{game_id:id});
+  clearInputs(id);await load();
+  msg("Actual native core restored to checkpoint #"+data.checkpoint_id+
+      " · evidence lineage continued · not a fresh-reset replay");
+ }catch(e){msg("Native rewind rejected: "+e.message)}
+}
 function deckFor(id){
  const lane=current.lanes[id],layout=lane.controller_layout;
  const deck=txt("section","","deck");
@@ -256,12 +272,20 @@ function panel(side){
  root.append(stage);
  root.append(deckFor(id));
  root.append(nativeAudioMonitor(frame));
- const actions=txt("div","","inline"),doStep=txt("button","Advance native frame"),doReset=txt("button","Reset this emulator");
- doStep.disabled=lane.status!=="running"||lane.lifetime_steps>=lane.max_lifetime_steps;doReset.disabled=lane.status==="native_execution_failed"||lane.reset_count>=4;
+ const actions=txt("div","","inline"),doStep=txt("button","Advance native frame"),doReset=txt("button","Reset this emulator"),
+  doCheckpoint=txt("button","Save private checkpoint"),doRewind=txt("button","Rewind to checkpoint");
+ doStep.disabled=lane.status!=="running"||lane.lifetime_steps>=lane.max_lifetime_steps;
+ doReset.disabled=lane.status==="native_execution_failed"||lane.reset_count>=4;
+ doCheckpoint.disabled=lane.status!=="running"||lane.checkpoint_count>=lane.max_checkpoints;
+ doRewind.disabled=!lane.has_private_checkpoint||lane.status==="native_execution_failed"||
+  lane.rewind_count>=lane.max_rewinds||lane.lifetime_steps>=lane.max_lifetime_steps;
  doStep.onclick=()=>step([id]);doReset.onclick=()=>resetGame(id);
- actions.append(doStep,doReset);root.append(actions);
+ doCheckpoint.onclick=()=>checkpointGame(id);doRewind.onclick=()=>rewindGame(id);
+ actions.append(doStep,doCheckpoint,doRewind,doReset);root.append(actions);
  root.append(txt("p",lane.status+" · lifetime "+lane.lifetime_steps+"/"+lane.max_lifetime_steps+
-    " native actions · reset "+lane.reset_count+"/4","stats"));
+    " native actions · checkpoint "+lane.checkpoint_count+"/"+lane.max_checkpoints+
+    " · rewinds "+lane.rewind_count+"/"+lane.max_rewinds+
+    " · resets "+lane.reset_count+"/4","stats"));
  root.append(txt("div","Frame SHA-256 "+(frame?.frame_sha256||"unavailable")+
     " · native evidence root "+lane.latest_event_chain_sha256,"stats"));
  root.append(graphFor(lane))

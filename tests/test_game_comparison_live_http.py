@@ -21,6 +21,10 @@ class FakeStudy:
         return {"status":"fake-test-only","accepted":packet}
     def reset(self,game_id):
         return {"status":"synthetic-reset","game_id":game_id}
+    def checkpoint(self,game_id):
+        return {"status":"synthetic-private-checkpoint","game_id":game_id}
+    def rewind(self,game_id):
+        return {"status":"synthetic-private-rewind","game_id":game_id}
     def export_evidence(self):
         return {"schema_version":"synthetic-no-native-evidence"}
     def close(self):
@@ -74,6 +78,26 @@ class LocalOriginContracts(unittest.TestCase):
         )
         self.assertEqual(status,200)
         self.assertEqual(self.study.steps,1)
+
+    def test_checkpoint_and_rewind_are_authenticated_same_origin_only(self):
+        for endpoint in ("/api/checkpoint","/api/rewind"):
+            status,_=self._call(
+                endpoint,method="POST",body={"game_id":"first"},
+                token=self.server.secret,origin="https://untrusted.invalid",
+            )
+            self.assertEqual(status,403)
+            status,receipt=self._call(
+                endpoint,method="POST",body={"game_id":"first"},
+                token=self.server.secret,origin=self.base,
+            )
+            self.assertEqual(status,200)
+            self.assertEqual(receipt["game_id"],"first")
+            self.assertEqual(set(receipt),{"status","game_id"})
+            status,_=self._call(
+                endpoint,method="POST",body={"game_id":"first","path":"/etc"},
+                token=self.server.secret,origin=self.base,
+            )
+            self.assertEqual(status,400)
 
     def test_home_page_restrictive_security_policy(self):
         request=urllib.request.Request(self.base+"/")

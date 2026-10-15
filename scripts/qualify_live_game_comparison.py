@@ -62,6 +62,11 @@ def main(argv:list[str]|None=None)->int:
         selected=next((x for x in verified["games"] if x["game_id"]==args.game),None)
         if selected is None:
             raise ValueError("Requested replay game is absent from actual verified live evidence")
+        if selected.get("snapshot_based_episodes_require_separate_qualification"):
+            raise ValueError(
+                "Snapshot-rewind branches are not fresh-reset episodes; "
+                "full state-custody qualification must be implemented first"
+            )
         tapes=selected["replayable_controller_tapes"]
         if type(args.episode) is not int or not 0<=args.episode<len(tapes):
             raise ValueError("Requested native reset epoch does not exist")
@@ -99,7 +104,7 @@ def main(argv:list[str]|None=None)->int:
         for event in events:
             if event["event_kind"]=="native_reset":
                 epoch+=1
-            elif epoch==args.episode:
+            elif event["event_kind"]=="native_step" and epoch==args.episode:
                 original.append(event["receipt"])
         if len(original)!=len(tape):
             raise ValueError("Original native step receipt count differs from controller epoch")
