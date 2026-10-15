@@ -730,7 +730,10 @@
       "measured rewards scoped strictly to each game",
       "independently repeated input sequences and identical source state",
       "per-step measured source projection SHA",
-      "exact independent report and pairwise comparison re-verification"
+      "exact independent report and pairwise comparison re-verification",
+      "bounded numeric source_observation and source_next_observation per real action, with game-local reward components",
+      "source numeric examples committed by independent per-transition and candidate corpus SHA256",
+      "source visual-change flags verified against actual successive native or original frame digests"
     ],
     "cannot_claim": [
       "equal game reward scale between consoles",
@@ -750,6 +753,16 @@
     "manual_acceptance_runner": "scripts/run_game_rom_acceptance_suite.py",
     "actual_operator_study_executed_during_authoring": false,
     "actual_native_emulator_studies_verified": 0,
-    "production_neural_optimizer_steps": 0
+    "production_neural_optimizer_steps": 0,
+    "private_native_savestate_hash_limit_bytes": 67108864,
+    "published_report_limit_bytes": 2097152,
+    "training_candidate": {
+      "actual_numeric_source_rows": "game count times sum of controlled program action lengths; one first-execution source row per step",
+      "candidate_digest": "candidate_numeric_dataset_sha256 binds game/environment identity, controller program, step and original numeric source transition",
+      "per_game_observation_and_reward_bounded": true,
+      "cross_game_feature_alignment_inferred": false,
+      "neural_gradient_steps_executed": 0,
+      "production_weight_promotion_authorized": false
+    }
   }
 }
