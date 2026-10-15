@@ -125,6 +125,18 @@ $ArchiveArgs = @(
 if ($LASTEXITCODE -ne 0) {
     throw "git archive failed"
 }
+
+# Inspect ZIP metadata before Expand-Archive touches NTFS. Linux-valid Git
+# paths can collide on Windows, use reserved names, or exceed the installer's
+# portable path budget; rejecting them after extraction is too late.
+$ArchivePreflight = Join-Path $RepoRoot "scripts\windows\check_payload_zip.py"
+if (-not (Test-Path -LiteralPath $ArchivePreflight -PathType Leaf)) {
+    throw "Windows payload ZIP preflight tool is missing"
+}
+& python $ArchivePreflight --archive $ArchivePath
+if ($LASTEXITCODE -ne 0) {
+    throw "Windows payload ZIP preflight rejected the archived SourceRef"
+}
 Expand-Archive -LiteralPath $ArchivePath -DestinationPath $PayloadDir -Force
 
 foreach ($RequiredPath in $SourceManifest.required_paths) {
@@ -184,14 +196,18 @@ if ($MissingPayloadPaths.Count -gt 0) {
 # Keep the installed runtime portable across ordinary Windows user-profile
 # paths. This is checked before compilation so path regressions fail cheaply
 # and with the exact offending relative path.
-$MaxRuntimeRelativePathChars = 190
+$MaxRuntimeRelativePathUnits = 190
 $PathBudgetViolations = @(
     Get-ChildItem -LiteralPath $PayloadDir -File -Recurse | ForEach-Object {
         $relative = [IO.Path]::GetRelativePath($PayloadDir, $_.FullName)
-        if ($relative.Length -gt $MaxRuntimeRelativePathChars) {
+        $portable = $relative.Replace("\", "/")
+        $utf8Bytes = [Text.Encoding]::UTF8.GetByteCount($portable)
+        $utf16Units = $portable.Length
+        if ([Math]::Max($utf8Bytes, $utf16Units) -gt $MaxRuntimeRelativePathUnits) {
             [PSCustomObject]@{
-                Length = $relative.Length
-                Path = $relative
+                Utf8Bytes = $utf8Bytes
+                Utf16Units = $utf16Units
+                Path = $portable
             }
         }
     }
@@ -199,11 +215,11 @@ $PathBudgetViolations = @(
 if ($PathBudgetViolations.Count -gt 0) {
     Write-Host "Windows runtime payload path budget exceeded:"
     $PathBudgetViolations |
-        Sort-Object Length -Descending |
+        Sort-Object Utf8Bytes -Descending |
         Format-Table -AutoSize |
         Out-String |
         Write-Host
-    throw "Runtime payload contains paths longer than $MaxRuntimeRelativePathChars characters"
+    throw "Runtime payload paths exceed the $MaxRuntimeRelativePathUnits-unit portable budget"
 }
 
 Write-Host "==> Building standalone Skeleton.exe"
