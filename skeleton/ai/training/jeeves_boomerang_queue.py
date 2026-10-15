@@ -47,7 +47,7 @@ def _receipt(queue: dict[str, Any]) -> dict[str, Any]:
 
 
 def _checked_file(path: Path, max_bytes: int) -> dict:
-    _require(type(path) is Path and not path.is_symlink() and path.is_file(),
+    _require(isinstance(path, Path) and not path.is_symlink() and path.is_file(),
              "source and archived campaign must be regular immutable files")
     _require(32 <= path.stat().st_size <= max_bytes,
              "source or prior evidence file outside size limit")
