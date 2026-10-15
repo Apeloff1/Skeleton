@@ -276,6 +276,8 @@ def inspect(
                     "checkpoint_path": str(path.resolve()),
                     "checkpoint_sha256": live_hash,
                     "checkpoint_bytes": len(raw),
+                    "selected_model_snapshot_bytes": len(_canonical(snap)),
+                    "training_batches_per_epoch": (len(train) + 7) // 8,
                     "model_kind": "torch-stack" if is_torch else "TinyTransformer",
                     "active_model_key": key,
                     "active_mouth": mouth,
