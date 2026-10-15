@@ -25,7 +25,7 @@ function DeliveryScreen(){
  },[]);
  return <ScrollView style={s.root} contentContainerStyle={s.content}>
    <Text style={s.title}>Dragon knowledge and native design</Text>
-   <Text style={s.notice}>Reviewed source evidence and original design planning are available here. Source generation is not enabled until the governed native-delivery route is integrated.</Text>
+   <Text style={s.notice}>Reviewed source evidence and original design planning are available here. Native source delivery requires current independently approved evidence, consented practice lessons and the shared resource runtime. Generated source is not a compiled or released game.</Text>
    {!!error&&<Text accessibilityRole="alert" style={s.warning}>{error}</Text>}
    <DragonDeliveryWorkbench targets={targets}/>
  </ScrollView>;

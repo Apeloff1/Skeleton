@@ -2152,3 +2152,9 @@ def practice_artifact(
             "sha256": sha256(html.encode("utf-8")).hexdigest(),
             "sandbox_required": True,
         }
+
+
+# Compose Dragon delivery with the existing authenticated Academy authorities.
+# Source creation is strictly opt-in; the library and resource ledger remain canonical.
+from core.dragon_delivery_routes import register_delivery_routes as _register_delivery_routes
+_register_delivery_routes(router, _principal, _lab, lambda: time.time())

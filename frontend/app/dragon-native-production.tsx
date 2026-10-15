@@ -409,6 +409,9 @@ function NativeSourceEditor() {
         <TouchableOpacity accessibilityRole="button" onPress={() => router.back()}>
           <Text style={stylesUi.link}>‹ Back to Studio</Text>
         </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/dragon-delivery')}>
+          <Text style={stylesUi.link}>Evidence-backed Dragon delivery →</Text>
+        </TouchableOpacity>
         <Text style={stylesUi.heading}>Dragon Native Homebrew</Text>
         <Text style={stylesUi.copy}>
           Build original game source for actual console and PC toolchains.
