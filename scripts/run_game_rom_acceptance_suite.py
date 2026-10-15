@@ -222,6 +222,48 @@ def _verify_mapper_bus(directory: Path) -> dict[str, Any]:
     }
 
 
+def _verify_interrupt_matrix(directory: Path) -> dict[str, Any]:
+    result, reference = _json_file(directory / "original-interrupt-control.json")
+    _verify_digest(result, "report_digest")
+    expected = [
+        *(f"priority_vector_{number}" for number in range(5)),
+        "ei_one_instruction_delay", "di_cancels_pending_ei",
+        "halt_bug_duplicate_opcode_byte", "halt_wake_immediate_irq",
+        "reti_stack_and_immediate_ime", "stop_frozen_until_joypad_edge",
+    ]
+    cases = result.get("source_scenarios")
+    if (
+        result.get("schema_version") != "skeleton.game.original_lr35902_interrupt_matrix.v1"
+        or result.get("status") != "original_cpu_interrupt_control_replayed"
+        or result.get("source") != "original_synthetic_ROM_real_GameBoyMachine"
+        or result.get("priority_vectors_tested") != [0x40, 0x48, 0x50, 0x58, 0x60]
+        or result.get("actual_independently_replayed_scenarios") != 11
+        or result.get("physical_state_executions") != 22
+        or result.get("cpu_interrupt_hardware_bus_phase_certified") is not False
+        or result.get("production_neural_weights_updated") != 0
+        or not isinstance(cases, list) or len(cases) != 11
+    ):
+        raise AcceptanceSuiteError("real source IRQ control and interrupt matrix is absent or incomplete")
+    for label, case in zip(expected, cases, strict=True):
+        if (
+            not isinstance(case, dict) or case.get("probe") != label
+            or case.get("real_interrupt_replay_passed") is not True
+            or case.get("hardware_bus_cycle_certified") is not False
+            or type(case.get("actual_execution_cycles")) is not int
+            or case["actual_execution_cycles"] < 4
+            or case.get("actual_source_after_sha256") != case.get("replayed_source_after_sha256")
+            or not isinstance(case.get("actual_source_before_sha256"), str)
+            or len(case["actual_source_before_sha256"]) != 64
+        ):
+            raise AcceptanceSuiteError(f"measured interrupt/replay scenario {label} failed source provenance")
+    return {
+        "accepted": True, "real_interrupt_scenarios": 11,
+        "exact_interpreter_interrupt_replays": 22,
+        "hardware_bus_accuracy_certified": False,
+        "receipt_file": reference,
+    }
+
+
 def _verify_alu_reference(directory: Path) -> dict[str, Any]:
     document, reference = _json_file(directory / "original-alu-flags.json")
     _verify_digest(document, "report_digest")
@@ -583,6 +625,16 @@ def run_acceptance_suite(
                 output_directory, "focused_synthetic_and_real_original_rom_regressions",
                 seconds=process_timeout_seconds,
             ))
+        interrupt_path = output_directory / "original-interrupt-control.json"
+        processes.append(_run(
+            [
+                sys.executable, "scripts/audit_original_gameboy_interrupts.py",
+                "--evidence-file", str(interrupt_path),
+            ],
+            output_directory, "original_sm83_interrupt_control",
+            seconds=process_timeout_seconds,
+        ))
+        interrupts = _verify_interrupt_matrix(output_directory)
         alu_path = output_directory / "original-alu-flags.json"
         processes.append(_run(
             [
@@ -664,6 +716,7 @@ def run_acceptance_suite(
             "source_instruction_replay_and_divergence_verified": True,
             "all_legal_source_opcodes_replay_verified": True,
             "independent_cpu_alu_flags_reference_verified": True,
+            "real_interrupt_priority_and_IME_control_replay_verified": True,
             "source_q_rewind_proven": True,
             "neural_candidate_optimized_and_scored": True,
             "source_goal_replay_and_neutral_control_verified": True,
@@ -673,6 +726,7 @@ def run_acceptance_suite(
             "source_cpu_instruction_divergence": instruction,
             "original_cpu_opcode_coverage": opcode_matrix,
             "original_cpu_alu_reference": alu_reference,
+            "original_cpu_interrupt_control": interrupts,
             "bounded_worker_receipts": processes,
             "real_libretro_installed_core_tested": False,
             "independent_game_hardware_accuracy_certified": False,
