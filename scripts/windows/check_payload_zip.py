@@ -19,6 +19,7 @@ import zipfile
 
 MAX_RELATIVE_PATH = 190
 MAX_COMPONENT = 180
+MAX_INSTALL_PATH = 240
 MAX_ENTRIES = 150_000
 MAX_SINGLE_FILE_BYTES = 1024**3
 MAX_UNCOMPRESSED_BYTES = 8 * 1024**3
@@ -37,7 +38,7 @@ def _lengths(value: str) -> tuple[int, int]:
     return (len(value.encode("utf-8", errors="strict")), _utf16_units(value))
 
 
-def filename_errors(name: str) -> list[str]:
+def filename_errors(name: str, install_root: str | None = None) -> list[str]:
     """Validate a ZIP entry's portable, relative destination name."""
     errors: list[str] = []
     if not name:
@@ -57,6 +58,19 @@ def filename_errors(name: str) -> list[str]:
             f"relative path exceeds {MAX_RELATIVE_PATH} units "
             f"({utf8_size} UTF-8 bytes / {utf16_size} UTF-16 units)"
         )
+
+    if install_root:
+        destination = install_root.rstrip("\\/") + "\\" + relative.replace("/", "\\")
+        try:
+            installed_utf8, installed_utf16 = _lengths(destination)
+        except UnicodeError:
+            errors.append("nonportable default installation root")
+        else:
+            if max(installed_utf8, installed_utf16) > MAX_INSTALL_PATH:
+                errors.append(
+                    f"default installed path exceeds {MAX_INSTALL_PATH} units "
+                    f"({installed_utf8} UTF-8 bytes / {installed_utf16} UTF-16 units)"
+                )
 
     for component in relative.split("/"):
         if not component or component in {".", ".."}:
@@ -85,7 +99,9 @@ def filename_errors(name: str) -> list[str]:
     return errors
 
 
-def archive_errors(entries: list[zipfile.ZipInfo]) -> list[str]:
+def archive_errors(
+    entries: list[zipfile.ZipInfo], install_root: str | None = None
+) -> list[str]:
     """Inspect central-directory metadata without extracting any member."""
     errors: list[str] = []
     nodes: dict[tuple[str, ...], tuple[str, str]] = {}
@@ -100,7 +116,7 @@ def archive_errors(entries: list[zipfile.ZipInfo]) -> list[str]:
 
     for entry in entries:
         name = entry.filename
-        problems = filename_errors(name)
+        problems = filename_errors(name, install_root=install_root)
         errors.extend(f"{name!r}: {problem}" for problem in problems)
         if entry.flag_bits & 1:
             errors.append(f"{name!r}: encrypted ZIP entry not supported")
@@ -136,22 +152,23 @@ def archive_errors(entries: list[zipfile.ZipInfo]) -> list[str]:
     return sorted(set(errors))
 
 
-def inspect_zip(path: Path) -> tuple[int, int, list[str]]:
+def inspect_zip(path: Path, install_root: str | None = None) -> tuple[int, int, list[str]]:
     with zipfile.ZipFile(path, mode="r") as archive:
         entries = archive.infolist()
         return (
             len(entries),
             sum(entry.file_size for entry in entries),
-            archive_errors(entries),
+            archive_errors(entries, install_root=install_root),
         )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", type=Path, required=True)
+    parser.add_argument("--install-root", type=str, default=None)
     args = parser.parse_args(argv)
     try:
-        count, total_bytes, errors = inspect_zip(args.archive)
+        count, total_bytes, errors = inspect_zip(args.archive, install_root=args.install_root)
     except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile, ValueError) as exc:
         print(f"Windows payload ZIP preflight failed: {type(exc).__name__}", file=sys.stderr)
         return 2

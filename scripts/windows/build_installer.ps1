@@ -133,7 +133,8 @@ $ArchivePreflight = Join-Path $RepoRoot "scripts\windows\check_payload_zip.py"
 if (-not (Test-Path -LiteralPath $ArchivePreflight -PathType Leaf)) {
     throw "Windows payload ZIP preflight tool is missing"
 }
-& python $ArchivePreflight --archive $ArchivePath
+$DefaultInstallRoot = "C:\Users\" + ("x" * 32) + "\AppData\Local\Programs\Skeleton"
+& python $ArchivePreflight --archive $ArchivePath --install-root $DefaultInstallRoot
 if ($LASTEXITCODE -ne 0) {
     throw "Windows payload ZIP preflight rejected the archived SourceRef"
 }
@@ -196,17 +197,24 @@ if ($MissingPayloadPaths.Count -gt 0) {
 # Keep the installed runtime portable across ordinary Windows user-profile
 # paths. This is checked before compilation so path regressions fail cheaply
 # and with the exact offending relative path.
-$MaxRuntimeRelativePathUnits = 190
+$MaxRuntimeRelativePathChars = 190
+$MaxRuntimeDefaultInstallChars = 240
 $PathBudgetViolations = @(
     Get-ChildItem -LiteralPath $PayloadDir -File -Recurse | ForEach-Object {
         $relative = [IO.Path]::GetRelativePath($PayloadDir, $_.FullName)
         $portable = $relative.Replace("\", "/")
-        $utf8Bytes = [Text.Encoding]::UTF8.GetByteCount($portable)
-        $utf16Units = $portable.Length
-        if ([Math]::Max($utf8Bytes, $utf16Units) -gt $MaxRuntimeRelativePathUnits) {
+        $absolute = Join-Path $DefaultInstallRoot $relative
+        $relativeUtf8Bytes = [Text.Encoding]::UTF8.GetByteCount($portable)
+        $absoluteUtf8Bytes = [Text.Encoding]::UTF8.GetByteCount($absolute)
+        if ($relative.Length -gt $MaxRuntimeRelativePathChars -or
+            $relativeUtf8Bytes -gt $MaxRuntimeRelativePathChars -or
+            $absolute.Length -gt $MaxRuntimeDefaultInstallChars -or
+            $absoluteUtf8Bytes -gt $MaxRuntimeDefaultInstallChars) {
             [PSCustomObject]@{
-                Utf8Bytes = $utf8Bytes
-                Utf16Units = $utf16Units
+                Utf8Bytes = $relativeUtf8Bytes
+                Utf16Units = $relative.Length
+                InstalledUtf8Bytes = $absoluteUtf8Bytes
+                InstalledUtf16Units = $absolute.Length
                 Path = $portable
             }
         }
@@ -215,11 +223,11 @@ $PathBudgetViolations = @(
 if ($PathBudgetViolations.Count -gt 0) {
     Write-Host "Windows runtime payload path budget exceeded:"
     $PathBudgetViolations |
-        Sort-Object Utf8Bytes -Descending |
+        Sort-Object InstalledUtf16Units -Descending |
         Format-Table -AutoSize |
         Out-String |
         Write-Host
-    throw "Runtime payload paths exceed the $MaxRuntimeRelativePathUnits-unit portable budget"
+    throw "Runtime payload exceeds relative ($MaxRuntimeRelativePathChars) or installed ($MaxRuntimeDefaultInstallChars) path budget"
 }
 
 Write-Host "==> Building standalone Skeleton.exe"

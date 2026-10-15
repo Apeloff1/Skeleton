@@ -57,6 +57,14 @@ class PayloadZipPreflightTests(unittest.TestCase):
         self.assertLess(len(name), 190)
         self.assertTrue(any("UTF-16" in issue for issue in filename_errors(name)))
 
+    def test_default_install_destination_ceiling(self) -> None:
+        root = "C:\\Users\\" + "x" * 32 + "\\AppData\\Local\\Programs\\Skeleton"
+        entry = "nested/" + ("n" * 165) + ".py"
+        self.assertEqual(filename_errors(entry), [])
+        self.assertTrue(
+            any("default installed" in error for error in filename_errors(entry, install_root=root))
+        )
+
     def test_case_collisions_in_parent_directory(self) -> None:
         issues = archive_errors([ZipInfo("Assets/a.png"), ZipInfo("assets/b.png")])
         self.assertTrue(any("collision" in issue for issue in issues), issues)
