@@ -313,10 +313,15 @@
     "integrated_control_plane": "skeleton/ai/game_builder/control_plane.py",
     "tests": [
       "tests/test_ai_game_builder_runtime.py",
-      "tests/test_ai_game_builder_overengineering_runtime.py"
+      "tests/test_ai_game_builder_overengineering_runtime.py",
+      "tests/test_dragon_wisdom_integration.py",
+      "tests/test_dragon_visual_play_integration.py"
     ],
     "resilience": "skeleton/ai/game_builder/resilience.py",
-    "gold_master": "skeleton/ai/game_builder/release.py"
+    "gold_master": "skeleton/ai/game_builder/release.py",
+    "dragon_advisory_review": "skeleton/ai/game_builder/dragon_wisdom.py",
+    "story_reference_digest": "skeleton/ai/game_builder/story_digest.py",
+    "homebrew_port_planner": "skeleton/ai/game_builder/dragon_porting.py"
   },
   "overengineering_authority": "machine/ai_game_builder_overengineering.json",
   "governance_runtime": {
@@ -324,5 +329,21 @@
     "rights": "skeleton/ai/game_builder/rights.py",
     "atom_lineage": "skeleton/ai/game_builder/atomizer.py",
     "tests": "tests/test_ai_game_builder_governance.py"
+  },
+  "dragon_boundary": {
+    "role": "advisory knowledge reviewer; never rival, routine panel substitute, or terminal release authority",
+    "square_projection": [
+      "play",
+      "craft",
+      "delivery",
+      "trust"
+    ],
+    "legal_authority": "canonical rights ledger plus artifact/target/jurisdiction-bound current independent review receipts",
+    "visual_play": "skeleton/ai/webcrawler/dragon_visual_play.py",
+    "reference_adapter": "skeleton/ai/webcrawler/dragon_reference_game_adapter.py",
+    "support_claim": "only original reference grid game visually demonstrated; arbitrary engines require trusted adapters and independent verification",
+    "companion_snapshots": "skeleton/ai/game_builder/dragon_review_store.py",
+    "legal_source_change_triage": "skeleton/ai/game_builder/dragon_legal_updates.py",
+    "product_delivery": "backend/routes/dragon_academy.py authenticated status snapshot; frontend/features/Jeeves/companion/useDragonAcademy.ts validates and expires final reviews"
   }
 }

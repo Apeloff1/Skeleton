@@ -523,6 +523,74 @@
         "reconnect",
         "provider-outage"
       ]
+    },
+    {
+      "capability_id": "game.native_delivery",
+      "version": "1.0.0",
+      "owner_plane": "application-api",
+      "enabled": true,
+      "implementation_state": "present_source_delivery_partial_native_release",
+      "risk_class": "medium",
+      "input_modalities": [
+        "text",
+        "structured-design"
+      ],
+      "output_modalities": [
+        "citations",
+        "native-source-archive"
+      ],
+      "required_planes": [
+        "application-api",
+        "identity",
+        "retrieval",
+        "memory",
+        "artifact-files",
+        "cost-capacity",
+        "governance"
+      ],
+      "required_provider_capabilities": [],
+      "tool_policy": {
+        "mode": "none"
+      },
+      "memory_policy": {
+        "mode": "read-only-approved"
+      },
+      "retrieval_policy": {
+        "mode": "required",
+        "grounding_required": true
+      },
+      "verification_level": "evidence",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "dragon-owner-retained-source-generation"
+      },
+      "instruction_policy_ref": "policy://game.native_delivery/default@1",
+      "readiness_requirements": [
+        "authenticated tenant-bound owner",
+        "current signed Wiki and separate Hoag approvals for two independent supporting source groups",
+        "matching consented practice lesson",
+        "supported target/style emitter",
+        "shared resource scheduler and owner retained artifact budget",
+        "durable reviewed knowledge and native practice SQLite stores"
+      ],
+      "degraded_behavior": {
+        "knowledge_unavailable": "browse_or_generation_unavailable",
+        "unapproved_or_stale_sources": "brief_blocked",
+        "resource_pressure": "defer_without_artifact",
+        "compiler_missing": "source_only_no_binary_claim"
+      },
+      "golden_journeys": [
+        "retrieval-grounded",
+        "artifact"
+      ],
+      "implementation_evidence": [
+        "skeleton/ai/game_builder/dragon_delivery.py",
+        "backend/routes/dragon_academy.py",
+        "frontend/features/Jeeves/companion/DragonDeliveryWorkbench.tsx",
+        "tests/test_dragon_delivery.py",
+        "backend/tests/test_dragon_delivery_routes.py"
+      ],
+      "release_boundary": "No network acquisition, review authority, model training, compiler subprocess or distribution authorization is exposed to the browser."
     }
   ],
   "invariants": [

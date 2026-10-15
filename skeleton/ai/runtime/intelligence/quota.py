@@ -11,11 +11,11 @@ this in-memory implementation without changing the reservation contract.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import math
 import threading
 import time
+from dataclasses import dataclass
 from typing import Any
 
 from skeleton.intelligence.admission import UsageEstimate
@@ -130,7 +130,7 @@ class QuotaUsage:
         estimate: UsageEstimate,
         *,
         operations: int = 1,
-    ) -> "QuotaUsage":
+    ) -> QuotaUsage:
         if not isinstance(estimate, UsageEstimate):
             raise QuotaError("estimate must be UsageEstimate")
         return cls(
@@ -143,7 +143,7 @@ class QuotaUsage:
             storage_bytes=estimate.storage_bytes,
         )
 
-    def plus(self, other: "QuotaUsage") -> "QuotaUsage":
+    def plus(self, other: QuotaUsage) -> QuotaUsage:
         return QuotaUsage(
             operations=self.operations + other.operations,
             input_tokens=self.input_tokens + other.input_tokens,
