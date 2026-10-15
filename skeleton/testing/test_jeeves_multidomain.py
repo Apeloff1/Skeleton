@@ -13,7 +13,7 @@ from skeleton.ai.training.jeeves_multidomain import (
 from skeleton.ai.training.jeeves_parallel_mirrors import run_parallel_candidates
 
 
-def _fixture(folder: Path) -> Path:
+def _fixture(folder: Path, *, dual_views: bool = False) -> Path:
     folder.mkdir(parents=True)
     train, held = [], []
     for domain, topic in (("gaming", "world"), ("ai", "evaluation"), ("coding", "testing")):
@@ -35,6 +35,19 @@ def _fixture(folder: Path) -> Path:
                            "rights_basis": "Original material with explicit review"},
             }
             (train if split == "train" else held).append(row)
+        if dual_views:
+            for i in range(9, 15):
+                train.append({
+                    "id": f"{domain}-{i}-counterexample",
+                    "module_id": f"jeeves.{domain}.{topic}.counterexample",
+                    "split": "train",
+                    "source_project_id": "authored-a" if i % 2 else "authored-b",
+                    "prompt": f"Challenge the independent {domain} implementation {i} with a different original counterexample and failure proof.",
+                    "answer": f"Adversarial {domain} case {i} provides a documented violating input, reproducible observations and scoped correction.",
+                    "rights": {"training_permitted": True, "human_reviewed": True,
+                               "source_ref": f"homebrew:{domain}:{i}",
+                               "rights_basis": "Original material with explicit review"},
+                })
     def dump(name, rows):
         raw = b"".join((json.dumps(row, sort_keys=True) + "\n").encode() for row in rows)
         (folder / name).write_bytes(raw)
@@ -94,7 +107,7 @@ def test_cross_split_project_is_rejected(tmp_path):
 
 
 def test_missing_live_attestation_does_not_create_weights(tmp_path, monkeypatch):
-    m = _fixture(tmp_path / "closed")
+    m = _fixture(tmp_path / "closed", dual_views=True)
     output = tmp_path / "candidate"; output.mkdir()
     monkeypatch.delenv("SKELETON_OWN", raising=False)
     with pytest.raises((OSError, ValueError), match="SKELETON_OWN|attestation|checkpoint"):
@@ -112,3 +125,14 @@ def test_optimizer_mirrors_refuse_unreviewed_adversarial_examples(tmp_path):
         load_multidomain_corpus(m, training_view="adversarial")
     with pytest.raises(ValueError, match="unknown optimizer training view"):
         load_multidomain_corpus(m, training_view="unreviewed")
+
+def test_reviewed_mirror_views_use_distinct_specialist_lessons(tmp_path):
+    m = _fixture(tmp_path / "dual", dual_views=True)
+    constructive, held_a, receipt_a = load_multidomain_corpus(m, training_view="constructive")
+    adversarial, held_b, receipt_b = load_multidomain_corpus(m, training_view="adversarial")
+    assert len(constructive) == 18 and len(adversarial) == 18
+    assert not (set(constructive) & set(adversarial))
+    assert held_a == held_b
+    assert receipt_a["manifest_sha256"] == receipt_b["manifest_sha256"]
+    assert receipt_a["training_view"] == "constructive"
+    assert receipt_b["training_view"] == "adversarial"
