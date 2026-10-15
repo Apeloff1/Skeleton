@@ -15,6 +15,7 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 
 from skeleton.jeeves.game_emulator_worker import NativeCore
+from skeleton.jeeves.game_emulator_timing import inspect_rgb_frame
 
 
 def main(argv:list[str])->int:
