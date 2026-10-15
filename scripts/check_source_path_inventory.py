@@ -98,6 +98,7 @@ FIRST_PARTY_PREFIXES = (
     "tests/",
     "docs/",
     "design/",  # first-party authored visual identity, not a canonical runtime root
+    "data/conversational/",  # reviewed, authored training corpus; other data roots remain unclassified
     ".github/",
     ".cursor/",
     "memory/",
