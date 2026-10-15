@@ -20,6 +20,10 @@ from . import advanced_networking_runtime as networking_engine
 from . import advanced_save_system_runtime as save_system_engine
 from . import advanced_animation_runtime as animation_engine
 from . import advanced_audio_runtime as audio_engine
+from . import advanced_ui_hud_runtime as ui_hud_engine
+from . import advanced_accessibility_runtime as accessibility_engine
+from . import advanced_localization_runtime as localization_engine
+from . import advanced_platform_profile_runtime as platform_profile_engine
 
 MODULES = {
     "procedural_world": procedural_world_engine,
@@ -36,6 +40,10 @@ MODULES = {
     "save_system": save_system_engine,
     "animation": animation_engine,
     "audio": audio_engine,
+    "ui_hud": ui_hud_engine,
+    "accessibility": accessibility_engine,
+    "localization": localization_engine,
+    "platform_profile": platform_profile_engine,
 }
 ACTIONS = {name: module.ACTIONS for name, module in MODULES.items()}
 STARTS = {name: module.start for name, module in MODULES.items()}
@@ -56,7 +64,11 @@ ERRORS = (procedural_world_engine.ProceduralWorldActionError,
           networking_engine.NetworkingActionError,
           save_system_engine.SaveSystemActionError,
           animation_engine.AnimationActionError,
-          audio_engine.AudioActionError,)
+          audio_engine.AudioActionError,
+          ui_hud_engine.HudActionError,
+          accessibility_engine.AccessibilityActionError,
+          localization_engine.LocalizationActionError,
+          platform_profile_engine.PlatformProfileActionError,)
 
 __all__ = ["MODULES", "ACTIONS", "STARTS", "STEPS", "DEFAULT_LAYOUTS",
            "NORMALIZE_LAYOUTS", "APPLY_SCENES", "ERRORS"]
