@@ -248,28 +248,44 @@ def _baseline(scene: dict, seed: int, frame_ms: int) -> dict:
 
 
 def _targeted(case: dict, signal: str, generation: int) -> dict:
-    """Produce one minimal, deterministic counterfactual around a found risk."""
+    """Attack or repair one observed failure family in a bounded contrast."""
     fields = {k: v for k, v in case.items() if k not in ("schema_version", "scenario_id")}
+    repair = generation % 2 == 0
     if "visibility" in signal or "occlusion" in signal:
-        fields["weather"] = "fog" if fields["weather"] != "fog" else "storm"
-        fields["attack"] = "low_visibility"
+        fields["weather"] = "clear" if repair else (
+            "fog" if fields["weather"] != "fog" else "storm")
+        fields["attack"] = "none" if repair else "low_visibility"
+        if repair:
+            fields["crowd_pct"] = min(fields["crowd_pct"], 25)
     elif "camera" in signal or "pan" in signal:
-        fields["attack"] = "camera_whip"
-        fields["pan_rate_pct"] = min(160, fields["pan_rate_pct"]+20)
+        fields["attack"] = "none" if repair else "camera_whip"
+        fields["pan_rate_pct"] = 100 if repair else min(160, fields["pan_rate_pct"]+20)
+        if repair:
+            fields["yaw_offset_deg"] = 0
+    elif "item" in signal or "capacity" in signal:
+        fields["attack"] = "none" if repair else "load_spike"
+        fields["item_mass_delta_g"] = -1000 if repair else min(
+            1000, fields["item_mass_delta_g"] + 500)
     elif "apparel" in signal or "mobility" in signal or "wind" in signal:
-        fields["weather"] = "storm"
-        fields["apparel_drag_delta_pct"] = min(30, fields["apparel_drag_delta_pct"] + 10)
+        fields["weather"] = "clear" if repair else "storm"
+        fields["apparel_drag_delta_pct"] = -30 if repair else min(
+            30, fields["apparel_drag_delta_pct"] + 10)
+        if repair:
+            fields["attack"] = "none"
     elif "dialogue" in signal or "intelligibility" in signal:
-        fields["attack"] = "distracting_noise"
+        fields["weather"] = "clear" if repair else "storm"
+        fields["attack"] = "none" if repair else "distracting_noise"
         fields["situation"] = "dialogue"
+    elif "light" in signal or "night" in signal:
+        fields["lighting"] = "day" if repair else "night"
     else:
-        fields["lighting"] = "night" if generation % 2 else "dusk"
-        fields["crowd_pct"] = min(100, fields["crowd_pct"]+25)
+        fields["lighting"] = "day" if repair else "night"
+        fields["crowd_pct"] = max(0, fields["crowd_pct"]-25) if repair else min(
+            100, fields["crowd_pct"]+25)
     return _scenario(fields["situation"], fields["weather"], fields["lighting"],
                      fields["attack"], fields["crowd_pct"], fields["yaw_offset_deg"],
                      fields["pan_rate_pct"], fields["item_mass_delta_g"],
                      fields["apparel_drag_delta_pct"], fields["seed"])
-
 
 def _execute(scene: dict, cases: tuple[dict, ...], frame_ms: int, workers: int):
     _require(len(cases) <= MAX_CASES, "active batch exceeds worker admission")
@@ -302,6 +318,7 @@ def run_campaign(scene: dict, *, budget: int = 24, seed: int = 0,
         -row["risk_severity"], -len(row["risk_counts"]),
         row["scenario"]["scenario_id"]))
     followup = []
+    parent_by_id = {}
     for generation in range(1, 9):
         for result in priority:
             if len(followup) >= budget - initial_count:
@@ -314,10 +331,15 @@ def run_campaign(scene: dict, *, budget: int = 24, seed: int = 0,
             if candidate["scenario_id"] not in seen:
                 seen.add(candidate["scenario_id"])
                 followup.append(candidate)
+                parent_by_id[candidate["scenario_id"]] = {
+                    "parent": result, "target_family":
+                    signals[(generation-1) % len(signals)] if signals else "coverage",
+                    "intervention": "repair" if generation % 2 == 0 else "adversarial",
+                }
         if len(followup) >= budget - initial_count:
             break
     if len(followup) < budget - initial_count:
-        for candidate in draft_scenarios(scene, budget=budget, seed=seed+1):
+        for candidate in draft_scenarios(scene, budget=budget, seed=(seed+1) % (2**31)):
             if candidate["scenario_id"] not in seen:
                 seen.add(candidate["scenario_id"])
                 followup.append(candidate)
@@ -326,6 +348,32 @@ def run_campaign(scene: dict, *, budget: int = 24, seed: int = 0,
     _require(len(followup) == budget-initial_count, "adaptive follow-up coverage exhausted")
     second_results = _execute(scene, tuple(followup), frame_ms, workers)
     rows = first_results + second_results
+    # Provenance-linked contrasts are measured, not inferred from the prompt.
+    contrasts = []
+    for child in second_results:
+        found = parent_by_id.get(child["scenario"]["scenario_id"])
+        if found is None:
+            continue  # pure coverage fallback, not falsely called causal evidence
+        parent = found["parent"]
+        family = found["target_family"]
+        before = parent["risk_counts"].get(family, 0)
+        after = child["risk_counts"].get(family, 0)
+        changed = sorted(k for k in child["scenario"] if k not in (
+            "schema_version", "scenario_id") and
+            child["scenario"][k] != parent["scenario"][k])
+        contrasts.append({
+            "parent_scenario_id": parent["scenario"]["scenario_id"],
+            "child_scenario_id": child["scenario"]["scenario_id"],
+            "intervention": found["intervention"],
+            "target_family": family, "changed_dimensions": changed,
+            "parent_failure_count": before, "child_failure_count": after,
+            "target_failure_delta": after - before,
+            "parent_total_risk": parent["risk_severity"],
+            "child_total_risk": child["risk_severity"],
+            "observed_reduction": after < before,
+            "observed_regression": after > before,
+            "model_training_executed": False,
+        })
     _require(len(rows) == budget and all(row["reverse_audit_passed"] for row in rows),
              "simulation quota or reverse integrity failure")
     covered = set().union(*(_features(row["scenario"]) for row in rows))
@@ -358,6 +406,8 @@ def run_campaign(scene: dict, *, budget: int = 24, seed: int = 0,
         "risk_family_frequency": distribution,
         "coverage_features": sorted(covered),
         "coverage_feature_count": len(covered),
+        "paired_counterfactual_experiments": len(contrasts),
+        "counterfactual_results": contrasts,
         "highest_risk_cases": [row["scenario"]["scenario_id"] for row in sorted(
             rows, key=lambda x: (-x["risk_severity"], x["scenario"]["scenario_id"]))[:8]],
         "baseline": baseline, "cases": rows,
@@ -390,6 +440,25 @@ def verify_campaign(report: dict) -> dict:
              sum(row["frames_executed"] for row in rows)+baseline["frames_executed"],
              "forward/reverse observation-count laundering")
     identities = [row["scenario"]["scenario_id"] for row in rows]
+    index = {row["scenario"]["scenario_id"]: row for row in rows}
+    contrast = report.get("counterfactual_results")
+    _require(type(contrast) is list and
+             len(contrast) == report["paired_counterfactual_experiments"] and
+             len(contrast) <= report["feedback_guided_runs"],
+             "counterfactual count or ledger changed")
+    for pair in contrast:
+        p = index.get(pair.get("parent_scenario_id"))
+        c = index.get(pair.get("child_scenario_id"))
+        family = pair.get("target_family")
+        _require(p is not None and c is not None and
+                 type(family) is str and type(pair.get("changed_dimensions")) is list and
+                 pair["parent_failure_count"] == p["risk_counts"].get(family, 0) and
+                 pair["child_failure_count"] == c["risk_counts"].get(family, 0) and
+                 pair["target_failure_delta"] ==
+                 pair["child_failure_count"] - pair["parent_failure_count"] and
+                 pair["observed_reduction"] == (pair["target_failure_delta"] < 0) and
+                 pair["observed_regression"] == (pair["target_failure_delta"] > 0),
+                 "counterfactual evidence does not match executed cases")
     _require(len(set(identities)) == len(identities) and
              all(validate_scenario(row["scenario"]) for row in rows),
              "duplicate or forged scenario identity")
@@ -410,6 +479,8 @@ def retraining_drafts(report: dict) -> tuple[dict, ...]:
     verify_campaign(report)
     output = []
     seen = set()
+    contrast_index = {pair["child_scenario_id"]: pair
+                      for pair in report["counterfactual_results"]}
     for row in sorted(report["cases"], key=lambda x: (
         -x["risk_severity"], x["scenario"]["scenario_id"])):
         family = sorted(row["risk_counts"],
@@ -435,6 +506,8 @@ def retraining_drafts(report: dict) -> tuple[dict, ...]:
                 "observed_risk_families": family,
                 "first_evidence": row["first_evidence"],
                 "risk_delta_vs_baseline": row["delta_risk_severity_vs_baseline"],
+                "observed_counterfactual": contrast_index.get(
+                    row["scenario"]["scenario_id"]),
                 "baseline_trace_sha256": report["baseline"]["trace_digest"],
                 "candidate_trace_sha256": row["trace_digest"],
                 "operator_rights_review_is_not_independent_legal_clearance": True,
