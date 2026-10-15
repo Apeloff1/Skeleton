@@ -91,7 +91,13 @@ def _palette(editor: str) -> tuple[str, ...]:
                "coast", "tick", "end_turn", "guard", "north", "south",
                "east", "west", "accelerate", "jump", "attack")
     selected = [name for name in favored if name in registered]
-    selected.extend(name for name in registered if name not in selected)
+    seen = set(selected)
+    for name in registered:
+        if name not in seen:
+            seen.add(name)
+            selected.append(name)
+            if len(selected) >= 32:
+                break
     return tuple(selected[:32])
 
 
