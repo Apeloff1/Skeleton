@@ -60,3 +60,21 @@ python3 scripts/install_game_emulator_cores.py --installed-audit --install-root 
 ```
 
 The first command fail-closes on a mismatch between **all 83** pinned source revisions in the installer and the machine contract, invalid source URLs/Makefile/artifact/license paths, duplicate/unknown hardware IDs or unsafe Make variables. The second is strictly local, read-only, and checks actual currently operator-approved ELF SHA-256/ABI and bounded declared firmware inventory. Deferred candidates remain marked deferred; mismatching approved artifacts are separately marked invalid. Neither command executes ROMs, compiles source, promotes weights, accesses licensed SDKs nor certifies gameplay.
+
+## Multi-run replay mirror audit (two through ten native captures)
+
+After explicit operator installation and approval on a qualified host, capture multiple real libretro episodes under **identical** core, firmware, ROM content, seed and action sequence. Capture receipts include distinct 128-bit random nonces to distinguish separate recording calls; nonces do not prove process independence or externally attest source authenticity.
+
+```python
+from skeleton.jeeves.game_emulator_replay_audit import compare_emulator_replays
+
+# env is an approved EmulatorEnvironment bound to lawful game content.
+first = env.capture_training_trace(["idle", "right", "a", "idle"], seed=8)
+second = env.capture_training_trace(["idle", "right", "a", "idle"], seed=8)
+audit = compare_emulator_replays([first, second])
+# Alternative: EmulatorEnvironment.audit_training_replays([first, second])
+```
+
+The audit uses the canonical `skeleton.game.trace.v1` offline validator before comparison. It verifies matching source/firmware/core/content/options and controls, then separately counts divergences in video pixel digests, PCM audio digests, observation/reward values, native callbacks and hash-chain receipts. It reports the first divergent step and a bounded per-run breakdown. The returned status **self_reported_replay_consistent** does not imply a perfect hardware emulator, lawful rights, a correct game result, an independently attested execution or a trained model. Any mismatch remains fail-visible; no automatic candidate or weight promotion.
+
+This mirror audit does not schedule runs, execute cores itself, replay or download ROMs, or bypass the operator's existing libretro sandbox. Native execution, smoke tests and deterministic replay qualification remain to be performed on the real target host.

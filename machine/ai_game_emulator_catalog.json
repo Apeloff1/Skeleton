@@ -528,6 +528,16 @@
       "trace": "Canonical offline native episode exports bind frame/PCM SHA-256 to controls and upstream source lineage.",
       "verified_native_runtime": false,
       "tests_run_in_this_change": false
+    },
+    "replay_mirror": {
+      "module": "skeleton/jeeves/game_emulator_replay_audit.py",
+      "api": "EmulatorEnvironment.audit_training_replays([native_trace_a, native_trace_b, ...])",
+      "repeat_bound": "2..10 native capture receipts per fixed core/content/source/seed/actions",
+      "checks": "Canonical offline ingestion signatures, immutable source/core/firmware/option identifiers, matching input and controller receipt, per-step image/PCM SHA, reward, observation, native callback and transition digests",
+      "first_divergence": "Records the earliest step with a video, audio, reward, observation, callback or transition hash mismatch and per-run category counts",
+      "proof": "Distinct random capture receipts are not independently trusted system attestation. No hardware correctness, training gain, victory, legal ownership or native repeat execution is claimed.",
+      "promotion_authorized": false,
+      "native_execution_performed_in_patch": false
     }
   }
 }

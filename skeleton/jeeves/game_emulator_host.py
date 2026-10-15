@@ -990,6 +990,13 @@ class EmulatorEnvironment:
             self, actions, seed=seed, rights_evidence_digest=rights_evidence_digest
         )
 
+    @staticmethod
+    def audit_training_replays(traces: Sequence[Mapping[str, object]]) -> dict[str, object]:
+        """Score 2–10 native replay receipts; never certify game success or weight promotion."""
+        from .game_emulator_replay_audit import compare_emulator_replays
+
+        return compare_emulator_replays(traces)
+
     def preview(self) -> dict[str, object] | None:
         self._authority()
         if self._pixels is None:
@@ -1311,6 +1318,8 @@ def capture_emulator_trace(
         "source_code_digest": descriptor["source_code_digest"],
         "frames_per_step": environment.frames_per_step,
         "rights_evidence_digest": rights_evidence_digest,
+        "capture_nonce": os.urandom(16).hex(),
+        "capture_process_independently_attested": False,
         "rights_verified": False,
         "hardware_compatibility_verified": False,
         "game_success_verified": False,
