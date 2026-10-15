@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -64,16 +65,19 @@ def _run(
     runner: Runner,
     label: str,
     timeout: float | None = None,
+    env: dict[str, str] | None = None,
 ) -> InstallPhase:
     try:
-        completed = runner(
-            list(command),
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        kwargs = {
+            "cwd": root,
+            "check": False,
+            "capture_output": True,
+            "text": True,
+            "timeout": timeout,
+        }
+        if env is not None:
+            kwargs["env"] = env
+        completed = runner(list(command), **kwargs)
     except (OSError, subprocess.SubprocessError) as exc:
         return InstallPhase(label, False, f"{label} failed: {type(exc).__name__}")
 
@@ -187,18 +191,22 @@ def install_application(
     if not runtime_ok:
         return InstallReceipt(root=root, phases=tuple(phases))
 
+    # Validate precisely the configuration used for startup. The production
+    # frontend uses port 8080, unlike the default development Compose model.
+    mode = "production" if production else "development"
+    compose_env = {**os.environ, **manifest.mode_env(mode)}
     compose_validate = _run(
-        compose_command("config", manifest=manifest),
+        compose_command("config", manifest=manifest, full=full, hot=hot),
         root=root,
         runner=runner,
         label="compose-config",
         timeout=60.0,
+        env=compose_env,
     )
     phases.append(compose_validate)
     if not compose_validate.ok or not start:
         return InstallReceipt(root=root, phases=tuple(phases))
 
-    mode = "production" if production else "development"
     command = compose_command(
         "up",
         manifest=manifest,
@@ -213,7 +221,7 @@ def install_application(
             check=False,
             capture_output=True,
             text=True,
-            env={**__import__("os").environ, **manifest.mode_env(mode)},
+            env=compose_env,
         )
         ok = completed.returncode == 0
         tail_lines = ((completed.stdout or "") + "\n" + (completed.stderr or "")).strip().splitlines()
