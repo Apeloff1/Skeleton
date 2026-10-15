@@ -420,3 +420,83 @@ focused positive/negative regression sources have been committed to the
 draft branch. No actual command or native session has been run from this
 conversation's environment; successful completion and held-out gain require
 real executable receipts.
+
+
+## I. One manual acceptance suite: DMG cartridges, replay, Q, neural and goal
+
+The new `scripts/run_game_rom_acceptance_suite.py` is an **executable
+integrator** rather than another static catalog. The operator can run all
+of the original-game proofs under one private, new output directory:
+
+```bash
+python scripts/run_game_rom_acceptance_suite.py \
+  --output-directory /private/research/rom-ai-suite-001 \
+  --seed 42 --process-timeout-seconds 600
+```
+
+Each source-executed phase retains a bounded create-only
+`phase_*.json` result, including a failing process's exit code or
+timeout and limited stdout/stderr. No final passing
+`suite-acceptance.json` exists if **any** phase fails or any expected
+original-ROM artifact/report SHA256 disagrees.
+
+The suite gates these independent actual-operation sources:
+
+1. Focused synthetic and original ROM regression modules (unless explicitly
+   skipped with `--without-tests`; skipping never skips the actual bus/Q/
+   neural/goal measurements).
+2. `scripts/audit_original_gameboy_mapper_matrix.py` executes **five
+   synthetic cartridge bus profiles** on the actual built-in ROM interpreter,
+   proving bank address decode, SRAM controls, and CPU/memory/raster snapshot
+   restore for ROM-only, MBC1, MBC2, RTC-free MBC3 and non-rumble MBC5.
+3. `scripts/accept_original_rom_ai_pipeline.py` generates an entirely
+   original ROM and measures source-replayed Q-learning and a separate
+   CPU-trained neural world-model candidate with independently grouped
+   heldout prediction error.
+4. `skeleton.jeeves.game_original_rom_goal_training` executes the
+   original generated maze, measures source-declared score/completion RAM,
+   reverse-replays every action, checks a same-length idle baseline, and
+   commits a bounded source-goal Q policy.
+5. Read back the **actual privately written artifacts**, validate per-file
+   SHA256 and source/weight/report links, compare true update counts and
+   independently distinguish an accepted original-game goal from
+   a hardware-accuracy, libretro, or production-model claim.
+
+The new `.github/workflows/on-demand-rom-ai-acceptance.yml` exposes the
+same path for an intentionally **manual-only** GitHub Actions dispatch,
+after the workflow is present on the repository default branch. It has
+`workflow_dispatch` only, read-only contents permissions, serialized
+source-ref concurrency, an exact 35-minute job budget and a short-lived
+receipt artifact containing both success and failure diagnostics.
+**No push, pull-request, schedule, or merge trigger** is added; this does
+not increase normal merge queue traffic. The optional workflow will not
+run merely because this draft PR exists, and has not been dispatched.
+
+### MBC2 is genuine new cartridge interpreter behavior
+
+Unlike catalog declarations, the bounded built-in interpreter now
+implements cartridge hardware types `0x05` and `0x06`:
+
+- Up to 16 ROM banks (256 KiB), with zero selecting ROM bank one.
+- 512 bytes of internal **four-bit** save RAM, not a fictitious 8 KiB
+  external SRAM bank. Reads expose a high nibble of `0xF`; writes retain
+  only the low four data bits.
+- Correct address-bit A8 qualification: RAM-enable writes at A8=0 in
+  `0000–1FFF`, bank-select writes at A8=1 in `2000–3FFF`.
+- Internal RAM addresses mirror across `A000–BFFF`, and disallowed
+  high-nibble state payloads or invalid MBC2 RAM geometry are refused.
+- Source-owned synthetic ROM regressions check A8 gate/no-op behavior,
+  mirroring, SRAM disable, bank selection and exact savestate rollback.
+
+The MBC2 work does **not** implement DMG boot ROM, APU audio, color-only
+titles, cartridge real-time clocks, camera/motion sensors, cycle-perfect
+PPU/timer behavior or arbitrary game compatibility. Source code and
+synthetic specifications still require an actual acceptance run before
+calling this hardware profile operational.
+
+**Current proof limitation:** the workspace executing this chat cannot
+resolve GitHub for a local clone. The source changes, test code and the
+manual-only workflow are committed on PR #3935, but the suite, source
+mapper matrix, native emulator builds and neural optimizer have not been
+executed here. A source-authored receipt must precede any statement that
+these gates pass.
