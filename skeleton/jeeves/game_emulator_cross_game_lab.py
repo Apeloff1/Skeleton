@@ -149,6 +149,7 @@ def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str,
     if _digest(start) != digest_before:
         raise CrossGameComparisonError("same-core restore changed exact pre-intervention source state")
     previous_frame = _frame(environment)
+    previous_observation = dict(before)
     transitions, visual_changes, initial_frame = [], 0, previous_frame
     for sequence, action in enumerate(program):
         step = environment.step(action)
@@ -167,17 +168,33 @@ def _run_program(environment: Any, start: Mapping[str, Any], program: tuple[str,
         # Source Game Boy ROM steps do not declare transition_digest;
         # create an explicitly LOCAL projection hash of measured data,
         # never falsely label it as an engine-declared native receipt.
+        next_observation = dict(step.observation)
+        for measured in (previous_observation, next_observation, reward):
+            if (
+                not 1 <= len(measured) <= 64
+                or any(
+                    type(k) is not str or not 1 <= len(k) <= 128
+                    or type(v) not in (int, float) or not math.isfinite(float(v))
+                    for k, v in measured.items()
+                )
+            ):
+                raise CrossGameComparisonError("native game numeric observation/reward is not finite or bounded")
         projected = {
             "ordinal": sequence,
             "action": action,
+            "source_observation": previous_observation,
+            "source_next_observation": next_observation,
+            "source_reward_components": reward,
+            "source_visual_change_observed": frame != previous_frame,
             "actual_frame_sha256": frame,
-            "source_observation_sha256": _digest(dict(step.observation)),
+            "source_observation_sha256": _digest(next_observation),
             "source_reward_components_sha256": _digest(reward),
             "actual_machine_state_sha256": actual_state_digest,
             "declared_native_transition_sha256": declared_digest or None,
             "terminated": step.terminated,
             "truncated": step.truncated,
         }
+        previous_observation = next_observation
         transitions.append({
             **projected,
             "measured_source_projection_sha256": _digest(projected),
