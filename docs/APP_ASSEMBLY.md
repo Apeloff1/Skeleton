@@ -595,3 +595,50 @@ independent training examples, SGD updates or proven new model capabilities.**
 The Windows GUI has a **Boomerang Sim Queue** control for explicit creation
 and one-pass advancement. Neither the GUI nor CLI automatically modifies
 Jeeves's serving weights.
+
+### Randomized boomerang reshuffle after pass three
+
+Previously completed three-pass boomerang queues can now be migrated into a
+**versioned, audit-preserving randomized-return queue**, without losing a
+single earlier observation or rerunning an original simulation:
+
+```bash
+python -m skeleton app boomerang-queue --reshuffle \
+  --queue boomerang-2.json --output boomerang-scheduled.json \
+  --shuffle-seed 1234 --min-return-seconds 3600 \
+  --max-return-seconds 86400 --max-return-visits 16 --plateau-limit 10
+
+python -m skeleton app boomerang-queue --inspect \
+  --queue boomerang-scheduled.json
+
+# One manual scheduler tick; only work due at the current UTC time runs.
+python -m skeleton app boomerang-queue --advance \
+  --queue boomerang-scheduled.json --output boomerang-next.json \
+  --max-entries 2 --probes 8 --workers 2
+
+# Optional continuously running local foreground scheduler.
+python -m skeleton app boomerang-queue --watch \
+  --queue boomerang-scheduled.json --output-directory ./boomerang-archive \
+  --max-watch-runs 16 --poll-seconds 60 --probes 8 --workers 2
+```
+
+The scheduler uses a deterministic SHA-256-seeded pseudorandom draw within
+the operator's actual wall-clock min/max interval. That makes the interval
+randomized yet independently recomputable from pinned evidence, seed, pass
+digest, return index and schedule time. Due historical simulations are
+reshuffled alongside fresh second-/third-pass work, with aging so due older
+work is not starved. Both the source and original full campaign remain pinned.
+
+Every after-third-pass revisit executes **new effective controls** only,
+preserves the old pass history and records independently audited forward and
+reverse observations. It measures new **failure contexts** across situation,
+weather, lighting and attack, deliberately *not* counting seed-only or
+micro-camera adjustments as new discoveries. A consecutive no-new-context
+plateau retires the source (default 10 returns), as does the hard 16-return
+cap. Both limits and the interval range are operator-configurable.
+
+The optional `--watch` executor runs only as an explicit, live local
+process. It waits for actual UTC due times, writes every queue generation to
+a new immutable filename, and stops on retirement or the configured cycle
+cap. It is not an always-on service unless the operator runs it as one.
+No autonomous checkpoint training or live-model promotion is performed.

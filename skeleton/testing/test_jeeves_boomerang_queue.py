@@ -272,3 +272,13 @@ def test_cli_reshuffle_existing_completed_snapshot_and_inspect_due(tmp_path):
     assert main(["--advance", "--queue", str(new_file),
                  "--output", str(tmp_path / "blocked.json"),
                  "--now-epoch", "1800000001"]) == 2
+
+
+def test_reshuffled_queue_watch_refuses_unconfigured_source(tmp_path):
+    from skeleton.ai.training.jeeves_boomerang_queue import watch_due_returns
+    source, archive, _ = archived(tmp_path)
+    original = create_queue(source, archive)
+    path = tmp_path / "legacy-queue.json"
+    path.write_text(json.dumps(original), encoding="utf-8")
+    with pytest.raises(CinematicSimError, match="enabled randomized-return"):
+        watch_due_returns(path, tmp_path, max_runs=1)

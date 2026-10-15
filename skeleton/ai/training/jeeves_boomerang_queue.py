@@ -725,6 +725,59 @@ def retraining_review_drafts(queue: dict) -> tuple[dict, ...]:
     return tuple(cases)
 
 
+def watch_due_returns(queue_file: Path, output_directory: Path, *,
+                      max_runs: int = 16, poll_seconds: int = 60,
+                      probes: int = 8, workers: int = 1,
+                      max_entries: int = 1) -> dict:
+    """Foreground executor: sleep until due and publish immutable next snapshots.
+
+    The OS/application must keep this explicit process running. This code
+    neither runs in ChatGPT's background nor silently alters live model weights.
+    """
+    _bounded_int(max_runs, 1, 1000, "scheduler cycle limit")
+    _bounded_int(poll_seconds, 10, 3600, "scheduler poll seconds")
+    _require(isinstance(output_directory, Path) and
+             output_directory.is_dir() and not output_directory.is_symlink(),
+             "existing non-symlink output directory required")
+    snapshot = _checked_file(queue_file, MAX_QUEUE_BYTES)
+    verify_queue(snapshot, verify_sources=True)
+    _require(snapshot["schema_version"] == RESHUFFLE_SCHEMA,
+             "--watch requires a previously enabled randomized-return queue")
+    completed = 0
+    while completed < max_runs:
+        info = verify_queue(snapshot)
+        if (info["pending_second_pass"] == 0 and
+                info["pending_third_pass"] == 0 and
+                info["scheduled_returns"] == 0):
+            break
+        now = _clock(None)
+        if not _due_work(snapshot, now):
+            next_due = info["next_return_epoch"]
+            # Delayed work is genuine wall-clock work, never busy spin.
+            pause = poll_seconds if next_due is None else min(
+                poll_seconds, max(1, next_due - now))
+            time.sleep(pause)
+            continue
+        updated = advance_queue(snapshot, max_entries=max_entries,
+                                probes=probes, workers=workers,
+                                now_epoch=now)
+        target = output_directory / (
+            f"boomerang-{updated['generation']:06}-"
+            f"{updated['queue_sha256'][:16]}.json")
+        _write_new(target, updated)  # new, atomic, no overwrite
+        snapshot = updated
+        completed += 1
+        print(json.dumps({"watch_cycle": completed,
+                          "queue_snapshot": str(target),
+                          "next_return_epoch": verify_queue(snapshot)["next_return_epoch"],
+                          "optimizer_updates": 0}, sort_keys=True), flush=True)
+    return {"status": "foreground_scheduler_exited",
+            "cycles_executed": completed,
+            "queue_sha256": snapshot["queue_sha256"],
+            "pending_due_returns": verify_queue(snapshot)["scheduled_returns"],
+            "model_weights_modified": False}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group(required=True)
@@ -733,11 +786,17 @@ def main(argv: list[str] | None = None) -> int:
     modes.add_argument("--advance", action="store_true")
     modes.add_argument("--reshuffle", action="store_true",
                        help="activate reproducible randomized returns on an existing queue")
+    modes.add_argument("--watch", action="store_true",
+                       help="foreground due-ticket executor writing immutable queue generations")
     modes.add_argument("--inspect", action="store_true")
     parser.add_argument("--queue", type=Path, help="existing immutable queue snapshot")
     parser.add_argument("--scene", type=Path, help="original rights-reviewed scene")
     parser.add_argument("--archive", type=Path, help="existing verified adaptive campaign")
     parser.add_argument("--output", type=Path, help="new immutable queue generation")
+    parser.add_argument("--output-directory", type=Path,
+                        help="existing directory for --watch generations")
+    parser.add_argument("--max-watch-runs", type=int, default=16)
+    parser.add_argument("--poll-seconds", type=int, default=60)
     parser.add_argument("--draft-output", type=Path, help="new quarantined review JSONL")
     parser.add_argument("--max-entries", type=int, default=1)
     parser.add_argument("--probes", type=int, default=8)
@@ -752,6 +811,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--plateau-limit", type=int, default=10)
     args = parser.parse_args(argv)
     try:
+        if args.watch:
+            _require(args.queue is not None and args.output is None and
+                     args.output_directory is not None and
+                     args.scene is None and args.archive is None and
+                     args.draft_output is None and args.now_epoch is None,
+                     "--watch requires pinned queue and existing output directory")
+            receipt = watch_due_returns(
+                args.queue, args.output_directory,
+                max_runs=args.max_watch_runs, poll_seconds=args.poll_seconds,
+                probes=args.probes, workers=args.workers,
+                max_entries=args.max_entries)
+            print(json.dumps(receipt, sort_keys=True))
+            return 0
         if args.create:
             _require(args.scene is not None and args.archive is not None
                      and args.queue is None and args.output is not None,
