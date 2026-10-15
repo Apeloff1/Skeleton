@@ -31,6 +31,7 @@ class EmulatorNeuralError(ValueError):
 @dataclass(frozen=True)
 class NeuralWorldConfig:
     seed: int = 0
+    holdout_seed: int | None = None
     width: int = 20
     epochs: int = 8
     minibatch: int = 16
@@ -53,6 +54,10 @@ class NeuralWorldConfig:
             item = getattr(self, key)
             if type(item) is not int or not minimum <= item <= maximum:
                 raise EmulatorNeuralError(f"{key} outside bounded neural training capacity")
+        if self.holdout_seed is not None and (
+            type(self.holdout_seed) is not int or not 0 <= self.holdout_seed <= 2**63 - 1
+        ):
+            raise EmulatorNeuralError("independent heldout partition seed exceeds bounds")
         for key, minimum, maximum in (
             ("learning_rate", 0.00001, 0.05),
             ("weight_decay", 0.0, 0.1),
@@ -213,8 +218,9 @@ def verify_neural_training_sources(
 def _split(
     samples: list[dict[str, Any]], config: NeuralWorldConfig,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    partition_seed = config.seed if config.holdout_seed is None else config.holdout_seed
     trace_ids = sorted({sample["trace_digest"] for sample in samples},
-                       key=lambda trace: _digest(["holdout", config.seed, trace]))
+                       key=lambda trace: _digest(["holdout", partition_seed, trace]))
     if len(trace_ids) < 3:
         raise EmulatorNeuralError("at least three independently measured episode groups required")
     holdout_count = max(1, len(trace_ids) // 4)
@@ -225,13 +231,14 @@ def _split(
     # heldout data or leak heldout scaling parameters into the candidate.
     if len(training) > config.max_samples:
         grouped = sorted(training, key=lambda sample: _digest([
-            "training_subsample", config.seed, sample["trace_digest"], sample["sequence"]
+            "training_subsample", partition_seed, sample["trace_digest"], sample["sequence"]
         ]))
         training = grouped[:config.max_samples]
     if not training or not validation or len(training) < 16:
         raise EmulatorNeuralError("episode-isolated train/evaluation dataset is insufficient")
     return training, validation, {
         "partition_method": "sha256_seeded_episode_group_isolation",
+        "partition_seed": partition_seed,
         "source_trace_groups": len(trace_ids),
         "train_trace_groups": len({item["trace_digest"] for item in training}),
         "heldout_trace_groups": len(holdout),
@@ -496,6 +503,9 @@ def train_neural_world_from_evidence(
         "source_evidence_digest": source_digest,
         "source_policy_snapshot_digest": policy["snapshot_digest"],
         "source_environment_digest": evidence["environment"]["environment_digest"],
+        "source_partition_digest": _digest(partition),
+        "source_partition_train_digest": partition["train_digest"],
+        "source_partition_holdout_digest": partition["heldout_digest"],
         "observation_features": list(features),
         "actions": list(actions),
         "input_dimensions": n_input,
@@ -534,6 +544,7 @@ def train_neural_world_from_evidence(
             "weight_decay": config.weight_decay,
             "gradient_clip_global_norm": config.clip_gradient,
             "seed": config.seed,
+            "independent_holdout_partition_seed": partition["partition_seed"],
             "actual_preflight_compute_units": expected_compute_units,
             "maximum_approved_compute_units": config.max_compute_units,
         },
