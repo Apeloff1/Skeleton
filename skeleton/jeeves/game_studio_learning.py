@@ -119,6 +119,8 @@ def _implementation() -> str:
         "game_console_assets.py",
         "game_emulator_host.py",
         "game_studio_review.py",
+        "game_studio_environment.py",
+        "game_studio_rule_curriculum.py",
     )
     return digest(
         {
@@ -692,6 +694,29 @@ class StudioLearningCampaign:
                 arms.append({"id": "map.terrain_path", "family": "layout", "kind": "terrain_path"})
             if spec.get("fidelity", {"profile": "pixel"})["profile"] != "cinematic":
                 arms.append({"id": "fidelity.profile", "family": "fidelity", "kind": "fidelity"})
+        elif request.kind == "studio":
+            from .game_studio_environment import parse_studio_source
+            from skeleton.ai.game_builder.system_editors import editor_spec
+
+            source = parse_studio_source(json.loads(request.tree["game/studio/session.json"]))
+            for field in editor_spec(source["editor"])["fields"]:
+                key = field["key"]
+                if key == "homebrew_only" or field["kind"] not in ("int", "bool", "enum"):
+                    continue
+                if field["kind"] == "int" and field["minimum"] == field["maximum"]:
+                    continue
+                if field["kind"] == "enum" and len(field["options"]) < 2:
+                    continue
+                arms.append({
+                    "id": "studio." + key,
+                    "family": "mechanics",
+                    "kind": "studio_rule_setting",
+                    "key": key,
+                    "field_kind": field["kind"],
+                    "minimum": field["minimum"],
+                    "maximum": field["maximum"],
+                    "options": field["options"],
+                })
         elif request.kind == "console_editor":
             from .game_console_editor import ConsoleProject
 
@@ -897,6 +922,61 @@ class StudioLearningCampaign:
                     if row["kind"] == "enemy":
                         change(row["properties"], "health", "entities." + row["id"] + ".health", 1, 100, True)
             tree = ConsoleProject(document, tree).export_files()
+        elif request.kind == "studio":
+            from .game_studio_environment import (
+                parse_studio_source, studio_request_tree,
+            )
+            from .game_studio_rule_curriculum import (
+                PROPOSAL_SCHEMA, RuleCurriculumError, apply_rule_proposal, _sha,
+            )
+
+            source = parse_studio_source(json.loads(tree["game/studio/session.json"]))
+            key = arm["key"]
+            old = source["settings"][key]
+            if arm["field_kind"] == "int":
+                minimum, maximum = arm["minimum"], arm["maximum"]
+                increment = max(1, round(max(1, abs(old)) * 0.08))
+                new = max(minimum, min(maximum, old + direction * increment))
+                if new == old:
+                    new = max(minimum, min(maximum, old - direction * increment))
+                operation = {"scope":"settings", "path":key, "op":"set", "value":new}
+            elif arm["field_kind"] == "bool":
+                new = not old
+                operation = {"scope":"settings", "path":key, "op":"toggle", "value":None}
+            else:
+                choices = arm["options"]
+                new = choices[(choices.index(old) + direction) % len(choices)]
+                operation = {"scope":"settings", "path":key, "op":"set", "value":new}
+            proposal = {
+                "schema_version": PROPOSAL_SCHEMA,
+                "proposal_id": "campaign-" + str(index).zfill(6),
+                "base_digest": _sha(source),
+                "reason": "Explore a distinct original-game mechanic under verified replay.",
+                "scene_seed": None if source["scene"] is None else source["scene"]["seed"],
+                "operations": [operation],
+            }
+            try:
+                changed = apply_rule_proposal(source, proposal)
+            except RuleCurriculumError as exc:
+                facts.update(
+                    supported=False,
+                    proposal_rejected=True,
+                    strategy="studio_rule_violates_canonical_bounds",
+                    validation_error=str(exc)[:256],
+                )
+                return request, facts
+            tree = studio_request_tree(changed)
+            changes.append({
+                "path":"game/studio/session.json/settings/" + key,
+                "before":old,"after":new,
+                "source_before_digest":_sha(source),
+                "source_after_digest":_sha(changed),
+                "rule_proposal_digest":_sha(proposal),
+                "source_rule_validated":True,
+            })
+            facts["strategy"]="bandit_selected_source_verified_game_rule"
+            facts["model_weights_modified"]=False
+            facts["runtime_engine_changed"]=False
         raw = request.as_dict()
         raw["tree"] = tree
         request = GameEnvironmentRequest.from_dict(raw)
