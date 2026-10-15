@@ -273,6 +273,13 @@ class LiveComparison:
             if last["status"]=="native_execution_failed":
                 break
             receipts.append(last["receipt"])
+            if last["status"]=="episode_complete":
+                # The native core reached the episode boundary. Never send a
+                # second step to an inactive environment or relabel success as
+                # worker failure. An early terminal frame still needs a preview.
+                if last.get("native_preview") is None:
+                    last["native_preview"]=_preview(lane.env)
+                break
         return {
             "game_id":lane.game["id"],
             "status":last["status"] if last is not None else lane.status,
@@ -286,7 +293,32 @@ class LiveComparison:
             ),
             "error_class":last.get("error_class") if last is not None else None,
             "complete":len(receipts)==repeat,
+            "stopped_on_episode_boundary":(
+                last is not None and last["status"]=="episode_complete"
+            ),
         }
+
+    @staticmethod
+    def _device_controls_match(device: str, value: Mapping[str, Any]) -> bool:
+        """Never translate one peripheral's payload into another device's ABI."""
+        buttons=bool(value["buttons"])
+        axes=any(value["axes"])
+        keys=bool(value["keys"])
+        mouse=any(value["mouse"])
+        pointer=any(value["pointer"])
+        if device=="none":
+            return not (buttons or axes or keys or mouse or pointer)
+        if device=="joypad":
+            return not (axes or keys or mouse or pointer)
+        if device=="analog":
+            return not (keys or mouse or pointer)
+        if device=="keyboard":
+            return not (buttons or axes or mouse or pointer)
+        if device=="mouse":
+            return not (buttons or axes or keys or pointer)
+        if device=="pointer":
+            return not (buttons or axes or keys or mouse)
+        return False
 
     def step(self, raw: object) -> dict[str, Any]:
         with self._lock:
@@ -314,15 +346,14 @@ class LiveComparison:
                 controls = _controls(row["controls"])
                 if len(controls) > len(lane.game["controller_devices"]):
                     raise LiveComparisonError("Controller vector exceeds selected native topology")
-                # A device marked 'none' has no input, even if a caller submits
-                # a nonzero vector for that disconnected port.
+                # Reject malformed cross-device payloads before launching ANY
+                # core in the requested multi-game batch.
                 for i,control in enumerate(controls):
-                    if lane.game["controller_devices"][i]=="none" and (
-                        control["buttons"] or any(control["axes"])
-                        or control["keys"] or any(control["mouse"])
-                        or any(control["pointer"])
-                    ):
-                        raise LiveComparisonError("Disconnected native controller port rejects nonzero input")
+                    device=lane.game["controller_devices"][i]
+                    if not self._device_controls_match(device,control):
+                        raise LiveComparisonError(
+                            "Native input is incompatible with declared "+device+" device on port "+str(i)
+                        )
                 prepared.append((lane,controls,repeat))
                 seen.add(identity)
             # First validate ALL lanes, then execute at most 10 actual cores.
@@ -391,6 +422,7 @@ class LiveComparison:
                         "core_id":lane.game["core_id"],
                         "target_id":lane.game["target_id"],
                         "source_media_sha256":lane.content_digest,
+                        "core_sha256":lane.env.core.library_sha256,
                         "native_environment_sha256":lane.env.spec.environment_digest,
                         "seed":lane.game["seed"],
                         "initial_chain_sha256":lane.first_chain,

@@ -864,6 +864,14 @@
       "report": "Each game's admitted source/core state, legacy physical controller layout uncertainty and exact source rights receipt presence; per-cohort available TMPDIR and whether all selected lanes fit concurrently",
       "denied_claims": "No ROM run, BIOS download, network content acquisition, physical controller accuracy certificate, independent rights verification, AI model learning or actual gameplay success",
       "tests": "tests/test_game_comparison_readiness.py added synthetic tests for file hash tampering, missing cores, low disk and successful source admission"
+    },
+    "live_failure_and_input_hardening": {
+      "source": "skeleton/jeeves/game_comparison_live.py",
+      "terminal_burst": "Short-circuits an actual native burst immediately when episode_complete occurs; retains the final image and accurate number of steps, with no post-terminal worker calls",
+      "port_semantics": "Enforces raw joypad/analog/keyboard/mouse/pointer/none payload compatibility against each declared port before executing any lane",
+      "replay_integrity": "Exports exact native core binary SHA-256 per game and checks it against every native step receipt, rejecting mismatched core identity",
+      "source_only_regressions": "tests/test_game_comparison_live.py adds early-episode terminal, atomic cross-device rejection and altered core identity checks",
+      "native_qualified": false
     }
   }
 }

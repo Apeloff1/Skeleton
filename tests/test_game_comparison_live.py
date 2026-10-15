@@ -155,6 +155,50 @@ class NativeLiveComparisonContracts(unittest.TestCase):
             session.step({"steps":[{"game_id":"first","controls":[controls],"repeat":9}]})
         self.assertEqual(session.export_evidence()["lanes"]["first"]["step_count"],0)
 
+    def test_terminal_game_does_not_overrun_burst(self):
+        session=self._session()
+        env=self.running[0]
+        base=env.input_step
+        def terminal_step(controls):
+            result=base(controls)
+            env.done=env._n>=2
+            return result
+        env.input_step=terminal_step
+        controls={"buttons":0,"axes":[0,0,0,0],"keys":[],
+                  "mouse":[0]*6,"pointer":[0]*3}
+        result=session.step({"steps":[
+            {"game_id":"first","controls":[controls],"repeat":8},
+        ]})
+        row=result["results"][0]
+        self.assertEqual(row["completed_native_steps"],2)
+        self.assertTrue(row["stopped_on_episode_boundary"])
+        self.assertEqual(row["status"],"episode_complete")
+        self.assertIsNotNone(row["native_preview"])
+        self.assertEqual(verify_live_evidence(session.export_evidence())[
+            "total_real_reported_native_steps"],2)
+
+    def test_cross_device_input_is_rejected_atomically(self):
+        session=self._session()
+        keyboard_only={"buttons":0,"axes":[0,0,0,0],"keys":[13],
+                       "mouse":[0]*6,"pointer":[0]*3}
+        with self.assertRaises(LiveComparisonError):
+            session.step({"steps":[
+                {"game_id":"first","controls":[keyboard_only]},
+                {"game_id":"second","controls":[keyboard_only]},
+            ]})
+        self.assertEqual(sum(x["step_count"] for x in session.export_evidence()[
+            "lanes"].values()),0)
+
+    def test_core_replacement_invalidates_export_verification(self):
+        session=self._session()
+        controls={"buttons":0,"axes":[0,0,0,0],"keys":[],
+                  "mouse":[0]*6,"pointer":[0]*3}
+        session.step({"steps":[{"game_id":"first","controls":[controls]}]})
+        exported=session.export_evidence()
+        exported["lanes"]["first"]["core_sha256"]="0"*64
+        with self.assertRaises(LiveEvidenceError):
+            verify_live_evidence(exported)
+
     def test_bad_port_fails_before_any_native_step(self):
         session=self._session()
         initial=session.export_evidence()

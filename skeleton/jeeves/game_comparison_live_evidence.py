@@ -32,6 +32,10 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         if type(game_id) is not str or not isinstance(lane,dict) or lane.get("game_id")!=game_id:
             raise LiveEvidenceError("Native evidence source game IDs differ")
         source=lane.get("source_media_sha256")
+        core_sha=lane.get("core_sha256")
+        if (type(core_sha) is not str or len(core_sha)!=64
+            or any(ch not in "0123456789abcdef" for ch in core_sha)):
+            raise LiveEvidenceError("Native core binary SHA-256 is absent or invalid")
         if type(source) is not str or len(source)!=64:
             raise LiveEvidenceError("Original game media hash is not recorded")
         initial=lane.get("initial_chain_sha256")
@@ -69,7 +73,8 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
                     or payload.get("index")!=steps+1
                     or payload.get("episode_step")!=episode_step+1
                     or payload.get("reset_generation")!=reset_generation
-                    or payload.get("source_content_sha256")!=source):
+                    or payload.get("source_content_sha256")!=source
+                    or payload.get("core_sha256")!=core_sha):
                     raise LiveEvidenceError("Actual native episode step index or source was modified")
                 controls=payload.get("controller_ports")
                 if not isinstance(controls,list) or not 1<=len(controls)<=4:
@@ -104,7 +109,7 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
             raise LiveEvidenceError("Final native evidence count/root differs from committed events")
         rows.append({
             "game_id":game_id,"core_id":lane["core_id"],
-            "target_id":lane["target_id"],
+            "core_sha256":core_sha,"target_id":lane["target_id"],
             "native_events_verified":len(events),
             "native_input_steps_verified":steps,
             "native_resets_verified":reset_generation,
