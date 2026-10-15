@@ -42,6 +42,7 @@ TEST_MODULES = (
     "skeleton.testing.test_game_emulator_first_boot_audit",
     "skeleton.testing.test_game_emulator_disc_first_boot",
     "skeleton.testing.test_game_emulator_cross_game_lab",
+    "skeleton.testing.test_game_emulator_cross_game_operator",
     "skeleton.testing.test_game_original_rom_ai_acceptance",
     "skeleton.testing.test_game_original_rom_goal_training",
     "skeleton.testing.test_game_rom_acceptance_suite",
