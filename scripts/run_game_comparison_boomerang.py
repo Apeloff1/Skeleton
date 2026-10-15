@@ -57,7 +57,9 @@ def main(argv:list[str]|None=None)->int:
     parser.add_argument("--rights-acknowledged",action="store_true",
                         help="Required for actual execution; must possess lawful local game media")
     parser.add_argument("--approve-native-runs",type=int,default=0,
-                        help="Explicit positive per-run authorization cap, >= planned execution count")
+                        help="Explicit native-worker authorization cap for NEW work in this invocation")
+    parser.add_argument("--max-new-treatments",type=int,default=0,
+                        help="New treatment count in this invocation, 0 means all remaining; does not redo saved verified work")
     args=parser.parse_args(argv)
     try:
         if (args.manifest.is_symlink() or args.output_dir.is_symlink()
@@ -94,13 +96,51 @@ def main(argv:list[str]|None=None)->int:
                 "model_weights_changed":False,
             },indent=2))
             return 0
-        estimate=plan["estimated_fresh_native_worker_runs"]
+        schedule=plan["schedule"]
+        if (type(args.max_new_treatments) is not int or
+            not 0<=args.max_new_treatments<=len(schedule)):
+            raise ValueError("New native treatment ceiling must be an exact integer within the plan")
+        # First verify all existing trials, in order, without starting ANY new
+        # emulator; refusing gaps prevents ambiguous partial resumption.
+        results=[]
+        saw_missing=False
+        for task in schedule:
+            dest=folder/("native_trial_"+str(task["slot"]).zfill(3)+".json")
+            if dest.is_symlink():
+                raise ValueError("Saved native trial cannot be a symlink")
+            if dest.exists():
+                if saw_missing:
+                    raise ValueError("Saved boomerang trials contain a missing interior checkpoint")
+                saved=_read_json_file(dest,MAX_REPORT)
+                make_boomerang_progress(plan,[*results,saved])
+                results.append(saved)
+            else:
+                saw_missing=True
+        completed=len(results)
+        progress=make_boomerang_progress(plan,results)
+        remaining=len(schedule)-completed
+        new_count=min(
+            remaining,
+            args.max_new_treatments if args.max_new_treatments else remaining,
+        )
+        scheduled_new=schedule[completed:completed+new_count]
+        new_worker_budget=sum(t["fresh_native_worker_runs"] for t in scheduled_new)
+        if new_count==0:
+            print(json.dumps({
+                "status":"all_bounded_native_boomerang_experiments_completed",
+                "study_id":plan["source_study_id"],
+                "completed_treatments":completed,
+                "new_native_executions":0,
+                "evidence_resume_verified":True,
+                "production_model_weights_changed":False,
+            },indent=2))
+            return 0
         if (not args.rights_acknowledged or args.registry is None
             or type(args.approve_native_runs) is not int
-            or args.approve_native_runs<estimate):
+            or args.approve_native_runs<new_worker_budget):
             raise ValueError(
-                "Native execution requires --rights-acknowledged, --registry and "
-                "--approve-native-runs >= "+str(estimate)
+                "New native execution requires --rights-acknowledged, --registry, "
+                "and --approve-native-runs >= "+str(new_worker_budget)
             )
         host=inspect_native_host_runtime(probe_sandbox=True)
         if not host["native_launch_preflight_passed"]:
@@ -111,42 +151,52 @@ def main(argv:list[str]|None=None)->int:
         os.environ[REGISTRY_ENV]=str(path)
         if GameEmulatorRegistry.from_environment().registry_digest!=registry.registry_digest:
             raise ValueError("Approved core registry diverged from live native authority")
-        results=[]
-        for task in plan["schedule"]:
+        previous_registry=progress["approved_native_core_registry_sha256"]
+        if previous_registry is not None and previous_registry!=registry.registry_digest:
+            raise ValueError(
+                "Approved native core registry differs from previously verified curriculum sessions"
+            )
+        for task in scheduled_new:
+            result=run_counterfactual_input_study(
+                study,game_ids=task["game_ids"],
+                step=task["step"],
+                replacement_action=task["replacement_action"],
+                repeats=plan["repeats_per_arm"],registry=registry,
+            )
+            # Preflight the complete study and source authority before
+            # committing even a single native observation as progress.
+            verified=make_boomerang_progress(plan,[*results,result])
             dest=folder/("native_trial_"+str(task["slot"]).zfill(3)+".json")
-            if dest.is_symlink():
-                raise ValueError("Saved native trial cannot be a symlink")
-            if dest.exists():
-                saved=_read_json_file(dest,MAX_REPORT)
-                # Recomputed input/frame/PCM hashes are a required resume gate.
-                make_boomerang_progress(plan,[*results,saved])
-                result=saved
-            else:
-                result=run_counterfactual_input_study(
-                    study,game_ids=task["game_ids"],
-                    step=task["step"],
-                    replacement_action=task["replacement_action"],
-                    repeats=plan["repeats_per_arm"],registry=registry,
-                )
-                make_boomerang_progress(plan,[*results,result])
-                _output(folder,dest.name,result)
-                # Each completed treatment has a separate offline evidence UI.
-                html=render_counterfactual_game_dashboard(result)
-                _output_html=folder/("native_trial_"+str(task["slot"]).zfill(3)+".html")
-                if _output_html.is_symlink():
-                    raise ValueError("Native trial HTML cannot be a symlink")
-                from scripts.compare_game_study import _atomic_write
-                _atomic_write(_output_html,html.encode())
+            if dest.exists() or dest.is_symlink():
+                raise ValueError("Native treatment checkpoint appeared during execution")
+            _output(folder,dest.name,result)
+            html=render_counterfactual_game_dashboard(result)
+            html_path=folder/("native_trial_"+str(task["slot"]).zfill(3)+".html")
+            if html_path.is_symlink():
+                raise ValueError("Native trial HTML cannot be a symlink")
+            from scripts.compare_game_study import _atomic_write
+            _atomic_write(html_path,html.encode())
             results.append(result)
-            progress=make_boomerang_progress(plan,results)
+            progress=verified
             _output(folder,"boomerang_progress.json",progress)
             print(json.dumps({
                 "completed_treatment":task["slot"]+1,
-                "total_treatments":len(plan["schedule"]),
+                "total_treatments":len(schedule),
                 "round":task["round"],
                 "source_evidence_sha256":result["result_sha256"],
                 "progress_sha256":progress["progress_sha256"],
             }),flush=True)
+        if len(results)<len(schedule):
+            print(json.dumps({
+                "status":"bounded_native_boomerang_partial_with_verified_resume",
+                "study_id":plan["source_study_id"],
+                "completed_treatments":len(results),
+                "remaining_treatments":len(schedule)-len(results),
+                "new_native_worker_runs_authorized":new_worker_budget,
+                "progress_report":str(folder/"boomerang_progress.json"),
+                "production_model_weights_changed":False,
+            },indent=2))
+            return 0
         print(json.dumps({
             "status":"all_bounded_native_boomerang_experiments_completed",
             "study_id":plan["source_study_id"],

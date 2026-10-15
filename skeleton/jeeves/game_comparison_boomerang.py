@@ -188,26 +188,50 @@ def verify_boomerang_plan(plan:Mapping[str,Any],study:Mapping[str,Any])->dict[st
     return verified
 
 
-def experiment_signal_signature(result:Mapping[str,Any])->str:
-    """Opaque deterministic response signature, never a learned weight."""
-    verified=verify_counterfactual_input_result(result)
+def experiment_signal_signature(result:Mapping[str,Any])->str|None:
+    """Fingerprint repeatable *observed responses*, not experiment identity.
+
+    A novel treatment ID, input action, source run root or fresh-worker
+    repetition is NOT learning or newly observed audiovisual behavior.
+    Confounded, nondeterministic and unchanged experiments have no
+    reviewable response signature.
+    """
+    verify_counterfactual_input_result(result)
     rows=[]
     for row in result["games"]:
         analysis=row["measured_analysis"]
+        if (
+            analysis["scientific_evidence_status"]!="controlled_observable_signal_response_candidate"
+            or not analysis["pre_intervention_controls_matched"]
+            or not analysis["repeat_consistent_in_both_arms"]
+            or not analysis["post_intervention_observable_response_candidate"]
+        ):
+            continue
         video=analysis["signal_comparison"]["video"]
         audio=analysis["signal_comparison"]["audio"]
+        # Normalize first changes to treatment index so the same observed
+        # response at a later chapter/step is not automatically 'new'.
+        cursor=row["perturbation_step"]
+        def lag(field:Mapping[str,Any])->int|None:
+            first=field["first_repeatable_post_intervention_difference"]
+            return (first-cursor) if first is not None else None
         rows.append({
             "game_id":row["game_id"],
-            "scientific_evidence_status":analysis["scientific_evidence_status"],
-            "pre_intervention_matched":analysis["pre_intervention_controls_matched"],
-            "video_first_repeatable_post_difference":video["first_repeatable_post_intervention_difference"],
-            "audio_first_repeatable_post_difference":audio["first_repeatable_post_intervention_difference"],
-            "actual_numeric_deltas":analysis["measured_objective_changes"],
+            "video_first_repeatable_response_lag":lag(video),
+            "audio_first_repeatable_response_lag":lag(audio),
+            "actual_objective_deltas":analysis["measured_objective_changes"],
+            "observed_multispectral_differences":(
+                analysis.get("multispectral_abstract_comparison",{}).get(
+                    "abstract_differences"
+                ) if analysis.get("multispectral_abstract_comparison",{}).get(
+                    "available",False
+                ) else None
+            ),
         })
+    if not rows:
+        return None
     return digest({
-        "source_verification":verified["schema_version"],
-        "input_step":result["input_step"],
-        "replacement_action":result["replacement_action"],
+        "schema_version":"skeleton.game.boomerang_observed_response_fingerprint.v2",
         "observed_response_signatures":rows,
     })
 
@@ -222,9 +246,17 @@ def make_boomerang_progress(plan:Mapping[str,Any],results:list[Mapping[str,Any]]
     observed=set()
     outcomes=[]
     rounds={}
+    accepted_registry=None
     for index,result in enumerate(results):
         task=plan["schedule"][index]
         checked=verify_counterfactual_input_result(result)
+        trial_registry=result["operator_core_registry_sha256"]
+        if accepted_registry is None:
+            accepted_registry=trial_registry
+        elif accepted_registry!=trial_registry:
+            raise ComparativeExperimentError(
+                "Native curriculum replay sources differ in approved core registry authority"
+            )
         if (result["source_study_id"]!=plan["source_study_id"]
             or result["source_manifest_sha256"]!=plan["study_manifest_sha256"]
             or result["input_step"]!=task["step"]
@@ -234,8 +266,10 @@ def make_boomerang_progress(plan:Mapping[str,Any],results:list[Mapping[str,Any]]
             or result["fresh_native_runs_completed"]!=task["fresh_native_worker_runs"]):
             raise ComparativeExperimentError("Native experiment does not match its approved boomerang queue slot")
         signature=experiment_signal_signature(result)
-        novel=signature not in observed
-        observed.add(signature)
+        reviewable=signature is not None
+        novel=reviewable and signature not in observed
+        if reviewable:
+            observed.add(signature)
         outcomes.append({
             "slot":index,"round":task["round"],
             "treatment_id":task["treatment_id"],
@@ -243,6 +277,7 @@ def make_boomerang_progress(plan:Mapping[str,Any],results:list[Mapping[str,Any]]
             "native_evidence_receipt_sha256":checked["verification_sha256"],
             "source_result_sha256":result["result_sha256"],
             "observation_signature_sha256":signature,
+            "qualified_repeatable_response_observed":reviewable,
             "novel_observational_signal_pattern":novel,
             "measured_observation_not_model_learning":True,
         })
@@ -252,6 +287,12 @@ def make_boomerang_progress(plan:Mapping[str,Any],results:list[Mapping[str,Any]]
         })
         round_summary["trials_completed"]+=1
         round_summary["previously_unseen_signatures"]+=int(novel)
+        round_summary["repeatable_response_trials"]=round_summary.get(
+            "repeatable_response_trials",0
+        )+int(reviewable)
+        round_summary["confounded_or_unchanged_trials"]=round_summary.get(
+            "confounded_or_unchanged_trials",0
+        )+int(not reviewable)
     total_done=sum(r["fresh_native_worker_runs"] for r in plan["schedule"][:len(results)])
     summary={
         "schema_version":RECEIPT_SCHEMA,
@@ -261,7 +302,12 @@ def make_boomerang_progress(plan:Mapping[str,Any],results:list[Mapping[str,Any]]
         "scheduled_treatments":len(plan["schedule"]),
         "remaining_treatments":len(plan["schedule"])-len(results),
         "fresh_native_worker_runs_completed":total_done,
+        "approved_native_core_registry_sha256":accepted_registry,
         "novel_response_patterns_observed":len(observed),
+        "unreviewable_or_no_repeatable_response_trials":sum(
+            not row["qualified_repeatable_response_observed"] for row in outcomes
+        ),
+        "novelty_counts_only_repeatable_post_intervention_signals":True,
         "per_round_evidence":list(rounds.values()),
         "review_queue":outcomes,
         "status":"completed" if len(results)==len(plan["schedule"]) else "partial_with_pending_treatments",

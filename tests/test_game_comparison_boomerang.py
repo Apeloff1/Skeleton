@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from skeleton.jeeves.game_comparison_boomerang import (
     plan_comparison_boomerang,verify_boomerang_plan,
@@ -72,6 +73,79 @@ class BoomerangCurriculumPlanningContracts(unittest.TestCase):
         plan=self.plan()
         with self.assertRaises(ComparativeExperimentError):
             make_boomerang_progress(plan,[{"schema_version":"synthetic_forgery"}])
+
+    def test_same_observed_signal_across_different_steps_is_not_new(self):
+        from skeleton.jeeves.game_comparison_boomerang import experiment_signal_signature
+        from skeleton.jeeves.game_comparison_counterfactual import _analyze_counterfactual
+        from tests.test_game_comparison_scientific_gates import repeated
+        def trial(step):
+            arms_a=repeated("baseline",split=step)
+            arms_b=repeated("variant",split=step)
+            return {
+                "games":[{
+                    "game_id":"test_one",
+                    "perturbation_step":step,
+                    "measured_analysis":_analyze_counterfactual(
+                        arms_a,arms_b,perturbation_step=step,
+                    ),
+                }]
+            }
+        with patch("skeleton.jeeves.game_comparison_boomerang.verify_counterfactual_input_result",
+                   return_value={"schema_version":"synthetic_fixture_only"}):
+            self.assertEqual(
+                experiment_signal_signature(trial(3)),
+                experiment_signal_signature(trial(4)),
+            )
+            unchanged={
+                "games":[{
+                    "game_id":"test_one",
+                    "perturbation_step":3,
+                    "measured_analysis":_analyze_counterfactual(
+                        repeated("same"),repeated("same"),
+                        perturbation_step=3,
+                    ),
+                }]
+            }
+            self.assertIsNone(experiment_signal_signature(unchanged))
+
+    def test_resume_rejects_different_approved_core_registry(self):
+        from skeleton.jeeves.game_comparison_schema import digest
+        plan=self.plan(treatments=3,revisit_rounds=0,repeats=2)
+        results=[]
+        for task,index in zip(plan["schedule"][:2],range(2),strict=True):
+            results.append({
+                "source_study_id":plan["source_study_id"],
+                "source_manifest_sha256":plan["study_manifest_sha256"],
+                "input_step":task["step"],
+                "replacement_action":task["replacement_action"],
+                "game_count":len(task["game_ids"]),
+                "games":[{"game_id":gid} for gid in task["game_ids"]],
+                "fresh_native_runs_completed":task["fresh_native_worker_runs"],
+                "result_sha256":digest(["fixture",index]),
+                "operator_core_registry_sha256":digest(["core",index]),
+            })
+        with patch("skeleton.jeeves.game_comparison_boomerang.verify_counterfactual_input_result",
+                   return_value={"verification_sha256":"a"*64}), patch(
+                   "skeleton.jeeves.game_comparison_boomerang.experiment_signal_signature",
+                   return_value=None):
+            with self.assertRaises(ComparativeExperimentError):
+                make_boomerang_progress(plan,results)
+
+    def test_execution_rejects_gapped_existing_checkpoints_before_core_launch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp)
+            manifest=base/"study.json"
+            manifest.write_text(json.dumps(study()))
+            out=base/"runs"
+            argv=[
+                "--manifest",str(manifest),
+                "--game","test_one","--game","test_two",
+                "--treatments","3","--revisit-rounds","0",
+                "--output-dir",str(out),
+            ]
+            self.assertEqual(main(argv),0)
+            (out/"native_trial_001.json").write_text("{}")
+            self.assertEqual(main([*argv,"--execute"]),2)
 
     def test_operator_plan_only_does_not_run_rom_or_require_core_registry(self):
         with tempfile.TemporaryDirectory() as tmp:

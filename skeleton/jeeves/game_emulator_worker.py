@@ -78,6 +78,14 @@ class GameInfo(C.Structure):
     _fields_ = [("path", C.c_void_p), ("data", C.c_void_p), ("size", C.c_size_t), ("meta", C.c_void_p)]
 
 
+class ControllerDescription(C.Structure):
+    _fields_ = [("desc", C.c_void_p), ("id", C.c_uint)]
+
+
+class ControllerInfo(C.Structure):
+    _fields_ = [("types", C.POINTER(ControllerDescription)), ("num_types", C.c_uint)]
+
+
 class InputDescriptor(C.Structure):
     """Upstream libretro retro_input_descriptor ABI, no pointer retained."""
     _fields_ = [
@@ -228,6 +236,7 @@ class NativeCore:
             or any(type(item) is not str or item not in allowed_ports for item in declared_ports)):
             raise ValueError("Native controller port topology is not a supported bounded declaration")
         self.controller_port_devices = tuple(declared_ports)
+        self.controller_capabilities: list[list[dict[str, object]]] | None = None
         self.input_descriptors: list[dict[str, object]] = []
         self.disk_callbacks: dict[str, int] | None = None
         self.disk_interface_version: int | None = None
@@ -329,6 +338,13 @@ class NativeCore:
             raise ValueError("native core rejected the supplied content")
         self._loaded = True
         for port, device in enumerate(self.controller_port_devices):
+            if (device not in ("none", "joypad")
+                and self.controller_capabilities is not None
+                and port < len(self.controller_capabilities)
+                and allowed_ports[device] not in {
+                    row["device_id"] for row in self.controller_capabilities[port]
+                }):
+                raise ValueError("requested native controller is absent from core port capabilities")
             self.core.retro_set_controller_port_device(port, allowed_ports[device])
         self.av = AvInfo()
         self.core.retro_get_system_av_info(C.byref(self.av))
@@ -338,6 +354,23 @@ class NativeCore:
         self.info["core_input_descriptors"] = list(self.input_descriptors)
         self.info["core_input_descriptors_are_user_defined"] = True
         self.info["disk_control_interface_version"] = self.disk_interface_version
+        self.info["controller_capabilities"] = self.controller_capabilities
+        self.info["input_descriptors"] = [
+            {"port": row["port"], "device": row["device"],
+             "index": row["index"], "id": row["id"],
+             "label": row["description"]}
+            for row in self.input_descriptors
+        ]
+        self.info["controller_routing_evidence"] = [
+            "disconnected" if device == "none" else (
+                "not_advertised" if self.controller_capabilities is None
+                or port >= len(self.controller_capabilities) else (
+                    "core_advertised" if allowed_ports[device] in {
+                        row["device_id"] for row in self.controller_capabilities[port]
+                    } else "core_unlisted"
+                )
+            ) for port, device in enumerate(self.controller_port_devices)
+        ]
         self._check()
 
     def _buffer(self, key: str, value: str) -> int:
@@ -473,6 +506,33 @@ class NativeCore:
                 # RETRO_ENVIRONMENT_SET_VARIABLES succeeded: core options are
                 # now available to subsequent RETRO_ENVIRONMENT_GET_VARIABLE.
                 return True
+            if command == 35:
+                # RETRO_ENVIRONMENT_SET_CONTROLLER_INFO: per-port native device
+                # announcements; never extrapolate to ports the core omitted.
+                ports = C.cast(data, C.POINTER(ControllerInfo))
+                announced = []
+                for port in range(17):
+                    entry = ports[port]
+                    if not entry.types or not entry.num_types:
+                        self.controller_capabilities = announced
+                        return True
+                    if port == 16 or entry.num_types > 32:
+                        raise ValueError("native controller announcement exceeds bounds")
+                    if port >= 4:
+                        continue
+                    ids = set()
+                    descriptions = []
+                    for index in range(entry.num_types):
+                        item = entry.types[index]
+                        if item.id > 65535 or item.id in ids:
+                            raise ValueError("native controller device ID is invalid or repeated")
+                        ids.add(item.id)
+                        descriptions.append({
+                            "device_id": int(item.id),
+                            "description": _text(item.desc, 128),
+                        })
+                    announced.append(descriptions)
+                return False
             if command == 24:
                 C.cast(data, C.POINTER(C.c_uint64))[0] = sum(1 << device for device in (1, 2, 3, 5, 6))
                 return True

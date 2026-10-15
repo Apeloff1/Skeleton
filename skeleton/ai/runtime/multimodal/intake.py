@@ -15,6 +15,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 from .contracts import Modality
+from .media_validation import MediaValidationError, MediaValidationReceipt, validate_media
 
 
 MAX_INTAKE_BYTES = 512 * 1024 * 1024
@@ -31,6 +32,10 @@ _INSTRUCTION_PATTERN = re.compile(
     r"|override\s+(?:the\s+)?(?:system|developer|policy)"
     r")\b"
 )
+# Training-export code searches bytes rather than decoded text. Reuse the
+# canonical intake pattern instead of weakening instruction detection.
+_INSTRUCTION_PATTERNS = (re.compile(_INSTRUCTION_PATTERN.pattern.encode("ascii")),)
+
 _AUTHORITY_METADATA_KEYS = frozenset(
     {
         "authority",
@@ -192,10 +197,34 @@ class MultimodalAsset:
         )
 
     @property
+    def size_bytes(self) -> int:
+        """Compatibility name for the same immutable, bounded source length."""
+        return self.content_bytes
+
+    @property
     def instruction_trusted(self) -> bool:
         """Multimodal content never gains instruction or policy authority."""
 
         return False
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedMultimodalAsset(MultimodalAsset):
+    """Measured media receipt bound to the same untrusted, sanitized source."""
+
+    validation: MediaValidationReceipt
+
+    def __post_init__(self) -> None:
+        MultimodalAsset.__post_init__(self)
+        if (
+            not isinstance(self.validation, MediaValidationReceipt)
+            or self.validation.source_digest != self.content_digest
+            or self.validation.source_bytes != self.content_bytes
+            or self.validation.media_type != self.mime_type
+        ):
+            raise MultimodalSanitizationError(
+                "verified decoder metadata must match exact intake source"
+            )
 
 
 class MultimodalIntake:
@@ -211,6 +240,15 @@ class MultimodalIntake:
                 "max_payload_bytes must be a positive bounded integer"
             )
         self.max_payload_bytes = max_payload_bytes
+        self._assets: dict[str, MultimodalAsset] = {}
+
+    def _register(self, asset: MultimodalAsset) -> None:
+        existing=self._assets.get(asset.asset_id)
+        if existing is not None and existing != asset:
+            raise MultimodalSanitizationError(
+                "same multimodal asset ID cannot replace verified source or metadata"
+            )
+        self._assets[asset.asset_id]=asset
 
     def sanitize(
         self,
@@ -241,7 +279,7 @@ class MultimodalIntake:
             raise MultimodalSanitizationError("metadata must be a mapping")
         embedded = _detect_embedded_instruction(payload, raw_metadata)
         safe_metadata = _sanitize_metadata(raw_metadata)
-        return MultimodalAsset(
+        asset=MultimodalAsset(
             asset_id=canonical_id,
             modality=modality,
             mime_type=canonical_mime,
@@ -250,6 +288,72 @@ class MultimodalIntake:
             embedded_instruction_detected=embedded,
             sanitized_metadata=safe_metadata,
         )
+        self._register(asset)
+        return asset
+
+    def sanitize_verified(
+        self,
+        *,
+        asset_id: str,
+        modality: Modality,
+        mime_type: str,
+        payload: bytes,
+        metadata: Mapping[str, object] | None = None,
+    ) -> VerifiedMultimodalAsset:
+        """Decode exact image/PCM WAVE bytes under the strict media ceilings.
+
+        The untrusted source cannot gain training/policy or instruction
+        authority. Failures leave this intake asset registry unchanged.
+        """
+        from .verified_intake import verify_media_intake
+
+        try:
+            witness=verify_media_intake(
+                asset_id=asset_id, modality=modality,
+                mime_type=mime_type,payload=payload,metadata=metadata,
+            )
+            safe=witness.asset
+            verified=VerifiedMultimodalAsset(
+                asset_id=safe.asset_id, modality=safe.modality,
+                mime_type=safe.mime_type,content_digest=safe.content_digest,
+                content_bytes=safe.content_bytes,
+                embedded_instruction_detected=safe.embedded_instruction_detected,
+                sanitized_metadata=safe.sanitized_metadata,
+                validation=witness.measured,
+            )
+            self._register(verified)
+            return verified
+        except (MediaValidationError, ValueError) as exc:
+            raise MultimodalSanitizationError(
+                "measured media validation rejected untrusted source"
+            ) from exc
+
+    def verify_verified_asset(
+        self, asset: VerifiedMultimodalAsset, payload: bytes
+    ) -> None:
+        """Recompute actual decoder receipt; never trust persisted claims."""
+        if not isinstance(asset,VerifiedMultimodalAsset) or type(payload) is not bytes:
+            raise MultimodalSanitizationError("verified media source and receipt required")
+        if (
+            len(payload)!=asset.content_bytes
+            or sha256(payload).hexdigest()!=asset.content_digest
+        ):
+            raise MultimodalSanitizationError("verified source SHA or length changed")
+        try:
+            actual=validate_media(
+                payload,
+                modality=asset.modality.value,
+                mime_type=asset.mime_type,
+                limits=asset.validation.limits,
+            )
+        except MediaValidationError as exc:
+            raise MultimodalSanitizationError(
+                "verified media can no longer be decoded within original limits"
+            ) from exc
+        if actual!=asset.validation:
+            raise MultimodalSanitizationError(
+                "verified media decoder receipt no longer matches source bytes"
+            )
 
 
 __all__ = [
@@ -258,4 +362,5 @@ __all__ = [
     "MultimodalAsset",
     "MultimodalIntake",
     "MultimodalSanitizationError",
+    "VerifiedMultimodalAsset",
 ]

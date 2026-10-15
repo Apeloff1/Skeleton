@@ -838,7 +838,7 @@
       "execution": "Select one 2–10-game cohort from the existing 30-game study, execute up to ten real sandboxed libretro cores; show any two real screens, multi-port controls strictly BELOW each frame and actually advance one/both/all lanes",
       "input": "Up to four bounded native joypad/analog/keyboard/mouse/pointer devices; write exact controls into hash-chained finite native step receipts, retain reset events and original source/core/environment hashes",
       "ui": "Objective graphs, per-step event logs, full source-pinned evidence export, notes drafting/JSON export, per-game reset; browser does not run arbitrary commands or load ROM bytes",
-      "safety": "127.0.0.1-only HTTP, origin/host check and process-random token, 2–10 live lanes, 256 lifetime steps, four resets, 60–3600-second idle timeout, explicit local media rights acknowledgment and existing disk quota",
+      "safety": "127.0.0.1-only HTTP, origin/host check and process-random token, 2–10 live lanes, 4096 lifetime steps, four resets, 60–3600-second idle timeout, explicit local media rights acknowledgment and existing disk quota",
       "replay": "Complete original raw controller vectors; offline SHA-chain verification; 2–10 fresh-worker true native replay for individually selected <=64-step epoch (do not silently truncate)",
       "regression_fix": "game_emulator_qualification.py raw controller tape no longer crashes from len(actions) when actions is None",
       "model_training": "No automatic production LLM/Dragon weight updates and no core accuracy verification",
@@ -852,7 +852,7 @@
         "status": "Source implemented; no native gameplay run in this editing session",
         "repeat_per_request": "Explicit 1,2,4,8 native input-step repeat choices, including all active up-to-ten game lanes; same selected multiport input applied to each actual step",
         "evidence": "Each held step independently committed into SHA-linked input/video/audio receipt chain; one final PNG encoded per lane per request to avoid redundant intermediate image work",
-        "budget": "Each lane remains limited to <=256 cumulative native steps and <=4 manual resets, with no partial preflight of an over-budget request",
+        "budget": "Each lane remains limited to <=4096 cumulative native steps and <=4 manual resets, with no partial preflight of an over-budget request",
         "replay": "Full individual controller frames retained as native evidence for independent replay (up to 64-step episode per approved qualification run)"
       }
     },
@@ -955,7 +955,10 @@
       "scientific_status": "Response signature novelty is descriptive observed native AV behavior; no causality of game mechanics, no generalization guarantee, no neural model weight changes",
       "deterministic_source_and_revisit_plan": true,
       "test_file": "tests/test_game_comparison_boomerang.py",
-      "native_cores_qualified_in_this_turn": false
+      "native_cores_qualified_in_this_turn": false,
+      "resume_hardening": "SHA-verified contiguous checkpoint prefix, exact prior approved native core registry, --max-new-treatments for finite incremental work, --approve-native-runs for only the fresh native work; no silent reruns or false all-complete flags",
+      "novelty_semantics": "Response fingerprints omit treatment identity/source hashes and require matched pre-intervention observations plus stable native A/B repeats and a post-intervention audiovisual difference; unchanged/confounded/unstable results yield no new signal score",
+      "native_execution_verified_in_this_pass": false
     },
     "native_multispectral_training_observation": {
       "owner": "skeleton/jeeves/game_comparison_multispectral.py",
@@ -968,6 +971,49 @@
       "tests": "tests/test_game_comparison_multispectral.py added to manually triggered focused qualification",
       "limitations": "Not pixel optical flow, speech/music recognition, musical composition, game-mechanics discovery, learned LLM weights or independent core hardware accuracy",
       "real_native_game_source_exercised_here": false
+    },
+    "compiled_native_homebrew_abi_qualification": {
+      "source": "tests/fixtures/homebrew_libretro_smoke.c",
+      "harness": "tests/fixtures/verify_homebrew_libretro_smoke.py",
+      "test": "tests/test_game_emulator_homebrew_native_abi.py",
+      "description": "Actually compile a tiny lawful deterministic homebrew shared libretro ABI v1 library and exercise frame, stereo PCM, native input callbacks, core-provided controller descriptions, memory, content admission and savestate restore in an ephemeral child process",
+      "run_result": "During this pass the C source was compiled locally and exercised via ctypes: 21 native exports, controller-specific frame SHA divergence, 4 video and PCM callbacks, deterministic native savestate restore",
+      "source_rom": "12 byte synthetic SKL-HOMEBREW marker only; no commercial ROM, BIOS or licensed assets",
+      "binary_committed": false,
+      "real_commercial_console_accuracy_verified": false,
+      "real_linux_bwrap_worker_host_qualified": false,
+      "model_weights_changed": false,
+      "ci": "Added to manually triggered focused-game-emulator-comparison workflow; source compilation automatically available to native test runner, exact CI pass not yet verified",
+      "isolated_bwrap_full_host_test": "tests/test_game_emulator_homebrew_bwrap_host.py",
+      "isolated_native_test_scope": "Temporary test-only registry binding with homebrew input marker; approved ELF inspection, real worker reset/step callbacks, core-provided input descriptions, video/PCM, native savestate restoration",
+      "isolated_native_test_result": "Source added but not run in this container (bubblewrap unavailable), manual-only workflow installs bwrap then executes",
+      "production_core_id_added": false
+    },
+    "private_native_savestate_branching": {
+      "owner": "skeleton/jeeves/game_comparison_live.py",
+      "interface": "Two under-screen controls per visible native game: Save private checkpoint; Rewind to checkpoint; loopback authenticated same-origin POST endpoints",
+      "native_state": "Existing EmulatorEnvironment.snapshot/restore in isolated libretro worker, maximum private state capacity <=8MiB per lane; latest checkpoint only, at most 2 checkpoint captures and 2 rewind operations per lane",
+      "budgets": "256 cumulative native inputs and 4 resets remain fixed, no new steps credited by state rewind",
+      "receipt": "SHA-256 chained native_checkpoint and native_rewind receipts record game, core, content, state, original and restored frame identities and episode cursors; no raw savestate/RAM bytes exported",
+      "replay_contract": "Offline verifier validates each branch, but fresh-worker standalone replay refuses rewound sessions until explicit independent savestate custody is implemented",
+      "tests": [
+        "tests/test_game_comparison_live.py",
+        "tests/test_game_comparison_live_http.py"
+      ],
+      "real_commercial_rom_executed": false
+    },
+    "verified_native_checkpoint_branch_diff": {
+      "owner": "skeleton/jeeves/game_comparison_branch_analysis.py",
+      "inputs": "Only full source/core/step SHA-verified live session evidence; no raw savestate bytes, ROM, video pixels or PCM exported",
+      "browser": "Under-screen live viewer Compare rewind branches button, same-origin bearer-token protected read-only /api/branches endpoint; shows aligned input, video and PCM SHA differences per checkpoint",
+      "correctness": "Each branch comparison stops at next reset/rewind; repeated rewinds compare against immediately preceding branch rather than concatenating unrelated timelines",
+      "scope": "At most 256 lifetime native steps per game, 4 resets, 2 checkpoints and 2 rewinds; 2–10 local live games",
+      "scientific_gates": "Single-session observation only: no independent fresh-worker replay, no proof of causal game mechanics or AI weight gain",
+      "regressions": [
+        "tests/test_game_comparison_live.py",
+        "tests/test_game_comparison_live_http.py"
+      ],
+      "game_emulation_qualified_here": false
     }
   }
 }

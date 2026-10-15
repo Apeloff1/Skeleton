@@ -54,8 +54,8 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         if initial!=expect:
             raise LiveEvidenceError("First native state hash differs from the initial approved environment")
         events=lane.get("native_events")
-        if not isinstance(events,list) or len(events)>348:
-            raise LiveEvidenceError("Native event recording exceeds the 256-step + 4-reset lifetime cap")
+        if not isinstance(events,list) or len(events)>4192:
+            raise LiveEvidenceError("Native event recording exceeds the 4096-step + 4-reset + 2-checkpoint + 2-rewind + 32-disc + 32-timing + 24-inspection cap")
         reset_generation=0
         disc_changes=0
         timing_changes=0
@@ -70,6 +70,9 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         host_disc_chain=digest(["native_disc_control",env_sha])
         episode_step=0
         steps=0
+        checkpoints=0
+        rewinds=0
+        saved=None
         previous=initial
         episodes=[[]]
         for row in events:
@@ -251,6 +254,46 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
                     raise LiveEvidenceError("Native disc swap lifetime exceeded 32 events")
                 disc_image=new
                 host_disc_chain=host["receipt_sha256"]
+            elif row["event_kind"]=="native_checkpoint":
+                number=checkpoints+1
+                if (payload.get("schema_version")!="skeleton.game.live_native_checkpoint_receipt.v1"
+                    or number>2 or payload.get("checkpoint_id")!=number
+                    or payload.get("episode_step")!=episode_step
+                    or payload.get("reset_generation")!=reset_generation
+                    or payload.get("source_content_sha256")!=source
+                    or payload.get("core_sha256")!=core_sha
+                    or payload.get("private_native_state_exported") is not False):
+                    raise LiveEvidenceError("Native private checkpoint identity or cursor differs")
+                for field in ("native_state_sha256","private_snapshot_digest","frame_sha256"):
+                    value=payload.get(field)
+                    if type(value) is not str or len(value)!=64:
+                        raise LiveEvidenceError("Native checkpoint hash identity missing")
+                checkpoints=number
+                saved={
+                    "id":number,"step":episode_step,"reset_generation":reset_generation,
+                    "state_sha":payload["native_state_sha256"],
+                    "snapshot_digest":payload["private_snapshot_digest"],
+                    "frame_sha":payload["frame_sha256"],
+                }
+            elif row["event_kind"]=="native_rewind":
+                if (payload.get("schema_version")!="skeleton.game.live_native_rewind_receipt.v1"
+                    or saved is None or rewinds>=2
+                    or payload.get("rewind_generation")!=rewinds+1
+                    or payload.get("checkpoint_id")!=saved["id"]
+                    or payload.get("reset_generation")!=saved["reset_generation"]
+                    or payload.get("restored_episode_step")!=saved["step"]
+                    or payload.get("native_state_sha256")!=saved["state_sha"]
+                    or payload.get("private_snapshot_digest")!=saved["snapshot_digest"]
+                    or payload.get("frame_sha256")!=saved["frame_sha"]
+                    or payload.get("source_content_sha256")!=source
+                    or payload.get("core_sha256")!=core_sha
+                    or payload.get("private_native_state_exported") is not False):
+                    raise LiveEvidenceError("Native rewind does not restore the exact saved core state")
+                rewinds+=1
+                episode_step=saved["step"]
+                # Branch input cannot be replayed as a new reset epoch without
+                # carrying original native savestate. Do NOT mark as replayable.
+                episodes.append([])
             elif row["event_kind"]=="native_reset":
                 if (payload.get("schema_version")!="skeleton.game.live_native_reset_receipt.v1"
                     or payload.get("reset_generation")!=reset_generation+1
@@ -261,6 +304,7 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
                 last_run_cursor=None
                 disc_image=None
                 episode_step=0
+                saved=None
                 episodes.append([])
             else:
                 raise LiveEvidenceError("Unknown native event kind")
@@ -270,7 +314,9 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
             or lane.get("reset_count")!=reset_generation
             or lane.get("disc_change_count",0)!=disc_changes
             or lane.get("timing_change_count",0)!=timing_changes
-            or lane.get("inspection_count",0)!=inspections):
+            or lane.get("inspection_count",0)!=inspections
+            or lane.get("checkpoint_count")!=checkpoints
+            or lane.get("rewind_count")!=rewinds):
             raise LiveEvidenceError("Final native evidence count/root differs from committed events")
         rows.append({
             "game_id":game_id,"core_id":lane["core_id"],
@@ -284,10 +330,14 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
             "last_timing_mode":timing_mode,
             "last_timing_factor":timing_factor,
             "last_native_disc_chain_sha256":host_disc_chain,
+            "native_checkpoints_verified":checkpoints,
+            "native_rewinds_verified":rewinds,
             "episode_tape_lengths":[len(ep) for ep in episodes],
+            "snapshot_based_episodes_require_separate_qualification":rewinds>0,
             "initial_chain_sha256":initial,
             "final_chain_sha256":previous,
-            "replayable_controller_tapes":episodes,
+            "replayable_controller_tapes":episodes if rewinds==0 else [],
+            "replay_gate":"fresh_native_replay_available" if rewinds==0 else "requires_private_savestate_branch_replay_not_yet_qualified",
             "locally_verified":True,
             "independently_attested_native_run":False,
         })
@@ -302,6 +352,9 @@ def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
         "total_native_disc_swaps_verified":sum(x["native_disc_swaps_verified"] for x in rows),
         "total_native_timing_changes_verified":sum(x["native_timing_changes_verified"] for x in rows),
         "total_frozen_frame_inspections_verified":sum(x["native_frozen_inspections_verified"] for x in rows),
+        "total_native_checkpoint_events":sum(x["native_checkpoints_verified"] for x in rows),
+        "total_native_rewind_events":sum(x["native_rewinds_verified"] for x in rows),
+        "private_savestate_bytes_exported":False,
         "games":rows,
         "correctness_claim":"Checks a self-contained hash chain and exact raw controller records, not independently signed hardware execution",
         "model_weights_changed":False,

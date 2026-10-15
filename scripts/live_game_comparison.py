@@ -37,8 +37,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Optional game ID from the cohort; repeat 2–10 times to reduce resource use")
     parser.add_argument("--rights-acknowledged",action="store_true",
                         help="Confirm operator is allowed to run all included game media locally")
-    parser.add_argument("--max-steps",type=int,default=256,
-                        help="1–256 actual native input steps per lane for the entire desk lifetime")
+    parser.add_argument("--max-steps",type=int,default=4096,
+                        help="1–4096 actual native input steps per lane for the entire desk lifetime")
     parser.add_argument("--timeout-seconds",type=float,default=5.0)
     parser.add_argument("--port",type=int,default=8765,
                         help="Local-only port 0–65535; 0 allocates a free ephemeral port")

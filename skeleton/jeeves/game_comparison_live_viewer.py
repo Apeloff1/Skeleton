@@ -51,9 +51,15 @@ textarea{width:100%;min-height:75px;resize:vertical}
 <div class="inline"><label>Steps per advance <select id="repeat"><option value="1">1</option><option value="2">2</option><option value="4">4</option><option value="8">8</option></select></label>
 <button id="all">Advance all active games</button>
 <button id="evidence">Export native evidence</button>
+<button id="branches">Compare rewind branches</button>
 <button id="stop" class="critical">Stop &amp; close workers</button></div></header>
 <p id="message" role="status" aria-live="polite">Connecting to the operator-approved native session…</p>
 <main><section id="left" class="player"></section><section id="right" class="player"></section></main>
+<section id="branch-report" class="notes">
+<h2>Checkpoint branch comparison</h2>
+<p class="subtle">Inspect native controller/frame/audio differences after a private savestate rewind. A single branch comparison is not proof of causal game mechanics or learned AI weights.</p>
+<div id="branch-results"><small>Use Compare rewind branches after saving and restoring a native checkpoint.</small></div>
+</section>
 <section class="notes">
 <h2>Attributable viewer notes</h2>
 <p class="subtle">Drafts stay in this browser until exported. They are never uploaded to Dragon or model memory automatically.</p>
@@ -221,6 +227,22 @@ function timingDeckFor(id){
   section.append(details)
  }
  return section
+}
+async function checkpointGame(id){
+ try{
+  const data=await request("/api/checkpoint",{game_id:id});
+  await load();
+  msg("Private native checkpoint #"+data.checkpoint_id+" saved · state SHA "+data.state_sha256.slice(0,15)+
+      " · game memory never sent to this browser");
+ }catch(e){msg("Checkpoint rejected: "+e.message)}
+}
+async function rewindGame(id){
+ try{
+  const data=await request("/api/rewind",{game_id:id});
+  clearInputs(id);await load();
+  msg("Actual native core restored to checkpoint #"+data.checkpoint_id+
+      " · evidence lineage continued · not a fresh-reset replay");
+ }catch(e){msg("Native rewind rejected: "+e.message)}
 }
 function deckFor(id){
  const lane=current.lanes[id],layout=lane.controller_layout;
@@ -394,12 +416,20 @@ function panel(side){
  root.append(deckFor(id));
  root.append(discDeckFor(id));
  root.append(nativeAudioMonitor(frame));
- const actions=txt("div","","inline"),doStep=txt("button","Advance native frame"),doReset=txt("button","Reset this emulator");
- doStep.disabled=lane.status!=="running"||lane.timing_mode==="paused"||lane.lifetime_steps>=lane.max_lifetime_steps;doReset.disabled=lane.status==="native_execution_failed"||lane.timing_mode==="paused"||lane.reset_count>=4;
+ const actions=txt("div","","inline"),doStep=txt("button","Advance native frame"),doReset=txt("button","Reset this emulator"),
+  doCheckpoint=txt("button","Save private checkpoint"),doRewind=txt("button","Rewind to checkpoint");
+ doStep.disabled=lane.status!=="running"||lane.timing_mode==="paused"||lane.lifetime_steps>=lane.max_lifetime_steps;
+ doReset.disabled=lane.status==="native_execution_failed"||lane.timing_mode==="paused"||lane.reset_count>=4;
+ doCheckpoint.disabled=lane.status!=="running"||lane.checkpoint_count>=lane.max_checkpoints;
+ doRewind.disabled=!lane.has_private_checkpoint||lane.status==="native_execution_failed"||
+  lane.rewind_count>=lane.max_rewinds||lane.lifetime_steps>=lane.max_lifetime_steps;
  doStep.onclick=()=>step([id]);doReset.onclick=()=>resetGame(id);
- actions.append(doStep,doReset);root.append(actions);
+ doCheckpoint.onclick=()=>checkpointGame(id);doRewind.onclick=()=>rewindGame(id);
+ actions.append(doStep,doCheckpoint,doRewind,doReset);root.append(actions);
  root.append(txt("p",lane.status+" · timing "+lane.timing_mode+" "+lane.timing_factor+" · lifetime "+lane.lifetime_steps+"/"+lane.max_lifetime_steps+
-    " native actions · reset "+lane.reset_count+"/4","stats"));
+    " native actions · checkpoint "+lane.checkpoint_count+"/"+lane.max_checkpoints+
+    " · rewinds "+lane.rewind_count+"/"+lane.max_rewinds+
+    " · resets "+lane.reset_count+"/4","stats"));
  root.append(txt("div","Last measured native throughput: "+
     (lane.last_burst_native_fps===null?"not measured":lane.last_burst_native_fps+" receipted frames/s")+
     " · "+(lane.last_burst_wall_ms??"—")+" ms for "+lane.last_burst_receipted_frames+
@@ -418,6 +448,30 @@ $("all").onclick=()=>{if(!current)return;
     && current.lanes[id].timing_mode!=="paused"
     && current.lanes[id].lifetime_steps+burstFor(id)<=current.lanes[id].max_lifetime_steps);
  if(ids.length)step(ids);else msg("No active games can advance")
+};
+$("branches").onclick=async()=>{try{
+ const data=await request("/api/branches");
+ const host=$("branch-results");host.replaceChildren();
+ let count=0;
+ data.games.forEach(game=>{
+  const section=txt("div","");
+  section.append(txt("h3",game.game_id+" · "+game.verified_rewind_count+" verified rewind(s)"));
+  (game.branch_comparisons||[]).forEach(branch=>{
+   count++;
+   section.append(txt("p","Checkpoint #"+branch.checkpoint_id+
+    " · "+branch.aligned_input_steps+" aligned native steps · "+
+    branch.original_path_native_steps+" original / "+branch.rewound_path_native_steps+
+    " alternate"));
+   section.append(txt("p","First input difference: "+(branch.first_controller_difference_offset??"none")+
+    " · first frame difference: "+(branch.first_video_difference_offset??"none")+
+    " · first PCM difference: "+(branch.first_audio_difference_offset??"none")));
+  });
+  host.append(section)
+ });
+ if(!count)host.append(txt("small","No native rewind comparisons recorded; play after a checkpoint and rewind first."));
+ exportJSON(data.source_study_id+"_native_rewind_branches",data);
+ msg("Verified "+count+" native checkpoint-branch comparison(s) · no game memory exported")
+ }catch(e){msg("Native branch comparison rejected: "+e.message)}
 };
 $("evidence").onclick=async()=>{try{
  const value=await request("/api/evidence");exportJSON(value.study_id+"_live_native_evidence",value);

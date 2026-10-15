@@ -71,6 +71,19 @@ class FakeNativeEnv:
             transition_digest=evidence_digest,
         )
 
+    def snapshot(self):
+        return {
+            "steps":self._n,
+            "state_sha256":digest(["synthetic-savestate",self._name,self._n]),
+            "snapshot_digest":digest(["synthetic-snapshot",self._name,self._n]),
+            "frame":dict(self._frame),
+            "synthetic_private_state":{"n":self._n},
+        }
+
+    def restore(self, snapshot):
+        self._n=snapshot["synthetic_private_state"]["n"]
+        self._frame_at("reset" if self._n==0 else "step")
+
     def preview(self):
         return {"data_uri":"data:image/png;base64,iVBORw0KGgo="}
 
@@ -198,6 +211,103 @@ class NativeLiveComparisonContracts(unittest.TestCase):
         exported["lanes"]["first"]["core_sha256"]="0"*64
         with self.assertRaises(LiveEvidenceError):
             verify_live_evidence(exported)
+
+    def test_private_native_checkpoint_rewind_and_branch_evidence(self):
+        session=self._session()
+        input_ports={"buttons":1,"axes":[0,0,0,0],"keys":[],
+                     "mouse":[0]*6,"pointer":[0]*3}
+        session.step({"steps":[{"game_id":"first","controls":[input_ports],"repeat":2}]})
+        checkpoint=session.checkpoint("first")
+        self.assertEqual(checkpoint["episode_step"],2)
+        self.assertNotIn("state_base64",checkpoint)
+        self.assertFalse(checkpoint["private_savestate_bytes_returned"])
+        session.step({"steps":[{"game_id":"first","controls":[input_ports],"repeat":2}]})
+        rewind=session.rewind("first")
+        self.assertEqual(rewind["restored_episode_step"],2)
+        self.assertEqual(rewind["checkpoint_id"],1)
+        session.step({"steps":[{"game_id":"first","controls":[input_ports]}]})
+        packet=session.export_evidence()
+        self.assertFalse(packet["private_savestates_exported"])
+        self.assertNotIn("state_base64",json.dumps(packet))
+        audited=verify_live_evidence(packet)
+        row=next(x for x in audited["games"] if x["game_id"]=="first")
+        self.assertEqual(row["native_checkpoints_verified"],1)
+        self.assertEqual(row["native_rewinds_verified"],1)
+        self.assertEqual(row["native_input_steps_verified"],5)
+        self.assertTrue(row["snapshot_based_episodes_require_separate_qualification"])
+        self.assertEqual(row["replayable_controller_tapes"],[])
+        self.assertEqual(audited["total_native_checkpoint_events"],1)
+        self.assertEqual(audited["total_native_rewind_events"],1)
+
+    def test_branch_difference_report_aligns_actual_native_input_after_rewind(self):
+        from skeleton.jeeves.game_comparison_branch_analysis import (
+            build_live_branch_difference_report,
+        )
+        session=self._session()
+        base={"buttons":1,"axes":[0,0,0,0],"keys":[],
+              "mouse":[0]*6,"pointer":[0]*3}
+        altered={"buttons":256,"axes":[0,0,0,0],"keys":[],
+                 "mouse":[0]*6,"pointer":[0]*3}
+        session.checkpoint("first")
+        session.step({"steps":[{"game_id":"first","controls":[base],"repeat":2}]})
+        session.rewind("first")
+        session.step({"steps":[{"game_id":"first","controls":[altered]}]})
+        report=build_live_branch_difference_report(session.export_evidence())
+        game=next(row for row in report["games"] if row["game_id"]=="first")
+        self.assertEqual(game["verified_rewind_count"],1)
+        branch=game["branch_comparisons"][0]
+        self.assertEqual(branch["original_path_native_steps"],2)
+        self.assertEqual(branch["rewound_path_native_steps"],1)
+        self.assertEqual(branch["first_controller_difference_offset"],1)
+        # This fixture's frame depends on step index, not the action input.
+        # Different input alone never qualifies a native visual effect.
+        self.assertIsNone(branch["first_video_difference_offset"])
+        self.assertFalse(branch["change_in_game_mechanics_or_training_proven"])
+        self.assertFalse(report["native_snapshot_game_memory_or_pcm_exported"])
+
+    def test_branch_report_rejects_modified_native_snapshot_sha_chain(self):
+        from skeleton.jeeves.game_comparison_branch_analysis import (
+            build_live_branch_difference_report,
+        )
+        session=self._session()
+        session.checkpoint("first")
+        session.rewind("first")
+        export=session.export_evidence()
+        export["lanes"]["first"]["native_events"][0]["receipt"]["native_state_sha256"]="0"*64
+        with self.assertRaises(LiveEvidenceError):
+            build_live_branch_difference_report(export)
+
+    def test_private_snapshot_invalid_after_native_reset(self):
+        session=self._session()
+        session.checkpoint("first")
+        session.reset("first")
+        with self.assertRaises(LiveComparisonError):
+            session.rewind("first")
+        audited=verify_live_evidence(session.export_evidence())
+        self.assertEqual(audited["total_native_checkpoint_events"],1)
+        self.assertEqual(audited["total_native_reset_events"],1)
+        self.assertEqual(audited["total_native_rewind_events"],0)
+
+    def test_tampered_native_checkpoint_receipt_fails_closed(self):
+        session=self._session()
+        session.checkpoint("first")
+        packet=session.export_evidence()
+        packet["lanes"]["first"]["native_events"][0]["receipt"]["native_state_sha256"]="0"*64
+        with self.assertRaises(LiveEvidenceError):
+            verify_live_evidence(packet)
+
+    def test_checkpoint_and_rewind_have_strict_finite_caps(self):
+        session=self._session()
+        session.checkpoint("first")
+        session.checkpoint("first")
+        with self.assertRaises(LiveComparisonError):
+            session.checkpoint("first")
+        session.rewind("first")
+        session.rewind("first")
+        with self.assertRaises(LiveComparisonError):
+            session.rewind("first")
+        self.assertEqual(verify_live_evidence(session.export_evidence())[
+            "total_native_rewind_events"],2)
 
     def test_bad_port_fails_before_any_native_step(self):
         session=self._session()

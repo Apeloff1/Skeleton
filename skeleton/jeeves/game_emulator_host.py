@@ -179,6 +179,75 @@ def _controller_ports(value: object) -> tuple[str, ...]:
     return tuple(value) + ("none",) * (4 - len(value))
 
 
+def _native_controller_profile(
+    system_info: Mapping[str, object], selected_ports: tuple[str, ...]
+) -> dict[str, object]:
+    """Validate the worker's native libretro advertisements before UI exposure.
+
+    These are untrusted labels from an approved native core. An absent announcement
+    must not be promoted to verified controller support.
+    """
+    if system_info.get("controller_port_devices") != list(selected_ports):
+        raise EmulatorHostError("native_device_mismatch", "Native core controller routing differs")
+    raw = system_info.get("controller_capabilities")
+    if raw is not None and (not isinstance(raw, list) or len(raw) > 4):
+        raise EmulatorHostError("native_device_mismatch", "Native controller advertisement shape differs")
+    advertised = []
+    if raw is not None:
+        for rows in raw:
+            if not isinstance(rows, list) or len(rows) > 32:
+                raise EmulatorHostError("native_device_mismatch", "Native port device capacity differs")
+            ids = set()
+            parsed = []
+            for row in rows:
+                if not isinstance(row, dict) or set(row) != {"device_id", "description"}:
+                    raise EmulatorHostError("native_device_mismatch", "Native controller declaration differs")
+                device_id = _int(row["device_id"], 0, 65535, "native controller ID")
+                label = row["description"]
+                if device_id in ids or type(label) is not str or len(label) > 128:
+                    raise EmulatorHostError("native_device_mismatch", "Native controller ID or legend differs")
+                ids.add(device_id)
+                parsed.append({"device_id": device_id, "description": label})
+            advertised.append(parsed)
+    raw_labels = system_info.get("input_descriptors")
+    if not isinstance(raw_labels, list) or len(raw_labels) > 128:
+        raise EmulatorHostError("native_device_mismatch", "Native control descriptor capacity differs")
+    labels = []
+    for row in raw_labels:
+        if not isinstance(row, dict) or set(row) != {"port", "device", "index", "id", "label"}:
+            raise EmulatorHostError("native_device_mismatch", "Native control descriptor shape differs")
+        label = row["label"]
+        if type(label) is not str or len(label) > 128:
+            raise EmulatorHostError("native_device_mismatch", "Native control legend exceeds bounds")
+        labels.append({
+            "port": _int(row["port"], 0, 3, "native input port"),
+            "device": _int(row["device"], 0, 65535, "native input device"),
+            "index": _int(row["index"], 0, 32, "native input index"),
+            "id": _int(row["id"], 0, 65535, "native input ID"),
+            "label": label,
+        })
+    statuses = []
+    for port, name in enumerate(selected_ports):
+        statuses.append(
+            "disconnected" if name == "none" else
+            "not_advertised" if raw is None or port >= len(advertised) else
+            "core_advertised" if _PORT_DEVICE_IDS[name] in {
+                item["device_id"] for item in advertised[port]
+            } else "core_unlisted"
+        )
+    if system_info.get("controller_routing_evidence") != statuses:
+        raise EmulatorHostError("native_device_mismatch", "Native routing verdict is inconsistent")
+    return {
+        "schema_version": "skeleton.libretro.controller_evidence.v1",
+        "devices": list(selected_ports),
+        "core_advertised_types": advertised if raw is not None else None,
+        "core_input_descriptors": labels,
+        "port_status": statuses,
+        "hardware_input_verified": False,
+        "notes": "Core advertisements are observed native metadata, not proof of physical controller or gameplay compatibility",
+    }
+
+
 def _frame_metadata(value: object) -> dict[str, object]:
     fields = {
         "width",
@@ -570,6 +639,12 @@ class EmulatorEnvironment:
         }
 
     @property
+    def controller_profile(self) -> dict[str, object]:
+        """Native controller legends suitable for presentation *below* the game viewport."""
+        self._authority()
+        return json.loads(json.dumps(self._native_controller_profile))
+
+    @property
     def done(self) -> bool:
         return self._closed or self._steps >= self.max_steps
 
@@ -787,8 +862,8 @@ class EmulatorEnvironment:
         self._descriptor["worker_runtime"] = dict(runtime)
         self._descriptor["python"] = list(runtime["version"])
         self._system_info = metadata["system_info"]
-        if self._system_info.get("controller_port_devices") != list(self._controller_devices):
-            raise EmulatorHostError("native_device_mismatch", "Actual native controller routing differs from the pinned episode specification")
+        self._native_controller_profile = _native_controller_profile(self._system_info, self._controller_devices)
+        self._descriptor["core_controller_profile_digest"] = _digest(self._native_controller_profile)
         self._registry.revalidate(self.core)
 
     def _read_loop(self) -> None:
@@ -1080,6 +1155,35 @@ class EmulatorEnvironment:
                     break
         return self._step(list(controls), exact)
 
+    def continue_playthrough(self) -> dict[str, object]:
+        """Continue native gameplay past one learning episode without retro_reset.
+
+        Only a caller using the explicit long-playthrough API may advance the
+        bounded logical window. Native core, content, controls and digest chain
+        remain intact. This is not a victory signal or a training admission.
+        """
+        if self._closed or self._seed is None or self._steps != self.max_steps:
+            raise EmulatorHostError(
+                "emulator_continuation_inactive", "Only a completed native step window can continue"
+            )
+        self._authority()
+        previous = self._chain
+        self._chain = _digest({
+            "event": "native_playthrough_window_continued",
+            "environment_digest": self.spec.environment_digest,
+            "previous_transition_digest": previous,
+            "window_steps": self.max_steps,
+        })
+        self._steps = 0
+        if self._observation is not None:
+            self._observation = {**self._observation, "step_fraction": 0.0}
+        return {
+            "native_core_reset": False,
+            "window_steps": self.max_steps,
+            "previous_transition_digest": previous,
+            "continuation_digest": self._chain,
+        }
+
     def input_frame_step(
         self, controls: Sequence[Mapping[str, object]], frames: int = 1,
     ) -> EpisodeStep:
@@ -1103,6 +1207,16 @@ class EmulatorEnvironment:
             self.frames_per_step if frame_count is None
             else _int(frame_count, 1, 60, "native frame precision")
         )
+        # Inert input on disconnected ports is not accepted as training evidence.
+        # Never record an action as applied if no hardware port can receive it.
+        for port, row in enumerate(controls):
+            if self._controller_devices[port] == "none" and (
+                row["buttons"] or any(row["axes"]) or row["keys"]
+                or any(row["mouse"]) or any(row["pointer"])
+            ):
+                raise EmulatorHostError(
+                    "invalid_emulator_controller", "Unconnected native controller port carries input"
+                )
         previous = self._chain
         metadata, blocks = self._exchange("step", {"frames": requested_frames, "controls": controls})
         self._steps += 1
@@ -1117,6 +1231,7 @@ class EmulatorEnvironment:
             "episode_step": self._steps,
             "policy_action": action,
             "controller_digest": _digest(controls),
+            "core_controller_profile_digest": self._descriptor["core_controller_profile_digest"],
             "controller_only": action is None,
             "frame_digest": metadata["pixel_sha256"],
             "native_runs": metadata["runs"],
@@ -1229,6 +1344,8 @@ class EmulatorEnvironment:
             },
             "core_id": self.core.core_id,
             "content_digest": self._descriptor["content_digest"],
+            "controller_profile": self.controller_profile,
+            "core_controller_profile_digest": self._descriptor["core_controller_profile_digest"],
             "hardware_compatibility_verified": False,
         }
 
@@ -1648,6 +1765,7 @@ def capture_emulator_trace(
         "source_code_digest": descriptor["source_code_digest"],
         "frames_per_step": environment.frames_per_step,
         "controller_port_devices": list(environment._controller_devices),
+        "core_controller_profile_digest": descriptor["core_controller_profile_digest"],
         "controller_tape_digest": _digest(normalized_tape) if normalized_tape is not None else None,
         "rights_evidence_digest": rights_evidence_digest,
         "capture_nonce": os.urandom(16).hex(),
