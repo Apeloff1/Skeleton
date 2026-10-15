@@ -26,6 +26,7 @@ import time
 import zlib
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
+from functools import wraps
 from pathlib import Path
 
 from .game_emulator_catalog import (
@@ -436,6 +437,15 @@ def _png(pixels: bytes, width: int, height: int) -> tuple[dict[str, object], byt
     }, image
 
 
+def _serialized_native_operation(method):
+    """Keep multi-command disk/savestate operations coherent on the same worker."""
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapped
+
+
 class EmulatorEnvironment:
     def __init__(
         self,
@@ -536,9 +546,13 @@ class EmulatorEnvironment:
         self._observation = None
         self._controls = [json.loads(json.dumps(_EMPTY))]
         self._chain = ""
+        self._disc_sequence = 0
+        self._disc_receipts: list[dict[str, object]] = []
+        self._disc_chain = ""
         try:
             self._start(entry)
             self.spec = replace(self.spec, environment_digest=_digest(self._descriptor))
+            self._disc_chain = _digest(["native_disc_control", self.spec.environment_digest])
         except (OSError, ValueError, RuntimeError):
             self.close()
             raise
@@ -914,6 +928,107 @@ class EmulatorEnvironment:
         }
         return dict(self._observation)
 
+    def disc_status(self) -> dict[str, object]:
+        """Report only core-registered disc counts/state, never filesystem paths."""
+        value, blocks = self._exchange("disc_status", {})
+        if blocks or not isinstance(value, dict) or set(value) != {
+            "supported", "interface_version", "image_count", "image_index", "ejected"
+        }:
+            self.close()
+            raise EmulatorHostError("native_disc_status_corrupt", "Disk status payload differs")
+        if type(value["supported"]) is not bool:
+            raise EmulatorHostError("native_disc_status_corrupt", "Native disk support flag differs")
+        if not value["supported"]:
+            if (value["interface_version"] is not None or value["image_count"] != 0
+                or value["image_index"] is not None or value["ejected"] is not None):
+                self.close()
+                raise EmulatorHostError("native_disc_status_corrupt", "Absent disk capability claimed media")
+        elif (
+            type(value["interface_version"]) is not int
+            or value["interface_version"] not in (0, 1)
+            or type(value["image_count"]) is not int or not 1 <= value["image_count"] <= 32
+            or type(value["image_index"]) is not int
+            or not 0 <= value["image_index"] < value["image_count"]
+            or type(value["ejected"]) is not bool
+        ):
+            self.close()
+            raise EmulatorHostError("native_disc_status_corrupt", "Native disk geometry exceeds bounds")
+        return dict(value)
+
+    @_serialized_native_operation
+    def swap_disc(self, image_index: int) -> dict[str, object]:
+        """Bounded in-place user-directed swap of a preloaded, readonly disc."""
+        if self._seed is None or self.done:
+            raise EmulatorHostError("emulator_episode_inactive", "Reset before an active disc swap")
+        wanted = _int(image_index, 0, 31, "native disc slot")
+        previous = self.disc_status()
+        if not previous["supported"] or previous["image_count"] < 2:
+            raise EmulatorHostError("native_multiple_discs_unavailable", "Core has not registered multiple discs")
+        if wanted >= previous["image_count"]:
+            raise EmulatorHostError("native_disc_index_invalid", "Disc is not registered by the core")
+        if previous["ejected"]:
+            raise EmulatorHostError("native_disc_tray_open", "Core's disc tray is already open")
+        if wanted == previous["image_index"]:
+            return {
+                "changed": False, "disc_status": previous,
+                "event_chain_sha256": self._disc_chain,
+                "native_emulation_advanced": False,
+            }
+        if self._disc_sequence >= 32:
+            raise EmulatorHostError("native_disc_event_limit", "Session exceeds bounded disc changes")
+        after, blocks = self._exchange("disc_swap", {"image_index": wanted})
+        if blocks or not isinstance(after, dict) or set(after) != {
+            "supported", "interface_version", "image_count", "image_index",
+            "ejected", "previous_image_index", "changed",
+        } or after["changed"] is not True or after["previous_image_index"] != previous["image_index"]:
+            self.close()
+            raise EmulatorHostError("native_disc_response_corrupt", "Native disc swap receipt differs")
+        status = self.disc_status()
+        if (not status["supported"] or status["ejected"]
+            or status["image_count"] != previous["image_count"]
+            or status["image_index"] != wanted
+            or status["interface_version"] != previous["interface_version"]
+            or any(after[key] != status[key] for key in status)):
+            self.close()
+            raise EmulatorHostError("native_disc_switch_unverified", "Disc status changed unexpectedly")
+        receipt = {
+            "schema_version": "skeleton.game.native_disc_swap_receipt.v1",
+            "core_sha256": self.core.library_sha256,
+            "content_digest": self._descriptor["content_digest"],
+            "environment_digest": self.spec.environment_digest,
+            "event_index": self._disc_sequence + 1,
+            "episode_step_before_swap": self._steps,
+            "previous_image_index": previous["image_index"],
+            "selected_image_index": wanted,
+            "registered_disc_count": status["image_count"],
+            "interface_version": status["interface_version"],
+            "previous_disc_chain_sha256": self._disc_chain,
+            "prior_game_transition_sha256": self._chain,
+            "rendered_frame_after_swap": False,
+        }
+        self._disc_chain = _digest(receipt)
+        receipt["receipt_sha256"] = self._disc_chain
+        self._disc_receipts.append(receipt)
+        self._disc_sequence += 1
+        self._chain = _digest(["native_disc_swap", self._chain, self._disc_chain])
+        return {
+            "changed": True, "disc_status": status, "receipt": receipt,
+            "event_chain_sha256": self._disc_chain,
+            "native_emulation_advanced": False,
+        }
+
+    def disc_receipts(self) -> dict[str, object]:
+        """Local, bounded, content-free source provenance of disc operations."""
+        return {
+            "schema_version": "skeleton.game.native_disc_history.v1",
+            "core_sha256": self.core.library_sha256,
+            "content_digest": self._descriptor["content_digest"],
+            "receipts": list(self._disc_receipts),
+            "event_chain_sha256": self._disc_chain,
+            "hardware_fidelity_verified": False,
+            "model_weights_updated": False,
+        }
+
     def reset(self, seed: int = 0) -> dict[str, float]:
         _int(seed, 0, 2**63 - 1, "episode seed")
         self._steps = 0
@@ -924,8 +1039,10 @@ class EmulatorEnvironment:
         metadata, blocks = self._exchange("reset", {"controls": self._controls})
         observation = self._accept_frame(metadata, blocks)
         self._seed = seed
+        disc = self.disc_status()
         self._chain = _digest(
             {
+                "disc_event_chain_sha256": self._disc_chain if disc["supported"] else None,
                 "environment_digest": self.spec.environment_digest,
                 "seed": seed,
                 "actual_native_reset": True,
@@ -984,6 +1101,8 @@ class EmulatorEnvironment:
             "observation": observation,
             "previous_transition_digest": previous,
         }
+        if self.disc_status()["supported"]:
+            evidence["disc_event_chain_sha256"] = self._disc_chain
         self._chain = _digest(evidence)
         return EpisodeStep(
             observation,
@@ -1068,6 +1187,7 @@ class EmulatorEnvironment:
             "hardware_compatibility_verified": False,
         }
 
+    @_serialized_native_operation
     def snapshot(self) -> dict[str, object]:
         if self._seed is None:
             raise EmulatorHostError("emulator_episode_inactive", "Reset before snapshotting native state")
@@ -1111,8 +1231,14 @@ class EmulatorEnvironment:
             raise EmulatorHostError(
                 "native_state_size_unavailable", "Operational snapshot encoding exceeds capacity"
             )
+        status = self.disc_status()
+        if status["supported"]:
+            payload["disc_context"] = {
+                "status": status, "disc_event_chain_sha256": self._disc_chain,
+            }
         return {**payload, "snapshot_digest": _digest(payload)}
 
+    @_serialized_native_operation
     def restore(self, snapshot: Mapping[str, object]) -> dict[str, float]:
         fields = {
             "schema_version",
@@ -1133,11 +1259,19 @@ class EmulatorEnvironment:
         }
         if (
             not isinstance(snapshot, Mapping)
-            or set(snapshot) != fields
+            or set(snapshot) not in (fields, fields | {"disc_context"})
             or snapshot["schema_version"] != SCHEMA
             or snapshot["environment_digest"] != self.spec.environment_digest
         ):
             raise EmulatorHostError("native_state_foreign", "Native savestate schema or environment differs")
+        status = self.disc_status()
+        if status["supported"]:
+            if snapshot.get("disc_context") != {
+                "status": status, "disc_event_chain_sha256": self._disc_chain,
+            }:
+                raise EmulatorHostError("native_disc_state_foreign", "Savestate and current disc provenance differ")
+        elif "disc_context" in snapshot:
+            raise EmulatorHostError("native_disc_state_foreign", "Savestate claims unsupported disc controls")
         size = _int(snapshot["state_size"], 1, MAX_STATE, "native state size")
         frame = _frame_metadata(snapshot["frame"])
         controls = _controls(snapshot["controls"])
