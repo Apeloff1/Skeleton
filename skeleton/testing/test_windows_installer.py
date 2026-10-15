@@ -251,3 +251,13 @@ def test_installed_adaptive_scenario_training_is_packaged_without_auto_training(
     assert '"Adaptive Simulation", self.run_adaptive_sim' in app
     assert '"skeleton.ai.training.jeeves_adaptive_sim_training"' in builder
     assert '"source-bound rehearsals"' not in app.lower()
+
+def test_windows_capacity_growth_is_opt_in_candidate_only():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    installer = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    trainer = Path("skeleton/ai/training/jeeves_production_game_train.py").read_text(encoding="utf-8")
+    assert "test_jeeves_capacity_growth.py" in workflow
+    assert '"skeleton.ai.training.jeeves_capacity_growth"' in installer
+    assert '"--capacity-growth"' in trainer
+    assert '"--max-added-parameters"' in trainer
+    assert "candidate_promoted" in trainer

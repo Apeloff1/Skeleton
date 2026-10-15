@@ -478,3 +478,47 @@ observed reduction or regression. These are *executed* comparisons against
 the original authored source, not merely plausible improvement prose.
 The reverse audit and immutable campaign hash detect forged measurements.
 The output stays quarantined until independent evaluator/rights approval.
+
+### Real candidate parameter growth (no implied trained improvement)
+
+Jeeves' persisted **Torch-stack** speaking model can now acquire *actual
+trainable neurons* in every feed-forward layer by a private, candidate-only
+operation. The operator selects `micro` (+12.5%), `balanced` (+25%),
+`large` (+50%) or `xlarge` (+100%) of FFN width. Existing tensor rows,
+token identities and optimizer counters remain pinned to the live parent,
+while the new incoming FFN rows get deterministic nonzero weights and the
+new outgoing columns start at zero. The widened candidate must reproduce
+parent logits within a strict tolerance *before* training new weights.
+
+This makes genuinely new optimizer-addressable parameters, without
+pretending that larger weights immediately improve game production.
+Growth is limited to 2,000,000 added parameters in a candidate, 16,000,000
+total trainable parameters, independent operator caps, and host memory
+admission. Native non-Torch checkpoints fail closed rather than silently
+switching model architectures. An attested production Torch checkpoint and
+approved training corpus are still required.
+
+```bash
+skeleton-jeeves-production-train --checkpoint LIVE_OWN.json \
+  --expected-sha256 VERIFIED_64_HEX \
+  --dataset-manifest APPROVED_DATASET.json \
+  --capacity-growth balanced --max-added-parameters 500000 \
+  --max-optimizer-steps 10000 --candidate candidate.json --report report.json
+```
+
+To grow the two process-isolated candidate arms differently:
+
+```bash
+python -m skeleton app training-modules --train-mirrors \
+  --dataset-manifest APPROVED_DATASET.json \
+  --attestation LIVE_ATTESTATION.json \
+  --output-directory PRIVATE_OUTPUT_DIR --receipt PRIVATE_OUTPUT_DIR/receipt.json \
+  --constructive-capacity balanced --adversarial-capacity micro \
+  --max-added-parameters 500000
+```
+
+The result records original and grown parameter counts, exact new tensor
+count, parent/candidate checksums, equivalence maximum error, measured
+SGD updates, holdout loss/regression and withheld production promotion.
+These are *capacity and candidate optimization results*, not independent
+proof of improved game-design capabilities.

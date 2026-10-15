@@ -216,7 +216,9 @@
     "skeleton/ai/training/jeeves_cinematic_simulation.py",
     "skeleton/testing/test_jeeves_cinematic_simulation.py",
     "skeleton/ai/training/jeeves_adaptive_sim_training.py",
-    "skeleton/testing/test_jeeves_adaptive_sim_training.py"
+    "skeleton/testing/test_jeeves_adaptive_sim_training.py",
+    "skeleton/ai/training/jeeves_capacity_growth.py",
+    "skeleton/testing/test_jeeves_capacity_growth.py"
   ],
   "architecture": {
     "contract": "machine/architecture.json",
