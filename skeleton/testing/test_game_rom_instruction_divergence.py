@@ -39,6 +39,57 @@ class InstructionSourceReplayCases(unittest.TestCase):
         self.assertFalse(report["production_jeeves_model_promotion"])
         self.assertEqual(report["neural_or_q_training_updates"], 0)
 
+    def test_actual_original_rom_multiphase_sequences_and_reverse_action_order(self):
+        from scripts.run_game_rom_acceptance_suite import _verify_instruction_microtrace, _canonical
+        from pathlib import Path
+        import tempfile
+
+        report = compare_original_rom_instruction_branches(
+            InstructionDivergenceConfig(
+                seed=12, instruction_count=96, sample_stride=4,
+                max_cycles_per_branch=8192,
+                action_subset=("idle", "a"),
+                temporal_sequences=(
+                    ("a", "idle", "right"),
+                    ("right", "idle", "a"),
+                ),
+            ),
+        )
+        self.assertEqual(report["actually_executed_temporal_sequences"], 2)
+        self.assertEqual(report["real_source_instruction_executions"], 2 * 4 * 96)
+        self.assertEqual(report["controlled_source_input_assignment_events"], 8)
+        self.assertEqual(
+            report["actual_passive_and_controller_interventions"][2]["source_input_schedule"],
+            [
+                {"at_source_instruction": 0, "action": "a"},
+                {"at_source_instruction": 32, "action": "idle"},
+                {"at_source_instruction": 64, "action": "right"},
+            ],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "original-cpu-instruction-divergence.json"
+            destination.write_bytes(_canonical(report) + b"\n")
+            checked = _verify_instruction_microtrace(Path(directory))
+            self.assertTrue(checked["accepted"])
+            self.assertEqual(checked["actual_multi_action_sequences"], 2)
+            self.assertEqual(checked["source_controller_assignment_events"], 8)
+
+    def test_schedule_validation_refuses_duplicate_and_oversized_sequences(self):
+        for profiles in (
+            (("a", "a"),),
+            (("a", "right"), ("a", "right")),
+            (("a",) * 9,),
+            (("a", "unsupported"),),
+            (("a", "right"),) * 7,
+            (["a", "right"],),
+        ):
+            with self.subTest(profiles=profiles):
+                with self.assertRaises(InstructionDivergenceError):
+                    InstructionDivergenceConfig(
+                        action_subset=("idle", "right"),
+                        temporal_sequences=profiles,
+                    )
+
     def test_source_microtrace_separates_register_timer_and_full_ram_differences(self):
         baseline = {
             "time_and_video_evidence": [
