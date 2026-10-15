@@ -252,10 +252,26 @@ class LiveComparison:
 
     def _execute_one(self, lane: _Lane, controls: list[dict[str, Any]], *, include_preview: bool = True) -> dict[str, Any]:
         try:
+            previous_frame=(
+                dict(lane.env._frame)
+                if isinstance(lane.env._frame,dict) else None
+            )
+            previous_pixels=getattr(lane.env,"_pixels",None)
             step = lane.env.input_step(controls)
             frame = lane.env._frame
             if not isinstance(frame, dict):
                 raise LiveComparisonError("Native worker omitted actual step video evidence")
+            from .game_comparison_multispectral import native_step_multispectral_receipt
+
+            rgb=getattr(lane.env,"_pixels",None)
+            pcm=getattr(lane.env,"_audio",None)
+            if type(rgb) is bytes and type(pcm) is bytes:
+                multi=native_step_multispectral_receipt(
+                    previous_frame,previous_pixels,frame,rgb,pcm,
+                )
+            else:
+                # Fake test workers never claim measured native spectra.
+                multi=None
             evidence = {
                 "schema_version": "skeleton.game.live_native_step_receipt.v1",
                 "game_id": lane.game["id"],
@@ -274,6 +290,7 @@ class LiveComparison:
                     k: float(step.observation[k])
                     for k in ("screen_mean", "visual_change", "audio_rms", "step_fraction")
                 },
+                "native_multispectral": multi,
                 "source_content_sha256": lane.content_digest,
                 "core_sha256": lane.env.core.library_sha256,
                 "previous_chain_sha256": lane.chain,
