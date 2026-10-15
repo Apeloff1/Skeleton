@@ -88,6 +88,31 @@ fine-tune of the user's existing model, nor the Jeeves LLM:
 This is a minimal educational checkpoint; it cannot be expected to generate
 coherent long-form game designs. A rejection may produce no output artifact.
 
+## Export chat fine-tuning datasets
+
+For transformer/LLM training frameworks, the original curriculum can also be
+exported as standard chat-message JSONL rather than being trained directly by
+the NumPy RNN operator:
+
+    python -m skeleton.ai.runtime.inference.game_pareto_dataset \
+      --output ./game-pareto-train.jsonl
+
+Or, with the package installed:
+
+    skeleton-game-pareto-export --output ./game-pareto-train.jsonl
+
+This writes **three new files** without overwriting any existing file:
+training JSONL (160 records, including repeated core cases), held-out
+evaluation JSONL (16 separate cases), and a manifest JSON with SHA-256 hashes,
+category budgets, and dataset provenance. A manifest is created last, after
+the two data files. Do **not** include the held-out file in training. All
+texts are authored in-repository, not scraped game IP.
+
+These records can be adapted to a compatible LoRA/SFT pipeline by a separate
+operator, with a **model-specific tokenizer, optimizer, checkpoint, and actual
+training execution**. Exporting the dataset performs none of those actions.
+There is no claim that the existing Jeeves LLM has been updated by export.
+
 ## Admission and interpretation
 
 Every run records training loss, held-out aggregate and per-domain loss,
