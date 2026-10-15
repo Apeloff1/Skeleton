@@ -434,6 +434,7 @@ class LiveComparison:
                     "source_content_sha256": lane.content_digest,
                     "core_sha256": lane.env.core.library_sha256,
                     "native_host_disc_receipt_sha256": operation["receipt"]["receipt_sha256"],
+                    "native_host_disc_receipt": dict(operation["receipt"]),
                     "previous_image_index": operation["receipt"]["previous_image_index"],
                     "selected_image_index": status["image_index"],
                     "registered_disc_count": status["image_count"],
