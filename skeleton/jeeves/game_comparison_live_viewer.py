@@ -398,6 +398,10 @@ function panel(side){
  actions.append(doStep,doReset);root.append(actions);
  root.append(txt("p",lane.status+" · timing "+lane.timing_mode+" "+lane.timing_factor+" · lifetime "+lane.lifetime_steps+"/"+lane.max_lifetime_steps+
     " native actions · reset "+lane.reset_count+"/4","stats"));
+ root.append(txt("div","Last measured native throughput: "+
+    (lane.last_burst_native_fps===null?"not measured":lane.last_burst_native_fps+" receipted frames/s")+
+    " · "+(lane.last_burst_wall_ms??"—")+" ms for "+lane.last_burst_receipted_frames+
+    " frames · host wall time only, not guaranteed speed","stats"));
  root.append(txt("div","Frame SHA-256 "+(frame?.frame_sha256||"unavailable")+
     " · native evidence root "+lane.latest_event_chain_sha256,"stats"));
  root.append(graphFor(lane))
