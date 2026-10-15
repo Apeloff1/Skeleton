@@ -824,18 +824,31 @@ class TorchTransformer:
     def _id(self, tok: str) -> int:
         return int(self.stoi.get(tok, self.unk))
 
-    def fit(self, texts: Iterable[str], *, lr: float = 0.06) -> int:
+    def fit(self, texts: Iterable[str], *, lr: float = 0.06,
+            schedule: str = "const") -> int:
+        """Bounded token SGD, compatible with Jeeves's native cosine curriculum."""
         torch = self.torch
-        for g in self._opt.param_groups:
-            g["lr"] = float(lr)
+        if not math.isfinite(float(lr)) or not 0 < float(lr) <= 1:
+            raise ValueError("Torch learning rate must be finite and positive")
+        if schedule not in {"const", "cosine"}:
+            raise ValueError("Torch schedule must be const or cosine")
+        corpus = [tokens(raw) for raw in texts if raw]
+        if len(corpus) > 4096:
+            raise ValueError("Torch single-fit corpus exceeds document budget")
+        total = sum(max(0, len(words) - 1) for words in corpus)
         n = 0
         self.net.train()
-        for raw in texts:
-            body = tokens(raw)
+        for body in corpus:
             if len(body) < 2:
                 continue
             ids = [self._id(t) for t in body]
             for i in range(1, len(ids)):
+                rate = (
+                    float(lr) * 0.5 * (1.0 + math.cos(math.pi * n / max(1, total)))
+                    if schedule == "cosine" else float(lr)
+                )
+                for group in self._opt.param_groups:
+                    group["lr"] = rate
                 window = ids[max(0, i - self.ctx):i]
                 x = torch.tensor([window], dtype=torch.long, device=self.device_obj)
                 y = torch.tensor([ids[i]], dtype=torch.long, device=self.device_obj)
