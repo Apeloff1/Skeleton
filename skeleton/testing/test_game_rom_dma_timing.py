@@ -131,6 +131,74 @@ class ClockedOAMSourceDMATests(unittest.TestCase):
         m._advance(8)
         self.assertEqual(m.dma_index, 1)
 
+    def test_HRAM_CPU_reads_of_WRAM_are_blocked_but_internal_DMA_still_reads_it(self):
+        m = make_machine()
+        m.pc = 0xFF80
+        m.memory[0xFF80] = 0x7E  # LD A,(HL)
+        m._set_pair(2, 0xC000)
+        m.a = 0
+        m.write(0xFF46, 0xC0)
+        m.instruction()
+        self.assertEqual(m.a, 0xFF)
+        self.assertEqual(m.memory[0xFE00], 0x80)
+        self.assertFalse(m._cpu_bus_active)
+
+    def test_HRAM_CPU_write_to_external_bus_during_DMA_has_no_effect(self):
+        m = make_machine()
+        m.pc = 0xFF80
+        m.memory[0xFF80] = 0x77  # LD (HL),A
+        m.a = 0x36
+        m._set_pair(2, 0xC100)
+        m.memory[0xC100] = 0x91
+        m.write(0xFF46, 0xC0)
+        m.instruction()
+        self.assertEqual(m.memory[0xC100], 0x91)
+        self.assertFalse(m._cpu_bus_active)
+
+    def test_HRAM_CPU_can_read_and_write_HRAM_during_DMA(self):
+        m = make_machine()
+        m.pc = 0xFF80
+        m.memory[0xFF80:0xFF84] = bytes((0x7E, 0x77, 0x00, 0x00))
+        m._set_pair(2, 0xFF90)
+        m.memory[0xFF90] = 0xA2
+        m.write(0xFF46, 0xC0)
+        m.instruction()
+        self.assertEqual(m.a, 0xA2)
+        m.a = 0xB5
+        m.instruction()
+        self.assertEqual(m.memory[0xFF90], 0xB5)
+
+    def test_ROM_opcode_fetch_during_DMA_fails_closed_not_fake_training(self):
+        m = make_machine()
+        m.write(0xFF46, 0xC0)
+        original_pc = m.pc
+        with self.assertRaisesRegex(GameRomRuntimeError, "outside HRAM"):
+            m.instruction()
+        self.assertEqual(m.pc, original_pc)
+        self.assertFalse(m._cpu_bus_active)
+
+    def test_DMA_IRQ_bus_phase_fails_closed(self):
+        m = make_machine()
+        m.pc = 0xFF80
+        m.memory[0xFF80] = 0
+        m.write(0xFF46, 0xC0)
+        m.memory[0xFFFF] = 1
+        m.memory[0xFF0F] = 1
+        m.ime = True
+        with self.assertRaisesRegex(GameRomRuntimeError, "IRQ service"):
+            m.instruction()
+        self.assertFalse(m._cpu_bus_active)
+
+    def test_invalid_HRAM_opcode_does_not_leave_CPU_bus_context_attached(self):
+        m = make_machine()
+        m.pc = 0xFF80
+        m.memory[0xFF80] = 0xD3  # Invalid SM83 opcode.
+        m.write(0xFF46, 0xC0)
+        with self.assertRaises(GameRomRuntimeError):
+            m.instruction()
+        self.assertFalse(m._cpu_bus_active)
+        self.assertEqual(m.read(0xC000), 0x80)
+
     def test_reject_unsupported_page_and_tampered_inflight_state(self):
         m = make_machine()
         with self.assertRaises(GameRomRuntimeError):
