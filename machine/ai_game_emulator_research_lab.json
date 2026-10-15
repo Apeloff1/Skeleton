@@ -34,7 +34,9 @@
     "python -m skeleton.jeeves.game_original_rom_goal_training",
     "python scripts/run_game_rom_acceptance_suite.py",
     "python scripts/audit_original_gameboy_mapper_matrix.py",
-    "python scripts/audit_original_rom_instruction_divergence.py"
+    "python scripts/audit_original_rom_instruction_divergence.py",
+    "python scripts/audit_original_gameboy_cpu_opcodes.py",
+    "python scripts/audit_original_gameboy_alu_flags.py"
   ],
   "experimental_conditions": [
     "passive neutral",
@@ -134,7 +136,8 @@
     "skeleton/testing/test_game_rom_virtual_rtc.py",
     "skeleton/testing/test_game_rom_cpu_timer.py",
     "skeleton/testing/test_game_rom_instruction_divergence.py",
-    "skeleton/testing/test_game_rom_dma_timing.py"
+    "skeleton/testing/test_game_rom_dma_timing.py",
+    "skeleton/testing/test_game_original_cpu_conformance.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -147,7 +150,8 @@
     "Native audio savestate and model-based real-run comparisons still need actual approved libretro replay verification",
     "Operator RAM hypotheses are only experimentally controlled numerical measurements, not independently established score/health/victory flags",
     "Pure-Python neural candidate optimizer is CPU bounded and not a production multimodal/transformer weight pipeline",
-    "Experimental OAM DMA does not yet emulate DMG CPU bus lockout or exact sprite fetch contention"
+    "Experimental OAM DMA does not yet emulate DMG CPU bus lockout or exact sprite fetch contention",
+    "Source-hashed emulator runtime is already part of the ROM environment digest, but executable opcode/ALU tests and cycle-perfect PPU/CPU bus stages remain unverified"
   ],
   "operator_docs": [
     "docs/ROM_EMULATOR_COMPLETION.md",
@@ -319,6 +323,8 @@
     "entrypoint": "python scripts/run_game_rom_acceptance_suite.py",
     "readiness": "operator-only, source implementation committed but not yet run",
     "phases": [
+      "500 actual synthetically authored legal CPU opcode variants against pinned CC0 gbdev reference timing; 11 invalid opcodes refused",
+      "5184 actual CPU ALU flag cases against independent mathematical reference",
       "actual original-ROM CPU instruction input divergence traces, independent save/replay and per-sample SHA256",
       "focused synthetic and original ROM regressions",
       "five mapper source bus audit",
@@ -467,5 +473,49 @@
     "producer_source_grounding": "skeleton/jeeves/game_rom_instruction_divergence.py captures real DMA source, byte index/phase and SHA256 of actual sprite OAM",
     "reference": "https://gbdev.io/pandocs/OAM_DMA_Transfer.html",
     "source_tests_executed": false
+  },
+  "sm83_independent_opcode_conformance": {
+    "source": "https://github.com/gbdev/gb-opcodes",
+    "source_commit": "376f61c86fdac2048f7ce5fe838ae756b306017e",
+    "source_license": "CC0-1.0",
+    "vendored_reference": "machine/gbdev_sm83_opcode_reference.json",
+    "operator_commands": [
+      "python scripts/audit_original_gameboy_cpu_opcodes.py --evidence-file /private/source-cpu-opcode-proof.json",
+      "python scripts/audit_original_gameboy_alu_flags.py --evidence-file /private/source-cpu-arithmetic-proof.json"
+    ],
+    "evidence": "500 legal SM83 base-and-CB combinations executed from owned synthetic ROM cartridges, each independently replayed and compared to pinned upstream T-cycle reference",
+    "opcode_counts": {
+      "legal_base_including_prefix_dispatch": 245,
+      "nonprefixed_base_instructions_executed": 244,
+      "cb_subopcodes_executed": 256,
+      "invalid_base_denied": 11,
+      "legal_single_step_instructions_and_replays": 1000,
+      "individual_reference_timing_comparisons": 500
+    },
+    "arithmetic": {
+      "real_flag_reference_cases": 5184,
+      "operations": [
+        "ADD",
+        "ADC",
+        "SUB",
+        "SBC",
+        "AND",
+        "XOR",
+        "OR",
+        "CP"
+      ],
+      "unique_boundary_bytes": 18,
+      "independent_expected_flags": [
+        "Z",
+        "N",
+        "H",
+        "C"
+      ]
+    },
+    "evidence_gate": "scripts/run_game_rom_acceptance_suite.py blocks verified neural candidate if opcode or independent ALU source proofs missing or inconsistent",
+    "test": "skeleton/testing/test_game_original_cpu_conformance.py",
+    "current_execution_verified": false,
+    "hardware_cycle_accuracy_certified": false,
+    "production_model_promotion": false
   }
 }
