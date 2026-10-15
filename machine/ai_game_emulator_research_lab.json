@@ -84,7 +84,8 @@
       "hidden_width": 64,
       "epochs": 40,
       "minibatch": 64,
-      "source_examples": 8192
+      "source_examples": 8192,
+      "max_compute_units": 300000000
     },
     "receipt_validation": "reconstitute policy+evidence SHA256 report; verify every committed episode/trace/sequence and rights assertion",
     "optimizer_measures": [
@@ -97,12 +98,24 @@
     "automatic_jeeves_production_transformer_update": false,
     "automatic_promotion": false,
     "weights_trained_in_this_commit": false,
-    "requirement_for_success": "independent local executable run on rights-cleared real ROMs and non-degenerate heldout improvement"
+    "requirement_for_success": "independent local executable run on rights-cleared real ROMs and non-degenerate heldout improvement",
+    "default_max_compute_units": 50000000,
+    "imported_checkpoint_validation": [
+      "source digests and own checksum",
+      "typed source observation/action dimensions",
+      "exact finite two-layer weight matrix lengths",
+      "finite normalization and training values",
+      "bounded width and parameter count",
+      "explicit candidate-only production flag"
+    ],
+    "minibatch_cancellation_check": true
   },
   "tests_added": [
     "skeleton/testing/test_game_emulator_training_lab.py",
     "skeleton/testing/test_game_emulator_advanced_experiments.py",
     "skeleton/testing/test_game_emulator_neural_world.py",
+    "skeleton/testing/test_game_emulator_physical_planning.py",
+    "skeleton/testing/test_game_emulator_operator_goals.py",
     "skeleton/testing/test_game_emulator_physical_planning.py",
     "skeleton/testing/test_game_emulator_operator_goals.py"
   ],
@@ -115,7 +128,8 @@
     "Source-rights assertion is not third-party independent legal clearance",
     "No game-event semantic classifier, joystick skill mastery, audiovisual cinematic labels, realtime cross-platform debugger, production LLM weight update or capability promotion has been verified",
     "Native audio savestate and model-based real-run comparisons still need actual approved libretro replay verification",
-    "Operator RAM hypotheses are only experimentally controlled numerical measurements, not independently established score/health/victory flags"
+    "Operator RAM hypotheses are only experimentally controlled numerical measurements, not independently established score/health/victory flags",
+    "Pure-Python neural candidate optimizer is CPU bounded and not a production multimodal/transformer weight pipeline"
   ],
   "operator_docs": [
     "docs/ROM_EMULATOR_COMPLETION.md",
