@@ -1,10 +1,12 @@
 """Conflict-aware work graph with dependency, frontier, critical-path, and parallelism intelligence."""
 from __future__ import annotations
-from dataclasses import dataclass, field
+
 import hashlib
-from typing import Iterable
+from dataclasses import dataclass, field
+
 from .model import RepositoryModel
-from .planner import WorkCandidate, derive_work_candidates
+from .planner import derive_work_candidates
+
 
 @dataclass(frozen=True, slots=True)
 class WorkNode:
@@ -30,9 +32,15 @@ class WorkGraph:
             if i in visiting: raise ValueError(f"work graph contains prerequisite cycle at {i}")
             if i in visited:return depth[i]
             visiting.add(i); d=0
-            for p in by[i].prerequisites:d=max(d,visit(p)+1); descendants[p].add(i); descendants[p].update(descendants[i])
+            for p in by[i].prerequisites:d=max(d,visit(p)+1)
             visiting.remove(i); visited.add(i); depth[i]=d; return d
         for i in by:visit(i)
+        # Propagate completed descendant sets from leaves toward roots. Adding
+        # children during prerequisite traversal loses grandchildren whenever
+        # an ancestor was visited before its deeper descendants.
+        for i in sorted(by,key=lambda identity:depth[identity],reverse=True):
+            for p in by[i].prerequisites:
+                descendants[p].add(i); descendants[p].update(descendants[i])
         max_depth=max(depth.values(),default=0); enriched=[]
         for n in ordered:
             unlock=len(descendants[n.identity]); strategic=min(100,max(0,n.decision_score+min(25,unlock*5)+min(15,depth[n.identity]*3)+min(10,n.blast_radius*2)+min(10,n.topology_confidence//10)+(10 if max_depth and depth[n.identity]==max_depth else 0)))
@@ -84,7 +92,7 @@ class WorkGraph:
         return count
     def node_pressure(self,identity):return self._pressure(self.node(identity))
     def downstream_value(self,identity):
-        node=self.node(identity);return min(100,node.strategic_score+sum(min(10,self._by_identity[d].strategic_score//10) for d in self._descendants[identity]))
+        node=self.node(identity);return min(100,node.strategic_score+sum(self._by_identity[d].strategic_score for d in self._descendants[identity]))
     def conflict_density(self,identity):
         node=self.node(identity);keys=set(node.conflict_keys)
         if not keys:return 0

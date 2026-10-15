@@ -16,7 +16,7 @@ import sys
 import threading
 import webbrowser
 
-from skeleton.app.assembly import compose_command, load_manifest
+from skeleton.app.assembly import checks_ok, compose_command, load_manifest, preflight, public_service_urls
 from skeleton.app.health import probe_application, probes_ok
 from skeleton.app.installer import InstallReceipt, install_application
 from skeleton.app.preloader import PreloadReport, inspect_host
@@ -43,6 +43,8 @@ def _hidden_runner(
     text: bool = False,
     timeout: float | None = None,
     env=None,
+    stdout=None,
+    stderr=None,
 ):
     """Run an argument-vector child process without a Windows console flash."""
 
@@ -55,6 +57,8 @@ def _hidden_runner(
         text=text,
         timeout=timeout,
         env=env,
+        stdout=stdout,
+        stderr=stderr,
         shell=False,
         creationflags=creationflags,
     )
@@ -86,6 +90,17 @@ def _format_receipt(receipt: InstallReceipt) -> str:
     lines.append("")
     lines.append("Runtime is ready." if receipt.ok else "Setup stopped at a failed phase.")
     return "\n".join(lines)
+
+
+def _action_succeeded(result: object) -> bool:
+    """Do not report GUI success when an operation returns a failure receipt."""
+    if isinstance(result, InstallReceipt):
+        return result.ok
+    if isinstance(result, PreloadReport):
+        return result.ready
+    if isinstance(result, tuple) and result and isinstance(result[0], bool):
+        return result[0]
+    return True
 
 
 def check_host(root: Path | None = None) -> PreloadReport:
@@ -136,20 +151,24 @@ def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
             timeout=90,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        return False, f"Unable to stop services: {type(exc).__name__}: {exc}"
+        return False, f"Unable to stop services: {type(exc).__name__}; check Docker Desktop"
     if completed.returncode == 0:
         return True, "Skeleton services stopped."
-    detail = (completed.stderr or completed.stdout or "").strip().splitlines()
-    tail = detail[-1][:300] if detail else f"exit {completed.returncode}"
-    return False, f"Stop command failed: {tail}"
+    # Docker may echo environment values in diagnostics. Do not surface
+    # unredacted child stderr/stdout in the installed GUI or CLI.
+    return False, f"Stop command failed with exit {completed.returncode}"
 
 
 def runtime_status(root: Path | None = None) -> tuple[bool, str]:
-    del root
+    root = (root or installation_root()).resolve()
     try:
-        results = probe_application(manifest=load_manifest(), timeout=2.0)
+        manifest = load_manifest()
+        urls = public_service_urls(root, manifest=manifest)
+        results = probe_application(
+            manifest=manifest, timeout=2.0, public_url_overrides=urls,
+        )
     except Exception as exc:
-        return False, f"Runtime probe failed: {type(exc).__name__}: {exc}"
+        return False, f"Runtime probe failed: {type(exc).__name__}; check local port configuration"
     if not results:
         return False, "No public health probes are configured."
     lines = []
@@ -158,6 +177,23 @@ def runtime_status(root: Path | None = None) -> tuple[bool, str]:
         status = result.status if result.status is not None else "-"
         lines.append(f"[{state}] {result.service}: HTTP {status} — {result.detail}")
     return probes_ok(results), "\n".join(lines)
+
+
+def open_running_application(root: Path | None = None) -> tuple[bool, str]:
+    """Probe off the GUI thread and open the browser only after readiness."""
+    online, detail = runtime_status(root)
+    if not online:
+        return False, "Application not ready:\n" + detail
+    try:
+        app_url = public_service_urls(
+            (root or installation_root()).resolve(),
+        ).get("frontend", APP_URL)
+        opened = webbrowser.open(app_url)
+    except (OSError, ValueError, webbrowser.Error) as exc:
+        return False, f"Application is ready; browser failed: {type(exc).__name__}"
+    if not opened:
+        return False, f"Application ready at {app_url}; no browser accepted the URL"
+    return True, f"Application opened at {app_url}\n" + detail
 
 
 class WindowsLauncher:
@@ -282,9 +318,9 @@ class WindowsLauncher:
             try:
                 result = work()
                 rendered = render(result)
-                error = None
+                error = None if _action_succeeded(result) else RuntimeError("operation returned unsuccessful result")
             except Exception as exc:
-                rendered = f"{type(exc).__name__}: {exc}"
+                rendered = f"{type(exc).__name__}: operation failed; see local runtime diagnostics"
                 error = exc
 
             def finish() -> None:
@@ -330,13 +366,11 @@ class WindowsLauncher:
         )
 
     def open_app(self) -> None:
-        online, detail = runtime_status(self.app_root)
-        self._set_log(detail)
-        if online:
-            webbrowser.open(APP_URL)
-            self.status.set("Application opened")
-        else:
-            self.status.set("Application is not ready")
+        self._run_worker(
+            "Checking application before opening…",
+            lambda: open_running_application(self.app_root),
+            lambda result: result[1],
+        )
 
     def local_ai(self) -> None:
         """Run real native checkpoint inference inside the installed GUI.
@@ -543,8 +577,17 @@ def _headless(args: argparse.Namespace, root: Path) -> int:
             return 0 if ready else 1
         except Exception as exc:
             if not args.quiet:
-                print("GGUF local acceptance failed: " + str(exc))
+                print("GGUF local acceptance failed: " + type(exc).__name__)
             return 1
+    if args.verify_payload:
+        # Docker-free verification of the real installed, frozen payload.
+        # Check the same architecture manifest paths that runtime setup uses.
+        checks = preflight(root, runtime=False, manifest=load_manifest())
+        if not args.quiet:
+            for check in checks:
+                state = "PASS" if check.ok else ("WARN" if not check.required else "FAIL")
+                print(f"[{state}] {check.code}: {check.message}")
+        return 0 if checks_ok(checks) else 1
     if args.check:
         report = check_host(root)
         if not args.quiet:
@@ -566,19 +609,18 @@ def _headless(args: argparse.Namespace, root: Path) -> int:
             print(detail)
         return 0 if ok else 1
     if args.open:
-        online, detail = runtime_status(root)
+        opened, detail = open_running_application(root)
         if not args.quiet:
             print(detail)
-        if online:
-            webbrowser.open(APP_URL)
-            return 0
-        return 1
+        return 0 if opened else 1
     return -1
 
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="Skeleton.exe")
     mode = result.add_mutually_exclusive_group()
+    mode.add_argument("--verify-payload", action="store_true",
+                      help="verify installed application source payload without Docker")
     mode.add_argument("--check", action="store_true")
     mode.add_argument("--repair", action="store_true")
     mode.add_argument("--start", action="store_true")

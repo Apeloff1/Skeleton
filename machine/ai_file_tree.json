@@ -937,7 +937,7 @@
       "source": "skeleton/security",
       "destination": "skeleton/ai/runtime/security",
       "kind": "tree",
-      "source_git_object_sha": "0b3b07eaeb8f67e02597d5e2147ceacdf7fc1d4b",
+      "source_git_object_sha": "e81bed1065ad6f5ac8cec82aa24613a56570c1a1",
       "role": "AI runtime security and activation controls",
       "work_package_refs": [
         "WP-W00",
@@ -5683,6 +5683,18 @@
         "deduplication.py",
         "distillation.py",
         "flgb_training_runtime.py",
+        "jeeves_game_corpus.py",
+        "jeeves_game_corpus_builder.py",
+        "jeeves_game_design_benchmark.py",
+        "jeeves_game_design_review_cli.py",
+        "jeeves_game_design_review_gate.py",
+        "jeeves_game_vocabulary.py",
+        "jeeves_production_game_recovery.py",
+        "jeeves_production_game_session.py",
+        "jeeves_production_game_train.py",
+        "jeeves_production_readiness.py",
+        "jeeves_torch_game_vocabulary.py",
+        "jeeves_training_progress.py",
         "lifecycle_proof.py",
         "mirror_room_evaluation.py",
         "model_release_journal.py",
@@ -6488,7 +6500,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "179_mapping_plus_33_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
+  "validation_state": "179_mapping_plus_45_native_owner_current_main_governance_path_reconciled_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7454,7 +7466,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 33
+    "native_ai_owner_count": 45
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -8517,6 +8529,138 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Sparse-model capability qualification and accounting.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-CORPUS",
+      "path": "skeleton/ai/training/jeeves_game_corpus.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-CORPUS-BUILDER",
+      "path": "skeleton/ai/training/jeeves_game_corpus_builder.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-DESIGN-BENCHMARK",
+      "path": "skeleton/ai/training/jeeves_game_design_benchmark.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-DESIGN-REVIEW-CLI",
+      "path": "skeleton/ai/training/jeeves_game_design_review_cli.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-DESIGN-REVIEW-GATE",
+      "path": "skeleton/ai/training/jeeves_game_design_review_gate.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-GAME-VOCABULARY",
+      "path": "skeleton/ai/training/jeeves_game_vocabulary.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-PRODUCTION-GAME-RECOVERY",
+      "path": "skeleton/ai/training/jeeves_production_game_recovery.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-PRODUCTION-GAME-SESSION",
+      "path": "skeleton/ai/training/jeeves_production_game_session.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-PRODUCTION-GAME-TRAIN",
+      "path": "skeleton/ai/training/jeeves_production_game_train.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-PRODUCTION-READINESS",
+      "path": "skeleton/ai/training/jeeves_production_readiness.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native Jeeves production game learning and review implementation, intentionally separate from the legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-TORCH-GAME-VOCABULARY",
+      "path": "skeleton/ai/training/jeeves_torch_game_vocabulary.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native game-specific model learning and training progress tracking, owned outside the staged legacy training mirror.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-JEEVES-JEEVES-TRAINING-PROGRESS",
+      "path": "skeleton/ai/training/jeeves_training_progress.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "AI-native game-specific model learning and training progress tracking, owned outside the staged legacy training mirror.",
       "volume_refs": [
         "VOL-006"
       ]

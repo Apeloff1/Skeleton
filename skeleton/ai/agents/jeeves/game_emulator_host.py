@@ -26,6 +26,7 @@ import time
 import zlib
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
+from functools import wraps
 from pathlib import Path
 
 from .game_emulator_catalog import (
@@ -39,6 +40,8 @@ from .game_learning_runtime import EpisodeStep, GameEnvironmentSpec
 
 SCHEMA = "skeleton.libretro_environment.v1"
 MAX_STATE = 64 * 1024 * 1024
+MAX_SAVE_RAM = 8 * 1024 * 1024
+SAVE_RAM_SCHEMA = "skeleton.game.native_save_ram_checkpoint.v1"
 MAX_SNAPSHOT_JSON = 8 * 1024 * 1024
 MAX_PRIVATE_CONTENT_COPY = 64 * 1024 * 1024
 MAX_PIXELS = 4_194_304
@@ -79,6 +82,7 @@ _KEY_ACTIONS = {
     "key_s": 115,
 }
 _EMPTY = {"buttons": 0, "axes": [0, 0, 0, 0], "keys": [], "mouse": [0, 0, 0, 0, 0, 0], "pointer": [0, 0, 0]}
+_PORT_DEVICE_IDS = {"none": 0, "joypad": 1, "mouse": 2, "keyboard": 3, "analog": 5, "pointer": 6}
 
 
 class EmulatorHostError(ValueError):
@@ -165,6 +169,85 @@ def _controls(value: object) -> list[dict[str, object]]:
     return result
 
 
+def _controller_ports(value: object) -> tuple[str, ...]:
+    if value is None:
+        return ("joypad",) * 4
+    if not isinstance(value, (list, tuple)) or not 1 <= len(value) <= 4:
+        raise EmulatorHostError("invalid_emulator_device", "Exactly 1–4 declared controller ports are required")
+    if any(type(name) is not str or name not in _PORT_DEVICE_IDS for name in value):
+        raise EmulatorHostError("invalid_emulator_device", "Controller devices must use the finite supported libretro device IDs")
+    return tuple(value) + ("none",) * (4 - len(value))
+
+
+def _native_controller_profile(
+    system_info: Mapping[str, object], selected_ports: tuple[str, ...]
+) -> dict[str, object]:
+    """Validate the worker's native libretro advertisements before UI exposure.
+
+    These are untrusted labels from an approved native core. An absent announcement
+    must not be promoted to verified controller support.
+    """
+    if system_info.get("controller_port_devices") != list(selected_ports):
+        raise EmulatorHostError("native_device_mismatch", "Native core controller routing differs")
+    raw = system_info.get("controller_capabilities")
+    if raw is not None and (not isinstance(raw, list) or len(raw) > 4):
+        raise EmulatorHostError("native_device_mismatch", "Native controller advertisement shape differs")
+    advertised = []
+    if raw is not None:
+        for rows in raw:
+            if not isinstance(rows, list) or len(rows) > 32:
+                raise EmulatorHostError("native_device_mismatch", "Native port device capacity differs")
+            ids = set()
+            parsed = []
+            for row in rows:
+                if not isinstance(row, dict) or set(row) != {"device_id", "description"}:
+                    raise EmulatorHostError("native_device_mismatch", "Native controller declaration differs")
+                device_id = _int(row["device_id"], 0, 65535, "native controller ID")
+                label = row["description"]
+                if device_id in ids or type(label) is not str or len(label) > 128:
+                    raise EmulatorHostError("native_device_mismatch", "Native controller ID or legend differs")
+                ids.add(device_id)
+                parsed.append({"device_id": device_id, "description": label})
+            advertised.append(parsed)
+    raw_labels = system_info.get("input_descriptors")
+    if not isinstance(raw_labels, list) or len(raw_labels) > 128:
+        raise EmulatorHostError("native_device_mismatch", "Native control descriptor capacity differs")
+    labels = []
+    for row in raw_labels:
+        if not isinstance(row, dict) or set(row) != {"port", "device", "index", "id", "label"}:
+            raise EmulatorHostError("native_device_mismatch", "Native control descriptor shape differs")
+        label = row["label"]
+        if type(label) is not str or len(label) > 128:
+            raise EmulatorHostError("native_device_mismatch", "Native control legend exceeds bounds")
+        labels.append({
+            "port": _int(row["port"], 0, 3, "native input port"),
+            "device": _int(row["device"], 0, 65535, "native input device"),
+            "index": _int(row["index"], 0, 32, "native input index"),
+            "id": _int(row["id"], 0, 65535, "native input ID"),
+            "label": label,
+        })
+    statuses = []
+    for port, name in enumerate(selected_ports):
+        statuses.append(
+            "disconnected" if name == "none" else
+            "not_advertised" if raw is None or port >= len(advertised) else
+            "core_advertised" if _PORT_DEVICE_IDS[name] in {
+                item["device_id"] for item in advertised[port]
+            } else "core_unlisted"
+        )
+    if system_info.get("controller_routing_evidence") != statuses:
+        raise EmulatorHostError("native_device_mismatch", "Native routing verdict is inconsistent")
+    return {
+        "schema_version": "skeleton.libretro.controller_evidence.v1",
+        "devices": list(selected_ports),
+        "core_advertised_types": advertised if raw is not None else None,
+        "core_input_descriptors": labels,
+        "port_status": statuses,
+        "hardware_input_verified": False,
+        "notes": "Core advertisements are observed native metadata, not proof of physical controller or gameplay compatibility",
+    }
+
+
 def _frame_metadata(value: object) -> dict[str, object]:
     fields = {
         "width",
@@ -175,6 +258,7 @@ def _frame_metadata(value: object) -> dict[str, object]:
         "video_callbacks",
         "runs",
         "audio_frames",
+        "audio_sha256",
         "sample_rate",
         "fps",
         "audio_available",
@@ -199,6 +283,7 @@ def _frame_metadata(value: object) -> dict[str, object]:
     ):
         _int(value[key], lower, upper, key)
     _sha(value["pixel_sha256"])
+    _sha(value["audio_sha256"])
     for key, upper in (("sample_rate", 384000), ("fps", 1000)):
         item = value[key]
         if item is not None and (
@@ -423,6 +508,15 @@ def _png(pixels: bytes, width: int, height: int) -> tuple[dict[str, object], byt
     }, image
 
 
+def _serialized_native_operation(method):
+    """Keep multi-command disk/savestate operations coherent on the same worker."""
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapped
+
+
 class EmulatorEnvironment:
     def __init__(
         self,
@@ -434,6 +528,7 @@ class EmulatorEnvironment:
         reader: Callable | None = None,
         max_steps: int = 512,
         frames_per_step: int = 1,
+        controller_devices: Sequence[str] | None = None,
         timeout_seconds: float = 5,
         cancelled: Callable[[], bool] | None = None,
     ):
@@ -453,6 +548,7 @@ class EmulatorEnvironment:
         self.core = core
         self.max_steps = _int(max_steps, 1, 4096, "episode steps")
         self.frames_per_step = _int(frames_per_step, 1, 60, "frames per step")
+        self._controller_devices = _controller_ports(controller_devices)
         if (
             type(timeout_seconds) not in (int, float)
             or not math.isfinite(timeout_seconds)
@@ -476,7 +572,7 @@ class EmulatorEnvironment:
         self._content_root, entry, files, materialized_digest = _prepared(descriptor, cancelled=cancelled)
         self._code_bindings = {
             name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest()
-            for name in ("game_emulator_host.py", "game_emulator_worker.py", "game_emulator_protocol.py")
+            for name in ("game_emulator_host.py", "game_emulator_worker.py", "game_emulator_protocol.py", "game_emulator_timing.py")
         }
         self._descriptor = {
             "schema_version": SCHEMA,
@@ -492,6 +588,7 @@ class EmulatorEnvironment:
             "files": list(files),
             "max_episode_steps": self.max_steps,
             "frames_per_step": self.frames_per_step,
+            "controller_port_devices": list(self._controller_devices),
             "source_code_digest": _digest(self._code_bindings),
             "host_python": list(sys.version_info[:3]),
             "worker_interpreter_sha256": self._interpreter_sha256,
@@ -505,7 +602,7 @@ class EmulatorEnvironment:
         self.spec = GameEnvironmentSpec(
             "libretro:" + core.core_id + ":" + materialized_digest[:24],
             _digest(self._descriptor),
-            (*_ACTIONS, *_KEY_ACTIONS),
+            (*_ACTIONS, *_KEY_ACTIONS, "controller_input"),
             {key: bins for key in ("screen_mean", "visual_change", "audio_rms", "step_fraction")},
             ("visual_change",),
             self.max_steps,
@@ -520,9 +617,14 @@ class EmulatorEnvironment:
         self._observation = None
         self._controls = [json.loads(json.dumps(_EMPTY))]
         self._chain = ""
+        self._disc_sequence = 0
+        self._save_ram_imported = False
+        self._disc_receipts: list[dict[str, object]] = []
+        self._disc_chain = ""
         try:
             self._start(entry)
             self.spec = replace(self.spec, environment_digest=_digest(self._descriptor))
+            self._disc_chain = _digest(["native_disc_control", self.spec.environment_digest])
         except (OSError, ValueError, RuntimeError):
             self.close()
             raise
@@ -535,6 +637,12 @@ class EmulatorEnvironment:
             "spec": self.spec.as_dict(),
             "system_info": self._system_info,
         }
+
+    @property
+    def controller_profile(self) -> dict[str, object]:
+        """Native controller legends suitable for presentation *below* the game viewport."""
+        self._authority()
+        return json.loads(json.dumps(self._native_controller_profile))
 
     @property
     def done(self) -> bool:
@@ -729,6 +837,7 @@ class EmulatorEnvironment:
             "library_sha256": self.core.library_sha256,
             "entrypoint": "/content/" + entry,
             "options": json.loads(self.core.options_json),
+            "controller_port_devices": list(self._controller_devices),
         }
         metadata, blocks = self._exchange("initialize", payload, authority=False)
         if (
@@ -753,6 +862,8 @@ class EmulatorEnvironment:
         self._descriptor["worker_runtime"] = dict(runtime)
         self._descriptor["python"] = list(runtime["version"])
         self._system_info = metadata["system_info"]
+        self._native_controller_profile = _native_controller_profile(self._system_info, self._controller_devices)
+        self._descriptor["core_controller_profile_digest"] = _digest(self._native_controller_profile)
         self._registry.revalidate(self.core)
 
     def _read_loop(self) -> None:
@@ -874,6 +985,8 @@ class EmulatorEnvironment:
             or not isinstance(audio, bytes)
             or len(audio) % 4
             or len(audio) > 131072 * 4
+            or len(audio) // 4 != metadata["audio_frames"]
+            or hashlib.sha256(audio).hexdigest() != metadata["audio_sha256"]
         ):
             raise EmulatorHostError("native_frame_corrupt", "Actual frame/audio geometry or checksum differs")
         change = (
@@ -893,6 +1006,113 @@ class EmulatorEnvironment:
         }
         return dict(self._observation)
 
+    def disc_status(self) -> dict[str, object]:
+        """Report only core-registered disc counts/state, never filesystem paths."""
+        value, blocks = self._exchange("disc_status", {})
+        if blocks or not isinstance(value, dict) or set(value) != {
+            "supported", "interface_version", "image_count", "image_index", "ejected"
+        }:
+            self.close()
+            raise EmulatorHostError("native_disc_status_corrupt", "Disk status payload differs")
+        if type(value["supported"]) is not bool:
+            self.close()
+            raise EmulatorHostError("native_disc_status_corrupt", "Native disk support flag differs")
+        if not value["supported"]:
+            if (value["interface_version"] is not None or value["image_count"] != 0
+                or value["image_index"] is not None or value["ejected"] is not None):
+                self.close()
+                raise EmulatorHostError("native_disc_status_corrupt", "Absent disk capability claimed media")
+        elif (
+            type(value["interface_version"]) is not int
+            or value["interface_version"] not in (0, 1)
+            or type(value["image_count"]) is not int or not 1 <= value["image_count"] <= 32
+            or type(value["ejected"]) is not bool
+            or not (
+                (value["image_index"] is None and value["ejected"] is True)
+                or (type(value["image_index"]) is int
+                    and 0 <= value["image_index"] < value["image_count"])
+            )
+        ):
+            self.close()
+            raise EmulatorHostError("native_disc_status_corrupt", "Native disk geometry exceeds bounds")
+        return dict(value)
+
+    @_serialized_native_operation
+    def swap_disc(self, image_index: int) -> dict[str, object]:
+        """Bounded in-place user-directed swap of a preloaded, readonly disc."""
+        if self._seed is None or self.done:
+            raise EmulatorHostError("emulator_episode_inactive", "Reset before an active disc swap")
+        wanted = _int(image_index, 0, 31, "native disc slot")
+        previous = self.disc_status()
+        if not previous["supported"] or previous["image_count"] < 2:
+            raise EmulatorHostError("native_multiple_discs_unavailable", "Core has not registered multiple discs")
+        if wanted >= previous["image_count"]:
+            raise EmulatorHostError("native_disc_index_invalid", "Disc is not registered by the core")
+        if previous["ejected"]:
+            raise EmulatorHostError("native_disc_tray_open", "Core's disc tray is already open")
+        if wanted == previous["image_index"]:
+            return {
+                "changed": False, "disc_status": previous,
+                "event_chain_sha256": self._disc_chain,
+                "native_emulation_advanced": False,
+            }
+        if self._disc_sequence >= 32:
+            raise EmulatorHostError("native_disc_event_limit", "Session exceeds bounded disc changes")
+        after, blocks = self._exchange("disc_swap", {"image_index": wanted})
+        if blocks or not isinstance(after, dict) or set(after) != {
+            "supported", "interface_version", "image_count", "image_index",
+            "ejected", "previous_image_index", "changed",
+        } or after["changed"] is not True or after["previous_image_index"] != previous["image_index"]:
+            self.close()
+            raise EmulatorHostError("native_disc_response_corrupt", "Native disc swap receipt differs")
+        status = self.disc_status()
+        if (not status["supported"] or status["ejected"]
+            or status["image_count"] != previous["image_count"]
+            or status["image_index"] != wanted
+            or status["interface_version"] != previous["interface_version"]
+            or any(after[key] != status[key] for key in status)):
+            self.close()
+            raise EmulatorHostError("native_disc_switch_unverified", "Disc status changed unexpectedly")
+        receipt = {
+            "schema_version": "skeleton.game.native_disc_swap_receipt.v1",
+            "core_sha256": self.core.library_sha256,
+            "content_digest": self._descriptor["content_digest"],
+            "environment_digest": self.spec.environment_digest,
+            "event_index": self._disc_sequence + 1,
+            "episode_step_before_swap": self._steps,
+            "previous_image_index": previous["image_index"],
+            "selected_image_index": wanted,
+            "registered_disc_count": status["image_count"],
+            "interface_version": status["interface_version"],
+            "previous_disc_chain_sha256": self._disc_chain,
+            "prior_game_transition_sha256": self._chain,
+            "rendered_frame_after_swap": False,
+        }
+        self._disc_chain = _digest(receipt)
+        receipt["receipt_sha256"] = self._disc_chain
+        self._disc_receipts.append(receipt)
+        self._disc_sequence += 1
+        self._chain = _digest(["native_disc_swap", self._chain, self._disc_chain])
+        return {
+            "changed": True, "disc_status": status, "receipt": receipt,
+            "event_chain_sha256": self._disc_chain,
+            "native_emulation_advanced": False,
+        }
+
+    @_serialized_native_operation
+    def disc_receipts(self) -> dict[str, object]:
+        """Local, bounded, content-free source provenance of disc operations."""
+        return {
+            "schema_version": "skeleton.game.native_disc_history.v1",
+            "core_sha256": self.core.library_sha256,
+            "content_digest": self._descriptor["content_digest"],
+            "receipts": list(self._disc_receipts),
+            "event_chain_sha256": self._disc_chain,
+            "hardware_fidelity_verified": False,
+            "model_weights_updated": False,
+        }
+
+    @_serialized_native_operation
     def reset(self, seed: int = 0) -> dict[str, float]:
         _int(seed, 0, 2**63 - 1, "episode seed")
         self._steps = 0
@@ -903,8 +1123,10 @@ class EmulatorEnvironment:
         metadata, blocks = self._exchange("reset", {"controls": self._controls})
         observation = self._accept_frame(metadata, blocks)
         self._seed = seed
+        disc = self.disc_status()
         self._chain = _digest(
             {
+                "disc_event_chain_sha256": self._disc_chain if disc["supported"] else None,
                 "environment_digest": self.spec.environment_digest,
                 "seed": seed,
                 "actual_native_reset": True,
@@ -962,14 +1184,41 @@ class EmulatorEnvironment:
             "continuation_digest": self._chain,
         }
 
-    def _step(self, controls: list[Mapping[str, object]], action: str | None) -> EpisodeStep:
+    def input_frame_step(
+        self, controls: Sequence[Mapping[str, object]], frames: int = 1,
+    ) -> EpisodeStep:
+        """Core-neutral frame precision: a real bounded retro_run count, never a playback illusion."""
+        if not isinstance(controls, (tuple, list)) or not 1 <= len(controls) <= 4:
+            raise EmulatorHostError("invalid_emulator_controller", "Controller ports exceed capacity")
+        count = _int(frames, 1, 60, "native frame precision")
+        return self._step(_controls(controls), None, frame_count=count)
+
+    @_serialized_native_operation
+    def _step(
+        self, controls: list[Mapping[str, object]], action: str | None,
+        *, frame_count: int | None = None,
+    ) -> EpisodeStep:
         if self._seed is None or self.done:
             raise EmulatorHostError(
                 "emulator_episode_inactive", "Reset an active native episode before stepping"
             )
         controls = _controls(controls)
+        requested_frames = (
+            self.frames_per_step if frame_count is None
+            else _int(frame_count, 1, 60, "native frame precision")
+        )
+        # Inert input on disconnected ports is not accepted as training evidence.
+        # Never record an action as applied if no hardware port can receive it.
+        for port, row in enumerate(controls):
+            if self._controller_devices[port] == "none" and (
+                row["buttons"] or any(row["axes"]) or row["keys"]
+                or any(row["mouse"]) or any(row["pointer"])
+            ):
+                raise EmulatorHostError(
+                    "invalid_emulator_controller", "Unconnected native controller port carries input"
+                )
         previous = self._chain
-        metadata, blocks = self._exchange("step", {"frames": self.frames_per_step, "controls": controls})
+        metadata, blocks = self._exchange("step", {"frames": requested_frames, "controls": controls})
         self._steps += 1
         observation = self._accept_frame(metadata, blocks)
         self._controls = json.loads(json.dumps(controls))
@@ -982,15 +1231,20 @@ class EmulatorEnvironment:
             "episode_step": self._steps,
             "policy_action": action,
             "controller_digest": _digest(controls),
+            "core_controller_profile_digest": self._descriptor["core_controller_profile_digest"],
             "controller_only": action is None,
             "frame_digest": metadata["pixel_sha256"],
             "native_runs": metadata["runs"],
+            "requested_native_frames": requested_frames,
             "video_callbacks": metadata["video_callbacks"],
             "audio_frames": metadata["audio_frames"],
+            "audio_sha256": metadata["audio_sha256"],
             "reward_components": rewards,
             "observation": observation,
             "previous_transition_digest": previous,
         }
+        if self.disc_status()["supported"]:
+            evidence["disc_event_chain_sha256"] = self._disc_chain
         self._chain = _digest(evidence)
         return EpisodeStep(
             observation,
@@ -1004,6 +1258,58 @@ class EmulatorEnvironment:
             },
             self._chain,
         )
+
+    @_serialized_native_operation
+    def inspect_frame(self) -> dict[str, object]:
+        """Freeze the current verified RGB frame for a bounded tile-level asset audit.
+
+        This method performs NO worker request, native run, memory probe or
+        mutation. Callers can compare hashes and inspect full-resolution PNG
+        through preview(), separately. Samples are explicitly not full-color
+        histograms.
+        """
+        from .game_emulator_timing import inspect_rgb_frame
+        if self._seed is None or self._closed or self._pixels is None or not isinstance(self._frame, dict):
+            raise EmulatorHostError("native_frame_unavailable", "Reset and capture an actual frame before inspection")
+        return inspect_rgb_frame(
+            self._pixels, int(self._frame["width"]), int(self._frame["height"]),
+            str(self._frame["pixel_sha256"]), str(self._frame["audio_sha256"]),
+            int(self._frame["runs"]),
+        )
+
+    def capture_training_trace(
+        self, actions: Sequence[str], *, seed: int = 0,
+        rights_evidence_digest: str | None = None,
+    ) -> dict[str, object]:
+        """Capture a real, bounded native rollout for offline review; never train/promote here."""
+        return capture_emulator_trace(
+            self, actions, seed=seed, rights_evidence_digest=rights_evidence_digest
+        )
+
+    def capture_controller_trace(
+        self,
+        controller_tape: Sequence[Sequence[Mapping[str, object]]],
+        *,
+        seed: int = 0,
+        rights_evidence_digest: str | None = None,
+    ) -> dict[str, object]:
+        """Capture real multi-port button/axis/key/mouse/pointer combinations."""
+        if not isinstance(controller_tape, (list, tuple)) or not 1 <= len(controller_tape) <= self.max_steps:
+            raise EmulatorHostError("emulator_trace_budget", "Controller tape exceeds the episode horizon")
+        return capture_emulator_trace(
+            self,
+            ["controller_input"] * len(controller_tape),
+            seed=seed,
+            rights_evidence_digest=rights_evidence_digest,
+            controller_tape=controller_tape,
+        )
+
+    @staticmethod
+    def audit_training_replays(traces: Sequence[Mapping[str, object]]) -> dict[str, object]:
+        """Score 2–10 native replay receipts; never certify game success or weight promotion."""
+        from .game_emulator_replay_audit import compare_emulator_replays
+
+        return compare_emulator_replays(traces)
 
     def preview(self) -> dict[str, object] | None:
         self._authority()
@@ -1038,9 +1344,105 @@ class EmulatorEnvironment:
             },
             "core_id": self.core.core_id,
             "content_digest": self._descriptor["content_digest"],
+            "controller_profile": self.controller_profile,
+            "core_controller_profile_digest": self._descriptor["core_controller_profile_digest"],
             "hardware_compatibility_verified": False,
         }
 
+    @_serialized_native_operation
+    def export_save_ram(self) -> tuple[dict[str, object], bytes]:
+        """Copy a bounded core-owned SRAM region; never expose it via HTTP."""
+        metadata, blocks = self._exchange("save_ram_export", {})
+        raw = blocks.get("save_ram")
+        if (set(metadata) != {"memory_region", "size", "sha256", "format"}
+            or metadata["memory_region"] != 0
+            or metadata["format"] != "raw_libretro_save_ram"
+            or type(metadata["size"]) is not int
+            or not 1 <= metadata["size"] <= MAX_SAVE_RAM
+            or type(raw) is not bytes or len(raw) != metadata["size"]
+            or hashlib.sha256(raw).hexdigest() != metadata["sha256"]):
+            self.close()
+            raise EmulatorHostError("native_save_ram_corrupt", "Native save RAM export is not hash intact")
+        checkpoint = {
+            "schema_version": SAVE_RAM_SCHEMA,
+            "format": "raw_libretro_save_ram",
+            "core_id": self.core.core_id,
+            "core_sha256": self.core.library_sha256,
+            "content_digest": self._descriptor["content_digest"],
+            "firmware_digest": self._descriptor["firmware_digest"],
+            "registry_digest": self._descriptor["registry_digest"],
+            "memory_region": 0,
+            "byte_count": metadata["size"],
+            "save_ram_sha256": metadata["sha256"],
+            "hardware_save_fidelity_verified": False,
+            "model_weights_updated": False,
+        }
+        checkpoint["checkpoint_sha256"] = _digest(checkpoint)
+        return checkpoint, raw
+
+    @_serialized_native_operation
+    def import_save_ram(self, checkpoint: Mapping[str, object], raw: bytes) -> dict[str, object]:
+        """Import matching, user-provided SRAM only BEFORE first native reset.
+
+        A game-specific checkpoint is not a portable savestate; SRAM memory
+        representations and game versions may still be incompatible.
+        """
+        if self._seed is not None or self._steps or self._save_ram_imported:
+            raise EmulatorHostError("native_save_ram_timing", "Only one save RAM import before first reset is permitted")
+        fields = {
+            "schema_version", "format", "core_id", "core_sha256", "content_digest",
+            "firmware_digest", "registry_digest", "memory_region", "byte_count",
+            "save_ram_sha256", "hardware_save_fidelity_verified",
+            "model_weights_updated", "checkpoint_sha256",
+        }
+        if not isinstance(checkpoint, Mapping) or set(checkpoint) != fields:
+            raise EmulatorHostError("native_save_ram_foreign", "Save RAM metadata fields differ")
+        expected = {
+            "schema_version": SAVE_RAM_SCHEMA,
+            "format": "raw_libretro_save_ram",
+            "core_id": self.core.core_id,
+            "core_sha256": self.core.library_sha256,
+            "content_digest": self._descriptor["content_digest"],
+            "firmware_digest": self._descriptor["firmware_digest"],
+            "registry_digest": self._descriptor["registry_digest"],
+            "memory_region": 0,
+            "hardware_save_fidelity_verified": False,
+            "model_weights_updated": False,
+        }
+        if any(checkpoint.get(key) != value for key, value in expected.items()):
+            raise EmulatorHostError("native_save_ram_foreign", "Checkpoint belongs to different source, core or firmware")
+        size = _int(checkpoint["byte_count"], 1, MAX_SAVE_RAM, "save RAM bytes")
+        sha = _sha(checkpoint["save_ram_sha256"])
+        receipt_sha = _sha(checkpoint["checkpoint_sha256"])
+        if (type(raw) is not bytes or len(raw) != size
+            or hashlib.sha256(raw).hexdigest() != sha
+            or _digest({key: value for key, value in checkpoint.items() if key != "checkpoint_sha256"}) != receipt_sha):
+            raise EmulatorHostError("native_save_ram_corrupt", "Source save RAM or receipt was altered")
+        output, blocks = self._exchange(
+            "save_ram_import", {"memory_region": 0, "size": size, "sha256": sha},
+            {"save_ram": raw},
+        )
+        if (blocks or output != {
+            "memory_region": 0, "size": size, "sha256": sha, "readback_verified": True,
+        }):
+            self.close()
+            raise EmulatorHostError("native_save_ram_readback_mismatch", "Native RAM write did not verify")
+        self._save_ram_imported = True
+        self._descriptor["restored_save_ram_sha256"] = sha
+        self.spec = replace(self.spec, environment_digest=_digest([
+            self.spec.environment_digest, SAVE_RAM_SCHEMA, sha,
+        ]))
+        return {
+            "schema_version": "skeleton.game.native_save_ram_import.v1",
+            "save_ram_sha256": sha,
+            "byte_count": size,
+            "environment_digest_after_import": self.spec.environment_digest,
+            "native_ram_write_verified": True,
+            "game_save_compatibility_verified": False,
+            "model_weights_updated": False,
+        }
+
+    @_serialized_native_operation
     def snapshot(self) -> dict[str, object]:
         if self._seed is None:
             raise EmulatorHostError("emulator_episode_inactive", "Reset before snapshotting native state")
@@ -1077,6 +1479,11 @@ class EmulatorEnvironment:
             "frame": self._frame,
             "pixels_base64": base64.b64encode(self._pixels).decode(),
         }
+        status = self.disc_status()
+        if status["supported"]:
+            payload["disc_context"] = {
+                "status": status, "disc_event_chain_sha256": self._disc_chain,
+            }
         if (
             len(json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode())
             > MAX_SNAPSHOT_JSON - 256
@@ -1086,6 +1493,7 @@ class EmulatorEnvironment:
             )
         return {**payload, "snapshot_digest": _digest(payload)}
 
+    @_serialized_native_operation
     def restore(self, snapshot: Mapping[str, object]) -> dict[str, float]:
         fields = {
             "schema_version",
@@ -1106,11 +1514,19 @@ class EmulatorEnvironment:
         }
         if (
             not isinstance(snapshot, Mapping)
-            or set(snapshot) != fields
+            or set(snapshot) not in (fields, fields | {"disc_context"})
             or snapshot["schema_version"] != SCHEMA
             or snapshot["environment_digest"] != self.spec.environment_digest
         ):
             raise EmulatorHostError("native_state_foreign", "Native savestate schema or environment differs")
+        status = self.disc_status()
+        if status["supported"]:
+            if snapshot.get("disc_context") != {
+                "status": status, "disc_event_chain_sha256": self._disc_chain,
+            }:
+                raise EmulatorHostError("native_disc_state_foreign", "Savestate and current disc provenance differ")
+        elif "disc_context" in snapshot:
+            raise EmulatorHostError("native_disc_state_foreign", "Savestate claims unsupported disc controls")
         size = _int(snapshot["state_size"], 1, MAX_STATE, "native state size")
         frame = _frame_metadata(snapshot["frame"])
         controls = _controls(snapshot["controls"])
@@ -1164,7 +1580,15 @@ class EmulatorEnvironment:
         self._audio_generation = audio_generation
         self._controls = controls
         self._pixels = None
-        self._accept_frame(frame, {"pixels": pixels, "audio": b""})
+        # Audio callback buffers are not savestate content. The restored state
+        # has an empty PCM boundary even if the saved frame emitted audio.
+        restored_frame = {
+            **frame,
+            "audio_frames": 0,
+            "audio_available": False,
+            "audio_sha256": hashlib.sha256(b"").hexdigest(),
+        }
+        self._accept_frame(restored_frame, {"pixels": pixels, "audio": b""})
         observation = snapshot["observation"]
         if (
             not isinstance(observation, Mapping)
@@ -1236,6 +1660,144 @@ class EmulatorEnvironment:
             pass
 
 
+def capture_emulator_trace(
+    environment: EmulatorEnvironment,
+    actions: Sequence[str],
+    *,
+    seed: int = 0,
+    rights_evidence_digest: str | None = None,
+    controller_tape: Sequence[Sequence[Mapping[str, object]]] | None = None,
+) -> dict[str, object]:
+    """Record actual libretro frames, input, audio and hash-chained transitions.
+
+    This is an evidence capture, *not* a proof of emulator correctness, gameplay
+    success, legal ROM rights or a promoted weight update. Uses the canonical
+    offline trace validator; no caller can inject observations or rewards.
+    """
+    if not isinstance(environment, EmulatorEnvironment):
+        raise EmulatorHostError("emulator_trace_source", "An active native emulator environment is required")
+    if not isinstance(actions, (list, tuple)) or not 1 <= len(actions) <= environment.max_steps:
+        raise EmulatorHostError("emulator_trace_budget", "Trace actions exceed the bounded episode horizon")
+    if not all(type(action) is str and action in environment.spec.actions for action in actions):
+        raise EmulatorHostError("emulator_trace_action", "Trace controls must use declared policy actions")
+    if controller_tape is None:
+        if "controller_input" in actions:
+            raise EmulatorHostError("emulator_trace_action", "Raw controller action requires an exact controller tape")
+        normalized_tape = None
+    else:
+        if (not isinstance(controller_tape, (list, tuple))
+            or len(controller_tape) != len(actions)
+            or any(action != "controller_input" for action in actions)):
+            raise EmulatorHostError("emulator_trace_action", "Controller tape requires exactly one raw-control action per step")
+        # Validate the entire tape before resetting or executing the native core.
+        normalized_tape = [_controls(ports) for ports in controller_tape]
+        for ports in normalized_tape:
+            for index, control in enumerate(ports):
+                if environment._controller_devices[index] == "none" and (
+                    control["buttons"] or any(control["axes"]) or control["keys"]
+                    or any(control["mouse"]) or any(control["pointer"])
+                ):
+                    raise EmulatorHostError("invalid_emulator_controller", "Unconnected controller ports cannot carry input")
+    _int(seed, 0, 2**63 - 1, "episode trace seed")
+    if rights_evidence_digest is not None:
+        _sha(rights_evidence_digest)
+    environment._authority()
+    initial = environment.reset(seed)
+    previous = dict(initial)
+    transitions = []
+    rewards = []
+    for index, action in enumerate(actions, 1):
+        step = (
+            environment.step(action)
+            if normalized_tape is None
+            else environment.input_step(normalized_tape[index - 1])
+        )
+        value = step.as_dict()
+        evidence = value["info"].get("evidence")
+        if not isinstance(evidence, dict):
+            raise EmulatorHostError("emulator_trace_evidence", "Native trace is missing frame evidence")
+        if (evidence.get("environment_digest") != environment.spec.environment_digest
+            or evidence.get("core_sha256") != environment.core.library_sha256
+            or evidence.get("episode_step") != index
+            or evidence.get("frame_digest") != environment._frame["pixel_sha256"]
+            or value["transition_digest"] != environment._chain):
+            raise EmulatorHostError("emulator_trace_evidence", "Native frame/transition binding differs")
+        reward_components = dict(value["reward_components"])
+        row = {
+            "sequence": index,
+            "observation": previous,
+            "action": action,
+            "next_observation": dict(value["observation"]),
+            "reward": value["reward"],
+            "reward_components": reward_components,
+            "terminated": bool(value["terminated"]),
+            "truncated": index == len(actions) and not value["terminated"],
+            "transition_digest": value["transition_digest"],
+            "info": {
+                "runtime_kind": "installed_libretro_emulator",
+                "source": "actual_isolated_native_core",
+                "frame_sha256": evidence["frame_digest"],
+                "controls_sha256": evidence["controller_digest"],
+                "previous_transition_digest": evidence["previous_transition_digest"],
+                "native_runs": evidence["native_runs"],
+                "video_callbacks": evidence["video_callbacks"],
+                "audio_frames": evidence["audio_frames"],
+                "audio_sha256": evidence["audio_sha256"],
+            },
+        }
+        transitions.append(row)
+        rewards.append(value["reward"])
+        previous = dict(value["observation"])
+        if value["terminated"] or value["truncated"]:
+            if index != len(actions):
+                raise EmulatorHostError("emulator_trace_incomplete", "Core episode ended before the declared action sequence")
+            break
+    spec = environment.spec.as_dict()
+    descriptor = environment.descriptor
+    lineage = {
+        "runtime_kind": "installed_libretro_emulator",
+        "core_id": environment.core.core_id,
+        "core_sha256": environment.core.library_sha256,
+        "content_digest": descriptor["content_digest"],
+        "registry_digest": descriptor["registry_digest"],
+        "firmware_digest": descriptor["firmware_digest"],
+        "options_digest": descriptor["options_digest"],
+        "source_code_digest": descriptor["source_code_digest"],
+        "frames_per_step": environment.frames_per_step,
+        "controller_port_devices": list(environment._controller_devices),
+        "core_controller_profile_digest": descriptor["core_controller_profile_digest"],
+        "controller_tape_digest": _digest(normalized_tape) if normalized_tape is not None else None,
+        "rights_evidence_digest": rights_evidence_digest,
+        "capture_nonce": os.urandom(16).hex(),
+        "capture_process_independently_attested": False,
+        "rights_verified": False,
+        "hardware_compatibility_verified": False,
+        "game_success_verified": False,
+        "production_training_admitted": False,
+        "seed_semantics": "episode label; native core may ignore seed",
+        "reward_semantics": "visual difference signal, not gameplay quality or victory",
+    }
+    episode_identity = _digest({
+        "environment_digest": environment.spec.environment_digest,
+        "seed": seed, "actions": list(actions),
+        "end_transition_digest": environment._chain,
+    })
+    trace = {
+        "schema_version": "skeleton.game.trace.v1",
+        "environment": spec,
+        "episode_id": "libretro-" + episode_identity,
+        "seed": seed,
+        "source_lineage": lineage,
+        "transitions": transitions,
+        "return": math.fsum(rewards),
+        "steps": len(transitions),
+    }
+    trace["trace_digest"] = _digest(trace)
+    from .game_learning_ingestion import _validate_trace
+
+    return _validate_trace(trace)
+
+
 def create_emulator_environment(
     target_id: str,
     *,
@@ -1247,6 +1809,7 @@ def create_emulator_environment(
     reader: Callable | None = None,
     max_steps: int = 512,
     frames_per_step: int = 1,
+    controller_devices: Sequence[str] | None = None,
     timeout_seconds: float = 5,
     cancelled: Callable[[], bool] | None = None,
 ) -> EmulatorEnvironment:
@@ -1267,6 +1830,7 @@ def create_emulator_environment(
         reader=reader,
         max_steps=max_steps,
         frames_per_step=frames_per_step,
+        controller_devices=controller_devices,
         timeout_seconds=timeout_seconds,
         cancelled=cancelled,
     )

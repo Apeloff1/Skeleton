@@ -1,6 +1,14 @@
 name: State Recovery Drill
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/state-recovery-drill.yml"
+      - "skeleton/app/runtime/**"
+      - "skeleton/ai/runtime/application/**"
+      - "machine/ai_master_plan.json"
   workflow_dispatch:
 
 permissions:

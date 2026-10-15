@@ -46,10 +46,6 @@ class WorkCandidate:
                 "topology_confidence": self.topology_confidence, "blast_radius": self.blast_radius,
                 "verification_depth": self.verification_depth, "decision_reasons": list(self.decision_reasons)}
 
-def _normalize_finding_path(path: str) -> str:
-    return path.replace("\\", "/").lstrip("./")
-
-
 def _lane(finding: Finding) -> str:
     if finding.code.startswith("quality."): return "regression"
     if finding.code.startswith("topology."): return "architecture"
@@ -124,7 +120,9 @@ def _decision_score(finding: Finding, impact: ImpactReport | None, decision_bonu
 def _normalize_finding_path(path: str) -> str:
     """Normalize repository finding paths to stable forward-slash form."""
 
-    return path.replace("\\", "/").lstrip("./")
+    return "/".join(
+        part for part in path.replace("\\", "/").split("/") if part and part != "."
+    )
 
 
 def derive_work_candidates(model: RepositoryModel, *, limit: int = 64) -> tuple[WorkCandidate, ...]:

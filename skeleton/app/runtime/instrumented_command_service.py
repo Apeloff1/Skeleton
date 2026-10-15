@@ -29,7 +29,16 @@ class InstrumentedCommandService:
         payload: Optional[Mapping[str, Any]] = None,
     ) -> CommandResult:
         execution_id = self.lifecycle.begin(command, payload)
-        result = self.service.execute(command, payload)
+        try:
+            result = self.service.execute(command, payload)
+        except Exception as exc:
+            # A failed command must never occupy a STARTED ledger slot forever,
+            # even when the underlying transport unexpectedly raises. Error
+            # messages can contain credentials; record only the exception type.
+            self.lifecycle.fail(
+                execution_id, f"unexpected {type(exc).__name__}",
+            )
+            raise
 
         if result.ok:
             self.lifecycle.succeed(execution_id, result.to_payload())

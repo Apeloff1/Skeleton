@@ -357,7 +357,10 @@ def _run_handler(state: Any):
         if gameforge is None:
             raise CommandError("unavailable", "GameForge runtime is not initialized")
         answers = require_mapping(payload, "answers", {}, optional=False)
-        target = require_text(payload, "target", "json", allowed=MATERIALISE_TARGETS)
+        # Match the creator CLI default: omitted target means the canonical
+        # ten-stage Godot pipeline, never the independent legacy spec engine.
+        # Callers wanting JSON/YAML specs must request that format explicitly.
+        target = require_text(payload, "target", "godot", allowed=MATERIALISE_TARGETS)
         if target == "godot":
             # A Godot request uses the same ten-stage engine as `skeleton run`.
             # Keep HTTP/command calls in-memory: a remote caller must never be

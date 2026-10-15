@@ -824,18 +824,31 @@ class TorchTransformer:
     def _id(self, tok: str) -> int:
         return int(self.stoi.get(tok, self.unk))
 
-    def fit(self, texts: Iterable[str], *, lr: float = 0.06) -> int:
+    def fit(self, texts: Iterable[str], *, lr: float = 0.06,
+            schedule: str = "const") -> int:
+        """Bounded token SGD, compatible with Jeeves's native cosine curriculum."""
         torch = self.torch
-        for g in self._opt.param_groups:
-            g["lr"] = float(lr)
+        if not math.isfinite(float(lr)) or not 0 < float(lr) <= 1:
+            raise ValueError("Torch learning rate must be finite and positive")
+        if schedule not in {"const", "cosine"}:
+            raise ValueError("Torch schedule must be const or cosine")
+        corpus = [tokens(raw) for raw in texts if raw]
+        if len(corpus) > 4096:
+            raise ValueError("Torch single-fit corpus exceeds document budget")
+        total = sum(max(0, len(words) - 1) for words in corpus)
         n = 0
         self.net.train()
-        for raw in texts:
-            body = tokens(raw)
+        for body in corpus:
             if len(body) < 2:
                 continue
             ids = [self._id(t) for t in body]
             for i in range(1, len(ids)):
+                rate = (
+                    float(lr) * 0.5 * (1.0 + math.cos(math.pi * n / max(1, total)))
+                    if schedule == "cosine" else float(lr)
+                )
+                for group in self._opt.param_groups:
+                    group["lr"] = rate
                 window = ids[max(0, i - self.ctx):i]
                 x = torch.tensor([window], dtype=torch.long, device=self.device_obj)
                 y = torch.tensor([ids[i]], dtype=torch.long, device=self.device_obj)
@@ -912,9 +925,17 @@ class TorchTransformer:
 
     @classmethod
     def from_snapshot(cls, data: Dict[str, Any]) -> "TorchTransformer":
+        if not isinstance(data, dict):
+            raise ValueError("torch checkpoint must be a mapping")
+        itos = data.get("itos")
+        if (not isinstance(itos, list) or len(itos) < 2 or
+                itos[0] != UNK or
+                any(not isinstance(token, str) or not token for token in itos) or
+                len(set(itos)) != len(itos)):
+            raise ValueError("torch checkpoint must declare unique ordered token identities")
         want = str(data.get("device") or "cpu")
         lm = cls(
-            vocab=[t for t in (data.get("itos") or []) if t != UNK],
+            vocab=[t for t in itos if t != UNK],
             dim=int(data.get("dim") or 8),
             ctx=int(data.get("ctx") or 8),
             n_heads=int(data.get("n_heads") or 2),
@@ -922,12 +943,18 @@ class TorchTransformer:
             d_ff=int(data.get("d_ff") or 32),
             device=want,
         )
-        state = data.get("state") or {}
-        if state:
-            torch = lm.torch
-            sd = {k: torch.tensor(v) for k, v in state.items()}
-            lm.net.load_state_dict(sd, strict=False)
-            lm.net.to(lm.device_obj)
+        # Constructor sorts a fresh vocabulary. A trained checkpoint MUST
+        # restore its original token IDs unchanged, including appended BPE
+        # vocabulary growth, or learned embedding rows lose their meaning.
+        lm.itos = list(itos)
+        lm.stoi = {token: index for index, token in enumerate(itos)}
+        state = data.get("state")
+        if not isinstance(state, dict) or not state:
+            raise ValueError("torch checkpoint is missing trained tensor state")
+        torch = lm.torch
+        sd = {k: torch.tensor(v) for k, v in state.items()}
+        lm.net.load_state_dict(sd, strict=True)
+        lm.net.to(lm.device_obj)
         lm.fitted = int(data.get("fitted") or 0)
         lm.steps = int(data.get("steps") or 0)
         return lm
