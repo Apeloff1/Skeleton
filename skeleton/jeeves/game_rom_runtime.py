@@ -124,6 +124,9 @@ class GameBoyMachine:
         self.cycles, self.frames, self.divider, self.line_cycles = 0, 0, 0xAB00, 0
         self.instructions = 0
         self.stat_line = False
+        # An overflow enters a four T-cycle TIMA=00 interval before TMA
+        # reload and timer IF bit request. This is saved with CPU state.
+        self.timer_reload_delay = 0
         # Battery-backed wall time is intentionally unavailable. RTC grows
         # only through executed CPU cycles and is sealed in source snapshots.
         self.rtc_regs = [0, 0, 0, 0, 0]
@@ -145,6 +148,25 @@ class GameBoyMachine:
         }
         for address, value in defaults.items():
             self.memory[address] = value
+
+    def _timer_signal(self) -> bool:
+        """DMG timer input: enabled TAC selector on the internal DIV."""
+        control = self.memory[0xFF07] & 7
+        return bool(control & 4 and self.divider & (1 << (9, 3, 5, 7)[control & 3]))
+
+    def _timer_tick(self) -> None:
+        if self.timer_reload_delay:
+            # A pending overflow ignores further falling edges until reload.
+            return
+        if self.memory[0xFF05] == 255:
+            self.memory[0xFF05] = 0
+            self.timer_reload_delay = 4
+        else:
+            self.memory[0xFF05] += 1
+
+    def _timer_apply_edge(self, old_signal: bool) -> None:
+        if old_signal and not self._timer_signal():
+            self._timer_tick()
 
     def _rtc_advance(self, cycles: int) -> None:
         """Advance the virtual clock in O(1), never using host wall time."""
@@ -296,7 +318,19 @@ class GameBoyMachine:
         if 0xFEA0 <= address < 0xFF00 or address == 0xFF44:
             return
         if address == 0xFF04:
+            old_signal = self._timer_signal()
             self.divider = 0
+            self._timer_apply_edge(old_signal)
+            return
+        if address == 0xFF05:
+            # TIMA writes during pending overflow cancel the reload and IF.
+            self.timer_reload_delay = 0
+            self.memory[address] = value
+            return
+        if address == 0xFF07:
+            old_signal = self._timer_signal()
+            self.memory[address] = value & 7
+            self._timer_apply_edge(old_signal)
             return
         if address == 0xFF00:
             old = self.read(address)
@@ -686,16 +720,14 @@ class GameBoyMachine:
 
     def _advance(self, cycles: int) -> None:
         for _ in range(cycles):
-            previous = self.divider
-            self.divider = (self.divider + 1) & 65535
-            control = self.memory[0xFF07]
-            bit = (9, 3, 5, 7)[control & 3]
-            if control & 4 and previous & 1 << bit and not self.divider & 1 << bit:
-                if self.memory[0xFF05] == 255:
+            if self.timer_reload_delay:
+                self.timer_reload_delay -= 1
+                if not self.timer_reload_delay:
                     self.memory[0xFF05] = self.memory[0xFF06]
                     self.memory[0xFF0F] |= 4
-                else:
-                    self.memory[0xFF05] += 1
+            old_signal = self._timer_signal()
+            self.divider = (self.divider + 1) & 65535
+            self._timer_apply_edge(old_signal)
         self.cycles += cycles
         self._rtc_advance(cycles)
         if not self.memory[0xFF40] & 0x80:
@@ -789,6 +821,7 @@ class GameBoyMachine:
             "line_cycles",
             "instructions",
             "stat_line",
+            "timer_reload_delay",
         )
         result = {
             "schema_version": 1,
@@ -843,6 +876,7 @@ class GameBoyMachine:
             "sp": 65535,
             "pc": 65535,
             "ime_delay": 2,
+            "timer_reload_delay": 4,
             "rom_bank": (
                 511 if self.metadata["mapper"] == "mbc5"
                 else 127 if self.metadata["mapper"] == "mbc3"
@@ -875,6 +909,8 @@ class GameBoyMachine:
             raise GameRomRuntimeError("ROM snapshot flag/bank is invalid")
         if registers["instructions"] * 4 > registers["cycles"]:
             raise GameRomRuntimeError("ROM snapshot CPU counters are inconsistent")
+        if registers["timer_reload_delay"] and registers["cycles"] < 4:
+            raise GameRomRuntimeError("ROM snapshot timer overflow cannot predate source CPU execution")
         decoded = {}
         for name, length in (
             ("memory", 65536),
