@@ -190,6 +190,9 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           expand_vocabulary: bool = False,
           capacity_growth: str = "none",
           max_added_parameters: int = 500000,
+          adaptive_replay: bool = False,
+          replay_examples: int = 64,
+          max_scored_examples: int = 128,
           max_optimizer_steps: int = 25000,
           max_training_seconds: int = 1200,
           dataset_manifest: Path | None = None,
@@ -221,6 +224,15 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         raise ValueError("unsupported Jeeves capacity growth profile")
     if type(max_added_parameters) is not int or not 1 <= max_added_parameters <= 2000000:
         raise ValueError("max_added_parameters must be a bounded positive integer")
+    if type(adaptive_replay) is not bool:
+        raise ValueError("adaptive_replay must be an explicit boolean")
+    if adaptive_replay and dataset_manifest is None:
+        raise ProductionCheckpointError("training-only capability replay requires approved external corpus")
+    if adaptive_replay and (
+            type(replay_examples) is not int or not 6 <= replay_examples <= 256 or
+            type(max_scored_examples) is not int or not 6 <= max_scored_examples <= 256 or
+            replay_examples > max_scored_examples):
+        raise ValueError("invalid capability-replay scoring or example budget")
     if type(epochs) is not int or not 1 <= epochs <= 3:
         raise ValueError("epochs must be 1..3")
     if type(lr) is not float or not math.isfinite(lr) or not 0 < lr <= 0.03:
@@ -315,6 +327,12 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         model, growth_receipt = grow_feedforward(
             model, profile=capacity_growth,
             max_added_parameters=max_added_parameters)
+    replay_receipt: dict[str, Any] | None = None
+    if adaptive_replay:
+        from .jeeves_capability_replay import schedule_capability_replay
+        dataset, replay_receipt = schedule_capability_replay(
+            model, dataset, max_examples=replay_examples,
+            max_scored_examples=max_scored_examples, deadline=deadline)
     before, sample_before = _heldout(model, heldout, deadline=deadline)
     steps_before = model.steps
     if torch_stack:
@@ -358,6 +376,10 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             "capacity_growth": capacity_growth,
             "max_added_parameters": max_added_parameters,
             "capacity_growth_receipt": growth_receipt,
+            "adaptive_replay": adaptive_replay,
+            "capability_replay_receipt": replay_receipt,
+            "replay_examples": replay_examples,
+            "max_scored_examples": max_scored_examples,
             "active_model_key": selected_key,
             "architecture": "torch-stack" if torch_stack else "TinyTransformer",
             "expected_optimizer_updates": expected_steps,
@@ -463,6 +485,8 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "capacity_growth_profile": capacity_growth,
         "capacity_growth": growth_receipt,
         "max_added_parameters": max_added_parameters,
+        "capability_replay_enabled": adaptive_replay,
+        "capability_replay": replay_receipt,
         "parent_trainable_parameters": parent_parameter_count,
         "candidate_trainable_parameters": (
             sum(int(p.numel()) for p in model.net.parameters() if p.requires_grad)
@@ -521,6 +545,10 @@ def main(argv: list[str] | None = None) -> int:
                         default="none", help="real Torch FFN trainable parameter growth, candidate-only")
     parser.add_argument("--max-added-parameters", type=int, default=500000,
                         help="hard cap on extra trainable candidate parameters")
+    parser.add_argument("--adaptive-replay", action="store_true",
+                        help="score and select source-approved weak and retention examples using TRAIN only")
+    parser.add_argument("--replay-examples", type=int, default=64)
+    parser.add_argument("--max-scored-examples", type=int, default=128)
     parser.add_argument("--max-domain-regression", type=float, default=0.0)
     args = parser.parse_args(argv)
     try:
@@ -531,6 +559,9 @@ def main(argv: list[str] | None = None) -> int:
                        expand_vocabulary=args.expand_vocabulary,
                        capacity_growth=args.capacity_growth,
                        max_added_parameters=args.max_added_parameters,
+                       adaptive_replay=args.adaptive_replay,
+                       replay_examples=args.replay_examples,
+                       max_scored_examples=args.max_scored_examples,
                        max_optimizer_steps=args.max_optimizer_steps,
                        max_training_seconds=args.max_training_seconds,
                        dataset_manifest=args.dataset_manifest,
