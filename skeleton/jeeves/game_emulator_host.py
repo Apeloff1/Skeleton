@@ -40,6 +40,8 @@ from .game_learning_runtime import EpisodeStep, GameEnvironmentSpec
 
 SCHEMA = "skeleton.libretro_environment.v1"
 MAX_STATE = 64 * 1024 * 1024
+MAX_SAVE_RAM = 8 * 1024 * 1024
+SAVE_RAM_SCHEMA = "skeleton.game.native_save_ram_checkpoint.v1"
 MAX_SNAPSHOT_JSON = 8 * 1024 * 1024
 MAX_PRIVATE_CONTENT_COPY = 64 * 1024 * 1024
 MAX_PIXELS = 4_194_304
@@ -547,6 +549,7 @@ class EmulatorEnvironment:
         self._controls = [json.loads(json.dumps(_EMPTY))]
         self._chain = ""
         self._disc_sequence = 0
+        self._save_ram_imported = False
         self._disc_receipts: list[dict[str, object]] = []
         self._disc_chain = ""
         try:
@@ -1189,6 +1192,99 @@ class EmulatorEnvironment:
             "core_id": self.core.core_id,
             "content_digest": self._descriptor["content_digest"],
             "hardware_compatibility_verified": False,
+        }
+
+    @_serialized_native_operation
+    def export_save_ram(self) -> tuple[dict[str, object], bytes]:
+        """Copy a bounded core-owned SRAM region; never expose it via HTTP."""
+        metadata, blocks = self._exchange("save_ram_export", {})
+        raw = blocks.get("save_ram")
+        if (set(metadata) != {"memory_region", "size", "sha256", "format"}
+            or metadata["memory_region"] != 0
+            or metadata["format"] != "raw_libretro_save_ram"
+            or type(metadata["size"]) is not int
+            or not 1 <= metadata["size"] <= MAX_SAVE_RAM
+            or type(raw) is not bytes or len(raw) != metadata["size"]
+            or hashlib.sha256(raw).hexdigest() != metadata["sha256"]):
+            self.close()
+            raise EmulatorHostError("native_save_ram_corrupt", "Native save RAM export is not hash intact")
+        checkpoint = {
+            "schema_version": SAVE_RAM_SCHEMA,
+            "format": "raw_libretro_save_ram",
+            "core_id": self.core.core_id,
+            "core_sha256": self.core.library_sha256,
+            "content_digest": self._descriptor["content_digest"],
+            "firmware_digest": self._descriptor["firmware_digest"],
+            "registry_digest": self._descriptor["registry_digest"],
+            "memory_region": 0,
+            "byte_count": metadata["size"],
+            "save_ram_sha256": metadata["sha256"],
+            "hardware_save_fidelity_verified": False,
+            "model_weights_updated": False,
+        }
+        checkpoint["checkpoint_sha256"] = _digest(checkpoint)
+        return checkpoint, raw
+
+    @_serialized_native_operation
+    def import_save_ram(self, checkpoint: Mapping[str, object], raw: bytes) -> dict[str, object]:
+        """Import matching, user-provided SRAM only BEFORE first native reset.
+
+        A game-specific checkpoint is not a portable savestate; SRAM memory
+        representations and game versions may still be incompatible.
+        """
+        if self._seed is not None or self._steps or self._save_ram_imported:
+            raise EmulatorHostError("native_save_ram_timing", "Only one save RAM import before first reset is permitted")
+        fields = {
+            "schema_version", "format", "core_id", "core_sha256", "content_digest",
+            "firmware_digest", "registry_digest", "memory_region", "byte_count",
+            "save_ram_sha256", "hardware_save_fidelity_verified",
+            "model_weights_updated", "checkpoint_sha256",
+        }
+        if not isinstance(checkpoint, Mapping) or set(checkpoint) != fields:
+            raise EmulatorHostError("native_save_ram_foreign", "Save RAM metadata fields differ")
+        expected = {
+            "schema_version": SAVE_RAM_SCHEMA,
+            "format": "raw_libretro_save_ram",
+            "core_id": self.core.core_id,
+            "core_sha256": self.core.library_sha256,
+            "content_digest": self._descriptor["content_digest"],
+            "firmware_digest": self._descriptor["firmware_digest"],
+            "registry_digest": self._descriptor["registry_digest"],
+            "memory_region": 0,
+            "hardware_save_fidelity_verified": False,
+            "model_weights_updated": False,
+        }
+        if any(checkpoint.get(key) != value for key, value in expected.items()):
+            raise EmulatorHostError("native_save_ram_foreign", "Checkpoint belongs to different source, core or firmware")
+        size = _int(checkpoint["byte_count"], 1, MAX_SAVE_RAM, "save RAM bytes")
+        sha = _sha(checkpoint["save_ram_sha256"])
+        receipt_sha = _sha(checkpoint["checkpoint_sha256"])
+        if (type(raw) is not bytes or len(raw) != size
+            or hashlib.sha256(raw).hexdigest() != sha
+            or _digest({key: value for key, value in checkpoint.items() if key != "checkpoint_sha256"}) != receipt_sha):
+            raise EmulatorHostError("native_save_ram_corrupt", "Source save RAM or receipt was altered")
+        output, blocks = self._exchange(
+            "save_ram_import", {"memory_region": 0, "size": size, "sha256": sha},
+            {"save_ram": raw},
+        )
+        if (blocks or output != {
+            "memory_region": 0, "size": size, "sha256": sha, "readback_verified": True,
+        }):
+            self.close()
+            raise EmulatorHostError("native_save_ram_readback_mismatch", "Native RAM write did not verify")
+        self._save_ram_imported = True
+        self._descriptor["restored_save_ram_sha256"] = sha
+        self.spec = replace(self.spec, environment_digest=_digest([
+            self.spec.environment_digest, SAVE_RAM_SCHEMA, sha,
+        ]))
+        return {
+            "schema_version": "skeleton.game.native_save_ram_import.v1",
+            "save_ram_sha256": sha,
+            "byte_count": size,
+            "environment_digest_after_import": self.spec.environment_digest,
+            "native_ram_write_verified": True,
+            "game_save_compatibility_verified": False,
+            "model_weights_updated": False,
         }
 
     @_serialized_native_operation
