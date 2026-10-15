@@ -24,3 +24,14 @@ An absent core device announcement stays unknown rather than certified. Explicit
 ## Operator qualification
 
 Run the focused test file and architecture checks separately; no runtime or native-ROM qualification is claimed by this change. The existing source-pinned recipes are not precompiled cores. Native controller metadata is not proof of accurate physical mappings. Core subclasses, lightguns, sensors, GPU context and disc-changing support remain outside this implementation.
+
+## Whole-catalog core readiness inventory
+
+The new read-only operator tool reconciles every Dragon hardware identity with all existing pinned-source build candidates. When a private approved registry is provided it also checks the canonical installed-core catalog rather than assuming a recipe is runnable.
+
+```bash
+python3 scripts/report_game_emulator_coverage.py --summary
+python3 scripts/report_game_emulator_coverage.py --registry /srv/approved/cores.json
+```
+
+Without `--registry`, the installation column is explicitly **not checked**, not zero or successful. With a registry, an approved installed core still has boot, gameplay, video/audio, controllers and model-training qualification set to false until separate native evidence exists. The JSON report has a deterministic digest and no ROM content.
