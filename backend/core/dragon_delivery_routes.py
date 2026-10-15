@@ -125,7 +125,7 @@ def register_delivery_routes(
         with _reviewed_delivery() as delivery:
             try:
                 return {"ok": True, **delivery.almanacs.report(
-                    owner, authorized=True, offset=offset, limit=25
+                    owner, authorized=True, offset=offset, limit=32
                 )}
             except (ValueError, PermissionError) as exc:
                 raise _error(exc) from None
@@ -136,9 +136,23 @@ def register_delivery_routes(
     ) -> dict:
         with _reviewed_delivery() as delivery:
             try:
-                return {"ok": True, **delivery.almanacs.learning_view(
-                    owner, topic, authorized=True, limit=100
-                )}
+                result = delivery.almanacs.learning_view(
+                    owner, topic, authorized=True, limit=32
+                )
+                # This is a read-only advisory projection. Native source
+                # synthesis does not constitute measured gameplay evidence,
+                # an independent review, or permission to promote model memory.
+                findings = [
+                    {
+                        **finding,
+                        "epistemic_state": "unreviewed",
+                        "empirical_truth_established": False,
+                        "memory_promotion_authorized": False,
+                        "training_authorized": False,
+                    }
+                    for finding in result["findings"]
+                ]
+                return {"ok": True, **result, "findings": findings}
             except (ValueError, PermissionError) as exc:
                 raise _error(exc) from None
 
@@ -257,6 +271,8 @@ def register_delivery_routes(
                     return {
                         "ok": True,
                         "delivery_state": "source_generated",
+                        "plan_digest": brief["plan_digest"],
+                        "gameplay_verified": False,
                         "created_native": asdict(item),
                         "resource_execution": run,
                         "compiled": False,
