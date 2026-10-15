@@ -219,3 +219,15 @@ def test_windows_workflow_builds_and_uploads_setup_exe():
     assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97" in source
     assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9" in source
     assert "dist/windows/Skeleton-Setup-*-windows-x64.exe" in source
+
+def test_windows_installer_packages_jeeves_curriculum_and_mirror_routes():
+    workflow = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
+    launcher = Path("skeleton/app/windows_launcher.py").read_text(encoding="utf-8")
+    builder = Path("scripts/windows/build_installer.ps1").read_text(encoding="utf-8")
+    assert "/machine/jeeves_training_modules.json" in workflow
+    assert "test_jeeves_multidomain.py" in workflow
+    assert 'ArgumentList @("--training-modules")' in workflow
+    assert '"Jeeves Training Modules", self.inspect_jeeves_modules' in launcher
+    assert "No model weights were trained or promoted by this check." in launcher
+    assert '"skeleton.ai.training.jeeves_parallel_mirrors"' in builder
+    assert '"skeleton.ai.training.jeeves_multidomain"' in builder

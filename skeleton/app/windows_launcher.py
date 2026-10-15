@@ -221,6 +221,9 @@ class WindowsLauncher:
         self._add_button(
             offline_buttons, "Stop Offline Browser", self.stop_browser_ai
         )
+        self._add_button(
+            offline_buttons, "Jeeves Training Modules", self.inspect_jeeves_modules
+        )
 
         helper = ttk.Frame(outer)
         helper.pack(fill="x", pady=(0, 10))
@@ -347,6 +350,25 @@ class WindowsLauncher:
 
         self._local_ai_window = open_offline_ai(self.window)
         self.status.set("Local AI window opened")
+
+    def inspect_jeeves_modules(self) -> None:
+        """Display actual curriculum readiness without starting model training."""
+        from skeleton.ai.training.jeeves_multidomain import validate_catalog
+
+        def check() -> str:
+            manifest = self.app_root / "machine" / "jeeves_training_modules.json"
+            result = validate_catalog(manifest)
+            return (
+                f"Jeeves curriculum: {result['modules']} specializations across "
+                "gaming, AI and coding.\n"
+                "Four concurrent data evidence mirrors available for approved data.\n"
+                "Two candidate optimizer processes require an attested production "
+                "checkpoint and human-reviewed corpus.\n"
+                "No model weights were trained or promoted by this check.\n"
+                f"Catalog SHA256: {result['catalog_sha256']}"
+            )
+
+        self._run_worker("Inspecting Jeeves curriculum...", check, lambda value: value)
 
     def _start_browser_service(self, selected: Path, *, gguf: bool) -> str:
         """Start one authenticated loopback service owned by this launcher.

@@ -372,3 +372,9 @@ dataset contamination, insufficient RAM/disk, or heldout regression. It never
 writes to serving weights and never auto-promotes a candidate. The mirrors
 perform distinct optimizer schedules; separate blinded human/independent model
 review is still required to establish improvement beyond language loss.
+
+The installed Windows launcher also provides a **Jeeves Training Modules**
+read-only catalogue panel. It validates the same manifest checksum and
+specialization schema without initializing the model or changing any weights.
+Windows installer CI now runs the specialist data-partition tests and executes
+the installed catalogue check before native inference smoke tests.
