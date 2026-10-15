@@ -410,6 +410,56 @@ def _plan_emulator(args) -> dict[str, Any]:
     }
 
 
+
+def _fit_emulator_world_ensemble(args) -> dict[str, Any]:
+    from .game_emulator_neural_ensemble import (
+        EmulatorEnsembleConfig, train_emulator_neural_ensemble,
+    )
+
+    destinations = [
+        args.policy_file.resolve(strict=False),
+        args.evidence_file.resolve(strict=False),
+        args.ensemble_file.resolve(strict=False),
+        args.ensemble_report_file.resolve(strict=False),
+    ]
+    if len(set(destinations)) != len(destinations):
+        raise ValueError("Source policy, source evidence and candidate ensemble files must be distinct")
+    if args.ensemble_file.exists() or args.ensemble_report_file.exists():
+        raise FileExistsError("Ensemble outputs must be new; existing models are never overwritten")
+    source_policy = _json_read(args.policy_file)
+    source_evidence = _json_read(args.evidence_file)
+    config = EmulatorEnsembleConfig(
+        seed=args.seed, holdout_seed=args.holdout_seed,
+        members=args.members, width=args.width, epochs=args.epochs,
+        minibatch=args.minibatch, max_samples=args.max_samples,
+        max_compute_units_per_member=args.max_compute_units_per_member,
+        max_calibration_samples=args.max_calibration_samples,
+        max_mean_normalized_spread=args.max_mean_normalized_spread,
+    )
+    ensemble, report = train_emulator_neural_ensemble(
+        source_evidence, source_policy, config=config,
+    )
+    _write_json(args.ensemble_file, ensemble, replace=False)
+    _write_json(args.ensemble_report_file, report, replace=False)
+    return {
+        "status": (
+            "candidate_ensemble_measured_for_native_confirmation"
+            if ensemble["qualified_for_source_confirmation"]
+            else "candidate_ensemble_rejected_by_empirical_gates"
+        ),
+        "ensemble_file": str(args.ensemble_file),
+        "report_file": str(args.ensemble_report_file),
+        "ensemble_digest": ensemble["ensemble_digest"],
+        "actual_candidate_neural_optimizers": len(ensemble["members"]),
+        "actual_optimizer_steps": sum(
+            model["real_optimizer_steps"] for model in ensemble["members"]
+        ),
+        "shared_holdout_partition_digest": ensemble["training_partition_digest"],
+        "production_jeeves_weight_updates": 0,
+        "production_model_promotion": False,
+    }
+
+
 def _fit_emulator_world_model(args) -> dict[str, Any]:
     from .game_emulator_neural_world import (
         NeuralWorldConfig,
@@ -700,6 +750,25 @@ def parser() -> argparse.ArgumentParser:
         default="measured_reward",
     )
     plan.add_argument("--rights-acknowledged", action="store_true")
+
+    ensemble = commands.add_parser(
+        "fit-emulator-world-ensemble",
+        help="Train 3-7 distinct real candidate neural models on one fixed source-ROM holdout",
+    )
+    ensemble.add_argument("--policy-file", type=Path, required=True)
+    ensemble.add_argument("--evidence-file", type=Path, required=True)
+    ensemble.add_argument("--ensemble-file", type=Path, required=True)
+    ensemble.add_argument("--ensemble-report-file", type=Path, required=True)
+    ensemble.add_argument("--seed", type=int, default=0)
+    ensemble.add_argument("--holdout-seed", type=int, default=42)
+    ensemble.add_argument("--members", type=int, default=3)
+    ensemble.add_argument("--width", type=int, default=12)
+    ensemble.add_argument("--epochs", type=int, default=6)
+    ensemble.add_argument("--minibatch", type=int, default=16)
+    ensemble.add_argument("--max-samples", type=int, default=2048)
+    ensemble.add_argument("--max-compute-units-per-member", type=int, default=20000000)
+    ensemble.add_argument("--max-calibration-samples", type=int, default=128)
+    ensemble.add_argument("--max-mean-normalized-spread", type=float, default=0.2)
     world = commands.add_parser(
         "fit-emulator-world-model",
         help="Perform REAL bounded neural optimizer steps on verified ROM traces; never promote Jeeves weights",
@@ -831,6 +900,8 @@ def main(argv: list[str] | None = None) -> int:
             result = _cross_core_comparison(args)
         elif args.command == "fit-emulator-world-model":
             result = _fit_emulator_world_model(args)
+        elif args.command == "fit-emulator-world-ensemble":
+            result = _fit_emulator_world_ensemble(args)
         elif args.command == "plan-emulator":
             result = _plan_emulator(args)
         elif args.command == "probe-emulator-goals":
