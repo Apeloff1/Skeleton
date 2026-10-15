@@ -47,5 +47,73 @@
   "failure": "Missing core/symbol/BIOS, failed sandbox activation, unsupported hardware framebuffer/pixel format, corrupt content/state/protocol, callback excess, core crash/shutdown, timeout and cancellation produce explicit errors and retire the worker. Unsupported callbacks return false, never invented success. Malformed/overlong native controller metadata or advertised exclusion of a requested nonstandard device fails activation.",
   "limitations": "Libretro has no universal game-score/health or RNG seed control. Reset invokes actual native reset; a seed labels the episode without claiming control over every core's RNG. Device compatibility, deterministic reset, game mastery and acceptance remain unverified. A bounded metadata/controller regression test is supplied; no live native core, ROM or CI run is claimed in this change. Operational snapshots refuse state/frame combinations exceeding the existing 8 MiB JSON boundary before native serialization; the ABI 64 MiB transport limit is not end-to-end persistence capacity. Large readonly content uses private hardlink pins and proportional streaming SHA work without per-actor disc copies; writable or cross-device large content explicitly refuses activation. Readonly owner-managed files are never mutated by the backend; arbitrary operator mutation of an already approved inode is outside this data boundary.",
   "production_model_promotion_authorized": false,
-  "masterplan_completion_authorized": false
+  "masterplan_completion_authorized": false,
+  "learning_telemetry": {
+    "schema_version": "skeleton.libretro_measured_signal_channels.v2",
+    "actual_source": "unmodified approved native libretro RGB24 framebuffer and stereo S16LE output",
+    "features": [
+      "screen_mean",
+      "visual_change",
+      "audio_rms",
+      "step_fraction",
+      "frame_entropy",
+      "luma_contrast",
+      "spatial_edges",
+      "color_saturation",
+      "color_bias",
+      "audio_peak",
+      "audio_zero_crossing",
+      "stereo_difference",
+      "motion_energy",
+      "motion_fraction",
+      "motion_centroid_x",
+      "motion_centroid_y",
+      "motion_quadrant_tl",
+      "motion_quadrant_tr",
+      "motion_quadrant_bl",
+      "motion_quadrant_br",
+      "frame_luma_drift",
+      "audio_energy_change",
+      "audio_positive_onset",
+      "audio_zero_crossing_shift"
+    ],
+    "sampling": {
+      "spatial_samples_max": 4096,
+      "audio_pairs_max": 4096
+    },
+    "guarantees": [
+      "No fabricated game score, health, win or semantic object recognition",
+      "Finite normalized frame and audio features are measured from real native callbacks",
+      "Checkpoint restore and independent replay required before candidate Q updates in deep training laboratory",
+      "Twenty-four finite native signal dimensions per actual worker-emitted observation including 12 paired-frame/audio changes"
+    ],
+    "limitations": [
+      "Missing output is reported as zero signal, not proof of silence in the game",
+      "Spatial edge and entropy probes sample pixels and are not render-quality certificates",
+      "Hardware compatibility remains unverified until actual native sessions",
+      "Cross-video-frame geometry change produces zero motion channels instead of fabricating vector correspondence"
+    ],
+    "neural_weights_updated": 0,
+    "time_correlations": {
+      "channels": 12,
+      "measurements": "prev real framebuffer versus actual current frame; prev native S16LE chunk versus actual current chunk",
+      "coordinate_basis": "normalized native pixel coordinates, 4 quadrant movement energy",
+      "semantics": "numerical frame-and-audio transition probes, not segmentation, optical flow vectors, scene understanding, music transcription or gameplay outcomes"
+    }
+  },
+  "bounded_signal_projection_extension": {
+    "status": "implementation_candidate",
+    "owner": "skeleton/jeeves/game_emulator_host.py",
+    "reason": "Incoming24 measured signal channels plus authored GB11 RAM fields exceed the existing32-feature learner limit.",
+    "projection": "Keep all measured24 channels source-bound in native frame inspection; policy observation selects stable leading signal channels within32 minus exact authored RAM field count, then appends every trusted authored field. Opaque ROMs retain all24; authored GB uses21+11 and NES24+5.",
+    "identity": "Actual ordered selected/omitted signal names are included in the environment descriptor; exact host source and descriptor fence old snapshots. No feature-limit increase or silent policy migration.",
+    "actions": "Policy catalogue contains only dispatchable fixed actions; controller_input remains a rich-controller transcript marker, never a policy action.",
+    "restore": "Preserve native RAM/signature/checksum proof and upstream bounded exact prior-audio history restoration together; reset clears both native evidence and prior audio.",
+    "claims": {
+      "arbitrary_rom_semantics": false,
+      "hardware_fidelity_verified": false,
+      "neural_optimizer_executed": false
+    },
+    "restored_signal_visibility": "A restore retains exact saved policy observation and prior PCM history but marks full measured-signals preview unavailable until the next actual native frame; synthetic zero temporal channels are never presented as a re-emitted snapshot."
+  }
 }

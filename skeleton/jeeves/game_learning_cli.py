@@ -322,6 +322,362 @@ def _evaluate(args) -> dict[str, Any]:
     }
 
 
+def _probe_goals(args) -> dict[str, Any]:
+    from .game_emulator_goal_lab import (
+        GoalExperimentConfig, MemoryGoal, evaluate_operator_native_goals,
+    )
+
+    if not args.rights_acknowledged or args.rom is None or args.project is not None:
+        raise ValueError("Actual native ROM and operator source rights are required")
+    if not args.target.startswith("emulator:"):
+        raise ValueError("Native memory-goal probes require an approved libretro core")
+    if args.evidence_file.exists():
+        raise FileExistsError("Memory-goal experiment output already exists")
+    if args.goal_file.resolve(strict=False) == args.evidence_file.resolve(strict=False):
+        raise ValueError("Goal definition and output destinations must be separate")
+    definition = _json_read(args.goal_file)
+    if set(definition) != {"source_authority", "goals", "interventions"}:
+        raise ValueError("Operator objective schema must include only source_authority/goals/interventions")
+    goals_raw = definition["goals"]
+    if not isinstance(goals_raw, list) or not 1 <= len(goals_raw) <= 8:
+        raise ValueError("The input must declare one to eight explicit bounded memory goals")
+    goals = tuple(MemoryGoal(**item) for item in goals_raw)
+    _, _, request = _factory(args)
+    result = evaluate_operator_native_goals(
+        request,
+        goals=goals,
+        interventions=definition["interventions"],
+        source_authority=definition["source_authority"],
+        rights_acknowledged=True,
+        config=GoalExperimentConfig(
+            seed=args.seed, anchors=args.anchors, repeats=args.repeats,
+            horizon=args.horizon, max_actual_steps=args.max_actual_steps,
+        ),
+    )
+    _write_json(args.evidence_file, result, replace=False)
+    return {
+        "status": "operator_goals_physically_measured",
+        "report_digest": result["report_digest"],
+        "observed_active_only_goal_contrasts": result["measured_active_only_goal_contrasts"],
+        "native_source_steps": result["actual_source_steps"],
+        "evidence_file": str(args.evidence_file),
+        "semantic_game_success_certified": False,
+        "production_weight_updates": 0,
+    }
+
+
+def _plan_emulator(args) -> dict[str, Any]:
+    from .game_emulator_planning_lab import (
+        EmulatorPlanningConfig,
+        run_native_confirmed_planning,
+    )
+
+    if not args.rights_acknowledged or args.rom is None or args.project is not None:
+        raise ValueError("Physical planning requires one explicit rights-cleared ROM source")
+    if args.evidence_file.exists():
+        raise FileExistsError("Native planning evidence must be a new private file")
+    destinations = {
+        args.model_file.resolve(strict=False),
+        args.training_report_file.resolve(strict=False),
+        args.evidence_file.resolve(strict=False),
+    }
+    if (args.ensemble_file is None) != (args.ensemble_report_file is None):
+        raise ValueError("Ensemble and ensemble receipt files must both be supplied or both absent")
+    if args.ensemble_file is not None:
+        destinations.add(args.ensemble_file.resolve(strict=False))
+        destinations.add(args.ensemble_report_file.resolve(strict=False))
+    if len(destinations) != 3:
+        raise ValueError("Training input and physical planning output locations must differ")
+    _, _, request = _factory(args)
+    model = _json_read(args.model_file)
+    report = _json_read(args.training_report_file)
+    ensemble = None
+    if args.ensemble_file is not None:
+        ensemble = _json_read(args.ensemble_file)
+        # The source-planning gate accepts only a report for the exact
+        # ensemble whose digest contains the nominated member checkpoint.
+        ensemble_report = _json_read(args.ensemble_report_file)
+        if report != ensemble_report:
+            raise ValueError("Use the matching ensemble training report for ensemble-gated physical planning")
+    results = run_native_confirmed_planning(
+        request,
+        model=model, training_report=report, ensemble=ensemble,
+        rights_acknowledged=True,
+        config=EmulatorPlanningConfig(
+            seed=args.seed, anchors=args.anchors, horizon=args.horizon,
+            beam_width=args.beam_width, action_subset=args.action_subset,
+            proposal_count=args.proposal_count, repeats=args.repeats,
+            max_actual_steps=args.max_actual_steps, objective=args.objective,
+        ),
+    )
+    _write_json(args.evidence_file, results, replace=False)
+    return {
+        "status": "measured_native_model_plans",
+        "evidence_file": str(args.evidence_file),
+        "report_digest": results["report_digest"],
+        "real_emulator_steps": results["real_emulator_steps"],
+        "physically_validated_plans": results["tested_plan_count"],
+        "physically_positive_plans": results["actual_positive_plans"],
+        "speculative_actions_rejected_by_disagreement": results["speculative_actions_rejected_by_neural_disagreement"],
+        "neural_or_q_weight_updates": 0,
+        "production_promotion": False,
+    }
+
+
+
+def _fit_emulator_world_ensemble(args) -> dict[str, Any]:
+    from .game_emulator_neural_ensemble import (
+        EmulatorEnsembleConfig, train_emulator_neural_ensemble,
+    )
+
+    destinations = [
+        args.policy_file.resolve(strict=False),
+        args.evidence_file.resolve(strict=False),
+        args.ensemble_file.resolve(strict=False),
+        args.ensemble_report_file.resolve(strict=False),
+    ]
+    if len(set(destinations)) != len(destinations):
+        raise ValueError("Source policy, source evidence and candidate ensemble files must be distinct")
+    if args.ensemble_file.exists() or args.ensemble_report_file.exists():
+        raise FileExistsError("Ensemble outputs must be new; existing models are never overwritten")
+    source_policy = _json_read(args.policy_file)
+    source_evidence = _json_read(args.evidence_file)
+    config = EmulatorEnsembleConfig(
+        seed=args.seed, holdout_seed=args.holdout_seed,
+        members=args.members, width=args.width, epochs=args.epochs,
+        minibatch=args.minibatch, max_samples=args.max_samples,
+        max_compute_units_per_member=args.max_compute_units_per_member,
+        max_calibration_samples=args.max_calibration_samples,
+        max_mean_normalized_spread=args.max_mean_normalized_spread,
+    )
+    ensemble, report = train_emulator_neural_ensemble(
+        source_evidence, source_policy, config=config,
+    )
+    _write_json(args.ensemble_file, ensemble, replace=False)
+    _write_json(args.ensemble_report_file, report, replace=False)
+    return {
+        "status": (
+            "candidate_ensemble_measured_for_native_confirmation"
+            if ensemble["qualified_for_source_confirmation"]
+            else "candidate_ensemble_rejected_by_empirical_gates"
+        ),
+        "ensemble_file": str(args.ensemble_file),
+        "report_file": str(args.ensemble_report_file),
+        "ensemble_digest": ensemble["ensemble_digest"],
+        "actual_candidate_neural_optimizers": len(ensemble["members"]),
+        "actual_optimizer_steps": sum(
+            model["real_optimizer_steps"] for model in ensemble["members"]
+        ),
+        "shared_holdout_partition_digest": ensemble["training_partition_digest"],
+        "production_jeeves_weight_updates": 0,
+        "production_model_promotion": False,
+    }
+
+
+def _fit_emulator_world_model(args) -> dict[str, Any]:
+    from .game_emulator_neural_world import (
+        NeuralWorldConfig,
+        train_neural_world_from_evidence,
+    )
+
+    if args.model_file.exists() or args.training_report_file.exists():
+        raise FileExistsError("Neural-world outputs must be new, not overwrite a previous checkpoint")
+    paths = [
+        args.policy_file.resolve(strict=False),
+        args.evidence_file.resolve(strict=False),
+        args.model_file.resolve(strict=False),
+        args.training_report_file.resolve(strict=False),
+    ]
+    if len(set(paths)) != len(paths):
+        raise ValueError("Neural training source and destination paths must be distinct")
+    policy = _json_read(args.policy_file)
+    evidence = _json_read(args.evidence_file)
+    model, report = train_neural_world_from_evidence(
+        evidence, policy,
+        config=NeuralWorldConfig(
+            seed=args.seed,
+            width=args.width,
+            epochs=args.epochs,
+            minibatch=args.minibatch,
+            learning_rate=args.learning_rate,
+            weight_decay=args.weight_decay,
+            clip_gradient=args.clip_gradient,
+            max_samples=args.max_samples,
+            min_relative_holdout_gain=args.min_relative_holdout_gain,
+            max_compute_units=args.max_compute_units,
+        ),
+    )
+    _write_json(args.model_file, model, replace=False)
+    _write_json(args.training_report_file, report, replace=False)
+    return {
+        "status": report["candidate_status"],
+        "candidate_model_file": str(args.model_file),
+        "training_report_file": str(args.training_report_file),
+        "candidate_model_sha256": model["model_digest"],
+        "actual_neural_optimizer_steps": model["real_optimizer_steps"],
+        "actual_gradient_evaluations": model["gradient_evaluations"],
+        "heldout_relative_improvement": report["relative_reduction_vs_mean_baseline"],
+        "jeeves_production_weight_updates": 0,
+        "production_model_promotion": False,
+    }
+
+
+def _cross_core_comparison(args) -> dict[str, Any]:
+    from .game_emulator_cross_core_lab import CrossCoreConfig, compare_real_emulator_cores
+
+    if not args.rights_acknowledged:
+        raise ValueError("Exact rights-cleared ROM input acknowledgment is required")
+    if args.project is not None or args.rom is None or not args.target.startswith("emulator:"):
+        raise ValueError("Only installed, approved libretro cores sharing one ROM are comparable")
+    if args.evidence_file.exists():
+        raise FileExistsError("Cross-core comparison output already exists")
+    cores = tuple(args.core)
+    if len(cores) != len(set(cores)):
+        raise ValueError("Comparison requires distinct core IDs")
+    from argparse import Namespace
+
+    requests = []
+    for core in cores:
+        options = vars(args).copy()
+        options["core"] = core
+        _, _, request = _factory(Namespace(**options))
+        if request.kind != "libretro":
+            raise ValueError("Expected actual approved native libretro runtime")
+        requests.append(request)
+    report = compare_real_emulator_cores(
+        requests,
+        rights_acknowledged=True,
+        config=CrossCoreConfig(
+            seed=args.seed, steps=args.comparison_steps,
+            repetitions=args.repetitions, max_native_steps=args.max_native_steps,
+        ),
+    )
+    _write_json(args.evidence_file, report, replace=False)
+    return {
+        "status": "measured_native_core_comparison",
+        "report_digest": report["report_digest"],
+        "compared_cores": report["compared_approved_native_cores"],
+        "actual_native_steps": report["actual_native_steps"],
+        "all_repetitions_reproducible": report["all_repeats_stable"],
+        "evidence_file": str(args.evidence_file),
+        "production_neural_weight_updates": 0,
+        "hardware_certification": False,
+    }
+
+
+def _emulator_experiment(args) -> dict[str, Any]:
+    from .game_emulator_experiment_lab import (
+        EmulatorExperimentConfig,
+        MemoryWatch,
+        run_emulator_experiment_matrix,
+    )
+
+    if not args.rights_acknowledged:
+        raise ValueError("Rights-cleared source acknowledgement is required")
+    if args.project is not None or args.rom is None:
+        raise ValueError("Experimental emulator measurement requires a local owned ROM")
+    if args.evidence_file.exists():
+        raise FileExistsError("Experiment evidence destination already exists")
+    _, lineage, request = _factory(args)
+    watches = ()
+    if args.memory_watch_file is not None:
+        root = _json_read(args.memory_watch_file)
+        rows = root.get("watches")
+        if not isinstance(rows, list) or len(rows) > 8:
+            raise ValueError("Expected at most eight explicit memory watches")
+        watches = tuple(MemoryWatch(**value) for value in rows)
+    report = run_emulator_experiment_matrix(
+        request,
+        rights_acknowledged=True,
+        config=EmulatorExperimentConfig(
+            seed=args.seed,
+            anchors=args.anchors,
+            repeats=args.repeats,
+            longest_duration=args.longest_duration,
+            max_conditions=args.max_conditions,
+            max_native_steps=args.max_native_steps,
+            include_multiplayer=args.include_multiplayer,
+            include_keyboard=args.include_keyboard,
+            include_memory_audit=args.memory_watch_file is not None,
+        ),
+        watches=watches,
+    )
+    _write_json(args.evidence_file, report, replace=False)
+    return {
+        "status": "native_controlled_experiments_recorded",
+        "report_digest": report["report_digest"],
+        "actual_experiment_steps": report["actual_native_steps_including_probe_anchors"],
+        "repeated_trials_stable": report["all_trials_reproducible"],
+        "evidence_file": str(args.evidence_file),
+        "neural_weight_updates": 0,
+        "production_promotion": False,
+    }
+
+
+def _deep_emulator(args) -> dict[str, Any]:
+    from .game_emulator_training_lab import EmulatorLabConfig, run_emulator_training_lab
+
+    if not args.rights_acknowledged:
+        raise ValueError("Explicit source rights acknowledgement is required to train on ROM content")
+    if args.project is not None or args.rom is None:
+        raise ValueError("Deep emulator training requires a local rights-cleared ROM, not a reference project")
+    if args.policy_file.exists() or args.evidence_file.exists() or args.checkpoint_file.exists():
+        raise ValueError("Deep emulator outputs must be new files; use distinct destinations")
+    targets = {
+        args.policy_file.resolve(strict=False),
+        args.evidence_file.resolve(strict=False),
+        args.checkpoint_file.resolve(strict=False),
+    }
+    if len(targets) != 3:
+        raise ValueError("Policy, evidence and checkpoint must use distinct destination files")
+    _, lineage, request = _factory(args)
+    lineage["rights_acknowledged"] = True
+    config = EmulatorLabConfig(
+        max_runs=args.max_runs, steps_per_run=args.episode_steps,
+        stagnation_runs=args.stagnation_runs,
+        checkpoint_stride=args.checkpoint_stride,
+        counterfactual_actions=args.counterfactual_actions,
+        boomerang_interval=args.boomerang_interval,
+        boomerang_retained=args.boomerang_retained,
+        heldout_episodes=args.heldout_episodes,
+        seed=args.seed,
+    )
+
+    def checkpoint(snapshot, progress):
+        # The operator selected the destination before starting. This is a
+        # private crash-recovery record; it is NOT a production model promotion.
+        _write_json(
+            args.checkpoint_file,
+            {"schema_version": "skeleton.game.emulator_lab_checkpoint.v1",
+             "policy_snapshot": snapshot, "progress": progress,
+             "production_promotion_authorized": False},
+            replace=True,
+        )
+
+    result = run_emulator_training_lab(
+        request, source_lineage=lineage, config=config,
+        policy_id=args.policy_id, on_checkpoint=checkpoint,
+    )
+    _write_json(args.policy_file, result["policy_snapshot"], replace=False)
+    evidence = {key: value for key, value in result.items() if key != "policy_snapshot"}
+    evidence["policy_snapshot_digest"] = result["policy_snapshot"]["snapshot_digest"]
+    evidence["evidence_digest"] = hashlib.sha256(
+        json.dumps(evidence, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    ).hexdigest()
+    _write_json(args.evidence_file, evidence, replace=False)
+    return {
+        "status": result["status"],
+        "policy_file": str(args.policy_file),
+        "evidence_file": str(args.evidence_file),
+        "checkpoint_file": str(args.checkpoint_file),
+        "report_digest": result["report_digest"],
+        "real_q_updates": result["actual_q_table_updates"],
+        "real_neural_weight_updates": 0,
+        "runs": result["run_count"],
+        "hardware_compatibility_verified": False,
+    }
+
+
 def _native(args) -> dict[str, Any]:
     from .game_rom_generation import build_original_dmg_game
 
@@ -355,6 +711,161 @@ def parser() -> argparse.ArgumentParser:
     native.add_argument("--title", default="Signal Garden")
     native.add_argument("--output", type=Path, required=True)
     native.add_argument("--force", action="store_true")
+
+
+
+
+
+
+    goal = commands.add_parser(
+        "probe-emulator-goals",
+        help="Measure operator-defined native memory objectives vs same-timeline neutral controls",
+    )
+    goal.add_argument("--target", required=True)
+    goal.add_argument("--rom", type=Path, required=True)
+    goal.add_argument("--project", type=Path)
+    goal.add_argument("--core", required=True)
+    goal.add_argument("--episode-steps", type=int, default=32)
+    goal.add_argument("--frames-per-step", type=int, default=1)
+    goal.add_argument("--cycles-per-step", type=int, default=1824)
+    goal.add_argument("--goal-file", type=Path, required=True)
+    goal.add_argument("--evidence-file", type=Path, required=True)
+    goal.add_argument("--seed", type=int, default=0)
+    goal.add_argument("--anchors", type=int, default=2)
+    goal.add_argument("--repeats", type=int, default=2)
+    goal.add_argument("--horizon", type=int, default=6)
+    goal.add_argument("--max-actual-steps", type=int, default=2048)
+    goal.add_argument("--rights-acknowledged", action="store_true")
+    plan = commands.add_parser(
+        "plan-emulator",
+        help="Physically compare candidate neural action plans vs identical-state neutral baselines",
+    )
+    plan.add_argument("--target", required=True)
+    plan.add_argument("--rom", type=Path, required=True)
+    plan.add_argument("--project", type=Path)
+    plan.add_argument("--core")
+    plan.add_argument("--episode-steps", type=int, default=32)
+    plan.add_argument("--frames-per-step", type=int, default=1)
+    plan.add_argument("--cycles-per-step", type=int, default=1824)
+    plan.add_argument("--model-file", type=Path, required=True)
+    plan.add_argument("--training-report-file", type=Path, required=True)
+    plan.add_argument("--ensemble-file", type=Path)
+    plan.add_argument("--ensemble-report-file", type=Path)
+    plan.add_argument("--evidence-file", type=Path, required=True)
+    plan.add_argument("--seed", type=int, default=0)
+    plan.add_argument("--anchors", type=int, default=2)
+    plan.add_argument("--horizon", type=int, default=4)
+    plan.add_argument("--beam-width", type=int, default=8)
+    plan.add_argument("--action-subset", type=int, default=8)
+    plan.add_argument("--proposal-count", type=int, default=3)
+    plan.add_argument("--repeats", type=int, default=2)
+    plan.add_argument("--max-actual-steps", type=int, default=512)
+    plan.add_argument(
+        "--objective",
+        choices=["measured_reward", "visual_activity", "audio_activity", "low_visual_activity"],
+        default="measured_reward",
+    )
+    plan.add_argument("--rights-acknowledged", action="store_true")
+
+    ensemble = commands.add_parser(
+        "fit-emulator-world-ensemble",
+        help="Train 3-7 distinct real candidate neural models on one fixed source-ROM holdout",
+    )
+    ensemble.add_argument("--policy-file", type=Path, required=True)
+    ensemble.add_argument("--evidence-file", type=Path, required=True)
+    ensemble.add_argument("--ensemble-file", type=Path, required=True)
+    ensemble.add_argument("--ensemble-report-file", type=Path, required=True)
+    ensemble.add_argument("--seed", type=int, default=0)
+    ensemble.add_argument("--holdout-seed", type=int, default=42)
+    ensemble.add_argument("--members", type=int, default=3)
+    ensemble.add_argument("--width", type=int, default=12)
+    ensemble.add_argument("--epochs", type=int, default=6)
+    ensemble.add_argument("--minibatch", type=int, default=16)
+    ensemble.add_argument("--max-samples", type=int, default=2048)
+    ensemble.add_argument("--max-compute-units-per-member", type=int, default=20000000)
+    ensemble.add_argument("--max-calibration-samples", type=int, default=128)
+    ensemble.add_argument("--max-mean-normalized-spread", type=float, default=0.2)
+    world = commands.add_parser(
+        "fit-emulator-world-model",
+        help="Perform REAL bounded neural optimizer steps on verified ROM traces; never promote Jeeves weights",
+    )
+    world.add_argument("--policy-file", type=Path, required=True)
+    world.add_argument("--evidence-file", type=Path, required=True)
+    world.add_argument("--model-file", type=Path, required=True)
+    world.add_argument("--training-report-file", type=Path, required=True)
+    world.add_argument("--seed", type=int, default=0)
+    world.add_argument("--width", type=int, default=20)
+    world.add_argument("--epochs", type=int, default=8)
+    world.add_argument("--minibatch", type=int, default=16)
+    world.add_argument("--learning-rate", type=float, default=0.003)
+    world.add_argument("--weight-decay", type=float, default=0.0001)
+    world.add_argument("--clip-gradient", type=float, default=3.0)
+    world.add_argument("--max-samples", type=int, default=2048)
+    world.add_argument("--min-relative-holdout-gain", type=float, default=0.01)
+    world.add_argument("--max-compute-units", type=int, default=50000000)
+    cross = commands.add_parser(
+        "compare-emulator-cores",
+        help="Execute the same owned ROM and exact controls on 2-4 approved libretro cores",
+    )
+    cross.add_argument("--target", required=True)
+    cross.add_argument("--rom", required=True, type=Path)
+    cross.add_argument("--project", type=Path)
+    cross.add_argument("--core", action="append", required=True)
+    cross.add_argument("--episode-steps", type=int, default=32)
+    cross.add_argument("--comparison-steps", type=int, default=16)
+    cross.add_argument("--repetitions", type=int, default=2)
+    cross.add_argument("--max-native-steps", type=int, default=256)
+    cross.add_argument("--seed", type=int, default=0)
+    cross.add_argument("--frames-per-step", type=int, default=1)
+    cross.add_argument("--cycles-per-step", type=int, default=1824)
+    cross.add_argument("--rights-acknowledged", action="store_true")
+    cross.add_argument("--evidence-file", required=True, type=Path)
+    experiment = commands.add_parser(
+        "experiment-emulator",
+        help="Run actual checkpointed ROM counterfactuals; never update model weights",
+    )
+    experiment.add_argument("--target", required=True)
+    experiment.add_argument("--rom", type=Path, required=True)
+    experiment.add_argument("--project", type=Path)
+    experiment.add_argument("--core")
+    experiment.add_argument("--frames-per-step", type=int, default=1)
+    experiment.add_argument("--cycles-per-step", type=int, default=1824)
+    experiment.add_argument("--episode-steps", type=int, default=32)
+    experiment.add_argument("--anchors", type=int, default=3)
+    experiment.add_argument("--repeats", type=int, default=2)
+    experiment.add_argument("--longest-duration", type=int, default=4)
+    experiment.add_argument("--max-conditions", type=int, default=32)
+    experiment.add_argument("--max-native-steps", type=int, default=1536)
+    experiment.add_argument("--seed", type=int, default=0)
+    experiment.add_argument("--include-multiplayer", action=argparse.BooleanOptionalAction, default=True)
+    experiment.add_argument("--include-keyboard", action=argparse.BooleanOptionalAction, default=True)
+    experiment.add_argument("--memory-watch-file", type=Path)
+    experiment.add_argument("--rights-acknowledged", action="store_true")
+    experiment.add_argument("--evidence-file", type=Path, required=True)
+    deep = commands.add_parser(
+        "train-emulator-deep",
+        help="Actual native/DMG ROM Q training with reverse replay and ten-run saturation audits",
+    )
+    deep.add_argument("--target", required=True)
+    deep.add_argument("--rom", required=True, type=Path)
+    deep.add_argument("--core")
+    deep.add_argument("--project", type=Path)
+    deep.add_argument("--frames-per-step", type=int, default=1)
+    deep.add_argument("--cycles-per-step", type=int, default=1824)
+    deep.add_argument("--episode-steps", type=int, default=24)
+    deep.add_argument("--max-runs", type=int, default=48)
+    deep.add_argument("--stagnation-runs", type=int, default=10)
+    deep.add_argument("--checkpoint-stride", type=int, default=6)
+    deep.add_argument("--counterfactual-actions", type=int, default=3)
+    deep.add_argument("--boomerang-interval", type=int, default=5)
+    deep.add_argument("--boomerang-retained", type=int, default=4)
+    deep.add_argument("--heldout-episodes", type=int, default=2)
+    deep.add_argument("--seed", type=int, default=0)
+    deep.add_argument("--policy-id", default="emulator-deep-local-candidate")
+    deep.add_argument("--policy-file", type=Path, required=True)
+    deep.add_argument("--evidence-file", type=Path, required=True)
+    deep.add_argument("--checkpoint-file", type=Path, required=True)
+    deep.add_argument("--rights-acknowledged", action="store_true")
     for name in ("train", "evaluate"):
         command = commands.add_parser(name)
         command.add_argument("--target", required=True)
@@ -398,6 +909,20 @@ def main(argv: list[str] | None = None) -> int:
             result = _train(args)
         elif args.command == "evaluate":
             result = _evaluate(args)
+        elif args.command == "train-emulator-deep":
+            result = _deep_emulator(args)
+        elif args.command == "experiment-emulator":
+            result = _emulator_experiment(args)
+        elif args.command == "compare-emulator-cores":
+            result = _cross_core_comparison(args)
+        elif args.command == "fit-emulator-world-model":
+            result = _fit_emulator_world_model(args)
+        elif args.command == "fit-emulator-world-ensemble":
+            result = _fit_emulator_world_ensemble(args)
+        elif args.command == "plan-emulator":
+            result = _plan_emulator(args)
+        elif args.command == "probe-emulator-goals":
+            result = _probe_goals(args)
         else:
             result = _native(args)
         print(json.dumps(result, sort_keys=True, allow_nan=False))

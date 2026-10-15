@@ -1038,5 +1038,25 @@
       ],
       "game_emulation_qualified_here": false
     }
+  },
+  "extended_core_recipes": {
+    "2026-10-15": {
+      "scope": "Five additional opt-in, exact-upstream native libretro source/build recipes. No binaries are bundled; no emulator execution, ROM compatibility, firmware rights or CI signoff claimed.",
+      "core_ids": [
+        "sameboy",
+        "nestopia",
+        "mesen",
+        "snes9x2010",
+        "mednafen_saturn"
+      ],
+      "requirements": [
+        "operator-invoked build and explicit approval",
+        "host-shape and ABI validation",
+        "rights-cleared content and legitimate BIOS",
+        "actual isolated boot, input/frame/save-state replay evidence"
+      ],
+      "default_selection_unchanged": true,
+      "execution_checked": false
+    }
   }
 }
