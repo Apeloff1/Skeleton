@@ -117,11 +117,14 @@ class JeevesCortex:
         self.shadow["own"] = {"wins": 0, "trials": 0}
         self.hive = HiveMind(bus=self._bus)
         self.auto_surpass = True
-        from skeleton.cortex.device import attach_lm, probe
+        from skeleton.cortex.device import probe
         from skeleton.cortex.lm import gameforge_vocab
-        self.transformer = attach_lm(
-            vocab=gameforge_vocab(), dim=8, ctx=8, seed=19,
-            n_heads=2, n_layers=2, d_ff=32, device="auto",
+        from skeleton.cortex.production_profile import build_initial_speaking_model
+        # An explicit nonlegacy profile configures initial capacity only.
+        # On restoring SKELETON_OWN, the saved production architecture remains
+        # authoritative; profile selection never silently migrates weights.
+        self.transformer = build_initial_speaking_model(
+            vocab=gameforge_vocab(), seed=19,
         )
         from skeleton.cortex.transformer import TinyTransformer
         self.neo_rms = TinyTransformer(
