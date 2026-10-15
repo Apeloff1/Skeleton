@@ -17,6 +17,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from functools import lru_cache
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -67,6 +68,51 @@ def _cartridge(opcode: int, cb: int | None = None) -> bytes:
     return bytes(raw)
 
 
+@lru_cache(maxsize=1)
+def _reference_table() -> dict:
+    path = ROOT / "machine" / "gbdev_sm83_opcode_reference.json"
+    with path.open("rb") as reader:
+        source = json.load(reader)
+    if (
+        source.get("schema_version") != "skeleton.game.gbdev_sm83_opcode_reference.v1"
+        or source.get("provenance", {}).get("upstream_commit_sha")
+        != "376f61c86fdac2048f7ce5fe838ae756b306017e"
+        or source["provenance"].get("license") != "CC0-1.0"
+        or any(len(source.get(group, {})) != 256 for group in ("unprefixed", "cbprefixed"))
+    ):
+        raise OpcodeMatrixError("pinned CC0 independent SM83 reference missing or changed")
+    return source
+
+
+def _expected_reference(opcode: int, cb: int | None, flags: int) -> tuple[int, int, str]:
+    group = "cbprefixed" if cb is not None else "unprefixed"
+    index = cb if cb is not None else opcode
+    reference = _reference_table()[group]["0x" + format(index, "02X")]
+    cycles = reference["cycles"]
+    if not isinstance(cycles, list) or not 1 <= len(cycles) <= 2:
+        raise OpcodeMatrixError("opcode reference has invalid timings")
+    if len(cycles) == 1:
+        expected = cycles[0]
+    else:
+        # gbdev lists taken/not-taken T-cycles for conditionals. Source
+        # flags are explicitly captured BEFORE this real instruction.
+        z = bool(flags & 0x80)
+        carry = bool(flags & 0x10)
+        if opcode in (0x20, 0x28, 0x30, 0x38):
+            which = (opcode - 0x20) // 8
+        else:
+            which = (opcode >> 3) & 3
+        taken = (not z, z, not carry, carry)[which]
+        expected = cycles[0 if taken else 1]
+    if (
+        type(expected) is not int or expected not in (4, 8, 12, 16, 20, 24)
+        or type(reference.get("bytes")) is not int
+        or not 1 <= reference["bytes"] <= 3
+    ):
+        raise OpcodeMatrixError("SM83 sourced reference instruction length or cycles invalid")
+    return expected, reference["bytes"], reference["mnemonic"]
+
+
 def _result(opcode: int, cb: int | None = None) -> dict:
     cart = _cartridge(opcode, cb)
     machine = GameBoyMachine(cart)
@@ -75,6 +121,9 @@ def _result(opcode: int, cb: int | None = None) -> dict:
     machine.memory[0xC010] = 0x81
     machine.memory[0xC020] = 0xA6
     original = machine.snapshot()
+    reference_cycles, reference_bytes, mnemonic = _expected_reference(
+        opcode, cb, machine.f
+    )
     first_error = None
     try:
         first_cycles = machine.instruction()
@@ -101,7 +150,7 @@ def _result(opcode: int, cb: int | None = None) -> dict:
         ) from first_error
     if (
         type(first_cycles) is not int
-        or first_cycles not in (4, 8, 12, 16, 20, 24)
+        or first_cycles != reference_cycles
         or first["registers"]["instructions"] != original["registers"]["instructions"] + 1
         or first["registers"]["cycles"] - original["registers"]["cycles"] != first_cycles
         or first["rom_digest"] != original["rom_digest"]
@@ -117,6 +166,10 @@ def _result(opcode: int, cb: int | None = None) -> dict:
         "cb": cb,
         "real_instruction_executed": True,
         "emulated_t_cycles": first_cycles,
+        "reference_documented_t_cycles": reference_cycles,
+        "reference_documented_instruction_bytes": reference_bytes,
+        "reference_documented_mnemonic": mnemonic,
+        "source_reference_cycles_verified": True,
         "actual_source_rom_sha256": hashlib.sha256(cart).hexdigest(),
         "source_registers_after_sha256": _digest(first["registers"]),
         "source_snapshot_after_sha256": _digest(first),
@@ -145,6 +198,8 @@ def audit_cpu_opcode_matrix() -> dict:
         "expected_illegal_base_opcodes_rejected": 11,
         "actual_total_single_step_source_replays": (244 + len(prefixed)) * 2,
         "original_generated_synthetic_cartridges": True,
+        "external_sm83_reference_commit": _reference_table()["provenance"]["upstream_commit_sha"],
+        "source_reference_opcodes_compared_to_actual_timing": 500,
         "base_instruction_receipts": base,
         "prefixed_instruction_receipts": prefixed,
         "hardware_instruction_cycle_accuracy_independently_proven": False,
