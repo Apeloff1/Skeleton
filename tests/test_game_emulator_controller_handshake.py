@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import ctypes as C
 import unittest
+from types import SimpleNamespace
+from unittest.mock import PropertyMock, patch
 
-from skeleton.jeeves.game_emulator_host import EmulatorHostError, _native_controller_profile
+from skeleton.jeeves.game_emulator_host import (
+    EmulatorEnvironment, EmulatorHostError, _native_controller_profile
+)
+from skeleton.jeeves.game_comparison_controllers import controller_layout_for_native_environment
 from skeleton.jeeves.game_emulator_worker import (
     ControllerDescription,
     ControllerInfo,
@@ -72,6 +77,41 @@ class TestCoreControllerHandshake(unittest.TestCase):
         system_info["controller_routing_evidence"][0] = "not_advertised"
         with self.assertRaises(EmulatorHostError):
             _native_controller_profile(system_info, ("joypad", "none", "none", "none"))
+
+    def test_below_screen_panel_preserves_real_core_labels_without_certifying(self):
+        session = EmulatorEnvironment.__new__(EmulatorEnvironment)
+        session.core = SimpleNamespace(
+            target_ids=("nes",), core_id="fceumm", library_sha256="a" * 64
+        )
+        observed = {
+            "devices": ["joypad", "none", "none", "none"],
+            "core_advertised_types": [[{
+                "device_id": 1, "description": "Native Pad"
+            }]],
+            "core_input_descriptors": [{
+                "port": 0, "device": 1, "index": 0, "id": 8, "label": "Native Fire"
+            }],
+            "port_status": [
+                "core_advertised", "disconnected", "disconnected", "disconnected"
+            ],
+        }
+        with (
+            patch.object(
+                EmulatorEnvironment, "controller_profile",
+                new_callable=PropertyMock, return_value=observed
+            ),
+            patch.object(
+                EmulatorEnvironment, "descriptor",
+                new_callable=PropertyMock,
+                return_value={"core_controller_profile_digest": "b" * 64},
+            ),
+        ):
+            layout = controller_layout_for_native_environment("nes", session)
+        self.assertEqual(layout["mapping_kind"], "libretro_retropad_semantic_overlay_below_game_screen")
+        self.assertEqual(layout["ports"][0]["native_core_input_labels"][0]["label"], "Native Fire")
+        self.assertEqual(layout["ports"][0]["native_core_port_status"], "core_advertised")
+        self.assertFalse(layout["ports"][0]["live_core_peripheral_validated"])
+        self.assertFalse(layout["physical_layout_certified"])
 
     def test_absent_native_announcement_is_not_certified(self):
         profile = _native_controller_profile(
