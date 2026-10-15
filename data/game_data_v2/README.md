@@ -1,15 +1,35 @@
-# Game data v2 — assets, mechanics, UX, music direction, logic, self-improvement
+# Game data v2 reference corpora
 
-High-Pareto corpora for game building. Not literal multi-GB unique dumps (impractical without LFS and far beyond GitHub file limits).
+Optional generated design-reference text: planning patterns, game mathematics,
+mechanics, assets, UX, music direction and improvement process notes. These are
+text references, not audio/art files, executable games or measured gameplay evidence.
 
-## Categories
-- assets/ — asset generation patterns and pipelines
-- mechanics/ — praised, enjoyable mechanic patterns
-- ux/ — professional UX principles (clarity, feedback, accessibility)
-- music/ — hit-class music *direction* (structure, era instrumentation, looping) — not audio files
-- logic/ — deterministic game logic patterns
-- self_improve/ — process improvement techniques
+All original records are retained in deterministic `.gz` files. `manifest.json`
+records the original path, source PR/commit, compressed/decoded SHA-256, byte count
+and newline count. Old split-part names now have a `.gz` suffix. Existing compressed
+expanded variants remain available. Parts and expanded variants can overlap; counts
+do not establish unique ideas or content quality.
 
-## Usage
-Concatenate parts where present. Feed to design systems, local model context, or production planning.
-Data-only. Operator-gated for any implementation or native testing.
+## Read a bounded sample
+
+```python
+import gzip
+import itertools
+import json
+from pathlib import Path
+
+root = Path("data/game_data_v2")
+manifest = json.loads((root / "manifest.json").read_text())
+relative = manifest["entries"][0]["path"]
+with gzip.open(relative, "rt", encoding="utf-8") as stream:
+    for line in itertools.islice(stream, 5):
+        print(line.rstrip())
+```
+
+Stream selected files instead of expanding every variant into memory. A full
+verification compares both compressed and decoded digests with the manifest.
+Reference-only corpus files are excluded from the application image source allowlists.
+No startup, model training, native execution, rights approval or quality promotion is
+granted by merely installing these files. Admission uses the existing dataset/source
+and rights owners. Repository-authored content follows the root MIT license;
+external inputs retain their own required rights review.

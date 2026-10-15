@@ -39,5 +39,17 @@
     "complete_reuse": "Nonempty destinations require the full previously admitted complete receipt/profile; they are never treated as empty or overwritten.",
     "compose": "Installer creates host-owned default artifact directory mode0755 before Compose bind mount; a Docker-created foreign root-owned directory is not adopted by another operator.",
     "permissions": "Only the explicitly selected artifact directory is made0755; no parent permission changes."
+  },
+  "context_profiles": {
+    "default_tokens": 8192,
+    "allowed_tokens": [
+      4096,
+      8192,
+      12288,
+      16384
+    ],
+    "operator_selection": "Explicit --context-size; the canonical activation and capacity owners still decide whether work fits.",
+    "existing_installation": "Requested context must match the issued deployment. Reconfiguration requires a fresh destination; existing files are never overwritten.",
+    "original_studio_guidance": "12288 tokens were used for the bounded eight-call original creation workflow; this does not guarantee success or capacity on every host."
   }
 }

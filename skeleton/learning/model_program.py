@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copyreg
 import hashlib
 import json
 import math
@@ -27,6 +28,7 @@ def _json(value: object) -> str:
         if isinstance(v, (list, tuple)):
             return [_thaw(i) for i in v]
         return v
+
     value = _thaw(value)
     try:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
@@ -114,7 +116,11 @@ class TrainingDataset:
     def __post_init__(self) -> None:
         object.__setattr__(self, "dataset_id", _text("dataset_id", self.dataset_id))
         object.__setattr__(self, "content_digest", _sha("content_digest", self.content_digest))
-        if isinstance(self.sample_count, bool) or not isinstance(self.sample_count, int) or self.sample_count <= 0:
+        if (
+            isinstance(self.sample_count, bool)
+            or not isinstance(self.sample_count, int)
+            or self.sample_count <= 0
+        ):
             raise ModelProgramError("sample_count must be a positive integer")
         object.__setattr__(self, "source_refs", _unique("source_ref", self.source_refs, minimum=1))
         object.__setattr__(self, "rights_refs", _unique("rights_ref", self.rights_refs, minimum=1))
@@ -274,24 +280,16 @@ class TrainingReceipt:
             object.__setattr__(self, field_name, _text(field_name, getattr(self, field_name)))
         for field_name in ("spec_digest", "model_digest", "artifact_digest"):
             object.__setattr__(self, field_name, _sha(field_name, getattr(self, field_name)))
-        dataset_digests = tuple(
-            _sha("dataset_digest", value)
-            for value in self.dataset_digests
-        )
+        dataset_digests = tuple(_sha("dataset_digest", value) for value in self.dataset_digests)
         if not dataset_digests:
             raise ModelProgramError("training receipt requires dataset digests")
         object.__setattr__(self, "dataset_digests", dataset_digests)
 
         dataset_identity_digests = tuple(
-            _sha("dataset_identity_digest", value)
-            for value in self.dataset_identity_digests
+            _sha("dataset_identity_digest", value) for value in self.dataset_identity_digests
         )
-        if dataset_identity_digests and (
-            len(dataset_identity_digests) != len(dataset_digests)
-        ):
-            raise ModelProgramError(
-                "dataset identity digest count must match dataset digest count"
-            )
+        if dataset_identity_digests and (len(dataset_identity_digests) != len(dataset_digests)):
+            raise ModelProgramError("dataset identity digest count must match dataset digest count")
         object.__setattr__(
             self,
             "dataset_identity_digests",
@@ -299,15 +297,10 @@ class TrainingReceipt:
         )
 
         integrity_binding_digests = tuple(
-            _sha("integrity_binding_digest", value)
-            for value in self.integrity_binding_digests
+            _sha("integrity_binding_digest", value) for value in self.integrity_binding_digests
         )
-        if integrity_binding_digests and (
-            len(integrity_binding_digests) != len(dataset_digests)
-        ):
-            raise ModelProgramError(
-                "integrity binding count must match dataset digest count"
-            )
+        if integrity_binding_digests and (len(integrity_binding_digests) != len(dataset_digests)):
+            raise ModelProgramError("integrity binding count must match dataset digest count")
         object.__setattr__(
             self,
             "integrity_binding_digests",
@@ -396,20 +389,12 @@ class TrainingRunEvidence:
     def __post_init__(self) -> None:
         object.__setattr__(self, "run_id", _text("run_id", self.run_id))
         object.__setattr__(self, "spec_digest", _sha("spec_digest", self.spec_digest))
-        dataset_ids = tuple(
-            _sha("dataset_identity_digest", value)
-            for value in self.dataset_identity_digests
-        )
+        dataset_ids = tuple(_sha("dataset_identity_digest", value) for value in self.dataset_identity_digests)
         if not dataset_ids:
             raise ModelProgramError("run evidence requires dataset identities")
-        bindings = tuple(
-            _sha("integrity_binding_digest", value)
-            for value in self.integrity_binding_digests
-        )
+        bindings = tuple(_sha("integrity_binding_digest", value) for value in self.integrity_binding_digests)
         if bindings and len(bindings) != len(dataset_ids):
-            raise ModelProgramError(
-                "run evidence integrity binding count must match datasets"
-            )
+            raise ModelProgramError("run evidence integrity binding count must match datasets")
         object.__setattr__(self, "dataset_identity_digests", dataset_ids)
         object.__setattr__(self, "integrity_binding_digests", bindings)
         object.__setattr__(
@@ -451,7 +436,9 @@ class ModelPromotionReceipt:
     def __post_init__(self) -> None:
         object.__setattr__(self, "model_id", _text("model_id", self.model_id))
         object.__setattr__(self, "model_digest", _sha("model_digest", self.model_digest))
-        object.__setattr__(self, "training_receipt_digest", _sha("training_receipt_digest", self.training_receipt_digest))
+        object.__setattr__(
+            self, "training_receipt_digest", _sha("training_receipt_digest", self.training_receipt_digest)
+        )
         object.__setattr__(
             self,
             "evaluation_refs",
@@ -536,17 +523,12 @@ class ModelDevelopmentRegistry:
         if not isinstance(require_integrity_receipts, bool):
             raise TypeError("require_integrity_receipts must be boolean")
         if not isinstance(require_governed_promotion_decisions, bool):
-            raise TypeError(
-                "require_governed_promotion_decisions must be boolean"
-            )
+            raise TypeError("require_governed_promotion_decisions must be boolean")
         self._require_integrity_receipts = require_integrity_receipts
-        self._require_governed_promotion_decisions = (
-            require_governed_promotion_decisions
-        )
+        self._require_governed_promotion_decisions = require_governed_promotion_decisions
         policies = tuple(
             sorted(
-                _sha("allowed_integrity_policy_digest", value)
-                for value in allowed_integrity_policy_digests
+                _sha("allowed_integrity_policy_digest", value) for value in allowed_integrity_policy_digests
             )
         )
         if len(policies) != len(set(policies)):
@@ -592,9 +574,7 @@ class ModelDevelopmentRegistry:
         try:
             TrainingIntegrityGate.require_admitted(receipt)
         except TrainingIntegrityError as exc:
-            raise ModelProgramError(
-                "training integrity receipt is not admitted"
-            ) from exc
+            raise ModelProgramError("training integrity receipt is not admitted") from exc
         if (
             self._allowed_integrity_policy_digests
             and receipt.policy_digest not in self._allowed_integrity_policy_digests
@@ -637,9 +617,7 @@ class ModelDevelopmentRegistry:
             raise TypeError("corpora must be a mapping")
         extra_corpora = set(corpora) - set(spec.dataset_ids)
         if extra_corpora:
-            raise ModelProgramError(
-                "training corpora contains unbound dataset ids"
-            )
+            raise ModelProgramError("training corpora contains unbound dataset ids")
 
         checked: dict[str, tuple[str, ...]] = {}
         dataset_digests: list[str] = []
@@ -663,71 +641,46 @@ class ModelDevelopmentRegistry:
 
             binding = self._integrity_bindings.get(dataset_id)
             if self._require_integrity_receipts and binding is None:
-                raise ModelProgramError(
-                    f"training integrity binding missing: {dataset_id}"
-                )
+                raise ModelProgramError(f"training integrity binding missing: {dataset_id}")
             if binding is not None:
                 if (
                     binding.dataset_identity_digest != dataset.digest
                     or binding.dataset_content_digest != dataset.content_digest
                 ):
-                    raise ModelProgramError(
-                        f"training integrity binding is stale: {dataset_id}"
-                    )
+                    raise ModelProgramError(f"training integrity binding is stale: {dataset_id}")
                 if (
                     self._allowed_integrity_policy_digests
-                    and binding.policy_digest
-                    not in self._allowed_integrity_policy_digests
+                    and binding.policy_digest not in self._allowed_integrity_policy_digests
                 ):
-                    raise ModelProgramError(
-                        f"training integrity policy is not allowlisted: {dataset_id}"
-                    )
+                    raise ModelProgramError(f"training integrity policy is not allowlisted: {dataset_id}")
                 integrity_binding_digests.append(binding.digest)
 
-        if self._require_integrity_receipts and (
-            len(integrity_binding_digests) != len(spec.dataset_ids)
-        ):
+        if self._require_integrity_receipts and (len(integrity_binding_digests) != len(spec.dataset_ids)):
             raise ModelProgramError("training integrity coverage is incomplete")
 
         prior_receipt = self._receipts.get(spec.run_id)
         if prior_receipt is not None:
             if prior_receipt.spec_digest != spec.digest:
-                raise ModelProgramError(
-                    "training run id is already bound to a different spec"
-                )
+                raise ModelProgramError("training run id is already bound to a different spec")
             if prior_receipt.dataset_digests != tuple(dataset_digests):
-                raise ModelProgramError(
-                    "training run replay dataset content drift"
-                )
-            if (
-                prior_receipt.dataset_identity_digests
-                and prior_receipt.dataset_identity_digests
-                != tuple(dataset_identity_digests)
+                raise ModelProgramError("training run replay dataset content drift")
+            if prior_receipt.dataset_identity_digests and prior_receipt.dataset_identity_digests != tuple(
+                dataset_identity_digests
             ):
-                raise ModelProgramError(
-                    "training run replay dataset identity drift"
-                )
-            if (
-                prior_receipt.integrity_binding_digests
-                and prior_receipt.integrity_binding_digests
-                != tuple(integrity_binding_digests)
+                raise ModelProgramError("training run replay dataset identity drift")
+            if prior_receipt.integrity_binding_digests and prior_receipt.integrity_binding_digests != tuple(
+                integrity_binding_digests
             ):
-                raise ModelProgramError(
-                    "training run replay integrity binding drift"
-                )
+                raise ModelProgramError("training run replay integrity binding drift")
             artifact = self._artifacts.get(prior_receipt.model_digest)
             if artifact is None:
-                raise ModelProgramError(
-                    "training run receipt has no retained artifact"
-                )
+                raise ModelProgramError("training run receipt has no retained artifact")
             if (
                 artifact.training_run_id != spec.run_id
                 or artifact.model_id != spec.model_id
                 or artifact.artifact_digest != prior_receipt.artifact_digest
             ):
-                raise ModelProgramError(
-                    "training run replay artifact binding is inconsistent"
-                )
+                raise ModelProgramError("training run replay artifact binding is inconsistent")
             return artifact, prior_receipt
 
         artifact, metrics = engine.train(spec, checked)
@@ -808,58 +761,32 @@ class ModelDevelopmentRegistry:
             )
 
             if not isinstance(governance_candidate, ImprovementCandidate):
-                raise TypeError(
-                    "governance_candidate must be ImprovementCandidate"
-                )
+                raise TypeError("governance_candidate must be ImprovementCandidate")
             if not isinstance(governance_decision, PromotionDecision):
-                raise TypeError(
-                    "governance_decision must be PromotionDecision"
-                )
+                raise TypeError("governance_decision must be PromotionDecision")
             if not isinstance(governance_ledger, PromotionLedger):
-                raise TypeError(
-                    "governance_ledger must be PromotionLedger"
-                )
+                raise TypeError("governance_ledger must be PromotionLedger")
             if governance_decision.status is not PromotionStatus.PROMOTE:
-                raise ModelProgramError(
-                    "governance decision does not authorize promotion"
-                )
+                raise ModelProgramError("governance decision does not authorize promotion")
             try:
-                verified = governance_ledger.decision(
-                    governance_decision.decision_id
-                )
+                verified = governance_ledger.decision(governance_decision.decision_id)
             except Exception as exc:
-                raise ModelProgramError(
-                    "governance decision is not verified by promotion ledger"
-                ) from exc
+                raise ModelProgramError("governance decision is not verified by promotion ledger") from exc
             if verified != governance_decision:
-                raise ModelProgramError(
-                    "governance ledger decision mismatch"
-                )
+                raise ModelProgramError("governance ledger decision mismatch")
             if governance_decision.candidate_digest != governance_candidate.digest:
-                raise ModelProgramError(
-                    "governance decision/candidate identity mismatch"
-                )
+                raise ModelProgramError("governance decision/candidate identity mismatch")
             if governance_candidate.challenger_digest != receipt.model_digest:
-                raise ModelProgramError(
-                    "governance challenger does not match trained model"
-                )
+                raise ModelProgramError("governance challenger does not match trained model")
             if governance_decision.verifier_id != verifier:
-                raise ModelProgramError(
-                    "model-program verifier must match governance verifier"
-                )
+                raise ModelProgramError("model-program verifier must match governance verifier")
             if governance_decision.verifier_id == receipt.trainer_id:
-                raise ModelProgramError(
-                    "training actor cannot serve as governance verifier"
-                )
+                raise ModelProgramError("training actor cannot serve as governance verifier")
             if governance_decision.canary_verifier_id == receipt.trainer_id:
-                raise ModelProgramError(
-                    "training actor cannot serve as canary verifier"
-                )
+                raise ModelProgramError("training actor cannot serve as canary verifier")
             governance_digest = governance_decision.digest
         elif self._require_governed_promotion_decisions:
-            raise ModelProgramError(
-                "governed promotion decision is required"
-            )
+            raise ModelProgramError("governed promotion decision is required")
 
         result = ModelPromotionReceipt(
             model_id=receipt.model_id,
@@ -873,9 +800,7 @@ class ModelDevelopmentRegistry:
         if prior is not None:
             if prior == result:
                 return prior
-            raise ModelProgramError(
-                "model promotion identity is already bound to another decision"
-            )
+            raise ModelProgramError("model promotion identity is already bound to another decision")
         self._promotions[result.model_id] = result
         return result
 
@@ -916,18 +841,18 @@ __all__ = [
     "corpus_digest",
 ]
 
-# Pickle/deepcopy support for MappingProxyType
-import copyreg
+
+def _restore_mapping_proxy(values):
+    return MappingProxyType(values)
 
 
 def _proxy_reduce(proxy):
-    return (MappingProxyType, (dict(proxy),))
+    return (_restore_mapping_proxy, (dict(proxy),))
+
+
 copyreg.pickle(MappingProxyType, _proxy_reduce)
 
 
 def safe_digest(value: object) -> str:
-    """Failsafe digest: returns a fixed sentinel on any non-deterministic or error path."""
-    try:
-        return _digest(value)
-    except Exception:
-        return "0" * 64
+    """Return a validated digest; invalid evidence cannot acquire a shared sentinel."""
+    return _digest(value)

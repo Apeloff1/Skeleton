@@ -75,3 +75,20 @@ description = "Inherited generic API key rule with Skeleton documentation false-
   regexTarget = "line"
   regexes = ['''^\s*hdrs = WebhookSigner\(\)\.headers\(secrets, "msg_p5jXN8AQM9LWM0D4loKWxJek", body, timestamp=1614265330\)$''']
   paths = ['''^skeleton/testing/test_gate_plane_pack_f_egress\.py$''']
+
+  [[rules.allowlists]]
+  description = "Two issued authentication receipt file digests, verified as SHA-256; no bearer values"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['^\s*"(?:actual-50b1b9f7-v1|native-50b1b9f7-v1)/authentication\.json": "a99f81913f7d4219e345289c46d611aed6ce0230c1f7dae6c087e1edf2f1e01c",?$']
+  paths = ['^machine/ai_studio_creation_session_evidence_2026-10-15\.json$']
+
+  [[rules.allowlists]]
+  description = "Immutable historical first-install file hashes; current representation is a SHA-256 object"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = [
+    '^\s*"auth-me\.json": "533a58c4806ffbf40ea20f8385812a52ee9b7d1469e0f262770fbad6dd73d1e5",?$',
+    '^\s*"normal-api-requests\.json": "2e93eb5e78e85813323f81125fb256c979b678469acb73cd1cabf0703474f829",?$'
+  ]
+  paths = ['^machine/ai_first_install_session_evidence_2026-10-15\.json$']

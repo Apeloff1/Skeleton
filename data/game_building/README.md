@@ -1,18 +1,35 @@
-# Game building data corpora
+# Game-building reference corpora
 
-High-scale Pareto game design patterns and game math/physics references for local-model and design use.
+Optional generated design-reference text: planning patterns, game mathematics,
+mechanics, assets, UX, music direction and improvement process notes. These are
+text references, not audio/art files, executable games or measured gameplay evidence.
 
-## Contents
-- pareto/ — design patterns (core verb, fairness, era constraints, provenance, etc.)
-- math_physics/ — kinematics, collision, projectiles, fixed timestep, inventory math, etc.
-- Split parts (*_part_*) stay under GitHub file size guidance
-- .gz versions for compact transfer
+All original records are retained in deterministic `.gz` files. `manifest.json`
+records the original path, source PR/commit, compressed/decoded SHA-256, byte count
+and newline count. Old split-part names now have a `.gz` suffix. Existing compressed
+expanded variants remain available. Parts and expanded variants can overlap; counts
+do not establish unique ideas or content quality.
 
-## Scale note
-Literal 10 GB of unique high-quality content is not practical to generate and push without Git LFS in this environment. These corpora prioritize Pareto value (patterns that cover most design/physics needs) at the largest volume that remains repo-friendly.
+## Read a bounded sample
 
-## Usage
-Concatenate parts if needed:
-  cat pareto/pareto_part_* > full_pareto.txt
-Feed to local model improvement, design bible generation, or as reference context.
-All content is data-only and operator-gated for any implementation.
+```python
+import gzip
+import itertools
+import json
+from pathlib import Path
+
+root = Path("data/game_building")
+manifest = json.loads((root / "manifest.json").read_text())
+relative = manifest["entries"][0]["path"]
+with gzip.open(relative, "rt", encoding="utf-8") as stream:
+    for line in itertools.islice(stream, 5):
+        print(line.rstrip())
+```
+
+Stream selected files instead of expanding every variant into memory. A full
+verification compares both compressed and decoded digests with the manifest.
+Reference-only corpus files are excluded from the application image source allowlists.
+No startup, model training, native execution, rights approval or quality promotion is
+granted by merely installing these files. Admission uses the existing dataset/source
+and rights owners. Repository-authored content follows the root MIT license;
+external inputs retain their own required rights review.

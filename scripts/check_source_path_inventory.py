@@ -24,7 +24,6 @@ import sys
 from collections import Counter
 from pathlib import Path, PurePosixPath
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 CLASSES = (
@@ -69,7 +68,7 @@ GENERATED_PARTS = frozenset(
         ".nox",
     }
 )
-GENERATED_SUFFIXES = frozenset({".pyc", ".pyo", ".egg", ".zst", ".snapshot"})
+GENERATED_SUFFIXES = frozenset({".pyc", ".pyo", ".egg", ".gz", ".zst", ".snapshot"})
 GENERATED_FILENAMES = frozenset({"test_result.md"})
 
 FIXTURE_PREFIXES = ("skeleton/testing/data/",)
@@ -90,6 +89,10 @@ CANONICAL_PREFIXES = (
 # Transitional/support roots remain first-party but cannot silently acquire
 # canonical runtime ownership. machine/architecture.json is authoritative.
 FIRST_PARTY_PREFIXES = (
+    # Reference data is first-party support content, never a runtime authority.
+    "data/conversational/",
+    "data/game_building/",
+    "data/game_data_v2/",
     "apps/",
     "core/",
     "eval/",
@@ -147,11 +150,7 @@ def normalize_repo_path(path: object) -> str:
         raise ValueError("path must use POSIX separators")
     pure = PurePosixPath(path)
     canonical = pure.as_posix()
-    if (
-        pure.is_absolute()
-        or any(part in {"", ".", ".."} for part in pure.parts)
-        or canonical != path
-    ):
+    if pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts) or canonical != path:
         raise ValueError("path must be repository-relative and normalized")
     return canonical
 
@@ -199,10 +198,7 @@ def classify_path(path: object) -> str:
     if (
         _has_prefix(normalized, GENERATED_PREFIXES)
         or any(
-            (
-                part in GENERATED_PARTS
-                and not (part == "build" and normalized.startswith("skeleton/build/"))
-            )
+            (part in GENERATED_PARTS and not (part == "build" and normalized.startswith("skeleton/build/")))
             or part.endswith(".egg-info")
             for part in parts
         )
@@ -263,14 +259,9 @@ def tracked_source_paths(repo_root: Path = REPO_ROOT) -> list[str]:
         ["git", "ls-files", "-z"],
         cwd=repo_root,
         check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
     )
-    return [
-        entry.decode("utf-8", errors="surrogateescape")
-        for entry in result.stdout.split(b"\0")
-        if entry
-    ]
+    return [entry.decode("utf-8", errors="surrogateescape") for entry in result.stdout.split(b"\0") if entry]
 
 
 def summarize(paths: list[str]) -> Counter[str]:

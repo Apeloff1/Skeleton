@@ -43,9 +43,7 @@ def frontend_sources() -> list[Path]:
     return sorted(
         path
         for path in base.rglob("*")
-        if path.is_file()
-        and path.suffix in allowed_suffixes
-        and not ignored_parts.intersection(path.parts)
+        if path.is_file() and path.suffix in allowed_suffixes and not ignored_parts.intersection(path.parts)
     )
 
 
@@ -100,7 +98,9 @@ def audit_manifest() -> None:
             name = item["name"]
             raw_deps = item.get("depends_on", [])
             check(isinstance(raw_deps, list), f"service {name} depends_on must be a list")
-            deps = tuple(dep for dep in raw_deps if isinstance(dep, str)) if isinstance(raw_deps, list) else ()
+            deps = (
+                tuple(dep for dep in raw_deps if isinstance(dep, str)) if isinstance(raw_deps, list) else ()
+            )
             check(
                 set(deps).issubset(known_names),
                 f"service {name} references unknown dependencies: {sorted(set(deps) - known_names)}",
@@ -150,7 +150,6 @@ def audit_manifest() -> None:
         for relative in required_paths:
             if isinstance(relative, str):
                 check((ROOT / relative).exists(), f"manifest required path missing: {relative}")
-
 
 
 def _compose_service_names(source: str) -> set[str]:
@@ -230,7 +229,10 @@ def audit_backend_public_identity() -> None:
     server = read("backend/server.py")
 
     check('"name": "Skeleton Application API"' in health, "backend root identity drift")
-    check('"legacy_name": "CodeDock Quantum Nexus"' in health, "legacy backend identity compatibility marker missing")
+    check(
+        '"legacy_name": "CodeDock Quantum Nexus"' in health,
+        "legacy backend identity compatibility marker missing",
+    )
     check('SYSTEM_VERSION = "11.0.0"' in health, "backend health component version drift")
     check('title="Skeleton Application API"' in server, "backend OpenAPI title drift")
     check('logging.getLogger("Skeleton.Backend")' in server, "backend logger identity drift")
@@ -279,9 +281,7 @@ def audit_endpoint_boundary() -> None:
         for token in forbidden:
             if token in text:
                 relative = path.relative_to(ROOT).as_posix()
-                FAILURES.append(
-                    f"{relative} bypasses frontend/utils/apiBase.ts with {token!r}"
-                )
+                FAILURES.append(f"{relative} bypasses frontend/utils/apiBase.ts with {token!r}")
 
     resolver = read("frontend/utils/apiBase.ts")
     check("export const API_BASE" in resolver, "canonical backend endpoint export missing")
@@ -297,7 +297,6 @@ def audit_endpoint_boundary() -> None:
         "'http://localhost:8010'" in resolver,
         "Skeleton local fallback must remain localhost:8010",
     )
-
 
 
 def _provider_registry_names(tree: ast.AST) -> set[str]:
@@ -328,11 +327,8 @@ def _provider_registry_names(tree: ast.AST) -> set[str]:
             if value is None:
                 continue
 
-            registry_value = (
-                isinstance(value, ast.Name) and value.id in names
-            ) or (
-                isinstance(value, ast.Attribute)
-                and value.attr == "ProviderRegistry"
+            registry_value = (isinstance(value, ast.Name) and value.id in names) or (
+                isinstance(value, ast.Attribute) and value.attr == "ProviderRegistry"
             )
             if not registry_value:
                 continue
@@ -362,11 +358,8 @@ def _provider_registry_activation_aliases(
         if not isinstance(value, ast.Attribute) or value.attr != "from_env":
             continue
         receiver = value.value
-        registry_receiver = (
-            isinstance(receiver, ast.Name) and receiver.id in names
-        ) or (
-            isinstance(receiver, ast.Attribute)
-            and receiver.attr == "ProviderRegistry"
+        registry_receiver = (isinstance(receiver, ast.Name) and receiver.id in names) or (
+            isinstance(receiver, ast.Attribute) and receiver.attr == "ProviderRegistry"
         )
         if not registry_receiver:
             continue
@@ -391,10 +384,7 @@ def _is_provider_registry_from_env_call(
         receiver = func.value
         if isinstance(receiver, ast.Name):
             return receiver.id in names
-        return (
-            isinstance(receiver, ast.Attribute)
-            and receiver.attr == "ProviderRegistry"
-        )
+        return isinstance(receiver, ast.Attribute) and receiver.attr == "ProviderRegistry"
 
     # Catch getattr(Registry, "from_env")() without evaluating arbitrary code.
     if (
@@ -406,11 +396,8 @@ def _is_provider_registry_from_env_call(
         and func.args[1].value == "from_env"
     ):
         receiver = func.args[0]
-        return (
-            isinstance(receiver, ast.Name) and receiver.id in names
-        ) or (
-            isinstance(receiver, ast.Attribute)
-            and receiver.attr == "ProviderRegistry"
+        return (isinstance(receiver, ast.Name) and receiver.id in names) or (
+            isinstance(receiver, ast.Attribute) and receiver.attr == "ProviderRegistry"
         )
 
     return False
@@ -448,6 +435,7 @@ def _backend_local_provider_consumers() -> tuple[str, ...]:
             consumers.append(relative)
     return tuple(consumers)
 
+
 def audit_compose_modes() -> None:
     base = read("docker-compose.yml")
     hot = read("docker-compose.hot.yml")
@@ -475,15 +463,23 @@ def audit_compose_modes() -> None:
         "frontend container port must be assembly-selectable",
     )
     check(
-        "EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:8001}"
-        in base,
+        "EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}" in base,
         "frontend backend public URL default drift",
     )
     check(
-        "EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:8010}"
+        "EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:${SKELETON_PORT:-8010}}"
         in base,
         "frontend Skeleton public URL default drift",
     )
+    for name, port_name, port in (
+        ("BACKEND", "BACKEND_PORT", "8001"),
+        ("SKELETON", "SKELETON_PORT", "8010"),
+    ):
+        expected = "${EXPO_PUBLIC_" + name + "_URL:-http://localhost:${" + port_name + ":-" + port + "}}"
+        check(
+            "EXPO_PUBLIC_" + name + "_URL: " + expected in base,
+            "frontend build URL must derive the published " + name.lower() + " port",
+        )
     check(
         "SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}" in base,
         "backend internal Skeleton endpoint default drift",
@@ -548,7 +544,11 @@ def audit_compose_modes() -> None:
         "backend must wait for healthy Skeleton engine before AI ingress",
     )
 
-    frontend_block = base.split("  frontend:", 1)[1].split("\n  mongo:", 1)[0] if "  frontend:" in base and "\n  mongo:" in base else ""
+    frontend_block = (
+        base.split("  frontend:", 1)[1].split("\n  mongo:", 1)[0]
+        if "  frontend:" in base and "\n  mongo:" in base
+        else ""
+    )
     check(
         "backend:\n        condition: service_healthy" in frontend_block,
         "frontend must wait for healthy backend",
@@ -619,7 +619,7 @@ def audit_production_ingress() -> None:
     engine_routes = read("skeleton/api/routes.py")
     check('payload["application"]' in engine_routes, "engine liveness canonical application identity missing")
     check('"component": "engine"' in engine_routes, "engine liveness component identity missing")
-    check('_APP_MANIFEST.version' in engine_routes, "engine liveness version bypasses assembly manifest")
+    check("_APP_MANIFEST.version" in engine_routes, "engine liveness version bypasses assembly manifest")
 
 
 def audit_launcher_convergence() -> None:
@@ -659,9 +659,11 @@ def _backend_product_policy() -> dict[str, tuple[str, ...]]:
         if isinstance(node, ast.AnnAssign):
             if isinstance(node.target, ast.Name) and node.target.id == "CANONICAL_PRODUCT_POLICY":
                 value = node.value
-        elif isinstance(node, ast.Assign):
-            if any(isinstance(target, ast.Name) and target.id == "CANONICAL_PRODUCT_POLICY" for target in node.targets):
-                value = node.value
+        elif isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "CANONICAL_PRODUCT_POLICY"
+            for target in node.targets
+        ):
+            value = node.value
         if value is None:
             continue
         if not isinstance(value, ast.Tuple):
@@ -693,7 +695,9 @@ def _backend_product_policy() -> dict[str, tuple[str, ...]]:
             actions: list[str] = []
             for action_node in actions_node.elts:
                 if not isinstance(action_node, ast.Constant) or not isinstance(action_node.value, str):
-                    FAILURES.append(f"canonical product policy action for {domain_node.value} is not a literal string")
+                    FAILURES.append(
+                        f"canonical product policy action for {domain_node.value} is not a literal string"
+                    )
                     continue
                 actions.append(action_node.value)
             policy[domain_node.value] = tuple(actions)
@@ -802,11 +806,7 @@ def audit_product_catalog_alignment() -> None:
             f"frontend backendSurface for {capability_id} is not owned by product kernel: {surface!r} not in {prefixes}",
         )
 
-    expected_bindings = {
-        (domain, action)
-        for domain, actions in backend_policy.items()
-        for action in actions
-    }
+    expected_bindings = {(domain, action) for domain, actions in backend_policy.items() for action in actions}
     executor_bindings, ordered_bindings = _backend_executor_bindings()
     check(
         executor_bindings == expected_bindings,
@@ -825,8 +825,14 @@ def audit_public_app_bootstrap_contract() -> None:
     client = read("frontend/src/product/appBootstrapClient.ts")
 
     check("def public_bootstrap_payload(" in bootstrap, "public bootstrap payload builder missing")
-    check('"health_path": service.health_path' in bootstrap, "bootstrap does not source health paths from manifest")
-    check('"ingress_prefix": service.ingress_prefix' in bootstrap, "bootstrap does not source ingress prefixes from manifest")
+    check(
+        '"health_path": service.health_path' in bootstrap,
+        "bootstrap does not source health paths from manifest",
+    )
+    check(
+        '"ingress_prefix": service.ingress_prefix' in bootstrap,
+        "bootstrap does not source ingress prefixes from manifest",
+    )
     for forbidden in ("required_env", "optional_env", "public_url", "container_port", "entrypoint"):
         check(forbidden not in bootstrap, f"public bootstrap leaks internal field: {forbidden}")
 
@@ -849,7 +855,7 @@ def audit_public_app_bootstrap_contract() -> None:
     check("public_bootstrap_payload()" in route, "app bootstrap route bypasses canonical payload builder")
     check("asyncio.to_thread(_probe_engine" in route, "aggregate app status does not isolate engine probe")
     check('"identity mismatch"' in route, "aggregate app status does not validate engine identity")
-    check('identity.get(key) == value' in route, "engine identity verification is incomplete")
+    check("identity.get(key) == value" in route, "engine identity verification is incomplete")
     check("async def _probe_mongo" in route, "aggregate app status state probe missing")
     check('core_db.command("ping")' in route, "aggregate app status does not verify durable state")
     check("asyncio.gather(" in route, "aggregate app status probes are not concurrent")
@@ -859,9 +865,15 @@ def audit_public_app_bootstrap_contract() -> None:
     check('("routes.app_runtime",' in registry, "public app runtime router is not registered")
 
     check("getAppBootstrap" in client, "frontend app bootstrap client missing")
-    check("DEFAULT_APP_BOOTSTRAP_PATH = '/api/app/bootstrap'" in client, "frontend bootstrap seed endpoint drift")
+    check(
+        "DEFAULT_APP_BOOTSTRAP_PATH = '/api/app/bootstrap'" in client,
+        "frontend bootstrap seed endpoint drift",
+    )
     check("getAppRuntimeStatus" in client, "frontend aggregate app runtime client missing")
-    check("bootstrap?.contract.status || DEFAULT_APP_STATUS_PATH" in client, "frontend runtime path bypasses bootstrap contract")
+    check(
+        "bootstrap?.contract.status || DEFAULT_APP_STATUS_PATH" in client,
+        "frontend runtime path bypasses bootstrap contract",
+    )
     check("bootstrapService" in client, "frontend app bootstrap service resolver missing")
 
 

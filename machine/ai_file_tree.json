@@ -477,7 +477,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "0e520ce323e1bc4fdb4a5bb0599fb88f770fa296",
+      "source_git_object_sha": "6a0138a9d54eaf8ce534bd6433ab99c2bf6770a3",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -691,7 +691,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "5c68d4790b32da5246aca4f727e90c8771344ea7",
+      "source_git_object_sha": "f2d7d3956398b9cba89b980a9552167afcc102e7",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1212,7 +1212,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "e74d01b60d1d0e94dc1d5100b3743d665f3c6cd4",
+      "source_git_object_sha": "cc997ce8f66c8a51992aa5040c3da47bf4609fb7",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -2759,7 +2759,7 @@
       "source": "skeleton/automation/hive",
       "destination": "skeleton/ai/agents/swarm/hive",
       "kind": "tree",
-      "source_git_object_sha": "b67b286d9450ba6780a4dc92b611ce3c2aa0fd28",
+      "source_git_object_sha": "203ade28e33194b567aa1b1f6d4358bf1715b99e",
       "role": "Hive is a swarm coordination primitive and should sit beneath the multi-agent owner rather than remain a competing top-level runtime.",
       "work_package_refs": [
         "WP-W15",
@@ -3091,7 +3091,7 @@
       "destination": "skeleton/ai/research/historical/sheaf",
       "kind": "tree",
       "source_git_object_sha": "b71b9d8ab5740a50a7d9df4db8a3acd6e5a7194e",
-      "role": "Sheaf/\u010cech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
       "work_package_refs": [
         "WP-W09",
         "WP-W26"
@@ -6118,7 +6118,7 @@
       "source": "skeleton/multimodal",
       "destination": "skeleton/ai/runtime/multimodal",
       "kind": "tree",
-      "source_git_object_sha": "63a2962e366b9f4ea565ca6200b0edc099994db9",
+      "source_git_object_sha": "ce8c9c6fe748cd6ddf0b039e44c091da225cfcb5",
       "role": "Typed multimodal ingestion, provenance, sanitization, and cross-modal artifact contracts for completed VOL-020 runtime behavior.",
       "work_package_refs": [
         "WP-W28",
@@ -8240,7 +8240,7 @@
       "kind": "tree",
       "ownership_mode": "canonical_native",
       "residual_only": true,
-      "role": "Residual canonical AI-native runtime surfaces\u2014including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion\u2014not claimed by more-specific mappings or native owners.",
+      "role": "Residual canonical AI-native runtime surfaces—including autonomous engineering, effects, local inference, learning foundation, training, functional AI, provider runtime, and system completion—not claimed by more-specific mappings or native owners.",
       "volume_refs": [
         "VOL-006",
         "VOL-007",

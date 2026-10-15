@@ -1,6 +1,19 @@
 # Capability & Data Index (Pareto map)
 
-Single map of what exists and where.
+Map of runtime, planning helpers and optional reference material.
+
+## Stateful application
+
+Use the [first-install guide](../../README.md#first-install), then Product → Studio →
+Game learning for the actual editors, play sessions, bounded training and build/export
+jobs. Jeeves chat and crawler capture use their existing authenticated API owners.
+
+The table below describes **data-only planning helpers**. They generate briefs,
+checklists and candidate descriptions. Fleet/planning records do not establish that
+a core is installed, firmware is approved or a game has executed. Consult Studio
+readiness for actual target availability and the existing emulator/build owners for
+execution. Canonical helpers live under `skeleton/jeeves/`; governed AI mirror paths
+remain available for existing imports.
 
 ## Code (skeleton/ai/agents/jeeves/)
 | Module | Purpose |
@@ -24,8 +37,8 @@ Single map of what exists and where.
 - ASSET_QUALITY_TIERS.md
 
 ## Data
-- data/game_building/ — Pareto patterns + math/physics
-- data/game_data_v2/ — assets, mechanics, UX, music direction, logic, self-improvement
+- [data/game_building/](../../data/game_building/README.md) — compressed Pareto patterns + math/physics with source/checksum manifest
+- [data/game_data_v2/](../../data/game_data_v2/README.md) — compressed design text with source/checksum manifest
 - data/conversational/ — model conversational corpora
 
 ## Scripts

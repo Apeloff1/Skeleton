@@ -1,50 +1,50 @@
-# Welcome to your Expo app 👋
+# Skeleton frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo/React Native web application for the product hub, Jeeves chat, Dragon crawler
+and game studio. Routes live in `app/`; stateful workspaces live in `features/`.
 
-## Get started
+## First install
 
-1. Install dependencies
+Use the [root first-install instructions](../README.md#first-install). The production
+Compose profile builds Expo once and serves it through Nginx. Open `/setup` to inspect
+readiness and `/product` to navigate the app. The frontend never owns provider keys
+or loads backend model weights.
 
-   ```bash
-   npm install
-   ```
+## Host development
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Use Node 24 and Yarn, matching the pinned [Dockerfile](Dockerfile). From this directory:
 
 ```bash
-npm run reset-project
+yarn install --frozen-lockfile
+yarn start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Run the canonical backend/engine/Mongo services first. `python -m skeleton app up --hot`
+from the repository root selects the existing hot-reload profile instead.
 
-## Learn more
+```bash
+yarn lint
+yarn export:web
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Public endpoints resolve through the existing API resolver. Compose derives default
+browser URLs from published service ports at build time and in development. After
+changing production `EXPO_PUBLIC_*` URLs, rebuild the frontend; restarting Nginx does
+not rewrite an already exported JavaScript bundle. Never expose provider/API secrets
+through public Expo variables.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Application surfaces
 
-## Join the community
+- `/setup`: first-run readiness, useful before login or while a service is unavailable.
+- `/product`: capability navigation; Studio links directly to `/game-learning`.
+- `/jeeves-chat` and `/ai-chat`: existing canonical/governed chat workspaces.
+- `/crawler`: bounded capture, source library, review and withdrawal.
+- `/game-learning`: editors, observation, training, review and exports.
 
-Join our community of developers creating universal apps.
+Session checks share initial token loading and fence real account changes. Public
+registration gives viewer access; create the owner through the documented bootstrap
+for editing, capture and administration. Do not run the Expo starter reset command
+on this application: it replaces application routes with a blank starter project.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+See [studio operations](../docs/ai/STUDIO_CRAWLER_BUILDER_TRAINING.md) and
+[AI/crawler setup](../docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md).

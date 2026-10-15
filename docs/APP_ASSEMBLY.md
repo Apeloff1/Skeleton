@@ -1,5 +1,14 @@
 # Application Assembly
 
+For a fresh clone, use the [current first-install guide](../README.md#first-install).
+The recommended end-user launch is `python scripts/install_app.py --production --start`;
+`/setup` reports service, AI and optional native readiness separately. Existing
+model provisioning supports explicit context choices without rewriting an issued
+installation. Public browser URLs follow configured published ports in both
+production builds and development. Preserve private configuration and durable
+volumes when updating; rebuild changed images instead of resetting state.
+
+
 This repository is being consolidated into one coherent application while
 preserving the internal boundaries that already carry production behavior.
 

@@ -8,14 +8,20 @@ executes media, follows embedded instructions, or grants production authority.
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from functools import lru_cache
 from hashlib import sha256
 from types import MappingProxyType
 
 from .contracts import Modality
+from .media_validation import (
+    MediaValidationError,
+    MediaValidationLimits,
+    MediaValidationReceipt,
+    validate_media,
+)
 
 MAX_INTAKE_BYTES = 512 * 1024 * 1024
 MAX_METADATA_ITEMS = 128
@@ -89,7 +95,7 @@ def _text(name: str, value: object, *, maximum: int) -> str:
 
 def _metadata_value(value: object) -> object:
     if value is None or isinstance(value, (bool, int, float)):
-        if isinstance(value, float) and (value != value or value in {float("inf"), float("-inf")}):
+        if isinstance(value, float) and not math.isfinite(value):
             raise MultimodalSanitizationError("metadata contains non-finite numeric value")
         return value
     if isinstance(value, str):
@@ -199,219 +205,191 @@ class MultimodalAsset:
 
 
 class MultimodalIntake:
-    def __init__(self, *, max_payload_bytes: int = MAX_INTAKE_BYTES) -> None:
+    """Bounded staging registry; publish only fully admitted source receipts."""
+
+    def __init__(self, *, max_payload_bytes: int = MAX_INTAKE_BYTES, max_assets: int = 4096) -> None:
+        if (
+            isinstance(max_payload_bytes, bool)
+            or not isinstance(max_payload_bytes, int)
+            or not 1 <= max_payload_bytes <= MAX_INTAKE_BYTES
+        ):
+            raise MultimodalSanitizationError("max_payload_bytes must be a positive bounded integer")
+        if isinstance(max_assets, bool) or not isinstance(max_assets, int) or not 1 <= max_assets <= 4096:
+            raise MultimodalSanitizationError("max_assets must be an integer in [1, 4096]")
         self.max_payload_bytes = max_payload_bytes
+        self.max_assets = max_assets
         self._assets: dict[str, MultimodalAsset] = {}
-        self.max_payload_bytes = max_payload_bytes
 
-    def sanitize_verified(
-        self,
-        *,
-        asset_id: str,
-        modality: Modality,
-        mime_type: str,
-        payload: bytes,
-        metadata: Mapping[str, object] | None = None,
-    ) -> VerifiedMultimodalAsset:
-        """Sanitize then verify, producing a VerifiedMultimodalAsset."""
-        import hashlib
-
-        if not isinstance(payload, bytes) or not payload:
-            raise MultimodalSanitizationError("payload must be non-empty bytes")
-        # Basic media check for audio
-        if modality == Modality.AUDIO and mime_type == "audio/wav" and not payload.startswith(b"RIFF"):
-            raise MultimodalSanitizationError("invalid wav header")
-        base = self.sanitize(
-            asset_id=asset_id,
-            modality=modality,
-            mime_type=mime_type,
-            payload=payload,
-            metadata=metadata or {},
-        )
-        digest = hashlib.sha256(payload).hexdigest()
-        evidence = ValidationEvidence(
-            digest=digest,
-            verifier_id="intake-verified",
-            source_digest=digest,
-            source_bytes=len(payload),
-            policy_refs=("no-instruction",),
-        )
-        verified = VerifiedMultimodalAsset(
-            asset_id=base.asset_id,
-            modality=base.modality,
-            mime_type=base.mime_type,
-            content_digest=base.content_digest,
-            content_bytes=base.content_bytes,
-            embedded_instruction_detected=base.embedded_instruction_detected,
-            sanitized_metadata=dict(base.sanitized_metadata),
-            validation=evidence,
-        )
-        self._assets[asset_id] = verified
-        return verified
-
-    def verify_verified_asset(self, asset: VerifiedMultimodalAsset, source: bytes) -> None:
-        verify_verified_asset(asset, source)
-
-    """Sanitize one asset without decoding, executing, or trusting its content."""
-
-    def safe_sanitize(
-        self,
-        *,
-        asset_id: str,
-        modality: Modality,
-        mime_type: str,
-        payload: bytes,
-        metadata: Mapping[str, object] | None = None,
-    ) -> MultimodalAsset:
-        """Failsafe sanitize: never raises on bad input; returns a rejected sentinel or raises only MultimodalSanitizationError."""
-        try:
-            return self.sanitize(
-                asset_id=asset_id,
-                modality=modality,
-                mime_type=mime_type,
-                payload=payload,
-                metadata=metadata,
-            )
-        except MultimodalSanitizationError:
-            raise
-        except Exception as exc:
-            raise MultimodalSanitizationError(f"sanitize failsafe: {type(exc).__name__}") from exc
-
-    def safe_sanitize_verified(
-        self,
-        *,
-        asset_id: str,
-        modality: Modality,
-        mime_type: str,
-        payload: bytes,
-        metadata: Mapping[str, object] | None = None,
-    ) -> VerifiedMultimodalAsset:
-        """Failsafe verified sanitize."""
-        try:
-            return self.sanitize_verified(
-                asset_id=asset_id,
-                modality=modality,
-                mime_type=mime_type,
-                payload=payload,
-                metadata=metadata,
-            )
-        except MultimodalSanitizationError:
-            raise
-        except Exception as exc:
-            raise MultimodalSanitizationError(f"verified failsafe: {type(exc).__name__}") from exc
-
-    def sanitize(
-        self,
-        *,
-        asset_id: str,
-        modality: Modality,
-        mime_type: str,
-        payload: bytes,
-        metadata: Mapping[str, object] | None = None,
-    ) -> MultimodalAsset:
+    def _candidate(self, *, asset_id, modality, mime_type, payload, metadata=None) -> MultimodalAsset:
         canonical_id = _text("asset_id", asset_id, maximum=512)
-        if canonical_id in self._assets:
-            existing = self._assets[canonical_id]
-            if existing.content_digest != sha256(payload).hexdigest():
-                raise MultimodalSanitizationError("asset id already bound to different content")
-            return existing
         if not isinstance(modality, Modality):
             raise MultimodalSanitizationError("modality must be typed")
-        canonical_mime = _text("mime_type", mime_type, maximum=255).lower()
-        if ";" in canonical_mime:
-            canonical_mime = canonical_mime.split(";", 1)[0].strip()
-        allowed_prefixes = _MEDIA_PREFIX[modality]
-        if not canonical_mime.startswith(allowed_prefixes):
-            raise MultimodalSanitizationError(f"mime type {canonical_mime!r} does not match {modality.value}")
+        canonical_mime = _text("mime_type", mime_type, maximum=255).lower().split(";", 1)[0].strip()
+        if not canonical_mime.startswith(_MEDIA_PREFIX[modality]):
+            raise MultimodalSanitizationError("mime type does not match the declared modality")
         if not isinstance(payload, bytes) or not payload:
             raise MultimodalSanitizationError("payload must be non-empty bytes")
         if len(payload) > self.max_payload_bytes:
             raise MultimodalSanitizationError("payload exceeds intake byte budget")
-        raw_metadata: Mapping[str, object] = {} if metadata is None else metadata
+        raw_metadata = {} if metadata is None else metadata
         if not isinstance(raw_metadata, Mapping):
             raise MultimodalSanitizationError("metadata must be a mapping")
-        embedded = _detect_embedded_instruction(payload, raw_metadata)
-        safe_metadata = _sanitize_metadata(raw_metadata)
-        asset = MultimodalAsset(
+        candidate = MultimodalAsset(
             asset_id=canonical_id,
             modality=modality,
             mime_type=canonical_mime,
             content_digest=sha256(payload).hexdigest(),
             content_bytes=len(payload),
-            embedded_instruction_detected=embedded,
-            sanitized_metadata=safe_metadata,
+            embedded_instruction_detected=_detect_embedded_instruction(payload, raw_metadata),
+            sanitized_metadata=_sanitize_metadata(raw_metadata),
         )
-        self._assets[canonical_id] = asset
-        return asset
+        prior = self._assets.get(canonical_id)
+        if prior is not None and any(
+            getattr(prior, name) != getattr(candidate, name)
+            for name in (
+                "asset_id",
+                "modality",
+                "mime_type",
+                "content_digest",
+                "content_bytes",
+                "embedded_instruction_detected",
+                "sanitized_metadata",
+                "authority_scope",
+            )
+        ):
+            raise MultimodalSanitizationError("asset id already bound to different source semantics")
+        if prior is None and len(self._assets) >= self.max_assets:
+            raise MultimodalSanitizationError("asset registry capacity exceeded")
+        return candidate
 
+    def sanitize(self, *, asset_id, modality, mime_type, payload, metadata=None) -> MultimodalAsset:
+        candidate = self._candidate(
+            asset_id=asset_id,
+            modality=modality,
+            mime_type=mime_type,
+            payload=payload,
+            metadata=metadata,
+        )
+        prior = self._assets.get(candidate.asset_id)
+        if prior is not None:
+            return prior
+        self._assets[candidate.asset_id] = candidate
+        return candidate
 
-__all__ = [
-    "MAX_INTAKE_BYTES",
-    "Modality",
-    "MultimodalAsset",
-    "MultimodalIntake",
-    "MultimodalSanitizationError",
-]
+    def sanitize_verified(
+        self,
+        *,
+        asset_id,
+        modality,
+        mime_type,
+        payload,
+        metadata=None,
+        limits: MediaValidationLimits | None = None,
+    ) -> VerifiedMultimodalAsset:
+        candidate = self._candidate(
+            asset_id=asset_id,
+            modality=modality,
+            mime_type=mime_type,
+            payload=payload,
+            metadata=metadata,
+        )
+        try:
+            measurement = validate_media(
+                payload,
+                modality=modality.value,
+                mime_type=candidate.mime_type,
+                limits=limits,
+            )
+        except MediaValidationError as exc:
+            raise MultimodalSanitizationError(str(exc)) from exc
+        verified = VerifiedMultimodalAsset(
+            asset_id=candidate.asset_id,
+            modality=candidate.modality,
+            mime_type=candidate.mime_type,
+            content_digest=candidate.content_digest,
+            content_bytes=candidate.content_bytes,
+            embedded_instruction_detected=candidate.embedded_instruction_detected,
+            sanitized_metadata=candidate.sanitized_metadata,
+            validation=measurement,
+        )
+        prior = self._assets.get(candidate.asset_id)
+        if isinstance(prior, VerifiedMultimodalAsset):
+            if prior.validation.as_dict() != measurement.as_dict():
+                raise MultimodalSanitizationError("asset id already bound to different decoder evidence")
+            return prior
+        self._assets[candidate.asset_id] = verified
+        return verified
 
-_INSTRUCTION_PATTERN_BYTES = re.compile(_INSTRUCTION_PATTERN.pattern.encode())
-_INSTRUCTION_PATTERNS = (_INSTRUCTION_PATTERN_BYTES,)
+    def verify_verified_asset(self, asset: VerifiedMultimodalAsset, source: bytes) -> None:
+        if self._assets.get(getattr(asset, "asset_id", None)) is not asset:
+            raise MultimodalSanitizationError("verified asset was not issued by this intake")
+        verify_verified_asset(asset, source)
 
+    def safe_sanitize(self, **kwargs) -> MultimodalAsset:
+        try:
+            return self.sanitize(**kwargs)
+        except MultimodalSanitizationError:
+            raise
+        except (TypeError, ValueError, KeyError) as exc:
+            raise MultimodalSanitizationError("invalid intake request") from exc
 
-@dataclass(frozen=True, slots=True)
-class ValidationEvidence:
-    """Cryptographic and policy evidence that a multimodal asset was verified."""
-
-    digest: str
-    verifier_id: str
-    source_digest: str = ""
-    source_bytes: int = 0
-    policy_refs: tuple[str, ...] = ()
-    timestamp: float = 0.0
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.digest, str) or len(self.digest) != 64:
-            raise MultimodalSanitizationError("validation digest must be sha256")
-        if not isinstance(self.verifier_id, str) or not self.verifier_id:
-            raise MultimodalSanitizationError("verifier_id required")
+    def safe_sanitize_verified(self, **kwargs) -> VerifiedMultimodalAsset:
+        try:
+            return self.sanitize_verified(**kwargs)
+        except MultimodalSanitizationError:
+            raise
+        except (TypeError, ValueError, KeyError) as exc:
+            raise MultimodalSanitizationError("invalid verified intake request") from exc
 
 
 @dataclass(frozen=True, slots=True)
 class VerifiedMultimodalAsset(MultimodalAsset):
-    """Multimodal asset that has passed full intake + verification gates."""
+    """Actual decoded-media evidence; instruction and training rights stay separate."""
 
-    validation: ValidationEvidence = field(
-        default_factory=lambda: ValidationEvidence(digest="0" * 64, verifier_id="stub")
-    )
+    validation: MediaValidationReceipt = field(kw_only=True)
 
     def __post_init__(self) -> None:
-        # Manual validation to avoid slots super issues
-        if not isinstance(self.validation, ValidationEvidence):
-            raise MultimodalSanitizationError("validation must be ValidationEvidence")
-        # Reuse parent checks via temporary or inline
         MultimodalAsset.__post_init__(self)
+        if not isinstance(self.validation, MediaValidationReceipt):
+            raise MultimodalSanitizationError("actual media decoder receipt is required")
+        if (
+            self.validation.source_digest != self.content_digest
+            or self.validation.source_bytes != self.content_bytes
+            or self.validation.media_type != self.mime_type
+            or self.modality not in {Modality.IMAGE, Modality.AUDIO}
+        ):
+            raise MultimodalSanitizationError("decoder receipt and source identity differ")
 
 
 def verify_verified_asset(asset: VerifiedMultimodalAsset, source: bytes) -> None:
-    """Fail-closed verification of a verified multimodal asset against its source bytes."""
     if not isinstance(asset, VerifiedMultimodalAsset):
-        raise MultimodalSanitizationError("asset is not a VerifiedMultimodalAsset")
-    import hashlib
-
-    computed = hashlib.sha256(source).hexdigest()
-    if computed != asset.content_digest:
+        raise MultimodalSanitizationError("typed verified asset is required")
+    if not isinstance(source, bytes) or len(source) != asset.content_bytes:
+        raise MultimodalSanitizationError("source bytes differ from issued evidence")
+    if sha256(source).hexdigest() != asset.content_digest:
         raise MultimodalSanitizationError("source content digest mismatch")
-    if asset.validation.digest != computed:
-        raise MultimodalSanitizationError("validation evidence digest mismatch")
-    if asset.instruction_trusted:
-        raise MultimodalSanitizationError("verified asset must not claim instruction trust")
-    # Additional policy: no embedded instruction if validation claims clean
-    if asset.embedded_instruction_detected and "no-instruction" in asset.validation.policy_refs:
-        raise MultimodalSanitizationError("policy violation: embedded instruction under clean policy")
+    try:
+        measured = validate_media(
+            source,
+            modality=asset.modality.value,
+            mime_type=asset.mime_type,
+            limits=asset.validation.limits,
+        )
+    except (MediaValidationError, AttributeError, TypeError) as exc:
+        raise MultimodalSanitizationError("verified source cannot be decoded") from exc
+    if measured.as_dict() != asset.validation.as_dict() or asset.instruction_trusted:
+        raise MultimodalSanitizationError("actual decoded source differs from issued evidence")
 
 
-@lru_cache(maxsize=256)
-def _cached_instruction_check(payload_hash: str, metadata_hash: str) -> bool:
-    """Cached instruction detection for repeated intake of similar payloads.
-    Improves responsiveness on re-processing the same content.
-    """
-    return False  # placeholder; real check remains in _detect_embedded_instruction
+_INSTRUCTION_PATTERNS = (re.compile(_INSTRUCTION_PATTERN.pattern.encode()),)
+ValidationEvidence = MediaValidationReceipt
+
+__all__ = [
+    "MAX_INTAKE_BYTES",
+    "MultimodalAsset",
+    "MultimodalIntake",
+    "MultimodalSanitizationError",
+    "ValidationEvidence",
+    "VerifiedMultimodalAsset",
+    "verify_verified_asset",
+]
