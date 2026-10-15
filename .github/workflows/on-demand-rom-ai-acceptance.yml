@@ -53,6 +53,18 @@ jobs:
             skeleton/jeeves/game_emulator_neural_world.py \
             skeleton/jeeves/game_original_rom_goal_training.py
 
+      - name: Confirm pinned independent SM83 opcode reference is present
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path("machine/gbdev_sm83_opcode_reference.json").read_text())
+          assert p["provenance"]["upstream_commit_sha"] == "376f61c86fdac2048f7ce5fe838ae756b306017e"
+          assert len(p["unprefixed"]) == 256 and len(p["cbprefixed"]) == 256
+          assert p["provenance"]["license"] == "CC0-1.0"
+          print("Pinned source reference present; actual instruction checks run in next step")
+          PY
+
       - name: Execute owned original ROM and verify exact evidence receipts
         env:
           INPUT_SEED: ${{ inputs.seed }}
