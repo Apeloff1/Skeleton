@@ -195,6 +195,7 @@ def ensure_runtime_environment(
         "SKELETON_MASTER_SECRET",
         "GF_SEAL_SECRET",
         "GF_KEYHOLDER_SEED",
+        "GAMEFORGE_JWT_SECRET",
     ):
         current = values.get(key, "")
         if _is_placeholder(current):
