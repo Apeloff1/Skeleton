@@ -38,7 +38,8 @@
     "python scripts/audit_original_gameboy_cpu_opcodes.py",
     "python scripts/audit_original_gameboy_alu_flags.py",
     "python scripts/audit_original_gameboy_interrupts.py",
-    "python scripts/audit_game_emulator_disc_first_boot.py"
+    "python scripts/audit_game_emulator_disc_first_boot.py",
+    "python scripts/audit_original_gameboy_bus_arbitration.py"
   ],
   "experimental_conditions": [
     "passive neutral",
@@ -141,7 +142,8 @@
     "skeleton/testing/test_game_rom_dma_timing.py",
     "skeleton/testing/test_game_original_cpu_conformance.py",
     "skeleton/testing/test_game_original_cpu_interrupts.py",
-    "skeleton/testing/test_game_emulator_disc_first_boot.py"
+    "skeleton/testing/test_game_emulator_disc_first_boot.py",
+    "skeleton/testing/test_game_original_cpu_bus_arbitration.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -339,7 +341,8 @@
       "source-authored original goal-conditioned Q",
       "artifact content integrity and report custody validation",
       "real source OAM DMA clocked-byte/scanline test with mid-transfer rewind custody",
-      "seven bounded repeated original-ROM CPU controller branches, including three multi-action temporal schedules with exact physical source input ledger"
+      "seven bounded repeated original-ROM CPU controller branches, including three multi-action temporal schedules with exact physical source input ledger",
+      "21 CPU-access isolation checks across HRAM, OAM DMA, VRAM/OAM PPU modes and same-source savestate"
     ],
     "failure": "nonzero subprocess and phase_*.json status, absence of suite-acceptance.json",
     "production_model_promotion": false,
@@ -609,5 +612,35 @@
     "native_disc_boots_executed": 0,
     "bios_or_disc_image_distributed": false,
     "hardware_accuracy_certified": false
+  },
+  "dmg_cpu_bus_arbitration": {
+    "canonical_source": "skeleton/jeeves/game_rom_runtime.py",
+    "governed_mirror": "skeleton/ai/agents/jeeves/game_rom_runtime.py",
+    "source_operator": "python scripts/audit_original_gameboy_bus_arbitration.py --evidence-file /private/research/original-cpu-bus.json",
+    "real_machine_behavior": [
+      "DMG DMA locks CPU to HRAM FF80-FFFE",
+      "CPU external data reads treated as high open bus and writes ignored during DMA",
+      "opcode fetch and IRQ service from unmodeled DMA-inaccessible buses fail closed",
+      "internal source DMA and PPU access same underlying RAM independently of CPU bus restriction",
+      "CPU VRAM blocked during source Mode3 and OAM blocked during source Mode2/Mode3",
+      "LCDC off removes video DMA-independent bus restriction",
+      "transient CPU bus context never serialized or leaked on invalid instruction"
+    ],
+    "original_source_checks": 21,
+    "separate_source_regression": "skeleton/testing/test_game_original_cpu_bus_arbitration.py",
+    "existing_raster_regressions": "skeleton/testing/test_game_rom_dma_timing.py",
+    "manual_AI_acceptance_gate": "scripts/run_game_rom_acceptance_suite.py",
+    "source_reference_urls": [
+      "https://gbdev.io/pandocs/OAM_DMA_Transfer.html",
+      "https://gbdev.io/pandocs/Accessing_VRAM_and_OAM.html"
+    ],
+    "physical_accuracy_limitations": [
+      "PPU Mode3 fixed-duration approximation, no sprite pixel-fetch contention",
+      "DMG bus floating value approximate; exact electrical bus-value protocol not certified",
+      "CPU IRQ service while DMA remains unsupported and fails closed",
+      "CGB cross-bus timing and full OAM blocking not implemented"
+    ],
+    "actual_acceptance_executed_during_authoring": false,
+    "production_weights_updated": 0
   }
 }
