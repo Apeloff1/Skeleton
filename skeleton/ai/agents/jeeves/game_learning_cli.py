@@ -322,6 +322,50 @@ def _evaluate(args) -> dict[str, Any]:
     }
 
 
+def _plan_emulator(args) -> dict[str, Any]:
+    from .game_emulator_planning_lab import (
+        EmulatorPlanningConfig,
+        run_native_confirmed_planning,
+    )
+
+    if not args.rights_acknowledged or args.rom is None or args.project is not None:
+        raise ValueError("Physical planning requires one explicit rights-cleared ROM source")
+    if args.evidence_file.exists():
+        raise FileExistsError("Native planning evidence must be a new private file")
+    destinations = {
+        args.model_file.resolve(strict=False),
+        args.training_report_file.resolve(strict=False),
+        args.evidence_file.resolve(strict=False),
+    }
+    if len(destinations) != 3:
+        raise ValueError("Training input and physical planning output locations must differ")
+    _, _, request = _factory(args)
+    model = _json_read(args.model_file)
+    report = _json_read(args.training_report_file)
+    results = run_native_confirmed_planning(
+        request,
+        model=model, training_report=report,
+        rights_acknowledged=True,
+        config=EmulatorPlanningConfig(
+            seed=args.seed, anchors=args.anchors, horizon=args.horizon,
+            beam_width=args.beam_width, action_subset=args.action_subset,
+            proposal_count=args.proposal_count, repeats=args.repeats,
+            max_actual_steps=args.max_actual_steps, objective=args.objective,
+        ),
+    )
+    _write_json(args.evidence_file, results, replace=False)
+    return {
+        "status": "measured_native_model_plans",
+        "evidence_file": str(args.evidence_file),
+        "report_digest": results["report_digest"],
+        "real_emulator_steps": results["real_emulator_steps"],
+        "physically_validated_plans": results["tested_plan_count"],
+        "physically_positive_plans": results["actual_positive_plans"],
+        "neural_or_q_weight_updates": 0,
+        "production_promotion": False,
+    }
+
+
 def _fit_emulator_world_model(args) -> dict[str, Any]:
     from .game_emulator_neural_world import (
         NeuralWorldConfig,
@@ -562,6 +606,35 @@ def parser() -> argparse.ArgumentParser:
 
 
 
+
+    plan = commands.add_parser(
+        "plan-emulator",
+        help="Physically compare candidate neural action plans vs identical-state neutral baselines",
+    )
+    plan.add_argument("--target", required=True)
+    plan.add_argument("--rom", type=Path, required=True)
+    plan.add_argument("--project", type=Path)
+    plan.add_argument("--core")
+    plan.add_argument("--episode-steps", type=int, default=32)
+    plan.add_argument("--frames-per-step", type=int, default=1)
+    plan.add_argument("--cycles-per-step", type=int, default=1824)
+    plan.add_argument("--model-file", type=Path, required=True)
+    plan.add_argument("--training-report-file", type=Path, required=True)
+    plan.add_argument("--evidence-file", type=Path, required=True)
+    plan.add_argument("--seed", type=int, default=0)
+    plan.add_argument("--anchors", type=int, default=2)
+    plan.add_argument("--horizon", type=int, default=4)
+    plan.add_argument("--beam-width", type=int, default=8)
+    plan.add_argument("--action-subset", type=int, default=8)
+    plan.add_argument("--proposal-count", type=int, default=3)
+    plan.add_argument("--repeats", type=int, default=2)
+    plan.add_argument("--max-actual-steps", type=int, default=512)
+    plan.add_argument(
+        "--objective",
+        choices=["measured_reward", "visual_activity", "audio_activity", "low_visual_activity"],
+        default="measured_reward",
+    )
+    plan.add_argument("--rights-acknowledged", action="store_true")
     world = commands.add_parser(
         "fit-emulator-world-model",
         help="Perform REAL bounded neural optimizer steps on verified ROM traces; never promote Jeeves weights",
@@ -692,6 +765,8 @@ def main(argv: list[str] | None = None) -> int:
             result = _cross_core_comparison(args)
         elif args.command == "fit-emulator-world-model":
             result = _fit_emulator_world_model(args)
+        elif args.command == "plan-emulator":
+            result = _plan_emulator(args)
         else:
             result = _native(args)
         print(json.dumps(result, sort_keys=True, allow_nan=False))
