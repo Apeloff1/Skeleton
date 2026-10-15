@@ -87,6 +87,7 @@ Each JSONL record has the same fields:
 
     {
       "id": "original_mechanics_001",
+      "source_project_id": "original_game_project_001",
       "split": "train",
       "family": "mechanics",
       "prompt": "Design an original reversible two-button climbing challenge.",
@@ -107,6 +108,33 @@ training_permitted=true. The loader rejects source_kind=unverified_scrape,
 unknown licensing, malformed rights declarations, edited files, duplicates
 and near-copied evaluation prompts/answers. It also excludes overlap with
 the separate 24-question human game-design benchmark.
+
+The source_project_id is mandatory. Every source project belongs entirely
+to TRAIN or HELDOUT, never both; this guards against copying scenes from one
+world between splits. At least two independent source projects are required
+in each split, and copied or near-copied benchmark questions are rejected.
+
+The app also has an optional builder for converting already human-reviewed
+game-work artifacts into a validated dataset. A reviewed intake is JSONL
+containing schema_version "skeleton.jeeves.reviewed_game_design_intake.v1",
+a unique id and source_project_id, family, prompt and answer, rights metadata,
+quality_approved=true, a named quality_reviewer_id, and an evidence-bearing
+quality_review_note. Those approvals are supplied by real operators; the app
+does not automatically decide ownership or invent reviewers.
+
+    skeleton-jeeves-corpus-build \
+      --intake /PRIVATE_PATH/reviews/reviewed-game-examples.jsonl \
+      --output-dir /PRIVATE_PATH/corpora \
+      --prefix approved_game_v001 \
+      --partition-seed approved_holdout_001 \
+      --rights-review-id original_sources_rights_001
+
+The builder groups all examples from a source game project together,
+deterministically selects held-out PROJECTS while preserving each domain's
+minimum training quota, runs the production loader on the staged output,
+then exclusively publishes two JSONL files and a SHA-pinned manifest.
+A builder receipt remains a review declaration, NOT legal verification
+or proof of game-design quality.
 
 All eight families need at least four TRAIN examples and two HELDOUT examples:
 mechanics, narrative, npc, world, economy, tooling, accessibility and review.
@@ -198,6 +226,21 @@ continuing. An unverified or missing stage is rejected, not skipped.
       --max-training-seconds 1200 \
       --resume
 
+When actual optimizer training has finished and the candidate plus training
+report are already written, but the independent game-design review or final
+manifest failed, use the POST-SGD recovery command instead of --resume:
+
+    skeleton-jeeves-session-recover \
+      --run-id game-001 \
+      --attestation /PRIVATE_PATH/operator/jeeves-training-attestation.json \
+      --dataset-manifest /PRIVATE_PATH/corpora/approved_game_v001-manifest.json \
+      --output-directory /PRIVATE_PATH/operator/candidates
+
+This checks the same serving parent and approved corpus, verifies candidate
+lineage and SGD steps, regenerates the independent 24-prompt model comparison,
+refuses mismatched existing review files, and exclusively writes the final
+session manifest. It neither retrains nor promotes a model.
+
 A completed/rejected run with a manifest cannot be resumed as though unfinished;
 start a distinct run ID instead. Resume does not modify the live parent file
 or authorize deployment. The progress folder must be privately writable by
@@ -266,7 +309,9 @@ Run:
       skeleton.testing.test_jeeves_training_progress \
       skeleton.testing.test_jeeves_torch_game_vocabulary \
       skeleton.testing.test_jeeves_production_profile \
-      skeleton.testing.test_jeeves_game_corpus
+      skeleton.testing.test_jeeves_game_corpus \
+      skeleton.testing.test_jeeves_game_corpus_builder \
+      skeleton.testing.test_jeeves_production_game_recovery
 
 Separately run the app installer, native runtime, game builder, security, model serving and end-to-end validation after compiling. Source commits alone do not prove those gates passed. No new noisy Actions workflows have been added.
 
