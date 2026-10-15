@@ -624,3 +624,62 @@ def test_compose_browser_endpoints_follow_custom_published_host_ports():
     ) in compose
     assert "\nEXPO_PUBLIC_BACKEND_URL=\n" in env_example
     assert "\nEXPO_PUBLIC_SKELETON_URL=\n" in env_example
+
+def test_probe_rejects_redirect_to_login_page_even_if_target_is_200(monkeypatch):
+    from skeleton.app.health import probe_http
+
+    class RedirectResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def geturl(self):
+            return "http://localhost:8001/login"
+
+        def read(self, _size):
+            return b"login page"
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+    result = probe_http("backend", "http://localhost:8001/api/health")
+    assert not result.ok
+    assert result.detail == "health endpoint redirected"
+    assert "/login" not in repr(result.to_dict())
+
+
+def test_probe_does_not_publish_sensitive_network_exception(monkeypatch):
+    from urllib.error import URLError
+    from skeleton.app.health import probe_http
+
+    def unavailable(*_args, **_kwargs):
+        raise URLError("private operator credential in daemon response")
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", unavailable)
+    result = probe_http("backend", "http://localhost:8001/api/health")
+    assert result.ok is False
+    assert "URLError" in result.detail
+    assert "private operator credential" not in repr(result.to_dict())
+
+
+def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
+    from skeleton.app.health import probe_http
+
+    class RedirectResponse:
+        status = 302
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _size):
+            return b"redirect"
+
+    monkeypatch.setattr("skeleton.app.health.urlopen", lambda *_args, **_kwargs: RedirectResponse())
+    result = probe_http("backend", "http://localhost:8001/api/health")
+    assert not result.ok
+    assert result.status == 302

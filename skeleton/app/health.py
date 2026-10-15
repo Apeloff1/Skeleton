@@ -36,14 +36,27 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
     try:
         with urlopen(request, timeout=timeout) as response:
             status = int(getattr(response, "status", 200))
+            # urllib automatically follows redirects. A redirected login page
+            # returning 200 is NOT evidence the declared health endpoint works.
+            geturl = getattr(response, "geturl", None)
+            effective_url = geturl() if callable(geturl) else url
             response.read(256)
-        ok = 200 <= status < 400
+        ok = 200 <= status < 300 and effective_url == url
+        detail = (
+            "healthy"
+            if ok
+            else (
+                "health endpoint redirected"
+                if effective_url != url
+                else f"unexpected HTTP status {status}"
+            )
+        )
         return ProbeResult(
             service=name,
             url=url,
             ok=ok,
             status=status,
-            detail="healthy" if ok else f"unexpected HTTP status {status}",
+            detail=detail,
         )
     except HTTPError as exc:
         return ProbeResult(
@@ -59,7 +72,9 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
             url=url,
             ok=False,
             status=None,
-            detail=f"{type(exc).__name__}: {exc}",
+            # Never include urllib exception text; a proxy/daemon can reflect
+            # credentials or a sensitive target URL into the reason string.
+            detail=f"{type(exc).__name__}: health endpoint unreachable",
         )
 
 
