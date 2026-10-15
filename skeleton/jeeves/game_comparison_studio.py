@@ -372,6 +372,11 @@ def run_comparative_study(
             "weight_promotion_authorized": False,
         },
     }
+    # One deterministic, separately reviewable synthesis layer; never train
+    # model parameters from screen brightness or a submitted viewer hypothesis.
+    from .game_comparison_synthesis import synthesize_comparative_report
+
+    report["synthesis"] = synthesize_comparative_report(report)
     report["result_sha256"] = digest(report)
     if len(json.dumps(report, sort_keys=True, allow_nan=False).encode()) > MAX_REPORT_BYTES:
         raise ComparativeStudyError("Comparative evidence exceeds 24 MiB; rerun without previews or select a single batch")

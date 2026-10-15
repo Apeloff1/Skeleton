@@ -55,6 +55,17 @@ def export_dragon_comparison_intake(report: Mapping[str, object]) -> dict[str, o
         "source_study_sha256": report["result_sha256"],
         "observer_card_count": len(cards),
         "cards": cards,
+        "proposed_training_curricula": [
+            {
+                "cohort_index": cohort["cohort_index"],
+                "game_ids": cohort["game_ids"],
+                "native_trace_receipts": cohort["native_trace_receipts"],
+                "training_ready": False,
+                "weight_promotion_allowed": False,
+            }
+            for cohort in report.get("synthesis", {}).get("training_cohorts", [])
+        ],
+        "synthesis_sha256": report.get("synthesis", {}).get("synthesis_sha256"),
         "available_to_user_and_ai": True,
         "dragon_source_type": "native_emulator_comparison_user_supplied_observations",
         "actual_automated_dragon_crawling_or_video_watching": False,

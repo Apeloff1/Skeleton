@@ -72,6 +72,8 @@ footer{margin-top:20px;color:#bbc6d5;font-size:12px}
 <h2>Objective observations, not quality rankings</h2>
 <div class="stats" id="stats"></div>
 <h2>Series / evolution</h2><div id="timeline"></div>
+<h2>Research synthesis &amp; ten-game curriculum proposals</h2>
+<div id="synthesis"></div>
 </section>
 <aside class="panel">
 <h2>Viewer & Dragon notes</h2>
@@ -120,6 +122,17 @@ function card(id,phase){
  c.append(txt("div","Mean pixel brightness "+Number(p.observations.screen_mean).toFixed(4)+" • Audio RMS "+Number(p.observations.audio_rms).toFixed(4),"meta"));
  return c
 }
+function renderSynthesis(){
+ const dest=$("synthesis"),s=report.synthesis||{};
+ dest.replaceChildren();
+ dest.append(txt("p","Only independently captured video/audio metrics and attributed notes are surfaced. Proposed parameters are not actual trained weights.","muted"));
+ (s.training_cohorts||[]).forEach(c=>{
+  const p=txt("div","Cohort "+(c.cohort_index+1)+" • "+c.game_count+" observed games • "+c.game_ids.join(", ")+" • training pending rights + held-out evaluation","note");dest.append(p)
+ });
+ (s.build_parameter_hypotheses||[]).slice(0,30).forEach(p=>{
+  dest.append(txt("div","Parameter hypothesis: "+p.parameter_name+" • "+p.proposal_count+" proposals • "+(p.conflicting_values_or_units?"conflicting values; independent review required":"not experimentally verified"),"note"))
+ });
+}
 function currentPair(){return activePairs[Number($("pair").value)||0]||null}
 function render(){
  const p=currentPair(),phase=$("phase").value;
@@ -145,7 +158,7 @@ function render(){
   box.append(list);$("timeline").append(box)
  }
  const notes=[...(report.observer_notes||[]),...localNotes].filter(n=>n.game_ids.some(id=>ids.has(id)));
- notes.forEach(n=>{const box=txt("div","", "note");box.append(txt("strong",n.author+" • "+n.dimension+" • "+n.claim_type+" • "+n.review_status),txt("div",n.text),txt("small","Referenced: "+n.game_ids.join(", ")+" / "+n.checkpoint+" • "+(n.knowledge_status||"viewer draft pending review")));$("notes").append(box)});
+ notes.forEach(n=>{const box=txt("div","", "note");box.append(txt("strong",n.author+" • "+n.dimension+" • "+n.claim_type+" • "+n.review_status),txt("div",n.text),txt("small","Referenced: "+n.game_ids.join(", ")+" / "+n.checkpoint+" • "+(n.knowledge_status||"viewer draft pending review")));if(n.build_parameter_candidate){box.append(txt("small"," Build parameter: "+n.build_parameter_candidate.name+"="+n.build_parameter_candidate.value+" "+n.build_parameter_candidate.units+" (unverified hypothesis)"))};$("notes").append(box)});
  if(!notes.length)$("notes").append(txt("p","No viewer/Dragon notes recorded for this pair yet.","muted"))
 }
 function addNote(){
@@ -180,6 +193,7 @@ $("phase").addEventListener("change",render);
 $("pair").addEventListener("change",render);
 $("add").addEventListener("click",addNote);
 $("export").addEventListener("click",exportNotes);
+renderSynthesis();
 updatePairs();
 </script>
 </body>

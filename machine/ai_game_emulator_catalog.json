@@ -680,6 +680,16 @@
     "rom_source_limit": "Current single-file admission <=16 MiB; larger disc/multi-file requires separate existing GameContentBundle integration",
     "execution_performed_in_this_commit": false,
     "license_verification_performed_in_this_commit": false,
-    "production_weights_changed": false
+    "production_weights_changed": false,
+    "synthesis": {
+      "owner": "skeleton/jeeves/game_comparison_synthesis.py",
+      "meaning": "Deterministic source-traced objective audiovisual contrasts and locally reviewed human/Jeeves/Dragon design notes; does not assert game quality or AI wisdom.",
+      "cohorts": "At most 10 genuinely observed game IDs per proposed training cohort, each with canonical offline trace receipts and rights/held-out evaluation gating.",
+      "design_parameters": "Note-authored numerical parameters kept as hypotheses; flag conflicts in values/units and never apply them automatically.",
+      "ui": "Comparison HTML viewer displays pending training cohorts, source-cited observer notes and bounded parameter hypotheses",
+      "dragon": "skeleton/ai/webcrawler/dragon_comparative_game_bridge.py exports pending curriculum metadata for independent consent/verification, not trained parameter states",
+      "actual_training_executed": false,
+      "model_weights_promoted": false
+    }
   }
 }
