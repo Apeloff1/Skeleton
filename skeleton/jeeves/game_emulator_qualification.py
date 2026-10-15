@@ -112,7 +112,7 @@ def run_emulator_qualification(
             rom_source=rom_source,
             filename=filename,
             reader=reader,
-            max_steps=len(actions),
+            max_steps=tape_length,
             frames_per_step=frames_per_step,
             controller_devices=controller_devices,
             timeout_seconds=timeout_seconds,

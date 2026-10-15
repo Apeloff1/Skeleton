@@ -1,0 +1,131 @@
+"""Offline verification of live multi-emulator input/frame/audio receipts.
+
+Replayable raw controller vectors remain user-owned local JSON. This verifier
+checks every hash link including reset generations, input vector hashes,
+step counters, and source/core lineage. It does not certify native hardware,
+legal rights, gameplay quality or independently signed execution.
+"""
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Any
+
+from .game_comparison_schema import digest
+from .game_emulator_host import _controls
+
+SCHEMA="skeleton.game.live_evidence_verification.v1"
+EXPORT="skeleton.game.live_evidence_export.v1"
+
+
+class LiveEvidenceError(ValueError):
+    """Native step/reset receipts or replay input have changed or are incomplete."""
+
+
+def verify_live_evidence(packet: Mapping[str,Any]) -> dict[str,Any]:
+    if not isinstance(packet,dict) or packet.get("schema_version")!=EXPORT:
+        raise LiveEvidenceError("Live evidence requires a canonical exported native session")
+    lanes=packet.get("lanes")
+    if not isinstance(lanes,dict) or not 2<=len(lanes)<=10:
+        raise LiveEvidenceError("Live evidence requires 2–10 actually selected native lanes")
+    rows=[]
+    for game_id,lane in lanes.items():
+        if type(game_id) is not str or not isinstance(lane,dict) or lane.get("game_id")!=game_id:
+            raise LiveEvidenceError("Native evidence source game IDs differ")
+        source=lane.get("source_media_sha256")
+        if type(source) is not str or len(source)!=64:
+            raise LiveEvidenceError("Original game media hash is not recorded")
+        initial=lane.get("initial_chain_sha256")
+        env_sha=lane.get("native_environment_sha256")
+        seed=lane.get("seed")
+        if type(env_sha) is not str or len(env_sha)!=64 or type(seed) is not int:
+            raise LiveEvidenceError("Native worker and reset-seed identity is not recorded")
+        expect=digest([
+            "skeleton.game.live_comparison.v1",packet["study_digest"],game_id,
+            source,env_sha,packet["registry_digest"],"reset",seed,
+        ])
+        if initial!=expect:
+            raise LiveEvidenceError("First native state hash differs from the initial approved environment")
+        events=lane.get("native_events")
+        if not isinstance(events,list) or len(events)>260:
+            raise LiveEvidenceError("Native event recording exceeds the 256-step + 4-reset lifetime cap")
+        reset_generation=0
+        episode_step=0
+        steps=0
+        previous=initial
+        episodes=[[]]
+        for row in events:
+            if not isinstance(row,dict) or set(row)!={"event_kind","receipt","receipt_sha256"}:
+                raise LiveEvidenceError("Unexpected live evidence event shape")
+            payload=row["receipt"]
+            if not isinstance(payload,dict):
+                raise LiveEvidenceError("Native event has no immutable input/frame receipt")
+            original={key:value for key,value in payload.items() if key!="receipt_sha256"}
+            if digest(original)!=row["receipt_sha256"] or payload.get("receipt_sha256")!=row["receipt_sha256"]:
+                raise LiveEvidenceError("Native event hash changed after capture")
+            if payload.get("previous_chain_sha256")!=previous or payload.get("game_id")!=game_id:
+                raise LiveEvidenceError("Native events are no longer chained to the correct game")
+            if row["event_kind"]=="native_step":
+                if (payload.get("schema_version")!="skeleton.game.live_native_step_receipt.v1"
+                    or payload.get("index")!=steps+1
+                    or payload.get("episode_step")!=episode_step+1
+                    or payload.get("reset_generation")!=reset_generation
+                    or payload.get("source_content_sha256")!=source):
+                    raise LiveEvidenceError("Actual native episode step index or source was modified")
+                controls=payload.get("controller_ports")
+                if not isinstance(controls,list) or not 1<=len(controls)<=4:
+                    raise LiveEvidenceError("Replayable native controller tape is missing")
+                try:
+                    normalized=_controls(controls)
+                except (ValueError,TypeError) as exc:
+                    raise LiveEvidenceError("Native input vector violates bounded host schema") from exc
+                if normalized!=controls or digest(controls)!=payload.get("input_vector_sha256"):
+                    raise LiveEvidenceError("Native controller vector differs from actual captured digest")
+                for sha_name in ("frame_sha256","pcm_sha256","transition_sha256"):
+                    value=payload.get(sha_name)
+                    if type(value) is not str or len(value)!=64:
+                        raise LiveEvidenceError("Native video/audio/transition evidence identity was removed")
+                steps+=1
+                episode_step+=1
+                episodes[-1].append(controls)
+            elif row["event_kind"]=="native_reset":
+                if (payload.get("schema_version")!="skeleton.game.live_native_reset_receipt.v1"
+                    or payload.get("reset_generation")!=reset_generation+1
+                    or payload.get("source_content_sha256")!=source):
+                    raise LiveEvidenceError("Native reset generation was mutated")
+                reset_generation+=1
+                episode_step=0
+                episodes.append([])
+            else:
+                raise LiveEvidenceError("Unknown native event kind")
+            previous=row["receipt_sha256"]
+        if (lane.get("final_chain_sha256")!=previous
+            or lane.get("step_count")!=steps
+            or lane.get("reset_count")!=reset_generation):
+            raise LiveEvidenceError("Final native evidence count/root differs from committed events")
+        rows.append({
+            "game_id":game_id,"core_id":lane["core_id"],
+            "target_id":lane["target_id"],
+            "native_events_verified":len(events),
+            "native_input_steps_verified":steps,
+            "native_resets_verified":reset_generation,
+            "episode_tape_lengths":[len(ep) for ep in episodes],
+            "initial_chain_sha256":initial,
+            "final_chain_sha256":previous,
+            "replayable_controller_tapes":episodes,
+            "locally_verified":True,
+            "independently_attested_native_run":False,
+        })
+    result={
+        "schema_version":SCHEMA,
+        "study_id":packet["study_id"],
+        "study_digest":packet["study_digest"],
+        "registry_digest":packet["registry_digest"],
+        "game_count":len(rows),
+        "total_real_reported_native_steps":sum(x["native_input_steps_verified"] for x in rows),
+        "total_native_reset_events":sum(x["native_resets_verified"] for x in rows),
+        "games":rows,
+        "correctness_claim":"Checks a self-contained hash chain and exact raw controller records, not independently signed hardware execution",
+        "model_weights_changed":False,
+    }
+    result["verification_sha256"]=digest(result)
+    return result

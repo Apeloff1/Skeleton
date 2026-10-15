@@ -826,6 +826,28 @@
       "withheld": "No invented gameplay victory, held-out improvement, ROM licensing approval, Dragon custody approval or production-weight promotion",
       "presentation": "Comparison viewer has reviewable six-metric uptake summary and exact digest; Dragon intake references uptake receipt without promoting it",
       "tests": "tests/test_game_comparison_uptake.py added with synthetic source fixtures, no real emulator run"
+    },
+    "real_live_comparison_desk": {
+      "state": "New source/runtime interface committed only after code edit; actual native core and real ROM not exercised in this chat",
+      "app_runtime": "skeleton/jeeves/game_comparison_live.py",
+      "local_server": "skeleton/jeeves/game_comparison_live_http.py",
+      "browser": "skeleton/jeeves/game_comparison_live_viewer.py",
+      "cli": "scripts/live_game_comparison.py",
+      "exact_receipt_verifier": "skeleton/jeeves/game_comparison_live_evidence.py",
+      "fresh_worker_replay": "scripts/qualify_live_game_comparison.py",
+      "execution": "Select one 2–10-game cohort from the existing 30-game study, execute up to ten real sandboxed libretro cores; show any two real screens, multi-port controls strictly BELOW each frame and actually advance one/both/all lanes",
+      "input": "Up to four bounded native joypad/analog/keyboard/mouse/pointer devices; write exact controls into hash-chained finite native step receipts, retain reset events and original source/core/environment hashes",
+      "ui": "Objective graphs, per-step event logs, full source-pinned evidence export, notes drafting/JSON export, per-game reset; browser does not run arbitrary commands or load ROM bytes",
+      "safety": "127.0.0.1-only HTTP, origin/host check and process-random token, 2–10 live lanes, 256 lifetime steps, four resets, 60–3600-second idle timeout, explicit local media rights acknowledgment and existing disk quota",
+      "replay": "Complete original raw controller vectors; offline SHA-chain verification; 2–10 fresh-worker true native replay for individually selected <=64-step epoch (do not silently truncate)",
+      "regression_fix": "game_emulator_qualification.py raw controller tape no longer crashes from len(actions) when actions is None",
+      "model_training": "No automatic production LLM/Dragon weight updates and no core accuracy verification",
+      "tests_added": [
+        "tests/test_game_comparison_live.py",
+        "tests/test_game_comparison_live_http.py",
+        "tests/test_game_comparison_raw_qualification_regression.py"
+      ],
+      "native_execution_tested": false
     }
   }
 }
