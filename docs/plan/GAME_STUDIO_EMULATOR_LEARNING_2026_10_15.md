@@ -306,3 +306,50 @@ all possible training angles, actual neural candidate updates and
 independently proven game-design quality are not complete. This is a
 substantial reference-engine **training and research plane** rather
 than full implementation of every physical production engine.
+
+## Executable diagnostics, concurrent evaluation and real work evidence
+
+The `skeleton/jeeves/game_studio_engine_diagnostics.py` tool permits
+paged execution of **every** registered engine command without
+mislabeling an initially unavailable input as successful gameplay.
+For each selected control it resets the original runtime twice,
+checks deterministic observed transitions, independently restores
+the snapshot and records either accepted actual game action or a
+typed rejected state. Its additional contract run tests canonical
+source identity, invalid fields, unknown action rejection, same
+seed reset, snapshot reconstruction and visual telemetry identity.
+
+```bash
+python -m skeleton.jeeves.game_studio_engine_diagnostics \
+  --engine economy --seed 7 --offset 0 --limit 32
+# Inspect next_offset and repeat until null to exercise the *entire*
+# registered action palette. The pass list is executable evidence,
+# not a claim that every imaginable state was exhaustively tested.
+```
+
+The authenticated `GET /api/game-studio-learning/engines/{editor}/probes`
+API bounds each call to sixteen separately replay-verified commands
+(the UI requests eight) with a single backend diagnostics admission
+semaphore, and displays actual passes/rejections from each page.
+An unset/failed probe cannot be surfaced as a completed test.
+
+**Concurrent *training-campaign* evaluation:** the canonical
+`StudioLearningCampaign._round` now evaluates multiple ordinary and
+adversarial control runs using a bounded four-thread executor only for
+original-game studio reference runtimes; all true emulator providers
+retain their existing sequential execution path. Six further
+`mirrored_rule_comparison` angles compare paired source-world
+circumstances for each genuinely modified studio candidate, and
+their worst-case observed reward difference is an explicit additional
+champion-acceptance gate. The recorded round counts actual mirrored
+steps, not the requested maximum. These measurements become part
+of committed campaign evidence and deterministic report digests.
+The spectator viewer is a distinct, read-only concurrent view—not
+the campaign's frozen training-step framebuffer.
+
+Actual production release still requires exact-head execution of
+the runnable suites, backend/frontend type and security checks,
+independent gameplay/engine acceptance, dataset rights checks,
+real checkpoint-derived neural training, and native graphics,
+sound, networking, persistence and platform verification. Nothing
+here certifies 43 complete shipping-grade game engines.

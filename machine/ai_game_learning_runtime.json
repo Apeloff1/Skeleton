@@ -131,6 +131,23 @@
       "circana_rank": "https://www.statista.com/statistics/1285658/top-ranked-video-games-sales-annual/",
       "permitted": "factually cited popularity reference plus original abstract mechanics hypotheses only",
       "forbidden": "commercial assets, levels, dialogue, copied source, unauthorized proprietary training data"
+    },
+    "executable_engine_probes": {
+      "owner": "skeleton/jeeves/game_studio_engine_diagnostics.py",
+      "route": "GET /api/game-studio-learning/engines/{editor}/probes",
+      "capacity": {
+        "max_actions_per_diagnostics_cli_page": 64,
+        "max_actions_per_api_page": 16,
+        "max_concurrent_api_probes": 1
+      },
+      "evidence": "each original registered command tested independently from reset, same-seed source replay and verified snapshot; accepted/rejected differentiated",
+      "completion": "not certified, check pages and native/genre/e2e quality gates remain required"
+    },
+    "concurrent_training_campaign": {
+      "owner": "skeleton/jeeves/game_studio_learning.py",
+      "scope": "Studio-only independent candidate/champion ordinary and adversarial evaluation uses bounded four-thread executor; six additional source-matched mirror perspectives independently measure declared rule changes.",
+      "acceptance": "worst observed mirror reward delta must satisfy configured worst-seed regression bound; no automatic live model weight promotion",
+      "caveat": "Actual measured round-frame stream not yet wired to the spectator preview; those frames remain separate."
     }
   }
 }
