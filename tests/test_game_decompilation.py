@@ -16,7 +16,7 @@ import wave
 import zipfile
 from pathlib import Path
 
-from skeleton.jeeves.game_console_assets import png_rgba
+from skeleton.jeeves.game_console_assets import png_rgba, TIMImage, encode_tim
 from skeleton.jeeves.game_decompilation import (
     GameDecompilationGrant, decompile_authorized_game,
     prepare_reviewed_training_candidate, SCOPE_STRUCTURE, SCOPE_CODE,
@@ -183,6 +183,37 @@ class RealStructureAndAssetContracts(unittest.TestCase):
         self.assertEqual(result["format"],"pe_coff")
         self.assertEqual(result["sections"][0]["raw_sha256"],digest(b"ABCDEFGH"))
         self.assertFalse(result["code_instructions_disassembled"])
+
+    def test_actual_ps1_tim_pixels_and_rights_gated_png(self):
+        # Original 2x2 RGB555 red/blue fixture, not Sony or commercial art.
+        tim=TIMImage(bits_per_pixel=16,width=2,height=2,
+                     pixels=(bytes([0x1F,0,0,0x7C])*2))
+        source=encode_tim(tim)
+        rights=grant(source)
+        report=decompile_authorized_game(
+            source,"homebrew.tim",grant=rights,authorize=lambda *_:True,
+            export_previews=True,
+        )
+        self.assertEqual(report.report["format"],"playstation_tim_candidate")
+        self.assertEqual(report.report["asset_analysis"]["format"],"ps1_tim_16bpp")
+        self.assertEqual(report.report["asset_analysis"]["pixel_count"],4)
+        self.assertEqual(len(report.previews),1)
+        self.assertTrue(report.previews[0][1].startswith(b"\\x89PNG"))
+        silent=decompile_authorized_game(
+            source,"homebrew.tim",grant=rights,authorize=lambda *_:True,
+            export_previews=False,
+        )
+        self.assertEqual(silent.previews,())
+
+    def test_existing_png_decodes_actual_rgba_without_export_by_default(self):
+        rgba=bytes([60,120,180,255])*4
+        source=png_rgba(rgba,2,2)
+        report=decompile_authorized_game(
+            source,"art.png",grant=grant(source),authorize=lambda *_:True,
+        )
+        self.assertEqual(report.report["asset_analysis"]["rgba_sha256"],digest(rgba))
+        self.assertFalse(report.previews)
+        self.assertFalse(report.report["asset_analysis"]["source_media_bytes_exported"])
 
     def test_nested_zip_not_executed_and_exact_png_assets_measured(self):
         image=png_rgba(bytes([50,100,150,255])*4,2,2)
