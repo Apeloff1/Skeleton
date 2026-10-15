@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 from functools import partial
 import hashlib
 import json
@@ -483,6 +484,16 @@ async def adopt(scope, candidate_id, body):
 
     issuer, recipe = await _candidate_job(scope, candidate_id)
     project_id = issuer["project_id"]
+    current = await workspace._project(project_id, scope)
+    if workspace.authored_environment_kind({item["path"]: item["content"] for item in current["files"]}) in {
+        "studio",
+        "studio_rules",
+    }:
+        raise GameLearningError(
+            "successor_source_root_conflict",
+            "Create an original-game workspace before adopting a successor; this project owns a studio engine source.",
+            422,
+        )
     operation = await _prepare(scope, project_id, "successor-adopt", {**body, "candidate_id": candidate_id})
     save_body = operation.get("_save_body")
     if save_body is None:
@@ -552,6 +563,139 @@ async def world(scope, project_id):
     }
 
 
+def _edited_world(spec, body):
+    """Apply inert, bounded authoring edits before canonical full-spec validation."""
+    editable = {"title", "world", "mechanics", "palette", "camera", "fidelity"}
+    if (body.get("changes") is None) == (body.get("edits") is None):
+        raise GameLearningError("world_edit_payload", "Provide complete changes or typed edits.", 422)
+    if body.get("changes") is not None:
+        if not isinstance(body["changes"], dict) or not body["changes"] or set(body["changes"]) - editable:
+            raise GameLearningError(
+                "world_field_immutable", "World edits cannot change origins or runtime identity.", 422
+            )
+        return {**spec, **body["changes"]}
+    edits = body["edits"]
+    if not isinstance(edits, list) or not 1 <= len(edits) <= 64:
+        raise GameLearningError("world_edit_capacity", "Select one to 64 typed world edits.", 422)
+    result = copy.deepcopy(spec)
+    sections = {
+        "obstacles_rects",
+        "platforms",
+        "ponds",
+        "farm_plots",
+        "villagers",
+        "dungeons",
+        "shops",
+        "collectibles",
+        "enemies",
+        "doors",
+        "checkpoints",
+        "landmarks",
+        "crop_variants",
+        "fish_variants",
+        "quests",
+    }
+    for edit in edits:
+        if not isinstance(edit, dict):
+            raise GameLearningError("world_edit_invalid", "A typed world edit is required.", 422)
+        operation = edit.get("op")
+        if operation == "set_field":
+            path = edit.get("path")
+            if (
+                not isinstance(path, list)
+                or not 1 <= len(path) <= 5
+                or not isinstance(path[0], str)
+                or path[0] not in editable
+                or any(
+                    type(key) not in (str, int)
+                    or (isinstance(key, str) and (not key or len(key) > 128 or key.startswith("__")))
+                    for key in path
+                )
+            ):
+                raise GameLearningError(
+                    "world_edit_path", "Select an existing field under an editable section.", 422
+                )
+            _json(edit.get("value"), 8192)
+            cursor = result
+            for index, key in enumerate(path):
+                final = index == len(path) - 1
+                if isinstance(cursor, dict) and isinstance(key, str):
+                    if key not in cursor and not (final and len(path) == 1 and key in {"fidelity", "camera"}):
+                        raise GameLearningError(
+                            "world_edit_field_absent", "Inspect the exact current field before editing.", 404
+                        )
+                elif isinstance(cursor, list) and type(key) is int and 0 <= key < len(cursor):
+                    pass
+                else:
+                    raise GameLearningError(
+                        "world_edit_path", "The field path does not match the saved world.", 422
+                    )
+                if final:
+                    cursor[key] = copy.deepcopy(edit.get("value"))
+                else:
+                    cursor = cursor[key]
+        elif operation in {"upsert_entity", "remove_entity"}:
+            section = edit.get("section")
+            if section not in sections:
+                raise GameLearningError("world_edit_section", "Select a declared world entity section.", 422)
+            if section == "quests":
+                rows = result["mechanics"]["progression"].setdefault("quests", [])
+            else:
+                # Older valid recipes may keep variants in their mechanic group.
+                if section in {"crop_variants", "fish_variants"} and section not in result["world"]:
+                    group = "farming" if section == "crop_variants" else "fishing"
+                    result["world"][section] = copy.deepcopy(result["mechanics"][group].get(section, []))
+                rows = result["world"].setdefault(section, [])
+            if not isinstance(rows, list):
+                raise GameLearningError(
+                    "world_edit_section", "This saved section is not an entity collection.", 422
+                )
+            entity = edit.get("entity") if operation == "upsert_entity" else None
+            identifier = entity.get("id") if isinstance(entity, dict) else edit.get("entity_id")
+            if not isinstance(identifier, str) or not 1 <= len(identifier) <= 128:
+                raise GameLearningError("world_edit_entity", "Select an exact bounded entity identity.", 422)
+            existing = next(
+                (i for i, row in enumerate(rows) if isinstance(row, dict) and row.get("id") == identifier),
+                None,
+            )
+            if operation == "remove_entity":
+                if existing is None:
+                    raise GameLearningError(
+                        "world_edit_entity_absent", "The entity is absent from the saved world.", 404
+                    )
+                rows.pop(existing)
+            else:
+                _json(entity, 8192)
+                if existing is None:
+                    rows.append(copy.deepcopy(entity))
+                else:
+                    rows[existing] = copy.deepcopy(entity)
+        elif operation == "paint_terrain":
+            x, y, width, height = (edit.get("x"), edit.get("y"), edit.get("width", 1), edit.get("height", 1))
+            terrain, tile = result["world"].get("terrain"), edit.get("tile")
+            if (
+                any(type(value) is not int for value in (x, y, width, height))
+                or min(x, y) < 0
+                or min(width, height) < 1
+                or width * height > 256
+                or not isinstance(tile, str)
+                or tile not in tuple("01234567")
+                or not isinstance(terrain, list)
+                or y + height > len(terrain)
+                or any(not isinstance(row, str) or x + width > len(row) for row in terrain[y : y + height])
+            ):
+                raise GameLearningError(
+                    "world_edit_terrain",
+                    "Paint at most256 existing bounded terrain cells using tile0..7.",
+                    422,
+                )
+            for row in range(y, y + height):
+                terrain[row] = terrain[row][:x] + tile * width + terrain[row][x + width :]
+        else:
+            raise GameLearningError("world_edit_unknown", "Select a declared typed world edit.", 422)
+    return result
+
+
 async def edit_world(scope, project_id, body):
     from core.game_console_studio import _prepare, _save_prepared
     from skeleton.jeeves.game_successor_runtime import emit_successor_project
@@ -563,12 +707,7 @@ async def edit_world(scope, project_id, body):
         current = await world(scope, project_id)
         if current["spec_digest"] != body["expected_spec_digest"]:
             raise GameLearningError("successor_world_conflict", "Successor world changed; reload it.", 409)
-        changes = body["changes"]
-        if set(changes) - {"title", "world", "mechanics", "palette", "camera", "fidelity"}:
-            raise GameLearningError(
-                "world_field_immutable", "World edits cannot change origins or runtime identity."
-            )
-        spec = {**current["spec"], **changes}
+        spec = _edited_world(current["spec"], body)
         # Canonical emission validates every nested bound and regenerates
         # browser/native bytes from this exact original world, never caller code.
         emitted = emit_successor_project(spec)

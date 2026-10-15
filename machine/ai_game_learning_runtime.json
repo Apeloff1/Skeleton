@@ -51,7 +51,7 @@
     "request_kind": "studio",
     "target_format": "studio:<registered_advanced_engine>",
     "scope": "All registered original-game reference engine sessions execute through existing advanced-session action replay and verified hashed receipts; no added model-provider, renderer or native emulator.",
-    "learning": "Emulator-compatible GameEnvironmentSpec/EpisodeStep reset/step/preview/snapshot/restore; local Q policy uses actual runtime state deltas; original scene, settings, seed and implementation hash bound; invalid inputs terminate with negative reward instead of inventing state.",
+    "learning": "Emulator-compatible GameEnvironmentSpec/EpisodeStep reset/step/current_observation/preview/snapshot/restore; local Q policy uses actual runtime state deltas. Registered but unavailable commands remain measured penalized attempts, consume the finite episode budget and leave the accepted engine replay unchanged; later legal commands can continue. Unregistered commands still reject before mutation.",
     "training_cli": "python -m skeleton.jeeves.game_studio_policy_cli --engine economy --output /private/new-candidate.json --authorized --rights-cleared",
     "guarantees": [
       "bounded actions and episodes",
@@ -62,12 +62,33 @@
       "candidate policy cannot auto-promote"
     ],
     "limitations": [
-      "reference preview contains state only; no fabricated pixels/audio",
+      "Original reference scenes render only actual replayed state; unsupported scene families retain explicitly labelled numeric telemetry. Neither is native hardware output or original commercial-game art/audio.",
       "reward shaping measures declared engine state, not general game design quality",
       "no live production neural weight update",
       "requires operator rights and training admission",
       "CI and independent validation pending"
-    ]
+    ],
+    "playable_state_extension": {
+      "status": "implementation_candidate",
+      "owners": [
+        "skeleton/jeeves/game_studio_environment.py",
+        "skeleton/jeeves/game_studio_frame.py",
+        "skeleton/jeeves/game_studio_engine_diagnostics.py"
+      ],
+      "observations": "At most32 finite features: existing seven scalar fields plus declared actual maze, RPG or farming state projections, including action prerequisites, plot growth and resources; no hidden reward, learned world model or inferred commercial-game semantics.",
+      "visuals": "Bounded original PNG scene projection of actual maze cells/player/key/exit, farm plots/crops/moisture and RPG party/quest/resources; other engines retain honest telemetry. Source-session and state digests bind frame evidence.",
+      "replay": "Snapshot retains every bounded attempted action; accepted commands alone enter canonical underlying engine replay. Restore independently executes the complete attempt ledger, including rejected transitions, before adopting any state.",
+      "compatibility": "Exact adapter/frame implementation and environment identities change. Previously issued snapshots are never silently transformed or relabelled as current numerical evidence.",
+      "limits": {
+        "features": 32,
+        "scene_width": 192,
+        "scene_height": 128,
+        "preview_bytes": 65536,
+        "attempts": 128
+      },
+      "automation": "Existing same-owner job fences, source authority, actor IPC and compute-credit leases remain unchanged. No new scheduler, store or provider boundary.",
+      "diagnostics": "Existing product diagnostic accepts only source-bound original scene PNG with valid bytes/dimensions and false native/hardware framebuffer claims, or the existing clearly labelled scalar telemetry. This reconciliation adds no automated test suite or execution."
+    }
   },
   "ai_rule_variation": {
     "status": "implementation_candidate_not_verified",

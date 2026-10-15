@@ -100,5 +100,20 @@
       "coordinate_basis": "normalized native pixel coordinates, 4 quadrant movement energy",
       "semantics": "numerical frame-and-audio transition probes, not segmentation, optical flow vectors, scene understanding, music transcription or gameplay outcomes"
     }
+  },
+  "bounded_signal_projection_extension": {
+    "status": "implementation_candidate",
+    "owner": "skeleton/jeeves/game_emulator_host.py",
+    "reason": "Incoming24 measured signal channels plus authored GB11 RAM fields exceed the existing32-feature learner limit.",
+    "projection": "Keep all measured24 channels source-bound in native frame inspection; policy observation selects stable leading signal channels within32 minus exact authored RAM field count, then appends every trusted authored field. Opaque ROMs retain all24; authored GB uses21+11 and NES24+5.",
+    "identity": "Actual ordered selected/omitted signal names are included in the environment descriptor; exact host source and descriptor fence old snapshots. No feature-limit increase or silent policy migration.",
+    "actions": "Policy catalogue contains only dispatchable fixed actions; controller_input remains a rich-controller transcript marker, never a policy action.",
+    "restore": "Preserve native RAM/signature/checksum proof and upstream bounded exact prior-audio history restoration together; reset clears both native evidence and prior audio.",
+    "claims": {
+      "arbitrary_rom_semantics": false,
+      "hardware_fidelity_verified": false,
+      "neural_optimizer_executed": false
+    },
+    "restored_signal_visibility": "A restore retains exact saved policy observation and prior PCM history but marks full measured-signals preview unavailable until the next actual native frame; synthetic zero temporal channels are never presented as a re-emitted snapshot."
   }
 }

@@ -34,7 +34,12 @@ export type ConsoleEdit = {
 };
 export type NativeGraphCompatibility = { schema_version: 'skeleton.console_editor_native_graph.v1'; target_id: string; graph_digest: string; status: 'supported' | 'unsupported' | 'empty'; capabilities: string[]; limits: Record<string, number>; unsupported: { record_id: string | null; code: string; message: string }[]; native_data_bytes?: number; sprite_tile_count?: number; timeline_frames?: number; quantization?: unknown; measurement_scope: string };
 export type ConsoleStudioDocument = { project: LearningProject; document: ConsoleDocument; profile: ConsoleProfile; manifest_digest: string; scene_graph?: ConsoleSceneGraph; native_graph_compatibility?: NativeGraphCompatibility; changes?: unknown[]; validation?: Record<string, unknown> };
-export type ConsoleHandoff = { project_id: string; project_version: number; source_digest: string; target_id: string; build_handoff: Record<string, unknown>; toolchain: Record<string, unknown> };
+export type ConsoleHandoff = {
+  project_id: string; project_version: number; source_digest: string; target_id: string;
+  build_handoff: { source_files: { path: string; sha256: string; bytes: number }[]; source_integration_required: boolean; native_execution_verified: false; materialized_source_files?: { path: string; sha256: string; bytes: number }[]; source_materialization_error?: { code: string; message: string } | null; native_binding?: { bound: boolean; code: string; message?: string; source_integration_required: boolean; deferred_mechanics?: string[] }; native_graph_compatibility?: NativeGraphCompatibility; [key: string]: unknown };
+  source_handoff?: { status?: string; source_generation?: boolean; style_id?: string; supported_mechanics?: string[]; deferred_mechanics?: string[]; binary_compiled?: boolean; hardware_execution_verified?: boolean };
+  toolchain: { status?: string; reason?: string; toolchain?: string; source_styles?: string[]; sdk_installed?: boolean | null; [key: string]: unknown };
+};
 const ROOT = '/api/game-console-studio';
 function invalid(message: string): never { throw new ChatClientError(message, { kind: 'protocol', retryable: false }); }
 function id(value: string): string { if (!value || value.length > 128) invalid('The console project identity is invalid.'); return encodeURIComponent(value); }
@@ -80,7 +85,10 @@ export async function saveConsoleStudioDocument(current: ConsoleStudioDocument, 
 }
 export async function getConsoleStudioHandoff(projectId: string, input: LearningRequest = {}): Promise<ConsoleHandoff> {
   const result = await request<ConsoleHandoff>('get', '/projects/' + id(projectId) + '/handoff', null, input);
-  if (result.project_id !== projectId || !Number.isSafeInteger(result.project_version) || !/^[a-f0-9]{64}$/.test(result.source_digest)) invalid('The console build handoff is invalid.'); return result;
+  const handoff = result?.build_handoff;
+  if (result?.project_id !== projectId || !Number.isSafeInteger(result.project_version) || result.project_version < 1 || typeof result.target_id !== 'string' || !/^[a-f0-9]{64}$/.test(result.source_digest) || !handoff || handoff.native_execution_verified !== false || typeof handoff.source_integration_required !== 'boolean' || !Array.isArray(handoff.source_files) || handoff.source_files.length > 128 || handoff.source_files.some(file => typeof file.path !== 'string' || !/^[a-f0-9]{64}$/.test(file.sha256) || !Number.isSafeInteger(file.bytes) || file.bytes < 0) || !result.toolchain || JSON.stringify(result).length > 512 * 1024) invalid('The console build handoff is invalid.');
+  if (handoff.native_binding && (typeof handoff.native_binding.bound !== 'boolean' || typeof handoff.native_binding.source_integration_required !== 'boolean' || typeof handoff.native_binding.code !== 'string')) invalid('The native source binding receipt is invalid.');
+  return result;
 }
 export function consoleFiles(current: ConsoleStudioDocument): LearningFile[] { return current.project.files || []; }
 

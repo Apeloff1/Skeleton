@@ -49,5 +49,45 @@
   "helpers": [
     "skeleton/jeeves/game_successor_assets.py"
   ],
-  "asset_scope": "Original deterministic 128x128 RGBA sprite atlas consumed by browser/native/Python renderers; no source sprites, ROM bytes, image crops or music copies."
+  "asset_scope": "Original deterministic 128x128 RGBA sprite atlas consumed by browser/native/Python renderers; no source sprites, ROM bytes, image crops or music copies.",
+  "application_authoring_extension": {
+    "status": "implementation_candidate",
+    "owners": [
+      "backend/core/game_successor.py",
+      "backend/routes/game_successor.py",
+      "backend/core/game_studio_tools.py",
+      "skeleton/jeeves/game_studio_tools.py"
+    ],
+    "operations": [
+      "successor.adopt",
+      "successor.export",
+      "world.inspect",
+      "world.edit",
+      "desktop.inspect",
+      "desktop.build",
+      "project.export",
+      "artifact.export",
+      "play.start"
+    ],
+    "authoring": "Existing world.edit supports mutually exclusive complete changes or bounded typed set_field/upsert_entity/remove_entity/paint_terrain edits; all changes are materialized and validated by the canonical successor emitter before existing revision/source-authority CAS publication.",
+    "inspection": "Current exact world/source identities with editable sections, bounded field/entity/terrain paging and actual runtime action descriptor. Model projections omit generated source bodies and remain bounded.",
+    "adoption": "Exact owned completed goal-issued successor candidate, expected project version, original source/teacher authority and existing successor-adopt prepared save; registration grants no implicit owner conversion.",
+    "exports": "Existing source project JSON and digest-verified actual completed desktop binary downloads; candidate export is prepared lineage/source JSON only and never a build or download claim.",
+    "compatibility": "Legacy changes requests retain their body identity by omitting absent new fields; no rewriting of frozen commands, journals or receipts.",
+    "bounds": {
+      "edits": 64,
+      "inspection_records": 32,
+      "inspection_string_codepoints": 1500,
+      "terrain_cells_per_edit": 256,
+      "patch_value_bytes": 8192
+    },
+    "claims": {
+      "subjective_quality_certified": false,
+      "foreign_os_executed": false,
+      "universal_emulation": false,
+      "production_promotion": false
+    },
+    "playback": "Expose the existing typed PlayRequest to canonical agent discovery; host forces admitted-policy AI control and <=256 steps. Studio result projections omit private human control tokens. Native/user controls retain their original direct API.",
+    "source_roots": "Studio/studio_rules source owners cannot implicitly convert to successor: admission rejects before creating any prepared editor operation. Existing original worlds and ordinary non-console bases retain supported adoption. Origins and source/teacher rights remain checked."
+  }
 }

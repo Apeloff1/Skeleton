@@ -95,6 +95,30 @@
   "related_contracts": [
     "machine/ai_game_studio_review.json"
   ],
+  "original_project_workflows_extension": {
+    "status": "implementation_candidate",
+    "owners": [
+      "backend/core/game_studio_agent.py",
+      "backend/routes/game_studio_agent.py"
+    ],
+    "completion_mode": "Optional explicit native|original on new goal intent. Absence preserves native semantics and historical request/state hashes; never rewrite frozen pending prompts, forms, keys, commands or receipts.",
+    "requirements": {
+      "native": ["edit", "build", "preview", "export"],
+      "original": ["edit", "simulate", "review", "package", "export"]
+    },
+    "admission": "Original mode accepts an owned existing successor or ordinary base project; it rejects implicit canonical console-editor, studio-session or studio-rules conversion before goal admission. Creating/adopting an original requires explicit edit authorization. Existing source/teacher/lease/finite-budget authorities remain mandatory.",
+    "creation": "Registered authored-profile identities and exact completed goal-issued candidate receipts are model-visible data. Synthesis and adoption use existing successor owners and successor-adopt prepared-edit recovery; each actual decision remains model-produced and owner-validated.",
+    "proofs": "Current-head source-changing successor.adopt/world.edit; positive committed simulation steps/transitions and actual rendered frame bound to the exact current source; completed digest-checked current-source numerical review; actual current-source desktop binary_ready issuer with exact artifact identity; re-read source and matching desktop artifact export bytes. Creation/source emission/queued jobs never count as compiled packages.",
+    "refinement": "After an actual current-source review, authorized world.edit remains available before packaging. Any source change invalidates prior simulation/review/package/export checks and requires new current-head evidence. No forced arbitrary changes, automatic edits or subjective-quality certification.",
+    "scope": "Original simulation measures the registered source runtime, not execution of a desktop executable. Current desktop output is a compiled browser-rendered launcher; target execution, cartridge support, universal console coverage and subjective game quality are not certified by these facts.",
+    "context": "Bounded host-observed registered profiles, actual desktop toolchain readiness, original spec identity/actions, remaining model/job grants and actual issued review findings/candidate/artifact identities are retained in new capacity-bound planner context. No model call is required merely to discover registered target IDs.",
+    "forms": "New structured decisions preserve every admitted owner operation and constraint, including exactly one or three synthesis sources, actual observed registered authored-profile IDs and mutually exclusive world changes/edits branches. Repeated identical nested owner schemas may share bounded acyclic decision-root definitions, keeping full inventory within the unchanged64KiB EngineChat serialization bound; compact prompt descriptions retain typed edit names while full forms enforce all constraints. No removal of unrelated tool functionality. Historical frozen schemas remain unchanged.",
+    "positive_simulation_stage_forms": "New ORIGINAL_SIMULATE decisions require the canonical simulation owner's positive bounded integer steps field and exclude the mutually exclusive action/actions alternatives. The model chooses the step count; the host never substitutes actions/counts. Ordinary/reset-only operations, native stages and every historical frozen prompt/schema/key remain unchanged. This is a stage requirement, not a change to the simulation owner API or goal budgets.",
+    "stage_owner_identity_subsets": "New original-stage owner-form subsets and matching prompt forms retain canonical owner definitions/annotations and bounds. Fresh current-world simulation omits foreign source/session/reset/controller overrides and requires positive model-chosen steps; the first current-world review uses the canonical seeded controller with bounded numeric review options and omits unissued source/policy/baseline/actions. Desktop packaging offers only observed ready registered target IDs and uses the owner's default timeout. Adoption and package export permit only exact verified candidate/artifact identities from current context, with no unproven receipt-token alternative. General/native/no-stage forms, owner APIs, existing frozen requests and finite goal budgets remain unchanged.",
+    "limits": {"requirements": 5, "steps": 16, "model_calls": 8, "jobs": 4},
+    "runtime": "Existing EngineChat, workspace jobs/simulation, successor/review/desktop owners and typed tool facade only; no new runtime, provider, store or promotion authority.",
+    "validation": "Static source/schema checks and separately authorized genuine app operations only; no automated tests per user."
+  },
   "readiness_owners": {
     "application": "backend/core/game_studio_health.py",
     "api": "backend/routes/game_studio_health.py",

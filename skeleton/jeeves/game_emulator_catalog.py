@@ -134,6 +134,10 @@ def _safe_path(value: str) -> Path:
                 _fail("unsafe_path", "Operator paths cannot traverse symbolic links")
         except FileNotFoundError:
             _fail("missing_installation", "An operator-approved installation path is unavailable")
+        except OSError as exc:
+            raise EmulatorCatalogError(
+                "installation_unavailable", "An operator-approved installation path cannot be inspected"
+            ) from exc
     return path
 
 
@@ -506,6 +510,27 @@ def emulator_content_extensions(core_id: str) -> tuple[str, ...]:
     return tuple("." + value for value in _CORE_CONTENT_EXTENSIONS.get(core_id, "").split("|") if value)
 
 
+def emulator_content_admission(core_id: str) -> dict[str, Any]:
+    """Describe data admission separately from upstream or actual loaded-core support."""
+    hinted = emulator_content_extensions(core_id)
+    unsupported = tuple(suffix for suffix in hinted if suffix in {".toc", ".mds"})
+    return {
+        "upstream_extension_hints": list(hinted),
+        "admitted_entrypoint_extensions": [suffix for suffix in hinted if suffix not in unsupported],
+        "unsupported_descriptor_extensions": list(unsupported),
+        "validated_disc_descriptor_extensions": [
+            suffix for suffix in hinted if suffix in {".cue", ".gdi", ".m3u", ".ccd"}
+        ],
+        "clonecd_companions": "same-stem IMG required; supplied SUB must match the IMG sector count",
+        "parent_chd_supported": False,
+        "inline_source_bytes": MAX_CONTENT_BYTES,
+        "streamed_file_bytes": MAX_REFERENCED_FILE_BYTES,
+        "streamed_bundle_bytes": MAX_REFERENCED_BUNDLE_BYTES,
+        "live_core_admission_required": True,
+        "hardware_compatibility_verified": False,
+    }
+
+
 _TARGET_ALIASES = {
     "sms": "master_system",
     "n64": "nintendo_64",
@@ -777,6 +802,15 @@ class GameEmulatorRegistry:
                 )
 
     def _inspect(self, raw: dict[str, Any]) -> ApprovedEmulatorCore:
+        try:
+            return self._inspect_installation(raw)
+        except OSError as exc:
+            raise EmulatorCatalogError(
+                "installation_unavailable",
+                "Installed core or system assets cannot be inspected; check local permissions and paths",
+            ) from exc
+
+    def _inspect_installation(self, raw: dict[str, Any]) -> ApprovedEmulatorCore:
         if raw["approved"] is not True:
             _fail("core_not_approved", "This installed core is not currently operator approved")
         inspected = inspect_libretro_library(raw["library_path"])
@@ -897,6 +931,34 @@ class GameEmulatorRegistry:
                 available[raw["core_id"]] = self._inspect(raw)
             except EmulatorCatalogError as exc:
                 failures[raw["core_id"]] = exc
+        records = {raw["core_id"]: raw for raw in self._raw["cores"]}
+
+        def core_option(identity: str, target: str) -> dict[str, Any]:
+            record = records.get(identity)
+            in_scope = record is not None and target in record["target_ids"]
+            ready = identity in available and in_scope
+            if ready:
+                code = "operator_approved_installation"
+            elif record is not None and not in_scope:
+                code = "core_target_not_approved"
+            elif identity in failures:
+                code = failures[identity].code
+            else:
+                code = "core_installation_required"
+            return {
+                "core_id": identity,
+                "installation_present": record is not None,
+                "operator_approved": bool(in_scope and record["approved"]),
+                "available": ready,
+                "readiness": {"code": code, "execution_checked": False},
+                "declared_required_firmware": (
+                    [item["name"] for item in record["firmware"] if item["required"]]
+                    if record is not None
+                    else []
+                ),
+                "content_admission": emulator_content_admission(identity),
+            }
+
         rows = []
         for target, metadata in canonical_targets().items():
             candidates = [identity for identity, values in _CORE_TARGET_GROUPS.items() if target in values]
@@ -940,6 +1002,8 @@ class GameEmulatorRegistry:
                     "candidate_core_ids": candidates,
                     "available": selected is not None,
                     "core": selected.public_dict() if selected else None,
+                    "core_installations": [core_option(identity, target) for identity in candidates],
+                    "content_admission": emulator_content_admission(selected.core_id) if selected else None,
                     "readiness": {"code": code, "message": message, "execution_checked": False},
                     "hardware_compatibility_verified": False,
                 }
@@ -979,9 +1043,14 @@ class GameContentReference:
         _text(self.artifact_ref, "governed artifact reference", 2048)
         if type(self.prefix) is not bytes or len(self.prefix) > min(self.size_bytes, 65536):
             _fail("invalid_content", "Referenced artifact prefix exceeds its bounded actual-byte span")
-        if PurePosixPath(self.name).suffix.casefold() in {".cue", ".gdi", ".m3u"} and (
-            self.size_bytes != len(self.prefix) or _sha(self.prefix) != self.sha256
-        ):
+        if PurePosixPath(self.name).suffix.casefold() in {
+            ".cue",
+            ".gdi",
+            ".m3u",
+            ".ccd",
+            ".toc",
+            ".mds",
+        } and (self.size_bytes != len(self.prefix) or _sha(self.prefix) != self.sha256):
             _fail(
                 "invalid_disc_descriptor",
                 "Referenced disc descriptors require their complete digest-verified bounded text",
@@ -1255,6 +1324,113 @@ def _descriptor_text(data: bytes) -> str:
     return value
 
 
+def _clonecd_dependencies(
+    name: str, data: bytes, files: Mapping[str, bytes | GameContentReference]
+) -> list[str]:
+    """Validate the bounded CloneCD 2/3 text and its actual same-stem image closure.
+
+    This admits a descriptor, not an image decoder or a fidelity claim. CCD
+    has no arbitrary filename directives: IMG and optional SUB share its stem.
+    """
+    sections: dict[str, dict[str, int]] = {}
+    current = None
+    for line in _descriptor_text(data).splitlines():
+        line = line.strip()
+        if not line or line.startswith(";"):
+            continue
+        section = re.fullmatch(r"\[([^\[\]]{1,40})\]", line)
+        if section:
+            label = section.group(1).casefold()
+            session = re.fullmatch(r"session ?([1-9][0-9]?)", label)
+            if session:
+                label = "session" + session.group(1)
+            if not re.fullmatch(r"clonecd|disc|session[1-9][0-9]?|entry [0-9]{1,3}|track [1-9][0-9]?", label):
+                _fail(
+                    "unsupported_disc_descriptor",
+                    "CloneCD section requires an unsupported descriptor feature",
+                )
+            if label in sections or len(sections) >= 457:
+                _fail("invalid_disc_descriptor", "CloneCD sections must be distinct and bounded")
+            sections[label] = {}
+            current = sections[label]
+            continue
+        key, separator, value = line.partition("=")
+        key, value = key.strip().casefold(), value.strip()
+        if key in {"index 0", "index 1"}:
+            key = key.replace(" ", "")
+        if (
+            current is None
+            or not separator
+            or not re.fullmatch(r"[a-z][a-z0-9]{0,39}", key)
+            or key in current
+            or len(current) >= 32
+            or not re.fullmatch(r"-?(?:0[xX][0-9a-fA-F]{1,8}|[0-9]{1,10})", value)
+        ):
+            _fail("invalid_disc_descriptor", "CloneCD metadata must contain distinct bounded integer fields")
+        number = int(value, 16 if "x" in value.casefold() else 10)
+        if not -(2**31) <= number < 2**32:
+            _fail("invalid_disc_descriptor", "CloneCD integer metadata exceeds its numeric bound")
+        current[key] = number
+    if sections.get("clonecd") not in ({"version": 2}, {"version": 3}):
+        _fail("unsupported_disc_descriptor", "Only explicit CloneCD version 2/3 descriptors are admitted")
+    disc = sections.get("disc", {})
+    entries, sessions = disc.get("tocentries"), disc.get("sessions")
+    if (
+        entries is None
+        or not 1 <= entries <= 256
+        or sessions is None
+        or not 1 <= sessions <= 99
+        or disc.get("datatracksscrambled", 0) not in {0, 1}
+        or disc.get("cdtextlength", 0) != 0
+    ):
+        _fail(
+            "unsupported_disc_descriptor",
+            "CloneCD requires a bounded TOC/session layout without embedded CD-text",
+        )
+    if {key for key in sections if key.startswith("entry ")} != {f"entry {i}" for i in range(entries)}:
+        _fail("invalid_disc_descriptor", "CloneCD TOC count differs from its exact entry sections")
+    if {key for key in sections if key.startswith("session")} != {
+        f"session{i}" for i in range(1, sessions + 1)
+    }:
+        _fail("invalid_disc_descriptor", "CloneCD session count differs from its exact session sections")
+    stem = str(PurePosixPath(name).with_suffix(""))
+
+    def companion(extension: str, *, required: bool) -> str | None:
+        matches = [candidate for candidate in files if candidate.casefold() == (stem + extension).casefold()]
+        if not matches:
+            if required:
+                _fail("missing_disc_dependency", "CloneCD requires its exact same-stem IMG sector file")
+            return None
+        return matches[0]
+
+    image = companion(".img", required=True)
+    size = _content_size(files[image])
+    if size % 2352:
+        _fail("invalid_disc_descriptor", "CloneCD IMG must contain complete actual 2,352-byte sectors")
+    sectors = size // 2352
+    tracks = [value for key, value in sections.items() if key.startswith("track ")]
+    if not 1 <= len(tracks) <= 99:
+        _fail("invalid_disc_descriptor", "CloneCD requires 1..99 bounded track sections")
+    if {key for key in sections if key.startswith("track ")} != {
+        f"track {i}" for i in range(1, len(tracks) + 1)
+    }:
+        _fail("invalid_disc_descriptor", "CloneCD track sections must be consecutive from track one")
+    for track in tracks:
+        start = track.get("index1")
+        if (
+            track.get("mode") not in {0, 1, 2}
+            or start is None
+            or not 0 <= start < sectors
+            or "index0" in track
+            and not -150 <= track["index0"] <= start
+        ):
+            _fail("invalid_disc_descriptor", "CloneCD track indexes/modes exceed the supplied image sectors")
+    subchannel = companion(".sub", required=False)
+    if subchannel is not None and _content_size(files[subchannel]) != sectors * 96:
+        _fail("invalid_disc_descriptor", "CloneCD SUB bytes must match its actual IMG sector count")
+    return [image, *([subchannel] if subchannel is not None else [])]
+
+
 def _validate_dependencies(entry: str, files: Mapping[str, bytes | GameContentReference]) -> None:
     visited, pending = set(), [(entry, 0)]
     while pending:
@@ -1266,7 +1442,14 @@ def _validate_dependencies(entry: str, files: Mapping[str, bytes | GameContentRe
         visited.add(name)
         data, extension = _content_head(files[name]), PurePosixPath(name).suffix.casefold()
         references = []
-        if extension == ".m3u":
+        if extension in {".toc", ".mds"}:
+            _fail(
+                "unsupported_disc_descriptor",
+                "TOC/MDS companion-file closure is not implemented; provide lawful CUE, CCD, GDI or standalone CHD content",
+            )
+        if extension == ".ccd":
+            references = _clonecd_dependencies(name, data, files)
+        elif extension == ".m3u":
             for line in _descriptor_text(data).splitlines():
                 line = line.strip()
                 if not line or line.startswith("#"):
@@ -1328,9 +1511,16 @@ def _validate_dependencies(entry: str, files: Mapping[str, bytes | GameContentRe
             length, version = struct.unpack_from(">II", data, 8)
             if version not in {3, 4, 5} or length != {3: 120, 4: 108, 5: 124}[version] or len(data) < length:
                 _fail("invalid_chd", "CHD structural header/version is unsupported or truncated")
-        elif extension == ".iso":
-            if len(data) < 17 * 2048 or data[32769:32774] != b"CD001" or data[32774] != 1:
-                _fail("invalid_iso", "ISO9660 volume descriptor is missing from actual image bytes")
+            parent_offset = {3: 100, 4: 68, 5: 104}[version]
+            if any(data[parent_offset : parent_offset + 20]) or version == 3 and any(data[60:76]):
+                _fail(
+                    "missing_disc_dependency",
+                    "Parent-dependent CHD images require an unimplemented exact parent closure",
+                )
+        elif extension == ".iso" and (
+            len(data) < 17 * 2048 or data[32769:32774] != b"CD001" or data[32774] != 1
+        ):
+            _fail("invalid_iso", "ISO9660 volume descriptor is missing from actual image bytes")
         for target in references:
             if target == name:
                 _fail("invalid_disc_descriptor", "A disc descriptor cannot reference itself")

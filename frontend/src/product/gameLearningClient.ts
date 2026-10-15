@@ -7,12 +7,14 @@ import { chatApiError, ChatClientError } from './chatErrors';
 export type LearningRequest = { signal?: AbortSignal };
 export type LearningSourceKind = 'text' | 'rom' | 'dragon' | 'project';
 export type LearningReadiness = { message: string; code?: string; action?: string | null };
+export type EmulatorContentAdmission = { admitted_entrypoint_extensions: string[]; upstream_extension_hints: string[]; unsupported_descriptor_extensions: string[]; validated_disc_descriptor_extensions?: string[]; live_core_admission_required: boolean; hardware_compatibility_verified: false; parent_chd_supported?: boolean };
+export type ConsoleEmulatorReadiness = { available: boolean; core_installations?: { core_id: string; installation_present: boolean; operator_approved: boolean; available: boolean; readiness: { code: string; execution_checked: false }; content_admission: EmulatorContentAdmission }[]; content_admission?: EmulatorContentAdmission | null; readiness?: { code: string; message: string; execution_checked: false } };
 export type LearningConsole = {
   console_id: string; label: string; family?: string; engine_kind: string;
   available: boolean; readiness?: LearningReadiness | null; description?: string;
   supported_source_kinds: LearningSourceKind[]; editor_language?: string;
   default_program?: string; actions: string[];
-  supported_formats?: string[]; limits?: Record<string, number>;
+  external_emulator?: ConsoleEmulatorReadiness; supported_formats?: string[]; limits?: Record<string, number>;
 };
 export type LearningAlgorithm = { id: string; label: string; available: boolean; readiness?: LearningReadiness | null };
 export type StudioLearningEngine = {
@@ -155,6 +157,11 @@ export async function getLearningCatalogue(input: LearningRequest = {}): Promise
       || typeof console.label !== 'string' || typeof console.available !== 'boolean' || typeof console.engine_kind !== 'string'
       || !Array.isArray(console.actions) || console.actions.length > 128 || console.actions.some(value => typeof value !== 'string')
       || !Array.isArray(console.supported_source_kinds)) invalid('The catalogue contains an invalid console.');
+    const emulator = console.external_emulator;
+    if (emulator) {
+      if (typeof emulator.available !== 'boolean' || emulator.core_installations !== undefined && (!Array.isArray(emulator.core_installations) || emulator.core_installations.length > 64 || emulator.core_installations.some(core => typeof core.core_id !== 'string' || [core.installation_present, core.operator_approved, core.available].some(flag => typeof flag !== 'boolean')))) invalid('The target emulator readiness is invalid.');
+      for (const admission of [emulator.content_admission, ...(emulator.core_installations || []).map(core => core.content_admission)]) if (admission && ([admission.admitted_entrypoint_extensions, admission.upstream_extension_hints, admission.unsupported_descriptor_extensions].some(rows => !Array.isArray(rows) || rows.length > 128 || rows.some(extension => typeof extension !== 'string' || extension.length > 32)) || typeof admission.live_core_admission_required !== 'boolean' || admission.hardware_compatibility_verified !== false)) invalid('The target content admission limits are invalid.');
+    }
     ids.add(console.console_id);
   }
   for (const algorithm of result.algorithms) if (!algorithm || typeof algorithm.id !== 'string' || typeof algorithm.label !== 'string' || typeof algorithm.available !== 'boolean') invalid('The catalogue contains an invalid learner.');

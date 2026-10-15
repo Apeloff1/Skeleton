@@ -3,16 +3,78 @@
   "status": "implementation_candidate",
   "parent": "machine/ai_game_learning.json",
   "owner": "skeleton/jeeves/game_successor_runtime.py",
-  "helpers": ["skeleton/jeeves/game_successor_browser.py", "skeleton/jeeves/game_successor_native.py", "skeleton/jeeves/game_successor_world.py", "skeleton/jeeves/game_successor_assets.py"],
-  "mirrors": ["skeleton/ai/agents/jeeves/game_successor_runtime.py", "skeleton/ai/agents/jeeves/game_successor_browser.py", "skeleton/ai/agents/jeeves/game_successor_native.py", "skeleton/ai/agents/jeeves/game_successor_world.py", "skeleton/ai/agents/jeeves/game_successor_assets.py"],
+  "helpers": [
+    "skeleton/jeeves/game_successor_browser.py",
+    "skeleton/jeeves/game_successor_native.py",
+    "skeleton/jeeves/game_successor_world.py",
+    "skeleton/jeeves/game_successor_assets.py"
+  ],
+  "mirrors": [
+    "skeleton/ai/agents/jeeves/game_successor_runtime.py",
+    "skeleton/ai/agents/jeeves/game_successor_browser.py",
+    "skeleton/ai/agents/jeeves/game_successor_native.py",
+    "skeleton/ai/agents/jeeves/game_successor_world.py",
+    "skeleton/ai/agents/jeeves/game_successor_assets.py"
+  ],
   "scope": "Original bounded successor game simulation and portable browser/C99 SDL2 project emission, under the existing Jeeves game runtime and native build owners",
-  "fidelity": {"input": "optional fidelity.profile: pixel, enhanced or cinematic; absent defaults to pixel", "consumers": "Actual browser Canvas, native SDL2 and Python preview renderer; original atlas remains bounded 2D pixel art", "profiles": {"pixel": "nearest sprites, exact authored palette, basic day/weather visualization", "enhanced": "graded sprite palette, stronger dynamic lighting/shadows and bounded decorative parallax/particles", "cinematic": "filtered sprites, warmer grading, layered haze/vignette and bounded richer ambient/event particles plus render camera interpolation"}, "limits": {"particles": 64, "layers": 3, "native_texture_pixels": 16384, "preview_pixels": 57600}, "claims": "Profiles alter actual render output, not underlying hardware compatibility, licensed source fidelity or AAA/photorealistic graphics"},
-  "interfaces": {"environment": "SuccessorEnvironment(spec,max_steps) reset/step/input_step/snapshot/restore/preview/close", "generation": "emit_successor_project(spec) returns exact original authored spec plus portable source/assets", "build": "existing ConsoleBuildRunner fixed trusted compiler and sandbox; emitted C99 SDL2 source never establishes successful compilation without actual output receipt"},
-  "mechanics": ["fixed 60 Hz topdown movement and sideview acceleration/friction/gravity/coyote/buffer controls", "original projectile/melee combat, patrol/chase/shooting enemies and boss phases", "actual cast/wait/bite/reel/tension fish catch states and species", "soil preparation, seed inventory, watering, growth, harvest, deterministic day/weather/season cycles", "NPC dialogue, seed economy/crafting, quests, doors, relics and checkpoints", "deterministic large-world camera and actual original raster frames", "interactive menus, keyboard/controller bindings, synthesized local audio and save/load"],
-  "bounds": {"world_width": 8192, "world_height": 4096, "platforms": 128, "collectibles": 64, "enemies": 32, "doors": 16, "checkpoints": 16, "projectiles": 128, "episode_steps": 4096, "spec_bytes": 131072, "snapshot_bytes": 262144},
+  "fidelity": {
+    "input": "optional fidelity.profile: pixel, enhanced or cinematic; absent defaults to pixel",
+    "consumers": "Actual browser Canvas, native SDL2 and Python preview renderer; original atlas remains bounded 2D pixel art",
+    "profiles": {
+      "pixel": "nearest sprites, exact authored palette, basic day/weather visualization",
+      "enhanced": "graded sprite palette, stronger dynamic lighting/shadows and bounded decorative parallax/particles",
+      "cinematic": "filtered sprites, warmer grading, layered haze/vignette and bounded richer ambient/event particles plus render camera interpolation"
+    },
+    "limits": {
+      "particles": 64,
+      "layers": 3,
+      "native_texture_pixels": 16384,
+      "preview_pixels": 57600
+    },
+    "claims": "Profiles alter actual render output, not underlying hardware compatibility, licensed source fidelity or AAA/photorealistic graphics"
+  },
+  "interfaces": {
+    "environment": "SuccessorEnvironment(spec,max_steps) reset/step/input_step/snapshot/restore/preview/close",
+    "generation": "emit_successor_project(spec) returns exact original authored spec plus portable source/assets",
+    "build": "existing ConsoleBuildRunner fixed trusted compiler and sandbox; emitted C99 SDL2 source never establishes successful compilation without actual output receipt"
+  },
+  "mechanics": [
+    "fixed 60 Hz topdown movement and sideview acceleration/friction/gravity/coyote/buffer controls",
+    "original projectile/melee combat, patrol/chase/shooting enemies and boss phases",
+    "actual cast/wait/bite/reel/tension fish catch states and species",
+    "soil preparation, seed inventory, watering, growth, harvest, deterministic day/weather/season cycles",
+    "NPC dialogue, seed economy/crafting, quests, doors, relics and checkpoints",
+    "deterministic large-world camera and actual original raster frames",
+    "interactive menus, keyboard/controller bindings, synthesized local audio and save/load"
+  ],
+  "bounds": {
+    "world_width": 8192,
+    "world_height": 4096,
+    "platforms": 128,
+    "collectibles": 64,
+    "enemies": 32,
+    "doors": 16,
+    "checkpoints": 16,
+    "projectiles": 128,
+    "episode_steps": 4096,
+    "spec_bytes": 131072,
+    "snapshot_bytes": 262144
+  },
   "state": "Local pure simulation state; existing application workspace remains tenant/source/rights/durable publication authority. Native/browser saves are local player state bound to exact authored spec.",
   "integrity": "Exact canonical spec and implementation identity bind measured environment; restore validates bounded complete state before atomic adoption; source lineage is descriptive provenance, never imported code/assets or authority.",
   "failure": "Invalid/foreign geometry or state, exhausted entities, unavailable toolchain or denied sandbox fail explicitly. No hardware binary/emulation claims from portable source output.",
   "limitations": "The full browser/C99 exporter currently accepts topdown successor recipes. Sideview physics are a real Python simulation adapter, but full sideview portable export is unavailable. Fidelity profiles remain original bounded 2D pixel art, not photorealistic or AAA graphics.",
-  "claims": {"production_promotion": false, "automated_tests_requested": false, "copied_original_game_assets": false, "all_console_binary_support": false}
+  "claims": {
+    "production_promotion": false,
+    "automated_tests_requested": false,
+    "copied_original_game_assets": false,
+    "all_console_binary_support": false
+  },
+  "learning_observation_extension": {
+    "status": "implementation_candidate",
+    "owner": "skeleton/jeeves/game_successor_world.py",
+    "scope": "Expand bounded actual top-down observations to at most32 features for target directions, facing/tool target, soil/crop/water, seed/inventory/economy prerequisites and real fishing tension/phase. Physical actions, clock, rewards and source custody remain unchanged.",
+    "compatibility": "Existing exact world implementation hash changes and fences old snapshots; no numerical migration or historical-evidence rewrite.",
+    "authority": "Existing finite local actor and application worker/source/credit fences remain authoritative."
+  }
 }

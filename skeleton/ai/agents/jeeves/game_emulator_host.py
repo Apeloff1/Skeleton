@@ -654,9 +654,7 @@ def _serialized_native_operation(method):
     return wrapped
 
 
-
-def _measured_signal_channels(pixels: bytes, width: int, height: int,
-                              samples: list[int]) -> dict[str, float]:
+def _measured_signal_channels(pixels: bytes, width: int, height: int, samples: list[int]) -> dict[str, float]:
     """Bounded deterministic measurements from REAL native pixels and S16LE audio.
 
     Signals are telemetry, not claims about semantic objects, melodies,
@@ -682,8 +680,7 @@ def _measured_signal_channels(pixels: bytes, width: int, height: int,
         bias += abs(red - green) + abs(green - blue) + abs(blue - red)
         if pixel % width + 1 < width:
             neighbor = offset + 3
-            other = (77 * pixels[neighbor] + 150 * pixels[neighbor + 1]
-                     + 29 * pixels[neighbor + 2]) >> 8
+            other = (77 * pixels[neighbor] + 150 * pixels[neighbor + 1] + 29 * pixels[neighbor + 2]) >> 8
             edges += abs(luma - other)
             edge_count += 1
     probability = [value / examined for value in histogram if value]
@@ -716,10 +713,13 @@ def _measured_signal_channels(pixels: bytes, width: int, height: int,
     }
 
 
-
 def _temporal_signal_channels(
-    previous_pixels: bytes | None, pixels: bytes,
-    width: int, height: int, previous_audio: bytes, audio: bytes,
+    previous_pixels: bytes | None,
+    pixels: bytes,
+    width: int,
+    height: int,
+    previous_audio: bytes,
+    audio: bytes,
 ) -> dict[str, float]:
     """Sample exact consecutive native frames and audio without any semantic guesses.
 
@@ -741,6 +741,7 @@ def _temporal_signal_channels(
         "audio_positive_onset": 0.0,
         "audio_zero_crossing_shift": 0.0,
     }
+
     def audio_metrics(data: bytes) -> tuple[float, float]:
         pairs = min(len(data) // 4, 4096)
         if not pairs:
@@ -754,6 +755,7 @@ def _temporal_signal_channels(
             changes += int(last is not None and (mono < 0) != (last < 0))
             last, count = mono, count + 1
         return math.sqrt(energies / count) / 32768, changes / max(1, count - 1)
+
     old_energy, old_crossings = audio_metrics(previous_audio)
     new_energy, new_crossings = audio_metrics(audio)
     zeros["audio_energy_change"] = min(1.0, abs(new_energy - old_energy))
@@ -783,17 +785,19 @@ def _temporal_signal_channels(
         new_luma = 77 * pixels[idx] + 150 * pixels[idx + 1] + 29 * pixels[idx + 2]
         delta_luma += abs(old_luma - new_luma) / 256
         examined += 1
-    zeros.update({
-        "motion_energy": motion_total / (765 * examined),
-        "motion_fraction": changed / examined,
-        "motion_centroid_x": spatial_x / (max(1, width - 1) * motion_total) if motion_total else 0.0,
-        "motion_centroid_y": spatial_y / (max(1, height - 1) * motion_total) if motion_total else 0.0,
-        "motion_quadrant_tl": quadrants[0] / motion_total if motion_total else 0.0,
-        "motion_quadrant_tr": quadrants[1] / motion_total if motion_total else 0.0,
-        "motion_quadrant_bl": quadrants[2] / motion_total if motion_total else 0.0,
-        "motion_quadrant_br": quadrants[3] / motion_total if motion_total else 0.0,
-        "frame_luma_drift": delta_luma / (255 * examined),
-    })
+    zeros.update(
+        {
+            "motion_energy": motion_total / (765 * examined),
+            "motion_fraction": changed / examined,
+            "motion_centroid_x": spatial_x / (max(1, width - 1) * motion_total) if motion_total else 0.0,
+            "motion_centroid_y": spatial_y / (max(1, height - 1) * motion_total) if motion_total else 0.0,
+            "motion_quadrant_tl": quadrants[0] / motion_total if motion_total else 0.0,
+            "motion_quadrant_tr": quadrants[1] / motion_total if motion_total else 0.0,
+            "motion_quadrant_bl": quadrants[2] / motion_total if motion_total else 0.0,
+            "motion_quadrant_br": quadrants[3] / motion_total if motion_total else 0.0,
+            "frame_luma_drift": delta_luma / (255 * examined),
+        }
+    )
     return zeros
 
 
@@ -905,26 +909,55 @@ class EmulatorEnvironment:
             "sandbox_required": True,
             "hardware_compatibility_verified": False,
         }
+        signal_channels = (
+            "screen_mean",
+            "visual_change",
+            "audio_rms",
+            "step_fraction",
+            "frame_entropy",
+            "luma_contrast",
+            "spatial_edges",
+            "color_saturation",
+            "color_bias",
+            "audio_peak",
+            "audio_zero_crossing",
+            "stereo_difference",
+            "motion_energy",
+            "motion_fraction",
+            "motion_centroid_x",
+            "motion_centroid_y",
+            "motion_quadrant_tl",
+            "motion_quadrant_tr",
+            "motion_quadrant_bl",
+            "motion_quadrant_br",
+            "frame_luma_drift",
+            "audio_energy_change",
+            "audio_positive_onset",
+            "audio_zero_crossing_shift",
+        )
+        native_fields = set(self._native_descriptor["layout"]["fields"]) if self._native_descriptor else set()
+        if len(native_fields) > 32:
+            raise EmulatorHostError(
+                "native_observation_capacity", "Authored fields exceed the existing32-feature limit"
+            )
+        self._policy_signal_channels = tuple(name for name in signal_channels if name not in native_fields)[
+            : 32 - len(native_fields)
+        ]
+        self._descriptor["observation_projection"] = {
+            "measured_signal_channels": list(signal_channels),
+            "policy_signal_channels": list(self._policy_signal_channels),
+            "omitted_policy_signals": [
+                name for name in signal_channels if name not in self._policy_signal_channels
+            ],
+            "authored_fields": sorted(native_fields),
+            "maximum_policy_features": 32,
+        }
         bins = (0.0, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75)
         self.spec = GameEnvironmentSpec(
             "libretro:" + core.core_id + ":" + materialized_digest[:24],
             _digest(self._descriptor),
             (*_ACTIONS, *_KEY_ACTIONS),
-            {
-                key: bins
-                for key in (
-                    "screen_mean", "visual_change", "audio_rms", "step_fraction",
-                    "frame_entropy", "luma_contrast", "spatial_edges",
-                    "color_saturation", "color_bias", "audio_peak",
-                    "audio_zero_crossing", "stereo_difference",
-                    "motion_energy", "motion_fraction",
-                    "motion_centroid_x", "motion_centroid_y",
-                    "motion_quadrant_tl", "motion_quadrant_tr",
-                    "motion_quadrant_bl", "motion_quadrant_br",
-                    "frame_luma_drift", "audio_energy_change",
-                    "audio_positive_onset", "audio_zero_crossing_shift",
-                )
-            },
+            {key: bins for key in self._policy_signal_channels},
             ("visual_change",),
             self.max_steps,
         )
@@ -960,6 +993,7 @@ class EmulatorEnvironment:
         self._audio_total = 0
         self._audio_generation = 0
         self._observation = None
+        self._measured_signals = None
         self._controls = [json.loads(json.dumps(_EMPTY))]
         self._chain = ""
         self._disc_sequence = 0
@@ -1350,11 +1384,16 @@ class EmulatorEnvironment:
         values = [value[0] for value in struct.iter_unpack("<h", audio)]
         rms = math.sqrt(sum(value * value for value in values) / len(values)) / 32768 if values else 0.0
         temporal = _temporal_signal_channels(
-            self._pixels, pixels, width, height, self._audio, audio,
+            self._pixels,
+            pixels,
+            width,
+            height,
+            self._audio,
+            audio,
         )
         self._pixels, self._frame, self._audio = pixels, dict(metadata), audio
         self._audio_total += len(audio) // 4
-        self._observation = {
+        self._measured_signals = {
             "screen_mean": sum(pixels) / (255 * len(pixels)),
             "visual_change": change,
             "audio_rms": rms,
@@ -1362,6 +1401,7 @@ class EmulatorEnvironment:
             **_measured_signal_channels(pixels, width, height, values),
             **temporal,
         }
+        self._observation = {name: self._measured_signals[name] for name in self._policy_signal_channels}
         return dict(self._observation)
 
     def _read_native_values(self, *, bootstrap=False):
@@ -1842,6 +1882,9 @@ class EmulatorEnvironment:
             "core_id": self.core.core_id,
             "content_digest": self._descriptor["content_digest"],
             "controller_profile": self.controller_profile,
+            "measured_signals": dict(self._measured_signals or {}),
+            "measured_signals_available": self._measured_signals is not None,
+            "policy_signal_channels": list(self._policy_signal_channels),
             "core_controller_profile_digest": self._descriptor["core_controller_profile_digest"],
             "hardware_compatibility_verified": False,
             "native_measurement": (
@@ -1988,10 +2031,7 @@ class EmulatorEnvironment:
         # sensor channels compare consecutive output chunks, and a
         # seemingly correct native core restore can otherwise change the
         # next measured observation and fail real source replay.
-        capacity = (
-            (MAX_SNAPSHOT_JSON - 65536) * 3 // 4
-            - len(self._pixels) - len(self._audio)
-        )
+        capacity = (MAX_SNAPSHOT_JSON - 65536) * 3 // 4 - len(self._pixels) - len(self._audio)
         state_info, _ = self._exchange("state_info", {})
         state_size = _int(state_info.get("state_size"), 0, 2**63 - 1, "native state size")
         if not 1 <= state_size <= capacity:
@@ -2122,8 +2162,8 @@ class EmulatorEnvironment:
         ):
             raise EmulatorHostError("native_state_limit", "Native savestate encoding exceeds capacity")
         if (
-            len(snapshot["state_base64"]) + len(snapshot["pixels_base64"])
-            + len(snapshot["audio_base64"]) > MAX_SNAPSHOT_JSON - 65536
+            len(snapshot["state_base64"]) + len(snapshot["pixels_base64"]) + len(snapshot["audio_base64"])
+            > MAX_SNAPSHOT_JSON - 65536
         ):
             raise EmulatorHostError("native_state_size_unavailable", "Operational snapshot exceeds capacity")
         payload = {key: value for key, value in snapshot.items() if key != "snapshot_digest"}
@@ -2139,10 +2179,7 @@ class EmulatorEnvironment:
             raise EmulatorHostError("native_state_corrupt", "Native state binary identity differs")
         if hashlib.sha256(pixels).hexdigest() != frame["pixel_sha256"]:
             raise EmulatorHostError("native_state_corrupt", "Restored frame checksum differs")
-        if (
-            len(audio) != audio_size
-            or hashlib.sha256(audio).hexdigest() != _sha(snapshot["audio_sha256"])
-        ):
+        if len(audio) != audio_size or hashlib.sha256(audio).hexdigest() != _sha(snapshot["audio_sha256"]):
             raise EmulatorHostError("native_state_corrupt", "Restored prior audio checksum differs")
         restore_metadata = {
             "controls": controls,
@@ -2194,6 +2231,10 @@ class EmulatorEnvironment:
             self.close()
             raise EmulatorHostError("native_state_corrupt", "Native observation projection differs")
         self._observation = dict(observation)
+        # The saved policy observation and prior PCM are replay history. No
+        # native callback re-emits the complete signal set at a restore-only
+        # boundary, so expose it again only after the next actual frame.
+        self._measured_signals = None
         self._chain = chain
         return dict(self._observation)
 
