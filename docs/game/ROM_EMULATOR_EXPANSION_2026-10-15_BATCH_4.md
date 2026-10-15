@@ -49,3 +49,9 @@ python3 scripts/install_game_emulator_cores.py \
 ```
 
 These commands are illustrative. No execution on the production host occurred in this pass.
+
+## Hardware-mapping audit and operator recipe inspection
+
+The canonical inventory is 47 primary + 122 supplemental hardware/OS/ABI rows = **169 identities**. Based on the canonical `_CORE_TARGET_GROUPS` declaration, **99** rows have at least one named libretro core mapping and **70** have no named mapping. Mapping is metadata, not proof that a core recipe is pinned, installed, capable of loading a ROM, or gameplay-qualified. Many of the 70 gaps represent modern phones/PCs, operating systems and restricted hardware where a ROM emulator is neither an accurate nor a licensed integration mechanism. Do not use 99/169 as a playable coverage percentage.
+
+The preexisting read-only `--list-cores` output now additionally includes the exact library artifact, upstream license review, makefile/build directory/target, feature limits and operator build dependencies. This makes per-core rollout blockers visible before any source fetching, compilation or registry approval.

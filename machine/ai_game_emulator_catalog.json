@@ -60,7 +60,7 @@
     "directories": 96,
     "stream_chunks_per_file": 131072,
     "stream_chunks_per_bundle": 262144,
-    "opaque_core_archives": "load_game_content_for_core revalidates the exact operator-approved core binding. Only the declared DOSBox Pure/FBNeo core profiles preserve an actual ZIP (including DOSBox Pure .dosz) as opaque native content; all directory/path/member/count/ratio/expanded-byte/CRC bounds still apply before admission. Worker actual retro_system_info.block_extract must agree before loading; no caller boolean grants this behavior. Large streamed archive descriptors remain exact owned files under the isolated worker resource budget.",
+    "opaque_core_archives": "load_game_content_for_core revalidates the exact operator-approved core binding. Only the declared DOSBox Pure, FBNeo and MAME 2003 Plus core profiles preserve an actual ZIP (plus DOSBox Pure .dosz) as opaque native content; all directory/path/member/count/ratio/expanded-byte/CRC bounds still apply before admission. Worker actual retro_system_info.block_extract must agree before loading; no caller boolean grants this behavior. Large streamed archive descriptors remain exact owned files under the isolated worker resource budget.",
     "extension_profiles": "Fixed native-content suffix hints are copied from the exact pinned upstream core valid_extensions declarations. They permit data-only metadata admission outside known cartridge parsers only after the existing owner resolves current approved core/target authority. Missing or malformed known cartridge formats do not become opaque. These hints are not native load approval: the isolated worker checks actual loaded core valid_extensions, exact content, and applicable block_extract before admission."
   },
   "interfaces": [
@@ -471,6 +471,14 @@
     "software_install_or_rom_execution_performed": false,
     "verified_gameplay_targets_new": 0,
     "core_build_command_fix": "Special upstream make target is removed from clean-only invocation, preserving explicit build target on compile",
-    "operator_use": "python3 scripts/install_game_emulator_cores.py --list-cores; python3 scripts/install_game_emulator_cores.py --coverage-matrix"
+    "operator_use": "python3 scripts/install_game_emulator_cores.py --list-cores; python3 scripts/install_game_emulator_cores.py --coverage-matrix",
+    "hardware_map_audit": {
+      "named_libretro_mapping_ids": 99,
+      "no_named_core_mapping_ids": 70,
+      "canonical_hardware_ids": 169,
+      "method": "Static canonical 47+122 hardware inventory intersected with _CORE_TARGET_GROUPS; core mappings can lack compiled source recipes and are not runtime qualification",
+      "nonemulator_targets_note": "Many of the unmapped rows are contemporary host OSes, handheld PCs, proprietary consoles or SDK destinations; not all correspond to a distinct ROM emulator core."
+    },
+    "recipe_list_information": "--list-cores now exposes exact artifact path, build kind/directory/file/target, licensing, feature limits and deployment dependencies for all 75 source recipes"
   }
 }
