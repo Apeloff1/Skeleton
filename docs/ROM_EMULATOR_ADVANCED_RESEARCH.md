@@ -547,3 +547,89 @@ manual acceptance integration are **committed, not executed in this chat**.
 The manually dispatched suite still requires real execution and reports
 only the supported interpreter experiments, never certified Game Boy
 hardware timing, game-title compatibility or production AI weight promotion.
+
+
+## K. Cycle-driven handheld timer and oscillator stop semantics
+
+The experimental Game Boy CPU used by the ROM training laboratory now
+models the timer as a falling-edge detector on the **internally selected DIV
+bit**, rather than treating TIMA as an immediate reload counter. This
+matters for source AI training because one mislabeled timer interrupt can
+cause later actual RAM/PPU observations and reward traces to diverge.
+
+- TAC frequency settings 00/01/10/11 sample divider bit 9/3/5/7.
+- A DIV reset or TAC source/enable write causes a TIMA pulse only if it
+  changes an enabled high timer signal to low. Timer control writes do not
+  unconditionally increment the counter.
+- TIMA overflow now holds 00 for four T-cycles, then copies current TMA
+  and requests the IF timer bit. Writing TIMA during that pending interval
+  cancels the pending reload; a TMA write affects the later load.
+- Source CPU savestates include the **bounded pending timer phase**, which
+  allows exact replay even when halted in the middle of a delayed overflow.
+- The source interpreter's STOP opcode resets DIV and freezes the
+  divider/TIMA/PPU clock until a controller event resumes the source CPU;
+  HALT still advances CPU/peripheral timers.
+
+These are **instruction-granular approximations** and explicitly do not
+assert correct sub-instruction CPU memory bus phases, same-M-cycle TMA
+transfer ordering, CGB speed switching, audio DIV side effects, timer
+behavior during a full DMA blockade, or universal hardware correctness.
+The timer state is not the independent MBC3 virtual cartridge RTC.
+References: <https://gbdev.io/pandocs/Timer_and_Divider_Registers.html>.
+
+The source test `skeleton/testing/test_game_rom_cpu_timer.py` covers
+all four selected DIV bits, DIV/TAC glitches, four-cycle overflow, TIMA
+cancellation, pending-cycle savestate replay, invalid phase rejection,
+STOP oscillator freeze, and HALT continuation.
+
+## L. Original CPU instruction-by-instruction multiview replay lab
+
+The new `skeleton.jeeves.game_rom_instruction_divergence` laboratory
+produces bounded, CPU-executed counterfactual evidence instead of relying
+on visually inferred outcomes. It generates only the project's original
+authored cartridge, boots the actual experimental LR35902 interpreter,
+seals a **full source machine snapshot**, and then runs separately
+controlled branches with exact independent replays:
+
+```bash
+python scripts/audit_original_rom_instruction_divergence.py \
+  --evidence-file /private/research/original-source-divergence.json \
+  --seed 42 --instruction-count 2048 \
+  --sample-stride 8 --max-cycles-per-branch 131072 \
+  --actions idle a right a_right
+```
+
+Up to eight distinct bounded input branches are allowed, including an
+explicit idle control. Each branch executes a finite number of actual
+CPU instructions, recording a source trace at regular instruction ordinals
+with:
+
+- PC before each sampled instruction, opcode byte, CPU registers/flags,
+  actual schedule cycles, frame counter and pending interrupts.
+- Exact DIV/TIMA/TMA/TAC/IE/IF and delayed-overflow phase, cartridge bank
+  selector, cartridge RTC state where applicable.
+- SHA-256 of **actual RAM, VRAM, OAM, I/O, SRAM and framebuffer** rather
+  than a synthesised reward or screenshot-based guess.
+- Only for this original generated maze, its authored player coordinates,
+  score and completion registers; never inferred game labels for
+  unrelated ROMs.
+- Independent, exact re-execution of each controlled branch from the same
+  full CPU/memory/frame/mapper snapshot. A differing repeated branch
+  immediately fails, with no model update or pass receipt.
+- The first distinct observed *instruction sample* compared against the
+  identical-state passive control, broken into measured hardware domains.
+  Equal instruction ordinals are not necessarily equal real-time duration
+  when an instruction's cycle cost differs.
+
+A new phase in the existing **manual-only**
+`scripts/run_game_rom_acceptance_suite.py` refuses a complete source AI
+acceptance result unless all source instruction traces and their nested
+digests validate. It does not label a differing RAM or timer register as a
+causal game win, a general skill gain, emulator compatibility, or neural
+training. That interpretation must come from separate replayable
+game-specific objectives.
+
+The standalone source command and focused regression
+`skeleton/testing/test_game_rom_instruction_divergence.py` are committed;
+they have **not** been run during this authoring pass, and there is
+no claim of observed emulator fidelity or production neural weight gain.
