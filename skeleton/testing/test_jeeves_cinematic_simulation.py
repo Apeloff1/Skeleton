@@ -120,7 +120,7 @@ def test_canon_and_apparel_and_item_safety_checks():
     with pytest.raises(CinematicSimError, match="voice"):
         validate_scene(forged)
     forged = deepcopy(scene())
-    forged["shots"][1]["axis"] = "axis_b"
+    forged["shots"][2]["axis"] = "axis_b"
     with pytest.raises(CinematicSimError, match="screen-axis"):
         validate_scene(forged)
     report = simulate_once(scene(), controls(item_mass_delta_g=750,
