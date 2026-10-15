@@ -28,6 +28,7 @@ FAMILIES = frozenset((
 ))
 MAX_DATASET_BYTES = 64 * 1024 * 1024
 MAX_ROWS_PER_SPLIT = 10000
+MAX_WORDS_PER_SPLIT = 200000
 MAX_PROMPT_CHARS = 4096
 MAX_ANSWER_CHARS = 12000
 MIN_TRAIN_PER_FAMILY = 4
@@ -97,6 +98,7 @@ def _load_split(root: Path, *, filename: Any, digest: Any, split: str) -> list[d
     if _digest(raw) != digest:
         raise ProductionCheckpointError("corpus SHA-256 has changed since rights admission")
     records: list[dict[str, Any]] = []
+    words_loaded = 0
     for line_number, raw_line in enumerate(raw.splitlines(), 1):
         if not raw_line.strip():
             raise ProductionCheckpointError("empty JSONL records are not allowed")
@@ -110,8 +112,11 @@ def _load_split(root: Path, *, filename: Any, digest: Any, split: str) -> list[d
             raise ProductionCheckpointError("corpus record id is missing or malformed")
         if row.get("family") not in FAMILIES:
             raise ProductionCheckpointError("unknown game-design curriculum family")
-        _text(row.get("prompt"), label="prompt", minimum=10, maximum=MAX_PROMPT_CHARS)
-        _text(row.get("answer"), label="answer", minimum=20, maximum=MAX_ANSWER_CHARS)
+        prompt = _text(row.get("prompt"), label="prompt", minimum=10, maximum=MAX_PROMPT_CHARS)
+        answer = _text(row.get("answer"), label="answer", minimum=20, maximum=MAX_ANSWER_CHARS)
+        words_loaded += len(prompt.split()) + len(answer.split())
+        if words_loaded > MAX_WORDS_PER_SPLIT:
+            raise ProductionCheckpointError("game corpus exceeds bounded tokenizer word budget")
         _check_rights(row)
         records.append(row)
     return records
