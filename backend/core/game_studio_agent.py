@@ -174,6 +174,8 @@ def _public(row):
             )
             if key in pending
         }
+        if pending.get("planner_context", {}).get("workflow_stage"):
+            result["pending_receipt"]["workflow_stage"] = pending["planner_context"]["workflow_stage"]
     result["continuation"] = (
         "Request-driven bounded advances; stop takes effect at the current issued operation boundary."
     )
@@ -402,6 +404,24 @@ async def create(scope, project_id, body):
         )
     digest = _digest(body)
     project = await workspace._project(project_id, scope, body["expected_version"])
+    if requirements:
+        from skeleton.jeeves.game_console_editor import ConsoleEditorError, ConsoleProject
+
+        files = {item["path"]: item["content"] for item in project["files"]}
+        if workspace.authored_environment_kind(files) != "console_editor":
+            raise GameLearningError(
+                "studio_goal_checklist_project",
+                "The native build checklist requires a canonical console editor project; use an ordinary scoped goal for other project types.",
+                422,
+            )
+        try:
+            ConsoleProject.from_files(files, target_id=project["console_id"])
+        except ConsoleEditorError as exc:
+            raise GameLearningError(
+                "studio_goal_checklist_project",
+                "The native build checklist requires a valid console editor document matching the project's selected console.",
+                422,
+            ) from exc
     binding = await workspace._input(scope, project, require_execution=False)
     await workspace._authority(scope, binding)
     # Existing revision capacity is shared; these journals do not extend it.
@@ -938,13 +958,15 @@ async def _completion_progress(scope, row, project=None):
                 and value.get("producer_input_digest") == actual["producer_input_digest"]
             ):
                 binary_exports.add(artifact_id)
-    if source_export and binary_exports.intersection(preview_artifacts):
-        checks["export"] = {
-            "verified": True,
-            "source_export_digest": source_export["content_digest"],
-            "artifact_ids": sorted(binary_exports.intersection(preview_artifacts)),
-            "client_download_verified": False,
-        }
+    matching_exports = sorted(binary_exports.intersection(preview_artifacts))
+    checks["export"] = {
+        "verified": bool(source_export and matching_exports),
+        "source_prepared": source_export is not None,
+        "binary_prepared": bool(matching_exports),
+        "artifact_ids": matching_exports,
+        "client_download_verified": False,
+        **({"source_export_digest": source_export["content_digest"]} if source_export else {}),
+    }
     await workspace._authority(scope, await workspace._input(scope, project, require_execution=False))
     result = {
         "schema_version": "skeleton.game.studio_workflow_completion.v1",
@@ -959,6 +981,52 @@ async def _completion_progress(scope, row, project=None):
     }
     result["receipt_digest"] = _digest(result)
     return result
+
+
+def _workflow_stage(row, context, allowed):
+    """Guide new checklist decisions using verified current owner receipts only."""
+    requirements = row.get("completion_requirements", [])
+    if not requirements:
+        return allowed, None
+    checks = context.get("completion", {}).get("checks", {})
+    exports = checks.get("export", {})
+    if "edit" in requirements and not checks.get("edit", {}).get("verified"):
+        stage, operations = "edit", {"console.inspect", "console.edit", "project.inspect"}
+    elif any(name in requirements for name in ("build", "preview", "export")) and not checks.get(
+        "build", {}
+    ).get("verified"):
+        stage, operations = "build", {"build.inspect", "build", "console.inspect"}
+    elif any(name in requirements for name in ("preview", "export")) and not checks.get("preview", {}).get(
+        "verified"
+    ):
+        stage, operations = "preview", {"artifact.inspect", "artifact.preview"}
+    elif "export" in requirements and not exports.get("verified"):
+        if exports.get("binary_prepared"):
+            stage, operations = "export_source", {"project.export"}
+        elif exports.get("source_prepared"):
+            stage, operations = "export_binary", {"artifact.export"}
+        else:
+            stage, operations = "export", {"project.export", "artifact.export"}
+    else:
+        stage, operations = "complete", {"project.inspect"}
+    allowed = allowed & operations
+    guidance = {
+        "stage": stage,
+        "required": requirements,
+        "verified": {name: value.get("verified", False) for name, value in checks.items()},
+        "exports": {
+            key: exports[key]
+            for key in ("source_prepared", "binary_prepared", "source_export_digest", "artifact_ids")
+            if key in exports
+        },
+        "remaining_operations": sorted(allowed),
+    }
+    # The minimum prompt must contain actual identities needed for the next action,
+    # rather than depending on optional job observations fitting the token budget.
+    if stage in {"preview", "export", "export_source", "export_binary"}:
+        build = checks.get("build", {})
+        guidance["build_receipt"] = {key: build[key] for key in ("job_id", "artifacts") if key in build}
+    return allowed, guidance
 
 
 async def _context(scope, row, project, binding):
@@ -1200,6 +1268,7 @@ async def _prepare(scope, row, token):
     schemas = studio_application_schemas()
     allowed = allowed & frozenset(schemas)
     context, dependencies = await _context(scope, row, project, binding)
+    allowed, workflow = _workflow_stage(row, context, allowed)
     prompt = json.dumps(
         {
             "goal": row["goal"],
@@ -1217,6 +1286,7 @@ async def _prepare(scope, row, token):
             },
             "receipt_reference_tokens": sorted(_RECEIPT_REFS),
             "completion_requirements": row.get("completion_requirements", []),
+            "workflow": workflow,
             "workflow_guidance": "Inspect exact records and build preflight; make authorized edits; build and wait for actual binary; preview exact artifact with bounded inputs; prepare project.export and artifact.export. Queued/source_only is not successful compilation. Cite only evidence_catalog refs. A requested export requires both current source JSON and the same previewed binary.",
         },
         ensure_ascii=False,
@@ -1224,7 +1294,7 @@ async def _prepare(scope, row, token):
         separators=(",", ":"),
     )
     prompt, allowed, capacity_receipt = await _fit_planner_context(
-        scope, row, context, schemas, allowed, prompt
+        scope, row, context, schemas, allowed, prompt, workflow=workflow
     )
     allow_done = (
         not row.get("completion_requirements") or context.get("completion", {}).get("verified") is True
@@ -1261,7 +1331,7 @@ async def _prepare(scope, row, token):
     )
 
 
-async def _fit_planner_context(scope, row, context, schemas, allowed, full_prompt):
+async def _fit_planner_context(scope, row, context, schemas, allowed, full_prompt, *, workflow=None):
     """Fit actual data to canonical capacity without changing frozen work or budgets."""
     from core.engine_client import EngineClient
     from core.model_catalog import (
@@ -1300,28 +1370,10 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
         framed = LocalInferenceRequest(prompt=prompt, instructions=PLANNER_SYSTEM).rendered_input
         return count(prompt) <= capacity and count(framed) <= budget.input_capacity(tools_enabled=False)
 
-    prompt, projected, stage = full_prompt, False, None
+    prompt, projected = full_prompt, False
+    stage = workflow.get("stage") if workflow else None
     if not fits(prompt):
         projected = True
-        progress = context.get("completion", {})
-        checks = progress.get("checks", {})
-        requirements = row.get("completion_requirements", [])
-        if requirements:
-            if "edit" in requirements and not checks.get("edit", {}).get("verified"):
-                stage, stage_ops = "edit", {"console.inspect", "console.edit", "project.inspect"}
-            elif any(name in requirements for name in ("build", "preview", "export")) and not checks.get(
-                "build", {}
-            ).get("verified"):
-                stage, stage_ops = "build", {"build.inspect", "build", "job.inspect", "console.inspect"}
-            elif any(name in requirements for name in ("preview", "export")) and not checks.get(
-                "preview", {}
-            ).get("verified"):
-                stage, stage_ops = "preview", {"artifact.inspect", "artifact.preview", "job.inspect"}
-            elif "export" in requirements and not checks.get("export", {}).get("verified"):
-                stage, stage_ops = "export", {"project.export", "artifact.export"}
-            else:
-                stage, stage_ops = "complete", {"project.inspect"}
-            allowed = allowed & stage_ops
 
         def field_shape(value):
             if not isinstance(value, dict):
@@ -1403,11 +1455,7 @@ async def _fit_planner_context(scope, row, context, schemas, allowed, full_promp
                 "manifest_digest": context.get("console_manifest_digest"),
                 "spec_digest": context.get("successor_spec_digest"),
             },
-            "workflow": {
-                "stage": stage,
-                "required": requirements,
-                "verified": {name: value.get("verified", False) for name, value in checks.items()},
-            },
+            "workflow": workflow,
             "operations": operations,
             "response": {
                 "schema_version": DECISION_SCHEMA,
@@ -2043,6 +2091,7 @@ async def advance(scope, goal_id, body):
                 },
             )
         advance_deadline = asyncio.get_running_loop().time() + 90
+        model_waited = False
         row = await _recover_own_edit(scope, row, token)
         await _current(scope, row)
         for _ in range(min(body["steps"], max(0, row["_active_advance"]["end_cursor"] - row["cursor"]))):
@@ -2135,12 +2184,19 @@ async def advance(scope, goal_id, body):
                 )
                 break
             if row.get("pending") is None:
+                if model_waited and not row.get("workflow"):
+                    # Yield after an issued operation instead of starting a second
+                    # model poll inside the same HTTP request's timeout window.
+                    break
                 row = (
                     await _next_workflow_action(scope, row, token)
                     if row.get("workflow")
                     else await _prepare(scope, row, token)
                 )
             if row["pending"]["phase"] == "model":
+                if model_waited:
+                    break
+                model_waited = True
                 row = await _model(scope, row, token)
             elif row["pending"]["phase"] == "response":
                 row = await _accept_response(scope, row, token)

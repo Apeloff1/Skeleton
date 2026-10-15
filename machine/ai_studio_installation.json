@@ -17,10 +17,11 @@
     "core_registry": "skeleton/jeeves/game_emulator_catalog.py",
     "core_installer": "scripts/install_game_emulator_cores.py",
     "server_readiness": "backend/core/game_studio_health.py",
-    "dragon_runtime": "backend/core/dragon_runtime.py"
+    "dragon_runtime": "backend/core/dragon_runtime.py",
+    "crawler_readiness": "backend/core/dragon_crawler.py"
   },
   "interfaces": {
-    "studio_readiness_report": "Optional bounded read-only local process snapshot from canonical build/desktop/core inventories; separate authenticated server projection from existing /api/game-studio-health.",
+    "studio_readiness_report": "Optional bounded read-only local process snapshot from canonical build/desktop/core inventories; separate authenticated projections from existing studio, Dragon runtime and crawler readiness endpoints.",
     "doctor": "app doctor --studio [--live --auth-token-file PRIVATE_FILE] --json; no raw token argument, provider call, model load, game/core execution or crawl.",
     "toolchains": "Existing install_game_desktop_toolchains.py selects explicit --tool names; no network without --download, local archive/source cache supported; existing --cc65/--rgbds accepted without acquiring unrequested Go/SDL."
   },
@@ -50,7 +51,8 @@
     "The default backend Alpine image does not gain native glibc tooling or weakened sandbox permissions; doctor must report the actual server prerequisites and direct operators to supported Linux host configuration.",
     "Dragon bootstrap creates only empty existing schemas under backend_data, is idempotent and fail-closed on unsafe/corrupt state, and grants no reviewed knowledge, scheduler authority, model calls or training rights.",
     "Authenticated readiness sends a private operator token only to configured HTTPS backend or loopback HTTP; diagnostics return no tokens or raw exceptions.",
-    "Local and authenticated HTTP probes run in bounded one-shot subprocesses; a slow peer cannot leave a detached diagnostic thread or retain the parent beyond its wall deadline."
+    "Local and authenticated HTTP probes run in bounded one-shot subprocesses; a slow peer cannot leave a detached diagnostic thread or retain the parent beyond its wall deadline.",
+    "Public AI-readiness JSON uses the same deadline-bound one-shot diagnostic process, finite64KiB response and redirect rejection; a socket read timeout alone is not a wall deadline. Authenticated crawler readiness updates doctor only after exactschema and booleanstate validation."
   ],
   "qualification": {
     "automated_tests_run": false,

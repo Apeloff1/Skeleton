@@ -92,9 +92,7 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
   const accept = useCallback((value: GamePlay, intentional = false) => {
     if (!safe()) return;
     const previous = live.current;
-    if (!previous || previous.play_id !== value.play_id || previous.controller_epoch !== value.controller_epoch) {
-      inputSequence.current = 0; inputQueue.current = []; heldSources.current.clear(); setHeld([]);
-    }
+    if (previous && previous.play_id !== value.play_id && !intentional) return;
     if (previous && previous.play_id === value.play_id) {
       if (!intentional && value.stream_id !== previous.stream_id) { setError('The session changed. Reopen it before sending more controls.'); return; }
       if (!intentional && value.control_version < previous.control_version) return;
@@ -103,9 +101,12 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
       // Reads never grant a new controller lease; preserve only this controller's unchanged epoch.
       if (!value.control_token && value.controller === 'human' && previous.controller === 'human' && value.controller_epoch === previous.controller_epoch) value = { ...value, control_token: previous.control_token };
     }
+    if (!previous || previous.play_id !== value.play_id || previous.controller_epoch !== value.controller_epoch) {
+      inputSequence.current = 0; inputQueue.current = []; heldSources.current.clear(); setHeld([]);
+    }
     live.current = value; setPlay(value); setSavedPlays(current => current.some(item => item.play_id === value.play_id) ? current.map(item => item.play_id === value.play_id ? value : item) : [value, ...current].slice(0, 32));
   }, [safe]);
-  useEffect(() => { if (!initialPlay || initialPlay.project_id !== projectRef.current.project_id || openedPlay.current === initialPlay.play_id || !safe()) return; openedPlay.current = initialPlay.play_id; accept(initialPlay, true); setKeyboard(Platform.OS === 'web' && initialPlay.controller === 'human'); }, [initialPlay, accept, safe]);
+  useEffect(() => { if (!initialPlay || initialPlay.project_id !== projectRef.current.project_id || openedPlay.current === initialPlay.play_id || !safe()) return; openedPlay.current = initialPlay.play_id; if (live.current?.play_id !== initialPlay.play_id) requests.current.forEach(request => request.abort()); accept(initialPlay, true); setKeyboard(Platform.OS === 'web' && initialPlay.controller === 'human'); }, [initialPlay, accept, safe]);
   const stopSound = useCallback(() => {
     audioSources.current.forEach(source => { try { source.stop(); } catch { /* The source already ended. */ } }); audioSources.current.clear();
     audioTime.current = 0; audioCursor.current = 0; audioSession.current = '';
@@ -137,8 +138,9 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
         const event = inputQueue.current.shift()!; const current = live.current;
         if (!current?.control_token || current.controller !== 'human' || current.status !== 'running') { inputQueue.current = []; break; }
         const controller = new AbortController(); requests.current.add(controller);
-        try { const value = await inputGamePlay(current, event.action, event.held, inputSequence.current + 1, { signal: controller.signal }); inputSequence.current++; accept(value); }
+        try { const value = await inputGamePlay(current, event.action, event.held, inputSequence.current + 1, { signal: controller.signal }); if (controller.signal.aborted || !safe() || live.current?.play_id !== current.play_id || live.current.stream_id !== current.stream_id || live.current.controller_epoch !== current.controller_epoch) continue; inputSequence.current++; accept(value); }
         catch (caught) {
+          if (controller.signal.aborted || !safe() || live.current?.play_id !== current.play_id || live.current.stream_id !== current.stream_id || live.current.controller_epoch !== current.controller_epoch) continue;
           inputQueue.current = []; heldSources.current.clear(); if (safe()) { if (live.current) { live.current = { ...live.current, control_token: undefined }; setPlay(live.current); } setHeld([]); setKeyboard(false); setGamepad(false); setError(caught instanceof Error ? caught.message : 'Input could not be delivered.'); }
           break;
         } finally { requests.current.delete(controller); }
@@ -217,9 +219,10 @@ export default function GamePlayViewport({ project, sourceId, seed, disabled, on
   }, [disabled, control]);
   useEffect(() => {
     const leave = () => { release(); setKeyboard(false); setGamepad(false); setSound(false); stopSound(); if (live.current?.status === 'running') control('pause'); };
+    const visibility = () => { if (document.visibilityState === 'hidden') leave(); };
     const subscription = AppState.addEventListener('change', state => { if (state !== 'active') leave(); });
-    if (Platform.OS === 'web') { window.addEventListener('blur', leave); document.addEventListener('visibilitychange', leave); }
-    return () => { subscription.remove(); if (Platform.OS === 'web') { window.removeEventListener('blur', leave); document.removeEventListener('visibilitychange', leave); } };
+    if (Platform.OS === 'web') { window.addEventListener('blur', leave); document.addEventListener('visibilitychange', visibility); }
+    return () => { subscription.remove(); if (Platform.OS === 'web') { window.removeEventListener('blur', leave); document.removeEventListener('visibilitychange', visibility); } };
   }, [control, release, stopSound]);
   useEffect(() => {
     if (Platform.OS !== 'web' || !keyboard) return;

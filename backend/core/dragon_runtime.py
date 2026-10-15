@@ -76,7 +76,7 @@ def _initialize_sync() -> dict:
         return {"initialized": False, "code": "dragon_bootstrap_disabled"}
     practice = _path("SKL_DRAGON_PRACTICE_DB_PATH", create=True)
     knowledge = _path("SKL_DRAGON_KNOWLEDGE_DB_PATH", create=True)
-    if practice == knowledge:
+    if _seen["SKL_DRAGON_PRACTICE_DB_PATH"] == _seen["SKL_DRAGON_KNOWLEDGE_DB_PATH"]:
         raise GameLearningError(
             "dragon_storage_invalid",
             "Practice and reviewed knowledge require their existing separate store paths.",
@@ -199,20 +199,35 @@ def _error(exc: Exception) -> GameLearningError:
 
 async def runtime_readiness() -> dict:
     checks = {}
-    for kind, variable, table in [
-        ("practice", "SKL_DRAGON_PRACTICE_DB_PATH", "dragon_practice_lessons"),
-        ("knowledge", "SKL_DRAGON_KNOWLEDGE_DB_PATH", "game_builder_source_candidates"),
+    admitted_paths = {}
+    for kind, variable, required in [
+        (
+            "practice",
+            "SKL_DRAGON_PRACTICE_DB_PATH",
+            {
+                "dragon_practice_lessons",
+                "dragon_practice_attempts",
+                "dragon_reference_practice_intents",
+                "dragon_reference_practice_attempts",
+            },
+        ),
+        (
+            "knowledge",
+            "SKL_DRAGON_KNOWLEDGE_DB_PATH",
+            {
+                "game_builder_knowledge",
+                "game_builder_source_candidates",
+                "game_builder_source_reviews",
+                "game_builder_captured_source_bindings",
+            },
+        ),
     ]:
         try:
             path = _path(variable)
+            admitted_paths[kind] = path
             with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=2)) as db:
-                valid = (
-                    db.execute(
-                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
-                    ).fetchone()
-                    is not None
-                )
-                if not valid:
+                tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                if not required.issubset(tables):
                     raise GameLearningError(
                         "dragon_storage_uninitialized", "Initialize empty Dragon schemas.", 503
                     )
@@ -222,6 +237,12 @@ async def runtime_readiness() -> dict:
                 "available": False,
                 "code": getattr(exc, "code", "dragon_storage_unavailable"),
             }
+    if (
+        len(admitted_paths) == 2
+        and _seen["SKL_DRAGON_PRACTICE_DB_PATH"] == _seen["SKL_DRAGON_KNOWLEDGE_DB_PATH"]
+    ):
+        for check in checks.values():
+            check.update(available=False, code="dragon_storage_invalid")
     available = all(check["available"] for check in checks.values())
     return {
         "schema_version": "skeleton.dragon.runtime_readiness.v1",

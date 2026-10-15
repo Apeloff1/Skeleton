@@ -96,7 +96,7 @@ export default function CrawlerSourceLibrary({ session, sources, more, busy, loa
       <Text style={s.small}>{session.source_count} server-recorded sources · captures remain unreviewed</Text></View>
       <Button title="Refresh sources" press={refresh} disabled={busy || reading} /></View>
     <View style={l.search}><Ionicons name="search-outline" size={20} color={C.accent} />
-      <TextInput accessibilityLabel="Search within captured sources" value={query} onChangeText={setQuery} maxLength={512}
+      <TextInput accessibilityLabel="Search within captured sources" value={query} onChangeText={value => { searchRequest.current?.abort(); setSearching(false); setHits(null); setQuery(value); }} maxLength={512}
         style={l.searchInput} placeholder="Find a passage in this crawl" placeholderTextColor={C.muted} onSubmitEditing={() => { if (query.trim()) void search(); }} />
       <Button title={searching ? 'Searching…' : 'Search'} disabled={searching || !query.trim()} press={() => void search()} /></View>
     {hits !== null && <View style={l.stack}>

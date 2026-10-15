@@ -17,7 +17,6 @@ import stat
 import threading
 import time
 from datetime import datetime, timezone
-from functools import partial
 from pathlib import Path
 from secrets import token_hex
 
@@ -33,13 +32,9 @@ def _json(value):
     try:
         raw = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     except (TypeError, ValueError, OverflowError) as exc:
-        raise GameLearningError(
-            "practice_payload", "Practice evidence must be finite JSON."
-        ) from exc
+        raise GameLearningError("practice_payload", "Practice evidence must be finite JSON.") from exc
     if len(raw) > MAX_BYTES:
-        raise GameLearningError(
-            "practice_evidence_limit", "Practice evidence exceeded one MiB.", 413
-        )
+        raise GameLearningError("practice_evidence_limit", "Practice evidence exceeded one MiB.", 413)
     return raw
 
 
@@ -106,9 +101,7 @@ def initialize_reference_practice(path: Path) -> None:
 
 def _source_pin(candidate):
     if not isinstance(candidate, dict) or candidate.get("state") != "approved":
-        raise GameLearningError(
-            "practice_review_required", "Approve a current source reference first.", 409
-        )
+        raise GameLearningError("practice_review_required", "Approve a current source reference first.", 409)
     pin = {
         key: candidate.get(key)
         for key in (
@@ -144,8 +137,7 @@ def _source_pin(candidate):
         }
         or pin["source_ref"].get("schema_version") != "skeleton.dragon.crawler_reference.v1"
         or any(
-            not isinstance(value, str) or not 1 <= len(value) <= 256
-            for value in pin["source_ref"].values()
+            not isinstance(value, str) or not 1 <= len(value) <= 256 for value in pin["source_ref"].values()
         )
         or not isinstance(pin["source_digest"], str)
         or len(pin["source_digest"]) != 64
@@ -156,9 +148,7 @@ def _source_pin(candidate):
             "practice_source_pin", "Exact reviewed reference evidence is incomplete.", 409
         )
     if len(_json(pin)) > 16384:
-        raise GameLearningError(
-            "practice_source_pin", "Reviewed reference identity exceeds its bound.", 413
-        )
+        raise GameLearningError("practice_source_pin", "Reviewed reference identity exceeds its bound.", 413)
     return pin
 
 
@@ -168,9 +158,7 @@ def _runtime_digest():
     return _digest(
         {
             "adapter": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-            "runtime": hashlib.sha256(
-                Path(game_learning_runtime.__file__).read_bytes()
-            ).hexdigest(),
+            "runtime": hashlib.sha256(Path(game_learning_runtime.__file__).read_bytes()).hexdigest(),
             "engine_sources": game_learning_runtime._source_digest(),
             "target": TARGET,
             "controller": "goal_dx_directional_reference_v1",
@@ -182,9 +170,7 @@ def _claim(path, owner, pin, request, runtime):
     identifier = _digest([owner, pin["candidate_id"], request["idempotency_key"]])
     active = _active.get((str(path), owner, identifier))
     if active is not None and not active.done():
-        raise GameLearningError(
-            "practice_running", "This exact practice attempt is still running.", 409
-        )
+        raise GameLearningError("practice_running", "This exact practice attempt is still running.", 409)
     now = time.time()
     db = _connect(path)
     try:
@@ -204,10 +190,7 @@ def _claim(path, owner, pin, request, runtime):
             (owner, identifier),
         ).fetchone()
         if prior:
-            if (
-                prior["request_digest"] != _digest(request)
-                or prior["source_pin_json"] != _json(pin).decode()
-            ):
+            if prior["request_digest"] != _digest(request) or prior["source_pin_json"] != _json(pin).decode():
                 raise GameLearningError(
                     "practice_idempotency_conflict", "Practice key binds different input.", 409
                 )
@@ -230,17 +213,14 @@ def _claim(path, owner, pin, request, runtime):
                 ).fetchone()
                 if (
                     receipt is None
-                    or hashlib.sha256(receipt["result_json"].encode()).hexdigest()
-                    != receipt["result_digest"]
+                    or hashlib.sha256(receipt["result_json"].encode()).hexdigest() != receipt["result_digest"]
                 ):
                     raise GameLearningError(
                         "practice_receipt_corrupt", "Stored practice evidence differs.", 503
                     )
                 return identifier, None, prior["attempt"], json.loads(receipt["result_json"])
             if prior["status"] == "running" and prior["lease_until"] > now:
-                raise GameLearningError(
-                    "practice_running", "A bounded practice lease is still active.", 409
-                )
+                raise GameLearningError("practice_running", "A bounded practice lease is still active.", 409)
             if prior["runtime_digest"] != runtime:
                 raise GameLearningError(
                     "practice_runtime_changed",
@@ -274,9 +254,7 @@ def _claim(path, owner, pin, request, runtime):
             "SELECT owner FROM dragon_reference_practice_intents WHERE status='running' AND lease_until>?",
             (now,),
         ).fetchall()
-        local_owner_active = any(
-            key[1] == owner and not future.done() for key, future in _active.items()
-        )
+        local_owner_active = any(key[1] == owner and not future.done() for key, future in _active.items())
         if (
             active_count >= 2
             or local_owner_active
@@ -382,6 +360,10 @@ def _save(path, owner, identifier, token, ordinal, *, trace=None, result=None, e
                 "WHERE owner=? AND practice_id=? AND worker_token=?",
                 (status_value, owner, identifier, token),
             )
+        # Serialization and SQLite statement work are part of publication;
+        # holding the write lock does not extend the issued execution lease.
+        if intent["lease_until"] <= time.time():
+            raise GameLearningError("practice_lease_lost", "Practice lease expired before publication.", 409)
         db.commit()
     finally:
         if db.in_transaction:
@@ -410,9 +392,7 @@ def _execute(
 
     def guard():
         if cancelled.is_set():
-            raise GameLearningError(
-                "practice_cancelled", "Practice stopped before completion.", 409
-            )
+            raise GameLearningError("practice_cancelled", "Practice stopped before completion.", 409)
         if time.monotonic() >= deadline:
             raise GameLearningError(
                 "practice_deadline", "Practice reached its ten-second execution limit.", 409
@@ -517,13 +497,10 @@ async def run_reference_practice(
     *, path: Path, owner: str, candidate: dict, request: dict, authorize
 ) -> dict:
     if not isinstance(owner, str) or not 1 <= len(owner) <= 128:
-        raise GameLearningError(
-            "practice_owner", "An exact scoped practice owner is required.", 403
-        )
+        raise GameLearningError("practice_owner", "An exact scoped practice owner is required.", 403)
     if (
         not isinstance(request, dict)
-        or set(request)
-        != {"expected_version", "seed", "max_steps", "idempotency_key", "practice_consent"}
+        or set(request) != {"expected_version", "seed", "max_steps", "idempotency_key", "practice_consent"}
         or request.get("practice_consent") is not True
         or type(request.get("seed")) is not int
         or not 0 <= request["seed"] <= 2**31 - 1
@@ -533,17 +510,10 @@ async def run_reference_practice(
         or not 1 <= len(request["idempotency_key"]) <= 256
         or request["idempotency_key"] != request["idempotency_key"].strip()
     ):
-        raise GameLearningError(
-            "practice_request", "A bounded explicit practice request is required."
-        )
+        raise GameLearningError("practice_request", "A bounded explicit practice request is required.")
     pin = _source_pin(candidate)
-    if (
-        type(request["expected_version"]) is not int
-        or request["expected_version"] != pin["version"]
-    ):
-        raise GameLearningError(
-            "practice_candidate_changed", "Reload the current reviewed reference.", 409
-        )
+    if type(request["expected_version"]) is not int or request["expected_version"] != pin["version"]:
+        raise GameLearningError("practice_candidate_changed", "Reload the current reviewed reference.", 409)
     await authorize()
     runtime = _runtime_digest()
     deadline = time.monotonic() + MAX_SECONDS
@@ -562,10 +532,17 @@ async def run_reference_practice(
             pending.cancel()
             raise
 
-    worker = loop.run_in_executor(
-        None,
-        partial(
-            _execute,
+    start_gate = threading.Lock()
+    started = threading.Event()
+
+    def execute():
+        # A queued wrapper can be cancelled without pretending an already
+        # running thread exited. The lock makes the start/cancel choice exact.
+        with start_gate:
+            if cancelled.is_set():
+                raise GameLearningError("practice_cancelled", "Practice stopped before dispatch.", 409)
+            started.set()
+        return _execute(
             path,
             owner,
             pin,
@@ -577,17 +554,38 @@ async def run_reference_practice(
             cancelled,
             check_authority,
             deadline,
-        ),
-    )
+        )
+
+    try:
+        worker = loop.run_in_executor(None, execute)
+    except Exception as exc:
+        _save(path, owner, identifier, token, ordinal, error="practice_dispatch_unavailable")
+        raise GameLearningError(
+            "practice_dispatch_unavailable", "The admitted practice worker could not be dispatched.", 503
+        ) from exc
     key = (str(path), owner, identifier)
     _active[key] = worker
     try:
+        complete, _ = await asyncio.wait({worker}, timeout=max(0.0, deadline - time.monotonic()))
+        if not complete:
+            raise GameLearningError(
+                "practice_deadline", "Practice reached its ten-second execution limit.", 409
+            )
         result = await asyncio.shield(worker)
         await authorize()
+        if time.monotonic() >= deadline:
+            raise GameLearningError(
+                "practice_deadline", "Practice reached its ten-second execution limit.", 409
+            )
         _save(path, owner, identifier, token, ordinal, result=result)
         return {"practice": result, "replayed": False}
     except BaseException as exc:
-        cancelled.set()
+        with start_gate:
+            cancelled.set()
+            if not started.is_set():
+                # The only callback that can enter _execute checks this same
+                # gate/event first. No practice work can start after this point.
+                worker.cancel()
         while not worker.done():
             try:
                 await asyncio.shield(worker)
@@ -623,8 +621,7 @@ def read_reference_practice(path, owner, candidate_id, practice_id) -> dict:
             "AND i.status='completed' AND a.status='completed'"
         )
         size = db.execute(
-            "SELECT length(CAST(a.result_json AS BLOB)),length(CAST(i.source_pin_json AS BLOB))"
-            + selected,
+            "SELECT length(CAST(a.result_json AS BLOB)),length(CAST(i.source_pin_json AS BLOB))" + selected,
             identity,
         ).fetchone()
         if size is None:
@@ -641,17 +638,11 @@ def read_reference_practice(path, owner, candidate_id, practice_id) -> dict:
                 "practice_receipt_corrupt", "Stored practice evidence exceeds its bound.", 503
             )
         row = db.execute(
-            "SELECT a.result_json,a.result_digest,i.runtime_digest,i.source_pin_json,i.attempt"
-            + selected,
+            "SELECT a.result_json,a.result_digest,i.runtime_digest,i.source_pin_json,i.attempt" + selected,
             identity,
         ).fetchone()
-        if (
-            row is None
-            or hashlib.sha256(row["result_json"].encode()).hexdigest() != row["result_digest"]
-        ):
-            raise GameLearningError(
-                "practice_receipt_corrupt", "Stored practice evidence differs.", 503
-            )
+        if row is None or hashlib.sha256(row["result_json"].encode()).hexdigest() != row["result_digest"]:
+            raise GameLearningError("practice_receipt_corrupt", "Stored practice evidence differs.", 503)
         try:
             value = json.loads(row["result_json"])
             source_pin = json.loads(row["source_pin_json"])
@@ -674,9 +665,7 @@ def read_reference_practice(path, owner, candidate_id, practice_id) -> dict:
             or value.get("steps") != len(value["trace"])
             or value.get("trace_digest") != _digest(value["trace"])
         ):
-            raise GameLearningError(
-                "practice_receipt_corrupt", "Stored practice identities differ.", 503
-            )
+            raise GameLearningError("practice_receipt_corrupt", "Stored practice identities differ.", 503)
         _source_pin({**source_pin, "state": "approved"})
         value.pop("trace")
         value.pop("preview", None)
@@ -725,9 +714,7 @@ def list_reference_practice(path, owner, candidate_id, limit=20) -> list[dict]:
         output = []
         for row in rows:
             if row["result_json"]:
-                value = read_reference_practice(path, owner, candidate_id, row["practice_id"])[
-                    "practice"
-                ]
+                value = read_reference_practice(path, owner, candidate_id, row["practice_id"])["practice"]
             else:
                 trace = json.loads(row["checkpoint_json"])
                 value = {

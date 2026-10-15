@@ -11,7 +11,8 @@ type Props = {
   session: CrawlSession;
   canWrite: boolean;
   busy: boolean;
-  run: (label: string, operation: (signal: AbortSignal) => Promise<CrawlSession>) => void;
+  running?: boolean;
+  run: (label: string, operation: (signal: AbortSignal) => Promise<CrawlSession>, stop?: boolean) => void;
   control: (action: 'pause' | 'resume' | 'cancel') => void;
   manual: () => void;
   refresh: () => void;
@@ -32,7 +33,7 @@ function when(value?: string | null) {
 function human(value: string) { return value.replaceAll('_', ' '); }
 
 /** The browser observes a finite server grant. It never schedules capture requests. */
-export default function CrawlerAutomationPanel({ session, canWrite, busy, run, control, manual, refresh }: Props) {
+export default function CrawlerAutomationPanel({ session, canWrite, busy, running = false, run, control, manual, refresh }: Props) {
   const [slices, setSlices] = useState('8');
   const [minutes, setMinutes] = useState('10');
   const [approved, setApproved] = useState(false);
@@ -60,7 +61,7 @@ export default function CrawlerAutomationPanel({ session, canWrite, busy, run, c
         body = { expected_version: current.version, idempotency_key: key, enabled, max_slices: count, max_seconds: duration * 60 };
       }
       return authorizeCrawlAutomation(session.session_id, body, signal);
-    });
+    }, !enabled);
   };
   return <View style={s.card}>
     <View style={s.row}>
@@ -98,8 +99,8 @@ export default function CrawlerAutomationPanel({ session, canWrite, busy, run, c
       !terminal && <View style={a.authorization}>
         <Text style={s.label}>Finite automatic run</Text>
         <View style={s.row}>
-          <View style={a.field}><Text style={s.small}>Maximum slices (1–64)</Text><TextInput accessibilityLabel="Maximum automatic capture slices" value={slices} onChangeText={setSlices} keyboardType="number-pad" maxLength={2} style={a.input} editable={!busy} /></View>
-          <View style={a.field}><Text style={s.small}>Time window (1–60 minutes)</Text><TextInput accessibilityLabel="Automatic capture authorization minutes" value={minutes} onChangeText={setMinutes} keyboardType="number-pad" maxLength={2} style={a.input} editable={!busy} /></View>
+          <View style={a.field}><Text style={s.small}>Maximum slices (1–64)</Text><TextInput accessibilityLabel="Maximum automatic capture slices" value={slices} onChangeText={setSlices} keyboardType="number-pad" maxLength={2} style={a.input} editable={!busy && !running} /></View>
+          <View style={a.field}><Text style={s.small}>Time window (1–60 minutes)</Text><TextInput accessibilityLabel="Automatic capture authorization minutes" value={minutes} onChangeText={setMinutes} keyboardType="number-pad" maxLength={2} style={a.input} editable={!busy && !running} /></View>
         </View>
         <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: approved, disabled: busy }} disabled={busy}
           onPress={() => setApproved(value => !value)} style={a.consent}>
@@ -109,11 +110,11 @@ export default function CrawlerAutomationPanel({ session, canWrite, busy, run, c
         {!session.consent_current && <Text style={s.error}>Capture consent has expired. This session cannot receive a new run authorization.</Text>}
         <View style={s.row}>
           <Action label={grant?.enabled ? 'Replace finite authorization' : 'Run automatically within limits'} primary
-            disabled={!canWrite || busy || !approved || !session.consent_current || caps?.can_automate !== true} press={() => authorize(true)} />
+            disabled={!canWrite || busy || running || !approved || !session.consent_current || caps?.can_automate !== true} press={() => authorize(true)} />
           {grant?.enabled && <Action label="Stop automatic continuation" disabled={busy} press={() => authorize(false)} />}
         </View>
       </View>}
-    <View style={s.row}><Action label="Run one manual slice" disabled={!canWrite || busy || terminal || (caps ? !caps.can_run : !session.consent_current || session.status === 'running')} press={manual} /></View>
+    <View style={s.row}><Action label="Run one manual slice" disabled={!canWrite || busy || running || terminal || (caps ? !caps.can_run : !session.consent_current || session.status === 'running')} press={manual} /></View>
     <Text style={s.small}>Pause and cancel fence future requests and publication. A running network request may still need to drain. Captures remain unreviewed external material.</Text>
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
   </View>;

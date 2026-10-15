@@ -175,6 +175,7 @@ class DragonCrawlerApplication:
             observed["running"] and any(job["id"] == "crawler_recovery" for job in observed["jobs"])
         )
         return {
+            "schema_version": "skeleton.dragon.crawler_readiness.v1",
             "ok": True,
             "configured": self.engine is not None,
             "available": available,
@@ -370,7 +371,9 @@ class DragonCrawlerApplication:
         return status
 
     async def _reconcile(self, scope: dict[str, str], row: dict) -> dict:
-        if row["status"] == "running" and row.get("lease_until") and _utc(row["lease_until"]) <= _now():
+        lease = row.get("lease_until")
+        worker = self._worker_state(row)
+        if row["status"] == "running" and (lease is None or _utc(lease) <= _now()) and not worker["active"]:
             _, run_type = _core()
             checkpoint_state = run_type.from_snapshot(_plain(row["snapshot"])).status()["state"]
             restored = (
@@ -391,14 +394,17 @@ class DragonCrawlerApplication:
                     **scope,
                     "status": "running",
                     "worker_token": row.get("worker_token"),
-                    "lease_until": row["lease_until"],
+                    "lease_until": lease,
                 },
                 {
                     "$set": {
                         "status": restored,
                         "operations": operations,
                         "updated_at": _now(),
-                        "last_worker_exit_confirmed": False,
+                        "last_worker_exit_confirmed": bool(
+                            worker["quiescent"]
+                            and (worker["local"] or row.get("last_worker_exit_confirmed") is True)
+                        ),
                         "error": (
                             {
                                 "code": "crawler_worker_expired",
@@ -827,6 +833,14 @@ class DragonCrawlerApplication:
                 raise CrawlerError("crawler_grant_expired", "The finite autonomous grant has stopped.", 403)
             await self._grant_principal(scope, grant)
         quota_id, token = _digest(scope), str(uuid4())
+        local_credit = await self.limits.find_one({"_id": quota_id, **scope}, {"worker_token": 1})
+        local_handle = self._workers.get((local_credit or {}).get("worker_token"))
+        if local_handle is not None and not local_handle[1].done():
+            raise CrawlerError(
+                "crawler_capacity", "The previous local account worker must physically drain.", 429
+            )
+        if sum(not handle[1].done() for handle in self._workers.values()) >= MAX_CONCURRENT_SLICES:
+            raise CrawlerError("crawler_capacity", "Local physical crawler capacity is occupied.", 429)
         now, epoch = _now(), int(row["worker_epoch"]) + 1
         credit = await self.limits.find_one_and_update(
             {
@@ -861,6 +875,10 @@ class DragonCrawlerApplication:
                     },
                     upsert=True,
                 )
+                existing_slot = await self.limits.find_one({"_id": slot}, {"worker_token": 1})
+                existing_handle = self._workers.get((existing_slot or {}).get("worker_token"))
+                if existing_handle is not None and not existing_handle[1].done():
+                    continue
                 global_credit = await self.limits.find_one_and_update(
                     {
                         "_id": slot,
@@ -1140,30 +1158,48 @@ class DragonCrawlerApplication:
                 "state": "interrupted",
                 "error_code": code,
             }
-            await self.sessions.update_one(
-                {"_id": identifier, **scope, "worker_token": token, "worker_epoch": epoch},
-                {
-                    "$set": {
-                        "updated_at": _now(),
-                        "operations." + operation: operation_receipt,
-                        "last_worker_exit_confirmed": True,
-                    },
-                    "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
-                },
-            )
-            await self.sessions.update_one(
-                {"_id": identifier, **scope, "status": "running", "worker_epoch": epoch},
+            owned_worker = {"_id": identifier, **scope, "worker_token": token, "worker_epoch": epoch}
+            settled = await self.sessions.update_one(
+                {**owned_worker, "status": "running"},
                 {
                     "$set": {
                         "status": "interrupted",
+                        "updated_at": _now(),
+                        "operations." + operation: operation_receipt,
+                        "last_worker_exit_confirmed": True,
                         "error": {
                             "code": code,
                             "message": "The slice stopped; only accepted checkpoints remain.",
                         },
                     },
                     "$inc": {"version": 1},
+                    "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
                 },
             )
+            if not settled.matched_count:
+                # A safety control may have won while this real worker drained.
+                # Preserve its status and grant while settling the old receipt.
+                await self.sessions.update_one(
+                    {**owned_worker, "status": {"$nin": ["running", "deleted"]}},
+                    {
+                        "$set": {
+                            "updated_at": _now(),
+                            "operations." + operation: operation_receipt,
+                            "last_worker_exit_confirmed": True,
+                        },
+                        "$inc": {"version": 1},
+                        "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
+                    },
+                )
+                # Erasure keeps only its tombstone and physical-exit metadata;
+                # never recreate an operations journal after source deletion.
+                await self.sessions.update_one(
+                    {**owned_worker, "status": "deleted"},
+                    {
+                        "$set": {"last_worker_exit_confirmed": True},
+                        "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
+                    },
+                )
         finally:
             if worker.done():
                 self._workers.pop(token, None)
@@ -1185,6 +1221,11 @@ class DragonCrawlerApplication:
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         previous = row.get("deletion")
         if previous and previous.get("operation") == operation and previous.get("request_digest") == digest:
+            # Tombstone publication may have succeeded before quota release
+            # lost its response. Exact replay must finish that idempotent step.
+            await self.limits.update_one(
+                {"_id": _digest(scope), **scope}, {"$pull": {"session_ids": identifier}}
+            )
             return {
                 "ok": True,
                 "session_id": identifier,
@@ -1250,6 +1291,15 @@ class DragonCrawlerApplication:
         }
 
     @staticmethod
+    def _source_use(row: dict) -> None:
+        if row["status"] in {"cancelled", "deleted"} or _utc(row["consent_expires_at"]) <= _now():
+            raise CrawlerError(
+                "crawler_context_revoked",
+                "Current capture/use consent is required for source retrieval.",
+                403,
+            )
+
+    @staticmethod
     def _source_projection(source: dict, *, text: bool = True) -> dict:
         result = dict(source)
         result.update(
@@ -1273,6 +1323,7 @@ class DragonCrawlerApplication:
         after_sequence: int | None = None,
     ) -> dict:
         row = await self._owned(scope, identifier)
+        self._source_use(row)
         _, run_type = _core()
         runtime = run_type.from_snapshot(_plain(row["snapshot"]))
         sources = runtime.sources()
@@ -1292,6 +1343,7 @@ class DragonCrawlerApplication:
         if cursor:
             ordered = [source for source in ordered if source["source_id"] > cursor]
         page = ordered[:limit]
+        self._source_use(await self._owned(scope, identifier))
         return {
             "ok": True,
             "sources": [
@@ -1309,16 +1361,11 @@ class DragonCrawlerApplication:
         }
 
     async def source(self, scope: dict[str, str], identifier: str, source_id: str) -> dict:
-        row = await self._owned(scope, identifier)
-        _, run_type = _core()
-        try:
-            source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
-        except ValueError:
-            raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404)
-        return self._source_projection(source)
+        return (await self.source_evidence(scope, identifier, source_id))["source"]
 
     async def source_evidence(self, scope: dict[str, str], identifier: str, source_id: str) -> dict:
         row = await self._owned(scope, identifier)
+        self._source_use(row)
         _, run_type = _core()
         try:
             source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
@@ -1536,6 +1583,23 @@ class DragonCrawlerApplication:
             if _digest(source) != reference["source_digest"]:
                 raise CrawlerError("crawler_context_changed", "The captured source evidence changed.", 403)
 
+    async def _defer_recovery(self, row: dict) -> bool:
+        """Rotate a bounded busy/skipped page without changing execution authority."""
+        result = await self.sessions.update_one(
+            {
+                "_id": row["_id"],
+                "tenant_id": row["tenant_id"],
+                "owner_id": row["owner_id"],
+                "version": row["version"],
+                "automation.enabled": True,
+                "automation.epoch": row["automation"]["epoch"],
+                "automation.next_run_at": row["automation"]["next_run_at"],
+            },
+            {"$set": {"automation.next_run_at": _now() + timedelta(seconds=10)}},
+        )
+        # Retry scheduling metadata is not a new grant, lease or source revision.
+        return bool(result.modified_count)
+
     async def recover(self, *, limit: int = 16) -> dict:
         """Consume only persisted finite grants in the existing scheduler."""
         if type(limit) is not int or not 1 <= limit <= 16:
@@ -1548,14 +1612,19 @@ class DragonCrawlerApplication:
             .max_time_ms(2000)
             .to_list(length=limit)
         )
-        selected, owners = [], set()
+        selected, deferred, owners = [], [], set()
         for row in rows:
             owner = (row["tenant_id"], row["owner_id"])
-            if owner not in owners:
+            if owner not in owners and len(selected) < MAX_CONCURRENT_SLICES:
                 owners.add(owner)
                 selected.append(row)
-            if len(selected) == MAX_CONCURRENT_SLICES:
-                break
+            else:
+                deferred.append(row)
+        # Otherwise a page filled by one account remains the oldest page on
+        # every sweep, starving due sessions belonging to all other accounts.
+        rotations = await asyncio.gather(
+            *(self._defer_recovery(row) for row in deferred), return_exceptions=True
+        )
 
         async def pulse(item):
             scope = {key: item[key] for key in ("tenant_id", "owner_id")}
@@ -1588,6 +1657,7 @@ class DragonCrawlerApplication:
                     )
                     return "stopped"
                 if self._worker_state(row)["active"]:
+                    await self._defer_recovery(row)
                     return "waiting"
                 await self._grant_principal(scope, grant)
                 _, run_type = _core()
@@ -1650,6 +1720,7 @@ class DragonCrawlerApplication:
         result = {
             "scanned": len(rows),
             "selected": len(selected),
+            "deferred": sum(value is True for value in rotations),
             "executed": 0,
             "waiting": 0,
             "stopped": 0,

@@ -15,7 +15,7 @@
     "policies": "full measured local policy snapshot with source/environment and episode lineage; candidate-only authority",
     "dragon": "Existing Dragon Academy principal and configured SQLite owner only; exact current reviewed ledger record read through DragonGameKnowledgeAdapter. Review writer guard spans Mongo checkpoint/terminal publication; current rights are rechecked before policy reuse/export.",
     "incremental_learning": "Completed parent policy is pinned by exact snapshot digest and current sources/environment; a new candidate preserves learned Q values and inherited evidence, uses a fresh job budget, and measures paired held-out returns against the actual parent.",
-    "audit": "Episode audit projection is prepared before the single authoritative full snapshot-plus-trace job update. Prepared audit/source/job records confer no membership or policy authority.",
+    "audit": "The authoritative same-document full policy checkpoint contains the complete latest acknowledged episode trace. One derived audit row per episode is projected only from that committed ledger; it is repaired before any later checkpoint can overwrite the retained full trace and before terminal publication. Historical prepared audit records confer no policy authority.",
     "live_play": "Existing scoped game-learning plays/recordings with rotating controller epochs and tokens, durable source/input/worker fences, snapshot resume and actual TTL frame projections. See ai_game_play.json.",
     "parallel_learning": "Native one-to-eight process actors use a persisted frozen batch and acknowledged checkpoint prefix; each pending/committed batch-state update shares the authoritative full snapshot/trace job document. Interactive and actor capacity are separately reserved.",
     "media": "Existing upload authority materializes large content through scoped immutable manifests; source registration pins exact content digest/rights/epoch and defaults to the admitted content. Legacy cartridges above2MiB use private hash-bound descriptors.",
@@ -43,7 +43,8 @@
     "parent_policy_bytes": 2097152,
     "normalized_source_bundle_bytes": 2097152,
     "native_actor_workers": 8,
-    "interactive_workers_reserved": 4
+    "interactive_workers_reserved": 4,
+    "episode_projection_rows_per_new_training_job": 256
   },
   "rules": [
     "authenticated tenant and owner scope precedes every payload read or mutation",
@@ -93,5 +94,26 @@
     "claims": "Both profiles expose server-owned training_credit_ids. Existing actor/play Mongo credit rows are claimed atomically with token/job/lease; no new actor ID or extra capacity. An active human play blocks that same credit until physical quiescence.",
     "limits": "Same observed effective CPU count,2GiB per native-compatible instance plus application reserve, global8-actor ceiling; zero capacity remains unavailable.",
     "compatibility": "Old requests/jobs default cpu. No policy snapshot identity, numerical counter, source/teacher authority or pending actor batch is rewritten."
+  },
+  "reliability_extension": {
+    "status": "implementation_candidate",
+    "owner": "backend/core/game_learning.py",
+    "authority": "Existing CORE_DB game-learning jobs, episodes and project heads; no new service/store or numerical policy owner.",
+    "episode_audit": "Keep the existing bounded job:episode audit key. Publish the authoritative full snapshot-plus-trace job CAS first; only its exact digest-bound committed ledger can populate or repair that episode projection. Repair the previously committed full trace before every later checkpoint overwrite and terminal completion. A projection failure after acknowledged CAS leaves the credited full checkpoint available for recovery, without rolling back or re-executing its episode. Existing rows cannot be overwritten by a failed/uncommitted retry; no digest-key orphan version growth is introduced.",
+    "admission_cleanup": "Native metadata creation and closure use shielded raw executor Futures; cancellation is drained through repeated cancellation, and any successfully created environment closes before the request returns.",
+    "frozen_execution": "Before numerical work, new jobs reconstruct the declared learning configuration and training plan from frozen request plus currently admitted exact demonstrations; stored configuration/digest/plan/episode total must agree. The actual runtime descriptor and full parent snapshot must match their durable admission pins. Legacy jobs preserve their existing fixed configuration path.",
+    "default_selection_recovery": "New training jobs retain a pending selection intent separate from immutable policy lineage. After completed issuing evidence, default selection retries only the original admission-observed parent/random comparator under unchanged project version/input epoch and current source authority. Same-key reads can repair a lost post-completion selection; rejected or superseded candidates never replace a newer pointer. Older completed jobs without the new intent are not retroactively selected.",
+    "queued_cancel": "Stopping a queued job does not schedule it as a side effect of looking it up. Worker/input/lease fences remain mandatory for checkpoint and terminal writes.",
+    "publication_outcome": "Checkpoint callbacks retain actual in-flight storage work until its outcome is known; a cooperative deadline signals cancellation but does not treat cancelling a concurrent Future as proof that its Mongo publication did not commit.",
+    "verification": "Source-only implementation and static checks; no automated tests or shared-runtime restart by this owner. Fresh productive operations are separately coordinated.",
+    "production_promotion_authorized": false,
+    "inherited_review_guard": "Before a Dragon-guarded publication, traverse only scoped immutable policy/teacher dependency metadata (no weight or source-file copies), including ancestors' direct/external/derived source refs. Deduplicate their reviewed Dragon records and hold the existing canonical SQLite writer guard across the publication; recursive dragon_guarded validation cannot omit inherited review dependencies when a later project replaces its current derived-source list.",
+    "dependency_guard_bounds": {
+      "policy_records": 256,
+      "teacher_records": 256,
+      "source_ids": 4096,
+      "metadata_bytes": 8388608
+    },
+    "storage_recovery": "A lost Mongo checkpoint acknowledgement is accepted only after exact current full-payload readback under the same live worker/source fence. Unknown storage outcomes interrupt the job for explicit authoritative checkpoint recovery; they never fabricate progress or mark the candidate complete."
   }
 }

@@ -47,8 +47,10 @@ and pass only the filename:
 python -m skeleton app doctor --studio --live --auth-token-file /absolute/private/token --json
 ```
 
-This performs read-only calls to `/api/game-studio-health` and
-`/api/dragon-academy/runtime/readiness`. It does not create an account, elevate a
+This performs read-only calls to `/api/game-studio-health`,
+`/api/dragon-academy/runtime/readiness` and
+`/api/dragon-academy/crawler/readiness`. The authenticated crawler observation also
+updates the top-level doctor crawler status; without the token it remains unknown. It does not create an account, elevate a
 role or invoke work. HTTP authentication is limited to loopback; remote endpoints
 require HTTPS, and redirects are rejected. Never place a token in a shell command,
 a public environment variable, a source file or a support report.

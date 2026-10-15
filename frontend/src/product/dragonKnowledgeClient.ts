@@ -85,6 +85,10 @@ export async function listDragonCandidates(state?: DragonKnowledgeCandidate['sta
   if (!Array.isArray(value.candidates) || value.candidates.length > 20 || value.next_cursor !== null && (typeof value.next_cursor !== 'string' || value.next_cursor.length > 4096)) invalid('The Dragon review list is invalid.');
   value.candidates.forEach(value => candidate(value)); return value;
 }
+export async function getDragonCandidate(candidateId: string, signal?: AbortSignal) {
+  const result = await request<{ candidate: DragonKnowledgeCandidate }>('get', '/knowledge/candidates/' + id(candidateId), null, signal);
+  return candidate(result.candidate, candidateId);
+}
 export async function createDragonCandidate(body: DragonCandidateDraft, signal?: AbortSignal) {
   const result = await request<{ candidate: DragonKnowledgeCandidate }>('post', '/knowledge/candidates', body, signal, body.idempotency_key);
   const value = candidate(result.candidate);

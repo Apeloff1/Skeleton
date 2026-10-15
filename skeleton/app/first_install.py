@@ -7,12 +7,10 @@ loads model weights, starts a crawler or submits application work.
 
 from __future__ import annotations
 
-import json
 import math
 from collections.abc import Mapping
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
 
 from skeleton.app.assembly import (
     _runtime_env,
@@ -27,22 +25,22 @@ from skeleton.app.preloader import inspect_host
 
 
 def _bounded_json(url: str, *, timeout: float) -> dict[str, object] | None:
-    request = Request(url, headers={"User-Agent": "skeleton-app-doctor/1"})
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            if response.status != 200:
-                return None
-            raw = response.read(65537)
-        if len(raw) > 65536:
-            return None
+    from skeleton.app.studio_readiness import _bounded_server
 
-        def finite(value: str) -> None:
-            raise ValueError("non-finite JSON response")
-
-        value = json.loads(raw, parse_constant=finite)
-        return value if isinstance(value, dict) else None
-    except (HTTPError, URLError, TimeoutError, OSError, ValueError, RecursionError):
+    parts = urlsplit(url)
+    if parts.query or parts.fragment:
         return None
+    result = _bounded_server(
+        Path(__file__).resolve().parents[2],
+        f"{parts.scheme}://{parts.netloc}",
+        None,
+        timeout,
+        endpoint=parts.path or "/",
+        schema=None,
+        max_response_bytes=65536,
+    )
+    value = result.get("report") if result.get("observed") is True else None
+    return value if isinstance(value, dict) else None
 
 
 def first_install_report(
@@ -182,4 +180,22 @@ def first_install_report(
             timeout=timeout,
             auth_token_file=auth_token_file,
         )
+        crawler = report["studio"]["server"]["crawler"]
+        observed = crawler.get("report", {})
+        if (
+            crawler.get("observed") is True
+            and type(observed.get("available")) is bool
+            and type(observed.get("configured")) is bool
+        ):
+            report["crawler"].update(
+                available=observed["available"],
+                configured=observed["configured"],
+                observed=True,
+                code=observed.get("code"),
+                scope="Authenticated canonical crawler readiness; no capture or training requested.",
+            )
+            if not observed["available"]:
+                report["next_steps"].append(
+                    "Inspect the authenticated crawler readiness report; configure its existing Mongo storage and canonical engine admission before starting capture."
+                )
     return report

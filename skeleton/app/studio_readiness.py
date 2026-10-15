@@ -202,12 +202,15 @@ class _NoRedirect(HTTPRedirectHandler):
 
 def _server_snapshot(
     base: str,
-    token: str,
+    token: str | None,
     timeout: float,
     *,
     endpoint: str = "/api/game-studio-health",
-    schema: str = "skeleton.game.studio_readiness.v1",
+    schema: str | None = "skeleton.game.studio_readiness.v1",
+    max_response_bytes: int = MAX_OUTPUT,
 ) -> dict[str, object]:
+    if type(max_response_bytes) is not int or not 0 < max_response_bytes <= MAX_OUTPUT:
+        raise ValueError("readiness response limit must be positive and at most two MiB")
     parts = urlsplit(base)
     loopback = parts.hostname == "localhost"
     try:
@@ -220,26 +223,30 @@ def _server_snapshot(
         or parts.query
         or parts.fragment
         or not parts.hostname
-        or not (parts.scheme == "https" or (parts.scheme == "http" and loopback))
+        or not (parts.scheme == "https" or (parts.scheme == "http" and (loopback or token is None)))
     ):
         raise ValueError("authenticated readiness requires HTTPS or loopback HTTP without URL credentials")
-    request = Request(
-        base.rstrip("/") + endpoint,
-        headers={"Authorization": "Bearer " + token, "User-Agent": "skeleton-app-doctor/1"},
-    )
+    headers = {"User-Agent": "skeleton-app-doctor/1"}
+    if token is not None:
+        headers["Authorization"] = "Bearer " + token
+    request = Request(base.rstrip("/") + endpoint, headers=headers)
     try:
         with build_opener(_NoRedirect).open(request, timeout=timeout) as response:
-            raw = response.read(MAX_OUTPUT + 1)
-        if len(raw) > MAX_OUTPUT:
+            raw = response.read(max_response_bytes + 1)
+        if len(raw) > max_response_bytes:
             return {"observed": False, "code": "server_inventory_exceeds_capacity"}
-        if token.encode("ascii") in raw:
+        if token is not None and token.encode("ascii") in raw:
             return {"observed": False, "code": "server_inventory_returned_credential"}
         result = json.loads(raw, parse_constant=_nonfinite)
-        if not isinstance(result, dict) or result.get("schema_version") != schema:
+        if not isinstance(result, dict) or (schema is not None and result.get("schema_version") != schema):
             return {"observed": False, "code": "server_inventory_protocol_invalid"}
         return {
             "observed": True,
-            "scope": "Authenticated backend runtime; separate from CLI host.",
+            "scope": (
+                "Authenticated backend runtime; separate from CLI host."
+                if token is not None
+                else "Public backend readiness; no authentication or model execution."
+            ),
             "report": result,
         }
     except HTTPError as exc:
@@ -254,7 +261,7 @@ def _server_snapshot(
         return {"observed": False, "code": "server_inventory_unavailable"}
 
 
-def _bounded_server(root, base, token, timeout, *, endpoint, schema):
+def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_response_bytes=MAX_OUTPUT):
     """A slow HTTP peer cannot retain a caller thread beyond the probe budget."""
     environment = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"}
     for key in (
@@ -288,7 +295,14 @@ def _bounded_server(root, base, token, timeout, *, endpoint, schema):
             *command,
         ]
     payload = json.dumps(
-        {"base": base, "token": token, "timeout": timeout, "endpoint": endpoint, "schema": schema}
+        {
+            "base": base,
+            "token": token,
+            "timeout": timeout,
+            "endpoint": endpoint,
+            "schema": schema,
+            "max_response_bytes": max_response_bytes,
+        }
     ).encode()
     try:
         with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error:
@@ -371,6 +385,22 @@ def studio_readiness_report(
             "observed": False,
             "code": "authenticated_server_probe_not_requested",
             "readiness_path": "/api/dragon-academy/runtime/readiness",
+        }
+    )
+    server["crawler"] = (
+        _bounded_server(
+            root,
+            backend_url,
+            token,
+            timeout,
+            endpoint="/api/dragon-academy/crawler/readiness",
+            schema="skeleton.dragon.crawler_readiness.v1",
+        )
+        if live and token
+        else {
+            "observed": False,
+            "code": "authenticated_server_probe_not_requested",
+            "readiness_path": "/api/dragon-academy/crawler/readiness",
         }
     )
     return {

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getAuthToken } from '../../src/auth/gameforgeAuth';
 import {
-  createDragonCandidate, dragonEvidenceKey, getDragonKnowledgeReadiness, listDragonCandidates,
+  createDragonCandidate, dragonEvidenceKey, getDragonCandidate, getDragonKnowledgeReadiness, listDragonCandidates,
   resumeDragonReview, reviewDragonCandidate, runDragonPractice, searchDragonReferences, getDragonPracticeHistory,
   type DragonKnowledgeCandidate, type DragonKnowledgeReadiness, type DragonPracticeReceipt, type DragonDesignReference,
 } from '../../src/product/dragonKnowledgeClient';
@@ -55,7 +55,7 @@ export default function DragonKnowledgePanel({ visible, canWrite, draft, clearDr
   useEffect(() => { alive.current = true; return () => { alive.current = false; readController.current?.abort(); mutation.current?.abort(); }; }, []);
   const load = useCallback(async (more = false) => {
     readController.current?.abort(); const request = new AbortController(); readController.current = request;
-    setLoading(true); setError('');
+    setLoading(true);
     try {
       const results = await Promise.allSettled([getDragonKnowledgeReadiness(request.signal), listDragonCandidates(filter, more ? cursor : null, request.signal)]);
       if (!safe() || request.signal.aborted) return;
@@ -77,12 +77,13 @@ export default function DragonKnowledgePanel({ visible, canWrite, draft, clearDr
   // fresh canonical page; Load more preserves the exact issued cursor.
   const loadRef = useRef(load); loadRef.current = load;
   useEffect(() => { if (visible) void loadRef.current(false); else readController.current?.abort(); }, [visible, filter]);
+  const draftRef = useRef(draft); draftRef.current = draft;
   useEffect(() => { if (draft) { setStatement(''); setSelected(null); setReceipt(null); setNotice('Selected preserved passage. Write the design statement you want a human to review.'); } }, [draft]);
   const run = (name: string, operation: (signal: AbortSignal) => Promise<void>) => {
     if (mutation.current) return;
     const execute = () => {
       if (mutation.current || !safe()) return;
-      const request = new AbortController(); mutation.current = request; setBusy(name); setError(''); setRetry(null);
+      const request = new AbortController(); mutation.current = request; readController.current?.abort(); setLoading(false); setBusy(name); setError(''); setRetry(null);
       void operation(request.signal).catch(failure => {
         if (!safe() || request.signal.aborted) return;
         setError(failure instanceof Error ? failure.message : 'The Dragon action was not confirmed.');
@@ -92,7 +93,7 @@ export default function DragonKnowledgePanel({ visible, canWrite, draft, clearDr
     execute();
   };
   const accept = (value: DragonKnowledgeCandidate) => {
-    setSelected(value); setCandidates(previous => [value, ...previous.filter(item => item.candidate_id !== value.candidate_id)].slice(0, 64));
+    setSelected(previous => previous?.candidate_id === value.candidate_id && previous.version > value.version ? previous : value); setCandidates(previous => { const newer = previous.find(item => item.candidate_id === value.candidate_id && item.version > value.version); return [newer || value, ...previous.filter(item => item.candidate_id !== value.candidate_id)].slice(0, 64); });
     setRationale(''); setRightsRef(''); setRights(false); setPracticeConsent(false); setReceipt(null); setPracticeHistory([]);
   };
   const create = () => {
@@ -101,7 +102,7 @@ export default function DragonKnowledgePanel({ visible, canWrite, draft, clearDr
       statement: statement.trim(), mechanic, idempotency_key: dragonEvidenceKey('candidate') };
     run('Saving source-bound review candidate', async signal => {
       const value = await createDragonCandidate(body, signal);
-      if (safe() && !signal.aborted) { accept(value); clearDraft(); setStatement(''); setNotice('The candidate is saved for human review. The source has not been approved or promoted.'); }
+      if (safe() && !signal.aborted) { accept(value); if (draftRef.current === draft) { clearDraft(); setStatement(''); } setNotice('The candidate is saved for human review. The source has not been approved or promoted.'); }
     });
   };
   const review = (decision: 'approve_design_reference' | 'reject') => {
@@ -159,7 +160,7 @@ export default function DragonKnowledgePanel({ visible, canWrite, draft, clearDr
     ] as const).map(([state, label]) => <Button key={label} label={label} primary={filter === state} disabled={!!busy || loading} press={() => { setFilter(state); setSelected(null); }} />)}</View>
       {!candidates.length && <Text style={s.small}>No candidates were returned for this filter. Select a passage from a captured source to prepare one.</Text>}
       {candidates.map(value => <TouchableOpacity key={value.candidate_id} accessibilityRole="button" accessibilityState={{ selected: selected?.candidate_id === value.candidate_id }}
-        disabled={!!busy} onPress={() => accept(value)} style={[k.candidate, selected?.candidate_id === value.candidate_id && k.selected]}>
+        disabled={!!busy} onPress={() => { run('Opening current source-bound candidate', async signal => { const current = await getDragonCandidate(value.candidate_id, signal); if (safe() && !signal.aborted) accept(current); }); }} style={[k.candidate, selected?.candidate_id === value.candidate_id && k.selected]}>
         <Text style={s.label}>{value.statement}</Text><Text style={s.small}>{human(value.state)} · {human(value.mechanic)}</Text><Text numberOfLines={2} style={s.small}>{value.title || value.source_url}</Text>
       </TouchableOpacity>)}
       {cursor && <Button label="Load more review records" disabled={loading || !!busy} press={() => void load(true)} />}

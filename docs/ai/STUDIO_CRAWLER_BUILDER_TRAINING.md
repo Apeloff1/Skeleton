@@ -114,6 +114,20 @@ Assistant goals can require `edit`, `build`, `preview` and `export`. Completion
 checks use current original-owner receipts at the current project head. A model
 stop statement cannot satisfy missing requirements. Historical goals without a
 checklist retain their existing unverified-stop semantics.
+This checklist is for canonical console editor projects. Successor and other
+project types use ordinary scoped goals; attempting the native checklist there
+returns an explicit admission error before creating a goal or calling a model.
+
+New checklist decisions expose the next prerequisite stage from those receipts,
+regardless of model capacity. Export progress reports source and binary
+preparation separately. Once one counterpart is verified, the planner receives
+only the missing export operation, together with the actual current artifact
+identities. The host already waits for a child build before requesting another
+decision. Preparing bytes does not verify that the client downloaded them.
+Each advance request joins at most one model poll and yields after its durable
+operation; already-issued compound actions retain the requested step bound.
+Continue using the returned cursor and status until terminal. The model work
+keeps its original identity when a poll returns before inference finishes.
 
 New decisions use the selected engine model's declared context capacity. When
 needed, the planner supplies the exact goal, current project identities, current

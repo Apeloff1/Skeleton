@@ -76,7 +76,9 @@
     "command_journal": "At most128 compact idempotency receipts retain actual usage/sequence/terminal status, full-result digest and exact event digests. Current queue and recent events are stored once in the runtime snapshot, preventing repeated-queue Mongo growth.",
     "quiescence": "Control and erase return explicit worker active/quiescent/lease state. Local workers are cooperatively signalled and awaited up to15seconds without cancelling their executor Future; remote active leases remain occupied until actual finalization or conservative expiry. Deleted tombstones retain no source text/request/consent/grant principal.",
     "safety_command_capacity": "Positive-authority commands retain at most128 immutable idempotency receipts. At journal capacity, pause/cancel/disable remain available via one bounded latest safety-control receipt with expected-version CAS. Replaced older safety keys cannot refresh or create a positive execution grant; stale versions fail closed. Erasure removes this slot.",
-    "physical_confirmation": "last_worker_exit_confirmed is set only after observing local executor completion. Expired remote leases are publication-fenced but report quiescent=false /lease_fenced_physical_unconfirmed. Existing conservative expired-lease recovery remains eligible under ten-second transport deadline, fifteen-second pre-IO server-clock margin and fresh epoch/consent/grant checks; lease recovery is not an attestation that a remote OS process exited."
+    "physical_confirmation": "last_worker_exit_confirmed is set only after observing local executor completion. Expired remote leases are publication-fenced but report quiescent=false /lease_fenced_physical_unconfirmed. Existing conservative expired-lease recovery remains eligible under ten-second transport deadline, fifteen-second pre-IO server-clock margin and fresh epoch/consent/grant checks; lease recovery is not an attestation that a remote OS process exited.",
+    "atomic_worker_failure": "Failure atomically records accepted snapshot/operation outcome and running-to-interrupted transition while clearing the exact worker token/lease. Legacy running rows without a live worker lease reconcile from accepted state without inventing success or discarding network reservations. Paused/cancelled/deleted authority remains unchanged.",
+    "deletion_recovery": "Exact deletion replay idempotently repairs the existing per-owner session quota release after the tombstone, so a lost acknowledgement cannot permanently consume session capacity."
   },
   "readiness": "Actual CORE_DB ping/index setup plus two-second canonical engine boundary read probe. Model/provider availability is independent of crawler capture. Every write still requires its own canonical storage admission; configuration never proves network reachability, reviewed knowledge or trusted local OS idle.",
   "verification": "User instruction prohibits tests; static checks and authorized actual bounded application crawl workflows are permitted. No release, complete masterplan, signed closure, verified source or policy quality claim follows this candidate.",
@@ -100,12 +102,14 @@
     "recovery": "Existing scheduler runs recover_crawler_runs(limit<=16), at most four distinct owners concurrently. Due cursor and finite grant survive backend restart; active leases fence duplicates. Delays follow actual frontier readiness.",
     "stops": "Pause/cancel/erase disable intent immediately, fence publication/new IO and signal local workers; bounded drain reports actual local/remote quiescence. Account/global physical credits are not released before observed executor completion.",
     "limits": "At most64 slices per grant and3600seconds; request/document/byte/consent/command bounds remain supreme. Every attempted worker consumes finite credit, including interrupted/crashed work.",
-    "separation": "Captured external material is unreviewed evidence. No automatic review, XP, verified lesson, provider call or training grant."
+    "separation": "Captured external material is unreviewed evidence. No automatic review, XP, verified lesson, provider call or training grant.",
+    "fairness": "Recovery inspects at most16 due rows and dispatches at mostfour distinct owners. Same-owner duplicates and locally busy rows advance only their existing due cursor, allowing other due owners into later bounded scans without consuming a slice or refreshing grants."
   },
   "inspection": {
     "incremental": "sources accepts after_sequence (snapshot event sequence), returns source capture sequence and exact current version; stable ID pagination retained.",
     "search": "Canonical exact-offset lexical passage search with source provenance and instruction-risk signals under current scoped consent; no provider call.",
-    "chunks": "Bounded text offsets with optional expected preserved-text SHA fence; text SHA and source provenance accompany chunks, no source regeneration or network IO."
+    "chunks": "Bounded text offsets with optional expected preserved-text SHA fence; text SHA and source provenance accompany chunks, no source regeneration or network IO.",
+    "authority": "Full source reads/exports, source metadata pages, search and text chunks use the same current owner, consent and source-use admission. Historical session/control inspection remains available to the exact owner; cancelled or expired sources cannot bypass withdrawal through the full-download route."
   },
   "frontend": {
     "owners": [
@@ -117,5 +121,6 @@
       "frontend/src/product/dragonKnowledgeClient.ts"
     ],
     "authority": "Frontend submits explicit finite grants and observes actual persisted status; browser polling never schedules or authorizes crawl work. Knowledge review retains separate canonical admission."
-  }
+  },
+  "readiness_schema": "skeleton.dragon.crawler_readiness.v1"
 }
