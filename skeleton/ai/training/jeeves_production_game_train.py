@@ -20,6 +20,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import time
 from typing import Any
 
 MAX_BYTES = 128 * 1024 * 1024
@@ -181,10 +182,16 @@ def _publish_new(path: Path, payload: bytes) -> None:
 
 def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           epochs: int, lr: float, min_coverage: float, max_domain_regression: float,
-          expand_vocabulary: bool = False) -> dict[str, Any]:
+          expand_vocabulary: bool = False,
+          max_optimizer_steps: int = 25000,
+          max_training_seconds: int = 1200) -> dict[str, Any]:
     from skeleton.cortex.transformer import TinyTransformer
     from skeleton.cortex.bpe import BytePairEncoder
 
+    if type(max_optimizer_steps) is not int or not 1 <= max_optimizer_steps <= 1000000:
+        raise ValueError("max_optimizer_steps must be an integer in [1, 1000000]")
+    if type(max_training_seconds) is not int or not 1 <= max_training_seconds <= 86400:
+        raise ValueError("max_training_seconds must be an integer in [1, 86400]")
     if type(expand_vocabulary) is not bool:
         raise ValueError("expand_vocabulary must be boolean")
     if type(epochs) is not int or not 1 <= epochs <= 3:
@@ -250,11 +257,38 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         )
     before, sample_before = _heldout(model, heldout)
     steps_before = model.steps
+    if torch_stack:
+        from skeleton.cortex.port import tokens
+        expected_per_epoch = sum(
+            max(0, len(tokens(case)) - 1) for case in dataset
+        )
+    else:
+        expected_per_epoch = sum(
+            max(0, len(model._ids(case)) - 1) for case in dataset
+        )
+    expected_steps = expected_per_epoch * epochs
+    if not 1 <= expected_steps <= max_optimizer_steps:
+        raise ProductionCheckpointError(
+            "real game curriculum optimizer updates exceed operator budget: "
+            + str(expected_steps) + " > " + str(max_optimizer_steps)
+        )
+    # Bound work by small batches, checking a monotonic deadline between them.
+    # A single in-progress document is not preemptible by this mechanism.
+    deadline = time.monotonic() + max_training_seconds
+    observed_steps = 0
     for _ in range(epochs):
-        if torch_stack:
-            model.fit(dataset, lr=lr)
-        else:
-            model.fit(dataset, lr=lr, schedule="cosine")
+        for offset in range(0, len(dataset), 8):
+            if time.monotonic() >= deadline:
+                raise ProductionCheckpointError("training time budget expired")
+            batch = dataset[offset:offset + 8]
+            if torch_stack:
+                observed_steps += model.fit(batch, lr=lr)
+            else:
+                observed_steps += model.fit(batch, lr=lr, schedule="cosine")
+            if time.monotonic() >= deadline:
+                raise ProductionCheckpointError("training time budget expired after batch")
+    if observed_steps != expected_steps or model.steps - steps_before != expected_steps:
+        raise ProductionCheckpointError("actual optimizer steps differ from admitted budget")
     trained_snapshot = model.snapshot()
     if model.steps <= steps_before or trained_snapshot == original_snapshot:
         raise ProductionCheckpointError("production-derived weights did not change")
@@ -278,6 +312,10 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "epochs": epochs,
         "training_steps_before": steps_before,
         "training_steps_after": model.steps,
+        "expected_optimizer_updates": expected_steps,
+        "observed_optimizer_updates": observed_steps,
+        "max_optimizer_steps": max_optimizer_steps,
+        "max_training_seconds": max_training_seconds,
         "vocabulary_coverage_before": vocab_coverage_before,
         "vocabulary_coverage": vocab_coverage,
         "vocabulary_expansion": expansion,
@@ -317,6 +355,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--candidate", type=Path, required=True, help="new candidate cortex-state JSON path")
     parser.add_argument("--report", type=Path, required=True, help="new evaluation report JSON path")
     parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--max-optimizer-steps", type=int, default=25000)
+    parser.add_argument("--max-training-seconds", type=int, default=1200)
     parser.add_argument("--learning-rate", type=float, default=0.005)
     parser.add_argument("--min-coverage", type=float, default=0.80)
     parser.add_argument("--expand-vocabulary", action="store_true",
@@ -328,7 +368,9 @@ def main(argv: list[str] | None = None) -> int:
                        report=args.report, epochs=args.epochs, lr=args.learning_rate,
                        min_coverage=args.min_coverage,
                        max_domain_regression=args.max_domain_regression,
-                       expand_vocabulary=args.expand_vocabulary)
+                       expand_vocabulary=args.expand_vocabulary,
+                       max_optimizer_steps=args.max_optimizer_steps,
+                       max_training_seconds=args.max_training_seconds)
         print(json.dumps({k: v for k, v in result.items() if not k.startswith("generated_")},
                          sort_keys=True, allow_nan=False))
         return 0 if result["status"] != "rejected_evaluation_gate" else 3
