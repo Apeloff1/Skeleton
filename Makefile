@@ -32,6 +32,8 @@ precompile:
 	python scripts/check_capability_interfaces.py
 	python scripts/check_provider_bootstrap.py
 	python scripts/check_state_topology.py
+	python scripts/check_ai_file_tree.py
+	python scripts/check_ai_file_tree_ownership.py
 	python scripts/check_enterprise_ai_superiority.py --json
 	python scripts/check_enterprise_ai_implementation_notes.py --json
 	python scripts/check_app_assembly.py
