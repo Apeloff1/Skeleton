@@ -647,5 +647,39 @@
     },
     "negative_claims": "No backward CPU cycle execution, emulator accuracy proof, legal rights certificate or production model training/promotion",
     "bios_and_rom_fetched": false
+  },
+  "comparative_game_studio_2026_10_15": {
+    "status": "source_implemented_not_native_run_tested",
+    "schema": "skeleton.game.comparative_study.v1",
+    "operator_script": "scripts/compare_game_study.py",
+    "visual_viewer": "skeleton/jeeves/game_comparison_viewer.py",
+    "execution_owner": "skeleton/jeeves/game_comparison_studio.py",
+    "dragon_intake_owner": "skeleton/ai/webcrawler/dragon_comparative_game_bridge.py",
+    "long_series_ledger_owner": "skeleton/jeeves/game_comparison_series_ledger.py",
+    "long_series_cli": "scripts/merge_game_series_studies.py",
+    "per_study_limits": {
+      "min_game_variants": 2,
+      "max_game_variants": 30,
+      "max_simultaneous_native_sessions": 10,
+      "max_all_pairs": 435,
+      "checkpoints": [
+        "earlier",
+        "middle",
+        "after"
+      ],
+      "max_actions_per_title": 64
+    },
+    "cross_study_limits": {
+      "max_studies_per_ledger": 128,
+      "max_native_variants": 3840
+    },
+    "viewership": "User and AI share exact JSON result, offline comparison HTML, readable chronology and reviewable observer notes; browser edits export separately for reimport",
+    "observations": "Native libretro RGB/PCM and feature summaries with exact game/core/firmware/trace identity, not gameplay correctness",
+    "knowledge": "Human, Jeeves and Dragon notes attributed; locally reviewed note candidates require Dragon Family custody and independent rights consent before almanac or promotion",
+    "training": "No training or weight promotion in comparative study; numeric parameters remain source-linked hypotheses and require downstream measured evaluation",
+    "rom_source_limit": "Current single-file admission <=16 MiB; larger disc/multi-file requires separate existing GameContentBundle integration",
+    "execution_performed_in_this_commit": false,
+    "license_verification_performed_in_this_commit": false,
+    "production_weights_changed": false
   }
 }
