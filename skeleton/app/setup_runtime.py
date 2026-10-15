@@ -145,14 +145,12 @@ def ensure_runtime_environment(
     values = _parse_env(text)
     configured: list[str] = []
     preserved: list[str] = []
-    local_credentials_changed = False
 
     username = values.get("MONGO_INITDB_ROOT_USERNAME", "admin").strip() or "admin"
     if not values.get("MONGO_INITDB_ROOT_USERNAME", "").strip():
         text = _replace_env_value(text, "MONGO_INITDB_ROOT_USERNAME", username)
         values["MONGO_INITDB_ROOT_USERNAME"] = username
         configured.append("MONGO_INITDB_ROOT_USERNAME")
-        local_credentials_changed = True
 
     password = values.get("MONGO_INITDB_ROOT_PASSWORD", "")
     if rotate_secrets or _is_placeholder(password):
@@ -160,7 +158,6 @@ def ensure_runtime_environment(
         text = _replace_env_value(text, "MONGO_INITDB_ROOT_PASSWORD", password)
         values["MONGO_INITDB_ROOT_PASSWORD"] = password
         configured.append("MONGO_INITDB_ROOT_PASSWORD")
-        local_credentials_changed = True
     else:
         preserved.append("MONGO_INITDB_ROOT_PASSWORD")
 
@@ -204,7 +201,10 @@ def ensure_runtime_environment(
         # credentials are now stale after a password repair. Keep intentionally
         # external Mongo targets untouched, but rebind the bundled local ones.
         if _is_placeholder(current) or (
-            local_generated_uri and (rotate_secrets or local_credentials_changed)
+            # The installed Docker stack authenticates using its configured
+            # root credentials; repair mismatched locally generated URIs
+            # even if those credentials were already valid and preserved.
+            local_generated_uri and current != generated
         ):
             text = _replace_env_value(text, key, generated)
             values[key] = generated
