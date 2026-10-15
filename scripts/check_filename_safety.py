@@ -16,9 +16,10 @@ import unicodedata
 
 # Leave headroom for a checkout root such as C:\\work\\Skeleton on Windows.
 MAX_NEW_PATH_LENGTH = 240
-MAX_COMPONENT_BYTES = 240
-INVALID_WINDOWS_CHARACTERS = re.compile(r'[<>:"\\|?*\x00-\x1f]')
-RESERVED_WINDOWS_NAMES = re.compile(r"^(?:CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[1-9¹²³]|LPT[1-9¹²³])(?:\..*)?$", re.I)
+MAX_COMPONENT_BYTES = 180
+MAX_COMPONENT_UTF16 = 180
+INVALID_WINDOWS_CHARACTERS = re.compile(r'[<>:"\\|?*\x00-\x1f\x7f-\x9f]')
+RESERVED_WINDOWS_NAMES = re.compile(r"^(?:CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|COM[1-9¹²³]|LPT[1-9¹²³]|CLOCK\$)(?:\..*)?$", re.I)
 
 
 def _identity(part: str) -> str:
@@ -66,6 +67,12 @@ def unsafe_filename(path: str) -> list[str]:
             errors.append(f"{path!r}: component ends with space or dot")
         if RESERVED_WINDOWS_NAMES.fullmatch(component):
             errors.append(f"{path!r}: reserved Windows device filename")
+        if component.casefold() == ".git":
+            errors.append(f"{path!r}: reserved Git metadata path")
+        if any(0x202A <= ord(ch) <= 0x202E or 0x2066 <= ord(ch) <= 0x2069 for ch in component):
+            errors.append(f"{path!r}: bidirectional control character in filename")
+        if len(component.encode("utf-16-le")) // 2 > MAX_COMPONENT_UTF16:
+            errors.append(f"{path!r}: component exceeds {MAX_COMPONENT_UTF16} UTF-16 code units")
         if len(component.encode("utf-8")) > MAX_COMPONENT_BYTES:
             errors.append(f"{path!r}: component exceeds {MAX_COMPONENT_BYTES} UTF-8 bytes")
     return errors
