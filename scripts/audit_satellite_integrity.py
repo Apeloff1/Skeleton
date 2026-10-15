@@ -20,7 +20,7 @@ MAX_SCAN_BYTES = 262144
 STALE_UI = re.compile(r"(?:(?:components/|@/components/)UI/|(?:\.\.?/)UI/)")
 STUB = re.compile(
     r"\b(?:TODO|FIXME|NotImplementedError)\b|"
-    r"throw\s+new\s+Error\s*\(\s*['\\"](?:not implemented|TODO)",
+    r"throw\s+new\s+Error\s*\(\s*[\"'](?:not implemented|TODO)",
     re.I,
 )
 TRUNC = re.compile(r"\[truncated\]|<truncated>|content truncated|output truncated", re.I)
