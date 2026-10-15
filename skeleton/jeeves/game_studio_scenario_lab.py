@@ -313,7 +313,8 @@ def _choose(actions: tuple[str,...], angle: str, step: int, seed: int,
     return actions[rng.randrange(len(actions))]
 
 
-def _lane(source: dict,angle: str,seed: int,steps: int) -> dict:
+def _lane(source: dict,angle: str,seed: int,steps: int,
+          *, scripted_actions: Sequence[str] | None = None) -> dict:
     env=StudioGameEnvironment(source,max_steps=steps)
     try:
         observation=dict(env.reset(seed))
@@ -331,9 +332,13 @@ def _lane(source: dict,angle: str,seed: int,steps: int) -> dict:
             return tuple(round(float(state[key]),6) for key in features)
         observed={state_key(observation)}
         gameplay_transition_states=[state_key(observation)]
+        semantic_evidence=[]
+        step_receipts=[]
         for i in range(steps):
             if env.done: break
-            action=_choose(env.spec.actions,angle,i,seed,observation)
+            action=(scripted_actions[i] if scripted_actions is not None
+                    and i<len(scripted_actions)
+                    else _choose(env.spec.actions,angle,i,seed,observation))
             measured=env.step(action)
             accepted=measured.info.get("evidence",{}).get("accepted",False)
             rejected+=int(accepted is not True)
@@ -345,6 +350,37 @@ def _lane(source: dict,angle: str,seed: int,steps: int) -> dict:
                 productive_changes+=1
             observed.add(state_key(next_observation))
             gameplay_transition_states.append(state_key(next_observation))
+            # Preserve accepted/rejected and directional state changes, not
+            # noisy seed/timestamp-only digests. One repeat observation
+            # cannot falsely create infinite novelty solely by clock ticks.
+            directional=tuple(
+                (key, -1 if next_observation[key] < observation[key]-1e-6
+                 else 1 if next_observation[key] > observation[key]+1e-6
+                 else 0)
+                for key in features
+            )
+            semantic=_hash({
+                "action":action, "accepted":accepted is True,
+                "state_delta_directions":directional,
+                "reward_signs":tuple(
+                    (key, 1 if value>1e-7 else -1 if value < -1e-7 else 0)
+                    for key,value in sorted(measured.reward_components.items())
+                ),
+                "terminated":bool(measured.terminated),
+                "truncated":bool(measured.truncated),
+            })
+            semantic_evidence.append(semantic)
+            step_receipts.append({
+                "index":i+1,"action":action,
+                "accepted":accepted is True,
+                "observation_before_digest":_hash(observation),
+                "observation_after_digest":_hash(next_observation),
+                "semantic_behavior_digest":semantic,
+                "transition_digest":measured.transition_digest,
+                "reward_components":dict(measured.reward_components),
+                "terminated":bool(measured.terminated),
+                "truncated":bool(measured.truncated),
+            })
             observation=next_observation
             actions.append(action)
             if (i+1)%max(1,steps//(MAX_FRAMES-1))==0:
@@ -361,6 +397,8 @@ def _lane(source: dict,angle: str,seed: int,steps: int) -> dict:
             "productive_state_changes":productive_changes,
             "unique_gameplay_states":len(observed),
             "gameplay_transition_states_digest":_hash(gameplay_transition_states),
+            "semantic_behavior_digests":semantic_evidence,
+            "step_receipts":step_receipts,
             "accepted_action_rate":round(accepted_count/max(1,len(actions)),6),
             "productive_action_rate":round(productive_changes/max(1,len(actions)),6),
             # The emulator-compatible reference replays the full action log
