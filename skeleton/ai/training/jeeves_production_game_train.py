@@ -185,6 +185,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           expand_vocabulary: bool = False,
           max_optimizer_steps: int = 25000,
           max_training_seconds: int = 1200,
+          dataset_manifest: Path | None = None,
           progress_directory: Path | None = None,
           progress_run_id: str | None = None,
           resume: bool = False) -> dict[str, Any]:
@@ -218,7 +219,18 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     parent_path, original, parent_sha = _production_source(source, expected)
     if parent_path.resolve() in (candidate.resolve(), report.resolve()):
         raise ProductionCheckpointError("outputs cannot overwrite active production checkpoint")
-    dataset, heldout = _texts()
+    if dataset_manifest is None:
+        dataset, heldout = _texts()
+        dataset_receipt: dict[str, Any] = {
+            "source": "built_in_pareto_smoke_curriculum",
+            "sufficient_for_advanced_game_design": False,
+            "external_rights_review": False,
+            "train_examples": len(dataset),
+            "heldout_examples": sum(len(items) for items in heldout.values()),
+        }
+    else:
+        from .jeeves_game_corpus import load_approved_corpus
+        dataset, heldout, dataset_receipt = load_approved_corpus(dataset_manifest)
     selected_key, original_snapshot, mouth = _active_snapshot(original)
     torch_stack = original_snapshot.get("kind") == "torch-stack"
     if torch_stack:
@@ -301,6 +313,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         config_digest = sha256(json.dumps({
             "dataset": list(dataset),
             "heldout": heldout,
+            "dataset_receipt": dataset_receipt,
             "epochs": epochs,
             "learning_rate": lr,
             "max_optimizer_steps": max_optimizer_steps,
@@ -392,6 +405,8 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "production_weights_modified": False,
         "candidate_promoted": False,
         "curriculum_exposures_per_epoch": len(dataset),
+        "dataset_receipt": dataset_receipt,
+        "built_in_smoke_curriculum_only": dataset_manifest is None,
         "epochs": epochs,
         "training_steps_before": steps_before,
         "training_steps_after": model.steps,
@@ -444,6 +459,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--max-optimizer-steps", type=int, default=25000)
     parser.add_argument("--max-training-seconds", type=int, default=1200)
+    parser.add_argument("--dataset-manifest", type=Path,
+                        help="rights-reviewed SHA-pinned external game corpus, rather than built-in smoke examples")
     parser.add_argument("--progress-directory", type=Path)
     parser.add_argument("--run-id")
     parser.add_argument("--resume", action="store_true")
@@ -461,6 +478,7 @@ def main(argv: list[str] | None = None) -> int:
                        expand_vocabulary=args.expand_vocabulary,
                        max_optimizer_steps=args.max_optimizer_steps,
                        max_training_seconds=args.max_training_seconds,
+                       dataset_manifest=args.dataset_manifest,
                        progress_directory=args.progress_directory,
                        progress_run_id=args.run_id,
                        resume=args.resume)
