@@ -381,14 +381,27 @@ def _plan_emulator(args) -> dict[str, Any]:
         args.training_report_file.resolve(strict=False),
         args.evidence_file.resolve(strict=False),
     }
+    if (args.ensemble_file is None) != (args.ensemble_report_file is None):
+        raise ValueError("Ensemble and ensemble receipt files must both be supplied or both absent")
+    if args.ensemble_file is not None:
+        destinations.add(args.ensemble_file.resolve(strict=False))
+        destinations.add(args.ensemble_report_file.resolve(strict=False))
     if len(destinations) != 3:
         raise ValueError("Training input and physical planning output locations must differ")
     _, _, request = _factory(args)
     model = _json_read(args.model_file)
     report = _json_read(args.training_report_file)
+    ensemble = None
+    if args.ensemble_file is not None:
+        ensemble = _json_read(args.ensemble_file)
+        # The source-planning gate accepts only a report for the exact
+        # ensemble whose digest contains the nominated member checkpoint.
+        ensemble_report = _json_read(args.ensemble_report_file)
+        if report != ensemble_report:
+            raise ValueError("Use the matching ensemble training report for ensemble-gated physical planning")
     results = run_native_confirmed_planning(
         request,
-        model=model, training_report=report,
+        model=model, training_report=report, ensemble=ensemble,
         rights_acknowledged=True,
         config=EmulatorPlanningConfig(
             seed=args.seed, anchors=args.anchors, horizon=args.horizon,
@@ -405,6 +418,7 @@ def _plan_emulator(args) -> dict[str, Any]:
         "real_emulator_steps": results["real_emulator_steps"],
         "physically_validated_plans": results["tested_plan_count"],
         "physically_positive_plans": results["actual_positive_plans"],
+        "speculative_actions_rejected_by_disagreement": results["speculative_actions_rejected_by_neural_disagreement"],
         "neural_or_q_weight_updates": 0,
         "production_promotion": False,
     }
@@ -735,6 +749,8 @@ def parser() -> argparse.ArgumentParser:
     plan.add_argument("--cycles-per-step", type=int, default=1824)
     plan.add_argument("--model-file", type=Path, required=True)
     plan.add_argument("--training-report-file", type=Path, required=True)
+    plan.add_argument("--ensemble-file", type=Path)
+    plan.add_argument("--ensemble-report-file", type=Path)
     plan.add_argument("--evidence-file", type=Path, required=True)
     plan.add_argument("--seed", type=int, default=0)
     plan.add_argument("--anchors", type=int, default=2)
