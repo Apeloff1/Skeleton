@@ -88,6 +88,17 @@ def _format_receipt(receipt: InstallReceipt) -> str:
     return "\n".join(lines)
 
 
+def _action_succeeded(result: object) -> bool:
+    """Do not report GUI success when an operation returns a failure receipt."""
+    if isinstance(result, InstallReceipt):
+        return result.ok
+    if isinstance(result, PreloadReport):
+        return result.ready
+    if isinstance(result, tuple) and result and isinstance(result[0], bool):
+        return result[0]
+    return True
+
+
 def check_host(root: Path | None = None) -> PreloadReport:
     return inspect_host(
         root or installation_root(),
@@ -282,7 +293,7 @@ class WindowsLauncher:
             try:
                 result = work()
                 rendered = render(result)
-                error = None
+                error = None if _action_succeeded(result) else RuntimeError("operation returned unsuccessful result")
             except Exception as exc:
                 rendered = f"{type(exc).__name__}: {exc}"
                 error = exc
