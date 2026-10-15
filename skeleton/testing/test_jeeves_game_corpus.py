@@ -44,6 +44,7 @@ class JeevesGameCorpusTests(unittest.TestCase):
                         )
                     rows.append({
                         "id": f"{split}_{family}_{i:03d}",
+                        "source_project_id": f"authored_{split}_{family}_{i:03d}",
                         "split": split,
                         "family": family,
                         "prompt": prompt,
@@ -93,6 +94,16 @@ class JeevesGameCorpusTests(unittest.TestCase):
             self.assertEqual(receipt["train_examples"], 32)
             self.assertFalse(receipt["heldout_used_for_training"])
             self.assertTrue(receipt["benchmark_overlap_checked"])
+
+    def test_short_embedded_game_question_is_not_a_safe_holdout(self) -> None:
+        from skeleton.ai.training.jeeves_game_corpus import _split_contamination
+        self.assertTrue(_split_contamination(
+            "Unlock hidden gate", "When exploring ruins, unlock hidden gate before sunset."
+        ))
+        self.assertTrue(_split_contamination("choose an ending", "choose an ending"))
+        self.assertFalse(_split_contamination(
+            "Repair a forest bridge", "Negotiate peace with strangers near the harbor."
+        ))
 
     def test_file_modification_invalidates_admission_sha(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -154,6 +165,14 @@ class JeevesGameCorpusTests(unittest.TestCase):
             train, _, regenerate = self._fixtures(root)
             train[0]["prompt"] = BENCHMARK[0][1]
             with self.assertRaisesRegex(ProductionCheckpointError, "benchmark"):
+                load_approved_corpus(regenerate())
+
+    def test_same_project_cannot_be_train_and_holdout(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            train, heldout, regenerate = self._fixtures(root)
+            heldout[0]["source_project_id"] = train[0]["source_project_id"]
+            with self.assertRaisesRegex(ProductionCheckpointError, "same source project"):
                 load_approved_corpus(regenerate())
 
     def test_cross_split_record_id_rejected(self) -> None:
