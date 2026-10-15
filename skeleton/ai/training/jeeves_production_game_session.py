@@ -56,6 +56,8 @@ def run(
     min_coverage: float = 0.8,
     dry_run: bool = False,
     expand_vocabulary: bool = False,
+    max_optimizer_steps: int = 25000,
+    max_training_seconds: int = 1200,
 ) -> dict[str, Any]:
     if not isinstance(run_id, str) or not _RUN_ID.fullmatch(run_id):
         raise ProductionCheckpointError("run id must be 3-48 safe lowercase characters")
@@ -127,6 +129,8 @@ def run(
         min_coverage=float(min_coverage),
         max_domain_regression=float(max_domain_regression),
         expand_vocabulary=expand_vocabulary,
+        max_optimizer_steps=max_optimizer_steps,
+        max_training_seconds=max_training_seconds,
     )
     if _sha(baseline) != start_sha:
         raise ProductionCheckpointError("live serving weights changed during training")
@@ -167,6 +171,8 @@ def run(
         "game_review_report_sha256": _sha(names["game_review"]),
         "benchmark_prompts": review["fresh_heldout_prompts"],
         "vocabulary_expansion_opted_in": expand_vocabulary,
+        "max_optimizer_steps": max_optimizer_steps,
+        "max_training_seconds": max_training_seconds,
         "human_review_complete": False,
         "game_design_improvement_established": False,
         "production_weights_modified": False,
@@ -185,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expand-vocabulary", action="store_true",
                         help="opt in to native BPE token growth on cloned candidate")
     parser.add_argument("--epochs", default=1, type=int)
+    parser.add_argument("--max-optimizer-steps", default=25000, type=int)
+    parser.add_argument("--max-training-seconds", default=1200, type=int)
     parser.add_argument("--learning-rate", default=0.005, type=float)
     parser.add_argument("--max-domain-regression", default=0.0, type=float)
     parser.add_argument("--min-coverage", default=0.8, type=float)
@@ -200,6 +208,8 @@ def main(argv: list[str] | None = None) -> int:
             min_coverage=args.min_coverage,
             dry_run=args.dry_run,
             expand_vocabulary=args.expand_vocabulary,
+            max_optimizer_steps=args.max_optimizer_steps,
+            max_training_seconds=args.max_training_seconds,
         )
         print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
         return 0 if result["status"] in (
