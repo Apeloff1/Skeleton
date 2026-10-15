@@ -13,6 +13,7 @@ import math
 import shutil
 import tempfile
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Any, Mapping
@@ -101,6 +102,9 @@ class _Lane:
     inspection_count: int = 0
     timing_mode: str = "normal"
     timing_factor: int = 1
+    last_burst_wall_ms: float | None = None
+    last_burst_native_fps: float | None = None
+    last_burst_receipted_frames: int = 0
     receipts: list[dict[str, Any]] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
     status: str = "running"
@@ -218,6 +222,10 @@ class LiveComparison:
             "native_disc_change_count": lane.disc_change_count,
             "timing_mode": lane.timing_mode,
             "timing_factor": lane.timing_factor,
+            "last_burst_wall_ms": lane.last_burst_wall_ms,
+            "last_burst_native_fps": lane.last_burst_native_fps,
+            "last_burst_receipted_frames": lane.last_burst_receipted_frames,
+            "speed_measurement_scope": "host_monotonic_wall_time_per_burst_not_hardware_accuracy",
             "timing_change_count": lane.timing_change_count,
             "inspection_count": lane.inspection_count,
             "native_frames_per_step": native_execution_budget(lane.timing_mode, lane.timing_factor, lane.game["frames_per_step"])[0],
@@ -348,6 +356,7 @@ class LiveComparison:
         self, lane: _Lane, controls: list[dict[str, Any]], repeat: int, native_frames: int
     ) -> dict[str, Any]:
         """Advance 1–8 actually executed steps; encode only final native PNG."""
+        started = time.perf_counter()
         receipts=[]
         last=None
         for index in range(repeat):
@@ -364,9 +373,18 @@ class LiveComparison:
                 if last.get("native_preview") is None:
                     last["native_preview"]=_preview(lane.env)
                 break
+        elapsed = max(1e-9, time.perf_counter() - started)
+        fully_receipted_frames = len(receipts) * native_frames
+        lane.last_burst_wall_ms = round(elapsed * 1000, 3)
+        lane.last_burst_native_fps = round(fully_receipted_frames / elapsed, 2)
+        lane.last_burst_receipted_frames = fully_receipted_frames
         return {
             "game_id":lane.game["id"],
             "status":last["status"] if last is not None else lane.status,
+            "measured_wall_ms": lane.last_burst_wall_ms,
+            "observed_native_frames_per_wall_second": lane.last_burst_native_fps,
+            "fully_receipted_native_frames": fully_receipted_frames,
+            "timing_semantics": "measured_per_host_burst_not_guaranteed_realtime_speed",
             "attempted_native_steps":repeat,
             "native_frames_per_step":native_frames,
             "completed_native_steps":len(receipts),
