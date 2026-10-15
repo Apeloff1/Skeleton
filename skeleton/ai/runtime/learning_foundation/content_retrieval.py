@@ -1183,7 +1183,7 @@ class ContentScrutinyEngine:
             raise ContentScrutinyError("max scrutiny depth")
         layers = ("bounds", "digest", "authority", "temporal")
         digests = []
-        bounds_ok = True
+        bounds_ok = True  # adversarial_layer: strict on empty or oversized
         try:
             # Layer 1: bounds
             if len(getattr(corpus, "records", getattr(corpus, "_records", []))) > _CEILINGS["max_records"]:
