@@ -88,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     from skeleton.jeeves.game_emulator_host import _ACTIONS, _KEY_ACTIONS
     from skeleton.jeeves.game_emulator_qualification import run_emulator_qualification
     from skeleton.jeeves.game_emulator_exploration import run_emulator_exploration
+    from skeleton.jeeves.game_emulator_cross_core import compare_native_emulator_cores
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--registry", type=Path, required=True, help="Approved local cores.json (no download)")
@@ -98,7 +99,9 @@ def main(argv: list[str] | None = None) -> int:
     tape_group.add_argument("--action", action="append", choices=sorted((*_ACTIONS, *_KEY_ACTIONS)))
     tape_group.add_argument("--controller-tape-json", type=Path, help="Explicit 1–64 step JSON input tape for four-player button/axis/key/mouse/pointer controls")
     parser.add_argument("--runs", type=int, default=3, help="2–10 independent isolated worker sessions per scenario")
-    parser.add_argument("--explore-scenarios", type=int, help="Explicit bounded deterministic boomerang exploration, 2–80 total scenarios")
+    advanced_group = parser.add_mutually_exclusive_group()
+    advanced_group.add_argument("--explore-scenarios", type=int, help="Explicit bounded boomerang exploration, 2–80 scenarios")
+    advanced_group.add_argument("--compare-core", action="append", help="Additional approved core to compare against --core; 1–7 other cores")
     parser.add_argument("--stagnation-window", type=int, default=10, help="Stop exploration after 3–20 scenarios with no new audiovisual outcome (default 10)")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--frames-per-step", type=int, default=1)
@@ -134,6 +137,24 @@ def main(argv: list[str] | None = None) -> int:
                 runs_per_scenario=args.runs,
                 max_scenarios=args.explore_scenarios,
                 stagnation_window=args.stagnation_window,
+                seed=args.seed,
+                frames_per_step=args.frames_per_step,
+                controller_devices=args.controller_device,
+                timeout_seconds=args.timeout_seconds,
+                rights_evidence_digest=args.rights_evidence_digest,
+            )
+        elif args.compare_core:
+            if args.include_traces:
+                raise ValueError("Cross-core differences report bounded receipt hashes, not raw trace exports")
+            result = compare_native_emulator_cores(
+                args.target,
+                core_ids=[args.core, *args.compare_core],
+                expected_registry_digest=registry.registry_digest,
+                rom_source=source,
+                filename=name,
+                actions=args.action,
+                controller_tape=tape,
+                runs_per_core=args.runs,
                 seed=args.seed,
                 frames_per_step=args.frames_per_step,
                 controller_devices=args.controller_device,

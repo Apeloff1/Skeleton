@@ -608,5 +608,21 @@
     "stop": "Ten consecutive no-new-observation scenarios by default, or explicit maximum scenario budget, whichever occurs first",
     "promotion": "No model weight updates or rights, hardware compatibility, game victory or human-level proof; actual training only through separately gated model training",
     "no_rom_or_bios_fetched": true
+  },
+  "cross_core_native_differential_2026_10_15": {
+    "state": "Source implemented; not executed or accuracy-validated against any actual ROM in this chat",
+    "owner": "skeleton/jeeves/game_emulator_cross_core.py",
+    "operator_cli": "scripts/qualify_game_emulator.py --core fceumm --compare-core nestopia --target nes --source /path/rights-cleared.nes --action idle --action right --runs 2 --registry /path/cores.json",
+    "comparison": "Two through eight distinct current operator-approved libretro cores, same target/ROM/firmware authority, action tape, seed, selected controller ports and bounded worker run count; compare exact final PCM/video hashes across each run",
+    "evidence": "Per-core internal mirror audit hash and status, per-run final audio/video hashes, all pairwise comparisons, source registry digest and exact input tape digest",
+    "bounds": {
+      "max_cores": 8,
+      "min_per_core_runs": 2,
+      "max_per_core_runs": 10,
+      "max_frames_across_all_cores_including_reset": 65536
+    },
+    "caveat": "Same frame/audio hashes do not prove either core is accurate; different output formats/resolutions and frame timing may be legitimate. No objective winner or model gains are asserted.",
+    "core_binary_compilations_performed": 0,
+    "training_weights_promoted": false
   }
 }
