@@ -15,6 +15,7 @@ from . import advanced_sports_runtime as sports_engine
 from . import advanced_npc_society_runtime as npc_society_engine
 from . import advanced_dialogue_runtime as dialogue_engine
 from . import advanced_narrative_runtime as narrative_engine
+from . import advanced_cinematics_runtime as cinematics_engine
 
 MODULES = {
     "procedural_world": procedural_world_engine,
@@ -26,6 +27,7 @@ MODULES = {
     "npc_society": npc_society_engine,
     "dialogue": dialogue_engine,
     "narrative": narrative_engine,
+    "cinematics": cinematics_engine,
 }
 ACTIONS = {name: module.ACTIONS for name, module in MODULES.items()}
 STARTS = {name: module.start for name, module in MODULES.items()}
@@ -41,7 +43,8 @@ ERRORS = (procedural_world_engine.ProceduralWorldActionError,
           sports_engine.SportsActionError,
           npc_society_engine.SocietyActionError,
           dialogue_engine.DialogueActionError,
-          narrative_engine.NarrativeActionError,)
+          narrative_engine.NarrativeActionError,
+          cinematics_engine.CinematicActionError,)
 
 __all__ = ["MODULES", "ACTIONS", "STARTS", "STEPS", "DEFAULT_LAYOUTS",
            "NORMALIZE_LAYOUTS", "APPLY_SCENES", "ERRORS"]

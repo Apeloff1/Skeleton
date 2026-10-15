@@ -63,3 +63,14 @@ player-branch effects, canon custody, capped persistent flags, progression,
 earned endings, and optional postgame. It is now in the shared scene,
 playable-session, snapshot, and emulator-compatible policy-training pipeline.
 It does not claim generated dialogue, model prose or movie rendering.
+
+## Batch 4 — executable interactive cinematic direction
+
+`advanced_cinematics_runtime.py` replaces the `cinematics` editor-only
+status with a real finite timeline execution model: up to 1,000 logical
+shots, author-specified camera rig overrides, 1–600 second shot clocks,
+pauses, multiple time advances, audiovisual *cue metadata*, branch prompts,
+skippable cuts, recorded decisions and earned end-of-storyboard proof.
+The module only simulates camera/cue/branch timing; there is no claim to
+render pixels or audio. Existing authored-scene verification, evidence
+replay, and Q-policy learning all apply.
