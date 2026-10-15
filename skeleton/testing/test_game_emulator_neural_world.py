@@ -190,6 +190,39 @@ class MeasuredNeuralWorldModelTests(unittest.TestCase):
                 cancel=lambda: True,
             )
 
+    def test_rehashed_malformed_parameter_shapes_are_not_executable(self):
+        evidence, policy = fixture()
+        model, _ = train_neural_world_from_evidence(
+            evidence, policy,
+            config=NeuralWorldConfig(seed=3, width=8, epochs=1, minibatch=16),
+        )
+        model["parameters"]["w1"].pop()
+        model["parameter_count"] -= 1
+        model["model_digest"] = _digest({k: v for k, v in model.items() if k != "model_digest"})
+        with self.assertRaises(EmulatorNeuralError):
+            infer_neural_world_transition(
+                model, {
+                    "screen_mean": 0.2, "visual_change": 0.1,
+                    "step_fraction": 0.1,
+                }, "idle",
+            )
+
+    def test_rehashed_oversized_model_metadata_is_not_executable(self):
+        evidence, policy = fixture()
+        model, _ = train_neural_world_from_evidence(
+            evidence, policy,
+            config=NeuralWorldConfig(seed=3, width=8, epochs=1, minibatch=16),
+        )
+        model["hidden_width"] = 100000
+        model["model_digest"] = _digest({k: v for k, v in model.items() if k != "model_digest"})
+        with self.assertRaises(EmulatorNeuralError):
+            infer_neural_world_transition(
+                model, {
+                    "screen_mean": 0.2, "visual_change": 0.1,
+                    "step_fraction": 0.1,
+                }, "idle",
+            )
+
     def test_neural_optimization_is_strictly_bounded(self):
         with self.assertRaises(EmulatorNeuralError):
             NeuralWorldConfig(width=512)
