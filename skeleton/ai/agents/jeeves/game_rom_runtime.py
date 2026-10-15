@@ -135,6 +135,7 @@ class GameBoyMachine:
         self.dma_index = 0
         self.dma_tcycles = 0
         self.dma_startup = 0
+        self._cpu_bus_active = False
         # Battery-backed wall time is intentionally unavailable. RTC grows
         # only through executed CPU cycles and is sealed in source snapshots.
         self.rtc_regs = [0, 0, 0, 0, 0]
@@ -233,6 +234,8 @@ class GameBoyMachine:
 
     def read(self, address: int) -> int:
         address &= 65535
+        if self._cpu_bus_active and self.dma_active and not 0xFF80 <= address <= 0xFFFE:
+            return 0xFF
         if address < 0x8000:
             if address < 0x4000:
                 bank = (self.bank_high << 5) if self.bank_mode and self.metadata["mapper"] == "mbc1" else 0
@@ -285,6 +288,8 @@ class GameBoyMachine:
 
     def write(self, address: int, value: int) -> None:
         address, value = address & 65535, value & 255
+        if self._cpu_bus_active and self.dma_active and not 0xFF80 <= address <= 0xFFFE:
+            return
         if address < 0x8000:
             mapper = self.metadata["mapper"]
             if mapper == "mbc1":
@@ -397,6 +402,8 @@ class GameBoyMachine:
             self.stopped = False
 
     def _fetch(self) -> int:
+        if self._cpu_bus_active and self.dma_active and not 0xFF80 <= self.pc <= 0xFFFE:
+            raise GameRomRuntimeError('DMG CPU attempted opcode fetch outside HRAM during OAM DMA')
         result = self.read(self.pc)
         if self.halt_bug:
             self.halt_bug = False
@@ -812,6 +819,8 @@ class GameBoyMachine:
         if pending:
             self.halted = False
             if self.ime:
+                if self.dma_active:
+                    raise GameRomRuntimeError('DMG IRQ service during OAM DMA requires unavailable bus phase emulation')
                 bit = (pending & -pending).bit_length() - 1
                 self.ime, self.ime_delay = False, 0
                 self.memory[0xFF0F] &= ~(1 << bit)
@@ -828,7 +837,11 @@ class GameBoyMachine:
         if self.halted:
             self._advance(4)
             return 4
-        cycles = self._execute()
+        self._cpu_bus_active = True
+        try:
+            cycles = self._execute()
+        finally:
+            self._cpu_bus_active = False
         self.instructions += 1
         if self.ime_delay:
             self.ime_delay -= 1
