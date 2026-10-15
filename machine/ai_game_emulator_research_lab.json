@@ -6,19 +6,25 @@
     "skeleton/jeeves/game_emulator_experiment_lab.py",
     "skeleton/jeeves/game_emulator_curriculum.py",
     "skeleton/jeeves/game_emulator_cross_core_lab.py",
-    "skeleton/jeeves/game_emulator_neural_world.py"
+    "skeleton/jeeves/game_emulator_neural_world.py",
+    "skeleton/jeeves/game_emulator_planning_lab.py",
+    "skeleton/jeeves/game_emulator_goal_lab.py"
   ],
   "governed_mirrors": [
     "skeleton/ai/agents/jeeves/game_emulator_experiment_lab.py",
     "skeleton/ai/agents/jeeves/game_emulator_curriculum.py",
     "skeleton/ai/agents/jeeves/game_emulator_cross_core_lab.py",
-    "skeleton/ai/agents/jeeves/game_emulator_neural_world.py"
+    "skeleton/ai/agents/jeeves/game_emulator_neural_world.py",
+    "skeleton/ai/agents/jeeves/game_emulator_planning_lab.py",
+    "skeleton/ai/agents/jeeves/game_emulator_goal_lab.py"
   ],
   "entrypoints": [
     "python -m skeleton.jeeves.game_learning_cli train-emulator-deep",
     "python -m skeleton.jeeves.game_learning_cli experiment-emulator",
     "python -m skeleton.jeeves.game_learning_cli compare-emulator-cores",
-    "python -m skeleton.jeeves.game_learning_cli fit-emulator-world-model"
+    "python -m skeleton.jeeves.game_learning_cli fit-emulator-world-model",
+    "python -m skeleton.jeeves.game_learning_cli plan-emulator",
+    "python -m skeleton.jeeves.game_learning_cli probe-emulator-goals"
   ],
   "experimental_conditions": [
     "passive neutral",
@@ -56,7 +62,7 @@
     "rare_actions": "use evidence of least-observed finite control",
     "convergence": "10 sequential runs without new coarse visual state AND Q-value motion above 1e-6; not universal proof of no further learnability",
     "boomerang": "seeded reshuffled reparse intervals and historical reservoir",
-    "auditable": false
+    "source_evidence_auditable": true
   },
   "cross_core": {
     "cores_min": 2,
@@ -96,7 +102,9 @@
   "tests_added": [
     "skeleton/testing/test_game_emulator_training_lab.py",
     "skeleton/testing/test_game_emulator_advanced_experiments.py",
-    "skeleton/testing/test_game_emulator_neural_world.py"
+    "skeleton/testing/test_game_emulator_neural_world.py",
+    "skeleton/testing/test_game_emulator_physical_planning.py",
+    "skeleton/testing/test_game_emulator_operator_goals.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -105,11 +113,50 @@
     "Original in-process DMG runtime remains experimental",
     "Native libretro requires approved external binaries and sandbox",
     "Source-rights assertion is not third-party independent legal clearance",
-    "No game-event semantic classifier, joystick skill mastery, audiovisual cinematic labels, realtime cross-platform debugger, production LLM weight update or capability promotion has been verified"
+    "No game-event semantic classifier, joystick skill mastery, audiovisual cinematic labels, realtime cross-platform debugger, production LLM weight update or capability promotion has been verified",
+    "Native audio savestate and model-based real-run comparisons still need actual approved libretro replay verification",
+    "Operator RAM hypotheses are only experimentally controlled numerical measurements, not independently established score/health/victory flags"
   ],
   "operator_docs": [
     "docs/ROM_EMULATOR_COMPLETION.md",
     "docs/ROM_EMULATOR_TRAINING_LAB.md",
+    "docs/ROM_EMULATOR_ADVANCED_RESEARCH.md",
     "docs/ROM_EMULATOR_ADVANCED_RESEARCH.md"
-  ]
+  ],
+  "replay_temporal_audio": {
+    "status": "source_implemented_unexecuted",
+    "native_snapshot_additions": [
+      "audio_size",
+      "audio_sha256",
+      "audio_base64"
+    ],
+    "reason": "Restoring libretro core state and video without preceding host audio changes subsequent 12 temporal audio/motion observations; exact rewind needs native audio history",
+    "checksum": "nested SHA256 plus outer snapshot digest",
+    "episode_reset_clears_previous_audio": true,
+    "independent_hardware_execution_verified": false
+  },
+  "model_based_planning": {
+    "module": "skeleton/jeeves/game_emulator_planning_lab.py",
+    "candidate_model_sha256_required": true,
+    "holdout_predictive_gain_gate_required": true,
+    "source_environment_digest_matches_model": true,
+    "search": "finite discounted beam search over controller action sequences; speculative",
+    "source_confirmation": "compare each neural proposal to matched neutral exact-state baseline using actual emulator, repeated runs",
+    "full_rollout_required_for_positive_evidence": true,
+    "promoted_policy_or_weights": false,
+    "hardware_replay_verified": false
+  },
+  "operator_defined_goal_experiments": {
+    "module": "skeleton/jeeves/game_emulator_goal_lab.py",
+    "read_source": "real approved libretro read_memory regions 0..3",
+    "operator_hypotheses": "explicit rights/source authority, numeric little-endian 1/2/4 byte offset, threshold or bitmask, no semantic auto labels",
+    "max_goals": 8,
+    "max_interventions": 12,
+    "max_source_anchors": 4,
+    "max_source_steps": 8192,
+    "neutral_baseline": "same source snapshot and full neutral horizon as active action padded to equal length",
+    "measured_active_only_controlled_effects": true,
+    "causal_or_achievement_labels_independently_certified": false,
+    "raw_memory_exported": false
+  }
 }
