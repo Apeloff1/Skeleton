@@ -541,3 +541,35 @@ def test_setup_never_retargets_remote_mongo_uri_containing_placeholder_word(tmp_
     assert values["SKL_MONGO_URI"] == external_engine
     assert {"MONGO_URL", "SKL_MONGO_URI"} <= set(receipt.preserved_keys)
     assert not ensure_runtime_environment(tmp_path).changed
+
+def test_setup_phase_surfaces_missing_optional_ai_provider_without_exposing_secret(tmp_path):
+    from skeleton.app.installer import _setup_phase
+    from skeleton.app.setup_runtime import SetupResult
+
+    secret = "simulated-secret-that-must-not-appear"
+    result = SetupResult(
+        env_path=tmp_path / ".env",
+        created=True,
+        changed=True,
+        configured_keys=("JWT_SECRET",),
+        preserved_keys=(),
+        warnings=("OPENAI_API_KEY remains optional and unconfigured",),
+    )
+    receipt = _setup_phase(result)
+    assert receipt.ok
+    assert "OPENAI_API_KEY remains optional and unconfigured" in receipt.detail
+    assert "JWT_SECRET" in receipt.detail
+    assert secret not in receipt.detail
+
+
+def test_setup_invalid_existing_signer_is_visible_in_install_receipt(tmp_path):
+    from skeleton.app.installer import _setup_phase
+
+    (tmp_path / ".env.example").write_text(
+        ENV_TEMPLATE + "GF_KEYHOLDER_SEED=invalid-operator-seed\n",
+        encoding="utf-8",
+    )
+    result = ensure_runtime_environment(tmp_path)
+    receipt = _setup_phase(result)
+    assert "GF_KEYHOLDER_SEED must be exactly 32 bytes" in receipt.detail
+    assert "invalid-operator-seed" not in receipt.detail

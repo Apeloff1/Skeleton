@@ -112,6 +112,11 @@ def _setup_phase(result: SetupResult) -> InstallPhase:
         detail = f"runtime environment already configured at {result.env_path}"
     if result.configured_keys:
         detail += "; configured " + ", ".join(result.configured_keys)
+    if result.warnings:
+        # Setup warnings contain only bounded configuration-key diagnostics,
+        # not secret material. Never silently report a fully configured AI
+        # runtime when the optional provider key or signing seed is missing.
+        detail += "; advisories: " + "; ".join(result.warnings)
     return InstallPhase("setup-runtime", True, detail)
 
 
