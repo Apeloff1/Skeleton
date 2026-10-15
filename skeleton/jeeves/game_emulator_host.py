@@ -937,6 +937,7 @@ class EmulatorEnvironment:
             self.close()
             raise EmulatorHostError("native_disc_status_corrupt", "Disk status payload differs")
         if type(value["supported"]) is not bool:
+            self.close()
             raise EmulatorHostError("native_disc_status_corrupt", "Native disk support flag differs")
         if not value["supported"]:
             if (value["interface_version"] is not None or value["image_count"] != 0
@@ -1017,6 +1018,7 @@ class EmulatorEnvironment:
             "native_emulation_advanced": False,
         }
 
+    @_serialized_native_operation
     def disc_receipts(self) -> dict[str, object]:
         """Local, bounded, content-free source provenance of disc operations."""
         return {
@@ -1029,6 +1031,7 @@ class EmulatorEnvironment:
             "model_weights_updated": False,
         }
 
+    @_serialized_native_operation
     def reset(self, seed: int = 0) -> dict[str, float]:
         _int(seed, 0, 2**63 - 1, "episode seed")
         self._steps = 0
@@ -1071,6 +1074,7 @@ class EmulatorEnvironment:
                     break
         return self._step(list(controls), exact)
 
+    @_serialized_native_operation
     def _step(self, controls: list[Mapping[str, object]], action: str | None) -> EpisodeStep:
         if self._seed is None or self.done:
             raise EmulatorHostError(
@@ -1224,6 +1228,11 @@ class EmulatorEnvironment:
             "frame": self._frame,
             "pixels_base64": base64.b64encode(self._pixels).decode(),
         }
+        status = self.disc_status()
+        if status["supported"]:
+            payload["disc_context"] = {
+                "status": status, "disc_event_chain_sha256": self._disc_chain,
+            }
         if (
             len(json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode())
             > MAX_SNAPSHOT_JSON - 256
@@ -1231,11 +1240,6 @@ class EmulatorEnvironment:
             raise EmulatorHostError(
                 "native_state_size_unavailable", "Operational snapshot encoding exceeds capacity"
             )
-        status = self.disc_status()
-        if status["supported"]:
-            payload["disc_context"] = {
-                "status": status, "disc_event_chain_sha256": self._disc_chain,
-            }
         return {**payload, "snapshot_digest": _digest(payload)}
 
     @_serialized_native_operation
