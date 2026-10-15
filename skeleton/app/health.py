@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Mapping
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -82,8 +83,9 @@ def probe_application(
     manifest: AssemblyManifest | None = None,
     full: bool = False,
     timeout: float = 3.0,
+    public_url_overrides: Mapping[str, str] | None = None,
 ) -> tuple[ProbeResult, ...]:
-    """Probe the public surfaces for the active assembly profile."""
+    """Probe the actual host-facing URLs for the active assembly profile."""
 
     manifest = manifest or load_manifest()
     active = set(manifest.full_services if full else manifest.default_services)
@@ -93,10 +95,13 @@ def probe_application(
             continue
         if not service.public_url or not service.health_path:
             continue
-        results.append(probe_url(service, timeout=timeout))
+        configured_url = (public_url_overrides or {}).get(service.name)
+        effective = replace(service, public_url=configured_url) if configured_url else service
+        results.append(probe_url(effective, timeout=timeout))
 
     backend = manifest.service("backend")
-    ready_url = backend.public_url.rstrip("/") + manifest.contract_path("ready")
+    backend_url = (public_url_overrides or {}).get("backend", backend.public_url)
+    ready_url = backend_url.rstrip("/") + manifest.contract_path("ready")
     results.append(probe_http("application", ready_url, timeout=timeout))
     return tuple(results)
 
@@ -112,6 +117,7 @@ def wait_for_application(
     timeout: float = 3.0,
     attempts: int = 10,
     delay: float = 1.0,
+    public_url_overrides: Mapping[str, str] | None = None,
 ) -> tuple[ProbeResult, ...]:
     """Retry whole-application probes until healthy or the budget is exhausted."""
 
@@ -125,7 +131,10 @@ def wait_for_application(
     manifest = manifest or load_manifest()
     latest: tuple[ProbeResult, ...] = ()
     for attempt in range(attempts):
-        latest = probe_application(manifest=manifest, full=full, timeout=timeout)
+        latest = probe_application(
+            manifest=manifest, full=full, timeout=timeout,
+            public_url_overrides=public_url_overrides,
+        )
         if probes_ok(latest):
             return latest
         if attempt + 1 < attempts and delay:
