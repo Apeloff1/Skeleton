@@ -74,6 +74,34 @@ class ClockedOAMSourceDMATests(unittest.TestCase):
         self.assertEqual(m.memory[0xFE00], 0x40)
         self.assertEqual(m.memory[0xFE9F], (0x40 + 159) & 255)
 
+    def test_scanlines_use_oam_at_their_real_tick_not_future_dma_state(self):
+        m = make_machine()
+        m.line_cycles = 455
+        captures = []
+        # Focus this regression on the clock coupling itself; the real
+        # sprite raster renderer has its own tile and priority contracts.
+        m._draw_line = lambda line: captures.append((line, m.dma_index))
+        m.write(0xFF46, 0xC0)
+        m._advance(457)  # One call spans TWO line endings.
+        self.assertEqual(captures, [(0, 0), (1, 113)])
+        self.assertTrue(m.dma_active)
+
+    def test_ppu_STAT_modes_are_sampled_during_multi_line_cpu_tick_blocks(self):
+        m = make_machine()
+        captured_modes = set()
+        original_read = m.read
+
+        def sampled_read(address):
+            result = original_read(address)
+            if address == 0xFF41:
+                captured_modes.add(result & 3)
+            return result
+
+        m.read = sampled_read
+        m._advance(456)
+        self.assertTrue({0, 2, 3}.issubset(captured_modes))
+        self.assertEqual(m.memory[0xFF44], 1)
+
     def test_inflight_oam_dma_savestate_replays_frame_and_bus_exactly(self):
         m = make_machine()
         m.write(0xFF46, 0xC0)
