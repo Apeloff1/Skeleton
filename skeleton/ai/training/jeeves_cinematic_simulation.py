@@ -455,7 +455,7 @@ def receipt_from_controller(controller: SimulationController) -> dict[str, Any]:
     summary = {
         "schema_version": "skeleton.jeeves.cinematic_sim_receipt.v1",
         "source_digest": controller.validation["source_digest"],
-        "controls": controls, "frames_executed": len(trace),
+        "controls": dict(controller.controls), "frames_executed": len(trace),
         "shot_count": controller.validation["shot_count"],
         "dialogue_count": controller.validation["dialogue_count"],
         "forward_head_digest": trace[-1]["digest"],
