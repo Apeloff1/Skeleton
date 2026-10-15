@@ -185,6 +185,7 @@ def inspect(
     minimum_free_bytes: int = MIN_FREE_BYTES,
     require_attestation: bool = True,
     allow_vocabulary_expansion: bool = False,
+    dataset_manifest: Path | None = None,
 ) -> dict[str, Any]:
     """Read-only preflight with actionable blockers; never trains or copies weights."""
     from skeleton.cortex.bpe import BytePairEncoder
@@ -244,7 +245,15 @@ def inspect(
                     model.bpe = BytePairEncoder.from_snapshot(data["bpe"])
                     if model.snapshot().get("E") != snap.get("E"):
                         blockers.append("native_weight_restore_mismatch")
-                train, heldout = _texts()
+                if dataset_manifest is None:
+                    train, heldout = _texts()
+                    corpus_info: dict[str, Any] = {
+                        "source": "built_in_smoke_only",
+                        "suitable_for_production_game_quality_claim": False,
+                    }
+                else:
+                    from .jeeves_game_corpus import load_approved_corpus
+                    train, heldout, corpus_info = load_approved_corpus(dataset_manifest)
                 all_cases = train + tuple(case for examples in heldout.values() for case in examples)
                 coverage = _token_coverage(model, all_cases)
                 planned_new_tokens = 0
@@ -283,6 +292,7 @@ def inspect(
                     "active_mouth": mouth,
                     "training_steps": snap["steps"],
                     "training_examples": len(train),
+                    "corpus": corpus_info,
                     "evaluation_examples": sum(map(len, heldout.values())),
                     "vocabulary_coverage": round(coverage, 6),
                     "predicted_coverage_after_train_only_growth": round(effective_coverage, 6),
@@ -326,6 +336,7 @@ def prepare_training_copy(
     copy_destination: Path,
     maximum_age_seconds: int = 900,
     allow_vocabulary_expansion: bool = False,
+    dataset_manifest: Path | None = None,
 ) -> dict[str, Any]:
     """Create an immutable, checksum-bound backup before any training.
 
@@ -338,6 +349,7 @@ def prepare_training_copy(
         candidate_directory=candidate_directory,
         maximum_age_seconds=maximum_age_seconds,
         allow_vocabulary_expansion=allow_vocabulary_expansion,
+        dataset_manifest=dataset_manifest,
     )
     if receipt["status"] != "ready_for_operator_training":
         raise ProductionCheckpointError("preflight blocked: " + ";".join(receipt["blockers"]))
@@ -367,6 +379,8 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     scan = sub.add_parser("preflight", help="Read-only production training admission scan")
     scan.add_argument("--attestation", type=Path)
+    scan.add_argument("--dataset-manifest", type=Path,
+                      help="approved external game corpus to be used for training and eval")
     scan.add_argument("--candidate-directory", type=Path, required=True)
     scan.add_argument("--max-age-seconds", type=int, default=900)
     scan.add_argument("--min-free-bytes", type=int, default=MIN_FREE_BYTES)
@@ -374,6 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument("--allow-vocabulary-expansion", action="store_true")
     backup = sub.add_parser("backup", help="Exclusive verified backup of active production checkpoint")
     backup.add_argument("--attestation", type=Path, required=True)
+    backup.add_argument("--dataset-manifest", type=Path)
     backup.add_argument("--candidate-directory", type=Path, required=True)
     backup.add_argument("--output", type=Path, required=True)
     backup.add_argument("--max-age-seconds", type=int, default=900)
@@ -388,6 +403,7 @@ def main(argv: list[str] | None = None) -> int:
                 minimum_free_bytes=args.min_free_bytes,
                 require_attestation=not args.allow_unattested_inspection,
                 allow_vocabulary_expansion=args.allow_vocabulary_expansion,
+                dataset_manifest=args.dataset_manifest,
             )
         else:
             result = prepare_training_copy(
@@ -396,6 +412,7 @@ def main(argv: list[str] | None = None) -> int:
                 copy_destination=args.output,
                 maximum_age_seconds=args.max_age_seconds,
                 allow_vocabulary_expansion=args.allow_vocabulary_expansion,
+                dataset_manifest=args.dataset_manifest,
             )
         print(json.dumps(result, indent=2, sort_keys=True, allow_nan=False))
         return 0 if result["status"] != "blocked" else 3
