@@ -24,7 +24,8 @@
     "python -m skeleton.jeeves.game_learning_cli compare-emulator-cores",
     "python -m skeleton.jeeves.game_learning_cli fit-emulator-world-model",
     "python -m skeleton.jeeves.game_learning_cli plan-emulator",
-    "python -m skeleton.jeeves.game_learning_cli probe-emulator-goals"
+    "python -m skeleton.jeeves.game_learning_cli probe-emulator-goals",
+    "python scripts/audit_game_emulator_first_boot.py"
   ],
   "experimental_conditions": [
     "passive neutral",
@@ -115,7 +116,8 @@
     "skeleton/testing/test_game_emulator_advanced_experiments.py",
     "skeleton/testing/test_game_emulator_neural_world.py",
     "skeleton/testing/test_game_emulator_physical_planning.py",
-    "skeleton/testing/test_game_emulator_operator_goals.py"
+    "skeleton/testing/test_game_emulator_operator_goals.py",
+    "skeleton/testing/test_game_emulator_first_boot_audit.py"
   ],
   "tests_executed": false,
   "limitations": [
@@ -169,5 +171,27 @@
     "measured_active_only_controlled_effects": true,
     "causal_or_achievement_labels_independently_certified": false,
     "raw_memory_exported": false
+  },
+  "native_first_boot_gate": {
+    "operator_entrypoint": "python scripts/audit_game_emulator_first_boot.py",
+    "source": "operator-approved installed native libretro core + exact lawful ROM SHA256",
+    "limits": {
+      "max_cases": 32,
+      "max_single_rom_bytes": 2097152,
+      "native_steps_per_case": 3,
+      "per_command_timeout_seconds_max": 30
+    },
+    "sequence": [
+      "approve exact installed native core and lawful ROM hash",
+      "reset and capture actual native framebuffer",
+      "step idle and serialize native core plus host temporal audio",
+      "step button a then serialize native state",
+      "restore idle savestate, replay a and compare observation/reward and native transition SHA",
+      "compare exact after-replay savestate including bound raw audio history",
+      "per-core source failure does not become success"
+    ],
+    "failure_policy": "all cores must independently pass; any failed case yields exit status 2 and failed receipt",
+    "hardware_accuracy_certified": false,
+    "first_boot_sessions_executed_in_this_pr": 0
   }
 }
