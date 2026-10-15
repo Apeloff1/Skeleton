@@ -14,7 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 MAX_FRAMES = 16
-MAX_RGB_BYTES = 4096 * 4096 * 3
+MAX_RGB_BYTES = 4 * 1024 * 1024
 GRID = 16
 
 
