@@ -18,8 +18,8 @@ $LauncherDist = "$ShortDrive\launcher-dist"
 $LauncherWork = "$ShortDrive\launcher-work"
 $LauncherSpec = "$ShortDrive\launcher-spec"
 $ArchivePath = "$ShortDrive\source.zip"
-$EntryPoint = Join-Path $RepoRoot "packaging\windows\launcher_entry.py"
-$InstallerScript = Join-Path $RepoRoot "packaging\windows\SkeletonSetup.iss"
+# The compiled entrypoints and installer recipe must come from the archived
+# SourceRef, not potentially divergent files in the working checkout.
 
 if (-not $Version) {
     $PyProject = Get-Content -Raw -LiteralPath $PyProjectPath
@@ -50,6 +50,7 @@ if (Test-Path $ShortDrive) {
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ShortDrive)) {
     throw "Unable to create short Windows build drive $ShortDrive"
 }
+try {
 New-Item -ItemType Directory -Force -Path $PayloadDir, $LauncherDist, $LauncherWork, $LauncherSpec | Out-Null
 
 Write-Host "==> Staging curated application payload from $SourceRef via $ShortDrive"
@@ -87,6 +88,23 @@ if ($LASTEXITCODE -ne 0) {
 }
 Expand-Archive -LiteralPath $ArchivePath -DestinationPath $PayloadDir -Force
 
+$EntryPoint = Join-Path $PayloadDir "packaging\windows\launcher_entry.py"
+$ConsoleEntryPoint = Join-Path $PayloadDir "packaging\windows\offline_cli_entry.py"
+$InstallerScript = Join-Path $PayloadDir "packaging\windows\SkeletonSetup.iss"
+foreach ($RequiredSource in @($EntryPoint, $ConsoleEntryPoint, $InstallerScript)) {
+    if (-not (Test-Path -LiteralPath $RequiredSource -PathType Leaf)) {
+        throw "Staged installer source missing: $RequiredSource"
+    }
+}
+$StagedPyProject = Get-Content -Raw -LiteralPath (Join-Path $PayloadDir "pyproject.toml")
+if ($StagedPyProject -notmatch '(?ms)^\[project\].*?^version\s*=\s*"([^"]+)"') {
+    throw "Staged pyproject.toml has no project version"
+}
+if ($Matches[1] -ne $Version) {
+    throw "Installer version does not match archived SourceRef: $Version versus $($Matches[1])"
+}
+Write-Host "Archived source version verified: $Version"
+
 # Keep the installed runtime portable across ordinary Windows user-profile
 # paths. This is checked before compilation so path regressions fail cheaply
 # and with the exact offending relative path.
@@ -113,7 +131,7 @@ if ($PathBudgetViolations.Count -gt 0) {
 }
 
 Write-Host "==> Building standalone Skeleton.exe"
-& python -m pip install --disable-pip-version-check --no-input "pyinstaller==6.22.3" "pydantic==2.13.5" "pydantic-settings==2.15.0"
+& python -m pip install --disable-pip-version-check --no-input "pyinstaller==6.22.3" "pydantic>=2.14.0,<3" "pydantic-settings>=2.15.0,<3"
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller/runtime dependency installation failed"
 }
@@ -128,7 +146,7 @@ $PyInstallerArgs = @(
     "--distpath", $LauncherDist,
     "--workpath", $LauncherWork,
     "--specpath", $LauncherSpec,
-    "--paths", $RepoRoot,
+    "--paths", $PayloadDir,
     "--collect-data", "skeleton.app",
     "--hidden-import", "skeleton.app.health",
     "--hidden-import", "skeleton.app.installer",
@@ -171,6 +189,8 @@ $PyInstallerArgs = @(
     "--hidden-import", "tkinter",
     $EntryPoint
 )
+Push-Location -LiteralPath $PayloadDir
+try {
 & python @PyInstallerArgs
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller launcher build failed"
@@ -193,7 +213,7 @@ if ($WindowFlagIndex -lt 0 -or $ConsoleNameIndex -lt 0 -or $ConsoleEntryIndex -l
 }
 $ConsoleArgs[$WindowFlagIndex] = "--console"
 $ConsoleArgs[$ConsoleNameIndex] = "SkeletonOffline"
-$ConsoleArgs[$ConsoleEntryIndex] = Join-Path $RepoRoot "packaging\windows\offline_cli_entry.py"
+$ConsoleArgs[$ConsoleEntryIndex] = $ConsoleEntryPoint
 & python @ConsoleArgs
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller offline console build failed"
@@ -203,6 +223,9 @@ if (-not (Test-Path -LiteralPath $ConsoleExe)) {
     throw "Expected offline console not found: $ConsoleExe"
 }
 Copy-Item -LiteralPath $ConsoleExe -Destination (Join-Path $PayloadDir "SkeletonOffline.exe") -Force
+} finally {
+    Pop-Location
+}
 
 
 $CompilerCandidates = @(
@@ -246,4 +269,7 @@ Write-Host "Windows installer built successfully:"
 Write-Host "  $($Installer.FullName)"
 Write-Host "  SHA256 $($Hash.Hash)"
 
-& subst $ShortDrive /D
+} finally {
+    # Failed compilation must never strand the virtual drive for subsequent runs.
+    & subst $ShortDrive /D | Out-Null
+}
