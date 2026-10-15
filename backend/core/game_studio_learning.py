@@ -2111,13 +2111,13 @@ async def _policy_dependencies(scope, row):
 _scenario_spectator_slots = asyncio.Semaphore(2)
 
 
-async def scenario_mirror_views(scope, identifier, *, lanes=4, steps=12, sample=0):
+async def scenario_mirror_views(scope, identifier, *, lanes=10, steps=12, sample=0):
     """Owner-authorized, bounded parallel replay telemetry while campaigns train."""
     from skeleton.jeeves.game_learning_parallel import GameEnvironmentRequest
     from skeleton.jeeves.game_studio_environment import parse_studio_source
     from skeleton.jeeves.game_studio_scenario_lab import ANGLES, mirrored_simulations
 
-    if (type(lanes) is not int or not 1 <= lanes <= 6
+    if (type(lanes) is not int or not 1 <= lanes <= 10
             or type(steps) is not int or not 1 <= steps <= 24
             or type(sample) is not int or not 0 <= sample <= 255):
         raise GameLearningError("spectator_bounds", "Bounded spectator controls required.", 422)
@@ -2137,6 +2137,8 @@ async def scenario_mirror_views(scope, identifier, *, lanes=4, steps=12, sample=
         )
     return {
         **result, "campaign_id": identifier, "campaign_cursor": row["cursor"],
+        "ten_pass_audits_verified": result["scrutiny_checked_runs"]==len(result["lanes"]),
+        "spectral_hardware_available":False,
         "campaign_status": row["status"], "sample":sample,
         "spectator_only":True,
         "frames_show_training_episodes":False,

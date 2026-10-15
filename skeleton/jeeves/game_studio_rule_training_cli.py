@@ -215,7 +215,7 @@ def train_rule_curriculum(
             "heldout_trace_digest": details["episodes"][i]["candidate"]["trace_digest"],
         })
     from .game_studio_scenario_lab import ANGLES, mirrored_rule_comparison
-    if heldout[-1] > 2**31-7:
+    if heldout[-1] > 2**31-16:
         # Studio engines accept 31-bit replay seeds; skip independent mirror
         # analysis rather than wrap heldout identities into training overlap.
         mirrors = []

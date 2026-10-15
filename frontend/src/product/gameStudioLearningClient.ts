@@ -63,11 +63,26 @@ export type StudioMirrorLane = {
   source_digest: string; environment_digest: string;
   snapshot_digest: string; last_observation: Record<string, number>;
   frames: StudioMirrorFrame[]; digest: string; native_frames: false;
+  audit_passed: boolean;
+  multispectral: {
+    schema_version: string; passed_count: number; failed_count: number;
+    digest: string; real_rgb_depth_thermal_sensors: false;
+    independent_information_streams_claimed: false;
+    spectral_channels: Record<string, {
+      values: number[]; minimum: number; maximum: number;
+      mean: number; derivation: string; digest: string;
+    }>;
+    checks: { name: string; passed: boolean }[];
+    reverse_checkpoints: { at_step: number; snapshot_digest: string }[];
+  };
 };
 export type StudioMirrorViews = {
   schema_version: string; campaign_id: string; campaign_cursor: number;
   campaign_status: string; sample: number; angles: string[];
   lanes: StudioMirrorLane[]; workers_used: number;
+  scrutiny_checks_per_run: number; scrutiny_checked_runs: number;
+  multispectral_analysis_channels: string[];
+  actual_spectral_sensor_hardware: false;
   spectator_only: true; frames_show_training_episodes: false;
   view_kind: string; digest: string;
 };
@@ -107,11 +122,11 @@ export type StudioSalesCatalog = {
 };
 
 export async function getStudioMirrorViews(
-  campaignId: string, sample: number, lanes = 4, steps = 12,
+  campaignId: string, sample: number, lanes = 10, steps = 12,
   input: LearningRequest = {},
 ): Promise<StudioMirrorViews> {
   if (!Number.isSafeInteger(sample) || sample < 0 || sample > 255
-      || !Number.isSafeInteger(lanes) || lanes < 1 || lanes > 6
+      || !Number.isSafeInteger(lanes) || lanes < 1 || lanes > 10
       || !Number.isSafeInteger(steps) || steps < 1 || steps > 24) invalid('Spectator limits differ.');
   const result = await request<StudioMirrorViews>(
     'get', '/campaigns/' + id(campaignId) + '/mirror-views?sample=' + sample +
@@ -119,12 +134,23 @@ export async function getStudioMirrorViews(
   );
   if (result.campaign_id !== campaignId || !result.spectator_only
       || result.frames_show_training_episodes !== false
+      || result.scrutiny_checks_per_run !== 10
+      || result.scrutiny_checked_runs !== result.lanes.length
+      || result.actual_spectral_sensor_hardware !== false
       || !Array.isArray(result.lanes) || result.lanes.length > lanes
       || result.lanes.some(lane => !Array.isArray(lane.frames)
           || lane.frames.length > 5 || lane.native_frames !== false
           || !Number.isSafeInteger(lane.steps) || lane.steps > steps
+          || lane.audit_passed !== true
+          || lane.multispectral?.passed_count !== 10
+          || lane.multispectral?.failed_count !== 0
+          || lane.multispectral?.real_rgb_depth_thermal_sensors !== false
+          || !Array.isArray(lane.multispectral?.checks)
+          || lane.multispectral.checks.length !== 10
+          || Object.keys(lane.multispectral.spectral_channels || {}).length !== 10
+          || !/^[a-f0-9]{64}$/.test(lane.multispectral.digest)
           || !/^[a-f0-9]{64}$/.test(lane.digest))
-      || JSON.stringify(result).length > 3 * 1024 * 1024) invalid('Mirrored simulation source or limits differ.');
+      || JSON.stringify(result).length > 6 * 1024 * 1024) invalid('Mirrored simulation source or limits differ.');
   return result;
 }
 export async function getStudioScenarioDrafts(campaignId: string, input: LearningRequest = {}) {

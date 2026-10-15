@@ -163,7 +163,7 @@ class CampaignConfig:
     def __post_init__(self) -> None:
         _int(self.round_limit, "campaign rounds", 1, 100000)
         _int(self.slice_rounds, "slice rounds", 1, 8)
-        _int(self.episodes_per_round, "round training episodes", 1, 4)
+        _int(self.episodes_per_round, "round training episodes", 1, 10)
         _int(self.episode_steps, "episode steps", 1, 4096)
         _int(self.seed, "campaign seed", 0, 2**63 - 1)
         _int(self.max_slice_steps, "slice step budget", 1, 131072)
@@ -1497,7 +1497,7 @@ class StudioLearningCampaign:
             before["survival"] - after["survival"], adv_before["survival"] - adv_after["survival"]
         )
         scenario_mirror = None
-        # The six additional angles are evidence-based conservative gates;
+        # All ten mirror angles are evidence-based conservative gates;
         # they never automatically certify subjective game quality or cause
         # changes in production weights. Full training-seed holds remain
         # disjoint from this measured evaluation.
@@ -1514,7 +1514,7 @@ class StudioLearningCampaign:
             )
             scenario_mirror = mirrored_rule_comparison(
                 original, variant,
-                seed=self._seed(index, "mirrored-angles") % (2**31 - 7),
+                seed=self._seed(index, "mirrored-angles") % (2**31 - 16),
                 steps=min(6, self.config.episode_steps), angles=ANGLES,
             )
         constraints = {
@@ -1757,11 +1757,11 @@ class StudioLearningCampaign:
             raise GameLearningError("campaign already executing a slice")
         if self.cursor + count > self.config.round_limit:
             raise GameLearningError("campaign requested beyond admitted total round budget")
-        # Account for the possible twelve additional baseline/candidate
-        # angle episodes. Their real steps are not free and must be admitted
+        # Account for twenty baseline/candidate audited mirror episodes.
+        # Their real steps must be admitted
         # *before* a campaign slice starts, not only after checkpointing.
         studio_mirror_allowance = (
-            12 * min(6, self.config.episode_steps)
+            20 * min(6, self.config.episode_steps)
             if self.champion.kind == "studio" else 0
         )
         planned = (

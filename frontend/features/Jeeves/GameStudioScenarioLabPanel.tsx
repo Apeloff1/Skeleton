@@ -18,7 +18,7 @@ export default function GameStudioScenarioLabPanel({
   campaign, editor,
 }: { campaign: StudioCampaign; editor: string }) {
   const [watch, setWatch] = useState(false);
-  const [lanes, setLanes] = useState(4);
+  const [lanes, setLanes] = useState(10);
   const [steps, setSteps] = useState(12);
   const [views, setViews] = useState<StudioMirrorViews | null>(null);
   const [drafts, setDrafts] = useState<StudioScenarioDiscovery | null>(null);
@@ -142,13 +142,15 @@ export default function GameStudioScenarioLabPanel({
     <View style={{ gap: 14, padding: 13, borderWidth: 1, borderColor: '#526173', borderRadius: 12 }}>
       <Text style={heading}>Advanced scenario laboratory · {editor.replace(/_/g, ' ')}</Text>
       <Text style={muted}>
-        Six mirrored training perspectives: exploration, progress, safety, economy, adversary and boundary.
+        Ten mirror-room runs: exploration, progress, safety, economy, adversary, boundary,
+        temporal, causal, perturbation and recovery. Each run undergoes ten scrutiny checks
+        and produces ten source-derived numeric analysis bands.
         The concurrent views below execute real source-bound reference simulations while Jeeves trains,
         but they are spectator samples, not the actual learner's episode frames or a native GPU renderer.
       </Text>
       <View style={group}>
         {button(watch ? 'Stop spectator lanes' : 'Watch parallel simulations', () => setWatch(current => !current), watch)}
-        {[2, 4, 6].map(value => <React.Fragment key={value}>{button(value + ' angles', () => { setViews(null); setLanes(value); }, lanes === value)}</React.Fragment>)}
+        {[2, 4, 6, 10].map(value => <React.Fragment key={value}>{button(value + ' angles', () => { setViews(null); setLanes(value); }, lanes === value)}</React.Fragment>)}
         {[8, 12, 24].map(value => <React.Fragment key={value}>{button(value + ' steps', () => { setViews(null); setSteps(value); }, steps === value)}</React.Fragment>)}
       </View>
       {loading && <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -158,7 +160,8 @@ export default function GameStudioScenarioLabPanel({
       {views && (
         <View style={{ gap: 8 }}>
           <Text style={muted} accessibilityLiveRegion="polite">
-            {views.lanes.length} observed lanes · {views.workers_used} concurrent workers ·
+            {views.lanes.length} observed runs · {views.workers_used} concurrent workers ·
+            {views.scrutiny_checked_runs * views.scrutiny_checks_per_run} passed scrutiny checks ·
             campaign committed round {views.campaign_cursor} · sample {views.sample}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -188,7 +191,19 @@ export default function GameStudioScenarioLabPanel({
                   {lane.unique_gameplay_states} distinct gameplay states ·
                   {lane.replayed_action_applications} replayed action applications
                 </Text>
-                <Text style={muted}>Replay {lane.snapshot_digest.slice(0, 12)}</Text>
+                <Text style={muted}>Replay {lane.snapshot_digest.slice(0, 12)} ·
+                  {lane.multispectral.passed_count}/10 independently replayed audit gates
+                </Text>
+                <View style={{ gap: 3 }}>
+                  {Object.entries(lane.multispectral.spectral_channels).map(([band, data]) => (
+                    <Text key={band} style={muted}>{band}: mean {data.mean.toFixed(3)}
+                      {' · '}peak {data.maximum.toFixed(3)}
+                    </Text>
+                  ))}
+                </View>
+                <Text style={muted}>Reverse audit: {lane.multispectral.reverse_checkpoints.length} source checkpoints.
+                  Derived telemetry, not RGB/depth/thermal sensor measurements.
+                </Text>
                 <Text style={muted} numberOfLines={3}>
                   {Object.entries(lane.last_observation).slice(0, 5)
                     .map(([key, value]) => key + ': ' + value.toFixed(2)).join(' · ')}

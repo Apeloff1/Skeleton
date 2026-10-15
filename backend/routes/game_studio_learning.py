@@ -15,7 +15,7 @@ router = APIRouter(prefix="/game-studio-learning", tags=["Studio learning"])
 class CampaignCreate(WriteRequest):
     round_limit: int = Field(default=100000, ge=1, le=100000, strict=True)
     slice_rounds: int = Field(default=4, ge=1, le=8, strict=True)
-    episodes: int = Field(default=1, ge=1, le=4, strict=True)
+    episodes: int = Field(default=10, ge=1, le=10, strict=True)
     max_steps: int = Field(default=256, ge=1, le=4096, strict=True)
     seed: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
     policy_id: str | None = Field(default=None, min_length=1, max_length=128)
@@ -52,7 +52,10 @@ class CampaignCreate(WriteRequest):
 
     @model_validator(mode="after")
     def slice_budget(self):
-        if self.slice_rounds * (self.episodes + 4 * self.evaluation_seeds) * self.max_steps > 131072:
+        if self.slice_rounds * (
+            (self.episodes + 4 * self.evaluation_seeds) * self.max_steps
+            + 20 * min(6,self.max_steps)
+        ) > 131072:
             raise ValueError("all training/play/adversarial slice transitions must fit131072steps")
         from skeleton.jeeves.game_studio_learning import CampaignConfig
 
