@@ -243,6 +243,8 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     vocab_coverage_before = _token_coverage(model, curriculum_and_eval)
     expansion: dict[str, Any] | None = None
     if expand_vocabulary and vocab_coverage_before < min_coverage:
+        # Grow tokens from TRAINING documents only. Reading held-out strings
+        # when creating the token registry leaks the evaluation split.
         original_snapshot_sha256 = sha256(json.dumps(
             original_snapshot, sort_keys=True, separators=(",", ":"),
             ensure_ascii=False, allow_nan=False,
@@ -250,13 +252,13 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         if torch_stack:
             from .jeeves_torch_game_vocabulary import expand_torch_game_words
             expansion = expand_torch_game_words(
-                model, curriculum_and_eval,
+                model, dataset,
                 expected_snapshot_digest=original_snapshot_sha256,
             )
         else:
             from .jeeves_game_vocabulary import expand_native_game_pieces
             expansion = expand_native_game_pieces(
-                model, curriculum_and_eval,
+                model, dataset,
                 expected_snapshot_digest=original_snapshot_sha256,
             )
     vocab_coverage = _token_coverage(model, curriculum_and_eval)
