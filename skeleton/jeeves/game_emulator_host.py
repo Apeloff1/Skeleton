@@ -1029,6 +1029,35 @@ class EmulatorEnvironment:
                     break
         return self._step(list(controls), exact)
 
+    def continue_playthrough(self) -> dict[str, object]:
+        """Continue native gameplay past one learning episode without retro_reset.
+
+        Only a caller using the explicit long-playthrough API may advance the
+        bounded logical window. Native core, content, controls and digest chain
+        remain intact. This is not a victory signal or a training admission.
+        """
+        if self._closed or self._seed is None or self._steps != self.max_steps:
+            raise EmulatorHostError(
+                "emulator_continuation_inactive", "Only a completed native step window can continue"
+            )
+        self._authority()
+        previous = self._chain
+        self._chain = _digest({
+            "event": "native_playthrough_window_continued",
+            "environment_digest": self.spec.environment_digest,
+            "previous_transition_digest": previous,
+            "window_steps": self.max_steps,
+        })
+        self._steps = 0
+        if self._observation is not None:
+            self._observation = {**self._observation, "step_fraction": 0.0}
+        return {
+            "native_core_reset": False,
+            "window_steps": self.max_steps,
+            "previous_transition_digest": previous,
+            "continuation_digest": self._chain,
+        }
+
     def _step(self, controls: list[Mapping[str, object]], action: str | None) -> EpisodeStep:
         if self._seed is None or self.done:
             raise EmulatorHostError(

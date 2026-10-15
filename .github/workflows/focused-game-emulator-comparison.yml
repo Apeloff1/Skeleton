@@ -1,0 +1,117 @@
+name: Focused Emulator Comparison Qualification
+
+# Explicit-only: no push/PR/schedule triggers to avoid more queue congestion.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: focused-emulator-comparison-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bounded-comparison-regressions:
+    name: Focused 169-target, live-input, sandbox and replay regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTHONUTF8: "1"
+    steps:
+      - name: Checkout immutable selected head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Python 3.11
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+      - name: Ensure sandbox tool for synthetic native host qualification
+        run: |
+          if ! command -v bwrap >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq bubblewrap
+          fi
+          command -v bwrap
+      - name: Compile touched runtime modules and operator entry points
+        run: |
+          python -m compileall -q \
+            skeleton/jeeves/game_comparison_live.py \
+            skeleton/jeeves/game_comparison_pairwise.py \
+            skeleton/jeeves/game_comparison_portfolio.py \
+            skeleton/jeeves/game_comparison_controllers.py \
+            skeleton/jeeves/game_emulator_worker.py \
+            skeleton/jeeves/game_comparison_live_evidence.py \
+            skeleton/jeeves/game_comparison_branch_analysis.py \
+            skeleton/jeeves/game_comparison_counterfactual.py \
+            skeleton/jeeves/game_comparison_boomerang.py \
+            skeleton/jeeves/game_comparison_multispectral.py \
+            skeleton/jeeves/game_comparison_counterfactual_viewer.py \
+            skeleton/ai/webcrawler/dragon_comparative_game_bridge.py \
+            skeleton/jeeves/game_comparison_live_http.py \
+            skeleton/jeeves/game_comparison_live_viewer.py \
+            skeleton/jeeves/game_comparison_host_preflight.py \
+            skeleton/jeeves/game_comparison_readiness.py \
+            skeleton/jeeves/game_emulator_target_gap_matrix.py \
+            skeleton/jeeves/game_comparison_studio.py \
+            scripts/live_game_comparison.py \
+            scripts/analyze_live_game_comparison.py \
+            scripts/analyze_game_comparison_portfolio.py \
+            scripts/qualify_live_game_comparison.py \
+            scripts/doctor_game_comparison.py \
+            scripts/audit_game_emulator_169_targets.py \
+            scripts/run_game_comparison_counterfactual.py \
+            scripts/run_game_comparison_boomerang.py
+      - name: Run focused source-contract regressions (no ROMs)
+        run: |
+          python -m unittest -v \
+            tests.test_game_comparison_live \
+            tests.test_game_comparison_core_input_descriptors \
+            tests.test_game_comparison_counterfactual \
+            tests.test_game_comparison_counterfactual_integrity \
+            tests.test_game_comparison_counterfactual_viewer \
+            tests.test_game_comparison_scientific_gates \
+            tests.test_game_comparison_boomerang \
+            tests.test_game_comparison_multispectral \
+            tests.test_game_comparison_live_http \
+            tests.test_game_comparison_pairwise \
+            tests.test_game_comparison_portfolio \
+            tests.test_game_comparison_raw_qualification_regression \
+            tests.test_game_comparison_readiness \
+            tests.test_game_comparison_host_preflight \
+            tests.test_game_emulator_169_gap_matrix \
+            tests.test_game_comparison_media \
+            tests.test_game_comparison_scheduler \
+            tests.test_game_comparison_signal_features \
+            tests.test_game_comparison_inspiration \
+            tests.test_game_comparison_uptake
+      - name: Prove compiled homebrew core and isolated Bubblewrap host actually executed
+        run: |
+          python - <<'PY'
+          import unittest
+          from tests.test_game_emulator_homebrew_native_abi import NativeCompiledLibretroAbiContracts
+          from tests.test_game_emulator_homebrew_bwrap_host import NativeIsolatedHomebrewCoreContract
+
+          suite=unittest.TestSuite()
+          for cls in (NativeCompiledLibretroAbiContracts,NativeIsolatedHomebrewCoreContract):
+              suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(cls))
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          if result.testsRun != 2 or result.skipped or result.errors or result.failures:
+              raise SystemExit("Native host qualification must EXECUTE both tests; skipped is not a pass")
+          print("Qualified actual homebrew libretro ABI and isolated Bubblewrap worker; no commercial ROM tested.")
+          PY
+      - name: Verify no source test invoked native ROM qualification
+        if: success()
+        run: |
+          python - <<'PY'
+          from skeleton.jeeves.game_emulator_target_gap_matrix import build_emulator_target_gap_matrix
+          from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry
+          report = build_emulator_target_gap_matrix(registry=GameEmulatorRegistry())
+          assert report["summary"]["canonical_target_count"] == 169
+          assert report["summary"]["real_rom_boot_qualified_in_this_audit"] == 0
+          assert report["actual_native_game_qualification_performed"] is False
+          print("169-target static audit complete; no native games executed.")
+          PY

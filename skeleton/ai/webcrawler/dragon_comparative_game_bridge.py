@@ -85,3 +85,80 @@ def export_dragon_comparison_intake(report: Mapping[str, object]) -> dict[str, o
         raise ValueError("Dragon comparative knowledge intake exceeds four MiB")
     data["intake_sha256"] = hashlib.sha256(encoded).hexdigest()
     return data
+
+
+def export_dragon_counterfactual_review(report: Mapping[str, object]) -> dict[str, object]:
+    """Propose measured controlled-input observations to Dragon's review queue.
+
+    This is evidence-only, never an authoritative skill or trained weight.
+    It intentionally excludes raw ROM bytes, native PCM, screenshots and
+    gameplay recordings. A claimed result requires a complete, digest-intact
+    native experiment with at least two fresh runs of each branch.
+    """
+    from skeleton.jeeves.game_comparison_counterfactual import verify_counterfactual_input_result
+
+    verified=verify_counterfactual_input_result(report)
+    games=report.get("games")
+    if not isinstance(games,list) or not 2<=len(games)<=10:
+        raise ValueError("Dragon counterfactual review requires two to ten actual game trials")
+    cards=[]
+    for game in games:
+        if not isinstance(game,dict):
+            raise ValueError("Actual source game row missing")
+        baseline=game.get("baseline_fresh_native_runs")
+        variant=game.get("perturbed_fresh_native_runs")
+        if (not isinstance(baseline,list) or not isinstance(variant,list)
+            or len(baseline)!=len(variant) or not 2<=len(baseline)<=3):
+            raise ValueError("Controlled trials have too few actual fresh-worker repetitions")
+        for arm in baseline+variant:
+            if (not isinstance(arm,dict) or arm.get("real_native_run") is not True
+                or not isinstance(arm.get("receipts"),list)
+                or len(arm["receipts"])<1
+                or any(r.get("source")!="actual_isolated_libretro" for r in arm["receipts"])):
+                raise ValueError("Dragon must not promote fabricated trial observations")
+        analysis=game.get("measured_analysis")
+        if not isinstance(analysis,dict):
+            raise ValueError("Measured native A/B analysis is absent")
+        cards.append({
+            "game_id":game["game_id"],
+            "target_id":game["target_id"],
+            "core_id":game["core_id"],
+            "source_media_sha256":game["source_sha256"],
+            "changed_input_step":game["perturbation_step"],
+            "original_action":game["baseline_action"],
+            "modified_action":game["alternative_action"],
+            "repeat_count_per_arm":len(baseline),
+            "baseline_final_receipt_sha256":[x["last_evidence_sha256"] for x in baseline],
+            "variant_final_receipt_sha256":[x["last_evidence_sha256"] for x in variant],
+            "actual_objective_deltas":analysis["measured_objective_changes"],
+            "within_arm_repeat_consistency":analysis["repeat_consistent_in_both_arms"],
+            "pre_intervention_observations_matched":analysis["pre_intervention_controls_matched"],
+            "scientific_evidence_status":analysis["scientific_evidence_status"],
+            "nonreconstructive_multispectral_observation":analysis.get("multispectral_abstract_comparison"),
+            "post_intervention_signal_candidate":analysis["post_intervention_observable_response_candidate"],
+            "causal_mechanic_or_transfer_knowledge_approved":False,
+            "signal_divergences":analysis["signal_comparison"],
+            "knowledge_candidate_kind":"controlled_input_response_hypothesis",
+            "independently_verified_causal_game_mechanics":False,
+            "requires_separate_human_review_and_rights_clearance":True,
+            "eligible_for_production_model_training":False,
+        })
+    result={
+        "schema_version":"skeleton.dragon.comparative_counterfactual_review.v1",
+        "source_native_study_sha256":report["result_sha256"],
+        "source_study_id":report["source_study_id"],
+        "native_evidence_verification_sha256":verified["verification_sha256"],
+        "native_input_steps_locally_verified":verified["native_action_observations_hash_checked"],
+        "game_count":len(cards),
+        "candidates":cards,
+        "review_status":"pending_independent_human_and_dragon_adversarial_review",
+        "source_rights_independently_verified":False,
+        "game_mechanics_or_gameplay_quality_proven":False,
+        "weights_or_longterm_memory_changed":False,
+        "no_copyrighted_audio_video_or_rom_data_copied":True,
+    }
+    serialized=json.dumps(result,sort_keys=True,separators=(",",":"),allow_nan=False).encode()
+    if len(serialized)>MAX_PAYLOAD_BYTES:
+        raise ValueError("Dragon controlled game experiment review envelope exceeds bounded payload")
+    result["intake_sha256"]=hashlib.sha256(serialized).hexdigest()
+    return result

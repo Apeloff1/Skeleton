@@ -77,6 +77,23 @@ class GameInfo(C.Structure):
     _fields_ = [("path", C.c_void_p), ("data", C.c_void_p), ("size", C.c_size_t), ("meta", C.c_void_p)]
 
 
+class ControllerDescription(C.Structure):
+    _fields_ = [("desc", C.c_void_p), ("id", C.c_uint)]
+
+
+class ControllerInfo(C.Structure):
+    _fields_ = [("types", C.POINTER(ControllerDescription)), ("num_types", C.c_uint)]
+
+
+class InputDescriptor(C.Structure):
+    """Upstream libretro retro_input_descriptor ABI, no pointer retained."""
+    _fields_ = [
+        ("port", C.c_uint), ("device", C.c_uint),
+        ("index", C.c_uint), ("id", C.c_uint),
+        ("description", C.c_void_p),
+    ]
+
+
 class Geometry(C.Structure):
     _fields_ = [
         ("base_width", C.c_uint),
@@ -97,24 +114,6 @@ class AvInfo(C.Structure):
 
 class Variable(C.Structure):
     _fields_ = [("key", C.c_void_p), ("value", C.c_void_p)]
-
-
-class ControllerDescription(C.Structure):
-    _fields_ = [("desc", C.c_void_p), ("id", C.c_uint)]
-
-
-class ControllerInfo(C.Structure):
-    _fields_ = [("types", C.POINTER(ControllerDescription)), ("num_types", C.c_uint)]
-
-
-class InputDescriptor(C.Structure):
-    _fields_ = [
-        ("port", C.c_uint),
-        ("device", C.c_uint),
-        ("index", C.c_uint),
-        ("id", C.c_uint),
-        ("description", C.c_void_p),
-    ]
 
 
 def _integer(value: object, lower: int, upper: int, label: str) -> int:
@@ -219,8 +218,6 @@ class NativeCore:
             or any(type(item) is not str or item not in allowed_ports for item in declared_ports)):
             raise ValueError("Native controller port topology is not a supported bounded declaration")
         self.controller_port_devices = tuple(declared_ports)
-        # These records must come from the loaded core, not a static emulator catalog.
-        # A missing announcement is UNKNOWN, never evidence of input compatibility.
         self.controller_capabilities: list[list[dict[str, object]]] | None = None
         self.input_descriptors: list[dict[str, object]] = []
         self.buffers: dict[str, object] = {}
@@ -327,13 +324,22 @@ class NativeCore:
                 and allowed_ports[device] not in {
                     row["device_id"] for row in self.controller_capabilities[port]
                 }):
-                raise ValueError("requested native controller is absent from the core's port capabilities")
+                raise ValueError("requested native controller is absent from core port capabilities")
             self.core.retro_set_controller_port_device(port, allowed_ports[device])
         self.av = AvInfo()
         self.core.retro_get_system_av_info(C.byref(self.av))
-        # Some cores update their input legends while querying AV geometry.
+        self._check_av()
+        # libretro cores may send descriptions before and after load_game;
+        # snapshot them into wire-safe metadata only after both phases.
+        self.info["core_input_descriptors"] = list(self.input_descriptors)
+        self.info["core_input_descriptors_are_user_defined"] = True
         self.info["controller_capabilities"] = self.controller_capabilities
-        self.info["input_descriptors"] = list(self.input_descriptors)
+        self.info["input_descriptors"] = [
+            {"port": row["port"], "device": row["device"],
+             "index": row["index"], "id": row["id"],
+             "label": row["description"]}
+            for row in self.input_descriptors
+        ]
         self.info["controller_routing_evidence"] = [
             "disconnected" if device == "none" else (
                 "not_advertised" if self.controller_capabilities is None
@@ -342,10 +348,8 @@ class NativeCore:
                         row["device_id"] for row in self.controller_capabilities[port]
                     } else "core_unlisted"
                 )
-            )
-            for port, device in enumerate(self.controller_port_devices)
+            ) for port, device in enumerate(self.controller_port_devices)
         ]
-        self._check_av()
         self._check()
 
     def _buffer(self, key: str, value: str) -> int:
@@ -393,38 +397,43 @@ class NativeCore:
                 directory = {9: "/system", 19: "/core/core.so", 30: "/core", 31: "/tmp/saves"}[command]
                 C.cast(data, C.POINTER(C.c_void_p))[0] = self._buffer("directory_" + str(command), directory)
                 return True
+            if command == 11:
+                # RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS. Observe labels,
+                # never interpret them as proof of controller compatibility.
+                values=C.cast(data,C.POINTER(InputDescriptor))
+                descriptions=[]
+                seen=set()
+                for index in range(129):
+                    row=values[index]
+                    if not row.description:
+                        break
+                    if index==128:
+                        return False
+                    if not (row.port<4 and row.device in (1,2,3,5,6)
+                            and row.index<=3 and row.id<=511):
+                        return False
+                    label=_text(row.description,96)
+                    if not label or any(ord(c)<32 for c in label):
+                        return False
+                    key=(int(row.port),int(row.device),int(row.index),int(row.id))
+                    if key in seen:
+                        return False
+                    seen.add(key)
+                    descriptions.append({
+                        "port":int(row.port),"device":int(row.device),
+                        "index":int(row.index),"id":int(row.id),
+                        "description":label,
+                    })
+                else:
+                    return False
+                self.input_descriptors=descriptions
+                return True
             if command == 10:
                 pixel_format = C.cast(data, C.POINTER(C.c_int))[0]
                 if pixel_format not in (0, 1, 2):
                     return False
                 self.pixel_format = pixel_format
                 return True
-            if command == 11:
-                # RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS is a null-terminated
-                # array of live core labels. Keep only supported frontend ports.
-                descriptors = C.cast(data, C.POINTER(InputDescriptor))
-                rows = []
-                for position in range(257):
-                    item = descriptors[position]
-                    if not item.description:
-                        self.input_descriptors = rows
-                        return True
-                    if position == 256:
-                        raise ValueError("native input descriptor capacity exceeded")
-                    if item.port >= 4:
-                        continue
-                    if item.device > 65535 or item.index > 32 or item.id > 65535:
-                        raise ValueError("native input descriptor exceeds coordinate bounds")
-                    if len(rows) >= 128:
-                        raise ValueError("native input descriptor presentation capacity exceeded")
-                    rows.append({
-                        "port": int(item.port),
-                        "device": int(item.device),
-                        "index": int(item.index),
-                        "id": int(item.id),
-                        "label": _text(item.description, 128),
-                    })
-                return False
             if command == 12:
                 pointer = C.cast(data, C.POINTER(C.c_void_p))[0]
                 if pointer:

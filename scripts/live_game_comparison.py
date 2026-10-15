@@ -23,6 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     from skeleton.jeeves.game_comparison_schema import MAX_MANIFEST_BYTES,validate_study
     from skeleton.jeeves.game_comparison_live import LiveComparison
     from skeleton.jeeves.game_comparison_live_http import LocalComparisonServer
+    from skeleton.jeeves.game_comparison_host_preflight import inspect_native_host_runtime
     from skeleton.jeeves.game_emulator_catalog import GameEmulatorRegistry,REGISTRY_ENV
 
     parser=argparse.ArgumentParser(description=__doc__)
@@ -36,8 +37,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Optional game ID from the cohort; repeat 2–10 times to reduce resource use")
     parser.add_argument("--rights-acknowledged",action="store_true",
                         help="Confirm operator is allowed to run all included game media locally")
-    parser.add_argument("--max-steps",type=int,default=256,
-                        help="1–256 actual native input steps per lane for the entire desk lifetime")
+    parser.add_argument("--max-steps",type=int,default=4096,
+                        help="1–4096 actual native input steps per lane for the entire desk lifetime")
     parser.add_argument("--timeout-seconds",type=float,default=5.0)
     parser.add_argument("--port",type=int,default=8765,
                         help="Local-only port 0–65535; 0 allocates a free ephemeral port")
@@ -47,6 +48,10 @@ def main(argv: list[str] | None = None) -> int:
     if not args.rights_acknowledged:
         parser.error("Native play requires explicit --rights-acknowledged; no source-rights certificate is inferred")
     try:
+        host=inspect_native_host_runtime(probe_sandbox=True)
+        if not host["native_launch_preflight_passed"]:
+            names=", ".join(finding["code"] for finding in host["blockers"])
+            raise ValueError("Native host sandbox preflight failed: "+names)
         if args.registry.is_symlink():
             raise ValueError("Core registry cannot be a symlink")
         pinned=args.registry.resolve(strict=True)
@@ -73,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
                     "physical_hardware_layout_verified":False,
                     "production_model_weights_changed":False,
                     "network_interface":"127.0.0.1 only",
+                    "native_host_preflight_sha256":host["host_preflight_sha256"],
+                    "bwrap_syscall_probe_passed":host["sandbox_probe"]["passed"],
                     "note":"This process must remain running for browser controls to work. No internet endpoints are opened.",
                 },indent=2),flush=True)
                 server.serve_forever(poll_interval=.25)

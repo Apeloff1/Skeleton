@@ -51,7 +51,7 @@ class TestCoreControllerHandshake(unittest.TestCase):
         )
         self.assertTrue(worker._environment(11, C.addressof(rows)))
         self.assertEqual(worker.input_descriptors, [{
-            "port": 0, "device": 1, "index": 0, "id": 8, "label": "Primary Fire"
+            "port": 0, "device": 1, "index": 0, "id": 8, "description": "Primary Fire"
         }])
 
     def test_profile_validates_exact_selected_devices_and_verdict(self):

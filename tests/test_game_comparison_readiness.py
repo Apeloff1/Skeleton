@@ -79,6 +79,23 @@ class OfflineReadinessContracts(unittest.TestCase):
         self.assertEqual(report["game_preflight_pass_count"],0)
         self.assertEqual(report["core_input_hardware_qualified_count"],0)
 
+    def test_good_source_not_reported_live_ready_when_host_cannot_sandbox(self):
+        from unittest.mock import patch
+        blocked={
+            "native_launch_preflight_passed":False,
+            "blockers":[{"code":"bubblewrap_missing","severity":"blocker"}],
+            "sandbox_probe":{"requested":False,"passed":False},
+        }
+        with patch("skeleton.jeeves.game_comparison_host_preflight.inspect_native_host_runtime",
+                   return_value=blocked):
+            report=inspect_game_comparison_readiness(
+                self.model,registry=self.registry,free_temp_bytes=16*1024**3,
+            )
+        self.assertEqual(report["game_preflight_pass_count"],2)
+        self.assertFalse(report["ready_for_all_live_study_cohorts"])
+        self.assertFalse(report["cohorts"][0]["ready_for_simultaneous_live_desk"])
+        self.assertEqual(report["host_runtime"]["blockers"][0]["code"],"bubblewrap_missing")
+
     def test_disk_budget_rejects_full_batch(self):
         report=inspect_game_comparison_readiness(
             self.model,registry=self.registry,free_temp_bytes=128,
