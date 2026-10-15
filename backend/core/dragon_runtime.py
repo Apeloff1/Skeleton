@@ -483,7 +483,16 @@ async def search_reviewed_references(scope: dict, query: str, limit: int = 8) ->
                 lambda source: source["source_id"] in by_source
                 and source["revision_digest"] == by_source[source["source_id"]]["revision_digest"]
             )
-            hits = store.search(owner, query, limit=limit, authorized=True, diversify=False)
+            hits = store.search(
+                owner,
+                query,
+                limit=limit,
+                authorized=True,
+                diversify=False,
+                allowed_revisions={
+                    source_id: binding["revision_digest"] for source_id, binding in by_source.items()
+                },
+            )
             # This application helper exposes only its explicitly source-bound
             # annotations. Legacy separately-reviewed libraries keep their owner API.
             pairs = [_projection(hit, by_source[hit.source_id]) for hit in hits if hit.source_id in by_source]

@@ -115,6 +115,13 @@ checks use current original-owner receipts at the current project head. A model
 stop statement cannot satisfy missing requirements. Historical goals without a
 checklist retain their existing unverified-stop semantics.
 
+New decisions use the selected engine model's declared context capacity. When
+needed, the planner supplies the exact goal, current project identities, current
+workflow stage and its typed forms in a compact projection. It adds complete
+observations only when they fit and records what was omitted. A model that
+cannot fit this minimum returns an explicit capacity error. Existing frozen
+prompts keep their original identities.
+
 ## Train, observe and retain lessons
 
 The learning panel exposes actual local Q-learning controls: rate, discount,
@@ -129,12 +136,23 @@ deadline with a committed checkpoint is interrupted/resumable. Resume retains
 original request, policy, source and teacher authority, with no uncommitted
 transitions counted as learned.
 
+Where the server exposes `cpu_throughput`, selecting it allows training to borrow
+idle play slots from the same existing physical credit pool. Active human play
+and training still compete for those exact credits. The ordinary CPU profile
+keeps its existing allocation.
+
 Evaluation uses disjoint held-out seeds and measured candidate/baseline returns.
 Acceptance metadata remains distinct from production promotion. Inspect/export
 policy snapshots, evaluation, committed episode evidence and campaign role/lesson
 reports. Campaigns retain accepted and rejected experiment lessons for later
 bounded proposals. A configured 100,000-round run is a budget; only committed
 rounds count as executed.
+
+A candidate that fails its configured return gate remains available for explicit
+inspection and export without replacing the default policy. A passing candidate
+can become the workspace default only when its evaluated baseline is still the
+current default at the same project head. Concurrent work cannot silently replace
+a newer selection.
 
 ## Compare review observations
 

@@ -1381,7 +1381,7 @@ def install(args):
     _private_directory(args.install_root)
     for name in ("cores", "system", "licenses", "logs", "identities"):
         _private_directory(args.install_root / name)
-    records = []
+    records, failures = [], []
     selected = args.core or (
         list(DEFAULT_CORES)
         if args.profile == "starter"
@@ -1392,7 +1392,7 @@ def install(args):
     )
     if len(selected) != len(set(selected)):
         raise ValueError("Core selection cannot repeat")
-    for identity in selected:
+    def _install_one(identity):
         pin = PINNED_CORES[identity]
         directory = args.source_root / identity
         log = args.install_root / "logs" / (identity + ".log")
@@ -1653,14 +1653,27 @@ def install(args):
             / (identity + "-" + hashlib.sha256(encoded).hexdigest() + ".json")
         )
         _write_once(identity_path, encoded)
-        records.append(record)
-    registry = GameEmulatorRegistry(args.install_root / "cores.json")
+        return record
+
+    for identity in selected:
+        try:
+            records.append(_install_one(identity))
+        except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
+            if not getattr(args, "continue_on_error", False):
+                raise
+            failures.append({"core_id": identity, "error_type": type(exc).__name__, "message": str(exc)})
+    registry_path = args.install_root / "cores.json"
+    registry = GameEmulatorRegistry(registry_path) if registry_path.is_file() else None
     return {
-        "status": "compiled_artifacts_installed",
-        "registry_digest": registry.registry_digest,
-        "registry_path": str(args.install_root / "cores.json"),
+        "status": "partial_core_installation" if failures else "compiled_artifacts_installed",
+        "registry_digest": registry.registry_digest if registry is not None else None,
+        "registry_path": str(registry_path) if registry is not None else None,
         "environment_variable": "SKL_GAME_EMULATOR_REGISTRY",
         "cores": records,
+        "selected_count": len(selected),
+        "installed_count": len(records),
+        "failed_count": len(failures),
+        "failures": failures,
         "execution_checked": False,
         "tests_run": False,
     }
@@ -1841,6 +1854,7 @@ def main(argv=None):
     parser.add_argument("--source-root", type=Path)
     parser.add_argument("--install-root", type=Path)
     parser.add_argument("--core", action="append", choices=sorted(PINNED_CORES))
+    parser.add_argument("--continue-on-error", action="store_true", help="Attempt all selected cores, record each failure and exit nonzero if any failed")
     parser.add_argument(
         "--profile", choices=("starter", "broad", "all"), default="starter",
         help="starter=original six, broad=all non-deferred recipes, all=include explicitly deferred candidates",
@@ -1930,8 +1944,9 @@ def main(argv=None):
     if not 1 <= args.jobs <= 8 or not 30 <= args.timeout <= 3600:
         parser.error("jobs must be 1..8 and command timeout30..3600 seconds")
     try:
-        print(json.dumps(install(args), indent=2))
-        return 0
+        report = install(args)
+        print(json.dumps(report, indent=2))
+        return 2 if report["failed_count"] else 0
     except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
         print(json.dumps({"status": "installation_rejected", "message": str(exc)}), file=sys.stderr)
         return 2

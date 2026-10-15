@@ -477,7 +477,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "1b6c6eead9ef4ebbaff78dc9dadf2f69b6eed91f",
+      "source_git_object_sha": "a8fa747c6e15a74d1ac0bb25bf5c6d26c8b55166",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -501,7 +501,35 @@
       "volume_refs": [
         "VOL-072",
         "VOL-074"
-      ]
+      ],
+      "source_exclusions": [
+        "game_comparison_pairwise.py",
+        "game_comparison_portfolio.py",
+        "game_decompilation.py",
+        "game_decompilation_archives.py",
+        "game_decompilation_arm.py",
+        "game_decompilation_assets.py",
+        "game_decompilation_capabilities.py",
+        "game_decompilation_code.py",
+        "game_decompilation_evidence.py",
+        "game_decompilation_formats.py",
+        "game_decompilation_learning.py",
+        "game_decompilation_quality.py",
+        "game_decompilation_runtime.py",
+        "game_emulator_host.py",
+        "game_emulator_timing.py",
+        "game_emulator_worker.py"
+      ],
+      "overlay_children": [
+        "game_emulator_host.py",
+        "game_emulator_worker.py"
+      ],
+      "native_emulator_compatibility": {
+        "authority_contract": "machine/ai_game_emulator_host.json",
+        "integration_parent": "389ea48a78c6e420e0ad7b01df8d7844b315cfa3",
+        "canonical_execution": "skeleton/jeeves/game_emulator_host.py and game_emulator_worker.py remain the approved native runtime. New canonical comparison/decompilation/timing modules retain incoming placement.",
+        "historical_overlays": "AI host/worker copies retain historical executable compatibility only; AIFT-NATIVE-AGENTS-ROOT provides residual file custody, not native execution or promotion authority. No byte parity claimed for those two modules."
+      }
     },
     {
       "id": "AIFT-BUILD-PLANNING",
@@ -7221,6 +7249,86 @@
       "path": "skeleton/volumes",
       "owner": "masterplan volume organs",
       "reason": "per-volume construction organs referenced by masterplan implementation_paths; retained outside the AI tree pending explicit per-volume cutover."
+    },
+    {
+      "path": "skeleton/jeeves/game_comparison_pairwise.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_comparison_portfolio.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation_archives.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation_arm.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation_assets.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation_capabilities.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation_code.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation_evidence.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation_formats.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation_learning.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation_quality.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_decompilation_runtime.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_emulator_host.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_emulator_timing.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
+    },
+    {
+      "path": "skeleton/jeeves/game_emulator_worker.py",
+      "owner": "canonical Jeeves native emulator/comparison/decompilation runtime",
+      "reason": "Preserve incoming389ea canonical placement and approved host/worker authority under machine/ai_game_emulator_host.json. Historical AI host/worker destinations remain compatibility-only overlays; no ownership cutover or promotion."
     }
   ],
   "classification_coverage": {
@@ -8042,7 +8150,7 @@
       "kind": "tree",
       "ownership_mode": "canonical_native",
       "residual_only": true,
-      "role": "Residual AI-native multi-agent engineering surfaces outside mirrored Jeeves/core/swarm subtrees.",
+      "role": "Residual AI-native multi-agent engineering surfaces outside mirrored Jeeves/core/swarm subtrees, and custody of explicitly excluded historical emulator host/worker compatibility overlays. Approved native execution remains canonical skeleton/jeeves under machine/ai_game_emulator_host.json.",
       "volume_refs": [
         "VOL-100",
         "VOL-201",

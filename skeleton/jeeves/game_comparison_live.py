@@ -1,7 +1,7 @@
 """Explicit operator-owned, loopback-only live comparative libretro sessions.
 
 Only pre-approved game rows from a validated 30-game study may be started.
-Two to ten live lanes; actual native screen frames; <=256 steps/lane,
+Two to ten live lanes; actual native screen frames; <=4096 steps/lane,
 independent errors, bounded receipt history, no ROM bytes in HTTP responses.
 No model weights/Dragon custody are changed. Browser controls never execute code.
 """
@@ -13,6 +13,7 @@ import math
 import shutil
 import tempfile
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Any, Mapping
@@ -22,18 +23,21 @@ from .game_comparison_controllers import controller_layout_for_target
 from .game_comparison_media import prepare_comparison_media
 from .game_comparison_studio import _storage_waves
 from .game_emulator_host import _controls, create_emulator_environment
+from .game_emulator_timing import normalize_timing, native_execution_budget
 from .game_emulator_catalog import GameEmulatorRegistry
 
 SCHEMA = "skeleton.game.live_comparison.v1"
 MAX_LANES = 10
-MAX_STEPS_PER_LANE = 256
+MAX_STEPS_PER_LANE = 4096
 MAX_RESET_PER_LANE = 4
 MAX_CHECKPOINTS_PER_LANE = 2
 MAX_REWINDS_PER_LANE = 2
 MAX_REQUEST_LANES = 10
 MAX_BURST_STEPS = 8
+MAX_TIMING_EVENTS = 32
+MAX_INSPECTION_EVENTS = 24
 MAX_IMAGE_URI = 320_000
-MAX_RESPONSE_BYTES = 5 * 1024 * 1024
+MAX_RESPONSE_BYTES = 64 * 1024 * 1024
 
 
 class LiveComparisonError(ValueError):
@@ -75,6 +79,7 @@ def _preview(env: Any) -> dict[str, Any]:
         "audio_sha256": frame["audio_sha256"],
         "audio_frames": frame["audio_frames"],
         "frame_calls": frame["runs"],
+        "native_fps": frame.get("fps"),
         "video_callbacks": frame["video_callbacks"],
         "width": frame["width"],
         "height": frame["height"],
@@ -88,12 +93,21 @@ class _Lane:
     game: dict[str, Any]
     env: Any
     content_digest: str
+    native_content_digest: str
     controls_digest: str
     chain: str
     first_chain: str
     step_count: int = 0
     total_steps: int = 0
     reset_count: int = 0
+    disc_change_count: int = 0
+    timing_change_count: int = 0
+    inspection_count: int = 0
+    timing_mode: str = "normal"
+    timing_factor: int = 1
+    last_burst_wall_ms: float | None = None
+    last_burst_native_fps: float | None = None
+    last_burst_receipted_frames: int = 0
     receipts: list[dict[str, Any]] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
     checkpoint: dict[str, Any] | None = None
@@ -180,6 +194,9 @@ class LiveComparison:
                 ])
                 self._lanes[game["id"]] = _Lane(
                     game=game, env=env, content_digest=content_digest,
+                    native_content_digest=(
+                        getattr(env, "descriptor", {}).get("content_digest", content_digest)
+                    ),
                     controls_digest=digest(game["controller_devices"]), chain=chain,
                     first_chain=chain,
                 )
@@ -197,6 +214,7 @@ class LiveComparison:
             "series_id": lane.game["series_id"],
             "core_id": lane.game["core_id"], "target_id": lane.game["target_id"],
             "content_sha256": lane.content_digest,
+            "native_content_digest": lane.native_content_digest,
             "controller_layout": controller_layout_for_target(
                 lane.game["target_id"], lane.game["controller_devices"],
                 core_input_descriptors=(
@@ -209,6 +227,23 @@ class LiveComparison:
             "status": lane.status, "error_class": lane.error_class,
             "episode_steps": lane.step_count, "lifetime_steps": lane.total_steps,
             "reset_count": lane.reset_count,
+            "native_disc_change_count": lane.disc_change_count,
+            "timing_mode": lane.timing_mode,
+            "timing_factor": lane.timing_factor,
+            "last_burst_wall_ms": lane.last_burst_wall_ms,
+            "last_burst_native_fps": lane.last_burst_native_fps,
+            "last_burst_receipted_frames": lane.last_burst_receipted_frames,
+            "speed_measurement_scope": "host_monotonic_wall_time_per_burst_not_hardware_accuracy",
+            "timing_change_count": lane.timing_change_count,
+            "inspection_count": lane.inspection_count,
+            "native_frames_per_step": native_execution_budget(lane.timing_mode, lane.timing_factor, lane.game["frames_per_step"])[0],
+            "max_inspections": MAX_INSPECTION_EVENTS,
+            "max_timing_changes": MAX_TIMING_EVENTS,
+            "native_disc_status": (
+                lane.env.disc_status()
+                if lane.status != "native_execution_failed" and hasattr(lane.env, "disc_status")
+                else {"supported": False, "image_count": 0}
+            ),
             "checkpoint_count":lane.checkpoint_id,
             "has_private_checkpoint":lane.checkpoint is not None,
             "rewind_count":lane.rewind_count,
@@ -247,20 +282,32 @@ class LiveComparison:
                 "model_training_or_promotion": False,
             }
             if len(json.dumps(result,allow_nan=False).encode()) > MAX_RESPONSE_BYTES:
-                raise LiveComparisonError("Live report exceeds five MiB; reset session or reduce lane count")
+                raise LiveComparisonError("Live report exceeds 64 MiB; reset session or reduce lane count")
             return result
 
-    def _execute_one(self, lane: _Lane, controls: list[dict[str, Any]], *, include_preview: bool = True) -> dict[str, Any]:
+    def _execute_one(
+        self, lane: _Lane, controls: list[dict[str, Any]], *,
+        native_frames: int, include_preview: bool = True,
+    ) -> dict[str, Any]:
         try:
             previous_frame=(
                 dict(lane.env._frame)
                 if isinstance(lane.env._frame,dict) else None
             )
             previous_pixels=getattr(lane.env,"_pixels",None)
-            step = lane.env.input_step(controls)
+            if hasattr(lane.env, "input_frame_step"):
+                step = lane.env.input_frame_step(controls, frames=native_frames)
+            elif native_frames == lane.game["frames_per_step"]:
+                step = lane.env.input_step(controls)  # Legacy synthetic test workers only.
+            else:
+                raise LiveComparisonError("Native worker lacks precise frame scheduling")
             frame = lane.env._frame
             if not isinstance(frame, dict):
                 raise LiveComparisonError("Native worker omitted actual step video evidence")
+            if (previous_frame is not None and type(frame.get("runs")) is int
+                and type(previous_frame.get("runs")) is int
+                and frame["runs"] - previous_frame["runs"] != native_frames):
+                raise LiveComparisonError("Native core reported an unexpected frame-advance count")
             from .game_comparison_multispectral import native_step_multispectral_receipt
 
             rgb=getattr(lane.env,"_pixels",None)
@@ -270,8 +317,7 @@ class LiveComparison:
                     previous_frame,previous_pixels,frame,rgb,pcm,
                 )
             else:
-                # Source-contract fixtures can use fake worker metadata;
-                # never pretend such a fixture emitted spectral measurements.
+                # Fake test workers never claim measured native spectra.
                 multi=None
             evidence = {
                 "schema_version": "skeleton.game.live_native_step_receipt.v1",
@@ -285,13 +331,16 @@ class LiveComparison:
                 "frame_sha256": frame["pixel_sha256"],
                 "pcm_sha256": frame["audio_sha256"],
                 "native_frame_calls": frame["runs"],
+                "requested_native_frames": native_frames,
+                "timing_mode": lane.timing_mode,
+                "timing_factor": lane.timing_factor,
                 "native_audio_frames": frame["audio_frames"],
                 "transition_sha256": step.transition_digest,
                 "objective_observations": {
                     k: float(step.observation[k])
                     for k in ("screen_mean", "visual_change", "audio_rms", "step_fraction")
                 },
-                "native_multispectral":multi,
+                "native_multispectral": multi,
                 "source_content_sha256": lane.content_digest,
                 "core_sha256": lane.env.core.library_sha256,
                 "previous_chain_sha256": lane.chain,
@@ -317,14 +366,15 @@ class LiveComparison:
                     "error_class": lane.error_class, "native_receipt_created": False}
 
     def _execute_burst(
-        self, lane: _Lane, controls: list[dict[str, Any]], repeat: int
+        self, lane: _Lane, controls: list[dict[str, Any]], repeat: int, native_frames: int
     ) -> dict[str, Any]:
         """Advance 1–8 actually executed steps; encode only final native PNG."""
+        started = time.perf_counter()
         receipts=[]
         last=None
         for index in range(repeat):
             last=self._execute_one(
-                lane,controls,include_preview=(index==repeat-1),
+                lane,controls,native_frames=native_frames,include_preview=(index==repeat-1),
             )
             if last["status"]=="native_execution_failed":
                 break
@@ -336,10 +386,20 @@ class LiveComparison:
                 if last.get("native_preview") is None:
                     last["native_preview"]=_preview(lane.env)
                 break
+        elapsed = max(1e-9, time.perf_counter() - started)
+        fully_receipted_frames = len(receipts) * native_frames
+        lane.last_burst_wall_ms = round(elapsed * 1000, 3)
+        lane.last_burst_native_fps = round(fully_receipted_frames / elapsed, 2)
+        lane.last_burst_receipted_frames = fully_receipted_frames
         return {
             "game_id":lane.game["id"],
             "status":last["status"] if last is not None else lane.status,
+            "measured_wall_ms": lane.last_burst_wall_ms,
+            "observed_native_frames_per_wall_second": lane.last_burst_native_fps,
+            "fully_receipted_native_frames": fully_receipted_frames,
+            "timing_semantics": "measured_per_host_burst_not_guaranteed_realtime_speed",
             "attempted_native_steps":repeat,
+            "native_frames_per_step":native_frames,
             "completed_native_steps":len(receipts),
             "receipts":receipts,
             "last_receipt_sha256":receipts[-1]["receipt_sha256"] if receipts else None,
@@ -390,13 +450,18 @@ class LiveComparison:
                 if (not isinstance(row,dict)
                     or set(row) not in ({"game_id","controls"}, {"game_id","controls","repeat"})):
                     raise LiveComparisonError("Step item requires game_id, controls and optional bounded repeat")
-                repeat=row.get("repeat",1)
-                if type(repeat) is not int or not 1<=repeat<=MAX_BURST_STEPS:
-                    raise LiveComparisonError("Native input repeat must be a positive integer <=8")
                 identity = row["game_id"]
                 if type(identity) is not str or identity not in self._lanes or identity in seen:
                     raise LiveComparisonError("Step must address a unique existing active game lane")
                 lane=self._lanes[identity]
+                if lane.timing_mode == "paused":
+                    raise LiveComparisonError("Paused emulator rejects all native frame advances")
+                native_frames, default_burst = native_execution_budget(
+                    lane.timing_mode, lane.timing_factor, lane.game["frames_per_step"]
+                )
+                repeat=row.get("repeat",default_burst)
+                if type(repeat) is not int or not 1<=repeat<=MAX_BURST_STEPS:
+                    raise LiveComparisonError("Native input repeat must be a positive integer <=8")
                 if lane.status!="running" or lane.total_steps+repeat>self._max_steps:
                     raise LiveComparisonError("Native burst exceeds this lane's remaining lifetime step budget")
                 controls = _controls(row["controls"])
@@ -410,17 +475,171 @@ class LiveComparison:
                         raise LiveComparisonError(
                             "Native input is incompatible with declared "+device+" device on port "+str(i)
                         )
-                prepared.append((lane,controls,repeat))
+                prepared.append((lane,controls,repeat,native_frames))
                 seen.add(identity)
             # First validate ALL lanes, then execute at most 10 actual cores.
             with ThreadPoolExecutor(max_workers=len(prepared)) as executor:
-                futures=[executor.submit(self._execute_burst,lane,controls,repeat)
-                         for lane,controls,repeat in prepared]
+                futures=[executor.submit(self._execute_burst,lane,controls,repeat,native_frames)
+                         for lane,controls,repeat,native_frames in prepared]
                 results=[f.result() for f in futures]
             return {"schema_version":"skeleton.game.live_step_batch.v1",
                     "results":results,"parallel_native_lanes_attempted":len(results),
                     "all_succeeded":all(x["complete"] and x["status"]!="native_execution_failed" for x in results),
                     "model_training_performed":False}
+
+    def set_timing(self, raw: object) -> dict[str, Any]:
+        """Core-independent speed profile, with native-frame-free audit receipt."""
+        with self._lock:
+            self._check()
+            if not isinstance(raw, dict) or set(raw) != {"game_id", "mode", "factor"}:
+                raise LiveComparisonError("Timing request needs exact game_id, mode and factor")
+            identity = raw["game_id"]
+            if type(identity) is not str or identity not in self._lanes:
+                raise LiveComparisonError("Unknown native game for timing control")
+            mode, factor = normalize_timing(raw["mode"], raw["factor"])
+            lane = self._lanes[identity]
+            if lane.status == "native_execution_failed":
+                raise LiveComparisonError("Cannot control failed native emulator")
+            if mode == lane.timing_mode and factor == lane.timing_factor:
+                return {"game_id": identity, "changed": False, "timing_mode": mode,
+                        "timing_factor": factor, "native_frame_advanced": False}
+            if lane.timing_change_count >= MAX_TIMING_EVENTS:
+                raise LiveComparisonError("Native timing event budget exhausted")
+            frame = getattr(lane.env, "_frame", None)
+            if not isinstance(frame, dict):
+                raise LiveComparisonError("Native frame missing before timing change")
+            receipt = {
+                "schema_version": "skeleton.game.live_native_timing_receipt.v1",
+                "game_id": identity, "index": lane.timing_change_count + 1,
+                "episode_step": lane.step_count, "reset_generation": lane.reset_count,
+                "previous_mode": lane.timing_mode, "previous_factor": lane.timing_factor,
+                "mode": mode, "factor": factor,
+                "native_frame_sha256": frame["pixel_sha256"],
+                "native_run_cursor": frame["runs"],
+                "source_content_sha256": lane.content_digest,
+                "core_sha256": lane.env.core.library_sha256,
+                "previous_chain_sha256": lane.chain,
+                "native_frame_advanced": False,
+            }
+            lane.chain = digest(receipt)
+            receipt["receipt_sha256"] = lane.chain
+            lane.events.append({"event_kind": "native_timing_change", "receipt": receipt,
+                                "receipt_sha256": lane.chain})
+            lane.timing_mode, lane.timing_factor = mode, factor
+            lane.timing_change_count += 1
+            return {"game_id": identity, "changed": True, "timing_mode": mode,
+                    "timing_factor": factor, "receipt": receipt,
+                    "native_frame_advanced": False, "model_training_performed": False}
+
+    def inspect(self, raw: object) -> dict[str, Any]:
+        """Snapshot native RGB tiles only while frozen. A pause is not retro_run."""
+        with self._lock:
+            self._check()
+            if not isinstance(raw, dict) or set(raw) != {"game_id"}:
+                raise LiveComparisonError("Inspection requires an exact game_id")
+            identity = raw["game_id"]
+            if type(identity) is not str or identity not in self._lanes:
+                raise LiveComparisonError("Unknown native game for frame inspection")
+            lane = self._lanes[identity]
+            if lane.timing_mode != "paused" or lane.status == "native_execution_failed":
+                raise LiveComparisonError("Pause the native emulator before high fidelity inspection")
+            if lane.inspection_count >= MAX_INSPECTION_EVENTS:
+                raise LiveComparisonError("Native inspection receipt budget exhausted")
+            if not hasattr(lane.env, "inspect_frame"):
+                raise LiveComparisonError("Real libretro pixel inspection unavailable")
+            inspected = lane.env.inspect_frame()
+            if (inspected.get("native_frames_executed_for_inspection") != 0
+                or inspected.get("total_tiles", 0) > 256):
+                raise LiveComparisonError("Native inspection exceeded immutable frame scope")
+            receipt = {
+                "schema_version": "skeleton.game.live_native_inspection_receipt.v1",
+                "game_id": identity, "index": lane.inspection_count + 1,
+                "episode_step": lane.step_count, "reset_generation": lane.reset_count,
+                "native_frame_sha256": inspected["pixel_sha256"],
+                "native_run_cursor": inspected["native_run_cursor"],
+                "inspection_sha256": digest(inspected),
+                "tile_count": inspected["total_tiles"],
+                "source_content_sha256": lane.content_digest,
+                "core_sha256": lane.env.core.library_sha256,
+                "previous_chain_sha256": lane.chain, "native_frame_advanced": False,
+            }
+            lane.chain = digest(receipt)
+            receipt["receipt_sha256"] = lane.chain
+            lane.events.append({"event_kind": "native_frame_inspection", "receipt": receipt,
+                                "receipt_sha256": lane.chain})
+            lane.inspection_count += 1
+            return {"game_id": identity, "inspection": inspected,
+                    "receipt": receipt, "native_frame_advanced": False,
+                    "model_training_performed": False}
+
+    def swap_disc(self, raw: object) -> dict[str, Any]:
+        """Operator-selected preloaded disc, never dynamic source file injection."""
+        with self._lock:
+            self._check()
+            if not isinstance(raw, dict) or set(raw) != {"game_id", "image_index"}:
+                raise LiveComparisonError("Disc change requires exact game ID and bounded index")
+            game_id, index = raw["game_id"], raw["image_index"]
+            if type(game_id) is not str or game_id not in self._lanes:
+                raise LiveComparisonError("Unknown approved live game lane")
+            if type(index) is not int or not 0 <= index <= 31:
+                raise LiveComparisonError("Native disc index must be 0–31")
+            lane = self._lanes[game_id]
+            if lane.status != "running" or lane.timing_mode == "paused" or lane.disc_change_count >= 32:
+                raise LiveComparisonError("Native disc changes are unavailable or exhausted")
+            if not hasattr(lane.env, "swap_disc"):
+                raise LiveComparisonError("This native lane has no disc switching capability")
+            try:
+                operation = lane.env.swap_disc(index)
+                if not operation["changed"]:
+                    return {
+                        "game_id": game_id, "changed": False,
+                        "disc_status": operation["disc_status"],
+                        "native_frame_advanced": False,
+                        "receipt_chain_sha256": lane.chain,
+                    }
+                status = operation["disc_status"]
+                receipt = {
+                    "schema_version": "skeleton.game.live_native_disc_swap_receipt.v1",
+                    "game_id": game_id,
+                    "index": lane.disc_change_count + 1,
+                    "episode_step": lane.step_count,
+                    "reset_generation": lane.reset_count,
+                    "source_content_sha256": lane.content_digest,
+                    "native_content_digest": lane.native_content_digest,
+                    "core_sha256": lane.env.core.library_sha256,
+                    "native_host_disc_receipt_sha256": operation["receipt"]["receipt_sha256"],
+                    "native_host_disc_receipt": dict(operation["receipt"]),
+                    "previous_image_index": operation["receipt"]["previous_image_index"],
+                    "selected_image_index": status["image_index"],
+                    "registered_disc_count": status["image_count"],
+                    "interface_version": status["interface_version"],
+                    "previous_chain_sha256": lane.chain,
+                    "native_frame_advanced": False,
+                }
+                lane.chain = digest(receipt)
+                receipt["receipt_sha256"] = lane.chain
+                lane.events.append({
+                    "event_kind": "native_disc_swap", "receipt": receipt,
+                    "receipt_sha256": lane.chain,
+                })
+                lane.disc_change_count += 1
+                return {
+                    "game_id": game_id, "changed": True,
+                    "disc_status": status,
+                    "receipt": receipt,
+                    "receipt_chain_sha256": lane.chain,
+                    "native_frame_advanced": False,
+                    "model_training_performed": False,
+                }
+            except BaseException as exc:
+                lane.status = "native_execution_failed"
+                lane.error_class = type(exc).__name__
+                lane.env.close()
+                return {
+                    "game_id": game_id, "status": lane.status,
+                    "error_class": lane.error_class,
+                    "native_receipt_created": False,
+                }
 
     def checkpoint(self, game_id: str) -> dict[str, Any]:
         """Save a bounded, private native state; export only hash evidence."""
@@ -539,6 +758,8 @@ class LiveComparison:
             lane=self._lanes.get(game_id)
             if lane is None or lane.status=="native_execution_failed":
                 raise LiveComparisonError("Cannot reset an unknown or failed native lane")
+            if lane.timing_mode == "paused":
+                raise LiveComparisonError("Resume the paused emulator before a native reset")
             if lane.reset_count >= MAX_RESET_PER_LANE or lane.total_steps >= self._max_steps:
                 raise LiveComparisonError("Live session reset or lifetime step budget exhausted")
             try:
@@ -590,13 +811,18 @@ class LiveComparison:
                         "core_id":lane.game["core_id"],
                         "target_id":lane.game["target_id"],
                         "source_media_sha256":lane.content_digest,
+                        "native_content_digest":lane.native_content_digest,
                         "core_sha256":lane.env.core.library_sha256,
                         "native_environment_sha256":lane.env.spec.environment_digest,
+                        "configured_frames_per_step":lane.game["frames_per_step"],
                         "seed":lane.game["seed"],
                         "initial_chain_sha256":lane.first_chain,
                         "final_chain_sha256":lane.chain,
                         "step_count":lane.total_steps,
                         "reset_count":lane.reset_count,
+                        "disc_change_count":lane.disc_change_count,
+                        "timing_change_count":lane.timing_change_count,
+                        "inspection_count":lane.inspection_count,
                         "checkpoint_count":lane.checkpoint_id,
                         "rewind_count":lane.rewind_count,
                         "native_events":list(lane.events),
@@ -610,7 +836,7 @@ class LiveComparison:
                 "learning_or_production_weight_promoted":False,
             }
             if len(json.dumps(result,sort_keys=True,allow_nan=False).encode())>MAX_RESPONSE_BYTES:
-                raise LiveComparisonError("Full live native receipts exceed the bounded five-MiB export")
+                raise LiveComparisonError("Full live native receipts exceed the bounded 64-MiB export")
             return result
 
     def close(self) -> None:

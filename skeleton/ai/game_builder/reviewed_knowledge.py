@@ -692,6 +692,7 @@ class ReviewedKnowledgeStore:
         min_confidence_ppm: int = 0,
         authorized: bool,
         diversify: bool = True,
+        allowed_revisions: dict[str, str] | None = None,
     ) -> tuple[KnowledgeHit, ...]:
         if not authorized:
             raise PermissionError("game knowledge retrieval requires authorization")
@@ -706,8 +707,22 @@ class ReviewedKnowledgeStore:
         terms = set(_words(query))
         if not terms:
             raise KnowledgeError("query has no searchable terms")
+        if allowed_revisions is not None:
+            if type(allowed_revisions) is not dict or len(allowed_revisions) > 64:
+                raise KnowledgeError("allowed revisions must be a bounded source/digest map")
+            allowed_revisions = {
+                _id(source_id, "allowed source_id"): _digest(revision, "allowed revision_digest")
+                for source_id, revision in allowed_revisions.items()
+            }
+            if not allowed_revisions:
+                return ()
         found: list[KnowledgeHit] = []
         for source in self._rows(owner):
+            if (
+                allowed_revisions is not None
+                and allowed_revisions.get(source["source_id"]) != source["revision_digest"]
+            ):
+                continue
             if source["status"] != "active" or scope not in source["allowed_scopes"]:
                 continue
             # Captured-source revisions remain unusable unless the embedding
