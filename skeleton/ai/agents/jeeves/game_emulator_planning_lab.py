@@ -255,7 +255,13 @@ def run_native_confirmed_planning(
     try:
         if env.spec.environment_digest != model.get("source_environment_digest"):
             raise EmulatorPlanningError("model source core, content or sensor basis changed")
-        if list(env.spec.observation_bins) != model.get("observation_features"):
+        from .game_learning import _descriptor
+
+        # Policy descriptors canonicalize sensor keys alphabetically. The
+        # raw native host defines them in acquisition order. Both represent
+        # the same measured features; compare their *canonical* order.
+        canonical_features = list(_descriptor(env.spec)["observation_bins"])
+        if canonical_features != model.get("observation_features"):
             raise EmulatorPlanningError("model trained on a different numeric sensor layout")
         allowed = tuple(name for name in model.get("actions", []) if name in env.spec.actions)
         if set(allowed) != set(env.spec.actions) or len(allowed) < 2:
