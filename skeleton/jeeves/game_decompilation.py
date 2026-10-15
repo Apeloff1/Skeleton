@@ -169,6 +169,15 @@ def decompile_authorized_game(
         elif fmt == "game_boy_cartridge":
             code = disassemble_gb_sm83(data, limit=instruction_limit)
             code["supported"] = True
+        elif fmt == "gba_structural_header":
+            from .game_decompilation_arm import disassemble_gba_arm_entry
+            try:
+                code = disassemble_gba_arm_entry(data, limit=instruction_limit)
+                code["supported"] = True
+            except ValueError:
+                code = {"supported": False,
+                        "reason": "gba_boot_checksum_or_entrypoint_not_validated",
+                        "fabricated_source_code": False}
         else:
             code = {"supported": False, "reason": "no_verified_disassembler_for_this_CPU_container",
                     "fabricated_source_code": False}
