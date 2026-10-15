@@ -160,6 +160,8 @@ class ExperimentalMbcExpansionTests(unittest.TestCase):
 
     def test_cartridge_geometry_refuses_impossible_ram_or_rom(self):
         for kind, size_code, ram_code in (
+            (0x03, 5, 3),
+            (0x03, 6, 3),
             (0x11, 7, 0),
             (0x13, 2, 4),
             (0x19, 2, 3),
