@@ -58,6 +58,8 @@ def run(
     expand_vocabulary: bool = False,
     max_optimizer_steps: int = 25000,
     max_training_seconds: int = 1200,
+    studio_corpus: Path | None = None,
+    studio_corpus_expected_sha256: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(run_id, str) or not _RUN_ID.fullmatch(run_id):
         raise ProductionCheckpointError("run id must be 3-48 safe lowercase characters")
@@ -74,6 +76,15 @@ def run(
             raise ProductionCheckpointError("invalid " + label)
     if learning_rate <= 0:
         raise ProductionCheckpointError("training learning rate must be > 0")
+    if (studio_corpus is None) != (studio_corpus_expected_sha256 is None):
+        raise ProductionCheckpointError("gameplay corpus requires independently pinned SHA256")
+    studio_examples = 0
+    if studio_corpus is not None:
+        from .jeeves_studio_curriculum import load_studio_curriculum
+        measured, _ = load_studio_curriculum(
+            studio_corpus, expected_sha256=studio_corpus_expected_sha256,
+        )
+        studio_examples = len(measured)
     report = inspect(
         attestation=attestation, candidate_directory=output_directory,
         allow_vocabulary_expansion=expand_vocabulary,
@@ -86,6 +97,8 @@ def run(
             "production_weights_modified": False,
             "candidate_promoted": False,
             "preflight": report,
+            "studio_corpus_sha256": studio_corpus_expected_sha256,
+            "studio_replay_verified_examples": studio_examples,
         }
     baseline = Path(report["checkpoint_path"])
     if output_directory.resolve() == baseline.parent.resolve():
@@ -131,6 +144,8 @@ def run(
         expand_vocabulary=expand_vocabulary,
         max_optimizer_steps=max_optimizer_steps,
         max_training_seconds=max_training_seconds,
+        studio_corpus=studio_corpus,
+        studio_corpus_expected_sha256=studio_corpus_expected_sha256,
     )
     if _sha(baseline) != start_sha:
         raise ProductionCheckpointError("live serving weights changed during training")
@@ -141,6 +156,8 @@ def run(
             "parent_checkpoint_sha256": start_sha,
             "parent_backup_sha256": backup["parent_sha256"],
             "training_report_path": str(names["training"].resolve()),
+            "studio_corpus_sha256": trained["studio_corpus_sha256"],
+            "studio_replay_verified_examples": trained["studio_replay_verified_examples"],
             "candidate_promoted": False,
             "game_design_improvement_established": False,
             "production_weights_modified": False,
@@ -170,6 +187,8 @@ def run(
         "game_review_report_path": str(names["game_review"].resolve()),
         "game_review_report_sha256": _sha(names["game_review"]),
         "benchmark_prompts": review["fresh_heldout_prompts"],
+        "studio_corpus_sha256": trained["studio_corpus_sha256"],
+        "studio_replay_verified_examples": trained["studio_replay_verified_examples"],
         "vocabulary_expansion_opted_in": expand_vocabulary,
         "max_optimizer_steps": max_optimizer_steps,
         "max_training_seconds": max_training_seconds,
@@ -196,6 +215,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--learning-rate", default=0.005, type=float)
     parser.add_argument("--max-domain-regression", default=0.0, type=float)
     parser.add_argument("--min-coverage", default=0.8, type=float)
+    parser.add_argument("--studio-corpus", type=Path)
+    parser.add_argument("--studio-corpus-expected-sha256")
     args = parser.parse_args(argv)
     try:
         result = run(
@@ -210,6 +231,8 @@ def main(argv: list[str] | None = None) -> int:
             expand_vocabulary=args.expand_vocabulary,
             max_optimizer_steps=args.max_optimizer_steps,
             max_training_seconds=args.max_training_seconds,
+            studio_corpus=args.studio_corpus,
+            studio_corpus_expected_sha256=args.studio_corpus_expected_sha256,
         )
         print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
         return 0 if result["status"] in (

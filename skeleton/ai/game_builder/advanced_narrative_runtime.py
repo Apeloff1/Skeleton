@@ -155,7 +155,13 @@ def step(state, config, action):
         effect = beat["choices"][branch]
         flag = beat["theme"] + ":" + effect
         if flag not in state["flags"] and len(state["flags"]) >= config["state_flags"]:
-            raise NarrativeActionError("source story state-flag capacity exhausted")
+            retired = state["flags"].pop(0)
+            state["canon"].append({
+                "beat":state["beat"],
+                "fact":"retired-active-flag:"+retired,
+                "source":"bounded_active_flags_historical_canon_retained",
+            })
+            events.append("historical_canon_preserved_when_active_flag_evicted")
         _choice_effect(state, effect, beat["theme"])
         old = state["beat"]
         state["beat"] = min(depth, old + (2 if depth >= 96 else 1))

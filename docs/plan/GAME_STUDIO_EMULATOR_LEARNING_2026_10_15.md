@@ -76,3 +76,28 @@ Episode replay depth is limited to 128 even where a generic job asks for more.
 This does **not** create a second ungoverned API or skip tenant/project/source
 authority. Frontend integration and exact-head application tests remain
 necessary before release.
+
+## Real Jeeves neural candidate from replay-verified engine experience
+
+An additional bridge, `skeleton/ai/training/jeeves_studio_curriculum.py`,
+collects actual original-game state transitions into a training-only corpus.
+Each episode is independently re-executed, with bounded action, seed,
+engine source and SHA256 identity. On checkpoint training, untrusted serialized
+claims are rejected, and the corpus is replay-verified a second time.
+
+```bash
+python -m skeleton.ai.training.jeeves_studio_curriculum \
+  --engine economy --actions inspect survey wait --seed 9 \
+  --output /private/engine-corpus.json --authorized --rights-cleared
+sha256sum /private/engine-corpus.json
+python -m skeleton.ai.training.jeeves_production_game_session \
+  --run-id game-corpus-01 --attestation /private/attestation.json \
+  --output-directory /private/new-candidate-folder \
+  --studio-corpus /private/engine-corpus.json \
+  --studio-corpus-expected-sha256 <independently-verified-64-hex-sha>
+```
+
+The checkpoint trainer must still have a real independently pinned
+`SKELETON_OWN` model, does actual optimizer updates only on a **candidate**,
+and independently evaluates its held-out outputs. This does not automatically
+train or promote live production weights, or prove improved game design.

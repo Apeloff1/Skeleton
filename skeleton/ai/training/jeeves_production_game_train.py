@@ -184,7 +184,9 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           epochs: int, lr: float, min_coverage: float, max_domain_regression: float,
           expand_vocabulary: bool = False,
           max_optimizer_steps: int = 25000,
-          max_training_seconds: int = 1200) -> dict[str, Any]:
+          max_training_seconds: int = 1200,
+          studio_corpus: Path | None = None,
+          studio_corpus_expected_sha256: str | None = None) -> dict[str, Any]:
     from skeleton.cortex.transformer import TinyTransformer
     from skeleton.cortex.bpe import BytePairEncoder
 
@@ -206,10 +208,28 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         if path.exists() or path.is_symlink() or not path.parent.is_dir():
             raise ProductionCheckpointError("outputs must be new paths in existing directories")
 
+    # Admit only independently pinned, replay-verified original engine
+    # experience. Never treat a user-supplied training label as proof.
+    if (studio_corpus is None) != (studio_corpus_expected_sha256 is None):
+        raise ProductionCheckpointError("gameplay corpus needs an independently pinned SHA256")
+    measured_examples: tuple[str, ...] = ()
+    pinned_corpus_sha256: str | None = None
+    if studio_corpus is not None:
+        from .jeeves_studio_curriculum import load_studio_curriculum
+        measured_examples, pinned_corpus_sha256 = load_studio_curriculum(
+            studio_corpus, expected_sha256=studio_corpus_expected_sha256,
+        )
+        if not measured_examples:
+            raise ProductionCheckpointError("replay-verified gameplay corpus is empty")
     parent_path, original, parent_sha = _production_source(source, expected)
     if parent_path.resolve() in (candidate.resolve(), report.resolve()):
         raise ProductionCheckpointError("outputs cannot overwrite active production checkpoint")
     dataset, heldout = _texts()
+    if measured_examples:
+        holdout_rows = {text for cases in heldout.values() for text in cases}
+        if holdout_rows.intersection(measured_examples):
+            raise ProductionCheckpointError("measured gameplay corpus overlaps heldout evaluation")
+        dataset = dataset + measured_examples
     selected_key, original_snapshot, mouth = _active_snapshot(original)
     torch_stack = original_snapshot.get("kind") == "torch-stack"
     if torch_stack:
@@ -309,6 +329,9 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "production_weights_modified": False,
         "candidate_promoted": False,
         "curriculum_exposures_per_epoch": len(dataset),
+        "studio_corpus_sha256": pinned_corpus_sha256,
+        "studio_replay_verified_examples": len(measured_examples),
+        "gameplay_training_only": True,
         "epochs": epochs,
         "training_steps_before": steps_before,
         "training_steps_after": model.steps,
@@ -335,6 +358,8 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     }
     if sha256(parent_path.read_bytes()).hexdigest() != parent_sha:
         raise ProductionCheckpointError("live checkpoint changed during training; refusing stale candidate")
+    if studio_corpus is not None and sha256(studio_corpus.read_bytes()).hexdigest() != pinned_corpus_sha256:
+        raise ProductionCheckpointError("gameplay training corpus changed during optimization")
     if result["status"] != "rejected_evaluation_gate":
         output = dict(original)
         output[selected_key] = trained_snapshot

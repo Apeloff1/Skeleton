@@ -219,5 +219,14 @@
       "No native hardware pixels from authoring-only engines",
       "No automatic live production transformer weight updates"
     ]
+  },
+  "studio_engine_corpus_training": {
+    "status": "implemented_pending_exact_head_verification",
+    "canonical_owner": "skeleton/ai/training/jeeves_studio_curriculum.py",
+    "candidate_trainer": "skeleton/ai/training/jeeves_production_game_train.py",
+    "candidate_session": "skeleton/ai/training/jeeves_production_game_session.py",
+    "workflow": "Rights-cleared original studio gameplay produces independently replay-verified text examples, pinned by SHA256 and admitted as candidate-only training examples to the authentic SKELETON_OWN checkpoint-derived Jeeves optimizer; separately declared Pareto heldout is preserved.",
+    "boundaries": "No new service/provider. No automatic training, model promotion or live serving-weight changes; operator initiates the pinned candidate with the checkpoint and attestation.",
+    "status_limit": "No live checkpoint was accessed or neural optimizer executed during this GitHub-only authoring session; local tests and exact-head CI remain required."
   }
 }
