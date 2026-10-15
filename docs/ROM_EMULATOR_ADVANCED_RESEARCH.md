@@ -694,3 +694,59 @@ The code and synthetic regressions have been committed but **not executed
 during authoring**. No new native core has a verified boot, no original
 ROM training result is reported as measured, and no production Jeeves
 model weights are updated by these changes.
+
+
+## N. Bounded original-ROM temporal controller sequences and real CPU snapshots
+
+The original homebrew ROM microtrace lab now supports not only a static
+controller hold, but also up to **eight total independent control branches**
+with a finite 2–8-phase instruction-timed schedule per temporal branch.
+Every phase change is applied to the **same real LR35902 CPU from an exact
+starting savestate** at a deterministic CPU instruction boundary. Every
+branch is executed twice independently and the full source-result digests
+must match.
+
+```bash
+python scripts/audit_original_rom_instruction_divergence.py \
+  --evidence-file /private/research/source-cpu-sequence-001.json \
+  --seed 42 --instruction-count 2048 --sample-stride 8 \
+  --max-cycles-per-branch 131072 \
+  --actions idle a right a_right \
+  --sequence a,idle,right \
+  --sequence right,a \
+  --sequence a_right,idle
+```
+
+The source input journal records the exact **instruction ordinal** of
+each controller assignment (for example 0, 682, 1365 for three phases
+over 2048 instructions). It never replaces that ordinal with a guessed
+frame time. Source model comparisons separately record real CPU cycle
+counts; actions with different branch costs are not assumed to have equal
+wall-time lengths. Repeated identical adjacent controller phases,
+unadmitted buttons, duplicates and input schedules beyond the finite
+branch budget fail before any CPU trial.
+
+The same manual-only original ROM AI acceptance suite now tests these
+three scheduled sequences in addition to four basic single-input branches.
+It checks nested per-instruction sample digests, source intervention
+journals, exact phase boundaries, repeated final CPU/memory states, and
+the total instruction/assignment counters. A rehashed manifest with
+missing or modified action-phase events cannot satisfy the suite.
+
+This source evidence is useful for studying input order, control release,
+simultaneous buttons, and time-dependent RAM/PPU/RTC/DMA effects. It does
+**not** assert that the AI has learned those action consequences from
+neural gradients or achieved a game objective. Learned policy improvement
+still requires separate truly source-run training, qualified independent
+evaluation, and explicit production promotion approval.
+
+### Current execution and source-bound limitations
+
+As of this draft authoring pass, the source additions include the OAM DMA
+engine, coupled T-cycle timer/PPU/DMA progression, multi-action source
+instruction trials, governed AI mirrors, and dedicated regression cases.
+The local environment has no working GitHub clone and the GitHub
+connector has no workflow-dispatch action. **No actual acceptance,
+native emulator build, regression suite or neural optimization job has
+been run.** An existing manual workflow is defined in source but is not
+an executed result and the PR remains draft.
