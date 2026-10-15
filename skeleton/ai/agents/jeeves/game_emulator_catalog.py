@@ -418,6 +418,14 @@ _CORE_CONTENT_EXTENSIONS = {
     "fbneo": "zip|cue|chd",
     "ppsspp": "elf|iso|cso|prx|pbp|chd",
     "flycast": "chd|cdi|elf|cue|gdi|lst|bin|dat|m3u",
+    "bsnes": "sfc|smc|fig|swc|bs",
+    "puae": "adf|adz|dms|fdi|ipf|hdf|hdz|m3u",
+    "np2kai": "d88|d98|fdi|hdm|nfd|nhd|hdi|hdd|m3u",
+    "dosbox_svn": "exe|com|bat|conf|iso|cue|img|ima",
+    "yabause": "cue|iso|ccd|mds|chd|m3u",
+    "hatari": "st|msa|stx|dim|ipf|m3u",
+    "swanstation": "cue|bin|img|chd|pbp|m3u|iso",
+    "mupen64plus_next": "n64|v64|z64|bin",
 }
 
 

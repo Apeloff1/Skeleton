@@ -143,7 +143,15 @@
     "vice_x128": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
     "vice_xvic": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
     "vice_xplus4": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
-    "vice_xpet": "f63b56688f3133a2bb17499db9eebb7ab81df5f5"
+    "vice_xpet": "f63b56688f3133a2bb17499db9eebb7ab81df5f5",
+    "bsnes": "63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+    "puae": "7387937066b1b693816c3b4e2b7a0c601d41363d",
+    "np2kai": "1ea561cd7fd62b33f4e7b3f1c2e30fc3e6089f28",
+    "dosbox_svn": "46a3164fc0f1e808ae56143d81698b00fb6b4781",
+    "yabause": "8926b0c6c347f8c5c755911ddb0ac695420ffbf8",
+    "hatari": "a82e014ce2b05fc7724add284febba3816e4112a",
+    "swanstation": "e436e9b85374def58d211df7f78880f0f4a917b4",
+    "mupen64plus_next": "12edd2c74a517ff86dfa8cfc71ad75e4c10486d5"
   },
   "two_hour_expansion": {
     "started_utc": "2026-10-14T04:39:16Z",
@@ -374,5 +382,27 @@
     "assets": "blueMSX copies only pinned C-BIOS machine profiles and databases into /system; no proprietary firmware bundled",
     "admission": "firmware-dependent and unqualified runtime cores remain deferred; build eligibility does not prove emulator execution",
     "verification": "Public upstream revisions, build artifacts and valid_extensions checked at source level; no native compilation or game run completed in this change."
+  },
+  "expansion_batch_2026_10_15_2": {
+    "kind": "pinned_source_recipe_expansion",
+    "new_core_recipes": [
+      "bsnes",
+      "puae",
+      "np2kai",
+      "dosbox_svn",
+      "yabause",
+      "hatari",
+      "swanstation",
+      "mupen64plus_next"
+    ],
+    "count_added": 8,
+    "previous_recipe_count": 51,
+    "declared_recipe_total": 59,
+    "installed_core_count_verified_in_this_change": 0,
+    "gameplay_qualified_in_this_change": 0,
+    "execution_policy": "operator source build, exact byte/ELF/ABI inspection, approved registry and isolated native worker; candidate_only entries remain deferred",
+    "firmware_policy": "operator-supplied rights-cleared firmware only; none distributed",
+    "legal_policy": "no game ROMs, encryption keys or platform firmware included",
+    "caveat": "The canonical 169-target inventory is hardware identities, not a claim of 169 runnable emulators."
   }
 }
