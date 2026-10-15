@@ -28,6 +28,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sample-stride", type=int, default=8)
     parser.add_argument("--max-cycles-per-branch", type=int, default=131072)
     parser.add_argument("--actions", nargs="+", default=["idle", "a", "right", "a_right"])
+    parser.add_argument(
+        "--sequence", action="append", default=[],
+        help="Additional exact-instruction input phases, comma-separated: a,idle,right; repeat up to 8 total branches",
+    )
     args = parser.parse_args(argv)
     try:
         if args.evidence_file.exists() or args.evidence_file.is_symlink():
@@ -40,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
             sample_stride=args.sample_stride,
             max_cycles_per_branch=args.max_cycles_per_branch,
             action_subset=tuple(args.actions),
+            temporal_sequences=tuple(tuple(part.split(",")) for part in args.sequence),
         )
         result = compare_original_rom_instruction_branches(config)
         payload = (json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
@@ -58,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
             "status": "original_source_cpu_instruction_replays_identical",
             "actual_original_cpu_instructions": result["real_source_instruction_executions"],
             "measured_active_control_branches": len(result["paired_replay_verified_differences"]),
+            "actual_multiphase_source_sequences": result["actually_executed_temporal_sequences"],
             "source_evidence_file": str(args.evidence_file),
             "report_digest": result["report_digest"],
             "production_jeeves_weight_updates": 0,
