@@ -27,22 +27,9 @@ from .game_learning import (
 )
 from .game_learning_demonstrations import current_observation, environment_snapshot_digest
 from .game_learning_parallel import GameEnvironmentRequest
+from .game_emulator_curriculum import ANGLES, EvidenceCurriculum
 
 SCHEMA = "skeleton.game.emulator_training_lab.v1"
-ANGLES = (
-    "exploration",
-    "policy",
-    "adversarial",
-    "temporal",
-    "boundary",
-    "recovery",
-    "perturbation",
-    "causal",
-    "reversal",
-    "boomerang",
-)
-
-
 class EmulatorTrainingError(GameLearningError):
     """Training provenance, replay or resource bound invalid."""
 
@@ -128,8 +115,11 @@ def _choose_action(
     ordinal: int,
     step: int,
     rng: random.Random,
+    underobserved_action: str | None = None,
 ) -> str:
     actions = tuple(learner.spec.actions)
+    if step == 0 and angle in ("exploration", "boundary") and underobserved_action in actions:
+        return underobserved_action
     if angle == "policy" or angle == "causal":
         return learner.predict(observation)["action"]
     if angle == "adversarial":
@@ -290,6 +280,7 @@ def _collect_audited(
     *, run_index: int, seed: int, angle: str,
     cancel: Callable[[], bool] | None,
     authorize: Callable[[], None] | None,
+    underobserved_action: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     _guard(cancel, authorize)
     environment = request.build(cancel=cancel)
@@ -309,7 +300,10 @@ def _collect_audited(
             _guard(cancel, authorize)
             if index and index % config.checkpoint_stride == 0:
                 checkpoints.append((index, environment.snapshot(), dict(observation)))
-            action = _choose_action(learner, observation, angle, run_index, index, rng)
+            action = _choose_action(
+                learner, observation, angle, run_index, index, rng,
+                underobserved_action=underobserved_action,
+            )
             # Counterfactuals are actual one-step native probes from one earlier
             # recorded state. Restore the real continuation before collecting.
             if index in (0, config.steps_per_run // 2) and config.counterfactual_actions:
@@ -491,6 +485,7 @@ def run_emulator_training_lab(
         policy_id=policy_id,
         source_lineage=dict(source_lineage),
     )
+    curriculum = EvidenceCurriculum(learner.spec.actions, seed=config.seed)
     seen: set[str] = set()
     evidence: list[dict[str, Any]] = []
     neural_candidate_samples: list[dict[str, Any]] = []
@@ -504,11 +499,13 @@ def run_emulator_training_lab(
     status = "budget_exhausted_before_saturation"
     for ordinal in range(config.max_runs):
         _guard(cancel, authorize)
-        angle = ANGLES[ordinal % len(ANGLES)]
+        angle, scheduling_proof = curriculum.select()
+        least_observed = curriculum.least_observed_action()
         run_seed = int(_digest(["train", config.seed, ordinal])[:15], 16)
         trace, receipt, retained = _collect_audited(
             request, learner, config, run_index=ordinal, seed=run_seed, angle=angle,
             cancel=cancel, authorize=authorize,
+            underobserved_action=least_observed,
         )
         new_signatures = set(item["state_signature"] for item in receipt["modalities"]) - seen
         seen.update(item["state_signature"] for item in receipt["modalities"])
@@ -536,6 +533,12 @@ def run_emulator_training_lab(
                 "truncated": row["truncated"],
                 "source": "independently_replayed_emulator_transition",
             })
+        curriculum_proof = curriculum.observe(
+            angle=angle, run_index=ordinal, trace=trace,
+            receipt=receipt, new_signatures=len(new_signatures),
+        )
+        receipt["curriculum_selection"] = scheduling_proof
+        receipt["curriculum_result"] = curriculum_proof
         receipt["new_visual_state_signatures"] = len(new_signatures)
         receipt["actual_tabular_q_updates"] = result.updates
         receipt["policy_snapshot_digest_after"] = learner.snapshot_digest
@@ -604,6 +607,7 @@ def run_emulator_training_lab(
         "stagnation_threshold": config.stagnation_runs,
         "audited_run_receipts": evidence,
         "boomerang_replay_receipts": boomerangs,
+        "adaptive_evidence_curriculum": curriculum.report(),
         "neural_candidate_dataset": {
             "schema_version": "skeleton.game.emulator_neural_candidate_data.v1",
             "format": "finite_numeric_observation_action_reward_pairs",
