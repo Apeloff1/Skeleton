@@ -796,6 +796,15 @@ class GameBoyMachine:
             "external_ram": base64.b64encode(self.external_ram).decode(),
             "framebuffer": base64.b64encode(self.framebuffer).decode(),
         }
+        if self.metadata["virtual_rtc"]:
+            result["schema_version"] = 2
+            result["rtc"] = {
+                "live": list(self.rtc_regs),
+                "latched": None if self.rtc_latched is None else list(self.rtc_latched),
+                "previous_latch_bit": self.rtc_latch_prev,
+                "cycle_remainder": self.rtc_cycle_remainder,
+                "time_basis": "emulated_cpu_cycles_only",
+            }
         result["state_digest"] = _digest(result)
         return result
 
@@ -804,13 +813,15 @@ class GameBoyMachine:
             raise GameRomRuntimeError("ROM snapshot is not an object")
         value = dict(snapshot)
         digest = value.pop("state_digest", None)
+        keys = {"schema_version", "rom_digest", "registers", "memory", "external_ram", "framebuffer"}
+        if self.metadata["virtual_rtc"]:
+            keys.add("rtc")
         if (
-            set(value)
-            != {"schema_version", "rom_digest", "registers", "memory", "external_ram", "framebuffer"}
+            set(value) != keys
             or type(value.get("schema_version")) is not int
             or len(json.dumps(value)) > 400000
             or digest != _digest(value)
-            or value.get("schema_version") != 1
+            or value.get("schema_version") != (2 if self.metadata["virtual_rtc"] else 1)
             or value.get("rom_digest") != self.metadata["rom_digest"]
         ):
             raise GameRomRuntimeError("ROM snapshot identity, size or digest is invalid")
@@ -836,7 +847,7 @@ class GameBoyMachine:
                 else 15 if self.metadata["mapper"] == "mbc2"
                 else 31
             ),
-            "bank_high": 15 if self.metadata["mapper"] == "mbc5" else 3,
+            "bank_high": 15 if self.metadata["mapper"] == "mbc5" else 12 if self.metadata["virtual_rtc"] else 3,
             "bank_mode": 1,
             "buttons": 255,
             "cycles": 2**53 - 1,
@@ -857,6 +868,7 @@ class GameBoyMachine:
             or (registers["rom_bank"] == 0 and self.metadata["mapper"] != "mbc5")
             or (self.metadata["mapper"] != "mbc1" and registers["bank_mode"] != 0)
             or (self.metadata["mapper"] == "mbc2" and registers["bank_high"] != 0)
+            or (self.metadata["virtual_rtc"] and registers["bank_high"] in (4, 5, 6, 7))
         ):
             raise GameRomRuntimeError("ROM snapshot flag/bank is invalid")
         if registers["instructions"] * 4 > registers["cycles"]:
@@ -885,6 +897,38 @@ class GameBoyMachine:
             byte & 0xF0 for byte in decoded["external_ram"]
         ):
             raise GameRomRuntimeError("MBC2 state contains data outside four-bit internal RAM")
+        validated_rtc = None
+        if self.metadata["virtual_rtc"]:
+            rtc = value["rtc"]
+            if not isinstance(rtc, dict) or set(rtc) != {
+                "live", "latched", "previous_latch_bit", "cycle_remainder", "time_basis"
+            } or rtc["time_basis"] != "emulated_cpu_cycles_only":
+                raise GameRomRuntimeError("MBC3 source RTC snapshot schema is invalid")
+
+            def valid_clock(values: Any) -> bool:
+                return (
+                    isinstance(values, list) and len(values) == 5
+                    and all(type(item) is int for item in values)
+                    and 0 <= values[0] < 60 and 0 <= values[1] < 60
+                    and 0 <= values[2] < 24 and 0 <= values[3] <= 255
+                    and 0 <= values[4] <= 0xC1
+                    and values[4] & ~0xC1 == 0
+                )
+
+            if (
+                not valid_clock(rtc["live"])
+                or rtc["latched"] is not None and not valid_clock(rtc["latched"])
+                or type(rtc["previous_latch_bit"]) is not int
+                or rtc["previous_latch_bit"] not in (0, 1)
+                or type(rtc["cycle_remainder"]) is not int
+                or not 0 <= rtc["cycle_remainder"] < RTC_CYCLES_PER_SECOND
+            ):
+                raise GameRomRuntimeError("MBC3 virtual RTC clock state is invalid")
+            validated_rtc = (
+                list(rtc["live"]),
+                None if rtc["latched"] is None else list(rtc["latched"]),
+                rtc["previous_latch_bit"], rtc["cycle_remainder"],
+            )
         for name, item in registers.items():
             setattr(self, name, item)
         self.memory, self.external_ram, self.framebuffer = (
@@ -892,6 +936,9 @@ class GameBoyMachine:
             decoded["external_ram"],
             decoded["framebuffer"],
         )
+        if validated_rtc is not None:
+            (self.rtc_regs, self.rtc_latched,
+             self.rtc_latch_prev, self.rtc_cycle_remainder) = validated_rtc
 
     def preview(self) -> dict[str, Any]:
         return {
