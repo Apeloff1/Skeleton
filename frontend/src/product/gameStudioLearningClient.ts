@@ -56,7 +56,10 @@ export type StudioMirrorFrame = {
 };
 export type StudioMirrorLane = {
   angle: string; seed: number; steps: number; actions: string[];
-  rejected_actions: number; total_reward: number;
+  rejected_actions: number; accepted_actions: number;
+  productive_state_changes: number; unique_gameplay_states: number;
+  accepted_action_rate: number; productive_action_rate: number;
+  replayed_action_applications: number; total_reward: number;
   source_digest: string; environment_digest: string;
   snapshot_digest: string; last_observation: Record<string, number>;
   frames: StudioMirrorFrame[]; digest: string; native_frames: false;
@@ -80,6 +83,7 @@ export type StudioScenarioDraft = {
 export type StudioScenarioDiscovery = {
   schema_version: string; campaign_id: string; engine: string;
   scenarios: StudioScenarioDraft[]; measured_committed_rounds: number;
+  already_explored_rule_variants: number; repeated_scenarios_skipped: number;
   requires_rights_and_operator_training_admission: true;
   automatic_training_performed: false; scenarios_verified_as_successful: false;
 };

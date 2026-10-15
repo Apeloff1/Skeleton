@@ -187,12 +187,20 @@ def all_engine_test_manifests() -> dict:
 
 def propose_scenarios(source: Mapping[str,object],
                       *, observations: Sequence[Mapping[str,object]]=(),
-                      limit: int=4) -> dict:
+                      limit: int=4,
+                      excluded_source_digests: Sequence[str]=()) -> dict:
     """Draft scenarios from actual measured evidence, not claimed game mastery."""
     base=parse_studio_source(_plain(source))
     if type(limit) is not int or not 1<=limit<=5 or (
             type(observations) not in (list,tuple) or len(observations)>64):
         raise ScenarioLabError("bounded observations and scenario budget required")
+    if (type(excluded_source_digests) not in (list,tuple)
+            or len(excluded_source_digests)>64
+            or any(type(x) is not str or len(x)!=64
+                   or any(char not in "0123456789abcdef" for char in x)
+                   for x in excluded_source_digests)):
+        raise ScenarioLabError("scenario novelty exclusions require bounded pinned sources")
+    excluded=set(excluded_source_digests)
     for row in observations:
         if (type(row) is not dict or set(row)!={"mean_return","failure_rate","episodes"}
                 or type(row["mean_return"]) not in (int,float)
@@ -210,6 +218,7 @@ def propose_scenarios(source: Mapping[str,object],
     needs_stress=any(x["failure_rate"]>0.35 or x["mean_return"]<0 for x in observations)
     sorted_fields=sorted(fields,key=lambda x:(x["type"]!="int",x["path"]))
     motifs=sales_informed_catalog(base["editor"])["entries"]
+    revisited=0
     for field in sorted_fields:
         if len(proposals)>=limit:
             break
@@ -217,9 +226,18 @@ def propose_scenarios(source: Mapping[str,object],
         if field["type"]=="int":
             if field["minimum"]==field["maximum"]:
                 continue
-            value=field["maximum"] if needs_stress else field["minimum"]
+            # Avoid immediate extreme parameters; search local, playable
+            # neighborhoods first and increase perturbation under failure.
+            width=field["maximum"]-field["minimum"]
+            increment=max(1,math.ceil(width/(6 if needs_stress else 12)))
+            direction=(1 if sha256(
+                (base["editor"]+":"+field["path"]).encode()
+            ).digest()[0]%2 else -1)
+            value=max(field["minimum"],min(field["maximum"],old+direction*increment))
             if value==old:
-                value=field["minimum"] if needs_stress else field["maximum"]
+                value=max(field["minimum"],min(field["maximum"],old-direction*increment))
+            if value==old:
+                continue
         elif field["type"]=="bool":
             value=not old
         else:
@@ -242,8 +260,13 @@ def propose_scenarios(source: Mapping[str,object],
             adjusted=apply_rule_proposal(base,proposal)
         except (RuleCurriculumError,ValueError):
             continue
+        changed_digest=source_digest(adjusted)
+        if changed_digest in excluded:
+            revisited+=1
+            continue
+        excluded.add(changed_digest)
         proposals.append({"proposal":proposal,
-                          "variant_source_digest":source_digest(adjusted),
+                          "variant_source_digest":changed_digest,
                           "support":"measured_problem" if needs_stress else "untested_hypothesis",
                           "mechanics_inspiration":([m["motif"] for m in motifs[:1]]
                                                   or ["Original mechanics boundary stress"]),
@@ -251,6 +274,8 @@ def propose_scenarios(source: Mapping[str,object],
     result={"schema_version":"skeleton.game_builder.scenario_discovery.v1",
             "engine":base["editor"],"source_digest":source_digest(base),
             "measured_episode_count":evidence_count,
+            "repeated_scenarios_skipped":revisited,
+            "scenario_delta_strategy":"bounded_local_numeric_changes_not_extreme_defaults",
             "scenarios":proposals,"automatic_training_performed":False,
             "scenarios_verified_as_successful":False,
             "requires_rights_and_operator_training_admission":True}

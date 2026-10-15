@@ -148,6 +148,26 @@
       "scope": "Studio-only independent candidate/champion ordinary and adversarial evaluation uses bounded four-thread executor; six additional source-matched mirror perspectives independently measure declared rule changes.",
       "acceptance": "worst observed mirror reward delta must satisfy configured worst-seed regression bound; no automatic live model weight promotion",
       "caveat": "Actual measured round-frame stream not yet wired to the spectator preview; those frames remain separate."
+    },
+    "effective_learning": {
+      "status": "committed_logic_pending_exact_head_execution_validation",
+      "measurements": [
+        "accepted_vs_rejected_controls",
+        "non-time productive_gameplay_state_changes",
+        "distinct numeric game states",
+        "replay action applications",
+        "paired baseline-to-candidate state-trajectory differences",
+        "novelty per replay work"
+      ],
+      "promotion_gates": [
+        "no regression beyond configured limits",
+        "actual measured mechanics change",
+        "seed-matched independent mirror checks",
+        "Dragon and adversarial evaluation retained"
+      ],
+      "budgets": "pre-admit up to twelve auxiliary source-mirror episodes per changed-rule candidate per round; actual executed steps checked before committing",
+      "scenario_efficiency": "bounded local parameter perturbations with canonical source digests and exclusion of previously explored committed settings",
+      "limitations": "not proof of neural generalization, human creative quality, model training completion or hardware frame rates"
     }
   }
 }

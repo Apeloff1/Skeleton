@@ -2164,8 +2164,17 @@ async def scenario_drafts(scope, identifier, *, limit=4):
         "round_index":{"$lte":row["cursor"]},
     }).sort("round_index",-1).limit(16).to_list(length=16)
     measured=[]
+    already_explored=set()
     for item in records:
         checked=_checked_round_record(row,item)
+        mutation=checked.get("mutation") or {}
+        for edit in mutation.get("changes",[]):
+            if type(edit) is not dict:
+                continue
+            value=edit.get("source_after_digest")
+            if (type(value) is str and len(value)==64
+                    and all(char in "0123456789abcdef" for char in value)):
+                already_explored.add(value)
         # Only recorded measurements, never user-supplied invented labels.
         vector=checked.get("objective_vector") or {}
         candidate_metrics=vector.get("candidate") or {}
@@ -2187,9 +2196,13 @@ async def scenario_drafts(scope, identifier, *, limit=4):
             "failure_rate": failure,
             "episodes": episodes,
         })
-    result=propose_scenarios(source,observations=measured,limit=limit)
+    result=propose_scenarios(
+        source,observations=measured,limit=limit,
+        excluded_source_digests=sorted(already_explored),
+    )
     return {
         **result, "campaign_id":identifier,"measured_committed_rounds":len(measured),
+        "already_explored_rule_variants":len(already_explored),
         "current_champion_source":True,"drafts_only":True,
         "no_automatic_gameplay_promotion":True,
     }

@@ -353,3 +353,47 @@ independent gameplay/engine acceptance, dataset rights checks,
 real checkpoint-derived neural training, and native graphics,
 sound, networking, persistence and platform verification. Nothing
 here certifies 43 complete shipping-grade game engines.
+
+## Effective learning per simulated compute — admission gate
+
+To prevent simulation volume being misrepresented as training progress,
+`mirrored_simulations` now measures each executed lane's accepted versus
+rejected controls, **non-time gameplay state changes**, distinct numeric
+game states, deterministic state-trajectory digest and actual replayed
+action applications (sum of 1..N for a source runner that replays the
+entire accepted game command log every step). Plain clock changes and
+no-op actions do not count as new gameplay knowledge.
+
+Paired source-matched evaluations publish an
+`informative_for_rule_selection` flag only when at least four actions
+were executed in total, at least two productive state transitions
+occurred across the paired experiments, at least two candidate commands
+were valid and at least one measurable reward/state-trajectory
+difference is observed. An uninformative variant can be classified
+`insufficient_behavioral_evidence` but **cannot** pass the new champion
+promotion gate merely because it happened to avoid a reward regression.
+This is a conservative evidence screen, not proof of causality or
+game-design excellence. Novelty per 100 replayed action applications
+exposes the cost of redundant source replay.
+
+The campaign now admits worst-case additional mirrored work **before**
+starting a slice, and fences the observed total executed steps against
+the authorized budget before committing the round. This prevents
+unbounded auxiliary scenario checking when an episode budget is
+nearly exhausted. Round receipts include actual effective state
+changes, replay work, worst observed difference and the reason
+insufficient scenarios did not promote.
+
+`propose_scenarios` uses bounded local numeric perturbations rather
+than leaping directly to the largest/smallest permitted engine values.
+It consumes a digest denylist of previously tried settings from
+checked committed campaign history and avoids rediscovering identical
+original-game variants. The user-facing scenario lab shows previously
+explored and skipped counts, plus per-lane *productive* changes. It
+never treats public sales positions as optimization rewards or
+derives causal training labels from commercial game popularity.
+
+These are **implemented gate and telemetry contracts**, not claims
+that training metrics have been measured in a live compiled app. CI,
+native engine acceptance, all scripted tests and real hardware/emulator
+performance still need separate evidence before sign-off.

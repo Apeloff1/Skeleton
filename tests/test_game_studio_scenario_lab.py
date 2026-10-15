@@ -65,6 +65,11 @@ class StudioEngineScenarioLabTests(unittest.TestCase):
                 self.assertLessEqual(len(lane["frames"]),5)
                 self.assertEqual(len(lane["transition_digests"]),lane["steps"])
                 self.assertEqual(len(lane["actions"]),lane["steps"])
+                self.assertEqual(lane["accepted_actions"]+lane["rejected_actions"],lane["steps"])
+                self.assertLessEqual(lane["productive_state_changes"],lane["accepted_actions"])
+                self.assertGreaterEqual(lane["unique_gameplay_states"],1)
+                self.assertEqual(lane["replayed_action_applications"],
+                                 lane["steps"]*(lane["steps"]+1)//2)
                 self.assertFalse(lane["native_frames"])
                 self.assertEqual(len(lane["snapshot_digest"]),64)
                 self.assertTrue(all(isinstance(x,str) for x in lane["actions"]))
@@ -83,6 +88,16 @@ class StudioEngineScenarioLabTests(unittest.TestCase):
         comparison=mirrored_rule_comparison(source,other,seed=10,steps=3,
                                            angles=ANGLES)
         self.assertEqual(len(comparison["mirrors"]),6)
+        self.assertEqual(comparison["total_executed_steps"],sum(
+            row["baseline_executed_steps"]+row["candidate_executed_steps"]
+            for row in comparison["mirrors"]
+        ))
+        self.assertEqual(comparison["total_replayed_action_applications"],sum(
+            row["baseline_replayed_action_applications"]
+            +row["candidate_replayed_action_applications"]
+            for row in comparison["mirrors"]
+        ))
+        self.assertIsInstance(comparison["informative_for_rule_selection"],bool)
         self.assertFalse(comparison["source_promotion_authorized"])
         self.assertTrue(comparison["independent_human_review_required"])
         self.assertEqual(len(comparison["digest"]),64)
@@ -96,6 +111,8 @@ class StudioEngineScenarioLabTests(unittest.TestCase):
         same=mirrored_rule_comparison(source,source,seed=10,steps=3)
         self.assertEqual(same["worst_return_difference"],0.0)
         self.assertEqual(same["mean_return_difference"],0.0)
+        self.assertFalse(same["informative_for_rule_selection"])
+        self.assertFalse(same["possibly_viable_under_bounded_mirror_checks"])
         with self.assertRaises(ScenarioLabError):
             mirrored_rule_comparison(
                 source,make_studio_source("animation"),seed=10,steps=2,
@@ -156,6 +173,23 @@ class StudioEngineScenarioLabTests(unittest.TestCase):
             self.assertEqual(patched["actions"],source["actions"])
             self.assertEqual(len(entry["variant_source_digest"]),64)
             self.assertFalse(entry["sales_rank_is_quality_evidence"])
+
+    def test_observed_source_variants_are_excluded_from_new_drafts(self):
+        source=make_studio_source("economy",{"market_nodes":3,"goods":10})
+        first=propose_scenarios(source,limit=3)
+        self.assertEqual(first["scenario_delta_strategy"],
+                         "bounded_local_numeric_changes_not_extreme_defaults")
+        self.assertEqual(first["repeated_scenarios_skipped"],0)
+        known=[row["variant_source_digest"] for row in first["scenarios"]]
+        second=propose_scenarios(
+            source,limit=3,excluded_source_digests=known,
+        )
+        self.assertGreaterEqual(second["repeated_scenarios_skipped"],len(known))
+        self.assertFalse(set(known).intersection(
+            row["variant_source_digest"] for row in second["scenarios"]
+        ))
+        with self.assertRaises(ScenarioLabError):
+            propose_scenarios(source,excluded_source_digests=["forged"])
 
     def test_observation_injection_cannot_author_or_modify_game_source(self):
         source=make_studio_source("economy")

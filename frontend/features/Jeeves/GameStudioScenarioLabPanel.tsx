@@ -180,7 +180,15 @@ export default function GameStudioScenarioLabPanel({
                 <Text style={muted}>
                   Seed {lane.seed} · {lane.steps} executed steps · reward {lane.total_reward.toFixed(2)}
                 </Text>
-                <Text style={muted}>{lane.rejected_actions} rejected commands · replay {lane.snapshot_digest.slice(0, 12)}</Text>
+                <Text style={muted}>
+                  {lane.accepted_actions} accepted · {lane.rejected_actions} rejected ·
+                  {lane.productive_state_changes} productive state changes
+                </Text>
+                <Text style={muted}>
+                  {lane.unique_gameplay_states} distinct gameplay states ·
+                  {lane.replayed_action_applications} replayed action applications
+                </Text>
+                <Text style={muted}>Replay {lane.snapshot_digest.slice(0, 12)}</Text>
                 <Text style={muted} numberOfLines={3}>
                   {Object.entries(lane.last_observation).slice(0, 5)
                     .map(([key, value]) => key + ': ' + value.toFixed(2)).join(' · ')}
@@ -198,7 +206,12 @@ export default function GameStudioScenarioLabPanel({
       </View>
       {drafts && <View style={{ gap: 7 }}>
         <Text style={heading}>AI scenario hypotheses · {drafts.measured_committed_rounds} recorded rounds</Text>
-        <Text style={muted}>These are untested source-validated drafts. They do not change the project, train live weights or certify a successful scenario.</Text>
+        <Text style={muted}>
+          {drafts.already_explored_rule_variants} previously explored source variants ·
+          {drafts.repeated_scenarios_skipped} redundant candidate drafts avoided.
+          Suggested changes begin locally before expanding to extreme rule values.
+          No project mutation or production model promotion occurs here.
+        </Text>
         {drafts.scenarios.map(row => (
           <View key={row.proposal.proposal_id} style={{ padding: 8, gap: 4, borderWidth: 1, borderColor: '#526173', borderRadius: 7 }}>
             <Text style={heading}>{row.proposal.proposal_id}</Text>
