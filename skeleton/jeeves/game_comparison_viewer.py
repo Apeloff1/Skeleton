@@ -118,6 +118,7 @@ function card(id,phase){
   const image=document.createElement("img");image.src=p.image_data_uri;image.alt="Actual bounded native screenshot for "+g.title+" at "+phase+" checkpoint";c.append(image);
  }else{c.append(txt("p","No native preview stored; raw frame SHA-256 remains available.","muted"))}
  c.append(txt("div","Step "+p.step+" • "+p.width+"×"+p.height+" • audio frames "+p.audio_frames,"meta"));
+ if(g.study_local_tabular_training){c.append(txt("div","Study-local Q updates: "+g.study_local_tabular_training.updates_applied+" • policy "+g.study_local_tabular_training.trained_policy_sha256+" • NOT production LLM weights","meta"))}
  c.append(txt("div","Frame "+p.frame_sha256+" • evidence "+p.evidence_sha256,"meta"));
  c.append(txt("div","Mean pixel brightness "+Number(p.observations.screen_mean).toFixed(4)+" • Audio RMS "+Number(p.observations.audio_rms).toFixed(4),"meta"));
  return c
@@ -187,7 +188,7 @@ function exportNotes(){
 }
 const seen=new Set();
 (report.series||[]).forEach(s=>{if(!seen.has(s.series_id)){seen.add(s.series_id);$("series").append(option(s.series_id,s.series_id))}});
-$("overview").textContent=report.game_observations_completed+" / "+report.planned_total_game_count+" game observations • "+pairList.length+" pairs • ≤"+report.maximum_parallel_native_game_sessions+" native sessions";
+$("overview").textContent=report.game_observations_completed+" / "+report.planned_total_game_count+" game observations • "+pairList.length+" pairs • ≤"+report.maximum_parallel_native_game_sessions+" native sessions • "+(report.games_with_study_local_q_updates||0)+" locally trained game Q-policies";
 $("series").addEventListener("change",updatePairs);
 $("phase").addEventListener("change",render);
 $("pair").addEventListener("change",render);

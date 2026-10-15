@@ -102,6 +102,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--registry", type=Path, help="Approved existing cores.json; required only with --run")
     parser.add_argument("--batch", type=int, help="0-based 10-game-or-smaller execution cohort; omit to run all batches sequentially")
     parser.add_argument("--without-previews", action="store_true", help="Do not embed screenshots in report/viewer")
+    parser.add_argument("--train-shadow-policy", action="store_true", help="Explicitly train independent study-local tabular Q policies from actual native traces, never production LLM weights")
+    parser.add_argument("--rights-acknowledged", action="store_true", help="Operator asserts legal rights to perform this study-local training; not independent license verification")
     parser.add_argument("--timeout-seconds", type=float, default=5.0)
     args = parser.parse_args(argv)
     try:
@@ -109,6 +111,13 @@ def main(argv: list[str] | None = None) -> int:
             raise ComparativeStudyError("Native --run must be paired with --registry; plan-only cannot have registry")
         if not args.run and args.batch is not None:
             raise ComparativeStudyError("Batch selection applies only to explicit native execution")
+        if args.train_shadow_policy and (
+            not args.run or not args.rights_acknowledged
+            or args.batch is None or not args.without_previews
+        ):
+            raise ComparativeStudyError("Study-local training requires --run --batch N --without-previews --train-shadow-policy --rights-acknowledged")
+        if args.rights_acknowledged and not args.train_shadow_policy:
+            raise ComparativeStudyError("Rights training acknowledgement only applies to explicit study-local training")
         manifest = _read_json_file(args.manifest, MAX_MANIFEST_BYTES)
         manifest = validate_study(manifest)
         if args.notes_json is not None:
@@ -141,9 +150,17 @@ def main(argv: list[str] | None = None) -> int:
         os.environ[REGISTRY_ENV] = str(args.registry.resolve(strict=True))
         if registry.registry_digest != GameEmulatorRegistry.from_environment().registry_digest:
             raise ComparativeStudyError("Actual approved registry changed before the comparative run")
+        def authorize_training():
+            if not args.train_shadow_policy or not args.rights_acknowledged:
+                raise PermissionError("Operator did not explicitly authorize study-local learning")
+            if GameEmulatorRegistry.from_environment().registry_digest != registry.registry_digest:
+                raise PermissionError("Actual libretro registry authority changed during training")
+
         result = run_comparative_study(
             manifest, selected_batch=args.batch,
             include_previews=not args.without_previews,
+            shadow_policy_training=args.train_shadow_policy,
+            authorize_training=authorize_training if args.train_shadow_policy else None,
             timeout_seconds=args.timeout_seconds,
         )
         _atomic_write(destination / (name + ".result.json"), json.dumps(result, indent=2, sort_keys=True, allow_nan=False).encode())
@@ -160,6 +177,7 @@ def main(argv: list[str] | None = None) -> int:
             "pair_count": len(result["pairs"]),
             "note_count": len(result["observer_notes"]),
             "reviewed_knowledge_candidates": dragon["observer_card_count"],
+            "games_with_local_q_policy_updates": result["games_with_study_local_q_updates"],
             "report_path": str(destination / (name + ".result.json")),
             "viewer_path": str(destination / (name + ".viewer.html")),
             "dragon_intake_path": str(destination / (name + ".dragon-intake.json")),

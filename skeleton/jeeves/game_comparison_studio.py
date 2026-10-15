@@ -68,6 +68,8 @@ def _observe_one(
     *,
     expected_registry_digest: str,
     include_previews: bool,
+    shadow_policy_training: bool,
+    authorize_training: Callable[[], None] | None,
     cancelled: Callable[[], bool] | None,
     timeout_seconds: float,
 ) -> dict[str, Any]:
@@ -150,6 +152,20 @@ def _observe_one(
         )
         actual_core_sha = env.core.library_sha256
         environment_sha = env.spec.environment_digest
+        training = None
+        if shadow_policy_training:
+            if game["rights_evidence_digest"] is None or authorize_training is None:
+                raise ComparativeStudyError("Training requires explicit operator source-rights receipt and per-step authorization")
+            from .game_comparison_shadow_learning import train_study_local_policy
+
+            training = train_study_local_policy(
+                spec=env.spec,
+                trace=trace,
+                game_id=game["id"],
+                rights_evidence_digest=game["rights_evidence_digest"],
+                authorize=authorize_training,
+                cancelled=cancelled,
+            )
     metrics = {
         "observed_step_count": observation_count,
         "mean_visual_change": sum(summaries["visual_change"]) / observation_count,
@@ -169,9 +185,10 @@ def _observe_one(
         "metrics": metrics,
         "canonical_offline_trace_sha256": trace["trace_digest"],
         "trace_step_count": trace["steps"],
+        "study_local_tabular_training": training,
         "legal_rom_rights_independently_verified": False,
         "human_gameplay_quality_verified": False,
-        "ai_model_weights_trained": False,
+        "production_ai_model_weights_trained": False,
     }
 
 
@@ -272,6 +289,8 @@ def run_comparative_study(
     *,
     selected_batch: int | None = None,
     include_previews: bool = True,
+    shadow_policy_training: bool = False,
+    authorize_training: Callable[[], None] | None = None,
     timeout_seconds: float = 5.0,
     cancelled: Callable[[], bool] | None = None,
     on_progress: Callable[[dict[str, Any]], None] | None = None,
@@ -293,8 +312,16 @@ def run_comparative_study(
         selected = [selected[selected_batch]]
     game_by_id = {game["id"]: game for game in model["games"]}
     inspected = {}
-    if type(include_previews) is not bool:
-        raise ComparativeStudyError("Native image preview inclusion must be a boolean")
+    if type(include_previews) is not bool or type(shadow_policy_training) is not bool:
+        raise ComparativeStudyError("Study visualization and training controls must be exact booleans")
+    if shadow_policy_training and (selected_batch is None or include_previews):
+        raise ComparativeStudyError("Study-local Q-learning is limited to a selected <=10-game batch without embedded screenshots")
+    if shadow_policy_training and not callable(authorize_training):
+        raise ComparativeStudyError("Training needs an explicit operator-owned rights/authorization callback")
+    if shadow_policy_training and any(game["rights_evidence_digest"] is None for game in model["games"] if game["id"] in {
+        identity for batch in selected for identity in batch["game_ids"]
+    }):
+        raise ComparativeStudyError("Training cannot begin without a declared rights receipt for every selected game")
     if type(timeout_seconds) not in (int, float) or not 0.1 <= timeout_seconds <= 30:
         raise ComparativeStudyError("Native command timeout is invalid")
     if on_progress is not None and not callable(on_progress):
@@ -313,6 +340,8 @@ def run_comparative_study(
                     _observe_one, game,
                     expected_registry_digest=registry.registry_digest,
                     include_previews=include_previews,
+                    shadow_policy_training=shadow_policy_training,
+                    authorize_training=authorize_training,
                     cancelled=cancelled, timeout_seconds=timeout_seconds,
                 ): game for game in games
             }
@@ -357,6 +386,11 @@ def run_comparative_study(
         "game_observations_completed": sum(g["status"] == "actual_native_observations_captured" for g in ordered.values()),
         "native_sessions_currently_running": 0,
         "maximum_parallel_native_game_sessions": model["max_active"],
+        "study_local_tabular_training_requested": shadow_policy_training,
+        "games_with_study_local_q_updates": sum(
+            bool(g.get("study_local_tabular_training") and g["study_local_tabular_training"]["updates_applied"] > 0)
+            for g in ordered.values()
+        ),
         "completed_batches": [b["batch_index"] for b in selected],
         "games": ordered, "pairs": pairing,
         "series": _series_report(model, ordered),
@@ -368,7 +402,8 @@ def run_comparative_study(
             "operator_rom_rights_independently_proven": False,
             "crawling_or_video_watching_performed": False,
             "semantic_gameplay_comprehension_automatically_verified": False,
-            "parameter_training_executed": False,
+            "study_local_tabular_q_learning_executed": shadow_policy_training,
+            "large_language_model_parameter_training_executed": False,
             "weight_promotion_authorized": False,
         },
     }

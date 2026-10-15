@@ -109,6 +109,17 @@ def synthesize_comparative_report(report: Mapping[str, object]) -> dict[str, Any
         "schema_version": SCHEMA,
         "study_id": report["study_id"],
         "successful_native_game_count": len(actual),
+        "study_local_q_learning_games": report.get("games_with_study_local_q_updates", 0),
+        "study_local_q_policy_snapshot_receipts": [
+            {
+                "game_id": game["id"],
+                "policy_snapshot_sha256": game["study_local_tabular_training"]["trained_policy_sha256"],
+                "q_weight_updates": game["study_local_tabular_training"]["updates_applied"],
+                "verified_offline_trace_sha256": game["canonical_offline_trace_sha256"],
+                "production_merged": False,
+            }
+            for game in actual if game.get("study_local_tabular_training") is not None
+        ],
         "ten_game_training_cohort_count": len(cohorts),
         "training_cohorts": cohorts,
         "objective_pairwise_metric_findings": objective,

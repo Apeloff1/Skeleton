@@ -690,6 +690,17 @@
       "dragon": "skeleton/ai/webcrawler/dragon_comparative_game_bridge.py exports pending curriculum metadata for independent consent/verification, not trained parameter states",
       "actual_training_executed": false,
       "model_weights_promoted": false
+    },
+    "local_tabular_training": {
+      "status": "Implemented as explicit opt-in existing Jeeves GamePolicyLearner.train_offline, not executed during repository editing",
+      "owner": "skeleton/jeeves/game_comparison_shadow_learning.py",
+      "algorithm": "Episode-atomic bounded tabular Q-learning per exact native game+core environment",
+      "input": "Canonical real libretro offline traces captured in same approved game study, with source SHA-256 and operator rights evidence; train per game, no incompatible policy merging",
+      "execution_limits": "Require --run --batch N --without-previews --train-shadow-policy --rights-acknowledged; only selected <=10-game cohort; max one episode, <=64 transitions and <=2MiB local policy snapshot per game",
+      "outputs": "Actual policy snapshot and SHA-256 with update count included in user/AI JSON and viewer summaries, when native execution succeeds",
+      "legal": "Operator rights acknowledgment is not independent IP/consent certification; existing auth/registry validated per step",
+      "production": "No production model weights or canonical shadow-weight pipeline promotion, independent evaluation required",
+      "execution_performed_in_this_change": false
     }
   }
 }
