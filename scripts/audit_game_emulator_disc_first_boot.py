@@ -63,8 +63,10 @@ def _admitted_path(raw: str, size: int, sha: str) -> Path:
     ):
         raise DiscAcceptanceError("bounded absolute local file path and admitted size required")
     path = Path(raw)
-    if path.is_symlink() or not path.is_absolute():
-        raise DiscAcceptanceError("symlink or nonabsolute private media source not allowed")
+    if path.is_symlink() or not path.is_absolute() or any(
+        parent.is_symlink() for parent in path.parents
+    ):
+        raise DiscAcceptanceError("symlinked file or parent directory is not a safe local media source")
     info = path.stat(follow_symlinks=False)
     if (
         not stat.S_ISREG(info.st_mode) or info.st_size != size
