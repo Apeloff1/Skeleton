@@ -19,7 +19,7 @@ from .game_decompilation_assets import decode_tile_region, extract_nes_chr
 from .game_decompilation_code import disassemble_gb_sm83, disassemble_nes_nrom
 from .game_decompilation_formats import inspect_binary_structure
 from .game_decompilation_quality import derive_game_quality_brief
-from .game_learning_ingestion import _parse_rom
+from .game_learning_ingestion import _parse_rom, _has_rom_signature
 
 REPORT_SCHEMA = "skeleton.game.authorized_decompilation.v1"
 MAX_GAME_BYTES = 32 * 1024 * 1024
@@ -99,13 +99,7 @@ def _authorize(
 
 def _format(data: bytes, name: str) -> tuple[str, dict[str, Any]]:
     lowered = name.lower()
-    if (data.startswith(b"NES\x1a")
-        or len(data) >= 0x150 and data[0x104:0x134] ==
-        bytes.fromhex(
-            "ceed6666cc0d000b03730083000c000d0008111f8889000e"
-            "dccc6ee6ddddd999bbbb67636e0eecccdddc999fbbb9333e"
-        )[:48]
-        or "." + lowered.rsplit(".", 1)[-1] in ROM_EXTENSIONS):
+    if _has_rom_signature(data) or "." + lowered.rsplit(".", 1)[-1] in ROM_EXTENSIONS:
         parsed = _parse_rom(data, lowered)
         return parsed["format"], parsed
     passive = inspect_binary_structure(data, lowered)
