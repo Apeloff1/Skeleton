@@ -607,3 +607,20 @@ def test_app_preflight_accepts_valid_mongo_db_uri_without_logging_credentials(tm
         for key in ("MONGO_URL", "SKL_MONGO_URI")
     )
     assert "password" not in repr(tuple(check.message for check in checks))
+
+def test_compose_browser_endpoints_follow_custom_published_host_ports():
+    from pathlib import Path
+
+    compose = Path("docker-compose.yml").read_text(encoding="utf-8")
+    env_example = Path(".env.example").read_text(encoding="utf-8")
+
+    assert (
+        "EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-"
+        "http://localhost:${BACKEND_PORT:-8001}}"
+    ) in compose
+    assert (
+        "EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-"
+        "http://localhost:${SKELETON_PORT:-8010}}"
+    ) in compose
+    assert "\nEXPO_PUBLIC_BACKEND_URL=\n" in env_example
+    assert "\nEXPO_PUBLIC_SKELETON_URL=\n" in env_example
