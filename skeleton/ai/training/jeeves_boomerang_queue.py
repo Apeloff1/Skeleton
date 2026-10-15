@@ -414,6 +414,20 @@ def verify_queue(queue: dict, *, verify_sources: bool = False) -> dict:
                              pair["observed_reduction"] == (pair["after"] < pair["before"]) and
                              pair["observed_regression"] == (pair["after"] > pair["before"]),
                              "counterfactual values changed since source re-analysis")
+            if policy is not None:
+                original_rows = list(source_archive["cases"])
+                streak = 0
+                discovered = 0
+                for historical in entry["passes"]:
+                    if historical["pass_number"] > 3:
+                        contexts = _context_signatures(original_rows)
+                        discovered = len(_context_signatures(
+                            historical["results"]) - contexts)
+                        streak = 0 if discovered else streak+1
+                    original_rows.extend(historical["results"])
+                _require(entry["last_discovery_context_count"] == discovered and
+                         entry["plateau_streak"] == streak,
+                         "source-derived discovery and plateau accounting diverged")
             archived_semantics = {_effective_identity(row["scenario"])
                                   for row in source_archive["cases"]}
             archived_semantics.add(_effective_identity(source_archive["baseline"]["scenario"]))
@@ -602,14 +616,29 @@ def _advance_entry(entry: dict, scene: dict, archive: dict, *,
 
 
 def advance_queue(queue: dict, *, max_entries: int = 1, probes: int = 8,
-                  workers: int = 1, frame_ms: int = 100) -> dict:
-    """Advance FIFO entries by ONE generation, storing prior evidence intact."""
+                  workers: int = 1, frame_ms: int = 100,
+                  now_epoch: int | None = None) -> dict:
+    """Execute only eligible work, mixing due old simulations into the queue.
+
+    The caller initiates each tick. Persist the returned immutable generation;
+    this function does not spin background timers or silently rerun old frames.
+    """
     verify_queue(queue, verify_sources=True)
     _bounded_int(max_entries, 1, MAX_ENTRIES, "maximum processed queue entries")
     _bounded_int(probes, 1, MAX_PROBES, "probes per return")
-    pending = [i for i, entry in enumerate(queue["entries"])
-               if entry["revisits_completed"] < MAX_REVISITS]
-    _require(bool(pending), "boomerang queue already completed all three passes")
+    policy = queue.get("reshuffle_policy")
+    if policy is None:
+        pending = [i for i, entry in enumerate(queue["entries"])
+                   if entry["revisits_completed"] < MAX_REVISITS]
+        _require(bool(pending), "boomerang queue already completed all three passes")
+        now = None
+    else:
+        now = _clock(now_epoch)
+        _require(now >= queue["last_tick_epoch"],
+                 "UTC queue clock rollback refused")
+        pending = _due_work(queue, now)
+        _require(bool(pending), "no boomerang source is due for a control parse; "
+                 "consult next_return_epoch in --inspect")
     updated = deepcopy(queue)
     for index in pending[:max_entries]:
         previous = queue["entries"][index]
@@ -619,16 +648,38 @@ def advance_queue(queue: dict, *, max_entries: int = 1, probes: int = 8,
         next_entry = updated["entries"][index]
         next_entry["passes"].append(result)
         next_entry["revisits_completed"] += 1
-        next_entry["status"] = ("awaiting_third_pass" if
-                               next_entry["revisits_completed"] == 1 else "complete")
+        if policy is not None:
+            next_entry["return_visits"] = max(
+                0, next_entry["revisits_completed"] - MAX_REVISITS)
+            if result["pass_number"] > 3:
+                history = _previous_rows(previous, archive)
+                before = _context_signatures(history)
+                after = _context_signatures(result["results"])
+                newfound = len(after - before)
+                next_entry["last_discovery_context_count"] = newfound
+                next_entry["plateau_streak"] = (
+                    0 if newfound else previous["plateau_streak"]+1)
+            next_entry["status"] = _status(next_entry, policy)
+            if next_entry["status"] == "scheduled_return":
+                next_entry["last_scheduled_epoch"] = now
+                next_entry["next_due_epoch"] = _due(
+                    policy, next_entry["queue_id"], result["pass_sha256"],
+                    next_entry["return_visits"]+1, now)
+            else:
+                next_entry["last_scheduled_epoch"] = None
+                next_entry["next_due_epoch"] = None
+        else:
+            next_entry["status"] = ("awaiting_third_pass" if
+                                   next_entry["revisits_completed"] == 1 else "complete")
     updated["parent_queue_sha256"] = queue["queue_sha256"]
     updated["generation"] += 1
+    if policy is not None:
+        updated["last_tick_epoch"] = now
     output = _receipt({k: v for k, v in updated.items() if k != "queue_sha256"})
     _require(len(_json(output)) <= MAX_QUEUE_BYTES,
              "queue snapshot exceeds durable bounded artifact size")
-    verify_queue(output)
+    verify_queue(output, verify_sources=True)
     return output
-
 
 def retraining_review_drafts(queue: dict) -> tuple[dict, ...]:
     """Novel source-linked discoveries to be independently labeled, never SGD."""
@@ -679,6 +730,8 @@ def main(argv: list[str] | None = None) -> int:
     modes.add_argument("--create", action="store_true")
     modes.add_argument("--enqueue", action="store_true")
     modes.add_argument("--advance", action="store_true")
+    modes.add_argument("--reshuffle", action="store_true",
+                       help="activate reproducible randomized returns on an existing queue")
     modes.add_argument("--inspect", action="store_true")
     parser.add_argument("--queue", type=Path, help="existing immutable queue snapshot")
     parser.add_argument("--scene", type=Path, help="original rights-reviewed scene")
@@ -689,6 +742,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--probes", type=int, default=8)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--frame-ms", type=int, default=100)
+    parser.add_argument("--now-epoch", type=int,
+                        help="explicit UTC clock for controlled replay or scheduling")
+    parser.add_argument("--shuffle-seed", type=int, default=19)
+    parser.add_argument("--min-return-seconds", type=int, default=3600)
+    parser.add_argument("--max-return-seconds", type=int, default=86400)
+    parser.add_argument("--max-return-visits", type=int, default=16)
+    parser.add_argument("--plateau-limit", type=int, default=10)
     args = parser.parse_args(argv)
     try:
         if args.create:
@@ -711,7 +771,19 @@ def main(argv: list[str] | None = None) -> int:
                          "--advance only accepts the existing anchored queue")
                 result = advance_queue(prior, max_entries=args.max_entries,
                                        probes=args.probes, workers=args.workers,
-                                       frame_ms=args.frame_ms)
+                                       frame_ms=args.frame_ms,
+                                       now_epoch=args.now_epoch)
+            elif args.reshuffle:
+                _require(args.scene is None and args.archive is None
+                         and args.output is not None,
+                         "--reshuffle only accepts a pinned existing queue")
+                result = enable_reshuffle(
+                    prior, seed=args.shuffle_seed,
+                    min_delay_seconds=args.min_return_seconds,
+                    max_delay_seconds=args.max_return_seconds,
+                    max_return_visits=args.max_return_visits,
+                    plateau_limit=args.plateau_limit,
+                    now_epoch=args.now_epoch)
             else:
                 _require(args.scene is None and args.archive is None
                          and args.output is None,
