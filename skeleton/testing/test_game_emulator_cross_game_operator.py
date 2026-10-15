@@ -69,6 +69,19 @@ class OperatorSourceGameComparisons(unittest.TestCase):
         with self.assertRaises(CrossGameComparisonError):
             self._cases(cases)
 
+    def test_programmatic_operator_CLI_cannot_bypass_manifest_path_and_duplicate_limits(self):
+        repeated = self.games + [dict(self.games[0])]
+        with self.assertRaises(CrossGameComparisonError):
+            run_manifest(repeated, rights_acknowledged=True)
+        changed = json.loads(json.dumps(self.games))
+        changed[0]["rom_path"] = "unsafe-relative-original.gb"
+        with self.assertRaises(CrossGameComparisonError):
+            run_manifest(changed, rights_acknowledged=True)
+        changed = json.loads(json.dumps(self.games))
+        changed[0]["run_untrusted_command"] = "python any_script.py"
+        with self.assertRaises(CrossGameComparisonError):
+            run_manifest(changed, rights_acknowledged=True)
+
     def test_manifests_cannot_include_hidden_build_options(self):
         payload = json.loads(json.dumps(self.games))
         payload[0]["execute_shell_command"] = "echo never"
