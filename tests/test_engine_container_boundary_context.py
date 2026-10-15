@@ -20,5 +20,5 @@ def test_engine_container_context_id_binds_exact_digest():
 def test_engine_command_uses_exact_bound_context_identity():
     context = _context()
     command = _command(context, started=_now())
-    assert command.context_id == context.context_id
-    assert command.context_digest == context.context_digest
+    assert command.compiled_context.context_id == context.context_id
+    assert command.compiled_context.context_digest == context.context_digest
