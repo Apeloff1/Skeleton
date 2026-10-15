@@ -41,9 +41,15 @@ class ExecutionLedger:
     def __init__(self, max_records: int = 1024) -> None:
         self._max_records = max(1, int(max_records))
         self._records: dict[str, ExecutionRecord] = {}
+        self._next_sequence = 0
 
     def begin(self, command: str, correlation: str = "") -> ExecutionRecord:
-        identity = sha256(f"{command}:{correlation}:{len(self._records)}".encode()).hexdigest()[:24]
+        # Retention-based counts stop advancing once the ledger is full.
+        # A monotonic sequence prevents fresh executions overwriting older IDs
+        # when the bounded history trims its oldest completed records.
+        sequence = self._next_sequence
+        self._next_sequence += 1
+        identity = sha256(f"{command}:{correlation}:{sequence}".encode()).hexdigest()[:24]
         record = ExecutionRecord(
             execution_id=identity,
             command=command,
