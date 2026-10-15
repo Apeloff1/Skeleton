@@ -168,3 +168,81 @@ been accepted by this new gate during this source authoring pass.
 See [advanced emulator training and research](ROM_EMULATOR_ADVANCED_RESEARCH.md)
 for neural parameter fitting, source-confirmed action planning and controlled
 game-objective hypotheses.
+
+
+## Operator-authorized optical disc, playlist and multi-file native first boot
+
+The standard cartridge gate handles one hash-pinned original ROM up to
+the native host's 16-MiB inline capacity. Larger original/lawful content
+requires a **different**, governed source-content route. The new
+`scripts/audit_game_emulator_disc_first_boot.py` uses the existing
+`GameContentBundle` and `GameContentReference` native-host transport.
+That transport already validates CUE/BIN, GDI, M3U and other supported
+disc descriptors and requires an approved native core, valid BIOS and
+actual sandboxed libretro execution. The new audit does not implement,
+download, grant permission for or emulate BIOS/game media.
+
+Example private operator manifest `/private/media/source-discs.json`:
+
+```json
+{
+  "schema_version": "skeleton.game.approved_native_disc_first_boot_matrix.v1",
+  "cases": [
+    {
+      "core_id": "mednafen_saturn",
+      "target_id": "sega_saturn",
+      "entrypoint": "original-disc.cue",
+      "files": [
+        {
+          "name": "original-disc.cue",
+          "path": "/private/media/original-disc.cue",
+          "size_bytes": 71,
+          "sha256": "replace-with-exact-64-character-lowercase-sha256"
+        },
+        {
+          "name": "original-track.bin",
+          "path": "/private/media/original-track.bin",
+          "size_bytes": 123456789,
+          "sha256": "replace-with-exact-64-character-lowercase-sha256"
+        }
+      ]
+    }
+  ]
+}
+```
+
+The illustrative filenames, sizes and SHA fields above must be replaced
+with **actual** locally held media metadata; the referenced CUE text must
+name the actual supplied track filename. An arbitrary JSON manifest
+is not evidence that Saturn or any other console booted.
+
+```bash
+python scripts/audit_game_emulator_disc_first_boot.py \
+  --manifest-file /private/media/source-discs.json \
+  --evidence-file /private/media/native-disc-first-boot.json \
+  --rights-acknowledged --timeout 5
+```
+
+The operator gate enforces at most eight cases, 16 exact local files per
+case, and the native-host's actual referenced-file and aggregate size
+limits. It rejects symlinks, duplicate aliases, malformed descriptors,
+missing dependencies, changed length and SHA256, and unsupported BIOS/
+core approval. Source files are consumed in bounded streaming chunks,
+not copied into an in-memory Python ROM blob. A source hash is checked
+again while streaming, and the existing materializer checks its actual
+private output before the native core can load any content.
+
+A valid core must then actually produce a native frame, execute idle
+and A, produce an opaque savestate and return the identical observation,
+reward, action digest and **source state after rewind/replay**. The output
+retains independent per-core failures; one failing native disc never
+inflates another platform's readiness. This audit is **operator-invoked
+only** and is not a new automatic push/PR action.
+
+**Known limits:** This is an acceptance gate, not a promise that any
+specific disc/core will load. Runtime savestate capability, proprietary
+firmware, media format, worker sandbox, OS support and core accuracy remain
+separate gates. The initial test uses only basic controller inputs; it
+does not establish complete game functionality, victory, legal ownership
+or independent emulator hardware cycle accuracy. No native multi-file
+disc was boot-verified during this source authoring pass.
