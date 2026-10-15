@@ -77,6 +77,15 @@ class GameInfo(C.Structure):
     _fields_ = [("path", C.c_void_p), ("data", C.c_void_p), ("size", C.c_size_t), ("meta", C.c_void_p)]
 
 
+class InputDescriptor(C.Structure):
+    """Upstream libretro retro_input_descriptor ABI, no pointer retained."""
+    _fields_ = [
+        ("port", C.c_uint), ("device", C.c_uint),
+        ("index", C.c_uint), ("id", C.c_uint),
+        ("description", C.c_void_p),
+    ]
+
+
 class Geometry(C.Structure):
     _fields_ = [
         ("base_width", C.c_uint),
@@ -201,6 +210,7 @@ class NativeCore:
             or any(type(item) is not str or item not in allowed_ports for item in declared_ports)):
             raise ValueError("Native controller port topology is not a supported bounded declaration")
         self.controller_port_devices = tuple(declared_ports)
+        self.input_descriptors: list[dict[str, object]] = []
         self.buffers: dict[str, object] = {}
         self.keys_previous: set[int] = set()
         self.keyboard = None
@@ -303,6 +313,10 @@ class NativeCore:
         self.av = AvInfo()
         self.core.retro_get_system_av_info(C.byref(self.av))
         self._check_av()
+        # libretro cores may send descriptions before and after load_game;
+        # snapshot them into wire-safe metadata only after both phases.
+        self.info["core_input_descriptors"] = list(self.input_descriptors)
+        self.info["core_input_descriptors_are_user_defined"] = True
         self._check()
 
     def _buffer(self, key: str, value: str) -> int:
@@ -349,6 +363,37 @@ class NativeCore:
             if command in (9, 19, 30, 31):
                 directory = {9: "/system", 19: "/core/core.so", 30: "/core", 31: "/tmp/saves"}[command]
                 C.cast(data, C.POINTER(C.c_void_p))[0] = self._buffer("directory_" + str(command), directory)
+                return True
+            if command == 11:
+                # RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS. Observe labels,
+                # never interpret them as proof of controller compatibility.
+                values=C.cast(data,C.POINTER(InputDescriptor))
+                descriptions=[]
+                seen=set()
+                for index in range(129):
+                    row=values[index]
+                    if not row.description:
+                        break
+                    if index==128:
+                        return False
+                    if not (row.port<4 and row.device in (1,2,3,5,6)
+                            and row.index<=3 and row.id<=511):
+                        return False
+                    label=_text(row.description,96)
+                    if not label or any(ord(c)<32 for c in label):
+                        return False
+                    key=(int(row.port),int(row.device),int(row.index),int(row.id))
+                    if key in seen:
+                        return False
+                    seen.add(key)
+                    descriptions.append({
+                        "port":int(row.port),"device":int(row.device),
+                        "index":int(row.index),"id":int(row.id),
+                        "description":label,
+                    })
+                else:
+                    return False
+                self.input_descriptors=descriptions
                 return True
             if command == 10:
                 pixel_format = C.cast(data, C.POINTER(C.c_int))[0]

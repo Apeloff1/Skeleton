@@ -35,6 +35,8 @@ jobs:
             skeleton/jeeves/game_comparison_live.py \
             skeleton/jeeves/game_comparison_pairwise.py \
             skeleton/jeeves/game_comparison_portfolio.py \
+            skeleton/jeeves/game_comparison_controllers.py \
+            skeleton/jeeves/game_emulator_worker.py \
             skeleton/jeeves/game_comparison_live_evidence.py \
             skeleton/jeeves/game_comparison_live_http.py \
             skeleton/jeeves/game_comparison_live_viewer.py \
@@ -52,6 +54,7 @@ jobs:
         run: |
           python -m unittest -v \
             tests.test_game_comparison_live \
+            tests.test_game_comparison_core_input_descriptors \
             tests.test_game_comparison_live_http \
             tests.test_game_comparison_pairwise \
             tests.test_game_comparison_portfolio \

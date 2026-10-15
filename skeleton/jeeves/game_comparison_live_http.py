@@ -76,7 +76,7 @@ class LocalComparisonHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Security-Policy",
                          "default-src 'none'; script-src 'nonce-" + self.server.nonce +
                          "'; style-src 'nonce-" + self.server.nonce +
-                         "'; img-src data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+                         "'; img-src data:; media-src blob:; connect-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; frame-ancestors 'none'")
         if extra:
             for key, value in extra.items():
                 self.send_header(key, value)
