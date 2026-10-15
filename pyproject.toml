@@ -62,4 +62,5 @@ skeleton-game-pareto-export = "skeleton.ai.runtime.inference.game_pareto_dataset
 skeleton-jeeves-production-preflight = "skeleton.ai.training.jeeves_production_readiness:main"
 skeleton-jeeves-game-session = "skeleton.ai.training.jeeves_production_game_session:main"
 skeleton-jeeves-game-review = "skeleton.ai.training.jeeves_game_design_review_cli:main"
+skeleton-jeeves-game-corpus = "skeleton.ai.training.jeeves_game_corpus:main"
 skeleton-jeeves-production-train = "skeleton.ai.training.jeeves_production_game_train:main"

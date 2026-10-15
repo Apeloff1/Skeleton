@@ -62,12 +62,74 @@ Inside the already running, operator-authorized compiled app process, use:
 
 This requires the running Jeeves singleton. It compares in-memory speaking weights, selected speaking mouth, restored BPE tokenizer and checkpoint content. It never boots a substitute Jeeves process. If the live model has legitimately changed, persist the live state in the existing process before attesting. It writes a new private receipt; no existing output is overwritten. Checkpoint hashes are local integrity/custody records, NOT cryptographic signatures or hardware attestation.
 
+## 2b. Prepare an approved game-design corpus (mandatory for production session)
+
+The original 40-example Pareto curriculum is a SMALL TEST SET. A genuine
+production specialization session requires an operator-supplied JSON manifest
+and two separate local JSONL files (train and held-out). No unauthorized
+web crawling, rights guessing, or copied third-party game content is
+automatically admitted. Each record needs its own documented review of
+permission to train or evaluate.
+
+Manifest (replace the hashes with SHA-256 of the EXACT files):
+
+    {
+      "schema_version": "skeleton.jeeves.game_corpus_manifest.v1",
+      "rights_reviewed": true,
+      "review_id": "legal-approved-original-game-corpus-001",
+      "train_file": "game-train.jsonl",
+      "train_sha256": "<64 hex SHA-256>",
+      "heldout_file": "game-heldout.jsonl",
+      "heldout_sha256": "<64 hex SHA-256>"
+    }
+
+Each JSONL record has the same fields:
+
+    {
+      "id": "original_mechanics_001",
+      "split": "train",
+      "family": "mechanics",
+      "prompt": "Design an original reversible two-button climbing challenge.",
+      "answer": "A valid detailed design must supply player controls, feedback, failure recovery, replay outcomes and constraints.",
+      "rights": {
+        "schema_version": "skeleton.jeeves.game_corpus_rights.v1",
+        "source_kind": "original_authoring",
+        "rights_holder": "Actual rights owner",
+        "rights_basis": "Actual documented grant or original authorship",
+        "review_id": "rights-review-001",
+        "training_permitted": true
+      }
+    }
+
+The snippet illustrates the schema, NOT independently validated permission or
+a high-quality training example. Review actual rights before setting
+training_permitted=true. The loader rejects source_kind=unverified_scrape,
+unknown licensing, malformed rights declarations, edited files, duplicates
+and near-copied evaluation prompts/answers. It also excludes overlap with
+the separate 24-question human game-design benchmark.
+
+All eight families need at least four TRAIN examples and two HELDOUT examples:
+mechanics, narrative, npc, world, economy, tooling, accessibility and review.
+This is a minimum STRUCTURAL validity threshold, NOT a recommended dataset
+size or guarantee of creativity. The entire production pipeline also admits
+only bounded optimizer-step budgets, which may require multiple reviewed runs
+for truly large corpora.
+
+Validate the corpus independently BEFORE reading production weights:
+
+    skeleton-jeeves-game-corpus --manifest /PRIVATE_PATH/corpora/game-manifest.json
+
+Then use --dataset-manifest with every preflight, backup, dry-run, training
+and resume command below. The dataset manifest hash is bound to saved
+optimizer progress. An edited corpus invalidates its original admission.
+
 ## 3. Read-only training preflight
 
 In the operator environment, point SKELETON_OWN at the exact same checkpoint as the app. The output directory must already exist:
 
     skeleton-jeeves-production-preflight preflight \
       --attestation /PRIVATE_PATH/operator/jeeves-training-attestation.json \
+      --dataset-manifest /PRIVATE_PATH/corpora/game-manifest.json \
       --candidate-directory /PRIVATE_PATH/operator/candidates
 
 The preflight checks production path and SHA identity, attestation freshness, active speaking model, tokenizer, architecture, eight-domain game curriculum coverage and free disk space.
@@ -82,6 +144,7 @@ For TinyTransformer or Torch-stack, an explicit vocabulary plan may permit addin
 
     skeleton-jeeves-production-preflight preflight \
       --attestation /PRIVATE_PATH/operator/jeeves-training-attestation.json \
+      --dataset-manifest /PRIVATE_PATH/corpora/game-manifest.json \
       --candidate-directory /PRIVATE_PATH/operator/candidates \
       --allow-vocabulary-expansion
 
@@ -92,6 +155,7 @@ Native growth is bounded to 512 BPE pieces, 4096 total tokens. Torch-stack growt
     skeleton-jeeves-game-session \
       --run-id game-001 \
       --attestation /PRIVATE_PATH/operator/jeeves-training-attestation.json \
+      --dataset-manifest /PRIVATE_PATH/corpora/game-manifest.json \
       --output-directory /PRIVATE_PATH/operator/candidates \
       --dry-run
 
@@ -102,6 +166,7 @@ A dry run never changes model weights or publishes a candidate. It returns block
     skeleton-jeeves-game-session \
       --run-id game-001 \
       --attestation /PRIVATE_PATH/operator/jeeves-training-attestation.json \
+      --dataset-manifest /PRIVATE_PATH/corpora/game-manifest.json \
       --output-directory /PRIVATE_PATH/operator/candidates \
       --epochs 1 \
       --learning-rate 0.005 \
@@ -125,6 +190,7 @@ continuing. An unverified or missing stage is rejected, not skipped.
     skeleton-jeeves-game-session \
       --run-id game-001 \
       --attestation /PRIVATE_PATH/operator/jeeves-training-attestation.json \
+      --dataset-manifest /PRIVATE_PATH/corpora/game-manifest.json \
       --output-directory /PRIVATE_PATH/operator/candidates \
       --epochs 1 \
       --learning-rate 0.005 \
@@ -199,14 +265,15 @@ Run:
       skeleton.testing.test_jeeves_game_design_review_gate \
       skeleton.testing.test_jeeves_training_progress \
       skeleton.testing.test_jeeves_torch_game_vocabulary \
-      skeleton.testing.test_jeeves_production_profile
+      skeleton.testing.test_jeeves_production_profile \
+      skeleton.testing.test_jeeves_game_corpus
 
 Separately run the app installer, native runtime, game builder, security, model serving and end-to-end validation after compiling. Source commits alone do not prove those gates passed. No new noisy Actions workflows have been added.
 
 ## Work remaining before production readiness
 
 - A real compiled serving process, real SKELETON_OWN checkpoint and in-process attestations are not accessible in this authoring environment; the guarded first-boot flow is implemented but remains unverified on a compiled installation.
-- An independent evaluation and controlled game playtesting process must establish whether candidate generations materially improve design; lexical/loss metrics are insufficient.
+- An independently reviewed, permission-cleared, high-quality game-design corpus must be provided; no such large approved dataset is included in source. Independent evaluation and controlled playtesting must establish whether candidate generations materially improve design.
 - Torch-stack vocabulary growth now supports preserved token IDs, but compiled GPU/CPU training performance and post-reload behavior remain to be verified end-to-end.
 - Interrupted candidate training can resume from immutable per-batch optimizer cursors, but the actual compiled-app restart path still requires end-to-end qualification.
 - End-to-end installer/compiled runtime proof and signed model promotion remain open until execution and separate authorization.

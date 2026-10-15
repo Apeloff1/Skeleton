@@ -144,7 +144,8 @@ def _token_coverage(model: Any, corpus: tuple[str, ...]) -> float:
     return 0.0 if total == 0 else (total - unseen) / total
 
 
-def _heldout(model: Any, cases: dict[str, tuple[str, ...]]) -> tuple[dict[str, float], dict[str, list[dict[str, Any]]]]:
+def _heldout(model: Any, cases: dict[str, tuple[str, ...]],
+             *, deadline: float | None = None) -> tuple[dict[str, float], dict[str, list[dict[str, Any]]]]:
     """Score held-out sequences and save actual generation for independent review."""
     loss: dict[str, float] = {}
     samples: dict[str, list[dict[str, Any]]] = {}
@@ -152,6 +153,8 @@ def _heldout(model: Any, cases: dict[str, tuple[str, ...]]) -> tuple[dict[str, f
         values: list[float] = []
         examples: list[dict[str, Any]] = []
         for index, case in enumerate(rows):
+            if deadline is not None and time.monotonic() >= deadline:
+                raise ProductionCheckpointError("model evaluation time budget expired")
             prompt = case.partition(" Jeeves: ")[0]
             # Log probability is a limited language-model measure, not a design score.
             lp = float(model.logprob(case))
@@ -159,6 +162,8 @@ def _heldout(model: Any, cases: dict[str, tuple[str, ...]]) -> tuple[dict[str, f
                 raise ProductionCheckpointError("non-finite held-out loss")
             values.append(-lp)
             generated = model.decode(prompt, n=32, seed=index + 41)
+            if deadline is not None and time.monotonic() >= deadline:
+                raise ProductionCheckpointError("model evaluation time budget expired")
             examples.append({"prompt": prompt, "output": generated, "reference": case})
         loss[family] = sum(values) / len(values)
         samples[family] = examples
@@ -185,6 +190,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
           expand_vocabulary: bool = False,
           max_optimizer_steps: int = 25000,
           max_training_seconds: int = 1200,
+          dataset_manifest: Path | None = None,
           progress_directory: Path | None = None,
           progress_run_id: str | None = None,
           resume: bool = False,
@@ -217,28 +223,47 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         if path.exists() or path.is_symlink() or not path.parent.is_dir():
             raise ProductionCheckpointError("outputs must be new paths in existing directories")
 
-    # Import only rights-cleared original gameplay from independently verified
-    # source and runtime replays, before touching the production checkpoint.
     if (studio_corpus is None) != (studio_corpus_expected_sha256 is None):
-        raise ProductionCheckpointError("studio corpus requires an independently pinned SHA256")
+        raise ProductionCheckpointError("original-game corpus requires pinned SHA256")
+    if dataset_manifest is not None and studio_corpus is not None:
+        raise ProductionCheckpointError(
+            "approved training/evaluation manifest and studio-only corpus are mutually exclusive"
+        )
     measured_examples: tuple[str, ...] = ()
-    pinned_corpus_sha256: str | None = None
+    studio_digest = None
     if studio_corpus is not None:
         from .jeeves_studio_curriculum import load_studio_curriculum
-        measured_examples, pinned_corpus_sha256 = load_studio_curriculum(
+        measured_examples, studio_digest = load_studio_curriculum(
             studio_corpus, expected_sha256=studio_corpus_expected_sha256,
         )
         if not measured_examples:
-            raise ProductionCheckpointError("replayed original game curriculum is empty")
+            raise ProductionCheckpointError("studio curriculum has no independently replayed episodes")
     parent_path, original, parent_sha = _production_source(source, expected)
     if parent_path.resolve() in (candidate.resolve(), report.resolve()):
         raise ProductionCheckpointError("outputs cannot overwrite active production checkpoint")
-    dataset, heldout = _texts()
+    if dataset_manifest is None:
+        dataset, heldout = _texts()
+        dataset_receipt: dict[str, Any] = {
+            "source": "built_in_pareto_smoke_curriculum",
+            "sufficient_for_advanced_game_design": False,
+            "external_rights_review": False,
+            "train_examples": len(dataset),
+            "heldout_examples": sum(len(items) for items in heldout.values()),
+        }
+    else:
+        from .jeeves_game_corpus import load_approved_corpus
+        dataset, heldout, dataset_receipt = load_approved_corpus(dataset_manifest)
     if measured_examples:
-        independent_holdout = {line for group in heldout.values() for line in group}
-        if independent_holdout.intersection(measured_examples):
-            raise ProductionCheckpointError("replayed game experiences overlap independent holdout")
+        heldout_text = {line for cases in heldout.values() for line in cases}
+        if heldout_text.intersection(measured_examples):
+            raise ProductionCheckpointError(
+                "original game transition text leaked into independent heldout domain"
+            )
         dataset = dataset + measured_examples
+        dataset_receipt = dict(dataset_receipt)
+        dataset_receipt["studio_replayed_examples"] = len(measured_examples)
+        dataset_receipt["studio_corpus_sha256"] = studio_digest
+        dataset_receipt["independent_studio_generalization_established"] = False
     selected_key, original_snapshot, mouth = _active_snapshot(original)
     torch_stack = original_snapshot.get("kind") == "torch-stack"
     if torch_stack:
@@ -256,13 +281,19 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     curriculum_and_eval = dataset + tuple(
         case for rows in heldout.values() for case in rows
     )
+    # The budget covers baseline evaluation, optimizer work and post-fit
+    # evaluation. Long-running individual model calls cannot be preempted
+    # by Python; the guard is enforced between independent cases/batches.
+    deadline = time.monotonic() + max_training_seconds
     # Capture *actual parent* outputs before even the optional vocabulary
     # growth. The post-growth but pre-SGD loss is a different tokenizer
     # baseline, so never mislabel it as production-model improvement.
-    parent_heldout, parent_generations = _heldout(model, heldout)
+    parent_heldout, parent_generations = _heldout(model, heldout, deadline=deadline)
     vocab_coverage_before = _token_coverage(model, curriculum_and_eval)
     expansion: dict[str, Any] | None = None
     if expand_vocabulary and vocab_coverage_before < min_coverage:
+        # Grow tokens from TRAINING documents only. Reading held-out strings
+        # when creating the token registry leaks the evaluation split.
         original_snapshot_sha256 = sha256(json.dumps(
             original_snapshot, sort_keys=True, separators=(",", ":"),
             ensure_ascii=False, allow_nan=False,
@@ -270,13 +301,13 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         if torch_stack:
             from .jeeves_torch_game_vocabulary import expand_torch_game_words
             expansion = expand_torch_game_words(
-                model, curriculum_and_eval,
+                model, dataset,
                 expected_snapshot_digest=original_snapshot_sha256,
             )
         else:
             from .jeeves_game_vocabulary import expand_native_game_pieces
             expansion = expand_native_game_pieces(
-                model, curriculum_and_eval,
+                model, dataset,
                 expected_snapshot_digest=original_snapshot_sha256,
             )
     vocab_coverage = _token_coverage(model, curriculum_and_eval)
@@ -287,7 +318,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             f"production vocabulary coverage {vocab_coverage:.4f} < {min_coverage:.4f}; "
             "refusing ineffective UNK-token specialization"
         )
-    before, sample_before = _heldout(model, heldout)
+    before, sample_before = _heldout(model, heldout, deadline=deadline)
     steps_before = model.steps
     if torch_stack:
         from skeleton.cortex.port import tokens
@@ -319,6 +350,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         config_digest = sha256(json.dumps({
             "dataset": list(dataset),
             "heldout": heldout,
+            "dataset_receipt": dataset_receipt,
             "epochs": epochs,
             "learning_rate": lr,
             "max_optimizer_steps": max_optimizer_steps,
@@ -373,7 +405,6 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
             observed_steps = state["receipt"]["completed_updates"]
             if model.steps - steps_before != observed_steps:
                 raise ProductionCheckpointError("resumed weight cursor differs from recorded SGD steps")
-    deadline = time.monotonic() + max_training_seconds
     for batch_index in range(start_batch, len(batches)):
         if time.monotonic() >= deadline:
             raise ProductionCheckpointError("training time budget expired; committed cursor is resumable")
@@ -393,7 +424,7 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     trained_snapshot = model.snapshot()
     if model.steps <= steps_before or trained_snapshot == original_snapshot:
         raise ProductionCheckpointError("production-derived weights did not change")
-    after, sample_after = _heldout(model, heldout)
+    after, sample_after = _heldout(model, heldout, deadline=deadline)
     regressions = [name for name in before
                    if after[name] > before[name] * (1 + max_domain_regression)]
     mean_before = sum(before.values()) / len(before)
@@ -410,9 +441,10 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
         "production_weights_modified": False,
         "candidate_promoted": False,
         "curriculum_exposures_per_epoch": len(dataset),
-        "studio_corpus_sha256": pinned_corpus_sha256,
+        "dataset_receipt": dataset_receipt,
+        "built_in_smoke_curriculum_only": dataset_manifest is None and not measured_examples,
+        "studio_corpus_sha256": studio_digest,
         "studio_replay_verified_examples": len(measured_examples),
-        "gameplay_training_only": True,
         "epochs": epochs,
         "training_steps_before": steps_before,
         "training_steps_after": model.steps,
@@ -443,8 +475,8 @@ def train(source: Path | None, *, expected: str, candidate: Path, report: Path,
     }
     if sha256(parent_path.read_bytes()).hexdigest() != parent_sha:
         raise ProductionCheckpointError("live checkpoint changed during training; refusing stale candidate")
-    if studio_corpus is not None and sha256(studio_corpus.read_bytes()).hexdigest() != pinned_corpus_sha256:
-        raise ProductionCheckpointError("gameplay curriculum changed during optimizer training")
+    if studio_corpus is not None and sha256(studio_corpus.read_bytes()).hexdigest() != studio_digest:
+        raise ProductionCheckpointError("original-game training corpus changed during training")
     if result["status"] != "rejected_evaluation_gate":
         output = dict(original)
         output[selected_key] = trained_snapshot
@@ -467,6 +499,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--max-optimizer-steps", type=int, default=25000)
     parser.add_argument("--max-training-seconds", type=int, default=1200)
+    parser.add_argument("--dataset-manifest", type=Path,
+                        help="rights-reviewed SHA-pinned external game corpus, rather than built-in smoke examples")
+    parser.add_argument("--studio-corpus", type=Path)
+    parser.add_argument("--studio-corpus-expected-sha256")
     parser.add_argument("--progress-directory", type=Path)
     parser.add_argument("--run-id")
     parser.add_argument("--resume", action="store_true")
@@ -484,6 +520,9 @@ def main(argv: list[str] | None = None) -> int:
                        expand_vocabulary=args.expand_vocabulary,
                        max_optimizer_steps=args.max_optimizer_steps,
                        max_training_seconds=args.max_training_seconds,
+                       dataset_manifest=args.dataset_manifest,
+                       studio_corpus=args.studio_corpus,
+                       studio_corpus_expected_sha256=args.studio_corpus_expected_sha256,
                        progress_directory=args.progress_directory,
                        progress_run_id=args.run_id,
                        resume=args.resume)

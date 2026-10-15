@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import re
 import sys
@@ -45,6 +46,28 @@ def _new_receipt(target: Path, payload: dict[str, Any]) -> None:
     _save_new_private(target, data)
 
 
+def required_free_bytes(
+    *, checkpoint_bytes: int, snapshot_bytes: int,
+    batches_per_epoch: int, epochs: int,
+) -> int:
+    """Admission budget for immutable batch snapshots and retained evidence.
+
+    Snapshot growth (extra tokens), JSON staging, and concurrent fsync files
+    can raise peak disk use above the sum of finalized artifacts; reserve 2x
+    snapshot storage, 3x parent bytes, and a 512 MiB operating-system margin.
+    """
+    values = (checkpoint_bytes, snapshot_bytes, batches_per_epoch, epochs)
+    if any(type(value) is not int or value < 1 for value in values):
+        raise ProductionCheckpointError("missing valid checkpoint size or optimizer batch estimate")
+    if epochs > 3 or batches_per_epoch > 100:
+        raise ProductionCheckpointError("training snapshot storage estimate exceeds bounds")
+    return (
+        512 * 1024 * 1024
+        + 3 * checkpoint_bytes
+        + 2 * snapshot_bytes * (batches_per_epoch * epochs + 1)
+    )
+
+
 def run(
     *,
     run_id: str,
@@ -59,6 +82,7 @@ def run(
     max_optimizer_steps: int = 25000,
     max_training_seconds: int = 1200,
     resume: bool = False,
+    dataset_manifest: Path | None = None,
     studio_corpus: Path | None = None,
     studio_corpus_expected_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -78,18 +102,36 @@ def run(
     if learning_rate <= 0:
         raise ProductionCheckpointError("training learning rate must be > 0")
     if (studio_corpus is None) != (studio_corpus_expected_sha256 is None):
-        raise ProductionCheckpointError("studio corpus requires independently pinned SHA256")
-    studio_examples = 0
+        raise ProductionCheckpointError("studio training corpus must be independently pinned")
+    if studio_corpus is not None and dataset_manifest is not None:
+        raise ProductionCheckpointError(
+            "approved external holdout corpus and original-only game corpus cannot be combined"
+        )
+    replayed_count = 0
     if studio_corpus is not None:
         from .jeeves_studio_curriculum import load_studio_curriculum
         measured, _ = load_studio_curriculum(
             studio_corpus, expected_sha256=studio_corpus_expected_sha256,
         )
-        studio_examples = len(measured)
+        replayed_count = len(measured)
     report = inspect(
         attestation=attestation, candidate_directory=output_directory,
         allow_vocabulary_expansion=expand_vocabulary,
+        dataset_manifest=dataset_manifest,
     )
+    if report["status"] == "ready_for_operator_training":
+        minimum = required_free_bytes(
+            checkpoint_bytes=report["checkpoint_bytes"],
+            snapshot_bytes=report["selected_model_snapshot_bytes"],
+            batches_per_epoch=report["training_batches_per_epoch"] + (replayed_count + 7) // 8,
+            epochs=epochs,
+        )
+        report["estimated_required_free_bytes"] = minimum
+        current_free = shutil.disk_usage(output_directory).free
+        report["currently_free_bytes"] = current_free
+        if current_free < minimum:
+            report["blockers"].append("insufficient_disk_for_immutable_batch_checkpoints")
+            report["status"] = "blocked"
     if dry_run or report["status"] != "ready_for_operator_training":
         return {
             "schema_version": SCHEMA,
@@ -99,7 +141,7 @@ def run(
             "candidate_promoted": False,
             "preflight": report,
             "studio_corpus_sha256": studio_corpus_expected_sha256,
-            "studio_replay_verified_examples": studio_examples,
+            "studio_replayed_examples": replayed_count,
         }
     baseline = Path(report["checkpoint_path"])
     if output_directory.resolve() == baseline.parent.resolve():
@@ -136,6 +178,7 @@ def run(
             candidate_directory=out,
             copy_destination=names["backup"],
             allow_vocabulary_expansion=expand_vocabulary,
+            dataset_manifest=dataset_manifest,
         )
     if _sha(baseline) != _sha(names["backup"]):
         raise ProductionCheckpointError("serving weights differ from prepared backup")
@@ -150,13 +193,14 @@ def run(
         min_coverage=float(min_coverage),
         max_domain_regression=float(max_domain_regression),
         expand_vocabulary=expand_vocabulary,
+        dataset_manifest=dataset_manifest,
+        studio_corpus=studio_corpus,
+        studio_corpus_expected_sha256=studio_corpus_expected_sha256,
         max_optimizer_steps=max_optimizer_steps,
         max_training_seconds=max_training_seconds,
         progress_directory=out,
         progress_run_id=run_id,
         resume=resume,
-        studio_corpus=studio_corpus,
-        studio_corpus_expected_sha256=studio_corpus_expected_sha256,
     )
     if _sha(baseline) != start_sha:
         raise ProductionCheckpointError("live serving weights changed during training")
@@ -198,13 +242,15 @@ def run(
         "game_review_report_path": str(names["game_review"].resolve()),
         "game_review_report_sha256": _sha(names["game_review"]),
         "benchmark_prompts": review["fresh_heldout_prompts"],
-        "studio_corpus_sha256": trained["studio_corpus_sha256"],
-        "studio_replay_verified_examples": trained["studio_replay_verified_examples"],
         "vocabulary_expansion_opted_in": expand_vocabulary,
         "max_optimizer_steps": max_optimizer_steps,
         "max_training_seconds": max_training_seconds,
         "resumed_from_existing_progress": resume,
         "resumable_optimizer_cursors": True,
+        "dataset_manifest": None if dataset_manifest is None else str(dataset_manifest.resolve()),
+        "dataset_source": trained["dataset_receipt"],
+        "studio_corpus_sha256": trained["studio_corpus_sha256"],
+        "studio_replay_verified_examples": trained["studio_replay_verified_examples"],
         "human_review_complete": False,
         "game_design_improvement_established": False,
         "production_weights_modified": False,
@@ -217,6 +263,10 @@ def run(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--studio-corpus", type=Path)
+    parser.add_argument("--studio-corpus-expected-sha256")
+    parser.add_argument("--dataset-manifest", type=Path,
+                        help="rights-approved external game training/evaluation corpus")
     parser.add_argument("--attestation", required=True, type=Path)
     parser.add_argument("--output-directory", required=True, type=Path)
     parser.add_argument("--dry-run", action="store_true")
@@ -230,8 +280,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--learning-rate", default=0.005, type=float)
     parser.add_argument("--max-domain-regression", default=0.0, type=float)
     parser.add_argument("--min-coverage", default=0.8, type=float)
-    parser.add_argument("--studio-corpus", type=Path)
-    parser.add_argument("--studio-corpus-expected-sha256")
     args = parser.parse_args(argv)
     try:
         result = run(
@@ -247,6 +295,7 @@ def main(argv: list[str] | None = None) -> int:
             max_optimizer_steps=args.max_optimizer_steps,
             max_training_seconds=args.max_training_seconds,
             resume=args.resume,
+            dataset_manifest=args.dataset_manifest,
             studio_corpus=args.studio_corpus,
             studio_corpus_expected_sha256=args.studio_corpus_expected_sha256,
         )
