@@ -539,5 +539,22 @@
       "promotion_authorized": false,
       "native_execution_performed_in_patch": false
     }
+  },
+  "controller_device_expansion_2026_10_15": {
+    "status": "source_implemented_unverified",
+    "host_api": "create_emulator_environment(..., controller_devices=['joypad','mouse','analog','pointer'])",
+    "explicit_devices": [
+      "none",
+      "joypad",
+      "mouse",
+      "keyboard",
+      "analog",
+      "pointer"
+    ],
+    "ports": 4,
+    "fallback": "Default four joypad ports, preserving existing callers.",
+    "verified_contract": "Host pins exact port topology into episode environment digest and native-worker initialization; native worker acknowledges and sets libretro controller device for each port. Replay audits compare exact port topology.",
+    "boundaries": "No live native core execution, tests, new lightgun ABI or new native emulator compiled in this change. A declared peripheral does not prove the core supports it.",
+    "security": "No dynamic device ID, uncontrolled pointer type, arbitrary callbacks or runtime code injection; only finite libretro device IDs admitted."
   }
 }

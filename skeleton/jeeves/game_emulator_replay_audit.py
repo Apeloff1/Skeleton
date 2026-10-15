@@ -21,7 +21,7 @@ _NONCE = re.compile(r"[0-9a-f]{32}\Z")
 _REQUIRED_LINEAGE = {
     "core_id", "core_sha256", "content_digest", "registry_digest",
     "firmware_digest", "options_digest", "source_code_digest",
-    "frames_per_step", "capture_nonce", "runtime_kind",
+    "frames_per_step", "controller_port_devices", "capture_nonce", "runtime_kind",
     "production_training_admitted", "rights_verified",
     "hardware_compatibility_verified", "game_success_verified",
 }
@@ -69,6 +69,11 @@ def _validated_native_trace(raw: Mapping[str, object]) -> dict[str, object]:
         _identity(lineage[name], _DIGEST, name)
     if type(lineage["frames_per_step"]) is not int or not 1 <= lineage["frames_per_step"] <= 60:
         _failure("Native frame cadence is invalid")
+    ports = lineage["controller_port_devices"]
+    if (not isinstance(ports, list) or len(ports) != 4 or
+        any(type(item) is not str or item not in
+            {"none", "joypad", "mouse", "keyboard", "analog", "pointer"} for item in ports)):
+        _failure("Native replay controller port topology is not a finite supported declaration")
     for transition in trace["transitions"]:
         info = transition.get("info")
         if not isinstance(info, dict) or not _REQUIRED_STEP_INFO <= set(info):
@@ -100,7 +105,7 @@ def compare_emulator_replays(traces: Sequence[Mapping[str, object]]) -> dict[str
     context_keys = (
         "runtime_kind", "core_id", "core_sha256", "content_digest",
         "registry_digest", "firmware_digest", "options_digest",
-        "source_code_digest", "frames_per_step", "rights_evidence_digest",
+        "source_code_digest", "frames_per_step", "controller_port_devices", "rights_evidence_digest",
     )
     if any(key not in baseline for key in context_keys):
         _failure("Native replay source context lacks complete immutable identity")

@@ -79,6 +79,7 @@ _KEY_ACTIONS = {
     "key_s": 115,
 }
 _EMPTY = {"buttons": 0, "axes": [0, 0, 0, 0], "keys": [], "mouse": [0, 0, 0, 0, 0, 0], "pointer": [0, 0, 0]}
+_PORT_DEVICE_IDS = {"none": 0, "joypad": 1, "mouse": 2, "keyboard": 3, "analog": 5, "pointer": 6}
 
 
 class EmulatorHostError(ValueError):
@@ -163,6 +164,16 @@ def _controls(value: object) -> list[dict[str, object]]:
         normalized["keys"] = sorted({_int(key, 0, 511, "keyboard key") for key in keys})
         result.append(normalized)
     return result
+
+
+def _controller_ports(value: object) -> tuple[str, ...]:
+    if value is None:
+        return ("joypad",) * 4
+    if not isinstance(value, (list, tuple)) or not 1 <= len(value) <= 4:
+        raise EmulatorHostError("invalid_emulator_device", "Exactly 1–4 declared controller ports are required")
+    if any(type(name) is not str or name not in _PORT_DEVICE_IDS for name in value):
+        raise EmulatorHostError("invalid_emulator_device", "Controller devices must use the finite supported libretro device IDs")
+    return tuple(value) + ("none",) * (4 - len(value))
 
 
 def _frame_metadata(value: object) -> dict[str, object]:
@@ -436,6 +447,7 @@ class EmulatorEnvironment:
         reader: Callable | None = None,
         max_steps: int = 512,
         frames_per_step: int = 1,
+        controller_devices: Sequence[str] | None = None,
         timeout_seconds: float = 5,
         cancelled: Callable[[], bool] | None = None,
     ):
@@ -455,6 +467,7 @@ class EmulatorEnvironment:
         self.core = core
         self.max_steps = _int(max_steps, 1, 4096, "episode steps")
         self.frames_per_step = _int(frames_per_step, 1, 60, "frames per step")
+        self._controller_devices = _controller_ports(controller_devices)
         if (
             type(timeout_seconds) not in (int, float)
             or not math.isfinite(timeout_seconds)
@@ -494,6 +507,7 @@ class EmulatorEnvironment:
             "files": list(files),
             "max_episode_steps": self.max_steps,
             "frames_per_step": self.frames_per_step,
+            "controller_port_devices": list(self._controller_devices),
             "source_code_digest": _digest(self._code_bindings),
             "host_python": list(sys.version_info[:3]),
             "worker_interpreter_sha256": self._interpreter_sha256,
@@ -731,6 +745,7 @@ class EmulatorEnvironment:
             "library_sha256": self.core.library_sha256,
             "entrypoint": "/content/" + entry,
             "options": json.loads(self.core.options_json),
+            "controller_port_devices": list(self._controller_devices),
         }
         metadata, blocks = self._exchange("initialize", payload, authority=False)
         if (
@@ -755,6 +770,8 @@ class EmulatorEnvironment:
         self._descriptor["worker_runtime"] = dict(runtime)
         self._descriptor["python"] = list(runtime["version"])
         self._system_info = metadata["system_info"]
+        if self._system_info.get("controller_port_devices") != list(self._controller_devices):
+            raise EmulatorHostError("native_device_mismatch", "Actual native controller routing differs from the pinned episode specification")
         self._registry.revalidate(self.core)
 
     def _read_loop(self) -> None:
@@ -1317,6 +1334,7 @@ def capture_emulator_trace(
         "options_digest": descriptor["options_digest"],
         "source_code_digest": descriptor["source_code_digest"],
         "frames_per_step": environment.frames_per_step,
+        "controller_port_devices": list(environment._controller_devices),
         "rights_evidence_digest": rights_evidence_digest,
         "capture_nonce": os.urandom(16).hex(),
         "capture_process_independently_attested": False,
@@ -1359,6 +1377,7 @@ def create_emulator_environment(
     reader: Callable | None = None,
     max_steps: int = 512,
     frames_per_step: int = 1,
+    controller_devices: Sequence[str] | None = None,
     timeout_seconds: float = 5,
     cancelled: Callable[[], bool] | None = None,
 ) -> EmulatorEnvironment:
@@ -1379,6 +1398,7 @@ def create_emulator_environment(
         reader=reader,
         max_steps=max_steps,
         frames_per_step=frames_per_step,
+        controller_devices=controller_devices,
         timeout_seconds=timeout_seconds,
         cancelled=cancelled,
     )

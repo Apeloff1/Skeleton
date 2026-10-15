@@ -195,6 +195,12 @@ class NativeCore:
         self.error: str | None = None
         self.shutdown = False
         self.options = dict(config["options"])
+        declared_ports = config.get("controller_port_devices", ["joypad"] * 4)
+        allowed_ports = {"none": 0, "joypad": 1, "mouse": 2, "keyboard": 3, "analog": 5, "pointer": 6}
+        if (not isinstance(declared_ports, list) or len(declared_ports) != 4
+            or any(type(item) is not str or item not in allowed_ports for item in declared_ports)):
+            raise ValueError("Native controller port topology is not a supported bounded declaration")
+        self.controller_port_devices = tuple(declared_ports)
         self.buffers: dict[str, object] = {}
         self.keys_previous: set[int] = set()
         self.keyboard = None
@@ -269,6 +275,7 @@ class NativeCore:
             "valid_extensions": _text(self.system.valid_extensions),
             "need_fullpath": bool(self.system.need_fullpath),
             "block_extract": bool(self.system.block_extract),
+            "controller_port_devices": list(self.controller_port_devices),
         }
         self.core.retro_init()
         self._initialized = True
@@ -291,8 +298,8 @@ class NativeCore:
         if not self.core.retro_load_game(C.byref(game)):
             raise ValueError("native core rejected the supplied content")
         self._loaded = True
-        for port in range(4):
-            self.core.retro_set_controller_port_device(port, 1)
+        for port, device in enumerate(self.controller_port_devices):
+            self.core.retro_set_controller_port_device(port, allowed_ports[device])
         self.av = AvInfo()
         self.core.retro_get_system_av_info(C.byref(self.av))
         self._check_av()
@@ -482,7 +489,7 @@ class NativeCore:
             return 0
 
     def _input(self, port: int, device: int, index: int, identity: int) -> int:
-        if port >= len(self.controls):
+        if port < 0 or index < 0 or identity < 0 or port >= len(self.controls):
             return 0
         control = self.controls[port]
         device &= 255
