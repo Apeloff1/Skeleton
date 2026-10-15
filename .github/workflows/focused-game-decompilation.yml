@@ -40,8 +40,11 @@ jobs:
             skeleton/jeeves/game_decompilation_runtime.py \
             skeleton/jeeves/game_decompilation_quality.py \
             skeleton/jeeves/game_decompilation_learning.py \
+            skeleton/jeeves/game_decompilation_evidence.py \
+            skeleton/jeeves/game_decompilation_capabilities.py \
             scripts/decompile_game_assets.py \
             scripts/train_game_asset_quality_shadow.py \
+            scripts/audit_game_decompilation_targets.py \
             tests/test_game_decompilation.py
       - name: Run real byte-level self-contained source and learning contracts
         run: |
