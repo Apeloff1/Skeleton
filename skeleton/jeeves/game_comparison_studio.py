@@ -11,6 +11,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
+import tempfile
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -287,6 +289,50 @@ def _series_report(model: Mapping[str, Any], results: Mapping[str, dict]) -> lis
     return records
 
 
+def _storage_waves(
+    games: list[dict[str, Any]],
+    *,
+    requested_slots: int,
+    free_temp_bytes: int,
+) -> tuple[list[list[dict[str, Any]]], int]:
+    """Partition input order into capped native runs without exhausting temporary disk.
+
+    Media may be materialized twice (temporary bundle + sandbox). Use a
+    conservative two-copy size plus per-worker native/core/firmware allowance
+    and keep at least two thirds of free temporary disk outside the study.
+    """
+    if (type(requested_slots) is not int or not 1 <= requested_slots <= 10
+        or type(free_temp_bytes) is not int or free_temp_bytes < 0):
+        raise ComparativeStudyError("Comparative resource admission requires finite disk and concurrency facts")
+    budget = min(16 * 1024**3, free_temp_bytes // 3)
+    costs = []
+    for game in games:
+        bundle = game.get("content_bundle")
+        source_size = (
+            sum(item["size_bytes"] for item in bundle["files"])
+            if bundle is not None else 16 * 1024 * 1024
+        )
+        cost = 2 * source_size + 128 * 1024 * 1024
+        if cost > budget:
+            raise ComparativeStudyError(
+                "Insufficient bounded temporary disk for the game's pinned content; select a larger TMPDIR or reduce game media size"
+            )
+        costs.append(cost)
+    waves = []
+    current = []
+    used = 0
+    for game, cost in zip(games, costs, strict=True):
+        if current and (len(current) >= requested_slots or used + cost > budget):
+            waves.append(current)
+            current = []
+            used = 0
+        current.append(game)
+        used += cost
+    if current:
+        waves.append(current)
+    return waves, budget
+
+
 def run_comparative_study(
     raw: Mapping[str, Any],
     *,
@@ -330,6 +376,7 @@ def run_comparative_study(
     if on_progress is not None and not callable(on_progress):
         raise ComparativeStudyError("Study progress callback must be callable")
 
+    scheduler_log = []
     for batch in selected:
         games = [game_by_id[g] for g in batch["game_ids"]]
         # Every core is verified before any work in the batch starts.
@@ -337,42 +384,54 @@ def run_comparative_study(
             core = registry.resolve_core(game["core_id"])
             if game["target_id"] not in core.target_ids:
                 raise ComparativeStudyError("Actual approved core does not allow its assigned game target")
-        with ThreadPoolExecutor(max_workers=min(len(games), model["max_active"])) as executor:
-            submitted = {
-                executor.submit(
-                    _observe_one, game,
-                    expected_registry_digest=registry.registry_digest,
-                    include_previews=include_previews,
-                    shadow_policy_training=shadow_policy_training,
-                    authorize_training=authorize_training,
-                    cancelled=cancelled, timeout_seconds=timeout_seconds,
-                ): game for game in games
-            }
-            for future in as_completed(submitted):
-                game = submitted[future]
-                try:
-                    evidence = future.result()
-                except Exception as exc:
-                    # A native failure is not a simulated observation. Do not
-                    # print source path, ROM bytes, firmware or privileged logs.
-                    evidence = {
-                        "id": game["id"], "title": game["title"],
-                        "core_id": game["core_id"], "target_id": game["target_id"],
-                        "status": "native_execution_failed",
-                        "error_class": type(exc).__name__,
-                        "error_code": getattr(exc, "code", "native_study_error"),
-                        "phases": {},
-                        "trained": False,
-                    }
-                inspected[game["id"]] = evidence
-                if on_progress is not None:
-                    on_progress({
-                        "study_id": model["study_id"],
-                        "batch_index": batch["batch_index"],
-                        "game_id": game["id"],
-                        "status": evidence["status"],
-                        "completed_game_count": len(inspected),
-                    })
+        free_bytes = shutil.disk_usage(tempfile.gettempdir()).free
+        waves, byte_budget = _storage_waves(
+            games, requested_slots=model["max_active"], free_temp_bytes=free_bytes
+        )
+        scheduler_log.append({
+            "batch_index": batch["batch_index"],
+            "reserved_two_copy_budget_bytes": byte_budget,
+            "preflight_free_temporary_bytes": free_bytes,
+            "native_execution_wave_sizes": [len(wave) for wave in waves],
+            "max_wave_concurrency": max(len(wave) for wave in waves),
+        })
+        for wave in waves:
+            with ThreadPoolExecutor(max_workers=len(wave)) as executor:
+                submitted = {
+                    executor.submit(
+                        _observe_one, game,
+                        expected_registry_digest=registry.registry_digest,
+                        include_previews=include_previews,
+                        shadow_policy_training=shadow_policy_training,
+                        authorize_training=authorize_training,
+                        cancelled=cancelled, timeout_seconds=timeout_seconds,
+                    ): game for game in wave
+                }
+                for future in as_completed(submitted):
+                    game = submitted[future]
+                    try:
+                        evidence = future.result()
+                    except Exception as exc:
+                        # A native failure is not a simulated observation. Do not
+                        # print source path, ROM bytes, firmware or privileged logs.
+                        evidence = {
+                            "id": game["id"], "title": game["title"],
+                            "core_id": game["core_id"], "target_id": game["target_id"],
+                            "status": "native_execution_failed",
+                            "error_class": type(exc).__name__,
+                            "error_code": getattr(exc, "code", "native_study_error"),
+                            "phases": {},
+                            "trained": False,
+                        }
+                    inspected[game["id"]] = evidence
+                    if on_progress is not None:
+                        on_progress({
+                            "study_id": model["study_id"],
+                            "batch_index": batch["batch_index"],
+                            "game_id": game["id"],
+                            "status": evidence["status"],
+                            "completed_game_count": len(inspected),
+                        })
     # Keep stable document ordering despite nondeterministic worker completion.
     ordered = {g["id"]: inspected[g["id"]] for g in model["games"] if g["id"] in inspected}
     pairing = [_pair_report(pair, ordered) for pair in model["pairs"]]
@@ -389,6 +448,8 @@ def run_comparative_study(
         "game_observations_completed": sum(g["status"] == "actual_native_observations_captured" for g in ordered.values()),
         "native_sessions_currently_running": 0,
         "maximum_parallel_native_game_sessions": model["max_active"],
+        "actual_scheduler_peak_session_limit": max((x["max_wave_concurrency"] for x in scheduler_log), default=0),
+        "temporary_disk_resource_schedule": scheduler_log,
         "study_local_tabular_training_requested": shadow_policy_training,
         "games_with_study_local_q_updates": sum(
             bool(g.get("study_local_tabular_training") and g["study_local_tabular_training"]["updates_applied"] > 0)

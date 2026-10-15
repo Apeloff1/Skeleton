@@ -737,6 +737,16 @@
       "large_content_requires_native_core_approval": true,
       "runtime_verified_on_actual_disc": false,
       "tests": "tests/test_game_comparison_media.py added; actual native emulator tests pending"
+    },
+    "disk_aware_scheduler": {
+      "status": "Implemented source, native runtime and real-temp-disk behavior untested",
+      "owner": "skeleton/jeeves/game_comparison_studio.py::_storage_waves",
+      "semantics": "Chronological input order preserved, no more than declared 1..10 native sessions, resource-bound wave sizes chosen from current free TMPDIR disk",
+      "budget": "At most 16 GiB and at most one third of free temporary disk for conservative duplicate media materialization; per-game estimate is two full media copies plus 128 MiB runtime/core/firmware overhead",
+      "failure": "If one game cannot fit the declared disk budget, reject before any game in its selected cohort runs",
+      "evidence": "Comparative result includes per-batch preflight free bytes, budget bytes, wave sizes and actual peak session limit",
+      "hardware_tested": false,
+      "unit_contract_tests": "tests/test_game_comparison_scheduler.py added; no native ROM run in this code patch"
     }
   }
 }
