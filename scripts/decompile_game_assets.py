@@ -46,7 +46,7 @@ def _regular_source(path: Path) -> bytes:
         os.close(fd)
 
 
-def _safe_output(dest: Path, report: dict, previews: tuple[tuple[str, bytes], ...]) -> None:
+def _safe_output(dest: Path, report: dict, previews: tuple[tuple[str, bytes], ...], candidate: dict | None = None) -> None:
     if dest.exists() or dest.is_symlink():
         raise FileExistsError("Never overwrite an existing decompilation evidence directory")
     # New, private directory: no relative/symlink child path can be passed
@@ -59,6 +59,10 @@ def _safe_output(dest: Path, report: dict, previews: tuple[tuple[str, bytes], ..
     try:
         items = [("report.json", json.dumps(report,sort_keys=True,indent=2,
                      ensure_ascii=True,allow_nan=False).encode())]
+        if candidate is not None:
+            items.append(("shadow_training_candidate.json",
+                          json.dumps(candidate,sort_keys=True,indent=2,
+                                     allow_nan=False).encode()))
         for name, data in previews:
             if (re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", name) is None
                 or not name.endswith(".png")):
@@ -145,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
         export_previews=args.export_previews,derive_quality=not args.skip_quality,
         candidate_tile_regions=candidates,instruction_limit=args.instruction_limit,
     )
-    report = dict(result.report)
+    candidate = None
     if args.human_score is not None:
         candidate = prepare_reviewed_training_candidate(
             result,grant=grant,authorize=local_explicit_authority,
@@ -154,8 +158,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         # Human label is a separate explicit result, never hidden in
         # the original game evidence digest or inserted into model weights.
-        report["local_shadow_training_candidate"] = candidate
-    _safe_output(args.output,report,result.previews)
+    _safe_output(args.output,result.report,result.previews,candidate=candidate)
     print(json.dumps({
         "report_sha256":result.report["report_sha256"],
         "source_sha256":result.report["source_sha256"],
