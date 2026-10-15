@@ -683,3 +683,32 @@ def test_probe_rejects_http_redirect_status_without_following(monkeypatch):
     result = probe_http("backend", "http://localhost:8001/api/health")
     assert not result.ok
     assert result.status == 302
+
+def test_full_profile_uses_custom_chroma_published_port(tmp_path):
+    from skeleton.app.assembly import public_service_urls
+
+    (tmp_path / ".env").write_text(
+        "CHROMA_PORT=8222\n", encoding="utf-8",
+    )
+    urls = public_service_urls(tmp_path, environ={})
+    assert urls["chroma"] == "http://localhost:8222"
+
+
+def test_full_profile_probes_custom_chroma_health(monkeypatch):
+    from skeleton.app.health import ProbeResult, probe_application
+
+    seen = []
+
+    def probe(service, *, timeout):
+        seen.append((service.name, service.public_url))
+        return ProbeResult(service.name, service.public_url, True, 200, "healthy")
+
+    def http(name, url, *, timeout):
+        return ProbeResult(name, url, True, 200, "healthy")
+
+    monkeypatch.setattr("skeleton.app.health.probe_url", probe)
+    monkeypatch.setattr("skeleton.app.health.probe_http", http)
+    probe_application(
+        full=True, public_url_overrides={"chroma": "http://localhost:8222"},
+    )
+    assert ("chroma", "http://localhost:8222") in seen

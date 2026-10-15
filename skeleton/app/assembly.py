@@ -359,6 +359,10 @@ def public_service_urls(
         "frontend": "FRONTEND_PORT",
         "backend": "BACKEND_PORT",
         "skeleton": "SKELETON_PORT",
+        # The full-profile vector store is published on CHROMA_PORT.
+        # Omitting this made a healthy custom-port full install fail
+        # readiness by probing the stale default localhost:8000.
+        "chroma": "CHROMA_PORT",
     }
     result: dict[str, str] = {}
     for service_name, key in ports.items():
